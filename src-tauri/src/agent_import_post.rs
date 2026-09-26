@@ -1710,15 +1710,14 @@ fn admit_fresh_saved_voucher(
 
 /// When the agent's post happens, stated in its dialog (#725): the post may
 /// come after the click, on the agent's next call, or not at all.
-pub(super) fn agent_post_timing_lines() -> [String; 2] {
-    [
-        format!(
-            "Bridge posts this now, or when the agent asks again within {} minutes; otherwise nothing is posted.",
-            approval::APPROVAL_TTL.as_secs() / 60
-        ),
-        "It is not posted if the request is cancelled or Bridge's checks just before posting refuse it."
-            .into(),
-    ]
+/// One line, so a multi-line voucher gives up as little of the dialog as can
+/// be: every outcome is in it, since a post not made now or on the agent's
+/// next ask in the window, or one cancelled or refused first, is never made.
+pub(super) fn agent_post_timing_lines() -> [String; 1] {
+    [format!(
+        "Bridge posts this now or when the agent asks again within {} minutes, unless cancelled or refused.",
+        approval::APPROVAL_TTL.as_secs() / 60
+    )]
 }
 
 /// The preview a post of `scope` shows, and so whether it fits the dialog at

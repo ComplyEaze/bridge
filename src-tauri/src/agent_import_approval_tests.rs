@@ -1112,23 +1112,14 @@ fn the_agent_preview_says_when_the_post_happens() {
     let server = batch_server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let (one, _) = saved_batch(&server);
     let endpoint = server.settings.endpoint.clone();
-    let [now, not] = agent_post_timing_lines();
+    let [now] = agent_post_timing_lines();
     assert_eq!(
         now,
-        "Bridge posts this now, or when the agent asks again within 15 minutes; otherwise nothing is posted."
+        "Bridge posts this now or when the agent asks again within 15 minutes, unless cancelled or refused."
     );
-    assert_eq!(
-        not,
-        "It is not posted if the request is cancelled or Bridge's checks just before posting refuse it."
-    );
-    for line in [&now, &not] {
-        assert!(
-            line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS,
-            "{line}"
-        );
-    }
+    assert!(now.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
     let single = agent_review_preview(&one, &endpoint).unwrap();
-    assert!(single.ends_with(&format!("{now}\n{not}")), "{single}");
+    assert!(single.ends_with(&format!("\n{now}")), "{single}");
     assert!(!admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .contains(&now));
@@ -1141,7 +1132,7 @@ fn the_agent_preview_says_when_the_post_happens() {
         .for_each(|entry| entry.amount = "7.25".into());
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
-    assert!(batch.ends_with(&format!("{now}\n{not}")), "{batch}");
+    assert!(batch.ends_with(&format!("\n{now}")), "{batch}");
     // The footer counts inside the caps: one long enough is refused.
     let crowded = vec!["x".to_string(); BATCH_REVIEW_MAX_LINES];
     for line in [&one, &two] {
@@ -1184,21 +1175,21 @@ fn build_and_post_agree_on_what_fits_the_dialog() {
     let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let endpoint = server.settings.endpoint.clone();
     let (saved, _) = saved_batch(&server);
-    let six = journal_of(&saved, 6);
     let seven = journal_of(&saved, 7);
+    let eight = journal_of(&saved, 8);
     assert_eq!(
-        review_preview_for(&six, &endpoint, PostScope::Vouchers)
+        review_preview_for(&seven, &endpoint, PostScope::Vouchers)
             .unwrap()
             .lines()
             .count(),
         24
     );
-    assert!(review_preview_for(&seven, &endpoint, PostScope::JournalOnly).is_ok());
+    assert!(review_preview_for(&eight, &endpoint, PostScope::JournalOnly).is_ok());
     for refused in [
-        review_preview_for(&seven, &endpoint, PostScope::Vouchers).err(),
-        admit_saved_voucher(&seven, &endpoint, PostScope::Vouchers, 1).err(),
+        review_preview_for(&eight, &endpoint, PostScope::Vouchers).err(),
+        admit_saved_voucher(&eight, &endpoint, PostScope::Vouchers, 1).err(),
     ] {
         assert_eq!(refused.as_deref(), Some("import_review_too_large"));
     }
-    assert!(admit_saved_voucher(&six, &endpoint, PostScope::Vouchers, 1).is_ok());
+    assert!(admit_saved_voucher(&seven, &endpoint, PostScope::Vouchers, 1).is_ok());
 }

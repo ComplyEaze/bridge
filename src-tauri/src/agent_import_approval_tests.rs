@@ -339,3 +339,22 @@ async fn an_approval_does_not_survive_its_process() {
         .take_for_dispatch(&line.batch_id, &binding_of(&line, "Synthetic preview"))
         .is_err());
 }
+
+/// Posted in the answering call only while the measured post still fits under
+/// the ceiling (#725): at the boundary it does, a millisecond later it does not,
+/// and a batch larger than any measured never does.
+#[test]
+fn an_approval_is_posted_in_its_call_only_while_the_measured_post_fits() {
+    use crate::agent::agent_import::approval::{dispatch_fits_in_call, CALL_CEILING};
+    let measured = std::time::Duration::from_millis(20_950);
+    let boundary = CALL_CEILING - measured;
+    assert!(dispatch_fits_in_call(std::time::Duration::ZERO, 1));
+    assert!(dispatch_fits_in_call(boundary, 50));
+    assert!(!dispatch_fits_in_call(
+        boundary + std::time::Duration::from_millis(1),
+        50
+    ));
+    assert!(!dispatch_fits_in_call(std::time::Duration::ZERO, 201));
+    assert!(dispatch_fits_in_call(std::time::Duration::ZERO, 200));
+    assert!(!dispatch_fits_in_call(std::time::Duration::MAX, 1));
+}

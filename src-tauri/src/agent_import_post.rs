@@ -573,10 +573,13 @@ impl Server {
                             }
                             Waited::Answered(answer) => {
                                 self.post_approvals.hold_approved(batch_id, binding.clone(), answer?, native)?;
-                                // Answered late in the call: posting now could
-                                // run past the host's limit, so the next call
-                                // redeems it, after checking the book again.
-                                if call_started.elapsed() > approval::DISPATCH_IN_CALL_WITHIN {
+                                // Answered too late in the call for the post to
+                                // fit: the next call redeems it, after checking
+                                // the book again.
+                                if !approval::dispatch_fits_in_call(
+                                    call_started.elapsed(),
+                                    line.vouchers.len(),
+                                ) {
                                     return Ok(self.approval_outcome(
                                         batch_id,
                                         guid,

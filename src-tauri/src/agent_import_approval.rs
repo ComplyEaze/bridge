@@ -31,10 +31,27 @@ use uuid::Uuid;
 pub(super) const CALL_BUDGET: Duration = Duration::from_secs(40);
 #[cfg(test)]
 pub(super) const CALL_BUDGET: Duration = Duration::from_millis(300);
-/// An approval answered this soon after its call began is posted in the same
-/// call, as before #725; one answered later is returned for the next call to
-/// redeem, so the post's own reads never start near the host's limit.
-pub(super) const DISPATCH_IN_CALL_WITHIN: Duration = Duration::from_secs(20);
+/// The most one call may take in all: three quarters of the roughly 60-second
+/// host timeout observed once (#485, #703).
+pub(super) const CALL_CEILING: Duration = Duration::from_secs(45);
+/// What a post took from its approval to its result at the largest batch
+/// measured live: 200 Journals (D4, 26 Sep 2026, bridge#725), from the answer
+/// to the end of the call, 20.95 s: the queue's re-checks 3.0 s, the POST 5.2 s,
+/// the readback 12.1 s, and the spacing between them. A concurrent build ran,
+/// so it overstates a quiet book; it is not measured above 200.
+const MEASURED_POST: Duration = Duration::from_millis(20_950);
+const MEASURED_POST_VOUCHERS: usize = 200;
+
+/// Whether an approval answered `elapsed` into its call may be posted in that
+/// same call, as before #725: only when the measured cost of the post still
+/// fits under the ceiling. Otherwise the next call redeems it, after checking
+/// the book again.
+pub(super) fn dispatch_fits_in_call(elapsed: Duration, vouchers: usize) -> bool {
+    vouchers <= MEASURED_POST_VOUCHERS
+        && elapsed
+            .checked_add(MEASURED_POST)
+            .is_some_and(|total| total <= CALL_CEILING)
+}
 /// How long an answered approval may wait to be redeemed. The owner's
 /// decision (#725); 15 minutes is the proposal it was put to them with.
 pub(super) const APPROVAL_TTL: Duration = Duration::from_secs(15 * 60);

@@ -329,6 +329,27 @@ fn a_composite_balance_on_a_base_ledger_is_named_as_mixed_and_not_parsed() {
         .foreign
         .iter()
         .all(|ledger| ledger.ledger != "BRIDGE FX DEBTOR A"));
+    // Either composite alone is enough: the opening with a plain closing, and
+    // the closing with a plain opening (both DERIVED the same way).
+    for (composite, plain) in [
+        (
+            "-$ 1100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 94600.00",
+            "-94600.00",
+        ),
+        (
+            "-$ 500.00 @ I\u{20b9} 84/$  = -I\u{20b9} 42000.00",
+            "-42000.00",
+        ),
+    ] {
+        assert_eq!(relabelled.matches(composite).count(), 1, "{composite}");
+        let one_composite = relabelled.replacen(composite, plain, 1);
+        let classified = crate::native_outstandings::parse_native_ledger_snapshot_classified(
+            &one_composite,
+            &forex_base(),
+        )
+        .unwrap();
+        assert_eq!(classified.mixed, ["BRIDGE FX DEBTOR A"], "{composite}");
+    }
 }
 
 #[test]

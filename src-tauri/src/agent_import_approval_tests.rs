@@ -556,9 +556,21 @@ async fn a_refused_redemption_withdraws_its_approval() {
         "post_refused_before_intent"
     );
     assert_eq!(intents(directory.path()), 0);
-    // The redeeming call stops at the currency refusal, before the closing
-    // mode probe its checks would otherwise end with.
+    // The redeeming call stops at the currency refusal: its last request is
+    // the currency pair's closing company list (a POST), and the closing mode
+    // probe its checks would otherwise end with (a GET /status, then the
+    // company list) is never sent.
     assert_eq!(observed.len(), 2 * before_approval().len() - probe().len());
+    let last = observed.last().unwrap();
+    assert_eq!(last.method, "POST", "the currency pair's closing read");
+    assert!(
+        !observed[before_approval().len()..]
+            .iter()
+            .rev()
+            .take_while(|request| request.method == "GET")
+            .any(|_| true),
+        "no mode probe follows the refusal"
+    );
 }
 
 /// A redemption that ends before its intent, here because another holder has

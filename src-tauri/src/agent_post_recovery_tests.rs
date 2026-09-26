@@ -231,7 +231,7 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
 }
 
 #[tokio::test]
-async fn cancellation_before_durable_intent_drops_the_controlled_future() {
+async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
     let directory = tempfile::tempdir().unwrap();
     let server = local_batch(directory.path());
     let (mut client, source) = tokio::io::duplex(1024);

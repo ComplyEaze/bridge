@@ -141,8 +141,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
             }
         }
         // Once it reads as not dispatched, the post is withdrawn (#725): it is
-        // polled to finish its operation in flight, and this one, which never
-        // finishes, is dropped at the grace.
+        // polled until it stops, as this stand-in does once withdrawn.
         assert!(polls.get() > polls_after_cancellation);
     };
     let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
@@ -275,7 +274,7 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
 }
 
 #[tokio::test]
-async fn cancellation_drops_pending_post_before_its_side_effect() {
+async fn cancellation_before_intent_withdraws_the_post() {
     let cancellation = tokio_util::sync::CancellationToken::new();
     let (mut client, source) = tokio::io::duplex(1024);
     let mut reader = BufReader::new(source);
@@ -306,7 +305,7 @@ async fn cancellation_drops_pending_post_before_its_side_effect() {
 }
 
 #[tokio::test]
-async fn disconnect_drops_pending_post() {
+async fn disconnect_before_intent_withdraws_the_post() {
     let cancellation = tokio_util::sync::CancellationToken::new();
     let mut reader = BufReader::new(&b""[..]);
     let directory = tempfile::tempdir().unwrap();
@@ -548,7 +547,9 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
         let batch_id = args["batch_id"].as_str().unwrap().to_string();
         let _held = server.post_approvals.redeeming_for_test(&batch_id);
         let cancellation = tokio_util::sync::CancellationToken::new();
-        let _ = await_post(
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            await_post(
             stand_in(cancellation.clone()),
             PostRequest {
                 id: &json!(7),
@@ -561,7 +562,10 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
             &mut std::collections::VecDeque::new(),
             &mut Vec::new(),
         )
-        .await;
+        ,
+        )
+        .await
+        .expect("a withdrawn post stops once its token is cancelled");
         assert!(cancellation.is_cancelled());
         assert!(!server.post_approvals.holds(&batch_id));
     }

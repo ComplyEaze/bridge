@@ -451,11 +451,15 @@ struct PostRequest<'a> {
 /// Withdraw a post that has written no intent (#725). Its approval is revoked,
 /// which closes an open dialog and leaves nothing an intent could be written
 /// under, and it stops before its next queued Tally operation. The operation in
-/// flight is finished, not abandoned: dropping it would leave Tally serving a
-/// request nobody reads (protocol reference §11b.2). It is awaited with no
-/// cap: each of its requests is bounded by the transport's 20-second deadline,
-/// so the queue's lease operation, about 32 requests, ends within about 32 × 20
-/// s at worst (#778 would stop it between requests). Input is read meanwhile.
+/// flight, and one already admitted to the queue, run in full rather than being
+/// abandoned: dropping one would leave Tally serving a request nobody reads
+/// (protocol reference §11b.2). It is awaited with no cap. Each request is
+/// bounded by the transport's deadline (20 seconds by default, configurable up
+/// to 120), and an operation waits at most the queue deadline (30 seconds by
+/// default) to start. The longest is the queue's lease operation, about 32
+/// requests for a Journal and 38 for a bank voucher, so at the defaults a
+/// cancelled post can hold this server for about 11 to 13 minutes at worst
+/// (#778 would stop it between requests). Input is read meanwhile.
 fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     request.cancellation.cancel();
     if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
@@ -811,7 +815,7 @@ where
         return Ok(Some(future.as_mut().await));
     }
     // No intent: withdraw it, and finish the operation in flight rather than
-    // abandon it. It sends nothing further and can write no intent (#725).
+    // abandon it. It starts no further operation and can write no intent (#725).
     withdraw_post(server, &request);
     let _withdrawn = future.as_mut().await;
     match interruption {
@@ -861,11 +865,8 @@ async fn cancel_queued_request<W: AsyncWrite + Unpin>(
         .unwrap_or_else(|| json!({}));
     let name = request["params"]["name"].as_str().unwrap_or("unknown");
     if is_tool && name == "post_import" {
-        // Cancelled before it started: whatever an earlier call left for this
-        // batch is withdrawn too, as for any cancelled call on it (#725).
-        if let Some(batch_id) = args.get("batch_id").and_then(Value::as_str) {
-            server.post_approvals.revoke(batch_id, "request_cancelled");
-        }
+        // Cancelled before it started, it holds nothing: what an earlier call
+        // left for this batch belongs to that call, and is left alone (#725).
         let response = server.finish_tool_response(
             name,
             &args,

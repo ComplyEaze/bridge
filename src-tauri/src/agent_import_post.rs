@@ -283,7 +283,10 @@ impl Server {
             }),
             ApprovalState::Approved => json!({
                 "state": "approved",
-                "expires_in_s": approval::APPROVAL_TTL.as_secs(),
+                "expires_in_s": self
+                    .post_approvals
+                    .approval_remaining(batch_id)
+                    .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
             }),
         };
@@ -347,6 +350,10 @@ impl Server {
                 self.post_voucher_limit(scope),
             )?;
             if snapshot.dispatched {
+                // Posted by any route: whatever was held for it can never be
+                // posted, and must not keep other batches waiting (#725).
+                self.post_approvals
+                    .revoke(batch_id, "batch_already_dispatched");
                 return self.verify_import(args).await;
             }
             // The record's own hash only proves the record agrees with itself.
@@ -418,14 +425,7 @@ impl Server {
             if recorded {
                 return Err("import_remote_id_reused".to_string().into());
             }
-            // An agent's post says when it happens (#725); the desktop's,
-            // answered and posted in one call, is unchanged.
-            let preview = match scope {
-                PostScope::JournalOnly => {
-                    admit_fresh_saved_voucher(&line, &self.settings.endpoint)?
-                }
-                PostScope::Vouchers => agent_review_preview(&line, &self.settings.endpoint)?,
-            };
+            let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
             // Also admits, on this read's measurement, the whole-window request
@@ -1683,8 +1683,7 @@ pub(super) fn admit_saved_voucher(
     max_vouchers: usize,
 ) -> Result<(String, String), String> {
     let xml = admit_saved_voucher_integrity(line, endpoint, scope, max_vouchers)?;
-    let preview = admit_fresh_saved_voucher(line, endpoint)?;
-    Ok((xml, preview))
+    Ok((xml, review_preview_for(line, endpoint, scope)?))
 }
 
 /// What the approval must show about a bank voucher's legs: which side had to
@@ -1720,6 +1719,21 @@ pub(super) fn agent_post_timing_lines() -> [String; 2] {
         "It is not posted if the request is cancelled or Bridge's checks just before posting refuse it."
             .into(),
     ]
+}
+
+/// The preview a post of `scope` shows, and so whether it fits the dialog at
+/// all: the one decision the build's eligibility and the post both use. An
+/// agent's post says when it happens (#725); the desktop's, answered and posted
+/// in one call, is unchanged.
+pub(super) fn review_preview_for(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    scope: PostScope,
+) -> Result<String, String> {
+    match scope {
+        PostScope::JournalOnly => admit_fresh_saved_voucher(line, endpoint),
+        PostScope::Vouchers => agent_review_preview(line, endpoint),
+    }
 }
 
 /// The preview an agent's post shows: the voucher or batch, and when it is

@@ -217,11 +217,11 @@ async fn another_batch_is_refused_while_one_waits_for_its_person() {
 }
 
 /// Wait until a held dialog's task has ended after its answer.
-async fn until_closed(scripted: &ScriptedApproval) {
-    while scripted.is_waiting() {
+/// Wait until a held dialog's answer has been stamped by its task.
+async fn until_answered(server: &Server, batch_id: &str) {
+    while !server.post_approvals.answered_for_test(batch_id) {
         tokio::time::sleep(Duration::from_millis(1)).await;
     }
-    tokio::time::sleep(Duration::from_millis(20)).await;
 }
 
 /// A dialog declined while no call waited no longer blocks other batches: the
@@ -245,7 +245,7 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
         "{pending}"
     );
     scripted.answer(false);
-    until_closed(&scripted).await;
+    until_answered(&server, &line.batch_id).await;
     let asked = ScriptedApproval::declining();
     let declined = SCRIPTED_APPROVAL
         .scope(asked.clone(), server.call_tool("post_import", other))
@@ -288,7 +288,7 @@ async fn an_approval_left_past_its_time_is_asked_again() {
         "{pending}"
     );
     scripted.answer(true);
-    until_closed(&scripted).await;
+    until_answered(&server, &line.batch_id).await;
     tokio::time::sleep(Duration::from_millis(400)).await;
     let asked_again = ScriptedApproval::declining();
     let declined = SCRIPTED_APPROVAL
@@ -388,39 +388,194 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     assert_eq!(intents(directory.path()), 0);
 }
 
-/// An answer and a withdrawal ready together: the withdrawal wins, so the
-/// approval does not outlive the cancelled call (#725, the biased wait and the
-/// held-under-lock refusal). Repeated, since the two race across threads.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+/// An answer and a withdrawal ready together, in a call where an approval
+/// would be kept for the next call: the withdrawal wins, and nothing is kept
+/// (#725, the biased wait and the held-under-lock refusal). The test drives the
+/// call itself, so the answer and the cancellation are both ready when it is
+/// next polled; repeated, since the pick between two ready arms is what is
+/// under test.
+#[tokio::test]
 async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
-    for _ in 0..8 {
+    for _ in 0..16 {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let server = server_at(simulator.address(), directory.path());
+        let mut server = server_at(simulator.address(), directory.path());
+        // Never fits: an answer would be held for the next call, not posted.
+        server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+            directory.path(),
+            CALL_CEILING,
+        ));
         let (line, args) = saved_batch(&server);
         let scripted = ScriptedApproval::held();
         let withdrawn = tokio_util::sync::CancellationToken::new();
-        let post = crate::tally::runtime::TOOL_CANCELLATION.scope(
+        let mut post = std::pin::pin!(crate::tally::runtime::TOOL_CANCELLATION.scope(
             withdrawn.clone(),
             SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
-        );
-        let both = async {
-            while !scripted.is_waiting() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
+        ));
+        // Drive the call until its dialog is open.
+        while !scripted.is_waiting() {
+            tokio::select! {
+                biased;
+                response = &mut post => panic!("the call ended early: {response}"),
+                () = tokio::time::sleep(Duration::from_millis(1)) => {}
             }
-            scripted.answer(true);
-            withdrawn.cancel();
-        };
-        let (response, ()) = tokio::join!(post, both);
+        }
+        // Answer, and let the dialog's task finish, without polling the call.
+        scripted.answer(true);
+        while scripted.is_waiting() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        withdrawn.cancel();
+        let response = post.await;
         let _ = sent(simulator);
         assert_eq!(
             result(&response)["error"]["code"],
             "request_cancelled",
             "{response}"
         );
-        assert!(!server.post_approvals.holds(&line.batch_id));
+        assert!(!server.post_approvals.holds(&line.batch_id), "nothing kept");
         assert_eq!(intents(directory.path()), 0);
     }
+}
+
+/// The wait itself: with an answer and a withdrawal both ready, the withdrawal
+/// is taken, every time.
+#[tokio::test]
+async fn the_wait_takes_a_ready_withdrawal_over_a_ready_answer() {
+    for _ in 0..32 {
+        let dialog = approved_dialog(1).await;
+        while dialog.answered().is_none() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let withdrawn = tokio_util::sync::CancellationToken::new();
+        withdrawn.cancel();
+        let waited = crate::tally::runtime::TOOL_CANCELLATION
+            .scope(withdrawn, wait_for_answer(dialog, Duration::from_secs(5)))
+            .await;
+        assert!(matches!(waited, Waited::Cancelled));
+    }
+}
+
+/// The wait stops as soon as its call is withdrawn, well inside its budget,
+/// and the dialog it held is closed.
+#[tokio::test]
+async fn the_wait_stops_at_a_withdrawal() {
+    let scripted = ScriptedApproval::held();
+    let dialog = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), async {
+            PendingPostApproval::ask(
+                "<ENVELOPE/>".into(),
+                "Synthetic preview".into(),
+                vec![bridge_tally_core::TallyDate::parse("20260901").unwrap()],
+                high_water_read(),
+                high_water_read(),
+                cash_binding(),
+                None,
+                high_water_read(),
+                high_water_read(),
+            )
+        })
+        .await;
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    let cancel = {
+        let withdrawn = withdrawn.clone();
+        async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            withdrawn.cancel();
+        }
+    };
+    let wait = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(withdrawn.clone(), wait_for_answer(dialog, Duration::from_secs(30)));
+    let (waited, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+        tokio::join!(wait, cancel)
+    })
+    .await
+    .expect("stopped at the withdrawal, not at the budget");
+    assert!(matches!(waited, Waited::Cancelled));
+    tokio::task::yield_now().await;
+    assert!(!scripted.is_waiting(), "the dialog was closed");
+}
+
+/// Holding a dialog or an approval is refused, and nothing held, once the
+/// asking call has been withdrawn.
+#[tokio::test]
+async fn nothing_is_held_for_a_withdrawn_call() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    withdrawn.cancel();
+    let dialog = approved_dialog(1).await;
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    let held = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(withdrawn.clone(), async {
+            approvals.hold_pending(&line.batch_id, binding.clone(), dialog, native)
+        })
+        .await;
+    assert_eq!(held.err().as_deref(), Some("request_cancelled"));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    let (request, answered, native) = granted(&line, 1).await;
+    let held = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(withdrawn, async {
+            approvals.hold_approved(&line.batch_id, binding, request, native, answered)
+        })
+        .await;
+    assert_eq!(held.err().as_deref(), Some("request_cancelled"));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+}
+
+/// An approval collected by a joined call late in its window reports what is
+/// left of it, counted from the click, not the whole window.
+#[tokio::test]
+async fn an_approval_reports_the_time_left_since_its_click() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.post_approvals = std::sync::Arc::new(PostApprovals::with_ttl(
+        directory.path(),
+        Duration::from_secs(3),
+    ));
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .await;
+    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    tokio::time::sleep(Duration::from_millis(1_600)).await;
+    let approved = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    assert_eq!(result(&approved)["approval"]["state"], "approved", "{approved}");
+    let left = result(&approved)["approval"]["expires_in_s"].as_u64().unwrap();
+    assert!(left <= 1, "counted from the click: {approved}");
+}
+
+/// A batch posted by any other route releases whatever was held for it, so it
+/// no longer keeps other batches waiting.
+#[tokio::test]
+async fn a_batch_posted_elsewhere_releases_its_hold() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .await;
+    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&line))
+            .unwrap();
+    }
+    let _verified = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    assert!(!scripted.is_waiting(), "its dialog was closed");
 }
 
 /// `post_import` over the stdio path every agent post takes, cancelled once
@@ -594,7 +749,11 @@ async fn a_redemption_ended_before_its_intent_is_not_left_taken() {
         )
         .await;
     let observed = sent(simulator);
-    assert!(result(&refused)["error"]["code"].is_string(), "{refused}");
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_admission_busy",
+        "{refused}"
+    );
     assert_eq!(
         observed.len(),
         before_approval().len(),
@@ -954,7 +1113,14 @@ fn the_agent_preview_says_when_the_post_happens() {
     let (one, _) = saved_batch(&server);
     let endpoint = server.settings.endpoint.clone();
     let [now, not] = agent_post_timing_lines();
-    assert!(now.contains("within 15 minutes"), "{now}");
+    assert_eq!(
+        now,
+        "Bridge posts this now, or when the agent asks again within 15 minutes; otherwise nothing is posted."
+    );
+    assert_eq!(
+        not,
+        "It is not posted if the request is cancelled or Bridge's checks just before posting refuse it."
+    );
     for line in [&now, &not] {
         assert!(
             line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS,
@@ -986,4 +1152,53 @@ fn the_agent_preview_says_when_the_post_happens() {
             Some("import_review_too_large")
         );
     }
+}
+
+/// One Journal with `entries` lines: `entries - 1` debits and one credit.
+fn journal_of(saved: &ImportLedgerLine, entries: usize) -> ImportLedgerLine {
+    let mut line = saved.clone();
+    let debit = line.vouchers[0].entries[0].clone();
+    let mut credit = line.vouchers[0].entries[1].clone();
+    let mut lines = Vec::new();
+    for _ in 0..entries - 1 {
+        let mut entry = debit.clone();
+        entry.amount = "1.00".into();
+        lines.push(entry);
+    }
+    credit.amount = format!("{}.00", entries - 1);
+    lines.push(credit);
+    line.vouchers[0].entries = lines;
+    line.sha256 = sha256_hex(
+        render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id).as_bytes(),
+    );
+    line
+}
+
+/// The build's eligibility and the post decide "fits the dialog" with the one
+/// function, on the preview the post will show: a Journal the desktop's
+/// preview fits but the agent's, with its timing lines, does not, is refused
+/// as the post would refuse it, at the line where the two part.
+#[test]
+fn build_and_post_agree_on_what_fits_the_dialog() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let (saved, _) = saved_batch(&server);
+    let six = journal_of(&saved, 6);
+    let seven = journal_of(&saved, 7);
+    assert_eq!(
+        review_preview_for(&six, &endpoint, PostScope::Vouchers)
+            .unwrap()
+            .lines()
+            .count(),
+        24
+    );
+    assert!(review_preview_for(&seven, &endpoint, PostScope::JournalOnly).is_ok());
+    for refused in [
+        review_preview_for(&seven, &endpoint, PostScope::Vouchers).err(),
+        admit_saved_voucher(&seven, &endpoint, PostScope::Vouchers, 1).err(),
+    ] {
+        assert_eq!(refused.as_deref(), Some("import_review_too_large"));
+    }
+    assert!(admit_saved_voucher(&six, &endpoint, PostScope::Vouchers, 1).is_ok());
 }

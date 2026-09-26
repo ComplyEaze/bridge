@@ -295,6 +295,12 @@ impl PendingPostApproval {
         self.answered.get().copied()
     }
 
+    /// Whether the dialog's task ended with no answer stamped (it panicked or
+    /// was aborted): nothing can come of it.
+    pub(crate) fn ended_unanswered(&self) -> bool {
+        self.task.is_finished() && self.answered.get().is_none()
+    }
+
     /// How much of the dialog's time limit remains.
     pub(crate) fn remaining(&self) -> Duration {
         POST_DIALOG_LIMIT.saturating_sub(self.started.elapsed())

@@ -246,10 +246,39 @@ impl PostApprovals {
     }
 
     fn expired(&self, answered: &Answered) -> bool {
-        answered.at.elapsed() > self.ttl
-            || SystemTime::now()
-                .duration_since(answered.at_wall)
-                .is_ok_and(|age| age > self.ttl)
+        self.remaining(answered).is_zero()
+    }
+
+    /// How long an approval given at `answered` may still be redeemed: the
+    /// less of what either clock leaves.
+    fn remaining(&self, answered: &Answered) -> Duration {
+        let wall_age = SystemTime::now()
+            .duration_since(answered.at_wall)
+            .unwrap_or(Duration::ZERO);
+        let age = answered.at.elapsed().max(wall_age);
+        self.ttl.saturating_sub(age)
+    }
+
+    /// How long `batch_id`'s held approval may still be redeemed, counted from
+    /// the click; `None` when no approval of it is held.
+    pub(super) fn approval_remaining(&self, batch_id: &str) -> Option<Duration> {
+        match self.slot().as_ref() {
+            Some((held_batch, Held::Approved { answered, .. })) if held_batch == batch_id => {
+                Some(self.remaining(answered))
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether `batch_id`'s held dialog has an answer stamped, for tests that
+    /// must wait for a person's scripted click to land.
+    #[cfg(test)]
+    pub(in crate::agent) fn answered_for_test(&self, batch_id: &str) -> bool {
+        matches!(
+            self.slot().as_ref(),
+            Some((held_batch, Held::Pending { dialog: Some(dialog), .. }))
+                if held_batch == batch_id && dialog.answered().is_some()
+        )
     }
 
     pub(super) fn begin(&self, batch_id: &str) -> Begin {
@@ -282,9 +311,12 @@ impl PostApprovals {
                     dialog: Some(dialog),
                     ..
                 },
-            )) => dialog
-                .answered()
-                .is_some_and(|answered| !answered.approved || self.expired(&answered)),
+            )) => {
+                dialog.ended_unanswered()
+                    || dialog
+                        .answered()
+                        .is_some_and(|answered| !answered.approved || self.expired(&answered))
+            }
             Some((_, Held::Approved { answered, .. })) => self.expired(answered),
             _ => false,
         };
@@ -404,7 +436,15 @@ impl PostApprovals {
         fresh: &ApprovalBinding,
     ) -> Result<(Redemption<'_>, ApprovedImport, NativePostRequest), String> {
         let mut slot = self.slot();
+        let expired = matches!(
+            slot.as_ref(),
+            Some((held_batch, Held::Approved { answered, .. }))
+                if held_batch == batch_id && self.expired(answered)
+        );
         self.settle(&mut slot);
+        if expired {
+            return Err("import_approval_expired".into());
+        }
         match slot.take() {
             Some((
                 held_batch,

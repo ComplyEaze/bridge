@@ -5,8 +5,7 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    dispatch_fits_in_call, ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING,
-    MEASURED_POST,
+    ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MEASURED_POST,
 };
 use crate::agent::agent_protocol::{run_post, Framer};
 use crate::agent::ToolResponse;
@@ -47,16 +46,31 @@ async fn a_dialog_answered_after_its_call_returned_is_posted_by_a_later_call() {
     let scripted = ScriptedApproval::held();
 
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
-    assert_eq!(result(&pending)["dispatch"]["state"], "not_dispatched", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    assert_eq!(
+        result(&pending)["dispatch"]["state"],
+        "not_dispatched",
+        "{pending}"
+    );
     assert_eq!(result(&pending)["attempt_recorded"], false, "{pending}");
     assert_eq!(intents(directory.path()), 0);
 
     scripted.answer(true);
     let approved = server.call_tool("post_import", args.clone()).await;
-    assert_eq!(result(&approved)["approval"]["state"], "approved", "{approved}");
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
     assert_eq!(intents(directory.path()), 0);
 
     let posted = server.call_tool("post_import", args).await;
@@ -64,7 +78,10 @@ async fn a_dialog_answered_after_its_call_returned_is_posted_by_a_later_call() {
     // The simulator's script ends at the POST, so the readback after it is
     // not served; what is asserted is the one intent and its clean create.
     assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
-    assert_eq!(dispatch_intent(directory.path())["batch_id"], line.batch_id.as_str());
+    assert_eq!(
+        dispatch_intent(directory.path())["batch_id"],
+        line.batch_id.as_str()
+    );
     assert_journaled_clean_create(directory.path());
     assert_eq!(scripted.counts(), [1], "one dialog, asked once");
     assert!(observed.len() > post_at, "the POST was sent: {posted}");
@@ -89,9 +106,16 @@ async fn an_answer_too_late_for_its_call_is_posted_by_the_next() {
     ));
     let (_, args) = saved_batch(&server);
     let approved = SCRIPTED_APPROVAL
-        .scope(ScriptedApproval::approving(), server.call_tool("post_import", args.clone()))
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&approved)["approval"]["state"], "approved", "{approved}");
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
     assert_eq!(intents(directory.path()), 0);
     let posted = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
@@ -111,15 +135,23 @@ async fn a_second_call_joins_the_open_dialog_and_a_decline_ends_it() {
     let scripted = ScriptedApproval::held();
     for _ in 0..2 {
         let pending = SCRIPTED_APPROVAL
-            .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+            .scope(
+                scripted.clone(),
+                server.call_tool("post_import", args.clone()),
+            )
             .await;
-        assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+        assert_eq!(
+            result(&pending)["approval"]["state"],
+            "pending",
+            "{pending}"
+        );
     }
     scripted.answer(false);
     let declined = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
     assert_eq!(
-        result(&declined)["error"]["code"], "import_approval_declined",
+        result(&declined)["error"]["code"],
+        "import_approval_declined",
         "{declined}"
     );
     assert_eq!(scripted.counts(), [1]);
@@ -156,13 +188,27 @@ async fn another_batch_is_refused_while_one_waits_for_its_person() {
     let other = saved_other_batch(&server, &line);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     let busy = SCRIPTED_APPROVAL
-        .scope(ScriptedApproval::approving(), server.call_tool("post_import", other))
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", other),
+        )
         .await;
-    assert_eq!(result(&busy)["error"]["code"], "post_approval_busy", "{busy}");
+    assert_eq!(
+        result(&busy)["error"]["code"],
+        "post_approval_busy",
+        "{busy}"
+    );
     let still = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
     assert_eq!(result(&still)["approval"]["state"], "pending", "{still}");
@@ -193,7 +239,11 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     let pending = SCRIPTED_APPROVAL
         .scope(scripted.clone(), server.call_tool("post_import", args))
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     scripted.answer(false);
     until_closed(&scripted).await;
     let asked = ScriptedApproval::declining();
@@ -202,7 +252,8 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
         .await;
     let observed = sent(simulator);
     assert_eq!(
-        result(&declined)["error"]["code"], "import_approval_declined",
+        result(&declined)["error"]["code"],
+        "import_approval_declined",
         "the other batch was asked, not refused as busy: {declined}"
     );
     assert_eq!(asked.counts(), [1]);
@@ -226,9 +277,16 @@ async fn an_approval_left_past_its_time_is_asked_again() {
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     scripted.answer(true);
     until_closed(&scripted).await;
     tokio::time::sleep(Duration::from_millis(400)).await;
@@ -238,7 +296,8 @@ async fn an_approval_left_past_its_time_is_asked_again() {
         .await;
     let observed = sent(simulator);
     assert_eq!(
-        result(&declined)["error"]["code"], "import_approval_declined",
+        result(&declined)["error"]["code"],
+        "import_approval_declined",
         "the old click was not used: {declined}"
     );
     assert_eq!(asked_again.counts(), [1]);
@@ -264,9 +323,16 @@ async fn a_click_after_revocation_approves_nothing() {
     let batch_id = args["batch_id"].as_str().unwrap().to_string();
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     assert!(scripted.is_waiting(), "the dialog is open");
     server.post_approvals.revoke(&batch_id, "request_cancelled");
     tokio::task::yield_now().await;
@@ -278,7 +344,8 @@ async fn a_click_after_revocation_approves_nothing() {
         .await;
     let observed = sent(simulator);
     assert_eq!(
-        result(&declined)["error"]["code"], "import_approval_declined",
+        result(&declined)["error"]["code"],
+        "import_approval_declined",
         "{declined}"
     );
     assert_eq!(asked_again.counts(), [1], "the next call asked afresh");
@@ -309,7 +376,11 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     };
     let (response, ()) = tokio::join!(post, cancel);
     let observed = sent(simulator);
-    assert_eq!(result(&response)["error"]["code"], "request_cancelled", "{response}");
+    assert_eq!(
+        result(&response)["error"]["code"],
+        "request_cancelled",
+        "{response}"
+    );
     tokio::task::yield_now().await;
     assert!(!scripted.is_waiting(), "the dialog was closed");
     assert!(!server.post_approvals.holds(&line.batch_id));
@@ -342,7 +413,11 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
         };
         let (response, ()) = tokio::join!(post, both);
         let _ = sent(simulator);
-        assert_eq!(result(&response)["error"]["code"], "request_cancelled", "{response}");
+        assert_eq!(
+            result(&response)["error"]["code"],
+            "request_cancelled",
+            "{response}"
+        );
         assert!(!server.post_approvals.holds(&line.batch_id));
         assert_eq!(intents(directory.path()), 0);
     }
@@ -451,16 +526,28 @@ async fn a_refused_redemption_withdraws_its_approval() {
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     scripted.answer(true);
     let approved = server.call_tool("post_import", args.clone()).await;
-    assert_eq!(result(&approved)["approval"]["state"], "approved", "{approved}");
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
     let refused = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
     assert_eq!(
-        result(&refused)["error"]["code"], "import_multi_currency_unsupported",
+        result(&refused)["error"]["code"],
+        "import_multi_currency_unsupported",
         "{refused}"
     );
     assert!(!server.post_approvals.holds(&line.batch_id));
@@ -469,7 +556,9 @@ async fn a_refused_redemption_withdraws_its_approval() {
         "post_refused_before_intent"
     );
     assert_eq!(intents(directory.path()), 0);
-    assert_eq!(observed.len(), 2 * before_approval().len());
+    // The redeeming call stops at the currency refusal, before the closing
+    // mode probe its checks would otherwise end with.
+    assert_eq!(observed.len(), 2 * before_approval().len() - probe().len());
 }
 
 /// A redemption that ends before its intent, here because another holder has
@@ -483,14 +572,24 @@ async fn a_redemption_ended_before_its_intent_is_not_left_taken() {
     let (line, args) = saved_batch(&server);
     let _other_holder = crate::endpoint_coordination::acquire(&server.settings.endpoint).unwrap();
     let refused = SCRIPTED_APPROVAL
-        .scope(ScriptedApproval::approving(), server.call_tool("post_import", args))
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
         .await;
     let observed = sent(simulator);
     assert!(result(&refused)["error"]["code"].is_string(), "{refused}");
-    assert_eq!(observed.len(), before_approval().len(), "nothing past the checks");
+    assert_eq!(
+        observed.len(),
+        before_approval().len(),
+        "nothing past the checks"
+    );
     assert_eq!(intents(directory.path()), 0);
     assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
-    assert!(matches!(server.post_approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(
+        server.post_approvals.begin(&line.batch_id),
+        Begin::Ask
+    ));
     assert_eq!(
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "post_refused_before_intent"
@@ -498,9 +597,9 @@ async fn a_redemption_ended_before_its_intent_is_not_left_taken() {
 }
 
 fn high_water_read() -> AgentReadRequest {
-    AgentReadRequest::parse(crate::agent::read_profiles::render_agent_company_high_water(
-        "WR2 Unicode Lab",
-    ))
+    AgentReadRequest::parse(
+        crate::agent::read_profiles::render_agent_company_high_water("WR2 Unicode Lab"),
+    )
     .unwrap()
 }
 
@@ -582,7 +681,12 @@ async fn a_redemption_for_anything_else_is_refused_and_lapses() {
     let changes: [(&str, Change, usize, &str); 6] = [
         ("preview", |_| {}, 1, "Another preview"),
         ("count", |_| {}, 2, "Synthetic preview"),
-        ("digest", |line| line.sha256 = "0".repeat(64), 1, "Synthetic preview"),
+        (
+            "digest",
+            |line| line.sha256 = "0".repeat(64),
+            1,
+            "Synthetic preview",
+        ),
         (
             "endpoint",
             |line| line.endpoint_origin = Some("http://127.0.0.1:1".into()),
@@ -633,7 +737,10 @@ async fn a_redemption_for_anything_else_is_refused_and_lapses() {
         let note = approvals.lapse_note(&line.batch_id).unwrap();
         assert_eq!(note["reason"], "approval_binding_changed", "{case}");
         assert_eq!(note["redeemable"], false, "{case}");
-        assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask), "{case}");
+        assert!(
+            matches!(approvals.begin(&line.batch_id), Begin::Ask),
+            "{case}"
+        );
     }
 }
 
@@ -650,7 +757,9 @@ async fn an_approval_is_spent_once_and_never_after_a_revocation() {
     approvals
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
-    let (taken, _, _) = approvals.take_for_dispatch(&line.batch_id, &binding).unwrap();
+    let (taken, _, _) = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
     assert_eq!(
         approvals
             .take_for_dispatch(&line.batch_id, &binding)
@@ -673,7 +782,9 @@ async fn an_approval_is_spent_once_and_never_after_a_revocation() {
     approvals
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
-    let (taken, _, _) = approvals.take_for_dispatch(&line.batch_id, &binding).unwrap();
+    let (taken, _, _) = approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .unwrap();
     approvals.revoke(&line.batch_id, "request_cancelled");
     assert_eq!(
         approvals.spend(&line.batch_id, taken.id()).err().as_deref(),
@@ -750,12 +861,19 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
 
     // Held: answered while no call waits, then revoked.
     approvals
-        .hold_pending(&line.batch_id, binding.clone(), approved_dialog(1).await, native())
+        .hold_pending(
+            &line.batch_id,
+            binding.clone(),
+            approved_dialog(1).await,
+            native(),
+        )
         .unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
     approvals.revoke(&line.batch_id, "request_cancelled");
     assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
-    assert!(approvals.take_for_dispatch(&line.batch_id, &binding).is_err());
+    assert!(approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .is_err());
     assert_eq!(
         approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "request_cancelled",
@@ -764,7 +882,12 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
 
     // Joined: a call has the dialog out when the revocation lands.
     approvals
-        .hold_pending(&line.batch_id, binding.clone(), approved_dialog(1).await, native())
+        .hold_pending(
+            &line.batch_id,
+            binding.clone(),
+            approved_dialog(1).await,
+            native(),
+        )
         .unwrap();
     let Begin::Join(dialog) = approvals.begin(&line.batch_id) else {
         panic!("a held dialog is joined");
@@ -780,7 +903,9 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
         Joined::Refused(code) if code == "import_approval_revoked"
     ));
     assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
-    assert!(approvals.take_for_dispatch(&line.batch_id, &binding).is_err());
+    assert!(approvals
+        .take_for_dispatch(&line.batch_id, &binding)
+        .is_err());
 }
 
 /// Posted in the answering call only while the measured post still fits under
@@ -788,6 +913,9 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
 /// and a batch larger than any measured never does.
 #[test]
 fn an_approval_is_posted_in_its_call_only_while_the_measured_post_fits() {
+    let directory = tempfile::tempdir().unwrap();
+    let approvals = PostApprovals::new(directory.path());
+    let dispatch_fits_in_call = |elapsed, vouchers| approvals.fits_in_call(elapsed, vouchers);
     let boundary = CALL_CEILING - MEASURED_POST;
     assert_eq!(boundary, Duration::from_millis(24_050));
     assert!(dispatch_fits_in_call(Duration::ZERO, 1));
@@ -812,7 +940,10 @@ fn the_agent_preview_says_when_the_post_happens() {
     let [now, not] = agent_post_timing_lines();
     assert!(now.contains("within 15 minutes"), "{now}");
     for line in [&now, &not] {
-        assert!(line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS, "{line}");
+        assert!(
+            line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS,
+            "{line}"
+        );
     }
     let single = agent_review_preview(&one, &endpoint).unwrap();
     assert!(single.ends_with(&format!("{now}\n{not}")), "{single}");

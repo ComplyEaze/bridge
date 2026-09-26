@@ -544,8 +544,9 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
     ] {
         let directory = tempfile::tempdir().unwrap();
         let server = server(directory.path());
-        let (line, args) = saved_batch(&server);
-        let _held = server.post_approvals.redeeming_for_test(&line.batch_id);
+        let (_, args) = saved_batch(&server);
+        let batch_id = args["batch_id"].as_str().unwrap().to_string();
+        let _held = server.post_approvals.redeeming_for_test(&batch_id);
         let cancellation = tokio_util::sync::CancellationToken::new();
         let _ = await_post(
             stand_in(cancellation.clone()),
@@ -562,6 +563,6 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
         )
         .await;
         assert!(cancellation.is_cancelled());
-        assert!(!server.post_approvals.holds(&line.batch_id));
+        assert!(!server.post_approvals.holds(&batch_id));
     }
 }

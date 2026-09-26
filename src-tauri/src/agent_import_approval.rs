@@ -47,10 +47,6 @@ pub(super) const MEASURED_POST_VOUCHERS: usize = 200;
 /// same call, as before #725: only when a post that costs `measured` still fits
 /// under the ceiling. Otherwise the next call redeems it, after checking the
 /// book again.
-pub(super) fn dispatch_fits_in_call(elapsed: Duration, vouchers: usize) -> bool {
-    fits_with(MEASURED_POST, elapsed, vouchers)
-}
-
 fn fits_with(measured: Duration, elapsed: Duration, vouchers: usize) -> bool {
     vouchers <= MEASURED_POST_VOUCHERS
         && elapsed
@@ -280,10 +276,13 @@ impl PostApprovals {
     /// or not a call has collected it yet. Neither blocks another batch.
     fn settle(&self, slot: &mut Option<(String, Held)>) {
         let finished = match slot.as_ref() {
-            Some((_, Held::Pending {
-                dialog: Some(dialog),
-                ..
-            })) => dialog
+            Some((
+                _,
+                Held::Pending {
+                    dialog: Some(dialog),
+                    ..
+                },
+            )) => dialog
                 .answered()
                 .is_some_and(|answered| !answered.approved || self.expired(&answered)),
             Some((_, Held::Approved { answered, .. })) => self.expired(answered),
@@ -540,7 +539,10 @@ impl PostApprovals {
         let uuid = batch_id
             .strip_prefix("bridge-")
             .and_then(|id| Uuid::parse_str(id).ok())?;
-        Some(self.imports.join(format!("bridge-{uuid}.approval_lapse.json")))
+        Some(
+            self.imports
+                .join(format!("bridge-{uuid}.approval_lapse.json")),
+        )
     }
 
     /// Best effort: a note that cannot be written loses a report, never an

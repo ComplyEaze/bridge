@@ -421,7 +421,9 @@ impl Server {
             // An agent's post says when it happens (#725); the desktop's,
             // answered and posted in one call, is unchanged.
             let preview = match scope {
-                PostScope::JournalOnly => admit_fresh_saved_voucher(&line, &self.settings.endpoint)?,
+                PostScope::JournalOnly => {
+                    admit_fresh_saved_voucher(&line, &self.settings.endpoint)?
+                }
                 PostScope::Vouchers => agent_review_preview(&line, &self.settings.endpoint)?,
             };
             // Number matching precedence is not qualified for native Create.

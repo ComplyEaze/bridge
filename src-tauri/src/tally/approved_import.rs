@@ -187,6 +187,68 @@ impl ApprovedImport {
     }
 }
 
+/// How long a post dialog stays open before it approves nothing: the limit
+/// [`nonce_bound_dialog`] applies. Used only to tell a caller how much of it
+/// remains; the dialog enforces its own.
+const POST_DIALOG_LIMIT: Duration = Duration::from_secs(120);
+
+/// A post dialog left open after the MCP call that asked it returned (#725).
+/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// that the dialog's time limit and its child's exit are observed while no call
+/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
+/// read, so a late click approves nothing.
+pub(crate) struct PendingPostApproval {
+    task: tokio::task::JoinHandle<Result<ApprovedImport, String>>,
+    started: std::time::Instant,
+}
+
+impl PendingPostApproval {
+    /// Start `dialog`, which must be a call of [`ApprovedImport::confirm`].
+    pub(crate) fn ask(
+        dialog: impl std::future::Future<Output = Result<ApprovedImport, String>> + Send + 'static,
+    ) -> Self {
+        Self {
+            task: tokio::spawn(carry_approval_scope(dialog)),
+            started: std::time::Instant::now(),
+        }
+    }
+
+    /// The person's answer, if it arrives within `budget`, or the dialog back
+    /// while it is still open. A task that ended without an answer (aborted or
+    /// panicked) approves nothing.
+    pub(crate) async fn answer_within(
+        mut self,
+        budget: Duration,
+    ) -> Result<Result<ApprovedImport, String>, Self> {
+        match tokio::time::timeout(budget, &mut self.task).await {
+            Err(_) => Err(self),
+            Ok(Ok(answer)) => Ok(answer),
+            Ok(Err(_)) => Ok(Err("import_approval_unavailable".into())),
+        }
+    }
+
+    /// How much of the dialog's time limit remains.
+    pub(crate) fn remaining(&self) -> Duration {
+        POST_DIALOG_LIMIT.saturating_sub(self.started.elapsed())
+    }
+}
+
+impl Drop for PendingPostApproval {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+impl ApprovedImport {
+    /// How many vouchers the person was asked about: the dialog's count is
+    /// taken from these dates (#746), so a redeemed approval can be held to the
+    /// batch it is redeemed for.
+    pub(crate) fn voucher_count(&self) -> usize {
+        self.voucher_dates.len()
+    }
+}
+
 /// A person's answer to the review dialog for a doubted post (#239): that
 /// they checked the voucher in Tally. It changes nothing in Tally and
 /// authorises no post: it is a different type from [`ApprovedImport`], built
@@ -286,6 +348,19 @@ use confirm_review as approve_review;
 #[cfg(test)]
 use test_seam::approve_review;
 
+/// What a post dialog's own task runs under (#725). Outside this crate's unit
+/// tests it is the dialog alone: nothing is carried into the task.
+#[cfg(not(test))]
+use carry_nothing as carry_approval_scope;
+
+#[cfg(test)]
+use test_seam::carry_approval_scope;
+
+#[cfg(not(test))]
+fn carry_nothing<F>(dialog: F) -> F {
+    dialog
+}
+
 /// A scripted answer to the native approval, for this crate's unit tests only
 /// (bridge#583). It is compiled only under bare `cfg(test)`, which Cargo sets
 /// for no shipped build and no feature, variable or flag can set at runtime;
@@ -320,6 +395,10 @@ pub(crate) mod test_seam {
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
         while_pending: Option<Arc<dyn Fn() + Send + Sync>>,
+        /// When set, the post dialog stays open until a test answers it
+        /// through [`ScriptedApproval::answer`], as a person who has not yet
+        /// clicked would (#725). `approve` is then ignored.
+        held: Option<Arc<tokio::sync::watch::Sender<Option<bool>>>>,
     }
 
     impl ScriptedApproval {
@@ -339,6 +418,22 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// A post dialog that stays open until [`ScriptedApproval::answer`].
+        pub(crate) fn held() -> Self {
+            Self {
+                held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
+                ..Self::new(false)
+            }
+        }
+
+        /// Answer a held post dialog. Answering one that was closed (its task
+        /// aborted) reaches nothing.
+        pub(crate) fn answer(&self, approve: bool) {
+            if let Some(held) = &self.held {
+                held.send_replace(Some(approve));
+            }
+        }
+
         fn new(approve: bool) -> Self {
             Self {
                 approve,
@@ -347,6 +442,7 @@ pub(crate) mod test_seam {
                 counts: Arc::default(),
                 review_counts: Arc::default(),
                 while_pending: None,
+                held: None,
             }
         }
 
@@ -384,14 +480,49 @@ pub(crate) mod test_seam {
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
-                scripted.approve
+                match &scripted.held {
+                    Some(held) => Err(held.subscribe()),
+                    None => Ok(scripted.approve),
+                }
             })
-            .unwrap_or(false);
+            .unwrap_or(Ok(false));
+        let decision = match decision {
+            Ok(decision) => decision,
+            Err(mut held) => {
+                let answered = held
+                    .wait_for(Option::is_some)
+                    .await
+                    .map(|answer| *answer == Some(true))
+                    .unwrap_or(false);
+                answered
+            }
+        };
         std::hint::black_box(SEAM_MARKER);
         if decision {
             Ok(())
         } else {
             Err("import_approval_declined".into())
+        }
+    }
+
+    /// Carries the test's scripted decision into a post dialog's own task
+    /// (#725). A task-local does not cross `tokio::spawn`, so without this a
+    /// dialog asked from its task would find no decision and decline; with it,
+    /// the task sees exactly the decision the asking test scoped, and an
+    /// unscoped test still declines.
+    pub(crate) fn carry_approval_scope<F>(
+        dialog: F,
+    ) -> impl std::future::Future<Output = F::Output> + Send + 'static
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send,
+    {
+        let scripted = SCRIPTED_APPROVAL.try_with(Clone::clone).ok();
+        async move {
+            match scripted {
+                Some(scripted) => SCRIPTED_APPROVAL.scope(scripted, dialog).await,
+                None => dialog.await,
+            }
         }
     }
 

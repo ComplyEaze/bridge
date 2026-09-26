@@ -49,6 +49,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
 
 #[tokio::test]
 async fn contended_cancellation_answers_ping_and_suspends_the_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (_, args) = saved_batch(&server);
@@ -72,6 +73,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
             PostRequest {
                 id: &json!(7),
                 args: &args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -95,6 +97,10 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
             json!({"jsonrpc":"2.0","id":8,"result":{}})
         );
         let polls_after_cancellation = polls.get();
+        // While another admission holds the journal, whether the post wrote an
+        // intent cannot be read, so it is not polled at all.
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        assert_eq!(polls.get(), polls_after_cancellation);
         drop(admission);
         // Keep stdin active more often than the classifier retry period. This
         // catches a retry sleep that restarts after every incoming frame.
@@ -107,7 +113,10 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
                 }
             }
         }
-        assert_eq!(polls.get(), polls_after_cancellation);
+        // Once it reads as not dispatched, the post is withdrawn (#725): it is
+        // polled to finish its operation in flight, and this one, which never
+        // finishes, is dropped at the grace.
+        assert!(polls.get() > polls_after_cancellation);
     };
     let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         tokio::join!(serve, client)
@@ -123,6 +132,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
 
 #[tokio::test]
 async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (line, args) = saved_batch(&server);
@@ -144,6 +154,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
         PostRequest {
             id: &id,
             args: &args,
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -185,6 +196,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
 
 #[tokio::test]
 async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (client, source) = tokio::io::duplex(4096);
@@ -201,6 +213,7 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
             PostRequest {
                 id: &id,
                 args: &args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -236,6 +249,7 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
 
 #[tokio::test]
 async fn cancellation_drops_pending_post_before_its_side_effect() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let (mut client, source) = tokio::io::duplex(1024);
     let mut reader = BufReader::new(source);
     let mut framer = Framer::default();
@@ -252,7 +266,8 @@ async fn cancellation_drops_pending_post_before_its_side_effect() {
         future,
         PostRequest {
             id: &json!(7),
-            args: &json!({})
+            args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -267,6 +282,7 @@ async fn cancellation_drops_pending_post_before_its_side_effect() {
 
 #[tokio::test]
 async fn disconnect_drops_pending_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let mut reader = BufReader::new(&b""[..]);
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
@@ -275,6 +291,7 @@ async fn disconnect_drops_pending_post() {
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -315,6 +332,7 @@ async fn interrupted_partial_frame_is_preserved() {
 
 #[tokio::test]
 async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/list\"}\n".repeat(9),
@@ -329,6 +347,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -350,6 +369,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
 
 #[tokio::test]
 async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let oversized = "é\"".repeat(100);
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"ping\"}}\n{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
@@ -367,6 +387,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -385,6 +406,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
 
 #[tokio::test]
 async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receipt() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{{\"name\":\"voucher_schema\",\"arguments\":{{}}}}}}\n{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/list\"}\n".repeat(8),
@@ -398,7 +420,8 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
         std::future::pending(),
         PostRequest {
             id: &json!(7),
-            args: &json!({})
+            args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -444,6 +467,7 @@ impl AsyncBufRead for AlwaysReadable {
 
 #[tokio::test]
 async fn readable_queue_traffic_cannot_starve_the_pending_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut reader = AlwaysReadable {
@@ -470,6 +494,7 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
             PostRequest {
                 id: &json!(7),
                 args: &json!({}),
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,

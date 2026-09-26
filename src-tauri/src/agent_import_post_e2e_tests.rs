@@ -3049,3 +3049,5 @@ fn a_pending_mark_never_erases_a_doubt() {
 
 #[path = "agent_import_ack_tests.rs"]
 mod ack_tests;
+#[path = "agent_import_approval_tests.rs"]
+mod approval_tests;

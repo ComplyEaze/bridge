@@ -53,6 +53,9 @@ pub(super) mod ledger;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+#[path = "agent_import_approval.rs"]
+mod approval;
+pub(super) use approval::PostApprovals;
 #[path = "agent_import_verification.rs"]
 mod verification;
 use std::path::{Path, PathBuf};

@@ -2,7 +2,10 @@
 //! subsequent calls only reconcile its identity.
 use super::*;
 use crate::agent::evidence_from_runtime_read;
-use crate::tally::approved_import::{ApprovedImport, ApprovedImportAdmissionError};
+use super::approval::{self, ApprovalBinding, Begin, Joined};
+use crate::tally::approved_import::{
+    ApprovedImport, ApprovedImportAdmissionError, PendingPostApproval,
+};
 use bridge_tally_protocol::native_outstandings::{parse_company_currency, BaseCurrencyName};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportApplicationStatus};
 
@@ -50,6 +53,51 @@ impl PostScope {
 /// How many bytes the in-queue classification recheck may spend describing a
 /// refusal it never returns: only whether a leg failed is used.
 const RECHECK_REFUSAL_BUDGET: usize = 4_096;
+
+/// Where a post stands with its person, when it returns without posting.
+enum ApprovalState {
+    /// The dialog is open, with this much of its time limit left when known.
+    Pending(Option<std::time::Duration>),
+    Approved,
+}
+
+/// What waiting on a dialog came to.
+enum Waited {
+    Answered(Result<ApprovedImport, String>),
+    Open(PendingPostApproval),
+    /// The call was withdrawn while it waited. The dialog was dropped, which
+    /// closes it.
+    Cancelled,
+}
+
+/// What is left of the call's budget for waiting on the person, never less
+/// than enough to have the dialog up before the call returns.
+fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
+    approval::CALL_BUDGET
+        .saturating_sub(call_started.elapsed())
+        .max(approval::MIN_DIALOG_WAIT)
+}
+
+/// Wait up to `budget` for the person's answer, stopping at once if the call
+/// is withdrawn (#554): nothing is sent to Tally while waiting.
+async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duration) -> Waited {
+    let withdrawn = crate::tally::runtime::TOOL_CANCELLATION
+        .try_with(Clone::clone)
+        .ok();
+    let withdrawal = async {
+        match &withdrawn {
+            Some(token) => token.cancelled().await,
+            None => std::future::pending().await,
+        }
+    };
+    tokio::select! {
+        waited = dialog.answer_within(budget) => match waited {
+            Ok(answer) => Waited::Answered(answer),
+            Err(dialog) => Waited::Open(dialog),
+        },
+        () = withdrawal => Waited::Cancelled,
+    }
+}
 
 pub(super) fn admit_post_window(served: Option<crate::agent::WindowServed>) -> Result<(), String> {
     match served {
@@ -213,6 +261,42 @@ impl Server {
         }
     }
 
+    /// A post that is waiting for its person, not failing (#725): the dialog is
+    /// open (`pending`) or answered and not yet posted (`approved`). Nothing
+    /// was sent to Tally; calling `post_import` again with the same batch
+    /// waits on the dialog or posts the approved batch.
+    fn approval_outcome(
+        &self,
+        batch_id: &str,
+        guid: &str,
+        state: ApprovalState,
+        evidence: Evidence,
+    ) -> ToolOutcome {
+        let approval = match state {
+            ApprovalState::Pending(remaining) => json!({
+                "state": "pending",
+                "dialog_remaining_s": remaining.map(|remaining| remaining.as_secs()),
+                "retry_after_s": approval::RETRY_AFTER.as_secs(),
+            }),
+            ApprovalState::Approved => json!({
+                "state": "approved",
+                "expires_in_s": approval::APPROVAL_TTL.as_secs(),
+                "retry_after_s": 0,
+            }),
+        };
+        ToolOutcome {
+            payload: json!({"result":{
+                "batch_id": batch_id,
+                "approval": approval,
+                "previous_approval": self.post_approvals.lapse_note(batch_id),
+                "dispatch": {"state": "not_dispatched", "resent": false},
+            }}),
+            evidence,
+            company_guid: Some(guid.to_string()),
+            truncated: false,
+        }
+    }
+
     pub(in crate::agent) async fn post_import(
         &self,
         args: &Value,
@@ -227,6 +311,7 @@ impl Server {
         expected_sha256: Option<&str>,
         scope: PostScope,
     ) -> Result<ToolOutcome, ToolFailure> {
+        let call_started = std::time::Instant::now();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let snapshot = self
@@ -274,6 +359,41 @@ impl Server {
             if line.ledger_identities.is_none() {
                 return Err(BuildBindingRefusal::Unbound.code().to_string().into());
             }
+            // A dialog or approval an earlier call left for this batch (#725).
+            // The desktop waits for its dialog in one call, as before.
+            let redeeming = match scope {
+                PostScope::JournalOnly => false,
+                PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
+                    Begin::Ask => false,
+                    Begin::Redeem => true,
+                    Begin::Busy(code) => return Err(code.to_string().into()),
+                    Begin::Waiting => {
+                        return Ok(self.approval_outcome(batch_id, guid, ApprovalState::Pending(None), accumulated.clone()))
+                    }
+                    Begin::Join(dialog) => {
+                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
+                            Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                            Waited::Open(dialog) => Err(dialog),
+                            Waited::Answered(answer) => Ok(answer),
+                        };
+                        return match self.post_approvals.settle_join(batch_id, waited) {
+                            Joined::StillOpen { remaining } => Ok(self.approval_outcome(
+                                batch_id,
+                                guid,
+                                ApprovalState::Pending(Some(remaining)),
+                                accumulated.clone(),
+                            )),
+                            Joined::Approved => Ok(self.approval_outcome(
+                                batch_id,
+                                guid,
+                                ApprovalState::Approved,
+                                accumulated.clone(),
+                            )),
+                            Joined::Refused(code) => Err(code.into()),
+                        };
+                    }
+                },
+            };
             // Tally may have seen any REMOTEID the journal records, and resending
             // one can undo a person's cancel or delete (protocol reference §9.3).
             // Refused before any Tally request; checked again as the intent is
@@ -409,18 +529,70 @@ impl Server {
                 super::super::read_profiles::render_agent_company_high_water(&company.name),
             )
             .map_err(|error| error.to_string())?;
-            let request = ApprovedImport::confirm(
-                xml,
-                &preview,
-                voucher_dates,
-                verification_request,
-                ledger_catalogue_request,
-                ledger_binding.clone(),
-                group_collection_request,
-                currency_request,
-                company_marks_request.clone(),
-            )
-            .await?;
+            // The one native approval, not yet started: an async block runs
+            // nothing until it is polled.
+            let asked = {
+                let preview = preview.clone();
+                let ledger_binding = ledger_binding.clone();
+                let company_marks_request = company_marks_request.clone();
+                async move {
+                    ApprovedImport::confirm(
+                        xml,
+                        &preview,
+                        voucher_dates,
+                        verification_request,
+                        ledger_catalogue_request,
+                        ledger_binding,
+                        group_collection_request,
+                        currency_request,
+                        company_marks_request,
+                    )
+                    .await
+                }
+            };
+            // The approval this call spends, if it is one held across calls.
+            let mut redemption = None;
+            let (request, native) = match scope {
+                PostScope::JournalOnly => (asked.await?, native),
+                PostScope::Vouchers => {
+                    // What the person is shown, and what it is about: an
+                    // approval is redeemed only for exactly this (#725).
+                    let binding = ApprovalBinding::new(&line, &preview, &ledger_binding);
+                    if !redeeming {
+                        match wait_for_answer(PendingPostApproval::ask(asked), call_budget(call_started)).await {
+                            Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                            Waited::Open(dialog) => {
+                                let remaining = dialog.remaining();
+                                self.post_approvals.hold_pending(batch_id, binding, dialog, native)?;
+                                return Ok(self.approval_outcome(
+                                    batch_id,
+                                    guid,
+                                    ApprovalState::Pending(Some(remaining)),
+                                    accumulated.clone(),
+                                ));
+                            }
+                            Waited::Answered(answer) => {
+                                self.post_approvals.hold_approved(batch_id, binding.clone(), answer?, native)?;
+                                // Answered late in the call: posting now could
+                                // run past the host's limit, so the next call
+                                // redeems it, after checking the book again.
+                                if call_started.elapsed() > approval::DISPATCH_IN_CALL_WITHIN {
+                                    return Ok(self.approval_outcome(
+                                        batch_id,
+                                        guid,
+                                        ApprovalState::Approved,
+                                        accumulated.clone(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    let (id, request, native) =
+                        self.post_approvals.take_for_dispatch(batch_id, &binding)?;
+                    redemption = Some(id);
+                    (request, native)
+                }
+            };
             // The cross-process lease starts only after the independent native
             // approval. It covers intent, the one POST, its response append and
             // immediate readback; recovery remains the durable batch journal.
@@ -473,12 +645,30 @@ impl Server {
                         {
                             return Err("import_batch_changed".into());
                         }
+                        // Spent here, once, under this lock and before the
+                        // intent: a revoked approval (the call was cancelled)
+                        // or a second redemption writes no intent (#725).
+                        match (scope, redemption) {
+                            (_, Some(id)) => self.post_approvals.spend(batch_id, id)?,
+                            // Every agent post redeems an approval; one that
+                            // reached here without one writes no intent.
+                            (PostScope::Vouchers, None) => {
+                                return Err("import_approval_revoked".into())
+                            }
+                            (PostScope::JournalOnly, None) => {}
+                        }
                         self.append_import_record_while_admitted(
                             &ledger::StatusRecord::dispatch_for(&line, &native),
                         )
                     },
                 )
                 .await;
+            // An approval this post did not spend lapses: it is never offered
+            // again (#725).
+            if let Some(id) = redemption {
+                self.post_approvals
+                    .release_unspent(batch_id, id, "post_refused_before_intent");
+            }
             // Whatever the outcome, the book may have changed: no ledger
             // listing of this company is continued from before it (#630).
             self.drop_listing_snapshots(identity.company_guid());

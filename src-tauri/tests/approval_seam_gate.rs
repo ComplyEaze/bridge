@@ -51,6 +51,9 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         // The review dialog for a doubted post (#239), gated the same way.
         ("use confirm_review as approve_review;", "#[cfg(not(test))]"),
         ("use test_seam::approve_review;", "#[cfg(test)]"),
+        // What a post dialog's own task runs under (#725), gated the same way.
+        ("use carry_nothing as carry_approval_scope;", "#[cfg(not(test))]"),
+        ("use test_seam::carry_approval_scope;", "#[cfg(test)]"),
         ("pub(crate) mod test_seam {", "#[cfg(test)]"),
     ] {
         if lines.iter().filter(|line| **line == item).count() != 1 {
@@ -77,6 +80,23 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     }
     if source.contains("impl From<") || source.contains("impl Into<") {
         problems.push("no conversion may exist between the approval types".into());
+    }
+    // A dialog outliving its call (#725) runs on one task, spawned in one
+    // place, under the gated scope; outside tests that scope carries nothing.
+    if source.matches("tokio::spawn(").count() != 1
+        || source
+            .matches("task: tokio::spawn(carry_approval_scope(dialog)),")
+            .count()
+            != 1
+    {
+        problems.push("a post dialog's task must be spawned once, under carry_approval_scope".into());
+    }
+    if source
+        .matches("#[cfg(not(test))]\nfn carry_nothing<F>(dialog: F) -> F {\n    dialog\n}")
+        .count()
+        != 1
+    {
+        problems.push("outside tests, carry_approval_scope must carry nothing".into());
     }
     problems.extend(widened_test_gates(source));
     problems
@@ -298,6 +318,23 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\nuse test_seam::approve;",
             "use test_seam::approve;",
         ),
+        source.replace(
+            "#[cfg(not(test))]\nuse carry_nothing as carry_approval_scope;",
+            "#[cfg(not(debug_assertions))]\nuse carry_nothing as carry_approval_scope;",
+        ),
+        source.replace(
+            "#[cfg(test)]\nuse test_seam::carry_approval_scope;",
+            "use test_seam::carry_approval_scope;",
+        ),
+        source.replace(
+            "task: tokio::spawn(carry_approval_scope(dialog)),",
+            "task: tokio::spawn(test_seam::carry_approval_scope(dialog)),",
+        ),
+        source.replace(
+            "fn carry_nothing<F>(dialog: F) -> F {\n    dialog\n}",
+            "fn carry_nothing<F>(dialog: F) -> F {\n    std::hint::black_box(dialog)\n}",
+        ),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::spawn(async {{}}); }}\n"),
         source.replace(
             "#[cfg(test)]\nuse test_seam::approve;",
             "#[cfg_attr(test, allow(unused))]\nuse test_seam::approve;",

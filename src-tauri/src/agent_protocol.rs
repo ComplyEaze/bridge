@@ -89,11 +89,18 @@ where
                     .unwrap_or_else(|| json!({}));
                 if catalog::registered_tool_definitions(true, true).as_array().is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name)) {
                     let response = if name == "post_import" {
+                        // Withdrawn by a cancellation before its intent (#725):
+                        // it stops before its next Tally operation, never in one.
+                        let cancellation = tokio_util::sync::CancellationToken::new();
                         await_post(
-                            server.call_tool_response(name, arguments.clone()),
+                            crate::tally::runtime::TOOL_CANCELLATION.scope(
+                                cancellation.clone(),
+                                server.call_tool_response(name, arguments.clone()),
+                            ),
                             PostRequest {
                                 id: id.as_ref().expect("tool requests have IDs"),
                                 args: &arguments,
+                                cancellation: &cancellation,
                             },
                             &server,
                             &mut reader, &mut framer, &mut pending,
@@ -447,12 +454,36 @@ impl Framer {
 struct PostRequest<'a> {
     id: &'a Value,
     args: &'a Value,
+    /// Withdraws the post before its next queued Tally operation (#554).
+    cancellation: &'a tokio_util::sync::CancellationToken,
+}
+
+/// How long a withdrawn post is polled to finish its operation in flight. A
+/// Tally request is bounded by the transport's 20-second deadline, so a post
+/// still running after this is waiting on something else and is dropped.
+/// Unit tests stand in posts that never finish, where waiting protects nothing.
+#[cfg(not(test))]
+const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_secs(25);
+#[cfg(test)]
+const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Withdraw a post that has written no intent (#725). Its approval is revoked,
+/// which closes an open dialog and leaves nothing an intent could be written
+/// under, and it stops before its next queued Tally operation. The operation in
+/// flight is finished, not abandoned: dropping it would leave Tally serving a
+/// request nobody reads (protocol reference §11b.2).
+fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
+    request.cancellation.cancel();
+    if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
+        server.post_approvals.revoke(batch_id, "request_cancelled");
+    }
 }
 
 // Keep receiving cancellation and disconnect while a native approval or write
 // is pending. A durable dispatch intent makes cancellation observational: the
 // original future must finish its response journal and readback before we drop
-// it. Before an intent, cancellation remains prompt and does not start a post.
+// it. Before an intent, cancellation withdraws the post: nothing further is
+// sent, no intent can be written, and the operation in flight is finished.
 async fn await_post<R, W, F>(
     future: F,
     request: PostRequest<'_>,
@@ -469,6 +500,9 @@ where
 {
     tokio::pin!(future);
     let mut phase = PostPhase::Running;
+    // Set when the post is withdrawn: it is dropped if still running then.
+    let withdraw_deadline = tokio::time::sleep(std::time::Duration::MAX);
+    tokio::pin!(withdraw_deadline);
     let mut classifier_retry = tokio::time::interval(std::time::Duration::from_millis(10));
     classifier_retry.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
@@ -491,11 +525,15 @@ where
                 match service_frame_in_flight(server, stdout, pending, request.id, frame, true).await {
                     Ok(InFlightFrame::Serviced) => {}
                     Ok(InFlightFrame::CancelsInFlight) => {
-                        if phase == PostPhase::Draining {
+                        if matches!(phase, PostPhase::Draining | PostPhase::Withdrawing) {
                             continue;
                         }
                         match post_dispatch_state(server, request.args) {
-                            PostDispatchState::NotDispatched => return Ok(None),
+                            PostDispatchState::NotDispatched => {
+                                withdraw_post(server, &request);
+                                phase = PostPhase::Withdrawing;
+                                withdraw_deadline.as_mut().reset(tokio::time::Instant::now() + WITHDRAW_GRACE);
+                            }
                             PostDispatchState::MayHaveDispatched if phase == PostPhase::Running => {
                                 phase = PostPhase::Draining;
                             }
@@ -513,12 +551,20 @@ where
             // for the builder's Tally reads to finish.
             _ = classifier_retry.tick(), if phase == PostPhase::Classifying => {
                 match post_dispatch_state(server, request.args) {
-                    PostDispatchState::NotDispatched => return Ok(None),
+                    PostDispatchState::NotDispatched => {
+                        withdraw_post(server, &request);
+                        phase = PostPhase::Withdrawing;
+                        withdraw_deadline.as_mut().reset(tokio::time::Instant::now() + WITHDRAW_GRACE);
+                    }
                     PostDispatchState::MayHaveDispatched => phase = PostPhase::Draining,
                     PostDispatchState::AdmissionBusy => {}
                 }
             }
-            response = &mut future, if phase != PostPhase::Classifying => return Ok(Some(response)),
+            () = &mut withdraw_deadline, if phase == PostPhase::Withdrawing => return Ok(None),
+            // A withdrawn post's own answer is replaced by the cancellation's.
+            response = &mut future, if phase != PostPhase::Classifying => {
+                return Ok((phase != PostPhase::Withdrawing).then_some(response))
+            }
         }
     }
 }
@@ -694,6 +740,8 @@ enum PostPhase {
     Running,
     Classifying,
     Draining,
+    /// Cancelled before its intent: finishing the operation in flight.
+    Withdrawing,
 }
 
 fn post_dispatch_state(server: &Server, args: &Value) -> PostDispatchState {
@@ -740,6 +788,10 @@ where
         // remains usable; no replacement post is created.
         return Ok(Some(future.as_mut().await));
     }
+    // No intent: withdraw it, and finish the operation in flight rather than
+    // abandon it. It sends nothing further and can write no intent (#725).
+    withdraw_post(server, &request);
+    let _withdrawn = tokio::time::timeout(WITHDRAW_GRACE, future.as_mut()).await;
     match interruption {
         Some(error) => Err(error),
         None => Ok(None),

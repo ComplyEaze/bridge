@@ -434,3 +434,57 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
     assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
     assert!(approvals.take_for_dispatch(&line.batch_id, &binding).is_err());
 }
+
+/// A cancellation that lands inside the queue's lease operation (#725): that
+/// operation finishes its reads, every one served in full, and then, finding
+/// its approval revoked, writes no intent and sends no POST. Nothing is
+/// abandoned mid-request, and nothing is posted.
+#[tokio::test]
+async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
+    let mut plans = before_approval();
+    let lease_start = plans.len();
+    let mut lease = after_approval(xml(created_one()));
+    // The lease opens with a probe, the company list and the marks at
+    // binding, then the ledger catalogue's pair: hold its first read.
+    let held_at = 5;
+    lease[held_at] = xml(catalogue()).with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+    let post_at = lease_start + lease.len() - 1;
+    plans.extend(lease);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    let post = crate::tally::runtime::TOOL_CANCELLATION.scope(
+        withdrawn.clone(),
+        SCRIPTED_APPROVAL.scope(ScriptedApproval::approving(), server.call_tool("post_import", args)),
+    );
+    let cancel = async {
+        while simulator.received() <= lease_start + held_at {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        // What `withdraw_post` does on a cancellation before the intent.
+        server.post_approvals.revoke(&line.batch_id, "request_cancelled");
+        withdrawn.cancel();
+    };
+    let (response, ()) = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::join!(post, cancel)
+    })
+    .await
+    .unwrap();
+    let observed = sent(simulator);
+    assert_eq!(intents(directory.path()), 0, "{response}");
+    assert_eq!(observed.len(), post_at, "every lease read, and no POST: {response}");
+    assert!(
+        observed
+            .iter()
+            .all(|request| request.request_processed
+                && !request.cancelled
+                && !request.client_stopped_reading_response),
+        "every started request was served in full"
+    );
+    assert_eq!(
+        PostApprovals::new(directory.path()).lapse_note(&line.batch_id).unwrap()["reason"],
+        "request_cancelled"
+    );
+}

@@ -18,6 +18,19 @@ pub struct TrialBalanceRequest {
 pub struct TrialBalanceResponse {
     read: TrialBalanceRead,
     export_id: String,
+    /// Present only when the read covers a several-currency book's
+    /// base-currency ledgers; the screen shows it with the ledgers left out
+    /// (bridge#709).
+    scope_limitation: Option<&'static str>,
+}
+
+fn scope_limitation(read: &TrialBalanceRead) -> Option<&'static str> {
+    match read.ledger_scope {
+        crate::tally::runtime::TrialBalanceLedgerScope::AllLedgers => None,
+        crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { .. } => {
+            Some(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION)
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,7 +121,7 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
                 "This report currently requires observed Licensed TallyPrime. Education support needs further qualification.");
         }
         return local_error(reason.safe_code(), "Bridge could not admit this Trial Balance period or currency.",
-            "Choose dates on or after book start. This report currently requires one observed INR currency master.");
+            "Choose dates on or after book start. This report requires an INR base currency that Tally identifies.");
     }
     if let Some(reason) = error.chain().find_map(|cause| {
         cause.downcast_ref::<bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError>()
@@ -159,6 +172,7 @@ pub async fn fetch_tally_trial_balance(
         .fetch_trial_balance(request.config, &identity, period)
         .await
         .map_err(read_error)?;
+    let scope_limitation = scope_limitation(&read);
     let export_id = exports.insert(read.clone()).map_err(|_| {
         local_error(
             "trial_balance_export_budget",
@@ -166,7 +180,11 @@ pub async fn fetch_tally_trial_balance(
             "Review the selected company and retry with a smaller supported source.",
         )
     })?;
-    Ok(TrialBalanceResponse { read, export_id })
+    Ok(TrialBalanceResponse {
+        read,
+        export_id,
+        scope_limitation,
+    })
 }
 
 /// The webview sends only an opaque handle; no amounts, rows or Tally request

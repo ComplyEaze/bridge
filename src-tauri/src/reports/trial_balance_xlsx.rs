@@ -4,7 +4,9 @@ use bridge_tally_protocol::native_trial_balance::NativeTrialBalanceAmount;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
 use super::party_statement_xlsx::amount_to_f64;
-use crate::tally::runtime::TrialBalanceRead;
+use crate::tally::runtime::{
+    TrialBalanceLedgerScope, TrialBalanceRead, BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
+};
 
 const EXCEL_MAX_ROWS: usize = 1_048_576;
 
@@ -23,9 +25,30 @@ pub enum TrialBalanceXlsxError {
 pub fn render_trial_balance_xlsx(
     read: &TrialBalanceRead,
 ) -> Result<Vec<u8>, TrialBalanceXlsxError> {
-    if read.report.rows.len().saturating_add(18) > EXCEL_MAX_ROWS {
+    if read.report.rows.len().saturating_add(19) > EXCEL_MAX_ROWS {
         return Err(TrialBalanceXlsxError::RowLimit);
     }
+    let partial = match &read.ledger_scope {
+        TrialBalanceLedgerScope::AllLedgers => None,
+        TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+            base_name,
+            foreign,
+            mixed,
+            ..
+        } => {
+            if foreign.len().saturating_add(mixed.len()).saturating_add(1) > EXCEL_MAX_ROWS {
+                return Err(TrialBalanceXlsxError::RowLimit);
+            }
+            Some((base_name, foreign, mixed))
+        }
+    };
+    let currency = match partial {
+        None => read.amount_currency().0.to_string(),
+        Some((base_name, _, _)) => format!(
+            "{base_name} (the base Tally identified; this book keeps {} Currency masters)",
+            read.currency.currency_count
+        ),
+    };
     let mut workbook = Workbook::new();
     let sheet = workbook.add_worksheet();
     sheet.set_name("Trial Balance")?;
@@ -43,7 +66,7 @@ pub fn render_trial_balance_xlsx(
             "Period",
             &format!("{} to {}", read.from.as_str(), read.to.as_str()),
         ),
-        ("Currency", read.currency.mailing_name.as_str()),
+        ("Currency", currency.as_str()),
         ("Read completed (UTC)", read.read_at.as_str()),
         (
             "Native Trial Balance rows",
@@ -74,7 +97,16 @@ pub fn render_trial_balance_xlsx(
     // column width, so preserve a full six-line row rather than Excel's
     // default clipped height.
     sheet.set_row_height(row, 90)?;
-    row += 2;
+    row += 1;
+    // A several-currency book's totals cover part of the book, and say so
+    // before any figure (bridge#709).
+    if partial.is_some() {
+        sheet.write_string_with_format(row, 0, "Ledgers covered", &bold)?;
+        sheet.write_string_with_format(row, 1, BASE_CURRENCY_LEDGERS_ONLY_LIMITATION, &wrapped)?;
+        sheet.set_row_height(row, 60)?;
+        row += 1;
+    }
+    row += 1;
 
     for (column, label) in [
         "Ledger",
@@ -150,7 +182,14 @@ pub fn render_trial_balance_xlsx(
     }
     row += 1;
     if read.totals.opening.empty_count == 0 {
-        sheet.write_string_with_format(row, 0, "Opening difference (observed)", &bold)?;
+        // Over part of a book the opening net is no balance check, so it is
+        // never labelled a difference (bridge#709).
+        let label = if partial.is_some() {
+            "Opening net, base-currency ledgers only (not a balance check)"
+        } else {
+            "Opening difference (observed)"
+        };
+        sheet.write_string_with_format(row, 0, label, &bold)?;
         sheet.write_number_with_format(
             row,
             3,
@@ -176,6 +215,36 @@ pub fn render_trial_balance_xlsx(
     sheet.set_column_width(2, 28)?;
     for column in 3..=6 {
         sheet.set_column_width(column, 22)?;
+    }
+    if let Some((base_name, foreign, mixed)) = partial {
+        let excluded = workbook.add_worksheet();
+        excluded.set_name("Excluded ledgers")?;
+        for (column, label) in ["Ledger", "Currency", "Why it is left out"]
+            .into_iter()
+            .enumerate()
+        {
+            excluded.write_string_with_format(0, column as u16, label, &bold)?;
+        }
+        let mut row = 1;
+        for ledger in foreign {
+            excluded.write_string(row, 0, &ledger.ledger)?;
+            excluded.write_string(row, 1, &ledger.currency)?;
+            excluded.write_string(row, 2, "Kept in another currency")?;
+            row += 1;
+        }
+        for ledger in mixed {
+            excluded.write_string(row, 0, ledger)?;
+            excluded.write_string(row, 1, base_name)?;
+            excluded.write_string(
+                row,
+                2,
+                "Base-currency ledger with a value Tally shows in another currency (mixed_currency_movement)",
+            )?;
+            row += 1;
+        }
+        excluded.set_column_width(0, 34)?;
+        excluded.set_column_width(1, 16)?;
+        excluded.set_column_width(2, 60)?;
     }
     workbook
         .save_to_buffer()
@@ -206,7 +275,7 @@ fn decimal(value: &str) -> Result<f64, TrialBalanceXlsxError> {
 }
 
 fn amount_num_format(read: &TrialBalanceRead) -> Result<String, TrialBalanceXlsxError> {
-    let mut places = usize::from(read.currency.decimal_places);
+    let mut places = usize::from(read.amount_currency().1);
     for row in &read.report.rows {
         for value in [&row.opening, &row.debit, &row.credit, &row.closing] {
             if let NativeTrialBalanceAmount::Present(value) = value {
@@ -234,4 +303,4 @@ fn amount_num_format(read: &TrialBalanceRead) -> Result<String, TrialBalanceXlsx
 
 #[cfg(test)]
 #[path = "trial_balance_xlsx_tests.rs"]
-mod tests;
+pub(crate) mod tests;

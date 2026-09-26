@@ -360,37 +360,88 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
     }
 }
 
-/// bridge#551: the desktop Trial Balance, which cannot show the ledgers a
-/// several-currency book's read would leave out, still refuses such a book
-/// after its currency read, and sends nothing more. Only the MCP read asks for
-/// the base-currency ledgers.
+/// bridge#709: `fetch_trial_balance`, the desktop's read, reads a
+/// several-currency book's plain base-currency ledgers through the base Tally
+/// identifies, sets the rest aside by name, and presents its amounts in that
+/// base, not in the first master read. Captured on one moment of one book
+/// (FOREX_601D_CAPTURE_PROVENANCE).
 #[tokio::test]
-async fn the_desktop_trial_balance_still_refuses_a_several_currency_book() {
-    let currency = decode(include_bytes!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers() {
+    const FOREX: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+    let forex = |bytes: &[u8]| xml(decode(bytes));
+    let extent = forex(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
     ));
-    let plans = opening_plans(currency);
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies.clone()];
+    pair(&mut plans, extent.clone());
+    for source in [
+        forex(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+        )),
+        forex(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+        )),
+        forex(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+        )),
+        forex(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/trial_balance_currency_forex_live.utf16le.xml"
+        )),
+    ] {
+        pair(&mut plans, source);
+    }
+    pair(&mut plans, extent);
+    plans.extend([companies.clone(), status(), companies]);
     let total = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let error = TallyRuntime::default()
+    let observed = parse_companies_from_collection(&companies()).unwrap();
+    let row = observed
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(FOREX))
+        .unwrap();
+    let identity = VerifiedCompanyIdentity::from_observed_companies(
+        row.name.clone(),
+        FOREX.into(),
+        row.company_number.clone().unwrap(),
+        row.books_from.clone().unwrap(),
+        &observed,
+    )
+    .unwrap();
+    let read = TallyRuntime::default()
         .fetch_trial_balance(
             config(&simulator),
-            &identity(),
+            &identity,
             TrialBalancePeriod::new(
-                TallyDate::parse("20260401").unwrap(),
-                TallyDate::parse("20260902").unwrap(),
+                TallyDate::parse("20250401").unwrap(),
+                TallyDate::parse("20260915").unwrap(),
             )
             .unwrap(),
         )
         .await
-        .unwrap_err();
-    assert!(matches!(
-        error
-            .chain()
-            .find_map(|cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()),
-        Some(super::trial_balance::TrialBalanceReadError::Currency(
-            "company_base_currency_undetermined"
-        ))
-    ));
+        .unwrap();
     assert_eq!(simulator.finish().unwrap().len(), total);
+    let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+        base_name,
+        foreign,
+        mixed,
+        ..
+    } = &read.ledger_scope
+    else {
+        panic!("a several-currency book's read covers its base ledgers only");
+    };
+    assert_eq!(base_name, "I\u{20b9}");
+    assert_eq!(foreign.len(), 3);
+    assert!(foreign.iter().all(|ledger| ledger.currency == "$"));
+    assert_eq!(mixed, &["FX Party 01", "FX Sales", "Profit & Loss A/c"]);
+    assert_eq!(
+        read.report
+            .rows
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["BRIDGE INR DEBTOR A", "Cash", "FX Party 02", "FX Party 03"]
+    );
+    assert_eq!(read.amount_currency().0, "I\u{20b9}");
+    assert_ne!(read.currency.currency_count, 1);
 }

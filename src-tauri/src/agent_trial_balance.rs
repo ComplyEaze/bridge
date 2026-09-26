@@ -29,12 +29,7 @@ impl Server {
             None => {
                 let (read, extent) = self
                     .runtime
-                    .fetch_trial_balance_with_extent(
-                        self.tally_config(),
-                        &identity,
-                        period,
-                        crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
-                    )
+                    .fetch_trial_balance_with_extent(self.tally_config(), &identity, period)
                     .await
                     .map_err(|error| {
                         ToolFailure::from_runtime("trial_balance_read_failed", error)
@@ -95,9 +90,8 @@ impl Server {
                             .map(|ledger| party_name(ledger.clone()))
                             .collect::<Vec<_>>(),
                     });
-                    frame["scope_limitation"] = json!(
-                        "Totals cover this book's plain base-currency ledgers only. Ledgers kept in another currency, and base-currency ledgers with a balance Tally shows in another currency, are left out and named, so debit and credit totals are expected to differ."
-                    );
+                    frame["scope_limitation"] =
+                        json!(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION);
                 }
                 self.hold_listing(ListingSnapshot::new(
                     &identity,

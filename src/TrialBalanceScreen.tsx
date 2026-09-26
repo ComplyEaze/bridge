@@ -16,6 +16,11 @@ type ParentObservation = string | null;
 type TrialBalanceRow = { name: string; guid: string; parent: ParentObservation; opening: Amount; debit: Amount; credit: Amount; closing: Amount };
 type ObservedAmountTotal = { sum: string; empty_count: number };
 type TrialBalanceTotals = { opening: ObservedAmountTotal; debit: ObservedAmountTotal; credit: ObservedAmountTotal; closing: ObservedAmountTotal };
+// Which ledgers a read covers. A several-currency book's read covers its plain
+// base-currency ledgers only and names the rest (bridge#709).
+type LedgerScope =
+  | { kind: "all_ledgers" }
+  | { kind: "base_currency_ledgers_only"; base_name: string; decimal_places: number; foreign: { ledger: string; currency: string }[]; mixed: string[] };
 
 type TrialBalanceResult = {
   read: {
@@ -28,8 +33,10 @@ type TrialBalanceResult = {
     totals: TrialBalanceTotals;
     read_at: string;
     evidence: { request_sha256: string; response_sha256: string; bytes: number };
+    ledger_scope: LedgerScope;
   };
   export_id: string;
+  scope_limitation: string | null;
 };
 
 type TrialBalanceCaptureParentQuery = {
@@ -314,7 +321,10 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
 
   const result = captured?.scope === scope ? captured.result : null;
   const read = result?.read;
-  const currency = read?.currency;
+  const partialScope = read?.ledger_scope.kind === "base_currency_ledgers_only" ? read.ledger_scope : null;
+  // Amounts are in the base Tally identified; on a several-currency book
+  // `read.currency` describes the first master read, not the base.
+  const currency = read ? (partialScope ? { symbol: partialScope.base_name, decimal_places: partialScope.decimal_places } : read.currency) : undefined;
   latestCapture.current = result ? { scope, result } : null;
   React.useEffect(() => {
     parentDiscoveryEpoch.current += 1;
@@ -374,7 +384,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
         <label>To<input type="date" value={to} onChange={(event) => { setTo(event.target.value); setCaptured(null); setSelectedParentKey(""); setParentSearch(""); setParentQuery(null); setParentQueryError(null); setParentOptions([]); setParentOptionsHasMore(false); setParentSourceRowCount(0); setParentDiscoveryError(null); setDiscoveringParents(false); setSelectedParent(null); setError(null); setExportPath(null); }} disabled={disabled} /></label>
       </div>
       <p className="section-note trial-balance-date-note">
-        Choose the end date before reading. This report currently requires Licensed TallyPrime and one observed INR currency master.
+        Choose the end date before reading. This report currently requires Licensed TallyPrime and an INR base currency. On a book with several Currency masters it covers the base-currency ledgers only and names the rest.
       </p>
       <p className="section-note">Preview: validated with small synthetic companies. Compare this report with Tally before relying on it for production work.</p>
       {error && <div className="error-banner" role="alert"><span>{error}</span></div>}
@@ -391,9 +401,21 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
             <button className="secondary-action" type="button" onClick={() => void queryCapturedParent()} disabled={disabled || !selectedParent}>{queryingParent ? "Selecting…" : "View selected rows"}</button>
           </div>
           <p id="trial-balance-parent-search-note" className="section-note">{parentDiscoveryError ?? (discoveringParents ? "Finding parent values in this capture…" : parentOptionsHasMore ? `Showing the first ${PARENT_OPTION_LIMIT} matching parent values. Refine the search to find another.` : parentOptions.length === 0 ? "No matching parent values. Change or clear the search; your current selection stays available." : `${parentOptions.length} matching parent values from ${parentSourceRowCount} captured rows. Search and selection use this capture without rereading Tally.`)}</p>
-          {queried && <p className="section-note">Selected rows: {queried.query.selected_rows.length} of {queried.query.source_row_count} from this capture. These exact observed-parent totals are a subset, not a qualified financial group balance. The capture had {queried.capture.expires_in_seconds} seconds remaining when this selection was derived and this query did not read Tally.</p>}
+          {partialScope && (
+            <div className="trial-balance-scope" role="note">
+              <p className="section-note">{result?.scope_limitation}</p>
+              <details>
+                <summary>Ledgers left out: {partialScope.foreign.length} kept in another currency · {partialScope.mixed.length} with a value Tally shows in another currency</summary>
+                <ul>
+                  {partialScope.foreign.map((ledger, index) => <li key={`foreign-${index}`}>{ledger.ledger}: kept in {ledger.currency}</li>)}
+                  {partialScope.mixed.map((ledger, index) => <li key={`mixed-${index}`}>{ledger}: a base-currency ledger with a value Tally shows in another currency</li>)}
+                </ul>
+              </details>
+            </div>
+          )}
+          {queried && <p className="section-note">Selected rows: {queried.query.selected_rows.length} of {queried.query.source_row_count} from this capture. These exact observed-parent totals are a subset, not a qualified financial group balance.{partialScope ? " They are drawn from the base-currency ledgers only." : ""} The capture had {queried.capture.expires_in_seconds} seconds remaining when this selection was derived and this query did not read Tally.</p>}
           <dl className="trial-balance-totals">
-            <div><dt>{queried ? "Selected opening net" : displayedTotals?.opening.empty_count === 0 ? "Difference in opening balances" : "Observed opening net"}</dt><dd>{displayedTotals && formatBalance({ state: "present", value: displayedTotals.opening.sum }, currency.symbol, currency.decimal_places)}{displayedTotals?.opening.empty_count ? ` · ${displayedTotals.opening.empty_count} empty source values` : ""}</dd></div>
+            <div><dt>{queried ? "Selected opening net" : partialScope ? "Opening net, base-currency ledgers only" : displayedTotals?.opening.empty_count === 0 ? "Difference in opening balances" : "Observed opening net"}</dt><dd>{displayedTotals && formatBalance({ state: "present", value: displayedTotals.opening.sum }, currency.symbol, currency.decimal_places)}{displayedTotals?.opening.empty_count ? ` · ${displayedTotals.opening.empty_count} empty source values` : ""}</dd></div>
             <div><dt>{queried ? "Selected debit total" : "Debit total"}</dt><dd>{displayedTotals && formatAmount({ state: "present", value: displayedTotals.debit.sum }, currency.symbol, currency.decimal_places, true)}{displayedTotals?.debit.empty_count ? ` · ${displayedTotals.debit.empty_count} empty` : ""}</dd></div>
             <div><dt>{queried ? "Selected credit total" : "Credit total"}</dt><dd>{displayedTotals && formatAmount({ state: "present", value: displayedTotals.credit.sum }, currency.symbol, currency.decimal_places, true)}{displayedTotals?.credit.empty_count ? ` · ${displayedTotals.credit.empty_count} empty` : ""}</dd></div>
             <div><dt>{queried ? "Selected closing total" : "Closing total"}</dt><dd>{displayedTotals && formatBalance({ state: "present", value: displayedTotals.closing.sum }, currency.symbol, currency.decimal_places)}{displayedTotals?.closing.empty_count ? ` · ${displayedTotals.closing.empty_count} empty source values` : ""}</dd></div>
@@ -406,7 +428,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
             <div><button className="secondary-action" type="button" onClick={() => setPage((current) => Math.max(0, current - 1))} disabled={page === 0}>Previous</button><button className="secondary-action" type="button" onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))} disabled={page >= pageCount - 1}>Next</button></div>
           </div>
           <details className="trial-balance-provenance"><summary>Capture provenance and limits</summary><p>Company GUID: {read.company_guid}. Period: {toInputDate(read.from)} → {toInputDate(read.to)}. Captured at: {new Date(read.read_at).toLocaleString()}. Request checksum: {read.evidence.request_sha256}. Response checksum: {read.evidence.response_sha256}. The retained capture expires after 15 minutes and queries never acquire Tally data.</p></details>
-          <p className="section-note">Currency: {currency.mailing_name || currency.symbol}. This native read is tied to the selected company and date range; it may include dormant ledger masters and is not an atomic snapshot of concurrent Tally changes.</p>
+          <p className="section-note">Currency: {partialScope ? `${partialScope.base_name}, the base Tally identified among ${read.currency.currency_count} Currency masters` : read.currency.mailing_name || read.currency.symbol}. This native read is tied to the selected company and date range; it may include dormant ledger masters and is not an atomic snapshot of concurrent Tally changes.</p>
         </div>
       )}
     </section>

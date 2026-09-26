@@ -30,8 +30,10 @@ const report = {
     totals: { opening: { sum: "-1234567.89", empty_count: 0 }, debit: { sum: "-1.25", empty_count: 0 }, credit: { sum: "100.00", empty_count: 0 }, closing: { sum: "1234467.80", empty_count: 0 } },
     read_at: "2026-09-08T10:00:00Z",
     evidence: { request_sha256: "a", response_sha256: "b", bytes: 10 },
+    ledger_scope: { kind: "all_ledgers" },
   },
   export_id: "export-1",
+  scope_limitation: null,
 };
 
 const defaultParentDiscovery = {
@@ -376,6 +378,46 @@ test("shows the observed closing empty count", async () => {
   await act(async () => button(host, "Refresh report").click());
   expect(host.textContent).toContain("Closing total");
   expect(host.textContent).toContain("2 empty source values");
+  root.unmount();
+});
+
+// bridge#709: a several-currency book's read covers its base-currency ledgers
+// only. The screen formats amounts in the identified base (not the first
+// master read), states the scope, names every ledger left out, and never
+// labels the opening net a difference.
+test("shows a several-currency book's base-ledgers-only result with its exclusions", async () => {
+  const limitation = "Totals cover this book's plain base-currency ledgers only.";
+  const several = {
+    ...report,
+    read: {
+      ...report.read,
+      currency: { symbol: "$", mailing_name: "US Dollar", currency_count: 2, decimal_places: 2, is_inr: false },
+      ledger_scope: {
+        kind: "base_currency_ledgers_only",
+        base_name: "I₹",
+        decimal_places: 2,
+        foreign: [{ ledger: "Dollar Debtor 01", currency: "$" }],
+        mixed: ["Rupee Party 01"],
+      },
+    },
+    scope_limitation: limitation,
+  };
+  queueInvoke({ responses: [several] });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={company} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
+  await chooseEndDate(host);
+  await act(async () => button(host, "Refresh report").click());
+  expect(host.textContent).toContain("I₹12,34,567.89 Cr");
+  expect(host.textContent).not.toContain("$1");
+  expect(host.textContent).toContain(limitation);
+  expect(host.textContent).toContain("Ledgers left out: 1 kept in another currency · 1 with a value Tally shows in another currency");
+  expect(host.textContent).toContain("Dollar Debtor 01: kept in $");
+  expect(host.textContent).toContain("Rupee Party 01: a base-currency ledger");
+  expect(host.textContent).toContain("Opening net, base-currency ledgers only");
+  expect(host.textContent).not.toContain("Difference in opening balances");
+  expect(host.textContent).toContain("I₹, the base Tally identified among 2 Currency masters");
   root.unmount();
 });
 

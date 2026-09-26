@@ -4,7 +4,7 @@ use super::approval::{self, ApprovalBinding, Begin, Joined};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
-    ApprovedImport, ApprovedImportAdmissionError, PendingPostApproval,
+    Answered, ApprovedImport, ApprovedImportAdmissionError, PendingPostApproval,
 };
 use bridge_tally_protocol::native_outstandings::{parse_company_currency, BaseCurrencyName};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportApplicationStatus};
@@ -63,7 +63,7 @@ enum ApprovalState {
 
 /// What waiting on a dialog came to.
 enum Waited {
-    Answered(Result<ApprovedImport, String>),
+    Answered((Result<ApprovedImport, String>, Answered)),
     Open(PendingPostApproval),
     /// The call was withdrawn while it waited. The dialog was dropped, which
     /// closes it.
@@ -90,12 +90,15 @@ async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duratio
             None => std::future::pending().await,
         }
     };
+    // Biased: a withdrawal ready in the same poll as an answer wins, so an
+    // answer never outlives the cancellation of the call that asked (#725).
     tokio::select! {
+        biased;
+        () = withdrawal => Waited::Cancelled,
         waited = dialog.answer_within(budget) => match waited {
             Ok(answer) => Waited::Answered(answer),
             Err(dialog) => Waited::Open(dialog),
         },
-        () = withdrawal => Waited::Cancelled,
     }
 }
 
@@ -287,6 +290,7 @@ impl Server {
         ToolOutcome {
             payload: json!({"result":{
                 "batch_id": batch_id,
+                "attempt_recorded": false,
                 "approval": approval,
                 "previous_approval": self.post_approvals.lapse_note(batch_id),
                 "dispatch": {"state": "not_dispatched", "resent": false},
@@ -414,7 +418,12 @@ impl Server {
             if recorded {
                 return Err("import_remote_id_reused".to_string().into());
             }
-            let preview = admit_fresh_saved_voucher(&line, &self.settings.endpoint)?;
+            // An agent's post says when it happens (#725); the desktop's,
+            // answered and posted in one call, is unchanged.
+            let preview = match scope {
+                PostScope::JournalOnly => admit_fresh_saved_voucher(&line, &self.settings.endpoint)?,
+                PostScope::Vouchers => agent_review_preview(&line, &self.settings.endpoint)?,
+            };
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
             // Also admits, on this read's measurement, the whole-window request
@@ -537,42 +546,42 @@ impl Server {
                 super::super::read_profiles::render_agent_company_high_water(&company.name),
             )
             .map_err(|error| error.to_string())?;
-            // The one native approval, not yet started: an async block runs
-            // nothing until it is polled.
-            let asked = {
-                let preview = preview.clone();
-                let ledger_binding = ledger_binding.clone();
-                let company_marks_request = company_marks_request.clone();
-                async move {
+            // The approval this call spends, if it is one held across calls. It
+            // lapses when this drops unspent, whatever way the call ends (#725).
+            let mut redemption = None;
+            let (request, native) = match scope {
+                PostScope::JournalOnly => (
                     ApprovedImport::confirm(
                         xml,
                         &preview,
                         voucher_dates,
                         verification_request,
                         ledger_catalogue_request,
-                        ledger_binding,
+                        ledger_binding.clone(),
                         group_collection_request,
                         currency_request,
-                        company_marks_request,
+                        company_marks_request.clone(),
                     )
-                    .await
-                }
-            };
-            // The approval this call spends, if it is one held across calls.
-            let mut redemption = None;
-            let (request, native) = match scope {
-                PostScope::JournalOnly => (asked.await?, native),
+                    .await?,
+                    native,
+                ),
                 PostScope::Vouchers => {
                     // What the person is shown, and what it is about: an
                     // approval is redeemed only for exactly this (#725).
                     let binding = ApprovalBinding::new(&line, &preview, &ledger_binding);
                     if !redeeming {
-                        match wait_for_answer(
-                            PendingPostApproval::ask(asked),
-                            call_budget(call_started),
-                        )
-                        .await
-                        {
+                        let asked = PendingPostApproval::ask(
+                            xml,
+                            preview.clone(),
+                            voucher_dates,
+                            verification_request,
+                            ledger_catalogue_request,
+                            ledger_binding.clone(),
+                            group_collection_request,
+                            currency_request,
+                            company_marks_request.clone(),
+                        );
+                        match wait_for_answer(asked, call_budget(call_started)).await {
                             Waited::Cancelled => {
                                 return Err("request_cancelled".to_string().into())
                             }
@@ -587,20 +596,21 @@ impl Server {
                                     accumulated.clone(),
                                 ));
                             }
-                            Waited::Answered(answer) => {
+                            Waited::Answered((answer, answered)) => {
                                 self.post_approvals.hold_approved(
                                     batch_id,
                                     binding.clone(),
                                     answer?,
                                     native,
+                                    answered,
                                 )?;
                                 // Answered too late in the call for the post to
                                 // fit: the next call redeems it, after checking
                                 // the book again.
-                                if !approval::dispatch_fits_in_call(
-                                    call_started.elapsed(),
-                                    line.vouchers.len(),
-                                ) {
+                                if !self
+                                    .post_approvals
+                                    .fits_in_call(call_started.elapsed(), line.vouchers.len())
+                                {
                                     return Ok(self.approval_outcome(
                                         batch_id,
                                         guid,
@@ -611,12 +621,13 @@ impl Server {
                             }
                         }
                     }
-                    let (id, request, native) =
+                    let (taken, request, native) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
-                    redemption = Some(id);
+                    redemption = Some(taken);
                     (request, native)
                 }
             };
+            let redemption_id = redemption.as_ref().map(approval::Redemption::id);
             // The cross-process lease starts only after the independent native
             // approval. It covers intent, the one POST, its response append and
             // immediate readback; recovery remains the durable batch journal.
@@ -672,7 +683,7 @@ impl Server {
                         // Spent here, once, under this lock and before the
                         // intent: a revoked approval (the call was cancelled)
                         // or a second redemption writes no intent (#725).
-                        match (scope, redemption) {
+                        match (scope, redemption_id) {
                             (_, Some(id)) => self.post_approvals.spend(batch_id, id)?,
                             // Every agent post redeems an approval; one that
                             // reached here without one writes no intent.
@@ -689,10 +700,7 @@ impl Server {
                 .await;
             // An approval this post did not spend lapses: it is never offered
             // again (#725).
-            if let Some(id) = redemption {
-                self.post_approvals
-                    .release_unspent(batch_id, id, "post_refused_before_intent");
-            }
+            drop(redemption);
             // Whatever the outcome, the book may have changed: no ledger
             // listing of this company is continued from before it (#630).
             self.drop_listing_snapshots(identity.company_guid());
@@ -907,6 +915,13 @@ impl Server {
             Ok(proof)
         }
         .await;
+        // A refused redemption withdraws the approval it was to use (#725): a
+        // later call asks the person again. One taken by this call has already
+        // lapsed; another call's, or a dialog, is left as it is.
+        if scope == PostScope::Vouchers && operation.is_err() {
+            self.post_approvals
+                .revoke_unredeemed(batch_id, "post_refused_before_intent");
+        }
         // Even failure after a lost response carries the saved identity. The next
         // call must reconcile that batch, never create a replacement business event.
         match operation {
@@ -1689,12 +1704,42 @@ fn admit_fresh_saved_voucher(
     line: &ImportLedgerLine,
     endpoint: &super::super::TallyEndpointConfig,
 ) -> Result<String, String> {
+    review_preview_with(line, endpoint, &[])
+}
+
+/// When the agent's post happens, stated in its dialog (#725): the post may
+/// come after the click, on the agent's next call, or not at all.
+pub(super) fn agent_post_timing_lines() -> [String; 2] {
+    [
+        format!(
+            "Bridge posts this now, or when the agent asks again within {} minutes; otherwise nothing is posted.",
+            approval::APPROVAL_TTL.as_secs() / 60
+        ),
+        "It is not posted if the request is cancelled or Bridge's checks just before posting refuse it."
+            .into(),
+    ]
+}
+
+/// The preview an agent's post shows: the voucher or batch, and when it is
+/// posted, all inside the dialog's caps.
+pub(super) fn agent_review_preview(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+) -> Result<String, String> {
+    review_preview_with(line, endpoint, &agent_post_timing_lines())
+}
+
+fn review_preview_with(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    footer: &[String],
+) -> Result<String, String> {
     let company = line.company.as_ref().ok_or("import_post_company_missing")?;
     let origin =
         super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
     let (debit, credit) = totals(&line.vouchers)?;
     if line.vouchers.len() > 1 {
-        return batch_review_text(line, company, &origin, &debit, &credit);
+        return batch_review_text(line, company, &origin, &debit, &credit, footer);
     }
     let voucher = &line.vouchers[0];
     let mut review_text = std::iter::once(company.name.as_str())
@@ -1740,6 +1785,10 @@ fn admit_fresh_saved_voucher(
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
+    let preview = std::iter::once(preview)
+        .chain(footer.iter().cloned())
+        .collect::<Vec<_>>()
+        .join("\n");
     // Native message boxes have no portable scrollable review surface. Keep this
     // first posting slice reviewable; longer batches retain the manual file path.
     if preview.chars().count() > 1_600
@@ -1770,6 +1819,7 @@ fn batch_review_text(
     origin: &str,
     debit: &ExactDecimal,
     credit: &ExactDecimal,
+    footer: &[String],
 ) -> Result<String, String> {
     let names = std::iter::once(company.name.as_str()).chain(
         line.vouchers
@@ -1890,6 +1940,7 @@ fn batch_review_text(
             .into(),
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());
+    text.extend(footer.iter().cloned());
     let preview = text.join("\n");
     if text.len() > BATCH_REVIEW_MAX_LINES
         || preview.chars().count() > BATCH_REVIEW_MAX_CHARS

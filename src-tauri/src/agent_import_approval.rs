@@ -8,52 +8,58 @@
 //! Everything here is in memory, in the one process that showed the dialog. A
 //! restarted process holds nothing, so no approval can be redeemed that a
 //! person did not give to this process. An approval is bound to what the
-//! person was shown, redeemed once, and spent under the import admission lock
-//! before the dispatch intent is written; a cancelled or refused redemption
-//! spends it too. An approval that lapses unredeemed leaves a note saying so,
-//! and nothing can post from a note.
+//! person was shown, runs out a fixed time after the click, is redeemed once,
+//! and is spent under the import admission lock before the dispatch intent is
+//! written. A cancelled call, a refused redemption, or a redemption that ends
+//! before its intent lapses it. An approval that lapses unredeemed leaves a
+//! note saying so, and nothing can post from a note.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
-use crate::tally::approved_import::{ApprovedImport, PendingPostApproval};
+use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
-/// The longest one `post_import` call spends before it returns, well inside
-/// the roughly 60-second host timeout observed once under #485. Unit tests
-/// wait on scripted dialogs, where a long budget only slows them.
+/// How long a call waits on its dialog, counted from the call's start, before
+/// returning `pending`. Unit tests wait on scripted dialogs, where a long
+/// budget only slows them.
 #[cfg(not(test))]
 pub(super) const CALL_BUDGET: Duration = Duration::from_secs(40);
 #[cfg(test)]
 pub(super) const CALL_BUDGET: Duration = Duration::from_millis(300);
-/// The most one call may take in all: three quarters of the roughly 60-second
-/// host timeout observed once (#485, #703).
+/// The most a call that answers and posts may take in all: three quarters of
+/// the roughly 60-second host timeout observed once (#485, #703).
 pub(super) const CALL_CEILING: Duration = Duration::from_secs(45);
 /// What a post took from its approval to its result at the largest batch
 /// measured live: 200 Journals (D4, 26 Sep 2026, bridge#725), from the answer
 /// to the end of the call, 20.95 s: the queue's re-checks 3.0 s, the POST 5.2 s,
 /// the readback 12.1 s, and the spacing between them. A concurrent build ran,
 /// so it overstates a quiet book; it is not measured above 200.
-const MEASURED_POST: Duration = Duration::from_millis(20_950);
-const MEASURED_POST_VOUCHERS: usize = 200;
+pub(super) const MEASURED_POST: Duration = Duration::from_millis(20_950);
+pub(super) const MEASURED_POST_VOUCHERS: usize = 200;
 
 /// Whether an approval answered `elapsed` into its call may be posted in that
-/// same call, as before #725: only when the measured cost of the post still
-/// fits under the ceiling. Otherwise the next call redeems it, after checking
-/// the book again.
+/// same call, as before #725: only when a post that costs `measured` still fits
+/// under the ceiling. Otherwise the next call redeems it, after checking the
+/// book again.
 pub(super) fn dispatch_fits_in_call(elapsed: Duration, vouchers: usize) -> bool {
+    fits_with(MEASURED_POST, elapsed, vouchers)
+}
+
+fn fits_with(measured: Duration, elapsed: Duration, vouchers: usize) -> bool {
     vouchers <= MEASURED_POST_VOUCHERS
         && elapsed
-            .checked_add(MEASURED_POST)
+            .checked_add(measured)
             .is_some_and(|total| total <= CALL_CEILING)
 }
-/// How long an answered approval may wait to be redeemed. The owner's
-/// decision (#725); 15 minutes is the proposal it was put to them with.
+
+/// How long an answered approval may wait to be redeemed, from the click. The
+/// owner's decision (#725); 15 minutes is the proposal it was put to them with.
 pub(super) const APPROVAL_TTL: Duration = Duration::from_secs(15 * 60);
 /// A dialog is given at least this long in the call that starts it, so the
 /// dialog is up before the call returns even when the checks used the budget.
@@ -66,6 +72,13 @@ pub(super) const MIN_DIALOG_WAIT: Duration = Duration::from_millis(50);
 pub(super) const RETRY_AFTER: Duration = Duration::from_secs(15);
 /// A lapse note is a few hundred bytes; anything larger is not one.
 const MAX_LAPSE_NOTE_BYTES: u64 = 4_096;
+
+/// Whether the calling tool call has been withdrawn (#554, #725).
+fn call_withdrawn() -> bool {
+    crate::tally::runtime::TOOL_CANCELLATION
+        .try_with(|token| token.is_cancelled())
+        .unwrap_or(false)
+}
 
 /// What the person was shown and what it is about, fixed when the dialog is
 /// asked. A redemption whose fresh checks produce a different binding is
@@ -101,7 +114,8 @@ impl ApprovalBinding {
 }
 
 enum Held {
-    /// The dialog is open. `dialog` is `None` while a call waits on it.
+    /// The dialog is open, or answered with no call yet to collect it.
+    /// `dialog` is `None` while a call waits on it.
     Pending {
         binding: ApprovalBinding,
         dialog: Option<PendingPostApproval>,
@@ -113,14 +127,10 @@ enum Held {
         id: Uuid,
         request: Box<ApprovedImport>,
         native: NativePostRequest,
-        approved_at: Instant,
-        approved_at_utc: DateTime<Utc>,
+        answered: Answered,
     },
     /// Taken by the call posting it; spent when that call's intent is admitted.
-    Redeeming {
-        id: Uuid,
-        approved_at_utc: DateTime<Utc>,
-    },
+    Redeeming { id: Uuid, answered: Answered },
 }
 
 /// What a `post_import` call finds held for its batch.
@@ -144,11 +154,34 @@ pub(super) enum Joined {
     Refused(String),
 }
 
+/// An approval taken by the call about to post it. Whatever way that call
+/// ends, an approval it did not spend lapses when this drops: it is never
+/// offered again, and it never blocks another post.
+pub(super) struct Redemption<'a> {
+    approvals: &'a PostApprovals,
+    batch_id: String,
+    id: Uuid,
+}
+
+impl Redemption<'_> {
+    pub(super) fn id(&self) -> Uuid {
+        self.id
+    }
+}
+
+impl Drop for Redemption<'_> {
+    fn drop(&mut self) {
+        self.approvals
+            .release_unspent(&self.batch_id, self.id, "post_refused_before_intent");
+    }
+}
+
 /// The approvals one process holds: at most one batch at a time.
 pub(in crate::agent) struct PostApprovals {
     imports: PathBuf,
     held: Mutex<Option<(String, Held)>>,
     ttl: Duration,
+    measured_post: Duration,
 }
 
 impl PostApprovals {
@@ -157,6 +190,7 @@ impl PostApprovals {
             imports: data_dir.join("imports"),
             held: Mutex::new(None),
             ttl: APPROVAL_TTL,
+            measured_post: MEASURED_POST,
         }
     }
 
@@ -164,6 +198,21 @@ impl PostApprovals {
     pub(super) fn with_ttl(data_dir: &Path, ttl: Duration) -> Self {
         let mut approvals = Self::new(data_dir);
         approvals.ttl = ttl;
+        approvals
+    }
+
+    /// Whether a post answered `elapsed` into its call fits in that call, at
+    /// this holder's measured post cost.
+    pub(super) fn fits_in_call(&self, elapsed: Duration, vouchers: usize) -> bool {
+        fits_with(self.measured_post, elapsed, vouchers)
+    }
+
+    /// A holder whose posts are measured at `measured`: a test drives the
+    /// answered-too-late branch through a real call with it.
+    #[cfg(test)]
+    pub(in crate::agent) fn with_measured_post(data_dir: &Path, measured: Duration) -> Self {
+        let mut approvals = Self::new(data_dir);
+        approvals.measured_post = measured;
         approvals
     }
 
@@ -176,7 +225,11 @@ impl PostApprovals {
             batch_id.to_string(),
             Held::Redeeming {
                 id,
-                approved_at_utc: Utc::now(),
+                answered: Answered {
+                    approved: true,
+                    at: std::time::Instant::now(),
+                    at_wall: SystemTime::now(),
+                },
             },
         ));
         id
@@ -196,13 +249,20 @@ impl PostApprovals {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    fn expired(&self, answered: &Answered) -> bool {
+        answered.at.elapsed() > self.ttl
+            || SystemTime::now()
+                .duration_since(answered.at_wall)
+                .is_ok_and(|age| age > self.ttl)
+    }
+
     pub(super) fn begin(&self, batch_id: &str) -> Begin {
         let mut slot = self.slot();
-        self.lapse_if_expired(&mut slot);
+        self.settle(&mut slot);
         let Some((held_batch, held)) = slot.as_mut() else {
             return Begin::Ask;
         };
-        if held_batch != batch_id {
+        if *held_batch != batch_id {
             return Begin::Busy("post_approval_busy");
         }
         match held {
@@ -215,7 +275,29 @@ impl PostApprovals {
         }
     }
 
-    /// Hold a dialog the asking call could not wait out.
+    /// Let go of what can no longer be redeemed: a dialog answered with a
+    /// decline, a lapse or a failure, and an approval past its time, whether
+    /// or not a call has collected it yet. Neither blocks another batch.
+    fn settle(&self, slot: &mut Option<(String, Held)>) {
+        let finished = match slot.as_ref() {
+            Some((_, Held::Pending {
+                dialog: Some(dialog),
+                ..
+            })) => dialog
+                .answered()
+                .is_some_and(|answered| !answered.approved || self.expired(&answered)),
+            Some((_, Held::Approved { answered, .. })) => self.expired(answered),
+            _ => false,
+        };
+        if finished {
+            if let Some((batch_id, held)) = slot.take() {
+                self.lapse(&batch_id, held, "approval_expired");
+            }
+        }
+    }
+
+    /// Hold a dialog the asking call could not wait out. Refused, and the
+    /// dialog closed, when that call was withdrawn meanwhile.
     pub(super) fn hold_pending(
         &self,
         batch_id: &str,
@@ -224,6 +306,11 @@ impl PostApprovals {
         native: NativePostRequest,
     ) -> Result<(), String> {
         let mut slot = self.slot();
+        // Checked under the lock: a withdrawal cancels before it revokes, so
+        // a hold either lands before the revocation or sees the cancellation.
+        if call_withdrawn() {
+            return Err("request_cancelled".into());
+        }
         if slot.is_some() {
             // Dropping `dialog` closes it: nothing can hold two.
             return Err("post_approval_busy".into());
@@ -239,19 +326,19 @@ impl PostApprovals {
         Ok(())
     }
 
-    /// Settle a joined wait: put an open dialog back, keep an approval, and
-    /// let go of a refusal.
+    /// Settle a joined wait: put an open dialog back, keep an approval that
+    /// has not run out, and let go of a refusal.
     pub(super) fn settle_join(
         &self,
         batch_id: &str,
-        waited: Result<Result<ApprovedImport, String>, PendingPostApproval>,
+        waited: Result<(Result<ApprovedImport, String>, Answered), PendingPostApproval>,
     ) -> Joined {
         let mut slot = self.slot();
         let Some((held_batch, Held::Pending { dialog, .. })) = slot.as_mut() else {
             // Revoked while this call waited: whatever was answered is dropped.
             return Joined::Refused("import_approval_revoked".into());
         };
-        if held_batch != batch_id {
+        if *held_batch != batch_id {
             return Joined::Refused("import_approval_revoked".into());
         }
         match waited {
@@ -260,11 +347,11 @@ impl PostApprovals {
                 *dialog = Some(open);
                 Joined::StillOpen { remaining }
             }
-            Ok(Err(code)) => {
+            Ok((Err(code), _)) => {
                 *slot = None;
                 Joined::Refused(code)
             }
-            Ok(Ok(request)) => {
+            Ok((Ok(request), answered)) => {
                 let Some((
                     _,
                     Held::Pending {
@@ -274,25 +361,38 @@ impl PostApprovals {
                 else {
                     unreachable!("matched as pending above");
                 };
-                *slot = Some((batch_id.to_string(), approved(binding, request, native)));
+                let held = approved(binding, request, native, answered);
+                if self.expired(&answered) {
+                    self.lapse(batch_id, held, "approval_expired");
+                    return Joined::Refused("import_approval_expired".into());
+                }
+                *slot = Some((batch_id.to_string(), held));
                 Joined::Approved
             }
         }
     }
 
-    /// Keep an approval answered in the asking call for a later one.
+    /// Keep an approval answered in the asking call for a later one, or for
+    /// this call to take at once. Refused when the call was withdrawn.
     pub(super) fn hold_approved(
         &self,
         batch_id: &str,
         binding: ApprovalBinding,
         request: ApprovedImport,
         native: NativePostRequest,
+        answered: Answered,
     ) -> Result<(), String> {
         let mut slot = self.slot();
+        if call_withdrawn() {
+            return Err("request_cancelled".into());
+        }
         if slot.is_some() {
             return Err("post_approval_busy".into());
         }
-        *slot = Some((batch_id.to_string(), approved(binding, request, native)));
+        *slot = Some((
+            batch_id.to_string(),
+            approved(binding, request, native, answered),
+        ));
         Ok(())
     }
 
@@ -303,9 +403,9 @@ impl PostApprovals {
         &self,
         batch_id: &str,
         fresh: &ApprovalBinding,
-    ) -> Result<(Uuid, ApprovedImport, NativePostRequest), String> {
+    ) -> Result<(Redemption<'_>, ApprovedImport, NativePostRequest), String> {
         let mut slot = self.slot();
-        self.lapse_if_expired(&mut slot);
+        self.settle(&mut slot);
         match slot.take() {
             Some((
                 held_batch,
@@ -314,22 +414,23 @@ impl PostApprovals {
                     id,
                     request,
                     native,
-                    approved_at_utc,
-                    ..
+                    answered,
                 },
             )) if held_batch == batch_id => {
                 if binding != *fresh || request.voucher_count() != fresh.voucher_count {
-                    self.write_lapse_note(batch_id, approved_at_utc, "approval_binding_changed");
+                    self.write_lapse_note(batch_id, answered, "approval_binding_changed");
                     return Err("import_approval_binding_changed".into());
                 }
-                *slot = Some((
-                    batch_id.to_string(),
-                    Held::Redeeming {
+                *slot = Some((batch_id.to_string(), Held::Redeeming { id, answered }));
+                Ok((
+                    Redemption {
+                        approvals: self,
+                        batch_id: batch_id.to_string(),
                         id,
-                        approved_at_utc,
                     },
-                ));
-                Ok((id, *request, native))
+                    *request,
+                    native,
+                ))
             }
             other => {
                 // Another call already took it: in use, not revoked.
@@ -364,22 +465,14 @@ impl PostApprovals {
         }
     }
 
-    /// After a redeeming call ends: an approval it did not spend (refused
-    /// before its intent) lapses; it is never offered again.
-    pub(super) fn release_unspent(&self, batch_id: &str, approval: Uuid, reason: &str) {
+    /// An approval taken and not spent lapses; it is never offered again.
+    fn release_unspent(&self, batch_id: &str, approval: Uuid, reason: &str) {
         let mut slot = self.slot();
-        if let Some((
-            held_batch,
-            Held::Redeeming {
-                id,
-                approved_at_utc,
-            },
-        )) = slot.as_ref()
-        {
+        if let Some((held_batch, Held::Redeeming { id, answered })) = slot.as_ref() {
             if held_batch == batch_id && *id == approval {
-                let approved_at_utc = *approved_at_utc;
+                let answered = *answered;
                 *slot = None;
-                self.write_lapse_note(batch_id, approved_at_utc, reason);
+                self.write_lapse_note(batch_id, answered, reason);
             }
         }
     }
@@ -392,6 +485,20 @@ impl PostApprovals {
             .as_ref()
             .is_some_and(|(held_batch, _)| held_batch == batch_id)
         {
+            if let Some((_, held)) = slot.take() {
+                self.lapse(batch_id, held, reason);
+            }
+        }
+    }
+
+    /// Withdraw `batch_id`'s approval if it is held and not taken: a call that
+    /// was to redeem it was refused before taking it.
+    pub(super) fn revoke_unredeemed(&self, batch_id: &str, reason: &str) {
+        let mut slot = self.slot();
+        if matches!(
+            slot.as_ref(),
+            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id
+        ) {
             if let Some((_, held)) = slot.take() {
                 self.lapse(batch_id, held, reason);
             }
@@ -412,29 +519,20 @@ impl PostApprovals {
         serde_json::from_slice(&bytes).ok()
     }
 
-    fn lapse_if_expired(&self, slot: &mut Option<(String, Held)>) {
-        let expired = matches!(
-            slot.as_ref(),
-            Some((_, Held::Approved { approved_at, .. })) if approved_at.elapsed() > self.ttl
-        );
-        if expired {
-            if let Some((batch_id, held)) = slot.take() {
-                self.lapse(&batch_id, held, "approval_expired");
-            }
-        }
-    }
-
     /// Let go of `held`: a dialog is closed by dropping it; an approval that
-    /// was given leaves a note.
+    /// was given, collected or not, leaves a note.
     fn lapse(&self, batch_id: &str, held: Held, reason: &str) {
-        match held {
-            Held::Pending { .. } => {}
-            Held::Approved {
-                approved_at_utc, ..
-            }
-            | Held::Redeeming {
-                approved_at_utc, ..
-            } => self.write_lapse_note(batch_id, approved_at_utc, reason),
+        let answered = match &held {
+            Held::Pending {
+                dialog: Some(dialog),
+                ..
+            } => dialog.answered().filter(|answered| answered.approved),
+            Held::Pending { dialog: None, .. } => None,
+            Held::Approved { answered, .. } | Held::Redeeming { answered, .. } => Some(*answered),
+        };
+        drop(held);
+        if let Some(answered) = answered {
+            self.write_lapse_note(batch_id, answered, reason);
         }
     }
 
@@ -442,15 +540,12 @@ impl PostApprovals {
         let uuid = batch_id
             .strip_prefix("bridge-")
             .and_then(|id| Uuid::parse_str(id).ok())?;
-        Some(
-            self.imports
-                .join(format!("bridge-{uuid}.approval_lapse.json")),
-        )
+        Some(self.imports.join(format!("bridge-{uuid}.approval_lapse.json")))
     }
 
     /// Best effort: a note that cannot be written loses a report, never an
     /// approval, since none is ever read back from it.
-    fn write_lapse_note(&self, batch_id: &str, approved_at: DateTime<Utc>, reason: &str) {
+    fn write_lapse_note(&self, batch_id: &str, answered: Answered, reason: &str) {
         let Some(path) = self.lapse_note_path(batch_id) else {
             return;
         };
@@ -458,7 +553,8 @@ impl PostApprovals {
             "batch_id": batch_id,
             "state": "approval_lapsed_unposted",
             "reason": reason,
-            "approved_at": approved_at.to_rfc3339_opts(SecondsFormat::Secs, true),
+            "approved_at": DateTime::<Utc>::from(answered.at_wall)
+                .to_rfc3339_opts(SecondsFormat::Secs, true),
             "lapsed_at": Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
             "redeemable": false,
         });
@@ -476,13 +572,17 @@ impl Drop for PostApprovals {
     }
 }
 
-fn approved(binding: ApprovalBinding, request: ApprovedImport, native: NativePostRequest) -> Held {
+fn approved(
+    binding: ApprovalBinding,
+    request: ApprovedImport,
+    native: NativePostRequest,
+    answered: Answered,
+) -> Held {
     Held::Approved {
         binding,
         id: Uuid::new_v4(),
         request: Box::new(request),
         native,
-        approved_at: Instant::now(),
-        approved_at_utc: Utc::now(),
+        answered,
     }
 }

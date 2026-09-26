@@ -192,6 +192,27 @@ impl ApprovedImport {
 /// remains; the dialog enforces its own.
 const POST_DIALOG_LIMIT: Duration = Duration::from_secs(120);
 
+/// When a post dialog was answered, and whether the answer approved: stamped
+/// by the dialog's own task as it ends, so an approval's age runs from the
+/// click, not from whichever call later collects it (#725). Both clocks are
+/// kept: the monotonic one does not advance while the machine sleeps.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Answered {
+    pub(crate) approved: bool,
+    pub(crate) at: std::time::Instant,
+    pub(crate) at_wall: std::time::SystemTime,
+}
+
+impl Answered {
+    fn now(approved: bool) -> Self {
+        Self {
+            approved,
+            at: std::time::Instant::now(),
+            at_wall: std::time::SystemTime::now(),
+        }
+    }
+}
+
 /// A post dialog left open after the MCP call that asked it returned (#725).
 /// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
@@ -200,32 +221,78 @@ const POST_DIALOG_LIMIT: Duration = Duration::from_secs(120);
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
     task: tokio::task::JoinHandle<Result<ApprovedImport, String>>,
+    answered: std::sync::Arc<std::sync::OnceLock<Answered>>,
     started: std::time::Instant,
 }
 
 impl PendingPostApproval {
-    /// Start `dialog`, which must be a call of [`ApprovedImport::confirm`].
+    /// Ask the person in a dialog that may outlive the calling call:
+    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
+    /// task. Nothing else can be run there.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
-        dialog: impl std::future::Future<Output = Result<ApprovedImport, String>> + Send + 'static,
+        xml: String,
+        preview: String,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
     ) -> Self {
+        let answered = std::sync::Arc::new(std::sync::OnceLock::new());
+        let stamp = std::sync::Arc::clone(&answered);
+        let dialog = async move {
+            let answer = ApprovedImport::confirm(
+                xml,
+                &preview,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+                company_marks_request,
+            )
+            .await;
+            let _ = stamp.set(Answered::now(answer.is_ok()));
+            answer
+        };
         Self {
             task: tokio::spawn(carry_approval_scope(dialog)),
+            answered,
             started: std::time::Instant::now(),
         }
     }
 
-    /// The person's answer, if it arrives within `budget`, or the dialog back
-    /// while it is still open. A task that ended without an answer (aborted or
-    /// panicked) approves nothing.
+    /// The person's answer and when it was given, if it arrives within
+    /// `budget`, or the dialog back while it is still open. A task that ended
+    /// without an answer (aborted or panicked) approves nothing.
     pub(crate) async fn answer_within(
         mut self,
         budget: Duration,
-    ) -> Result<Result<ApprovedImport, String>, Self> {
+    ) -> Result<(Result<ApprovedImport, String>, Answered), Self> {
         match tokio::time::timeout(budget, &mut self.task).await {
             Err(_) => Err(self),
-            Ok(Ok(answer)) => Ok(answer),
-            Ok(Err(_)) => Ok(Err("import_approval_unavailable".into())),
+            Ok(Ok(answer)) => {
+                let at = self
+                    .answered
+                    .get()
+                    .copied()
+                    .unwrap_or_else(|| Answered::now(answer.is_ok()));
+                Ok((answer, at))
+            }
+            Ok(Err(_)) => Ok((
+                Err("import_approval_unavailable".into()),
+                Answered::now(false),
+            )),
         }
+    }
+
+    /// Whether the dialog has been answered, and how, without waiting.
+    pub(crate) fn answered(&self) -> Option<Answered> {
+        self.answered.get().copied()
     }
 
     /// How much of the dialog's time limit remains.

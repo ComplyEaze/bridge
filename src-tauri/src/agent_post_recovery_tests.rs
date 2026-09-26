@@ -7,6 +7,29 @@ use std::{
 };
 use tokio::io::AsyncWrite;
 
+/// What a withdrawn post answers once it stops. Its answer is replaced by the
+/// cancellation's, so what it holds is never read.
+fn stand_in_response() -> ToolResponse {
+    ToolResponse {
+        value: json!({}),
+        egress: EgressContext {
+            evidence: None,
+            tool: "post_import".into(),
+            args_sha256: sha256_hex(b"post"),
+            company_guid: None,
+        },
+        recovery_batch_id: None,
+    }
+}
+
+/// A post that stops when withdrawn, as a real one does before its next queued
+/// Tally operation (#725). A withdrawn post is awaited until it stops, so a
+/// stand-in that never stopped would hold the call forever.
+async fn stand_in(withdrawal: tokio_util::sync::CancellationToken) -> ToolResponse {
+    withdrawal.cancelled().await;
+    stand_in_response()
+}
+
 const BATCH: &str = "bridge-00000000-0000-4000-8000-000000000001";
 const COMPANY: &str = "00000000-0000-4000-8000-000000000002";
 
@@ -218,7 +241,7 @@ async fn cancellation_before_durable_intent_drops_the_controlled_future() {
         .unwrap();
     let cancellation = tokio_util::sync::CancellationToken::new();
     let result = await_post(
-        std::future::pending::<ToolResponse>(),
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &args(),
@@ -359,12 +382,13 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
     let input = format!("{queued}\n{}\n{}\n", cancel(8), cancel(7));
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
+    let cancellation = tokio_util::sync::CancellationToken::new();
     assert!(await_post(
-        std::future::pending(),
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &args(),
-            cancellation: &tokio_util::sync::CancellationToken::new(),
+            cancellation: &cancellation,
         },
         &server,
         &mut BufReader::new(input.as_bytes()),

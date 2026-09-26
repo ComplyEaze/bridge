@@ -89,20 +89,10 @@ where
                     .unwrap_or_else(|| json!({}));
                 if catalog::registered_tool_definitions(true, true).as_array().is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name)) {
                     let response = if name == "post_import" {
-                        // Withdrawn by a cancellation before its intent (#725):
-                        // it stops before its next Tally operation, never in one.
-                        let cancellation = tokio_util::sync::CancellationToken::new();
-                        await_post(
-                            crate::tally::runtime::TOOL_CANCELLATION.scope(
-                                cancellation.clone(),
-                                server.call_tool_response(name, arguments.clone()),
-                            ),
-                            PostRequest {
-                                id: id.as_ref().expect("tool requests have IDs"),
-                                args: &arguments,
-                                cancellation: &cancellation,
-                            },
+                        run_post(
                             &server,
+                            id.as_ref().expect("tool requests have IDs"),
+                            &arguments,
                             &mut reader, &mut framer, &mut pending,
                             stdout,
                         ).await?
@@ -405,12 +395,12 @@ fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {
 
 // Independently bounds caller-controlled memory; response caps cannot bound stdin.
 const MAX_REQUEST_BYTES: usize = 5_000_000;
-type Frame = Result<String, (i32, &'static str)>;
+pub(in crate::agent) type Frame = Result<String, (i32, &'static str)>;
 
 // State survives a cancelled read future when a write finishes between frame
 // fragments. Dropping a local Vec here would corrupt the next MCP request.
 #[derive(Default)]
-struct Framer {
+pub(in crate::agent) struct Framer {
     bytes: Vec<u8>,
     oversized: bool,
 }
@@ -458,29 +448,56 @@ struct PostRequest<'a> {
     cancellation: &'a tokio_util::sync::CancellationToken,
 }
 
-/// How long a withdrawn post is polled to finish its operation in flight.
-/// The operation is one queued runtime operation, which may be many
-/// requests: the queue's lease operation is about 32 (3.0 s in the 200-voucher
-/// run of 26 Sep 2026), each bounded by the transport's 20-second deadline.
-/// This is a backstop against a post that never stops, not a normal bound:
-/// dropping one still running abandons its request in flight. It is the
-/// transport's own ceiling for one request. Input is still read meanwhile.
-/// Unit tests stand in posts that never finish, where waiting protects nothing.
-#[cfg(not(test))]
-const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_secs(120);
-#[cfg(test)]
-const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_millis(100);
-
 /// Withdraw a post that has written no intent (#725). Its approval is revoked,
 /// which closes an open dialog and leaves nothing an intent could be written
 /// under, and it stops before its next queued Tally operation. The operation in
 /// flight is finished, not abandoned: dropping it would leave Tally serving a
-/// request nobody reads (protocol reference §11b.2).
+/// request nobody reads (protocol reference §11b.2). It is awaited with no
+/// cap: each of its requests is bounded by the transport's 20-second deadline,
+/// so the queue's lease operation, about 32 requests, ends within about 32 × 20
+/// s at worst (#778 would stop it between requests). Input is read meanwhile.
 fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     request.cancellation.cancel();
     if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
         server.post_approvals.revoke(batch_id, "request_cancelled");
     }
+}
+
+/// Run one `post_import` call to its end while servicing input: the one path
+/// every agent post takes. It runs under its own withdrawal token (#725): a
+/// cancellation before its intent stops it before its next Tally operation,
+/// never in one.
+pub(in crate::agent) async fn run_post<R, W>(
+    server: &Server,
+    id: &Value,
+    args: &Value,
+    reader: &mut R,
+    framer: &mut Framer,
+    pending: &mut std::collections::VecDeque<Frame>,
+    stdout: &mut W,
+) -> Result<Option<ToolResponse>, String>
+where
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    await_post(
+        crate::tally::runtime::TOOL_CANCELLATION.scope(
+            cancellation.clone(),
+            server.call_tool_response("post_import", args.clone()),
+        ),
+        PostRequest {
+            id,
+            args,
+            cancellation: &cancellation,
+        },
+        server,
+        reader,
+        framer,
+        pending,
+        stdout,
+    )
+    .await
 }
 
 // Keep receiving cancellation and disconnect while a native approval or write
@@ -504,9 +521,6 @@ where
 {
     tokio::pin!(future);
     let mut phase = PostPhase::Running;
-    // Set when the post is withdrawn: it is dropped if still running then.
-    let withdraw_deadline = tokio::time::sleep(std::time::Duration::MAX);
-    tokio::pin!(withdraw_deadline);
     let mut classifier_retry = tokio::time::interval(std::time::Duration::from_millis(10));
     classifier_retry.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
@@ -517,14 +531,10 @@ where
                 let frame = match frame {
                     Ok(Some(frame)) => frame,
                     // Already withdrawn: the input ending changes nothing. The
-                    // operation in flight is finished (within the grace) and
-                    // the call answers as cancelled.
+                    // operation in flight is finished and the call answers as
+                    // cancelled.
                     Ok(None) if phase == PostPhase::Withdrawing => {
-                        let _finished = tokio::time::timeout_at(
-                            withdraw_deadline.deadline(),
-                            future.as_mut(),
-                        )
-                        .await;
+                        let _finished = future.as_mut().await;
                         return Ok(None);
                     }
                     Ok(None) => return finish_interrupted_post(
@@ -547,7 +557,6 @@ where
                             PostDispatchState::NotDispatched => {
                                 withdraw_post(server, &request);
                                 phase = PostPhase::Withdrawing;
-                                withdraw_deadline.as_mut().reset(tokio::time::Instant::now() + WITHDRAW_GRACE);
                             }
                             PostDispatchState::MayHaveDispatched if phase == PostPhase::Running => {
                                 phase = PostPhase::Draining;
@@ -569,13 +578,11 @@ where
                     PostDispatchState::NotDispatched => {
                         withdraw_post(server, &request);
                         phase = PostPhase::Withdrawing;
-                        withdraw_deadline.as_mut().reset(tokio::time::Instant::now() + WITHDRAW_GRACE);
                     }
                     PostDispatchState::MayHaveDispatched => phase = PostPhase::Draining,
                     PostDispatchState::AdmissionBusy => {}
                 }
             }
-            () = &mut withdraw_deadline, if phase == PostPhase::Withdrawing => return Ok(None),
             // A withdrawn post's own answer is replaced by the cancellation's.
             response = &mut future, if phase != PostPhase::Classifying => {
                 return Ok((phase != PostPhase::Withdrawing).then_some(response))
@@ -806,7 +813,7 @@ where
     // No intent: withdraw it, and finish the operation in flight rather than
     // abandon it. It sends nothing further and can write no intent (#725).
     withdraw_post(server, &request);
-    let _withdrawn = tokio::time::timeout(WITHDRAW_GRACE, future.as_mut()).await;
+    let _withdrawn = future.as_mut().await;
     match interruption {
         Some(error) => Err(error),
         None => Ok(None),
@@ -854,6 +861,11 @@ async fn cancel_queued_request<W: AsyncWrite + Unpin>(
         .unwrap_or_else(|| json!({}));
     let name = request["params"]["name"].as_str().unwrap_or("unknown");
     if is_tool && name == "post_import" {
+        // Cancelled before it started: whatever an earlier call left for this
+        // batch is withdrawn too, as for any cancelled call on it (#725).
+        if let Some(batch_id) = args.get("batch_id").and_then(Value::as_str) {
+            server.post_approvals.revoke(batch_id, "request_cancelled");
+        }
         let response = server.finish_tool_response(
             name,
             &args,

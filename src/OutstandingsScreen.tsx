@@ -136,9 +136,10 @@ type LoadResult =
       requested_as_of_yyyymmdd?: string;
       tally_as_of_yyyymmdd?: string;
       foreign_currency_ledger_name?: string;
-      // bridge#551: present with reason foreign_currency_ledgers_excluded.
-      // The base-currency figures that come with it are not shown here.
+      // bridge#551, #642: both present with reason currency_ledgers_excluded.
+      // The base-currency figures that come with them are not shown here.
       foreign_currency_ledgers_excluded?: Array<ExcludedCurrencyLedger>;
+      base_currency_ledgers_mixed_excluded?: Array<string>;
       synced_at_unix_ms: number;
     };
 
@@ -308,6 +309,7 @@ export function OutstandingsScreen({
       result.tally_as_of_yyyymmdd,
       result.foreign_currency_ledger_name,
       result.foreign_currency_ledgers_excluded,
+      result.base_currency_ledgers_mixed_excluded,
     )
     : null;
   const outstandingsUnavailable = result?.state === "partial" && isNonRetryableOutstandingsBoundary(result.reason_code);

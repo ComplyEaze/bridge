@@ -508,14 +508,11 @@ async fn the_desktop_command_reads_forex_as_base_currency_ledgers_only() {
     )
     .await
     .unwrap();
-    let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-        foreign_currency_ledgers_excluded,
-        ..
-    } = &response.result
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. } = &response.result
     else {
         panic!("{:?}", response.result);
     };
-    assert_eq!(foreign_currency_ledgers_excluded.len(), 3);
+    assert_eq!(exclusions.foreign().len(), 3);
     assert!(response.working_paper_export_id.is_none());
     assert!(response.party_statement_source_id.is_none());
     assert_eq!(response.working_paper_unavailable_reason_code, None);
@@ -768,16 +765,22 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
         .unwrap();
     let requests = simulator.finish().unwrap();
     let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-        reason,
-        foreign_currency_ledgers_excluded,
+        exclusions,
         base_currency_ledgers,
         ..
     } = result
     else {
         panic!("{result:?}");
     };
-    assert_eq!(reason.reason_code, "foreign_currency_ledgers_excluded");
-    let excluded = foreign_currency_ledgers_excluded
+    // Captured before any foreign-currency entry touched a rupee ledger: the
+    // derived reasons name the foreign list only (bridge#642).
+    assert_eq!(
+        exclusions.partial_reasons(),
+        ["foreign_currency_ledgers_excluded"]
+    );
+    assert!(exclusions.mixed().is_empty());
+    let excluded = exclusions
+        .foreign()
         .iter()
         .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
         .collect::<Vec<_>>();
@@ -1044,13 +1047,9 @@ async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledg
             (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), Some(expected)) => {
                 assert_eq!(code, expected);
             }
-            (
-                Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-                    foreign_currency_ledgers_excluded,
-                    ..
-                }),
-                None,
-            ) => assert_eq!(foreign_currency_ledgers_excluded.len(), 3),
+            (Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }), None) => {
+                assert_eq!(exclusions.foreign().len(), 3)
+            }
             (Ok(other), _) => panic!("{expected:?}: {other:?}"),
             (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), _) => {
                 panic!("{expected:?}: refused with {code}")

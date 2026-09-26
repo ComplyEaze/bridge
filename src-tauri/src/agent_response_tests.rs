@@ -227,9 +227,10 @@ fn offset_row_pages_still_advance_after_byte_trimming() {
     }
 }
 
-/// bridge#551: a base-currency-ledgers-only result nests its figures under
-/// `base_currency_ledgers` and adds the excluded ledgers. The byte cap pages
-/// all three collections by the one offset, and never drops a row.
+/// bridge#551, #642: a base-currency-ledgers-only result nests its figures
+/// under `base_currency_ledgers` and adds both lists of excluded ledgers. The
+/// byte cap pages all four collections by the one offset, and never drops a
+/// row.
 #[test]
 fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
     let rows = |count| {
@@ -241,11 +242,15 @@ fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
         let (bills, _, bill_next) = paginate_open_bills(rows(3), offset, 6);
         let (parties, _, party_next) = paginate_open_bills(rows(2), offset, 6);
         let (ledgers, _, ledger_next) = paginate_open_bills(rows(6), offset, 6);
-        json!({"result":{"state":"partial","partial_reason":"foreign_currency_ledgers_excluded",
+        let (mixed, _, mixed_next) = paginate_open_bills(rows(4), offset, 6);
+        json!({"result":{"state":"partial","partial_reason":"currency_ledgers_excluded",
+            "partial_reasons":["foreign_currency_ledgers_excluded","mixed_currency_ledgers_excluded"],
             "base_currency_ledgers":{"offset":offset,"open_bills":bills,"next_offset":bill_next,
                 "unallocated":{"count":2,"parties":parties,"next_offset":party_next,"truncated":party_next.is_some()}},
             "foreign_currency_ledgers_excluded":{"count":6,"ledgers":ledgers,"next_offset":ledger_next,
-                "truncated":ledger_next.is_some()}}})
+                "truncated":ledger_next.is_some()},
+            "base_currency_ledgers_mixed_excluded":{"count":4,"reason":"mixed_currency_movement",
+                "ledgers":mixed,"next_offset":mixed_next,"truncated":mixed_next.is_some()}}})
     };
     let ids = |rows: &Value| {
         rows.as_array()
@@ -254,12 +259,13 @@ fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
             .map(|row| row["id"].as_u64().unwrap())
             .collect::<Vec<_>>()
     };
-    let (mut offset, mut bills, mut parties, mut ledgers) = (0, Vec::new(), Vec::new(), Vec::new());
+    let (mut offset, mut bills, mut parties, mut ledgers, mut mixed) =
+        (0, Vec::new(), Vec::new(), Vec::new(), Vec::new());
     loop {
         let unbounded = page(offset);
         assert_eq!(
             response_row_count(&unbounded),
-            Some(11 - 3.min(offset) - 2.min(offset) - 6.min(offset))
+            Some(15 - 3.min(offset) - 2.min(offset) - 6.min(offset) - 4.min(offset))
         );
         let (response, _, _) = enforce_response_byte_cap(unbounded, 1000).unwrap();
         assert!(response.to_string().len() <= 1000);
@@ -269,10 +275,14 @@ fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
             &result["base_currency_ledgers"]["unallocated"]["parties"]
         ));
         ledgers.extend(ids(&result["foreign_currency_ledgers_excluded"]["ledgers"]));
+        mixed.extend(ids(
+            &result["base_currency_ledgers_mixed_excluded"]["ledgers"]
+        ));
         let continuing = [
             result["base_currency_ledgers"]["next_offset"].as_u64(),
             result["base_currency_ledgers"]["unallocated"]["next_offset"].as_u64(),
             result["foreign_currency_ledgers_excluded"]["next_offset"].as_u64(),
+            result["base_currency_ledgers_mixed_excluded"]["next_offset"].as_u64(),
         ]
         .into_iter()
         .flatten()
@@ -288,4 +298,28 @@ fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
     assert_eq!(bills, [0, 1, 2]);
     assert_eq!(parties, [0, 1]);
     assert_eq!(ledgers, [0, 1, 2, 3, 4, 5]);
+    assert_eq!(mixed, [0, 1, 2, 3]);
+}
+
+/// Trimming a complete outstandings result never adds an excluded-ledger
+/// list to it: an absent list stays absent (bridge#642).
+#[test]
+fn final_framing_caps_add_no_excluded_list_to_a_complete_result() {
+    let bills = (0..6)
+        .map(|id| json!({"id":id,"padding":"x".repeat(120)}))
+        .collect::<Vec<Value>>();
+    let unbounded =
+        json!({"result":{"state":"complete","offset":0,"open_bills":bills,"next_offset":null}});
+    let (response, _, _) = enforce_response_byte_cap(unbounded, 600).unwrap();
+    let result = &response["result"];
+    assert!(
+        result["open_bills"].as_array().unwrap().len() < 6,
+        "the cap trimmed"
+    );
+    for key in [
+        "foreign_currency_ledgers_excluded",
+        "base_currency_ledgers_mixed_excluded",
+    ] {
+        assert!(result.get(key).is_none(), "{key} added: {result}");
+    }
 }

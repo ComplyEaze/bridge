@@ -106,20 +106,31 @@ impl Server {
                     result_evidence.reason_code = Some(reason.reason_code.clone());
                     (partial_payload(&reason, self.settings.redaction), false)
                 }
-                // bridge#551: foreign-currency ledgers were left out. The
-                // figures are the base-currency ledgers' only, and sit under
-                // their own key, so that nothing reads them as the book's.
+                // bridge#551, #642: ledgers kept in another currency, and
+                // base-currency ledgers with a composite value, were left out.
+                // The figures are the plain base-currency ledgers' only, and
+                // sit under their own key, so that nothing reads them as the
+                // book's. The scalar reason is the same for any mix; the
+                // derived `partial_reasons` say which lists are non-empty.
                 OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-                    reason,
-                    foreign_currency_ledgers_excluded,
+                    exclusions,
                     base_currency_ledgers,
                     ..
                 } => {
                     result_evidence.state = "partial";
-                    result_evidence.reason_code = Some(reason.reason_code.clone());
+                    result_evidence.reason_code = Some(exclusions.evidence_reason());
+                    let partial_reasons = exclusions.partial_reasons();
+                    let (foreign_currency_ledgers_excluded, mixed) = exclusions.into_parts();
                     let base = *base_currency_ledgers;
                     let (figures, figures_truncated) =
                         figures(base.statement_open_bills, base.statement_unallocated_by_party)?;
+                    let mixed_count = mixed.len();
+                    let (mixed, mixed_truncated, next_mixed_offset) =
+                        paginate_open_bills(mixed, bill_offset, bill_limit);
+                    let mixed = mixed
+                        .into_iter()
+                        .map(|ledger| redact_value(party_name_value(ledger), self.settings.redaction))
+                        .collect::<Vec<_>>();
                     let excluded_count = foreign_currency_ledgers_excluded.len();
                     let (excluded, excluded_truncated, next_excluded_offset) =
                         paginate_open_bills(foreign_currency_ledgers_excluded, bill_offset, bill_limit);
@@ -133,8 +144,8 @@ impl Server {
                         })
                         .collect::<Vec<_>>();
                     (
-                        json!({"state":"partial", "partial_reason": reason.reason_code, "base_currency_ledgers": figures, "foreign_currency_ledgers_excluded": {"count": excluded_count, "ledgers": excluded, "truncated": excluded_truncated, "next_offset": next_excluded_offset}}),
-                        figures_truncated || excluded_truncated,
+                        json!({"state":"partial", "partial_reason": crate::tally::CurrencyExclusions::PARTIAL_REASON, "partial_reasons": partial_reasons, "base_currency_ledgers": figures, "foreign_currency_ledgers_excluded": {"count": excluded_count, "ledgers": excluded, "truncated": excluded_truncated, "next_offset": next_excluded_offset}, "base_currency_ledgers_mixed_excluded": {"count": mixed_count, "reason": "mixed_currency_movement", "ledgers": mixed, "truncated": mixed_truncated, "next_offset": next_mixed_offset}}),
+                        figures_truncated || excluded_truncated || mixed_truncated,
                     )
                 }
             };

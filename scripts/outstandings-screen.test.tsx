@@ -137,12 +137,14 @@ async function renderWithCurrency(detect: () => Promise<unknown>) {
 test("a book with several currencies is read and the backend's decision is shown", async () => {
   const exclusion = {
     state: "partial",
-    reason_code: "foreign_currency_ledgers_excluded",
+    reason_code: "currency_ledgers_excluded",
+    partial_reasons: ["foreign_currency_ledgers_excluded", "mixed_currency_ledgers_excluded"],
     synced_at_unix_ms: 1,
     foreign_currency_ledgers_excluded: [
       { ledger: "Synthetic FX Debtor A", currency: "$" },
       { ledger: "Synthetic FX Debtor B", currency: "$" },
     ],
+    base_currency_ledgers_mixed_excluded: ["Synthetic Rupee Party"],
     base_currency_ledgers: {
       report: { ...completeResult().report, receivable_total: "34500.00" },
       currency_assertion: "INR",
@@ -158,7 +160,7 @@ test("a book with several currencies is read and the backend's decision is shown
     synced_at_unix_ms: 1,
   };
   for (const [name, response, expected, absent] of [
-    ["exclusion", exclusion, ["Synthetic FX Debtor A ($), Synthetic FX Debtor B ($)", "shows no totals here"], ["34,500", "34500"]],
+    ["exclusion", exclusion, ["Synthetic FX Debtor A ($), Synthetic FX Debtor B ($)", "on 1 base-currency ledger: Synthetic Rupee Party", "shows no totals here"], ["34,500", "34500"]],
     ["undetermined", undetermined, ["could not tell from Tally which one is its base currency"], []],
     ["complete", completeResult("synthetic-statements"), ["All Excel statements"], ["Multi-currency"]],
   ] as const) {

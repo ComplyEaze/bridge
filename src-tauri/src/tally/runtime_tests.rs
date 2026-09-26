@@ -236,6 +236,7 @@ fn single_company_forex_ledger_capture_returns_a_typed_partial() {
             .map(|base| ClassifiedLedgerSnapshot {
                 base,
                 foreign: Vec::new(),
+                mixed: Vec::new(),
                 unobserved: 0,
             })
             .map_err(anyhow::Error::from)

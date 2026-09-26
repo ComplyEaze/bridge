@@ -13,26 +13,35 @@ const CHANGE_AXES: [(&str, &str, &str); 2] = [
     ("masters", "next_master_alter_id", "master_alter_id"),
 ];
 
+/// A base-currency-ledgers-only outstandings result's lists of ledgers left
+/// out: those kept in another currency (bridge#551) and base-currency ones
+/// with a composite value (bridge#642).
+const OUTSTANDINGS_EXCLUDED_AXES: [&str; 2] = [
+    "foreign_currency_ledgers_excluded",
+    "base_currency_ledgers_mixed_excluded",
+];
+
 /// The rows an outstandings result pages by one shared `offset`: open bills
 /// and unallocated parties, at the top of the result or, for a
 /// base-currency-ledgers-only result, under `base_currency_ledgers`; and that
-/// result's excluded foreign-currency ledgers (bridge#551). `None` for any
-/// other result.
-fn outstandings_axis_widths(result: &Value) -> Option<[usize; 3]> {
+/// result's excluded ledgers. `None` for any other result.
+fn outstandings_axis_widths(result: &Value) -> Option<[usize; 4]> {
     let figures = if result["base_currency_ledgers"].is_object() {
         &result["base_currency_ledgers"]
     } else {
         result
     };
-    let excluded = &result["foreign_currency_ledgers_excluded"]["ledgers"];
+    let [foreign, mixed] = OUTSTANDINGS_EXCLUDED_AXES.map(|key| &result[key]["ledgers"]);
     (figures["open_bills"].is_array()
         || figures["unallocated"]["parties"].is_array()
-        || excluded.is_array())
+        || foreign.is_array()
+        || mixed.is_array())
     .then(|| {
         [
             &figures["open_bills"],
             &figures["unallocated"]["parties"],
-            excluded,
+            foreign,
+            mixed,
         ]
         .map(|rows| rows.as_array().map_or(0, Vec::len))
     })
@@ -95,14 +104,21 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
         PageShape::Outstandings => {
             // Every collection consumes one input offset. Keep their shared
             // prefix width; exhausted shorter axes retain their null cursor.
-            if let Some(rows) = result["foreign_currency_ledgers_excluded"]["ledgers"]
-                .as_array_mut()
-                .filter(|rows| rows.len() > width)
-            {
-                rows.truncate(width);
-                result["foreign_currency_ledgers_excluded"]["next_offset"] =
-                    json!(offset + width as u64);
-                result["foreign_currency_ledgers_excluded"]["truncated"] = json!(true);
+            // `get_mut`, not indexing: indexing a `Value` mutably inserts a
+            // missing key, which would add an empty excluded list to a
+            // complete result.
+            for key in OUTSTANDINGS_EXCLUDED_AXES {
+                let Some(list) = result.get_mut(key) else {
+                    continue;
+                };
+                if let Some(rows) = list["ledgers"]
+                    .as_array_mut()
+                    .filter(|rows| rows.len() > width)
+                {
+                    rows.truncate(width);
+                    list["next_offset"] = json!(offset + width as u64);
+                    list["truncated"] = json!(true);
+                }
             }
             let figures = if result["base_currency_ledgers"].is_object() {
                 &mut result["base_currency_ledgers"]
@@ -204,7 +220,7 @@ pub(super) fn response_row_count(response: &Value) -> Option<usize> {
         return Some(vouchers.len() + result["masters"].as_array().map_or(0, Vec::len));
     }
     // Receipts count each released outstandings row collection: open bills,
-    // unallocated parties and excluded foreign-currency ledgers. Top parties
+    // unallocated parties and both lists of excluded ledgers. Top parties
     // are a derived ranking summary, not a separately paged row collection,
     // so they are intentionally excluded.
     if let Some(widths) = outstandings_axis_widths(result) {

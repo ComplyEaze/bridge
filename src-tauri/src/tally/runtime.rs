@@ -1332,22 +1332,87 @@ pub enum OutstandingsLoadResult {
         reason: OutstandingsPartialReason,
         synced_at_unix_ms: i64,
     },
-    /// Some ledgers are kept in another currency and were left out, with
-    /// their bills (bridge#551). A partial result: `base_currency_ledgers`
-    /// describes the base-currency ledgers only, and no figure for the whole
-    /// book exists. Reason `foreign_currency_ledgers_excluded`. Only a read
-    /// under a classified witness can build it, since it carries that
-    /// witness's [`ClassifiedBase`].
+    /// Some ledgers were left out with their bills: ledgers kept in another
+    /// currency (bridge#551), base-currency ledgers with a value Tally wrote
+    /// as a currency composite (bridge#642), or both. A partial result:
+    /// `base_currency_ledgers` describes the plain base-currency ledgers only,
+    /// and no figure for the whole book exists. Its reasons are derived from
+    /// `exclusions`, never stored. Only a read under a classified witness can
+    /// build it, since it carries that witness's [`ClassifiedBase`].
     #[serde(rename = "partial")]
     BaseCurrencyLedgersOnly {
         #[serde(skip)]
         classified: ClassifiedBase,
         #[serde(flatten)]
-        reason: OutstandingsPartialReason,
+        exclusions: CurrencyExclusions,
         synced_at_unix_ms: i64,
-        foreign_currency_ledgers_excluded: Vec<ForeignCurrencyLedger>,
         base_currency_ledgers: Box<BaseCurrencyLedgersOutstandings>,
     },
+}
+
+/// The ledgers an outstandings read set aside by currency, never both empty:
+/// [`Self::new`] refuses that, so a result carrying one is partial by
+/// construction. Every reason is derived from which list is non-empty, so no
+/// reason can disagree with the lists (bridge#642).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyExclusions {
+    foreign: Vec<ForeignCurrencyLedger>,
+    mixed: Vec<String>,
+}
+
+impl CurrencyExclusions {
+    /// The one reason every such result carries, whatever it set aside.
+    pub const PARTIAL_REASON: &'static str = "currency_ledgers_excluded";
+
+    /// `None` when nothing was set aside: the figures then describe the whole
+    /// book and the result is complete.
+    pub fn new(foreign: Vec<ForeignCurrencyLedger>, mixed: Vec<String>) -> Option<Self> {
+        (!foreign.is_empty() || !mixed.is_empty()).then_some(Self { foreign, mixed })
+    }
+
+    /// Ledgers kept in another currency, in read order.
+    pub fn foreign(&self) -> &[ForeignCurrencyLedger] {
+        &self.foreign
+    }
+
+    /// Base-currency ledgers with a composite value, in read order.
+    pub fn mixed(&self) -> &[String] {
+        &self.mixed
+    }
+
+    /// What was set aside, each code present exactly when its list is
+    /// non-empty; foreign first. Never empty.
+    pub fn partial_reasons(&self) -> Vec<&'static str> {
+        let mut reasons = Vec::with_capacity(2);
+        if !self.foreign.is_empty() {
+            reasons.push("foreign_currency_ledgers_excluded");
+        }
+        if !self.mixed.is_empty() {
+            reasons.push("mixed_currency_ledgers_excluded");
+        }
+        reasons
+    }
+
+    /// The evidence log's reason: the derived codes joined by `+`.
+    pub fn evidence_reason(&self) -> String {
+        self.partial_reasons().join("+")
+    }
+
+    pub fn into_parts(self) -> (Vec<ForeignCurrencyLedger>, Vec<String>) {
+        (self.foreign, self.mixed)
+    }
+}
+
+impl Serialize for CurrencyExclusions {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("CurrencyExclusions", 4)?;
+        state.serialize_field("reason_code", Self::PARTIAL_REASON)?;
+        state.serialize_field("partial_reasons", &self.partial_reasons())?;
+        state.serialize_field("foreign_currency_ledgers_excluded", &self.foreign)?;
+        state.serialize_field("base_currency_ledgers_mixed_excluded", &self.mixed)?;
+        state.end()
+    }
 }
 
 /// The figures of [`OutstandingsLoadResult::Complete`] over the base-currency
@@ -1771,12 +1836,15 @@ pub(crate) fn inr_witness_for_tests(
 
 /// Every bill row whose party is a foreign-currency ledger left out
 /// (bridge#551).
-fn without_foreign_parties(
+fn without_excluded_parties(
     rows: Vec<NativeBillRow>,
     foreign: &[ForeignCurrencyLedger],
+    mixed: &[String],
 ) -> Vec<NativeBillRow> {
     rows.into_iter()
-        .filter(|row| !foreign.iter().any(|ledger| ledger.ledger == row.party))
+        .filter(|row| {
+            !foreign.iter().any(|ledger| ledger.ledger == row.party) && !mixed.contains(&row.party)
+        })
         .collect()
 }
 
@@ -4169,11 +4237,15 @@ impl TallyRuntime {
                             }
                         };
                         // A foreign ledger's bills are plain amounts that are
-                        // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d): they
-                        // leave every figure, the statement rows included.
+                        // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d), and a
+                        // mixed ledger's are rupee amounts behind a balance
+                        // that was never read (bridge#642): both leave every
+                        // figure, the statement rows included.
                         let foreign = snapshot.foreign;
-                        let receivable_rows = without_foreign_parties(receivable_rows, &foreign);
-                        let payable_rows = without_foreign_parties(payable_rows, &foreign);
+                        let mixed = snapshot.mixed;
+                        let receivable_rows =
+                            without_excluded_parties(receivable_rows, &foreign, &mixed);
+                        let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
                         let ledger_rows = snapshot.base;
                         let group_rows =
                             parse_native_group_snapshot(&group_body, expected_company_guid)?;
@@ -4193,6 +4265,7 @@ impl TallyRuntime {
                                 groups: NativeGroupSnapshot::Complete(&group_rows),
                             },
                             &foreign,
+                            &mixed,
                             ageing_anchor.native_anchor(),
                             &as_of,
                             total_bytes,
@@ -4210,26 +4283,34 @@ impl TallyRuntime {
                         );
                         let statement_unallocated_by_party =
                             all_unallocated_parties(&result.residuals);
-                        if !result.foreign_currency_ledgers_excluded.is_empty() {
+                        if let Some(exclusions) = CurrencyExclusions::new(
+                            result.foreign_currency_ledgers_excluded,
+                            result.mixed_currency_ledgers_excluded,
+                        ) {
                             // A single-master base refuses a ledger in another
                             // currency before this point (classify_ledger_currencies);
                             // without a classified witness this result cannot be
-                            // built, so it refuses here too.
+                            // built, so it refuses here too. A composite value
+                            // on such a book keeps the refusal it had before
+                            // bridge#642, naming the ledger.
                             let Some(classified) = currency_witness.classified_base() else {
-                                return Ok((
-                                    partial_result("ledger_currency_base_unmatched"),
-                                    read_evidence.clone(),
-                                ));
+                                let reason = match (exclusions.foreign(), exclusions.mixed()) {
+                                    ([], [ledger, ..]) => {
+                                        OutstandingsPartialReason::foreign_currency_ledger_balance(
+                                            ledger.clone(),
+                                        )
+                                    }
+                                    _ => OutstandingsPartialReason::code(
+                                        "ledger_currency_base_unmatched",
+                                    ),
+                                };
+                                return Ok((partial_result(reason), read_evidence.clone()));
                             };
                             return Ok((
                                 OutstandingsLoadResult::BaseCurrencyLedgersOnly {
                                     classified,
-                                    reason: OutstandingsPartialReason::code(
-                                        "foreign_currency_ledgers_excluded",
-                                    ),
+                                    exclusions,
                                     synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
-                                    foreign_currency_ledgers_excluded: result
-                                        .foreign_currency_ledgers_excluded,
                                     base_currency_ledgers: Box::new(
                                         BaseCurrencyLedgersOutstandings {
                                             report: result.report,

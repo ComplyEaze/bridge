@@ -29,7 +29,12 @@ impl Server {
             None => {
                 let (read, extent) = self
                     .runtime
-                    .fetch_trial_balance_with_extent(self.tally_config(), &identity, period)
+                    .fetch_trial_balance_with_extent(
+                        self.tally_config(),
+                        &identity,
+                        period,
+                        crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+                    )
                     .await
                     .map_err(|error| {
                         ToolFailure::from_runtime("trial_balance_read_failed", error)

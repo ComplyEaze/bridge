@@ -360,11 +360,11 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
     }
 }
 
-/// bridge#709: `fetch_trial_balance`, the desktop's read, reads a
-/// several-currency book's plain base-currency ledgers through the base Tally
-/// identifies, sets the rest aside by name, and presents its amounts in that
-/// base, not in the first master read. Captured on one moment of one book
-/// (FOREX_601D_CAPTURE_PROVENANCE).
+/// bridge#709: the desktop's read, which opts in to the base-currency
+/// ledgers, reads a several-currency book's plain base-currency ledgers
+/// through the base Tally identifies, sets the rest aside by name, and
+/// presents its amounts in that base, not in the first master read. Captured
+/// on one moment of one book (FOREX_601D_CAPTURE_PROVENANCE).
 #[tokio::test]
 async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers() {
     const FOREX: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
@@ -408,8 +408,8 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
         &observed,
     )
     .unwrap();
-    let read = TallyRuntime::default()
-        .fetch_trial_balance(
+    let (read, _) = TallyRuntime::default()
+        .fetch_trial_balance_with_extent(
             config(&simulator),
             &identity,
             TrialBalancePeriod::new(
@@ -417,6 +417,7 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
                 TallyDate::parse("20260915").unwrap(),
             )
             .unwrap(),
+            super::trial_balance::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
         )
         .await
         .unwrap();
@@ -444,4 +445,39 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
     );
     assert_eq!(read.amount_currency().0, "I\u{20b9}");
     assert_ne!(read.currency.currency_count, 1);
+}
+
+/// bridge#551, #709: the default read, which every caller that cannot show
+/// the ledgers left out uses (for example a statement derived from the Trial
+/// Balance), still refuses a several-currency book after its currency read,
+/// and sends nothing more. Only the MCP and desktop Trial Balance opt in.
+#[tokio::test]
+async fn the_default_trial_balance_read_still_refuses_a_several_currency_book() {
+    let currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    let plans = opening_plans(currency);
+    let total = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let error = TallyRuntime::default()
+        .fetch_trial_balance(
+            config(&simulator),
+            &identity(),
+            TrialBalancePeriod::new(
+                TallyDate::parse("20260401").unwrap(),
+                TallyDate::parse("20260902").unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()),
+        Some(super::trial_balance::TrialBalanceReadError::Currency(
+            "company_base_currency_undetermined"
+        ))
+    ));
+    assert_eq!(simulator.finish().unwrap().len(), total);
 }

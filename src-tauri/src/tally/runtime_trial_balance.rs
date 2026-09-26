@@ -18,10 +18,24 @@ pub struct TrialBalanceRead {
     pub totals: crate::reports::trial_balance::TrialBalanceTotals,
     pub read_at: String,
     pub evidence: RuntimeReadEvidence,
-    /// Which ledgers `report` and `totals` cover. Every caller shows the
-    /// ledgers a several-currency book's read leaves out: the MCP read and,
-    /// since bridge#709, the desktop screen and its workbook.
+    /// Which ledgers `report` and `totals` cover. Only a caller that asks for
+    /// [`TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly`] can receive a
+    /// partial one: the MCP read and, since bridge#709, the desktop screen and
+    /// its workbook, which show the ledgers left out.
     pub ledger_scope: TrialBalanceLedgerScope,
+}
+
+/// Whether a caller can present a Trial Balance that covers only part of the
+/// book. A caller that cannot show the ledgers left out must never receive
+/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance`]
+/// keeps the single-INR refusal for every other reader (bridge#709).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TrialBalanceCurrencyScope {
+    /// One Currency master only; several refuse (`company_base_currency_undetermined`).
+    SingleCurrency,
+    /// Several masters admitted through the identified INR base: the plain
+    /// base-currency ledgers are read, the rest set aside by name.
+    BaseCurrencyLedgersOnly,
 }
 
 impl TrialBalanceRead {
@@ -117,9 +131,14 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
     ) -> anyhow::Result<TrialBalanceRead> {
-        self.fetch_trial_balance_with_extent(config, identity, period)
-            .await
-            .map(|(read, _)| read)
+        self.fetch_trial_balance_with_extent(
+            config,
+            identity,
+            period,
+            TrialBalanceCurrencyScope::SingleCurrency,
+        )
+        .await
+        .map(|(read, _)| read)
     }
 
     /// As [`Self::fetch_trial_balance`], also returning the book extent the
@@ -131,6 +150,7 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
+        scope: TrialBalanceCurrencyScope,
     ) -> anyhow::Result<(TrialBalanceRead, CompanyBookExtent)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
@@ -171,12 +191,13 @@ impl TallyRuntime {
                             bytes,
                         ));
                         let currency = parse_company_currency(&currency_xml)?;
-                        // A several-currency book is admitted through the base
-                        // Tally identifies, and its plain base-currency ledgers
-                        // are read with the rest set aside by name (bridge#551).
-                        // Every caller shows those ledgers (bridge#709). A book
-                        // with one master keeps the single-INR admission.
-                        let base = if currency.currency_count > 1 {
+                        // A several-currency book is admitted only for a caller
+                        // that can show the ledgers left out, through the base
+                        // Tally identifies (bridge#551). Every other read keeps
+                        // the single-INR admission of existing monetary reports.
+                        let base = if scope == TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly
+                            && currency.currency_count > 1
+                        {
                             let masters = parse_currency_master_list(&currency_xml)?;
                             let identified = identify_base_among_several(
                                 &client,

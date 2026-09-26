@@ -168,8 +168,15 @@ pub async fn fetch_tally_trial_balance(
     })?;
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
-    let read = runtime
-        .fetch_trial_balance(request.config, &identity, period)
+    // The desktop shows the ledgers a several-currency book's read leaves out,
+    // so it asks for the base-currency ledgers explicitly (bridge#709).
+    let (read, _) = runtime
+        .fetch_trial_balance_with_extent(
+            request.config,
+            &identity,
+            period,
+            crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+        )
         .await
         .map_err(read_error)?;
     let scope_limitation = scope_limitation(&read);

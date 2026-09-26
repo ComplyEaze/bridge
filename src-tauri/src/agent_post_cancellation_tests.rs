@@ -506,3 +506,37 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
     .await;
     assert!(completed.unwrap().unwrap().is_some());
 }
+
+/// A cancellation before the intent withdraws the post (#725): its token is
+/// cancelled, so it starts no further queued operation, and the batch's held
+/// approval is revoked, so no intent can be written for it. The same holds
+/// when the input ends instead.
+#[tokio::test]
+async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
+    for input in [
+        &b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n"[..],
+        &b""[..],
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let server = server(directory.path());
+        let (line, args) = saved_batch(&server);
+        let _held = server.post_approvals.redeeming_for_test(&line.batch_id);
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let _ = await_post(
+            std::future::pending(),
+            PostRequest {
+                id: &json!(7),
+                args: &args,
+                cancellation: &cancellation,
+            },
+            &server,
+            &mut BufReader::new(input),
+            &mut Framer::default(),
+            &mut std::collections::VecDeque::new(),
+            &mut Vec::new(),
+        )
+        .await;
+        assert!(cancellation.is_cancelled());
+        assert!(!server.post_approvals.holds(&line.batch_id));
+    }
+}

@@ -426,6 +426,14 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// Whether a held post dialog is still open: its task is waiting for
+        /// an answer. False once the task was aborted, which closes it.
+        pub(crate) fn is_waiting(&self) -> bool {
+            self.held
+                .as_ref()
+                .is_some_and(|held| held.receiver_count() > 0)
+        }
+
         /// Answer a held post dialog. Answering one that was closed (its task
         /// aborted) reaches nothing.
         pub(crate) fn answer(&self, approve: bool) {

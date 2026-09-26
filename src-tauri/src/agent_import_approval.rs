@@ -167,6 +167,29 @@ impl PostApprovals {
         approvals
     }
 
+    /// An approval for `batch_id` already taken by a posting call, with no
+    /// dialog or request behind it: enough for the cancellation path's tests.
+    #[cfg(test)]
+    pub(in crate::agent) fn redeeming_for_test(&self, batch_id: &str) -> Uuid {
+        let id = Uuid::new_v4();
+        *self.slot() = Some((
+            batch_id.to_string(),
+            Held::Redeeming {
+                id,
+                approved_at_utc: Utc::now(),
+            },
+        ));
+        id
+    }
+
+    /// Whether anything is held for `batch_id`.
+    #[cfg(test)]
+    pub(in crate::agent) fn holds(&self, batch_id: &str) -> bool {
+        self.slot()
+            .as_ref()
+            .is_some_and(|(held_batch, _)| held_batch == batch_id)
+    }
+
     fn slot(&self) -> std::sync::MutexGuard<'_, Option<(String, Held)>> {
         self.held
             .lock()

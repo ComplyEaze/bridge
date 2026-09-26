@@ -195,7 +195,10 @@ async fn a_click_after_revocation_approves_nothing() {
         "pending",
         "{pending}"
     );
+    assert!(scripted.is_waiting(), "the dialog is open");
     server.post_approvals.revoke(&batch_id, "request_cancelled");
+    tokio::task::yield_now().await;
+    assert!(!scripted.is_waiting(), "revoking closed the dialog");
     scripted.answer(true);
     let asked_again = ScriptedApproval::declining();
     let declined = SCRIPTED_APPROVAL
@@ -559,4 +562,35 @@ async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
             .unwrap()["reason"],
         "request_cancelled"
     );
+}
+
+/// A call withdrawn while it waits on the dialog (#725) stops waiting at once,
+/// answers `request_cancelled` rather than `pending`, and closes the dialog it
+/// had started.
+#[tokio::test]
+async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    let post = crate::tally::runtime::TOOL_CANCELLATION.scope(
+        withdrawn.clone(),
+        SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+    );
+    let cancel = async {
+        while !scripted.is_waiting() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        withdrawn.cancel();
+    };
+    let (response, ()) = tokio::join!(post, cancel);
+    let observed = sent(simulator);
+    assert_eq!(result(&response)["error"]["code"], "request_cancelled", "{response}");
+    tokio::task::yield_now().await;
+    assert!(!scripted.is_waiting(), "the dialog was closed");
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
 }

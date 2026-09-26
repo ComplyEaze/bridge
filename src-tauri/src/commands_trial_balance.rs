@@ -151,6 +151,27 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
 #[path = "commands_trial_balance_tests.rs"]
 mod tests;
 
+/// The desktop's Trial Balance read. The screen and its workbook show the
+/// ledgers a several-currency book's read leaves out, so it asks for the
+/// base-currency ledgers explicitly (bridge#709); every other caller keeps
+/// the default refusal.
+pub(crate) async fn read_desktop_trial_balance(
+    runtime: &TallyRuntime,
+    config: TallyConfig,
+    identity: &VerifiedCompanyIdentity,
+    period: TrialBalancePeriod,
+) -> anyhow::Result<TrialBalanceRead> {
+    runtime
+        .fetch_trial_balance_with_extent(
+            config,
+            identity,
+            period,
+            crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+        )
+        .await
+        .map(|(read, _)| read)
+}
+
 #[tauri::command]
 pub async fn fetch_tally_trial_balance(
     request: TrialBalanceRequest,
@@ -168,15 +189,7 @@ pub async fn fetch_tally_trial_balance(
     })?;
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
-    // The desktop shows the ledgers a several-currency book's read leaves out,
-    // so it asks for the base-currency ledgers explicitly (bridge#709).
-    let (read, _) = runtime
-        .fetch_trial_balance_with_extent(
-            request.config,
-            &identity,
-            period,
-            crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
-        )
+    let read = read_desktop_trial_balance(&runtime, request.config, &identity, period)
         .await
         .map_err(read_error)?;
     let scope_limitation = scope_limitation(&read);

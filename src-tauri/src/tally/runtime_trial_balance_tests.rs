@@ -408,19 +408,18 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
         &observed,
     )
     .unwrap();
-    let (read, _) = TallyRuntime::default()
-        .fetch_trial_balance_with_extent(
-            config(&simulator),
-            &identity,
-            TrialBalancePeriod::new(
-                TallyDate::parse("20250401").unwrap(),
-                TallyDate::parse("20260915").unwrap(),
-            )
-            .unwrap(),
-            super::trial_balance::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+    let read = crate::commands::trial_balance::read_desktop_trial_balance(
+        &TallyRuntime::default(),
+        config(&simulator),
+        &identity,
+        TrialBalancePeriod::new(
+            TallyDate::parse("20250401").unwrap(),
+            TallyDate::parse("20260915").unwrap(),
         )
-        .await
-        .unwrap();
+        .unwrap(),
+    )
+    .await
+    .unwrap();
     assert_eq!(simulator.finish().unwrap().len(), total);
     let TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
         base_name,

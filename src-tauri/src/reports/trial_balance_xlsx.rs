@@ -5,7 +5,8 @@ use rust_xlsxwriter::{Format, Workbook, XlsxError};
 
 use super::party_statement_xlsx::amount_to_f64;
 use crate::tally::runtime::{
-    TrialBalanceLedgerScope, TrialBalanceRead, BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
+    base_currency_ledgers_only_label, TrialBalanceLedgerScope, TrialBalanceRead,
+    BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
 };
 
 const EXCEL_MAX_ROWS: usize = 1_048_576;
@@ -100,10 +101,15 @@ pub fn render_trial_balance_xlsx(
     row += 1;
     // A several-currency book's totals cover part of the book, and say so
     // before any figure (bridge#709).
-    if partial.is_some() {
+    if let Some((_, foreign, mixed)) = partial {
+        let covered = format!(
+            "{} {BASE_CURRENCY_LEDGERS_ONLY_LIMITATION}",
+            base_currency_ledgers_only_label(foreign.len(), mixed.len())
+        );
         sheet.write_string_with_format(row, 0, "Ledgers covered", &bold)?;
-        sheet.write_string_with_format(row, 1, BASE_CURRENCY_LEDGERS_ONLY_LIMITATION, &wrapped)?;
-        sheet.set_row_height(row, 60)?;
+        sheet.write_string_with_format(row, 1, &covered, &wrapped)?;
+        // The label and the statement together wrap to about eight lines.
+        sheet.set_row_height(row, 120)?;
         row += 1;
     }
     row += 1;

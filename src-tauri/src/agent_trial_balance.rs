@@ -97,6 +97,11 @@ impl Server {
                     });
                     frame["scope_limitation"] =
                         json!(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION);
+                    frame["scope_label"] =
+                        json!(crate::tally::runtime::base_currency_ledgers_only_label(
+                            foreign.len(),
+                            mixed.len(),
+                        ));
                 }
                 self.hold_listing(ListingSnapshot::new(
                     &identity,
@@ -154,6 +159,12 @@ impl Server {
             limitations.as_array_mut(),
         ) {
             list.push(json!(limitation));
+        }
+        // A partial read says so first, with its counts (bridge#709).
+        if let (Some(label), Some(list)) =
+            (frame["scope_label"].as_str(), limitations.as_array_mut())
+        {
+            list.insert(0, json!(label));
         }
         result["limitations"] = limitations;
         Ok(ToolOutcome {

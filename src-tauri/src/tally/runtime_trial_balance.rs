@@ -61,6 +61,18 @@ impl TrialBalanceRead {
 /// about its totals: the MCP read, the desktop screen and its workbook.
 pub(crate) const BASE_CURRENCY_LEDGERS_ONLY_LIMITATION: &str = "Totals cover this book's plain base-currency ledgers only. Ledgers kept in another currency, and base-currency ledgers with a balance Tally shows in another currency, are left out and named, so debit and credit totals are expected to differ.";
 
+/// The first line every surface shows for a several-currency book's partial
+/// read, in its own output rather than only in a field (bridge#709): what it
+/// covers, and how many ledgers it left out and listed.
+pub(crate) fn base_currency_ledgers_only_label(foreign: usize, mixed: usize) -> String {
+    let ledgers = |count: usize| if count == 1 { "ledger" } else { "ledgers" };
+    format!(
+        "Base-currency ledgers only: {foreign} {} kept in another currency and {mixed} base-currency {} with a value Tally shows in another currency are excluded and listed.",
+        ledgers(foreign),
+        ledgers(mixed),
+    )
+}
+
 /// The ledgers a Trial Balance read covers.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

@@ -207,6 +207,10 @@ fn a_several_currency_export_states_its_scope_and_lists_the_ledgers_left_out() {
     let bytes = render_trial_balance_xlsx(&several_currency_read()).unwrap();
     let text = workbook_text(&bytes);
     assert!(text.contains(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION));
+    // The partial read says so first, with its counts (bridge#709).
+    assert!(text.contains(
+        "Base-currency ledgers only: 1 ledger kept in another currency and 1 base-currency ledger with a value Tally shows in another currency are excluded and listed."
+    ));
     assert!(
         text.contains("I\u{20b9} (the base Tally identified; this book keeps 2 Currency masters)")
     );

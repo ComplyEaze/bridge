@@ -256,6 +256,8 @@ impl PendingPostApproval {
                 company_marks_request,
             )
             .await;
+            // Stamped before the task ends, never after: a task seen finished
+            // with no stamp is one that ended without an answer.
             let _ = stamp.set(Answered::now(answer.is_ok()));
             answer
         };

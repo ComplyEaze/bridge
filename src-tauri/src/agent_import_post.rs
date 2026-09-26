@@ -1711,11 +1711,12 @@ fn admit_fresh_saved_voucher(
 /// When the agent's post happens, stated in its dialog (#725): the post may
 /// come after the click, on the agent's next call, or not at all.
 /// One line, so a multi-line voucher gives up as little of the dialog as can
-/// be: every outcome is in it, since a post not made now or on the agent's
-/// next ask in the window, or one cancelled or refused first, is never made.
+/// be: every outcome is in it, since a post not made now or on the next ask in
+/// the window, or one cancelled, refused or cut off by a restart (the approval
+/// is held in memory), is never made. Exactly the 100-character line cap.
 pub(super) fn agent_post_timing_lines() -> [String; 1] {
     [format!(
-        "Bridge posts this now or when the agent asks again within {} minutes, unless cancelled or refused.",
+        "Bridge posts this now or when asked again within {} minutes, unless cancelled, refused or restarted.",
         approval::APPROVAL_TTL.as_secs() / 60
     )]
 }

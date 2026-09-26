@@ -1115,9 +1115,10 @@ fn the_agent_preview_says_when_the_post_happens() {
     let [now] = agent_post_timing_lines();
     assert_eq!(
         now,
-        "Bridge posts this now or when the agent asks again within 15 minutes, unless cancelled or refused."
+        "Bridge posts this now or when asked again within 15 minutes, unless cancelled, refused or restarted."
     );
-    assert!(now.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
+    // Exactly at the width cap, which refuses only past it: no margin.
+    assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
     let single = agent_review_preview(&one, &endpoint).unwrap();
     assert!(single.ends_with(&format!("\n{now}")), "{single}");
     assert!(!admit_fresh_saved_voucher(&one, &endpoint)

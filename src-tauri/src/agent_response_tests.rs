@@ -267,8 +267,11 @@ fn final_framing_caps_page_a_base_currency_ledgers_only_result() {
             response_row_count(&unbounded),
             Some(15 - 3.min(offset) - 2.min(offset) - 6.min(offset) - 4.min(offset))
         );
-        let (response, _, _) = enforce_response_byte_cap(unbounded, 1000).unwrap();
-        assert!(response.to_string().len() <= 1000);
+        // Four axes at one row each, with the reasons and both excluded
+        // lists' framing, need more than the three-axis 1,000 bytes; the 15
+        // unbounded rows (about 2,000 bytes) still have to page.
+        let (response, _, _) = enforce_response_byte_cap(unbounded, 1400).unwrap();
+        assert!(response.to_string().len() <= 1400);
         let result = &response["result"];
         bills.extend(ids(&result["base_currency_ledgers"]["open_bills"]));
         parties.extend(ids(

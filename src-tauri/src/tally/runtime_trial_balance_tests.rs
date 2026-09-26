@@ -372,8 +372,8 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
     let extent = forex(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
     ));
-    let companies = xml(companies());
-    let mut plans = vec![status(), companies.clone(), companies.clone()];
+    let listing = xml(companies());
+    let mut plans = vec![status(), listing.clone(), listing.clone()];
     pair(&mut plans, extent.clone());
     for source in [
         forex(include_bytes!(
@@ -392,7 +392,7 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
         pair(&mut plans, source);
     }
     pair(&mut plans, extent);
-    plans.extend([companies.clone(), status(), companies]);
+    plans.extend([listing.clone(), status(), listing]);
     let total = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let observed = parse_companies_from_collection(&companies()).unwrap();

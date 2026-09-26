@@ -594,3 +594,26 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     assert_eq!(observed.len(), before_approval().len());
     assert_eq!(intents(directory.path()), 0);
 }
+
+/// An approval already taken by a posting call reads as in use, not revoked:
+/// a second redemption is refused, and the first can still spend it.
+#[tokio::test]
+async fn a_second_redemption_reads_as_in_use() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let (request, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native)
+        .unwrap();
+    let (id, _, _) = approvals.take_for_dispatch(&line.batch_id, &binding).unwrap();
+    assert_eq!(
+        approvals
+            .take_for_dispatch(&line.batch_id, &binding)
+            .err()
+            .as_deref(),
+        Some("import_approval_in_use")
+    );
+    approvals.spend(&line.batch_id, id).unwrap();
+}

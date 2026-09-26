@@ -332,8 +332,18 @@ impl PostApprovals {
                 Ok((id, *request, native))
             }
             other => {
+                // Another call already took it: in use, not revoked.
+                let in_use = matches!(
+                    &other,
+                    Some((held_batch, Held::Redeeming { .. })) if held_batch == batch_id
+                );
                 *slot = other;
-                Err("import_approval_revoked".into())
+                Err(if in_use {
+                    "import_approval_in_use"
+                } else {
+                    "import_approval_revoked"
+                }
+                .into())
             }
         }
     }

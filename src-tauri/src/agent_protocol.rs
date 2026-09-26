@@ -458,12 +458,16 @@ struct PostRequest<'a> {
     cancellation: &'a tokio_util::sync::CancellationToken,
 }
 
-/// How long a withdrawn post is polled to finish its operation in flight. A
-/// Tally request is bounded by the transport's 20-second deadline, so a post
-/// still running after this is waiting on something else and is dropped.
+/// How long a withdrawn post is polled to finish its operation in flight.
+/// The operation is one queued runtime operation, which may be many
+/// requests: the queue's lease operation is about 32 (3.0 s in the 200-voucher
+/// run of 26 Sep 2026), each bounded by the transport's 20-second deadline.
+/// This is a backstop against a post that never stops, not a normal bound:
+/// dropping one still running abandons its request in flight. It is the
+/// transport's own ceiling for one request. Input is still read meanwhile.
 /// Unit tests stand in posts that never finish, where waiting protects nothing.
 #[cfg(not(test))]
-const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_secs(25);
+const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_secs(120);
 #[cfg(test)]
 const WITHDRAW_GRACE: std::time::Duration = std::time::Duration::from_millis(100);
 

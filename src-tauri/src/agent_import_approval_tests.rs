@@ -485,13 +485,14 @@ async fn the_wait_stops_at_a_withdrawal() {
             withdrawn.cancel();
         }
     };
-    let wait = crate::tally::runtime::TOOL_CANCELLATION
-        .scope(withdrawn.clone(), wait_for_answer(dialog, Duration::from_secs(30)));
-    let (waited, ()) = tokio::time::timeout(Duration::from_secs(2), async {
-        tokio::join!(wait, cancel)
-    })
-    .await
-    .expect("stopped at the withdrawal, not at the budget");
+    let wait = crate::tally::runtime::TOOL_CANCELLATION.scope(
+        withdrawn.clone(),
+        wait_for_answer(dialog, Duration::from_secs(30)),
+    );
+    let (waited, ()) =
+        tokio::time::timeout(Duration::from_secs(2), async { tokio::join!(wait, cancel) })
+            .await
+            .expect("stopped at the withdrawal, not at the budget");
     assert!(matches!(waited, Waited::Cancelled));
     tokio::task::yield_now().await;
     assert!(!scripted.is_waiting(), "the dialog was closed");
@@ -540,16 +541,29 @@ async fn an_approval_reports_the_time_left_since_its_click() {
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     scripted.answer(true);
     until_answered(&server, &line.batch_id).await;
     tokio::time::sleep(Duration::from_millis(1_600)).await;
     let approved = server.call_tool("post_import", args).await;
     let _ = sent(simulator);
-    assert_eq!(result(&approved)["approval"]["state"], "approved", "{approved}");
-    let left = result(&approved)["approval"]["expires_in_s"].as_u64().unwrap();
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
+    let left = result(&approved)["approval"]["expires_in_s"]
+        .as_u64()
+        .unwrap();
     assert!(left <= 1, "counted from the click: {approved}");
 }
 
@@ -563,9 +577,16 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args.clone()))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
-    assert_eq!(result(&pending)["approval"]["state"], "pending", "{pending}");
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
     {
         let _lock = server.lock_import_admission().unwrap();
         server
@@ -1160,9 +1181,8 @@ fn journal_of(saved: &ImportLedgerLine, entries: usize) -> ImportLedgerLine {
     credit.amount = format!("{}.00", entries - 1);
     lines.push(credit);
     line.vouchers[0].entries = lines;
-    line.sha256 = sha256_hex(
-        render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id).as_bytes(),
-    );
+    line.sha256 =
+        sha256_hex(render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id).as_bytes());
     line
 }
 

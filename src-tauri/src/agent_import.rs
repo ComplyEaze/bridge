@@ -47,14 +47,14 @@ use crate::local_files::file::lock_error as import_admission_lock_error;
 mod ack;
 #[path = "agent_import_amend.rs"]
 mod amend;
+#[path = "agent_import_approval.rs"]
+mod approval;
 #[path = "agent_import_ledger.rs"]
 pub(super) mod ledger;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
-#[path = "agent_import_approval.rs"]
-mod approval;
 pub(super) use approval::PostApprovals;
 #[path = "agent_import_verification.rs"]
 mod verification;

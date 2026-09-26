@@ -153,11 +153,13 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let response = {
+        let cancellation = tokio_util::sync::CancellationToken::new();
         let result = await_post(
             future,
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -214,11 +216,13 @@ async fn cancellation_before_durable_intent_drops_the_controlled_future() {
         .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n")
         .await
         .unwrap();
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let result = await_post(
         std::future::pending::<ToolResponse>(),
         PostRequest {
             id: &json!(7),
             args: &args(),
+            cancellation: &cancellation,
         },
         &server,
         &mut BufReader::new(source),
@@ -243,6 +247,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let response = {
         let result = await_post(
             async move {
@@ -252,6 +257,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -284,6 +290,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let mut output = FailingWriter;
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let response = {
         let result = await_post(
             async move {
@@ -293,6 +300,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -356,6 +364,7 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
         PostRequest {
             id: &json!(7),
             args: &args(),
+            cancellation: &tokio_util::sync::CancellationToken::new(),
         },
         &server,
         &mut BufReader::new(input.as_bytes()),

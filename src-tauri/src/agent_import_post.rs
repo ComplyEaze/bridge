@@ -1,8 +1,8 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
 //! subsequent calls only reconcile its identity.
+use super::approval::{self, ApprovalBinding, Begin, Joined};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
-use super::approval::{self, ApprovalBinding, Begin, Joined};
 use crate::tally::approved_import::{
     ApprovedImport, ApprovedImportAdmissionError, PendingPostApproval,
 };
@@ -368,11 +368,19 @@ impl Server {
                     Begin::Redeem => true,
                     Begin::Busy(code) => return Err(code.to_string().into()),
                     Begin::Waiting => {
-                        return Ok(self.approval_outcome(batch_id, guid, ApprovalState::Pending(None), accumulated.clone()))
+                        return Ok(self.approval_outcome(
+                            batch_id,
+                            guid,
+                            ApprovalState::Pending(None),
+                            accumulated.clone(),
+                        ))
                     }
                     Begin::Join(dialog) => {
-                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
-                            Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
+                        {
+                            Waited::Cancelled => {
+                                return Err("request_cancelled".to_string().into())
+                            }
                             Waited::Open(dialog) => Err(dialog),
                             Waited::Answered(answer) => Ok(answer),
                         };
@@ -559,11 +567,19 @@ impl Server {
                     // approval is redeemed only for exactly this (#725).
                     let binding = ApprovalBinding::new(&line, &preview, &ledger_binding);
                     if !redeeming {
-                        match wait_for_answer(PendingPostApproval::ask(asked), call_budget(call_started)).await {
-                            Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                        match wait_for_answer(
+                            PendingPostApproval::ask(asked),
+                            call_budget(call_started),
+                        )
+                        .await
+                        {
+                            Waited::Cancelled => {
+                                return Err("request_cancelled".to_string().into())
+                            }
                             Waited::Open(dialog) => {
                                 let remaining = dialog.remaining();
-                                self.post_approvals.hold_pending(batch_id, binding, dialog, native)?;
+                                self.post_approvals
+                                    .hold_pending(batch_id, binding, dialog, native)?;
                                 return Ok(self.approval_outcome(
                                     batch_id,
                                     guid,
@@ -572,7 +588,12 @@ impl Server {
                                 ));
                             }
                             Waited::Answered(answer) => {
-                                self.post_approvals.hold_approved(batch_id, binding.clone(), answer?, native)?;
+                                self.post_approvals.hold_approved(
+                                    batch_id,
+                                    binding.clone(),
+                                    answer?,
+                                    native,
+                                )?;
                                 // Answered too late in the call for the post to
                                 // fit: the next call redeems it, after checking
                                 // the book again.

@@ -111,7 +111,7 @@ enum Held {
     Approved {
         binding: ApprovalBinding,
         id: Uuid,
-        request: ApprovedImport,
+        request: Box<ApprovedImport>,
         native: NativePostRequest,
         approved_at: Instant,
         approved_at_utc: DateTime<Utc>,
@@ -242,9 +242,12 @@ impl PostApprovals {
                 Joined::Refused(code)
             }
             Ok(Ok(request)) => {
-                let Some((_, Held::Pending {
-                    binding, native, ..
-                })) = slot.take()
+                let Some((
+                    _,
+                    Held::Pending {
+                        binding, native, ..
+                    },
+                )) = slot.take()
                 else {
                     unreachable!("matched as pending above");
                 };
@@ -281,14 +284,17 @@ impl PostApprovals {
         let mut slot = self.slot();
         self.lapse_if_expired(&mut slot);
         match slot.take() {
-            Some((held_batch, Held::Approved {
-                binding,
-                id,
-                request,
-                native,
-                approved_at_utc,
-                ..
-            })) if held_batch == batch_id => {
+            Some((
+                held_batch,
+                Held::Approved {
+                    binding,
+                    id,
+                    request,
+                    native,
+                    approved_at_utc,
+                    ..
+                },
+            )) if held_batch == batch_id => {
                 if binding != *fresh || request.voucher_count() != fresh.voucher_count {
                     self.write_lapse_note(batch_id, approved_at_utc, "approval_binding_changed");
                     return Err("import_approval_binding_changed".into());
@@ -300,7 +306,7 @@ impl PostApprovals {
                         approved_at_utc,
                     },
                 ));
-                Ok((id, request, native))
+                Ok((id, *request, native))
             }
             other => {
                 *slot = other;
@@ -329,7 +335,14 @@ impl PostApprovals {
     /// before its intent) lapses; it is never offered again.
     pub(super) fn release_unspent(&self, batch_id: &str, approval: Uuid, reason: &str) {
         let mut slot = self.slot();
-        if let Some((held_batch, Held::Redeeming { id, approved_at_utc })) = slot.as_ref() {
+        if let Some((
+            held_batch,
+            Held::Redeeming {
+                id,
+                approved_at_utc,
+            },
+        )) = slot.as_ref()
+        {
             if held_batch == batch_id && *id == approval {
                 let approved_at_utc = *approved_at_utc;
                 *slot = None;
@@ -342,7 +355,10 @@ impl PostApprovals {
     /// an approval, redeemed or not, can no longer be spent.
     pub(in crate::agent) fn revoke(&self, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
-        if slot.as_ref().is_some_and(|(held_batch, _)| held_batch == batch_id) {
+        if slot
+            .as_ref()
+            .is_some_and(|(held_batch, _)| held_batch == batch_id)
+        {
             if let Some((_, held)) = slot.take() {
                 self.lapse(batch_id, held, reason);
             }
@@ -431,7 +447,7 @@ fn approved(binding: ApprovalBinding, request: ApprovedImport, native: NativePos
     Held::Approved {
         binding,
         id: Uuid::new_v4(),
-        request,
+        request: Box::new(request),
         native,
         approved_at: Instant::now(),
         approved_at_utc: Utc::now(),

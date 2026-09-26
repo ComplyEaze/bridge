@@ -512,6 +512,17 @@ where
             frame = framer.read(reader, MAX_REQUEST_BYTES) => {
                 let frame = match frame {
                     Ok(Some(frame)) => frame,
+                    // Already withdrawn: the input ending changes nothing. The
+                    // operation in flight is finished (within the grace) and
+                    // the call answers as cancelled.
+                    Ok(None) if phase == PostPhase::Withdrawing => {
+                        let _finished = tokio::time::timeout_at(
+                            withdraw_deadline.deadline(),
+                            future.as_mut(),
+                        )
+                        .await;
+                        return Ok(None);
+                    }
                     Ok(None) => return finish_interrupted_post(
                         future.as_mut(),
                         request,

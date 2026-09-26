@@ -52,7 +52,10 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         ("use confirm_review as approve_review;", "#[cfg(not(test))]"),
         ("use test_seam::approve_review;", "#[cfg(test)]"),
         // What a post dialog's own task runs under (#725), gated the same way.
-        ("use carry_nothing as carry_approval_scope;", "#[cfg(not(test))]"),
+        (
+            "use carry_nothing as carry_approval_scope;",
+            "#[cfg(not(test))]",
+        ),
         ("use test_seam::carry_approval_scope;", "#[cfg(test)]"),
         ("pub(crate) mod test_seam {", "#[cfg(test)]"),
     ] {
@@ -89,7 +92,8 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
             .count()
             != 1
     {
-        problems.push("a post dialog's task must be spawned once, under carry_approval_scope".into());
+        problems
+            .push("a post dialog's task must be spawned once, under carry_approval_scope".into());
     }
     if source
         .matches("#[cfg(not(test))]\nfn carry_nothing<F>(dialog: F) -> F {\n    dialog\n}")
@@ -784,12 +788,14 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 15] = [
 /// bare text `cfg`, so a `cfg_attr`, a `cfg!`, or a combined predicate such as
 /// `cfg(any(…))` is caught too.
 const CFG_CENSUS: [(&str, usize); 6] = [
-    ("#[cfg(test)]", 5),
-    ("#[cfg(not(test))]", 2),
+    // #725 added one of each seam arm for the dialog task's scope, and the
+    // non-test arm's identity function.
+    ("#[cfg(test)]", 6),
+    ("#[cfg(not(test))]", 4),
     ("#[cfg(unix)]", 7),
     ("#[cfg(windows)]", 6),
     ("#[cfg(not(windows))]", 7),
-    ("cfg", 28),
+    ("cfg", 31),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {

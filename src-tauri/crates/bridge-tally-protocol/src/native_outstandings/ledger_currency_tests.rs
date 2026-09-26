@@ -668,3 +668,65 @@ fn a_mixed_partys_bills_leave_every_figure_with_it() {
         .iter()
         .all(|residual| residual.party != "FX Party 01"));
 }
+
+/// bridge#642 and #683, on the book after a $40 receipt at 88 against the
+/// dollar bill of the rupee party `FX Party 01` (sold at 86). Captured, one
+/// moment: FOREX_601D_CAPTURE_PROVENANCE, PARTIAL. Tally computed a forex
+/// gain into that party's closing and bill with no voucher, revalued other
+/// dollar bills no voucher touched, and made `Cash` a composite. Every
+/// ledger with a composite value is named as mixed, never parsed or compared.
+/// Its bills leave every figure: the plain rupee parties' receivable is still
+/// 23,000, as before the receipt.
+#[test]
+fn a_mixed_party_revalued_with_no_voucher_is_listed_not_compared() {
+    let snapshot = parse_native_ledger_snapshot_classified(
+        &decode(include_bytes!(
+            "../../tests/fixtures/balance_snapshot_forex_post_receipt_live.utf16le.xml"
+        )),
+        &forex_base(),
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot.mixed,
+        ["Cash", "FX Party 01", "FX Sales", "Profit & Loss A/c"]
+    );
+    assert_eq!(
+        snapshot
+            .base
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["BRIDGE INR DEBTOR A", "FX Party 02", "FX Party 03"]
+    );
+    let as_of = TallyDate::parse("20260915").unwrap();
+    let receivable = parse_native_bill_rows(
+        &decode(include_bytes!(
+            "../../tests/fixtures/bills_receivable_forex_post_receipt_live.utf16le.xml"
+        )),
+        &TallyDate::parse("20250401").unwrap(),
+        &as_of,
+    )
+    .unwrap();
+    assert_eq!(receivable.len(), 19);
+    let result = compute_native_outstandings_with_exclusions(
+        "BRIDGE CORPUS FOREX",
+        &receivable,
+        &[],
+        NativeMasterSnapshot {
+            ledgers: &snapshot.base,
+            groups: NativeGroupSnapshot::LegacyFixtureWithoutGroups,
+        },
+        &snapshot.foreign,
+        &snapshot.mixed,
+        AgeingAnchor::DueDate,
+        &as_of,
+        0,
+    )
+    .unwrap();
+    assert_eq!(result.report.receivable_total, amount("23000"));
+    assert_eq!(result.mixed_currency_ledgers_excluded, snapshot.mixed);
+    assert!(result
+        .residuals
+        .iter()
+        .all(|residual| !snapshot.mixed.contains(&residual.party)));
+}

@@ -4236,6 +4236,22 @@ impl TallyRuntime {
                                 return Ok((partial, read_evidence.clone()));
                             }
                         };
+                        // A book with one Currency master holds no composite
+                        // legitimately. Its read keeps the refusal it had
+                        // before bridge#642, at the same point and naming the
+                        // ledger, rather than setting the ledger aside.
+                        if currency_witness.classified_base().is_none() {
+                            if let Some(ledger) = snapshot.mixed.first() {
+                                return Ok((
+                                    partial_result(
+                                        OutstandingsPartialReason::foreign_currency_ledger_balance(
+                                            ledger.clone(),
+                                        ),
+                                    ),
+                                    read_evidence.clone(),
+                                ));
+                            }
+                        }
                         // A foreign ledger's bills are plain amounts that are
                         // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d), and a
                         // mixed ledger's are rupee amounts behind a balance
@@ -4288,23 +4304,15 @@ impl TallyRuntime {
                             result.mixed_currency_ledgers_excluded,
                         ) {
                             // A single-master base refuses a ledger in another
-                            // currency before this point (classify_ledger_currencies);
-                            // without a classified witness this result cannot be
-                            // built, so it refuses here too. A composite value
-                            // on such a book keeps the refusal it had before
-                            // bridge#642, naming the ledger.
+                            // currency before this point (classify_ledger_currencies),
+                            // and a composite value above; without a classified
+                            // witness this result cannot be built, so it refuses
+                            // here too.
                             let Some(classified) = currency_witness.classified_base() else {
-                                let reason = match (exclusions.foreign(), exclusions.mixed()) {
-                                    ([], [ledger, ..]) => {
-                                        OutstandingsPartialReason::foreign_currency_ledger_balance(
-                                            ledger.clone(),
-                                        )
-                                    }
-                                    _ => OutstandingsPartialReason::code(
-                                        "ledger_currency_base_unmatched",
-                                    ),
-                                };
-                                return Ok((partial_result(reason), read_evidence.clone()));
+                                return Ok((
+                                    partial_result("ledger_currency_base_unmatched"),
+                                    read_evidence.clone(),
+                                ));
                             };
                             return Ok((
                                 OutstandingsLoadResult::BaseCurrencyLedgersOnly {

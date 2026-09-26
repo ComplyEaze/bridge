@@ -102,6 +102,24 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     {
         problems.push("outside tests, carry_approval_scope must carry nothing".into());
     }
+    // Every other way to run code off the calling task, counted (#725): none
+    // but the one dialog task above. The two `.spawn(` are processes, the
+    // dialog's child and a unit test's stand-in, and the bare word is counted
+    // too, as the cfg census is, so a form nobody listed is caught.
+    for (form, expected) in [
+        ("tokio::task::spawn(", 0),
+        ("task::spawn(", 0),
+        ("spawn_blocking(", 0),
+        ("spawn_local(", 0),
+        ("JoinSet", 0),
+        ("Handle::current()", 0),
+        (".spawn(", 2),
+        ("spawn", 9),
+    ] {
+        if source.matches(form).count() != expected {
+            problems.push(format!("expected {expected} of `{form}`"));
+        }
+    }
     problems.extend(widened_test_gates(source));
     problems
 }
@@ -339,6 +357,13 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "fn carry_nothing<F>(dialog: F) -> F {\n    std::hint::black_box(dialog)\n}",
         ),
         format!("{source}\nfn elsewhere() {{ let _ = tokio::spawn(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn_blocking(|| {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn_local(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::JoinSet::<()>::new(); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::runtime::Handle::current(); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = std::process::Command::new(\"x\").spawn(); }}\n"),
+        format!("{source}\nfn respawned() {{}}\n"),
         source.replace(
             "#[cfg(test)]\nuse test_seam::approve;",
             "#[cfg_attr(test, allow(unused))]\nuse test_seam::approve;",

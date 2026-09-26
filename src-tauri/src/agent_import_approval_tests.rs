@@ -563,13 +563,17 @@ async fn a_refused_redemption_withdraws_its_approval() {
     assert_eq!(observed.len(), 2 * before_approval().len() - probe().len());
     let last = observed.last().unwrap();
     assert_eq!(last.method, "POST", "the currency pair's closing read");
-    assert!(
-        !observed[before_approval().len()..]
+    let (first_call, redeeming) = observed.split_at(before_approval().len());
+    let gets = |requests: &[tally_protocol_simulator::ObservedRequest]| {
+        requests
             .iter()
-            .rev()
-            .take_while(|request| request.method == "GET")
-            .any(|_| true),
-        "no mode probe follows the refusal"
+            .filter(|request| request.method == "GET")
+            .count()
+    };
+    assert_eq!(
+        gets(redeeming) + 1,
+        gets(first_call),
+        "exactly the mode probe's GET /status is missing"
     );
 }
 

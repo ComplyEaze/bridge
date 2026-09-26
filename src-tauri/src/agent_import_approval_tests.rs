@@ -358,3 +358,79 @@ fn an_approval_is_posted_in_its_call_only_while_the_measured_post_fits() {
     assert!(dispatch_fits_in_call(std::time::Duration::ZERO, 200));
     assert!(!dispatch_fits_in_call(std::time::Duration::MAX, 1));
 }
+
+/// A dialog the person already answered, then revoked (a cancelled call):
+/// the answer is dropped unread, whether the dialog was held or a joined call
+/// had it out, and nothing is left to redeem.
+#[tokio::test]
+async fn an_answer_revoked_before_its_redemption_is_never_spent() {
+    use crate::agent::agent_import::approval::Joined;
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let answered = || {
+        SCRIPTED_APPROVAL.scope(ScriptedApproval::approving(), async {
+            PendingPostApproval::ask(ApprovedImport::confirm(
+                "<ENVELOPE/>".into(),
+                "Synthetic preview",
+                vec![bridge_tally_core::TallyDate::parse("20260901".into()).unwrap()],
+                AgentReadRequest::parse(
+                    crate::agent::read_profiles::render_agent_company_high_water("WR2 Unicode Lab"),
+                )
+                .unwrap(),
+                AgentReadRequest::parse(
+                    crate::agent::read_profiles::render_agent_company_high_water("WR2 Unicode Lab"),
+                )
+                .unwrap(),
+                bridge_tally_protocol::parse_standard_ledger_catalog_with_identities(
+                    &catalogue(),
+                    "WR2 Unicode Lab",
+                    GUID,
+                )
+                .unwrap()
+                .bind_selected(["Cash".to_string()])
+                .unwrap(),
+                None,
+                AgentReadRequest::parse(
+                    crate::agent::read_profiles::render_agent_company_high_water("WR2 Unicode Lab"),
+                )
+                .unwrap(),
+                AgentReadRequest::parse(
+                    crate::agent::read_profiles::render_agent_company_high_water("WR2 Unicode Lab"),
+                )
+                .unwrap(),
+            ))
+        })
+    };
+    let native = || native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+
+    // Held: answered while no call waits, then revoked.
+    approvals
+        .hold_pending(&line.batch_id, binding.clone(), answered().await, native())
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    approvals.revoke(&line.batch_id, "request_cancelled");
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(approvals.take_for_dispatch(&line.batch_id, &binding).is_err());
+
+    // Joined: a call has the dialog out when the revocation lands.
+    approvals
+        .hold_pending(&line.batch_id, binding.clone(), answered().await, native())
+        .unwrap();
+    let Begin::Join(dialog) = approvals.begin(&line.batch_id) else {
+        panic!("a held dialog is joined");
+    };
+    let answer = dialog
+        .answer_within(std::time::Duration::from_secs(5))
+        .await
+        .ok()
+        .expect("answered");
+    approvals.revoke(&line.batch_id, "request_cancelled");
+    assert!(matches!(
+        approvals.settle_join(&line.batch_id, Ok(answer)),
+        Joined::Refused(code) if code == "import_approval_revoked"
+    ));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(approvals.take_for_dispatch(&line.batch_id, &binding).is_err());
+}

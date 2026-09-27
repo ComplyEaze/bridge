@@ -58,9 +58,9 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    parse_import_voucher_rows, parse_import_vouchers, render_proof_markdown,
-    verification_response_page, verification_status, verification_window_identities, verify_batch,
-    voucher_diffs, voucher_is_accounting_effective,
+    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
+    render_proof_markdown, verification_response_page, verification_status,
+    verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
 };
 #[cfg(test)]
 use verification::{
@@ -1244,13 +1244,11 @@ impl Server {
                     );
                 }
             }
-            let status = if dispatched
-                && payload["result"]["dispatch"]["state"] == "reconciliation_required"
-            {
-                "verification_incomplete"
-            } else {
-                verification_status(&result, line.vouchers.len())
-            };
+            let status = final_verification_status(
+                dispatched.then(|| &payload["result"]["dispatch"]),
+                &result,
+                line.vouchers.len(),
+            );
             payload["result"]["verification_status"] = json!(status);
             let mut update = line.clone();
             update.status = status.to_string();

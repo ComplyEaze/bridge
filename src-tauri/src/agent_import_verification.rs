@@ -395,6 +395,21 @@ pub(super) fn verification_response_page(
     page
 }
 
+/// The verdict `verify_import` records and the proof renders. A dispatch that
+/// needs reconciliation is never verified, whatever the readback shows; with no
+/// dispatch record, the readback alone decides (bridge#804).
+pub(super) fn final_verification_status(
+    dispatch: Option<&Value>,
+    result: &Value,
+    expected_voucher_count: usize,
+) -> &'static str {
+    if dispatch.is_some_and(|dispatch| dispatch["state"] == "reconciliation_required") {
+        "verification_incomplete"
+    } else {
+        verification_status(result, expected_voucher_count)
+    }
+}
+
 pub(super) fn verification_status(result: &Value, expected_voucher_count: usize) -> &'static str {
     if result["counts"]["posted_verified"].as_u64() == Some(expected_voucher_count as u64)
         && result["duplicates"].as_array().is_some_and(Vec::is_empty)
@@ -634,6 +649,24 @@ pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> 
     }
 }
 
+/// `text` as a code span inside a Markdown table cell. A REMOTEID comes from
+/// Tally and may hold `|` or a backtick: the pipe is escaped so the row keeps
+/// its cells, and the span's fence is one backtick longer than any run inside.
+fn markdown_table_code(text: &str) -> String {
+    let text = text.replace('|', "\\|");
+    let longest_run = text
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    if longest_run == 0 {
+        format!("`{text}`")
+    } else {
+        let fence = "`".repeat(longest_run + 1);
+        format!("{fence} {text} {fence}")
+    }
+}
+
 pub(super) fn render_proof_markdown(proof: &Value) -> String {
     let mut output = format!(
         "# Voucher import verification — {}\n\n",
@@ -693,9 +726,9 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
                 )
             };
             output.push_str(&format!(
-                "| {} | `{}` | {vouchers} |\n",
+                "| {} | {} | {vouchers} |\n",
                 duplicate["kind"].as_str().unwrap_or("unknown"),
-                key.as_str().unwrap_or("unknown")
+                markdown_table_code(key.as_str().unwrap_or("unknown"))
             ));
         }
     }

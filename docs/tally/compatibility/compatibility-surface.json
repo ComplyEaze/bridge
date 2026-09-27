@@ -455,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent_desktop_journal.rs",
-      "sha256": "ef96509a18f7f3844e8140ed6b7052c75647ce5ebe8e46dca3c3e6b8842e5548"
+      "sha256": "30143ebdcece1719ff22c5db95dafc153172a5855b19825753163d19313aed34"
     },
     {
       "path": "src-tauri/src/agent_egress.rs",
@@ -467,7 +467,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
-      "sha256": "5957057d7b5c9e8e8a37f50a265d8ec78b4dcfbc238779f97d553db03b436418"
+      "sha256": "a6c65c17a1e2bb62e10f53b5692bc1008dec75c897efd3719eaec0b708ba584a"
     },
     {
       "path": "src-tauri/src/agent_import_amend.rs",
@@ -491,7 +491,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "c48db094b1ba19cba198a05ac18701236491e6c22bd01791c64222752e76ee9c"
+      "sha256": "11c4a74fef80241e19fa4735b4c5c7ca18552a1375f9b428b4c4c8e95a9c7b5e"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",
@@ -967,7 +967,7 @@
     },
     {
       "path": "src/JournalPostingScreen.tsx",
-      "sha256": "d02613e4e411034af3c5f97a57fff3b79e10f424822e5908826751681e323d9f"
+      "sha256": "984c2201fbed4d049a0170efab4f2ecc686fdc3a6c84d7dd0a2cc1aab9fc8162"
     },
     {
       "path": "src/LedgerEntriesScreen.tsx",

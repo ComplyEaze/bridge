@@ -1525,17 +1525,14 @@ fn admit_fresh_saved_voucher(
         return batch_review_text(line, company, &origin, &debit, &credit);
     }
     let voucher = &line.vouchers[0];
-    let mut review_text = std::iter::once(company.name.as_str())
-        .chain(voucher.voucher_number.iter().map(String::as_str))
-        .chain(voucher.reference.iter().map(String::as_str))
-        .chain(voucher.narration.iter().map(String::as_str))
-        .chain(voucher.entries.iter().map(|entry| entry.ledger.as_str()));
-    if review_text.clone().any(has_unsafe_review_layout_character) {
-        return Err("import_review_layout_text".into());
-    }
-    if review_text.any(has_unreviewable_format_character) {
-        return Err("import_review_format_text".into());
-    }
+    let ledgers = admit_review_text(
+        std::iter::once(company.name.as_str())
+            .chain(voucher.voucher_number.iter().map(String::as_str))
+            .chain(voucher.reference.iter().map(String::as_str))
+            .chain(voucher.narration.iter().map(String::as_str)),
+        voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+    )
+    .map_err(|refusal| refusal.import_code().to_string())?;
     require_native_numbering(voucher)?;
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let optional = |value: &Option<String>| {
@@ -1544,21 +1541,23 @@ fn admit_fresh_saved_voucher(
             .map(quoted)
             .unwrap_or_else(|| "(none)".into())
     };
+    let note = line_break_note(&ledgers);
     let entries = voucher
         .entries
         .iter()
-        .map(|entry| {
+        .zip(ledgers)
+        .map(|(entry, ledger)| {
             format!(
-                "{} {}  {}",
+                "{} {}  {ledger}",
                 if entry.side == EntrySide::Dr {
                     "Dr"
                 } else {
                     "Cr"
                 },
                 entry.amount,
-                quoted(&entry.ledger)
             )
         })
+        .chain(note.map(str::to_string))
         .collect::<Vec<_>>()
         .join("\n");
     let classification = classification_review_line(&voucher.voucher_type)
@@ -1599,17 +1598,18 @@ fn batch_review_text(
     debit: &ExactDecimal,
     credit: &ExactDecimal,
 ) -> Result<String, String> {
-    let names = std::iter::once(company.name.as_str()).chain(
-        line.vouchers
+    let entries = line.vouchers.iter().flat_map(|voucher| {
+        voucher
+            .entries
             .iter()
-            .flat_map(|voucher| voucher.entries.iter().map(|entry| entry.ledger.as_str())),
-    );
-    if names.clone().any(has_unsafe_review_layout_character) {
-        return Err("import_review_layout_text".into());
-    }
-    if names.clone().any(has_unreviewable_format_character) {
-        return Err("import_review_format_text".into());
-    }
+            .map(move |entry| (&voucher.voucher_type, entry))
+    });
+    let names = admit_review_text(
+        [company.name.as_str()],
+        entries.clone().map(|(_, entry)| entry.ledger.as_str()),
+    )
+    .map_err(|refusal| refusal.import_code().to_string())?;
+    let note = line_break_note(&names);
     for voucher in &line.vouchers {
         require_native_numbering(voucher)?;
     }
@@ -1622,26 +1622,26 @@ fn batch_review_text(
         Ok(())
     };
     let mut by_type = BTreeMap::<&str, usize>::new();
-    let mut ledgers = BTreeMap::<&str, (ExactDecimal, ExactDecimal, usize)>::new();
+    let mut ledgers = BTreeMap::<ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
     let (mut money_in, mut money_out) = (ExactDecimal::zero(), ExactDecimal::zero());
     for voucher in &line.vouchers {
         *by_type.entry(voucher.voucher_type.as_str()).or_default() += 1;
-        for entry in &voucher.entries {
-            let totals = ledgers
-                .entry(entry.ledger.as_str())
-                .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
-            totals.2 += 1;
-            match &entry.side {
-                EntrySide::Dr => add(&mut totals.0, &entry.amount)?,
-                EntrySide::Cr => add(&mut totals.1, &entry.amount)?,
-            }
-            // The type fixes the cash/bank side: a Receipt's debits and a
-            // Payment's credits (checked at build and again in the queue).
-            match (&voucher.voucher_type, &entry.side) {
-                (VoucherType::Receipt, EntrySide::Dr) => add(&mut money_in, &entry.amount)?,
-                (VoucherType::Payment, EntrySide::Cr) => add(&mut money_out, &entry.amount)?,
-                _ => {}
-            }
+    }
+    for ((voucher_type, entry), name) in entries.zip(names) {
+        let totals = ledgers
+            .entry(name)
+            .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
+        totals.2 += 1;
+        match &entry.side {
+            EntrySide::Dr => add(&mut totals.0, &entry.amount)?,
+            EntrySide::Cr => add(&mut totals.1, &entry.amount)?,
+        }
+        // The type fixes the cash/bank side: a Receipt's debits and a
+        // Payment's credits (checked at build and again in the queue).
+        match (voucher_type, &entry.side) {
+            (VoucherType::Receipt, EntrySide::Dr) => add(&mut money_in, &entry.amount)?,
+            (VoucherType::Payment, EntrySide::Cr) => add(&mut money_out, &entry.amount)?,
+            _ => {}
         }
     }
     let dates = line.vouchers.iter().map(|voucher| voucher.date.as_str());
@@ -1676,13 +1676,13 @@ fn batch_review_text(
     ];
     for (ledger, (dr, cr, count)) in &ledgers {
         text.push(format!(
-            "Dr {}  Cr {}  {count} {}  {}",
+            "Dr {}  Cr {}  {count} {}  {ledger}",
             dr.as_str(),
             cr.as_str(),
             if *count == 1 { "entry" } else { "entries" },
-            quoted(ledger)
         ));
     }
+    text.extend(note.map(str::to_string));
     text.push(String::new());
     text.push(format!(
         "Total debit: {}  Total credit: {}",
@@ -1729,6 +1729,101 @@ fn batch_review_text(
         return Err("import_review_too_large".into());
     }
     Ok(preview)
+}
+
+/// Why a value cannot be shown in a native approval dialog. A layout
+/// character anywhere is reported before a format character anywhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum ReviewTextRefusal {
+    Layout,
+    Format,
+}
+
+impl ReviewTextRefusal {
+    fn of(value: &str) -> Option<Self> {
+        if has_unsafe_review_layout_character(value) {
+            Some(Self::Layout)
+        } else if has_unreviewable_format_character(value) {
+            Some(Self::Format)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn import_code(self) -> &'static str {
+        match self {
+            Self::Layout => "import_review_layout_text",
+            Self::Format => "import_review_format_text",
+        }
+    }
+}
+
+/// A ledger name as an approval shows it (bridge#626): the only way one
+/// enters the native post and review previews, and the desktop Journal review
+/// of a batch not yet dispatched.
+/// It is held to the rules for all review text, except that it may end in
+/// exactly one CR LF when the rest is a name the build admits: the one spelling
+/// observed to import onto a stored ledger. It is shown JSON-quoted
+/// (`"Cash\r\n"`), so no raw control character reaches `rfd`, `MessageBoxW` or
+/// the webview, and it never reads as the same name without the break. A
+/// preview that shows one adds [`LINE_BREAK_NOTE`] once, on its own line, so
+/// the name's own line grows only by its escape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct ReviewLedgerName<'a>(&'a str);
+
+/// Said once under any approval showing a name that ends in a line break.
+pub(super) const LINE_BREAK_NOTE: &str =
+    "A ledger name ending in \\r\\n has a line break stored at the end of its name.";
+
+impl<'a> ReviewLedgerName<'a> {
+    fn parse(name: &'a str) -> Result<Self, ReviewTextRefusal> {
+        let shown = if super::live_spelling_importable(0, name) {
+            super::without_trailing_crlf(name)
+        } else {
+            name
+        };
+        ReviewTextRefusal::of(shown).map_or(Ok(Self(name)), Err)
+    }
+
+    fn ends_in_line_break(self) -> bool {
+        self.0.ends_with("\r\n")
+    }
+}
+
+impl std::fmt::Display for ReviewLedgerName<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let quoted = serde_json::to_string(self.0).map_err(|_| std::fmt::Error)?;
+        formatter.write_str(&quoted)
+    }
+}
+
+/// [`LINE_BREAK_NOTE`] when any of `names` ends in a line break.
+pub(super) fn line_break_note(names: &[ReviewLedgerName<'_>]) -> Option<&'static str> {
+    names
+        .iter()
+        .any(|name| name.ends_in_line_break())
+        .then_some(LINE_BREAK_NOTE)
+}
+
+/// Checks every value an approval shows: `text` under the plain rules, and
+/// `ledgers` as [`ReviewLedgerName`]s, returned in the order given.
+pub(super) fn admit_review_text<'a>(
+    text: impl IntoIterator<Item = &'a str>,
+    ledgers: impl IntoIterator<Item = &'a str>,
+) -> Result<Vec<ReviewLedgerName<'a>>, ReviewTextRefusal> {
+    let ledgers = ledgers
+        .into_iter()
+        .map(ReviewLedgerName::parse)
+        .collect::<Vec<_>>();
+    let refusal = text
+        .into_iter()
+        .filter_map(ReviewTextRefusal::of)
+        .chain(ledgers.iter().filter_map(|ledger| ledger.err()))
+        .min();
+    match refusal {
+        Some(refusal) => Err(refusal),
+        None => ledgers.into_iter().collect(),
+    }
 }
 
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {

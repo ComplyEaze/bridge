@@ -48,6 +48,38 @@ afterEach(() => {
   mocks.invoke.mockReset();
 });
 
+test("shows each ledger as Bridge sends it, and the line-break note only when sent (#626)", async () => {
+  const note = "A ledger name ending in \\r\\n has a line break stored at the end of its name.";
+  const escaped = {
+    ...review,
+    details: {
+      ...review.details,
+      ledgerNote: note,
+      entries: [
+        { ledger: '"Expense\\r\\n"', side: "Dr" as const, amount: "12.50" },
+        { ledger: '"Cash"', side: "Cr" as const, amount: "12.50" },
+      ],
+    },
+  };
+  for (const [payload, noted] of [[escaped, true], [review, false]] as const) {
+    mocks.invoke.mockResolvedValueOnce(payload);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(<JournalPostingScreen config={config} />);
+    });
+    await act(async () => {
+      button(host, "Choose Journal file").click();
+    });
+    const cells = [...host.querySelectorAll(".journal-entry-table tbody td:first-child")].map((cell) => cell.textContent);
+    expect(cells).toEqual(payload.details.entries.map((entry) => entry.ledger));
+    expect(host.querySelector(".journal-ledger-note")?.textContent ?? null).toBe(noted ? note : null);
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
 test("renders the review flow and keeps safe recovery actions after each backend result", async () => {
   mocks.invoke.mockResolvedValueOnce(review);
   const host = document.createElement("div");

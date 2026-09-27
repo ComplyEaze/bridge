@@ -12,6 +12,7 @@ type JournalDetails = {
   date: string;
   reference: string | null;
   narration: string | null;
+  ledgerNote?: string | null;
   entries: JournalEntry[];
   totalDebit: string;
   totalCredit: string;
@@ -232,6 +233,7 @@ export function JournalPostingScreen({
                 <tbody>{review.details.entries.map((entry, index) => <tr key={index}><td>{entry.ledger}</td><td>{entry.side}</td><td>{entry.amount}</td></tr>)}</tbody>
                 <tfoot><tr><th scope="row" colSpan={2}>Total debit</th><td>{review.details.totalDebit}</td></tr><tr><th scope="row" colSpan={2}>Total credit</th><td>{review.details.totalCredit}</td></tr></tfoot>
               </table>
+              {review.details.ledgerNote && <p className="journal-ledger-note">{review.details.ledgerNote}</p>}
             </div>
           </section>
           <details className="journal-recovery-details">

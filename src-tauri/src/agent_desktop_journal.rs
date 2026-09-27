@@ -6,7 +6,9 @@ use super::super::{
 use super::desktop_journal_review::{
     DesktopJournalCompany, DesktopJournalDetails, DesktopJournalEntry, DesktopJournalReview,
 };
-use super::post::{admit_saved_journal, admit_saved_journal_integrity};
+use super::post::{
+    admit_review_text, admit_saved_journal, admit_saved_journal_integrity, line_break_note,
+};
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
 use bridge_tally_transport::canonical_loopback_origin;
@@ -138,15 +140,38 @@ impl DesktopJournalService {
             .company
             .ok_or_else(|| "import_post_company_missing".to_string())?;
         let (total_debit, total_credit) = totals(&snapshot.batch.vouchers)?;
+        // Each ledger as the native dialog shows it (bridge#626): quoted, so a
+        // name ending in a line break never renders as its twin without one.
+        // A fresh batch passed this admission above. A dispatched one is shown
+        // for reconciliation whatever it holds, quoted the same way, unnoted.
+        let (ledgers, ledger_note) = match admit_review_text(
+            std::iter::empty::<&str>(),
+            voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+        ) {
+            Ok(names) => (
+                names.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                line_break_note(&names),
+            ),
+            Err(_) => (
+                voucher
+                    .entries
+                    .iter()
+                    .map(|entry| serde_json::to_string(&entry.ledger).unwrap_or_default())
+                    .collect(),
+                None,
+            ),
+        };
         let details = DesktopJournalDetails {
             date: voucher.date.clone(),
             reference: voucher.reference.clone(),
             narration: voucher.narration.clone(),
+            ledger_note: ledger_note.map(str::to_string),
             entries: voucher
                 .entries
                 .iter()
-                .map(|entry| DesktopJournalEntry {
-                    ledger: entry.ledger.clone(),
+                .zip(ledgers)
+                .map(|(entry, ledger)| DesktopJournalEntry {
+                    ledger,
                     side: match entry.side {
                         EntrySide::Dr => "Dr".into(),
                         EntrySide::Cr => "Cr".into(),

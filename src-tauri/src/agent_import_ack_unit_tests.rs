@@ -165,6 +165,106 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
     }
 }
 
+/// bridge#626 slice 2a: a ledger name ending in one CR LF, read from Tally or
+/// named by the doubt, is shown as the post dialog shows it, escaped with a
+/// note; any other line break in it stays refused.
+#[test]
+fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
+    const NOTE: &str = post::LINE_BREAK_NOTE;
+    let only_layout_breaks = |preview: &str| {
+        assert!(!preview.as_bytes().contains(&b'\r'), "{preview:?}");
+        assert!(
+            preview
+                .chars()
+                .all(|character| character == '\n' || !character.is_control()),
+            "{preview:?}"
+        );
+        assert!(!preview.contains(['\u{2028}', '\u{2029}']), "{preview:?}");
+        assert_eq!(preview.matches(NOTE).count(), 1, "{preview}");
+    };
+    let named = json!({"state":"posted_under_changed_masters","ledgers":["Ledger 0\r\n"]});
+    let mut voucher = row_json(2, "Paid");
+    voucher["amounts"][0]["ledger"] = json!("Ledger 0\r\n");
+    let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+    let preview = review_preview(BATCH, MARKER, "Books", &named, &voucher).unwrap();
+    for shown in [
+        r#"  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 1.00  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 1.00  "Ledger 1""#.to_string(),
+        NOTE.to_string(),
+    ] {
+        assert!(
+            preview.lines().any(|line| line == shown),
+            "{shown}: {preview}"
+        );
+    }
+    only_layout_breaks(&preview);
+
+    let line = posted_batch(3);
+    let mut rows = batch_rows(&line);
+    for row in &mut rows {
+        row.entries[0].ledger.push_str("\r\n");
+    }
+    let rows = rows.iter().collect::<Vec<_>>();
+    let preview = batch_review_preview(&line, DoubtKind::Masters, "Books", &named, &rows).unwrap();
+    for shown in [
+        r#"  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 3  Cr 0  3 entries  "Ledger 1""#.to_string(),
+        NOTE.to_string(),
+    ] {
+        assert!(
+            preview.lines().any(|line| line == shown),
+            "{shown}: {preview}"
+        );
+    }
+    only_layout_breaks(&preview);
+    // A step doubt names no ledger; its summary shows the name the same way.
+    let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    let preview = batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &rows).unwrap();
+    assert!(
+        preview
+            .lines()
+            .any(|line| line == r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n""#),
+        "{preview}"
+    );
+    only_layout_breaks(&preview);
+
+    for (bad, code) in [
+        ("Ledger 0\r", "ack_review_layout_text"),
+        ("Ledger 0\n", "ack_review_layout_text"),
+        ("Ledger 0\r\n\r\n", "ack_review_layout_text"),
+        ("\r\n", "ack_review_layout_text"),
+        ("Ledger 0\u{200d}\r\n", "ack_review_format_text"),
+    ] {
+        let doubted = json!({"state":"posted_under_changed_masters","ledgers":[bad]});
+        let mut voucher = row_json(2, "Paid");
+        voucher["amounts"][0]["ledger"] = json!(bad);
+        let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+        let rows = [&voucher];
+        for (source, preview) in [
+            (
+                "doubt ledger",
+                review_preview(BATCH, MARKER, "Books", &doubted, &row(2, "Paid")),
+            ),
+            (
+                "entry ledger",
+                review_preview(BATCH, MARKER, "Books", &doubt(), &voucher),
+            ),
+            (
+                "batch doubt ledger",
+                batch_review_preview(&line, DoubtKind::Masters, "Books", &doubted, &rows[..0]),
+            ),
+            (
+                "batch entry ledger",
+                batch_review_preview(&line, DoubtKind::Masters, "Books", &doubt(), &rows),
+            ),
+        ] {
+            assert_eq!(preview, Err(code.to_string()), "{source} with {bad:?}");
+        }
+    }
+}
+
 /// Only this batch's own marker at the end of the narration is left out;
 /// text after it, a second marker and another batch's marker are all shown,
 /// because the record binds the whole narration.

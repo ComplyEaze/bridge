@@ -207,9 +207,11 @@ deleted rather than fixed.
 **Gated:** `scripts/check-tally-request-builder-hazards.mjs` now fails on a request-builder FIELD
 that lacks `<TYPE>Amount</TYPE>` while any of its `<SET>`s names a method or `$$` function whose
 name ends in Balance, Amount, Opening, Closing, Total(s), Debit, Credit, Value or Limit. The last
-name of a sub-object path counts (`$LedgerEntries[1].Amount`). A SET holding a formula reference
-(`@Name`, `@@Name`) fails unless the FIELD declares some TYPE. A money method named otherwise, and
-a FIELD with no `<SET>`, are not caught. Its pinned set for that kind is empty, so
+name of a sub-object path counts (`$LedgerEntries[1].Amount`, with one level of brackets inside an
+index). A SET holding a formula reference (`@Name`, `@@Name`) fails unless the FIELD declares some
+TYPE; so does any other `@` followed by a letter, which fails closed. A TYPE counts only outside
+every SET and XML comment. A money method named otherwise, an index nested deeper, and a FIELD with
+no `<SET>`, are not caught. Its pinned set for that kind is empty, so
 `scripts/check-tally-request-builder-hazards.test.mjs` is its positive control: it plants each of
 those shapes in a synthetic tree and requires each to be reported. Removing the TYPE from
 `ledgers_v1`, or from the period-balance request's closing FIELD, makes the gate fail.

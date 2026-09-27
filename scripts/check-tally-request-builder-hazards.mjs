@@ -161,18 +161,22 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
       // Every method and function in every SET counts, so an amount in a
       // compound expression (`$Quantity + $OpeningBalance`), inside a `$$`
       // function's argument (`$$Abs:$ClosingBalance`) or at the end of a
-      // sub-object path (`$LedgerEntries[1].Amount`, read as `Amount`) is
-      // caught too.
+      // sub-object path (`$LedgerEntries[1].Amount`, read as `Amount`, with
+      // one level of brackets inside an index) is caught too.
+      const index = /\[(?:[^[\]]|\[[^[\]]*\])*\]/g;
       const methods = sets.flatMap((set) =>
-        [...set.matchAll(/\$\$?[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\]|\.[A-Za-z_][A-Za-z0-9_]*)*/g)].map(
-          (reference) => reference[0].replace(/\[[^\]]*\]/g, "").split(".").pop().replace(/^\$+/, ""),
+        [...set.matchAll(/\$\$?[A-Za-z_][A-Za-z0-9_]*(?:\[(?:[^[\]]|\[[^[\]]*\])*\]|\.[A-Za-z_][A-Za-z0-9_]*)*/g)].map(
+          (reference) => reference[0].replace(index, "").split(".").pop().replace(/^\$+/, ""),
         ),
       );
       // A formula reference (`@Name`, `@@Name`) hides what it evaluates, so a
       // SET holding one fails closed unless the FIELD declares a TYPE.
       const opaque = sets.some((set) => /@@?[A-Za-z_]/.test(set));
-      const typed = /<TYPE>[\s\S]*?<\/TYPE>/i.test(field[2]);
-      const amountTyped = /<TYPE>\s*Amount\s*<\/TYPE>/i.test(field[2]);
+      // A TYPE counts only outside every SET and comment, so TYPE-shaped text
+      // inside an expression or a comment cannot pass for the declaration.
+      const declarations = field[2].replace(/<SET>[\s\S]*?<\/SET>|<!--[\s\S]*?-->/gi, "");
+      const typed = /<TYPE>[\s\S]*?<\/TYPE>/i.test(declarations);
+      const amountTyped = /<TYPE>\s*Amount\s*<\/TYPE>/i.test(declarations);
       const needsAmountType = methods.some((method) => amountMethod.test(method));
       if (needsAmountType ? amountTyped : !opaque || typed) continue;
       const name = /NAME="([^"]*)"/.exec(field[1])?.[1] ?? "<unnamed>";

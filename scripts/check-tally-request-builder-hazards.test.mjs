@@ -55,6 +55,9 @@ const untyped = {
   formula_reference: `<FIELD NAME="Formula"><SET>@@BridgeClosing</SET></FIELD>`,
   unlisted_suffix: `<FIELD NAME="Credit Limit"><SET>$CreditLimit</SET></FIELD>`,
   second_set: `<FIELD NAME="Second Set"><SET>$Name</SET><SET>$ClosingBalance</SET></FIELD>`,
+  nested_index: `<FIELD NAME="Nested Index"><SET>$LedgerEntries[$$Number:$Index[1]].Amount</SET></FIELD>`,
+  type_text_in_set: `<FIELD NAME="Type In Set"><SET>"<TYPE>Amount</TYPE>" + $ClosingBalance</SET></FIELD>`,
+  type_in_comment: `<FIELD NAME="Type In Comment"><!-- <TYPE>Amount</TYPE> --><SET>$ClosingBalance</SET></FIELD>`,
 };
 
 test("every untyped amount shape is reported, each by its FIELD", async () => {
@@ -63,9 +66,12 @@ test("every untyped amount shape is reported, each by its FIELD", async () => {
     [...actual].sort(),
     [
       violation("formula_reference", "Formula"),
+      violation("nested_index", "Nested Index"),
       violation("plain_method", "Plain"),
       violation("second_set", "Second Set"),
       violation("sub_object_path", "Sub Object"),
+      violation("type_in_comment", "Type In Comment"),
+      violation("type_text_in_set", "Type In Set"),
       violation("unlisted_suffix", "Credit Limit"),
     ],
   );

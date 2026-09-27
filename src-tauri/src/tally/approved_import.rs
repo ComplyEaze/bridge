@@ -218,6 +218,11 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// import lookup could take for it (bridge#626).
     #[error("ledger_has_folded_twin")]
     LedgerFoldedTwin,
+    /// The group collection the queue re-read for a bank voucher's
+    /// classification could not be parsed. Carries the snapshot parser's own
+    /// data-free code, as the read before approval does (bridge#717).
+    #[error("group_export_invalid")]
+    GroupExportInvalid { cause: Option<&'static str> },
     /// A bank voucher reached the queue without its group read, or a Journal
     /// with one: a wiring fault, refused before any request is sent.
     #[error("import_post_admission_inconsistent")]
@@ -257,6 +262,19 @@ pub(crate) enum ApprovedImportAdmissionError {
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
 }
 
+/// The data-free code a group snapshot refusal carries as its `cause`, for
+/// the read before approval and the queue's re-read alike (bridge#676, #717).
+pub(crate) fn group_snapshot_cause(
+    error: &bridge_tally_protocol::native_outstandings::NativeOutstandingsError,
+) -> Option<&'static str> {
+    use bridge_tally_protocol::native_outstandings::NativeOutstandingsError;
+    match error {
+        NativeOutstandingsError::InvalidResponse(code) => Some(code),
+        NativeOutstandingsError::TallyReportedFailure => Some("group_status_not_success"),
+        _ => None,
+    }
+}
+
 /// A failure inside the endpoint queue before the dispatch intent is recorded
 /// (#656): every queue read, and the admission recheck, run in one block whose
 /// error this wraps; the intent, the POST and the readback run after it. So it
@@ -268,6 +286,44 @@ pub(crate) enum ApprovedImportAdmissionError {
 pub(crate) struct PreIntentQueueRefusal {
     #[source]
     pub(crate) source: anyhow::Error,
+}
+
+/// A refusal under the exclusive admission lock, just before the dispatch
+/// intent is appended (#711). Nothing was recorded and nothing was sent, so
+/// each keeps its own code instead of the catch-all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum UnderLockRefusal {
+    #[error("import_batch_not_found")]
+    BatchNotFound,
+    #[error("import_already_attempted")]
+    AlreadyAttempted,
+    #[error("import_remote_id_reused")]
+    RemoteIdReused,
+    #[error("import_batch_changed")]
+    BatchChanged,
+}
+
+impl UnderLockRefusal {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::BatchNotFound => "import_batch_not_found",
+            Self::AlreadyAttempted => "import_already_attempted",
+            Self::RemoteIdReused => "import_remote_id_reused",
+            Self::BatchChanged => "import_batch_changed",
+        }
+    }
+}
+
+/// Why `before_dispatch` refused. Only a named check made before the intent
+/// append is `Refused`; the lock, the journal read and the append itself are
+/// `Other`, which keeps the catch-all because the append may have recorded an
+/// intent (#711).
+/// Built explicitly at each site: this file holds no conversion (the approval
+/// seam gate refuses any `impl From`).
+#[derive(Debug)]
+pub(crate) enum BeforeDispatchError {
+    Refused(UnderLockRefusal),
+    Other(String),
 }
 
 /// The native approval every real post goes through. Outside this crate's own

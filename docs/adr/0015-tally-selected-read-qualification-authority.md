@@ -223,5 +223,7 @@ those shapes in a synthetic tree and requires each to be reported. Removing the 
 - **Tests.** Counted with `git grep -hE '^[[:space:]]*#\[(tokio::)?test' -- src-tauri/src | wc -l`,
   `bridge`'s sources carry exactly five fewer test attributes than the branch's base (1574 at
   8563ed31 to 1569): the five deleted tests.
-- **Results.** `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge
-  --lib`: 1425 passed, 0 failed, 6 ignored.
+- **Results** (rustc 1.96.0, macOS, on this branch merged with master a04020c9).
+  `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge --lib`: 1445
+  passed, 0 failed, 6 ignored. The merged tree carries five fewer test attributes than that master
+  (1596 to 1591), counted as above.

@@ -5076,8 +5076,8 @@
   "by": "author",
   "what": "tds_payees re-pin: a short deduction read as mid",
   "file": "src/tds_payees.rs",
-  "from": "                    short.push(*g);",
-  "to": "                    mid.push(*g);"
+  "from": "                short.push(*g);",
+  "to": "                mid.push(*g);"
  },
  {
   "id": "TR-32",

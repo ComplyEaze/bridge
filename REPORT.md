@@ -230,3 +230,6 @@ Open Lane Q PRs and their heads:
 - #763 at `3197bb99a7d60e42c37c6c34ee8e8a30536320d8`: not yet merged up with master.
 
 Merged today: #749 and #743. No check-in routine is armed.
+
+## 2026-09-27T13:48Z: Remaining Lane Q branches handed to other lanes (Lane D2)
+Lane D2 (the fresh orchestrator) says a local lane, Posting thread 2, is doing the schema-2 migrations on `cloud-q/689-review-unavailable` (#731), `cloud-q/632-amendment-overwrite-warning` (#736) and `cloud-q/735-lineerror-cdata` (#763). Lane D2 is updating #733 (`cloud-q/696-lab-lineerror`) itself. Lane Q will not push to any of these four branches.

@@ -3304,6 +3304,89 @@ mod tests {
         assert_eq!(run_on(&two, &rules).unwrap().findings.len(), 2);
     }
 
+    /// Without `[tds_rates].s194a_bp` coverage is not judged: no expected or covering figure, the
+    /// coverage figure says so, and the s.194A finding carries the reference's limit for it.
+    #[test]
+    fn coverage_is_not_judged_without_the_s194a_rate() {
+        let mut rules = Rules::vendored().unwrap();
+        if let Some(t) = rules.tds_rates.as_mut() {
+            t.s194a_bp = None;
+        }
+        let mut b = book(vec![Voucher {
+            guid: "i1".to_string(),
+            date: TallyDate::parse("20250930".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: vec![
+                LedgerLine {
+                    ledger: "Interest A".to_string(),
+                    amount_paise: 1_200_000,
+                },
+                LedgerLine {
+                    ledger: "Loan A".to_string(),
+                    amount_paise: -1_200_000,
+                },
+            ],
+            ..Default::default()
+        }]);
+        b.ledgers.insert(
+            "Interest A".to_string(),
+            Ledger {
+                name: "Interest A".to_string(),
+                parent: "Indirect Expenses".to_string(),
+                chain: vec!["Indirect Expenses".to_string()],
+                chain_complete: true,
+                master_opening_paise: 0,
+                guid: String::new(),
+                masterid: None,
+            },
+        );
+        let loans = loan_config(&table(
+            "[\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\ninterest_ledger = \"Interest A\"\n",
+        ))
+        .unwrap();
+        let none = BTreeSet::new();
+        let r = run(
+            &b,
+            &rules,
+            "firm",
+            &loans,
+            &Inputs {
+                previous_year_turnover_paise: None,
+                cash: &none,
+                bank: &none,
+                shared_interest_ledgers: &none,
+                tds_payable_ledgers: &none,
+                deductor_activity: None,
+                turnover_is_placeholder: false,
+            },
+        )
+        .unwrap();
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        let value = |name: &str| {
+            r.figures
+                .iter()
+                .find(|f| f.id == format!("{TEST_ID}.{name}_{h}"))
+                .map(|f| f.value.clone())
+        };
+        assert_eq!(
+            value("s194a_tds_coverage"),
+            Some(Value::Text("not judged".to_string()))
+        );
+        assert_eq!(value("s194a_tds_expected"), None);
+        assert_eq!(value("s194a_tds_covering"), None);
+        let finding = r
+            .findings
+            .iter()
+            .find(|f| f.id == format!("{TEST_ID}/s194a/{h}"))
+            .unwrap();
+        assert!(finding
+            .limits
+            .iter()
+            .any(|l| l.starts_with("The rules carry no s.194A rate")));
+    }
+
     #[test]
     fn rules_without_s194a_are_refused() {
         let mut rules = Rules::vendored().unwrap();

@@ -1478,6 +1478,54 @@ mod tests {
         assert_eq!(err.code(), Some(BIND_COLLISION));
     }
 
+    /// A loan's `interest_ledger` may be one name or a non-empty list of names (the reference's
+    /// `name_or_list`): each name is bound, and the value keeps the shape it was given. Anything
+    /// else is refused as malformed, naming the location.
+    #[test]
+    fn a_loans_interest_ledger_list_binds_each_name_in_its_shape() {
+        let loans = |interest: &str| {
+            format!(
+                "\n[ledger_ids]\n\"Old Interest\" = {G_ROUNDOFF:?}\n\
+                 \n[loans.loan_ledgers.\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = {interest}\n\
+                 \n[loans.loan_ledgers.\"Loan B\"]\nlender = \"y\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = \"Fee\"\n"
+            )
+        };
+        let mut b = book("Cash-in-Hand", "", None);
+        for (name, group, guid) in [
+            ("Loan A", "Unsecured Loans", ""),
+            ("Loan B", "Unsecured Loans", ""),
+            ("Fee", "Indirect Expenses", ""),
+            ("Renamed Interest", "Indirect Expenses", G_ROUNDOFF),
+        ] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, group, guid, None));
+        }
+        let (bound, _) = engagement(&loans("[\"Old Interest\", \"Fee\"]"))
+            .bind(&b)
+            .unwrap();
+        let entry = |l: &str| bound.loans.loan_ledgers[l]["interest_ledger"].clone();
+        assert_eq!(
+            entry("Loan A"),
+            toml::Value::from(vec!["Renamed Interest".to_string(), "Fee".to_string()])
+        );
+        assert_eq!(entry("Loan B"), toml::Value::from("Fee"));
+        for bad in ["[]", "[\"Fee\", 3]", "5"] {
+            let err = engagement(&loans(bad)).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_ID_MALFORMED), "{bad}");
+            assert!(
+                format!("{err}").contains("loans.loan_ledgers.Loan A.interest_ledger"),
+                "{bad}: {err}"
+            );
+        }
+        let err = engagement(&loans("[\"Old Interest\", \"No Such Ledger\"]"))
+            .bind(&b)
+            .unwrap_err();
+        assert_ne!(err.code(), Some(BIND_ID_MALFORMED));
+        assert!(format!("{err}").contains("No Such Ledger"), "{err}");
+    }
+
     // ---- depreciation locations ----
 
     #[test]

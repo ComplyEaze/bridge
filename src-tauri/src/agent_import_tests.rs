@@ -271,6 +271,9 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         .expect("published status");
     assert_eq!(proof["writer"], latest.batch.status);
     assert!(markdown.contains(&format!("- Company: `{}`", latest.batch.status)));
+    // The files carry the status the ledger records, not the caller's copy.
+    assert_eq!(proof["verification_status"], latest.batch.status);
+    assert!(markdown.contains(&format!("- Verification status: `{}`", latest.batch.status)));
 }
 
 #[test]

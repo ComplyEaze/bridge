@@ -31,6 +31,7 @@ pub mod audit_company_part;
 pub mod bills_native_outstandings_probe;
 #[cfg(feature = "bills-payments-observation-parser")]
 pub mod bills_payments_observation;
+pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_registration;
 mod import_outcome;
@@ -42,6 +43,7 @@ pub mod jsonex;
 pub mod jsonex_request;
 mod native_ledger_collection;
 pub mod native_outstandings;
+pub mod native_statement_reports;
 pub mod native_trial_balance;
 /// The legacy voucher-scan outstandings path: date/AlterID-partitioned
 /// wildcard voucher fetch, segment/witness completeness proofs, and bill

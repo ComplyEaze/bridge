@@ -295,7 +295,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/ledger_currency.rs",
-      "sha256": "0396edbc1178a8eb7e6d3358dbed6e6d92c96ddfd8424ee9409b445750a7174c"
+      "sha256": "67ce3ca9eb5030139649234560cb020c6aef9382e04f4c7e6d870bf992d6524a"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs",
@@ -443,7 +443,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "908bc890c0044274ffcc89f98b3537d2496c25fccc84f56849952b107deee13c"
+      "sha256": "8d3d6ddf50613c0642c7cbcab1c9abda0150a1bfb2a6092bbb190a2151bfe455"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -931,7 +931,7 @@
     },
     {
       "path": "src-tauri/src/tally/runtime.rs",
-      "sha256": "07dcdf299ba3f733e4cb62996b9a83a0fefaad3c7202fec3c184fc773ed50db7"
+      "sha256": "73d750eb635a3735b6f94dbe1d382986bf349e3c047e32f66213facaf3028c69"
     },
     {
       "path": "src-tauri/src/tally/runtime_control.rs",

@@ -1,0 +1,595 @@
+{
+ "comment": "tds_payees at the reference's current head: a credit counted gross of the TDS on its own bill crosses the aggregate only gross (P1, one bill also debiting the payee); GST left out for a payee whose agreement states it separately (P2) and counted for one without (P3); a Duties & Taxes credit not classified as TDS making a payee possibly over the s.194J aggregate (P4) and the s.194-I month (P7); TDS on a bill crediting two payees, over the single sum only with it (P5 and Q); a payee whose only TDS is a catch-up journal (P6, Form 26A held), its small credit listed only because TDS is seen; an unnamed cash payee; and list entries matching nothing.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_gross_gst-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_gross_gst-001"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_gross_gst-002"
+  },
+  {
+   "name": "Contract Labour",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_gross_gst-003"
+  },
+  {
+   "name": "Professional Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_gross_gst-004"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_gross_gst-005"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-006"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-007"
+  },
+  {
+   "name": "TDS Payable 194C",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-008"
+  },
+  {
+   "name": "TDS Payable 194J",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-009"
+  },
+  {
+   "name": "TDS Payable 194I",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-010"
+  },
+  {
+   "name": "Other Levy",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-011"
+  },
+  {
+   "name": "P1 Carrier",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-012"
+  },
+  {
+   "name": "P2 Builder",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-013"
+  },
+  {
+   "name": "P3 Painter",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-014"
+  },
+  {
+   "name": "P4 Consultant",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-015"
+  },
+  {
+   "name": "P5 Mover",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-016"
+  },
+  {
+   "name": "P6 Haulier",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-017"
+  },
+  {
+   "name": "P7 Landlord",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-018"
+  },
+  {
+   "name": "Q Coop",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_gross_gst-019"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1000000,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 4000000,
+   "closing": -3000000
+  },
+  {
+   "ledger": "Contract Labour",
+   "opening": 0,
+   "debit": 14000000,
+   "credit": 0,
+   "closing": 14000000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 27200000,
+   "credit": 0,
+   "closing": 27200000
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 1260000,
+   "credit": 0,
+   "closing": 1260000
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 1260000,
+   "credit": 0,
+   "closing": 1260000
+  },
+  {
+   "ledger": "Other Levy",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1100000,
+   "closing": -1100000
+  },
+  {
+   "ledger": "P1 Carrier",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 10898000,
+   "closing": -10878000
+  },
+  {
+   "ledger": "P2 Builder",
+   "opening": 0,
+   "debit": 0,
+   "credit": 11800000,
+   "closing": -11800000
+  },
+  {
+   "ledger": "P3 Painter",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4720000,
+   "closing": -4720000
+  },
+  {
+   "ledger": "P4 Consultant",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4950000,
+   "closing": -4950000
+  },
+  {
+   "ledger": "P5 Mover",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2900000,
+   "closing": -2900000
+  },
+  {
+   "ledger": "P6 Haulier",
+   "opening": 0,
+   "debit": 120000,
+   "credit": 6100000,
+   "closing": -5980000
+  },
+  {
+   "ledger": "P7 Landlord",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4950000,
+   "closing": -4950000
+  },
+  {
+   "ledger": "Professional Fees",
+   "opening": 0,
+   "debit": 5500000,
+   "credit": 0,
+   "closing": 5500000
+  },
+  {
+   "ledger": "Q Coop",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2980000,
+   "closing": -2980000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 5500000,
+   "credit": 0,
+   "closing": 5500000
+  },
+  {
+   "ledger": "TDS Payable 194C",
+   "opening": 0,
+   "debit": 0,
+   "credit": 462000,
+   "closing": -462000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "g01",
+   "date": "2025-04-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     3000000
+    ],
+    [
+     "P1 Carrier",
+     -2940000
+    ],
+    [
+     "TDS Payable 194C",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     7100000
+    ],
+    [
+     "P1 Carrier",
+     -6958000
+    ],
+    [
+     "TDS Payable 194C",
+     -142000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     1000000
+    ],
+    [
+     "P1 Carrier",
+     20000
+    ],
+    [
+     "P1 Carrier",
+     -1000000
+    ],
+    [
+     "TDS Payable 194C",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "g04",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     10000000
+    ],
+    [
+     "Input CGST",
+     900000
+    ],
+    [
+     "Input SGST",
+     900000
+    ],
+    [
+     "P2 Builder",
+     -11800000
+    ]
+   ]
+  },
+  {
+   "guid": "g05",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     4000000
+    ],
+    [
+     "Input CGST",
+     360000
+    ],
+    [
+     "Input SGST",
+     360000
+    ],
+    [
+     "P3 Painter",
+     -4720000
+    ]
+   ]
+  },
+  {
+   "guid": "g06",
+   "date": "2025-08-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Professional Fees",
+     5500000
+    ],
+    [
+     "P4 Consultant",
+     -4950000
+    ],
+    [
+     "Other Levy",
+     -550000
+    ]
+   ]
+  },
+  {
+   "guid": "g07",
+   "date": "2025-09-03",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Rent",
+     5500000
+    ],
+    [
+     "P7 Landlord",
+     -4950000
+    ],
+    [
+     "Other Levy",
+     -550000
+    ]
+   ]
+  },
+  {
+   "guid": "g08",
+   "date": "2025-10-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     6000000
+    ],
+    [
+     "P5 Mover",
+     -2900000
+    ],
+    [
+     "Q Coop",
+     -2980000
+    ],
+    [
+     "TDS Payable 194C",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "g09",
+   "date": "2025-11-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     6000000
+    ],
+    [
+     "P6 Haulier",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "g10",
+   "date": "2026-01-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "P6 Haulier",
+     120000
+    ],
+    [
+     "TDS Payable 194C",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "g11",
+   "date": "2025-12-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Freight",
+     4000000
+    ],
+    [
+     "Cash",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "g12",
+   "date": "2025-12-02",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Bank",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g13",
+   "date": "2026-02-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     100000
+    ],
+    [
+     "P6 Haulier",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Freight": "194C",
+  "Contract Labour": "194C",
+  "Professional Fees": "194J",
+  "Rent": "194I"
+ },
+ "s194j_category_by_ledger": {
+  "Professional Fees": "professional"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable 194C",
+  "TDS Payable 194J",
+  "TDS Payable 194I"
+ ],
+ "gst_ledgers": [
+  "Input CGST",
+  "Input SGST"
+ ],
+ "gst_separate_by_agreement": [
+  "P2 Builder",
+  "Nobody Ltd"
+ ],
+ "foreseeability": {
+  "P1 Carrier": "foreseeable",
+  "Partner X": "one_off",
+  "Ghost": "one_off"
+ },
+ "partners": {
+  "Partner X": {}
+ },
+ "form_26a": [
+  {
+   "payee": "P6 Haulier",
+   "held": true
+  },
+  {
+   "payee": "Ghost Two",
+   "held": false
+  }
+ ],
+ "reversals": {
+  "zz-none": {
+   "kind": "credit_note"
+  }
+ }
+}

@@ -308,8 +308,11 @@ pub(super) fn verify_batch(
                 // cancel is captured in fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md),
                 // so its entries never match: it is cancelled, not changed.
                 // Only the header is compared, so a re-date before the cancel
-                // still shows. The fingerprint branch above cannot see a
-                // cancelled row: with no entries, no build's fingerprint matches.
+                // still shows, if it stays inside the read window: a voucher
+                // re-dated out of it is not read, so is not found unless another
+                // voucher in the window has its content. The fingerprint branch
+                // above cannot see a cancelled row: with no entries, no build's
+                // fingerprint matches.
                 counts
                     .entry("posted_not_effective")
                     .and_modify(|count| *count += 1);
@@ -594,10 +597,16 @@ pub(super) fn duplicates(
                 .or_default()
                 .insert(identity.clone());
         }
-        fingerprints
-            .entry(fingerprint.clone())
-            .or_default()
-            .insert(identity.clone(), voucher.remote_id.clone());
+        // Tally drops a cancelled voucher's entries from this read (see
+        // `verify_batch`), so every cancel of one date and type shares a
+        // fingerprint that says nothing of what it recorded (bridge#767). Here,
+        // only its REMOTEID, above, can show it duplicated.
+        if voucher.cancelled != Some(true) {
+            fingerprints
+                .entry(fingerprint.clone())
+                .or_default()
+                .insert(identity.clone(), voucher.remote_id.clone());
+        }
     }
     let mut result = remote.into_iter().filter(|(_, identities)| identities.len() > 1)
         .map(|(remote_id, identities)| json!({"kind":"remote_id","remote_id":remote_id,"count":identities.len()}))

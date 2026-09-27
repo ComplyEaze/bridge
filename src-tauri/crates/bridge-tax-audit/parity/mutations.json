@@ -1760,14 +1760,6 @@
   "to": "        let _ = lbinder.rebind_map("
  },
  {
-  "id": "C1-39",
-  "by": "author (Lane C)",
-  "what": "duplicate figure id not refused",
-  "file": "src/tds_payees.rs",
-  "from": "            if r.figures.iter().any(|f| f.id == row_figure) {",
-  "to": "            if false {"
- },
- {
   "id": "C1-40",
   "by": "author (Lane C)",
   "what": "[tds_payees] never read",
@@ -2316,8 +2308,8 @@
   "by": "author (Lane C)",
   "what": "advance tax uses credit",
   "file": "src/tds_tcs_26as.rs",
-  "from": "            .filter_map(|n| book.tb.get(n))\n            .map(|t| t.debit_paise),\n    )?;\n    fig(\n        &mut r,\n        \"books_advance_tax_paise\",",
-  "to": "            .filter_map(|n| book.tb.get(n))\n            .map(|t| t.credit_paise),\n    )?;\n    fig(\n        &mut r,\n        \"books_advance_tax_paise\","
+  "from": "            .filter_map(|n| book.tb.get(n))\n            .map(|t| t.debit_paise),\n    )?;\n    r.fig(\n        \"books_advance_tax_paise\",",
+  "to": "            .filter_map(|n| book.tb.get(n))\n            .map(|t| t.credit_paise),\n    )?;\n    r.fig(\n        \"books_advance_tax_paise\","
  },
  {
   "id": "C2-27",
@@ -2326,14 +2318,6 @@
   "file": "src/tds_tcs_26as.rs",
   "from": "    });\n    Ok(r)\n}",
   "to": "    });\n    r.findings.pop();\n    Ok(r)\n}"
- },
- {
-  "id": "C2-28",
-  "by": "author (Lane C)",
-  "what": "a repeated figure id not refused",
-  "file": "src/tds_tcs_26as.rs",
-  "from": "    if r.figures.iter().any(|f| f.id == id) {",
-  "to": "    if false {"
  },
  {
   "id": "C2-29",
@@ -3078,14 +3062,6 @@
   "file": "src/loans_interest.rs",
   "from": "                if debits.len() > 5 { \" ...\" } else { \"\" }",
   "to": "                if debits.len() > 6 { \" ...\" } else { \"\" }"
- },
- {
-  "id": "D1-19",
-  "by": "author (Lane B)",
-  "what": "a repeated row figure id not refused",
-  "file": "src/loans_interest.rs",
-  "from": "            if r.figures\n                .iter()\n",
-  "to": "            if false && r.figures\n                .iter()\n"
  },
  {
   "id": "D1-20",
@@ -3870,14 +3846,6 @@
   "file": "src/bank_reconciliation.rs",
   "from": "        let (Some(pb), Some(cb)) = (prev.balance_paise, cur.balance_paise) else {\n            continue;\n        };",
   "to": "        let (pb, cb) = (prev.balance_paise.unwrap_or(0), cur.balance_paise.unwrap_or(0));"
- },
- {
-  "id": "E2A-13",
-  "by": "author",
-  "what": "a repeated figure id reaches TestResult::fig's panic instead of refusing",
-  "file": "src/bank_reconciliation.rs",
-  "from": "    if r.figures.iter().any(|f| f.id == id) {\n        return Err(",
-  "to": "    if false && r.figures.iter().any(|f| f.id == id) {\n        return Err("
  },
  {
   "id": "E2A-14",
@@ -4984,14 +4952,6 @@
   "to": "            } else if false && matches.len() > 1 {"
  },
  {
-  "id": "E4-20",
-  "by": "author",
-  "what": "a repeated figure id is not refused",
-  "file": "src/party_monthly.rs",
-  "from": "if r.figures.iter().any(|f| f.id == id) {",
-  "to": "if false {"
- },
- {
   "id": "E4-21",
   "by": "author",
   "what": "PWM-1 ignores the Trial Balance movement",
@@ -5270,5 +5230,21 @@
   "file": "src/party_monthly.rs",
   "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
   "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
+ },
+ {
+  "id": "F644-01",
+  "by": "author",
+  "what": "a repeated figure id is kept instead of refused (#644)",
+  "file": "src/findings.rs",
+  "from": "        if self.figures.iter().any(|f| f.id == id) {",
+  "to": "        if false {"
+ },
+ {
+  "id": "F644-02",
+  "by": "author",
+  "what": "a repeated figure id is refused but appended first (#644)",
+  "file": "src/findings.rs",
+  "from": "            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });",
+  "to": "            self.figures.push(Figure {\n                id: id.clone(),\n                value,\n                unit,\n                definition: definition.to_string(),\n                evidence,\n            });\n            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });"
  }
 ]

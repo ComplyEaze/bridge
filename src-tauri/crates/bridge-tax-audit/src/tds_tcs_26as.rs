@@ -698,7 +698,8 @@ attempted (limit).",
             .filter_map(|n| book.tb.get(n))
             .map(|t| t.debit_paise),
     )?;
-    r.fig("books_advance_tax_paise",
+    r.fig(
+        "books_advance_tax_paise",
         Value::Int(books_advance_tax),
         Unit::Paise,
         "Period debit movement of the caller-supplied advance-tax ledger(s) -- recomputed from the \

@@ -217,12 +217,15 @@ def _tds_payees(c):
 
 def _loans_interest(c):
     from tae.audit_tests import loans_interest
-    from tae.config import loan_ledgers_config
+    from tae.config import deductor_activity, loan_ledgers_config, tds_payable_ledgers, turnover_is_placeholder
     # As tae/pack.py calls it: the loan table, [tds].previous_year_turnover_paise (tds_config's
-    # optional key) and the declared-shared interest ledgers.
+    # optional key), the declared-shared interest ledgers, and through the reference's own readers the
+    # TDS-payable ledgers, [deductor].activity and whether the turnover is a placeholder.
     return loans_interest, loans_interest.run(
         c.eng, c.rules, loan_ledgers_config(c.cfg), c.cfg.get("tds", {}).get("previous_year_turnover_paise"),
-        c.cash, c.bank, frozenset(c.cfg.get("loans", {}).get("shared_interest_ledgers", [])))
+        c.cash, c.bank, frozenset(c.cfg.get("loans", {}).get("shared_interest_ledgers", [])),
+        tds_payable_ledgers=tds_payable_ledgers(c.cfg), deductor_activity=deductor_activity(c.cfg),
+        turnover_is_placeholder=turnover_is_placeholder(c.cfg))
 
 
 def _partners_40b_194t(c):

@@ -755,15 +755,26 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         let mut entry = raw_loan_ledgers.expect("a key came from the table")[orig].clone();
         if let Some(t) = entry.as_table_mut() {
             if let Some(v) = t.get("interest_ledger") {
+                // One name, or (since the reference's 25-Sep change) a non-empty list of names,
+                // written back in the shape it was given.
                 let location = format!("loans.loan_ledgers.{orig}.interest_ledger");
-                let name = v.as_str().ok_or_else(|| {
+                let malformed = || {
                     AuditError::refused(
                         BIND_ID_MALFORMED,
-                        format!("{location}: expected a name, got {v}"),
+                        format!("{location}: expected a name or a list of names, got {v}"),
                     )
-                })?;
-                let name = lbinder.bind_one(name, &location)?;
-                t.insert("interest_ledger".to_string(), toml::Value::from(name));
+                };
+                let bound = match v {
+                    toml::Value::String(name) => {
+                        toml::Value::from(lbinder.bind_one(name, &location)?)
+                    }
+                    toml::Value::Array(items) if !items.is_empty() => {
+                        let names = names_at(v, &location).map_err(|_| malformed())?;
+                        toml::Value::from(lbinder.bind_list(&names, &location)?)
+                    }
+                    _ => return Err(malformed()),
+                };
+                t.insert("interest_ledger".to_string(), bound);
             }
         }
         loan_ledgers.insert(bound.clone(), entry);

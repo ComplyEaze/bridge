@@ -1642,10 +1642,10 @@
  {
   "id": "C1-24",
   "by": "author (Lane C)",
-  "what": "turnover at the threshold makes a deductor",
+  "what": "turnover at the business limit makes a deductor",
   "file": "src/tds_payees.rs",
-  "from": "Some(t) if t > threshold => \"deductor\",",
-  "to": "Some(t) if t >= threshold => \"deductor\","
+  "from": "            if turnover > business {",
+  "to": "            if turnover >= business {"
  },
  {
   "id": "C1-25",

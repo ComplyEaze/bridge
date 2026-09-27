@@ -802,25 +802,6 @@ fn summarise<'a>(row: &Row<'a>) -> Result<Summary<'a>> {
     })
 }
 
-/// The reference's `deductor_status` before its commit 96640dfe (the business limit only).
-/// `loans_interest` reads this until its own re-pin to the reference's current head (#787), where
-/// the reference's `loans_interest` passes the activity and the placeholder flag to
-/// [`deductor_status`]; deleted then.
-pub(crate) fn deductor_status_business_limit_only(
-    entity_type: &str,
-    threshold: i64,
-    turnover: Option<i64>,
-) -> &'static str {
-    if entity_type == "individual" || entity_type == "huf" {
-        return match turnover {
-            None => "unknown",
-            Some(t) if t > threshold => "deductor",
-            Some(_) => "not_deductor",
-        };
-    }
-    "deductor"
-}
-
 /// The reference's `deductor_status`: "deductor" | "not_deductor" | "unknown". An individual/HUF
 /// deducts only if its preceding year's business turnover exceeded the business limit, or its
 /// profession's gross receipts the (lower) profession limit, as the activity says. Fails closed:
@@ -887,8 +868,8 @@ pub(crate) fn deductor_status(
     })
 }
 
-/// The reference's `deductor_question`: the "unknown" status's limit.
-fn deductor_question(
+/// The reference's `deductor_question`: the "unknown" status's limit (`loans_interest` asks it too).
+pub(crate) fn deductor_question(
     rules: &Rules,
     sections: &str,
     activity: Option<DeductorActivity>,
@@ -2634,11 +2615,6 @@ mod tests {
                 "{entity} {turnover:?} {activity:?} {placeholder}"
             );
         }
-        // The pin's rule, kept for loans_interest until its re-pin, answers the business limit alone.
-        assert_eq!(
-            deductor_status_business_limit_only("individual", crore, Some(crore)),
-            "not_deductor"
-        );
         // Python's casefold reaches "kerala" through the Kelvin sign and "lakshadweep" through a
         // long s; any other spelling does not.
         assert!(in_kerala_hc("Kerala") && in_kerala_hc("\u{212A}ERALA"));

@@ -19,6 +19,8 @@ It writes:
 - the non-ASCII code points Python's `\\d` matches, measured over every code point, for the
   quantity and rate readers in `src/book.rs`;
 - the code points `str.isprintable()` rejects, over every code point (for `repr()`);
+- the code points whose `str.casefold()` is not their `str.lower()`, over every code point, with
+  the folded text (so a casefold is this table, else a one-character lower);
 - the probe file: Python's own results on the acceptance set (Latin, Latin-1/Ext-A/B, modifier
   letters and combining diacriticals, currency symbols, Devanagari
   and the other Indic scripts, general punctuation, NBSP and the whitespace Tally emits), plus, for
@@ -99,6 +101,9 @@ def main() -> int:
             ignorable.append(ord(c))
     digit = re.compile(r"\d")
     decimals = [cp for cp in range(0x80, 0x110000) if digit.fullmatch(chr(cp))]
+    folds = [(cp, chr(cp).casefold()) for cp in range(0x110000)
+             if not 0xD800 <= cp <= 0xDFFF and chr(cp).casefold() != chr(cp).lower()]
+    fold_rows = "\n".join(f"    (0x{cp:04X}, \"{''.join(f'\\u{{{ord(x):x}}}' for x in t)}\")," for cp, t in folds)
     ci_rows = "\n".join(f"    ('{l}', &[{', '.join(f'0x{c:04X}' for c in cs)}])," for l, cs in ci.items() if cs)
     out = (
         "// SPDX-License-Identifier: Apache-2.0\n"
@@ -124,6 +129,9 @@ def main() -> int:
         + "\n/// Code points Python's `str.isprintable()` rejects (every code point measured; `repr()`\n"
         "/// escapes them). Surrogates are included, though a Rust `char` is never one.\n"
         + rust_ranges("PY_NOT_PRINTABLE", not_printable)
+        + "\n/// Code points whose Python `str.casefold()` is not their `str.lower()` (every code point\n"
+        "/// measured), with the folded text. Every other character folds to its one-character lower.\n"
+        f"pub(crate) const PY_CASEFOLD: [(u32, &str); {len(folds)}] = [\n{fold_rows}\n];\n"
     )
     (ROOT / "src" / "text_tables.rs").write_text(out, encoding="utf-8")
 
@@ -165,7 +173,7 @@ def main() -> int:
     (ROOT / "tests" / "fixtures" / "text-probes.json").write_text(
         json.dumps({"header": header, "probes": probes}, ensure_ascii=False, indent=0) + "\n", encoding="utf-8")
     print(f"NOT_PY_ALNUM {len(ranges(not_alnum))} ranges; PY_CASED {len(ranges(cased))}; "
-          f"PY_NOT_PRINTABLE {len(not_printable)}; "
+          f"PY_NOT_PRINTABLE {len(not_printable)}; PY_CASEFOLD {len(folds)}; "
           f"PY_CASE_IGNORABLE {len(ranges(ignorable))}; ci extras {{{', '.join(f'{l}: {len(cs)}' for l, cs in ci.items() if cs)}}}; "
           f"probes {', '.join(f'{k}={len(v)}' for k, v in probes.items())}")
     return 0

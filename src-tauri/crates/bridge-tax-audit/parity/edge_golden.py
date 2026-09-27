@@ -46,8 +46,9 @@ config, each through the reference's own `tae.config` reader (so each is refused
 `form26as`, `ais`, `tis` (invented document rows in the shape `parity/python_golden.py
 --emit-traces-documents` writes; default []) and `tds_ledgers`, `tcs_ledgers`,
 `advance_tax_ledgers`, `deductor_aliases` (default empty); and for `loans_interest`: `entity_type` and
-`previous_year_turnover_paise` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
-interest_ledger?}}, default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
+`previous_year_turnover_paise`, `previous_year_turnover_status`, `deductor_activity` and
+`tds_payable_ledgers` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
+interest_ledger?}}, the interest ledger one name or a list; default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
 default false: true sets the module's NET_REVERSALS switch, reaching the dormant reversal rule in `run` and
 in the module invariant alike); and for `partners_40b_194t`: `entity_type` as for `tds_payees`, `partners`
 ({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}) and `deed` (a table such as
@@ -160,10 +161,17 @@ def main() -> int:
         # canonical dump below calls check_invariants in this same process, before anything resets it.
         loans_interest.NET_REVERSALS = typed(spec, "net_reversals", lambda x: isinstance(x, bool), "true or false",
                                              absent=False, nullable=False)
+        # As tae/pack.py passes them: the deductor activity and the turnover's status through the
+        # reference's own readers, from a config built out of the spec's keys.
+        from tae import config as tc
+        cfg = {"tds": {k: spec[k] for k in ("previous_year_turnover_status",) if k in spec},
+               "deductor": {"activity": spec["deductor_activity"]} if "deductor_activity" in spec else {}}
         return loans_interest, loans_interest.run(
             eng, rules, {k: dict(v) for k, v in spec.get("loans", {}).items()},
             spec.get("previous_year_turnover_paise"), cash, bank,
-            frozenset(spec.get("shared_interest_ledgers", [])))
+            frozenset(spec.get("shared_interest_ledgers", [])),
+            tds_payable_ledgers=frozenset(spec.get("tds_payable_ledgers", [])),
+            deductor_activity=tc.deductor_activity(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg))
 
     # One runner per test an edge book may name: the module and its result, run as the reference's
     # pack runs it.

@@ -4354,7 +4354,7 @@ impl TallyRuntime {
                             .assertion()
                             .base
                             .as_ref()
-                            .map_or(true, |base| base.is_single_master());
+                            .is_none_or(|base| base.is_single_master());
                         if one_master {
                             if let Some(ledger) = snapshot.mixed.first() {
                                 return Ok((

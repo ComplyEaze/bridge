@@ -200,18 +200,26 @@ deleted rather than fixed.
 - The `ledgers_v1` and `vouchers_v2` profiles in `bridge-tally-protocol`, which
   `tools/bridge-tally-live-read` still sends. `ledgers_v1`'s opening-balance FIELD now declares
   `<TYPE>Amount</TYPE>`. Its sealed template digest and the ledger canary's, which derives from it,
-  are updated deliberately.
+  are updated deliberately. The changed request has not been sent to a live Tally: the typed
+  response is unmeasured until the live-read tool next runs. The parser keeps the field as text,
+  and nothing reads its value.
 
-**Gated:** `scripts/check-tally-request-builder-hazards.mjs` now fails on any request-builder FIELD
-that SETs an amount-valued method without `<TYPE>Amount</TYPE>`. Its pinned set for that kind is
-empty. Removing the TYPE from `ledgers_v1`, or from the period-balance request's closing FIELD,
-makes it fail.
+**Gated:** `scripts/check-tally-request-builder-hazards.mjs` now fails on a request-builder FIELD
+that lacks `<TYPE>Amount</TYPE>` while any of its `<SET>`s names a method or `$$` function whose
+name ends in Balance, Amount, Opening, Closing, Total(s), Debit, Credit, Value or Limit. The last
+name of a sub-object path counts (`$LedgerEntries[1].Amount`). A SET holding a formula reference
+(`@Name`, `@@Name`) fails unless the FIELD declares some TYPE. A money method named otherwise, and
+a FIELD with no `<SET>`, are not caught. Its pinned set for that kind is empty, so
+`scripts/check-tally-request-builder-hazards.test.mjs` is its positive control: it plants each of
+those shapes in a synthetic tree and requires each to be reported. Removing the TYPE from
+`ledgers_v1`, or from the period-balance request's closing FIELD, makes the gate fail.
 
 **How this was measured:**
 - **Compiler.** `cargo check --locked --workspace --all-targets --all-features` for `src-tauri/`
   and for `tools/` builds with every deleted item gone. `cargo clippy` with `--all-features` and
   `-D warnings` reports nothing.
-- **Tests.** `bridge`'s sources carry exactly five fewer `#[test]`/`#[tokio::test]` attributes
-  than master (1441 to 1436): the five deleted tests.
+- **Tests.** Counted with `git grep -hE '^[[:space:]]*#\[(tokio::)?test' -- src-tauri/src | wc -l`,
+  `bridge`'s sources carry exactly five fewer test attributes than the branch's base (1574 at
+  8563ed31 to 1569): the five deleted tests.
 - **Results.** `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge
   --lib`: 1425 passed, 0 failed, 6 ignored.

@@ -28,10 +28,9 @@ const expected = new Set([
   "function-argument-with-space|src-tauri/src/tally/tdl_engine.rs::ledger_period_balances_request|$$NumItems:BRIDGE Ledger Period Collection V1",
 ]);
 
-// Method names whose value is money. A `$$` function's own name is not
-// matched (a `$` preceded by `$` is skipped), and a FIELD with no <SET> is
-// not scanned; neither shape carries an amount in any builder today.
-const amountMethod = /(?:Balance|Amount|Opening|Closing|Totals?|Debit|Credit|Value)$/i;
+// Method and function names whose value is money, by suffix. A money method
+// named otherwise is not caught, and a FIELD with no <SET> is not scanned.
+const amountMethod = /(?:Balance|Amount|Opening|Closing|Totals?|Debit|Credit|Value|Limit)$/i;
 
 const actual = new Set();
 for (const sourceRoot of ["src-tauri", "tools"]) {
@@ -157,14 +156,25 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
     // <TYPE>Amount</TYPE> returns Tally's display text, with the sign dropped
     // and digits grouped (protocol reference §6.3). The pinned set for this
     // kind is empty: every amount FIELD must carry its TYPE.
-    for (const field of literal.value.matchAll(/<FIELD\b([^>]*)>([\s\S]*?)<\/FIELD>/g)) {
-      // Every single-`$` method anywhere in the SET counts, so an amount in a
-      // compound expression (`$Quantity + $OpeningBalance`) or inside a `$$`
-      // function's argument (`$$Abs:$ClosingBalance`) is caught too.
-      const set = /<SET>([\s\S]*?)<\/SET>/.exec(field[2]);
-      const methods = set ? [...set[1].matchAll(/(?<!\$)\$([A-Za-z_][A-Za-z0-9_]*)/g)] : [];
-      if (!methods.some((method) => amountMethod.test(method[1]))) continue;
-      if (/<TYPE>\s*Amount\s*<\/TYPE>/i.test(field[2])) continue;
+    for (const field of literal.value.matchAll(/<FIELD\b([^>]*)>([\s\S]*?)<\/FIELD>/gi)) {
+      const sets = [...field[2].matchAll(/<SET>([\s\S]*?)<\/SET>/gi)].map((set) => set[1]);
+      // Every method and function in every SET counts, so an amount in a
+      // compound expression (`$Quantity + $OpeningBalance`), inside a `$$`
+      // function's argument (`$$Abs:$ClosingBalance`) or at the end of a
+      // sub-object path (`$LedgerEntries[1].Amount`, read as `Amount`) is
+      // caught too.
+      const methods = sets.flatMap((set) =>
+        [...set.matchAll(/\$\$?[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\]|\.[A-Za-z_][A-Za-z0-9_]*)*/g)].map(
+          (reference) => reference[0].replace(/\[[^\]]*\]/g, "").split(".").pop().replace(/^\$+/, ""),
+        ),
+      );
+      // A formula reference (`@Name`, `@@Name`) hides what it evaluates, so a
+      // SET holding one fails closed unless the FIELD declares a TYPE.
+      const opaque = sets.some((set) => /@@?[A-Za-z_]/.test(set));
+      const typed = /<TYPE>[\s\S]*?<\/TYPE>/i.test(field[2]);
+      const amountTyped = /<TYPE>\s*Amount\s*<\/TYPE>/i.test(field[2]);
+      const needsAmountType = methods.some((method) => amountMethod.test(method));
+      if (needsAmountType ? amountTyped : !opaque || typed) continue;
       const name = /NAME="([^"]*)"/.exec(field[1])?.[1] ?? "<unnamed>";
       violations.add(`amount-field-without-type|${file}::${identifier}|${name}`);
     }

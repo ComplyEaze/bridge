@@ -20,7 +20,7 @@ It writes:
   quantity and rate readers in `src/book.rs`;
 - the code points `str.isprintable()` rejects, over every code point (for `repr()`);
 - the code points whose `str.casefold()` is not their `str.lower()`, over every code point, with
-  the folded text (so a casefold is this table, else a one-character lower);
+  the folded text (so a casefold is this table, else each character's own lower case);
 - the probe file: Python's own results on the acceptance set (Latin, Latin-1/Ext-A/B, modifier
   letters and combining diacriticals, currency symbols, Devanagari
   and the other Indic scripts, general punctuation, NBSP and the whitespace Tally emits), plus, for
@@ -130,7 +130,7 @@ def main() -> int:
         "/// escapes them). Surrogates are included, though a Rust `char` is never one.\n"
         + rust_ranges("PY_NOT_PRINTABLE", not_printable)
         + "\n/// Code points whose Python `str.casefold()` is not their `str.lower()` (every code point\n"
-        "/// measured), with the folded text. Every other character folds to its one-character lower.\n"
+        "/// measured), with the folded text. Every other character folds to its own lower case.\n"
         f"pub(crate) const PY_CASEFOLD: [(u32, &str); {len(folds)}] = [\n{fold_rows}\n];\n"
     )
     (ROOT / "src" / "text_tables.rs").write_text(out, encoding="utf-8")

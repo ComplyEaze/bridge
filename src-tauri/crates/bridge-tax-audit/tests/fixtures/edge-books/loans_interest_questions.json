@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest questions at the reference's current head, an individual whose previous-year turnover is a placeholder between the two limits and whose activity is not recorded (deductor status unknown): an expense credited to a loan and its reversal, asked about as the lender's charge (Charge Loan, with its interest over the threshold); an entry against only another loan's interest ledger (Misposted Loan); a bank debit and its return by identical narration, one by a number in the credit's reference, and a repeated narration (Pair Loan); a repayment past the balance, then a cash loan tested on its own amount, then one the two walks disagree on, listed as not computed (Walk Loan); a repayment reportable under both walks and flagged only under the second (Flag Loan); a Government loan taken, reported, and repaid, not (Govt Loan); one lender on two ledgers whose names match only case-folded (Strasse A, B); two ledgers with no lender (Nameless A, B); and the notices: a loan left out of the list, instalments to a creditor in three months, and no notice for suspense in two months, a duties ledger, a bank OD or a ledger whose group chain is incomplete.",
+ "comment": "loans_interest questions at the reference's current head, an individual whose previous-year turnover is a placeholder below both limits, activity not recorded (not a deductor, but unknown as a placeholder): an expense credited to a loan and its reversal, asked about as the lender's charge (Charge Loan, with its interest over the threshold); an entry against only another loan's interest ledger (Misposted Loan); a bank debit and its return by identical narration, one by a number in the credit's reference, and a repeated narration (Pair Loan); a repayment past the balance, then a cash loan tested on its own amount, then one the two walks disagree on, listed as not computed (Walk Loan); a repayment reportable under both walks and flagged only under the second (Flag Loan); a Government loan taken, reported, and repaid, not (Govt Loan); one lender on two ledgers whose names match only case-folded (Strasse A, B); two ledgers with no lender (Nameless A, B); and the notices: a loan left out of the list, instalments to a creditor in three months, and no notice for suspense in two months, a duties ledger, a bank OD or a ledger whose group chain is incomplete, though it reaches Loans (Liability).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -173,7 +173,8 @@
   {
    "name": "Broken Ledger",
    "chain": [
-    "Missing Group"
+    "Missing Group",
+    "Loans (Liability)"
    ],
    "guid": "edge-loans_interest_questions-020",
    "chain_complete": false
@@ -946,7 +947,7 @@
   "Bank A"
  ],
  "entity_type": "individual",
- "previous_year_turnover_paise": 600000000,
+ "previous_year_turnover_paise": 400000000,
  "previous_year_turnover_status": "placeholder",
  "loans": {
   "Charge Loan": {

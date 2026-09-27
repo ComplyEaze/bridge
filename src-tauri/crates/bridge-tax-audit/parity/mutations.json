@@ -3384,6 +3384,30 @@
   "to": "            Ok(_) => out.push_str(&py_lower(c.encode_utf8(&mut [0; 4]))),"
  },
  {
+  "id": "LR-36",
+  "by": "author (Lane E2)",
+  "what": "TDS on the same day as interest is read before it",
+  "file": "src/loans_interest.rs",
+  "from": "(&pop[a.0].date, u8::from(a.1 <= 0)).cmp(&(&pop[b.0].date, u8::from(b.1 <= 0)))",
+  "to": "(&pop[a.0].date, u8::from(a.1 > 0)).cmp(&(&pop[b.0].date, u8::from(b.1 > 0)))"
+ },
+ {
+  "id": "LR-37",
+  "by": "author (Lane E2)",
+  "what": "coverage allows no rupee of rounding per deduction",
+  "file": "src/loans_interest.rs",
+  "from": "                if tds_on_loan > 0 && covering >= expected - tolerance {",
+  "to": "                if tds_on_loan > 0 && covering >= expected {"
+ },
+ {
+  "id": "LR-38",
+  "by": "author (Lane E2)",
+  "what": "the s.194A rate on interest is rounded down, not half up",
+  "file": "src/loans_interest.rs",
+  "from": "                    .and_then(|x| x.checked_add(5000))",
+  "to": "                    .and_then(|x| x.checked_add(0))"
+ },
+ {
   "id": "Y01",
   "by": "author",
   "what": "the no-party bucket cited as a ledger (EVID-1)",

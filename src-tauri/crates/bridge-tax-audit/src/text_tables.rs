@@ -1694,7 +1694,7 @@ pub(crate) const PY_NOT_PRINTABLE: [(u32, u32); 713] = [
 ];
 
 /// Code points whose Python `str.casefold()` is not their `str.lower()` (every code point
-/// measured), with the folded text. Every other character folds to its one-character lower.
+/// measured), with the folded text. Every other character folds to its own lower case.
 pub(crate) const PY_CASEFOLD: [(u32, &str); 297] = [
     (0x00B5, "\u{3bc}"),
     (0x00DF, "\u{73}\u{73}"),

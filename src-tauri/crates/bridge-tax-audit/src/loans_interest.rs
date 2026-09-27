@@ -8,8 +8,11 @@
 //! * Every amount is summed in i128 and refused if a figure does not fit i64, where the
 //!   reference's integers are unbounded.
 //! * A loan entry's `lender` and `lender_type` must be strings, and its `interest_ledger` a name
-//!   or a list of non-empty names, each refused when the loans are read; the reference formats
-//!   any `lender` with `str()` and refuses a malformed `interest_ledger` when the test runs.
+//!   or a list of non-empty names, each refused when the loans are read. The reference refuses a
+//!   non-text `lender` (its per-lender check strips it) and a malformed `interest_ledger` too, but
+//!   only when the test runs; it runs with a `lender_type` of any type, which is refused here.
+//! * The s.194A coverage arithmetic (the rate times the interest, in paise x 10,000) is checked:
+//!   a product past i128, which only an unvendored rate could reach, is refused.
 //! * A figure id the reference would repeat (two vouchers with one GUID on one loan, in the same
 //!   direction, say) is refused with an error, as the reference's `fig` raises, never a panic.
 //! * Voucher identity (the reference's `id(v)`) is the voucher's position in the population.
@@ -1048,7 +1051,12 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
             None => "not judged",
             Some(rate) => {
                 let rate = i128::from(rate);
-                let expected = (interest_total.max(0) * rate + 5000).div_euclid(10_000);
+                let expected = interest_total
+                    .max(0)
+                    .checked_mul(rate)
+                    .and_then(|x| x.checked_add(5000))
+                    .ok_or_else(|| overflow(TEST_ID))?
+                    .div_euclid(10_000);
                 fig(
                     &mut r,
                     &format!("s194a_tds_expected_{h}"),
@@ -1074,18 +1082,32 @@ interest."
                 };
                 for &(at, amt) in &rows.interest {
                     let gross = -(amt + net_on(pop[at], &tds_here));
-                    slot(at, gross * rate, 0);
+                    slot(
+                        at,
+                        gross.checked_mul(rate).ok_or_else(|| overflow(TEST_ID))?,
+                        0,
+                    );
                 }
                 for &(at, x) in &tds_by_voucher {
-                    slot(at, 0, x * 10_000);
+                    slot(
+                        at,
+                        0,
+                        x.checked_mul(10_000).ok_or_else(|| overflow(TEST_ID))?,
+                    );
                 }
                 per_voucher.sort_by(|a, b| {
                     (&pop[a.0].date, u8::from(a.1 <= 0)).cmp(&(&pop[b.0].date, u8::from(b.1 <= 0)))
                 });
                 let (mut required, mut usable) = (0_i128, 0_i128);
                 for &(_, need, tds) in &per_voucher {
-                    required += need;
-                    usable = (usable + tds).min(required).max(0);
+                    required = required
+                        .checked_add(need)
+                        .ok_or_else(|| overflow(TEST_ID))?;
+                    usable = usable
+                        .checked_add(tds)
+                        .ok_or_else(|| overflow(TEST_ID))?
+                        .min(required)
+                        .max(0);
                 }
                 let covering = usable.div_euclid(10_000);
                 fig(

@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest s.194A coverage at the reference's current head, a firm (a deductor): interest booked net of a TDS-payable ledger, counted gross, then a TDS catch-up journal, covering the rate (Covered Loan: no s.194A finding, a TDS-seen finding); TDS short of the rate (Partly Loan: partly covered); TDS dated before any interest covers none of it (Early TDS Loan); a LIC and a financial-corporation lender, which the current rules exempt, over the threshold with no TDS (no finding); two interest ledgers on one loan, one of them also classified TDS payable, which never makes it a TDS line (Multi Loan); one TDS journal debiting two loans, counted for neither, which LOAN-1 names for both (Twin A, Twin B).",
+ "comment": "loans_interest s.194A coverage at the reference's current head, a firm (a deductor): interest booked net of a TDS-payable ledger, counted gross, then a TDS catch-up journal, covering the rate (Covered Loan: no s.194A finding, a TDS-seen finding); TDS short of the rate (Partly Loan: partly covered); TDS dated before any interest covers none of it (Early TDS Loan); a LIC and a financial-corporation lender, which the current rules exempt, over the threshold with no TDS (no finding); two interest ledgers on one loan, one of them also classified TDS payable, which never makes it a TDS line (Multi Loan); interest whose s.194A rate ends in half a paisa, TDS on a separate voucher the same day and a TDS reversal, covered only within the tolerance (Round Loan); one TDS journal debiting two loans, counted for neither, which LOAN-1 names for both (Twin A, Twin B).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -79,7 +79,7 @@
    "guid": "edge-loans_interest_tds_coverage-007"
   },
   {
-   "name": "Twin A",
+   "name": "Round Loan",
    "chain": [
     "Unsecured Loans",
     "Loans (Liability)"
@@ -87,7 +87,7 @@
    "guid": "edge-loans_interest_tds_coverage-008"
   },
   {
-   "name": "Twin B",
+   "name": "Twin A",
    "chain": [
     "Unsecured Loans",
     "Loans (Liability)"
@@ -95,53 +95,68 @@
    "guid": "edge-loans_interest_tds_coverage-009"
   },
   {
-   "name": "Interest Covered",
+   "name": "Twin B",
    "chain": [
-    "Indirect Expenses"
+    "Unsecured Loans",
+    "Loans (Liability)"
    ],
    "guid": "edge-loans_interest_tds_coverage-010"
   },
   {
-   "name": "Interest Partly",
+   "name": "Interest Covered",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-011"
   },
   {
-   "name": "Interest Early",
+   "name": "Interest Partly",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-012"
   },
   {
-   "name": "Interest LIC",
+   "name": "Interest Early",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-013"
   },
   {
-   "name": "Interest Fin Corp",
+   "name": "Interest LIC",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-014"
   },
   {
-   "name": "Interest Multi",
+   "name": "Interest Fin Corp",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-015"
   },
   {
-   "name": "Processing Fee Multi",
+   "name": "Interest Multi",
    "chain": [
     "Indirect Expenses"
    ],
    "guid": "edge-loans_interest_tds_coverage-016"
+  },
+  {
+   "name": "Processing Fee Multi",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-017"
+  },
+  {
+   "name": "Interest Round",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-018"
   }
  ],
  "tb": [
@@ -216,6 +231,13 @@
    "closing": 1500000
   },
   {
+   "ledger": "Interest Round",
+   "opening": 0,
+   "debit": 1000005,
+   "credit": 0,
+   "closing": 1000005
+  },
+  {
    "ledger": "LIC Loan",
    "opening": -10000000,
    "debit": 0,
@@ -244,11 +266,18 @@
    "closing": 150000
   },
   {
+   "ledger": "Round Loan",
+   "opening": 0,
+   "debit": 100050,
+   "credit": 1000055,
+   "closing": -900005
+  },
+  {
    "ledger": "TDS Payable",
    "opening": 0,
-   "debit": 0,
-   "credit": 305000,
-   "closing": -305000
+   "debit": 50,
+   "credit": 405050,
+   "closing": -405000
   },
   {
    "ledger": "Twin A",
@@ -478,6 +507,51 @@
    ]
   },
   {
+   "guid": "r01",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Round",
+     1000005
+    ],
+    [
+     "Round Loan",
+     -1000005
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Round Loan",
+     100050
+    ],
+    [
+     "TDS Payable",
+     -100050
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "TDS Payable",
+     50
+    ],
+    [
+     "Round Loan",
+     -50
+    ]
+   ]
+  },
+  {
    "guid": "t01",
    "date": "2025-09-01",
    "base_type": "Receipt",
@@ -568,6 +642,11 @@
     "Interest Multi",
     "Processing Fee Multi"
    ]
+  },
+  "Round Loan": {
+   "lender": "Invented Round Finance",
+   "lender_type": "nbfc",
+   "interest_ledger": "Interest Round"
   },
   "Twin A": {
    "lender": "Invented Twin One",

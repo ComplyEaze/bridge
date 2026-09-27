@@ -135,8 +135,8 @@ pub(crate) fn py_lower(text: &str) -> String {
 
 /// Python 3.13's `str.casefold()`: per character, the folded text where it differs from the
 /// lower case (`text_tables::PY_CASEFOLD`, every code point measured), else the character's own
-/// one-character lower. No final-sigma rule: casefold has none, and a lone capital sigma lowers to
-/// U+03C3 as it folds.
+/// lower case, which may be longer than one character ("İ" lowers to "i" and U+0307). No
+/// final-sigma rule: casefold has none, and a lone capital sigma lowers to U+03C3 as it folds.
 pub(crate) fn py_casefold(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {

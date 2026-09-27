@@ -176,14 +176,20 @@ impl Drop for Redemption<'_> {
     }
 }
 
-/// The refusal of a held dialog that ended without an approval: declined,
-/// timed out, or ended with no answer.
-fn refusal_of(held: &Held) -> Option<String> {
+/// The refusal of a held dialog that ended without an approval (declined,
+/// timed out, or ended with no answer), and when it was given: the click, or
+/// now for a dialog that ended with no answer.
+fn refusal_of(held: &Held) -> Option<(String, std::time::Instant)> {
     match held {
         Held::Pending {
             dialog: Some(dialog),
             ..
-        } => dialog.refusal(),
+        } => dialog.refusal().map(|code| {
+            let at = dialog
+                .answered()
+                .map_or_else(std::time::Instant::now, |answered| answered.at);
+            (code, at)
+        }),
         _ => None,
     }
 }
@@ -285,21 +291,18 @@ impl PostApprovals {
             .refusals
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        // A refusal is kept as long as an approval would be, from its landing.
+        // A refusal is kept as long as an approval would be, from the click.
         let ttl = self.ttl;
         refusals.retain(|kept| kept.at.elapsed() < ttl);
         refusals
     }
 
-    /// Keep `batch_id`'s refusal for its next call, in place of any earlier one.
-    fn keep_refusal(&self, batch_id: String, code: String) {
+    /// Keep `batch_id`'s refusal, given `at`, for its next call, in place of
+    /// any earlier one. One already past its time is dropped when next read.
+    fn keep_refusal(&self, batch_id: String, code: String, at: std::time::Instant) {
         let mut refusals = self.refusals();
         refusals.retain(|kept| kept.batch_id != batch_id);
-        refusals.push_back(KeptRefusal {
-            batch_id,
-            code,
-            at: std::time::Instant::now(),
-        });
+        refusals.push_back(KeptRefusal { batch_id, code, at });
         while refusals.len() > MAX_KEPT_REFUSALS {
             refusals.pop_front();
         }
@@ -377,9 +380,9 @@ impl PostApprovals {
     /// collected it yet. Neither blocks another batch. A refusal's code is
     /// kept for its own batch's next call; the dialog itself is dropped.
     fn settle(&self, slot: &mut Option<(String, Held)>) {
-        if let Some(code) = slot.as_ref().and_then(|(_, held)| refusal_of(held)) {
+        if let Some((code, at)) = slot.as_ref().and_then(|(_, held)| refusal_of(held)) {
             if let Some((batch_id, _dialog)) = slot.take() {
-                self.keep_refusal(batch_id, code);
+                self.keep_refusal(batch_id, code, at);
             }
             return;
         }

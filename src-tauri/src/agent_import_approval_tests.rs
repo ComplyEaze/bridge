@@ -770,13 +770,14 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let directory = tempfile::tempdir().unwrap();
     let (_server, line) = held_line(directory.path());
     let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
+    // The age runs from the click, not from the later call that notices it.
     hold_declined(&approvals, &line, &line.batch_id).await;
-    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask),
         "aged out"
     );
+    assert!(!approvals.holds(&line.batch_id));
 
     let approvals = PostApprovals::new(directory.path());
     let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");

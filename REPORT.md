@@ -242,3 +242,16 @@ Lane D2 (the fresh orchestrator) says a local lane, Posting thread 2, is doing t
 
 ## 2026-09-27T14:52Z: #736 merged (part of #632)
 #736 merged at `47311f3`, after the local lane's schema-2 update. Lane Q PRs merged so far: #727, #734, #749, #743, #733, #731, #736. Still open and with other lanes: #763.
+
+## 2026-09-27T15:20Z: #763 merged (#735): all Lane Q PRs have landed
+#763 merged at `72fbca5`, after the local lane's schema-2 update. That lands every Lane Q PR: #727 (#662), #734 (#680), #749 (#711), #743 (#717 part 1), #733 (#696), #731 (#689), #736 (part of #632) and #763 (#735).
+
+Issues skipped, with the reason recorded earlier in this report:
+- #644: Lane E's.
+- #717 part 2: design question.
+- #718: too large, and overlaps #715.
+- #702: design choice, and needs a Windows run.
+- #557: blocked on #686.
+- #667: the owner's call.
+
+Needs lab: none. Lane Q has no open PRs, no armed routine, and no work in progress.

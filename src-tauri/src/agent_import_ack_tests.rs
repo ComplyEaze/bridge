@@ -1438,6 +1438,19 @@ fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
     ]
 }
 
+/// The post path's catalogue request for the D3 company: the one the capture
+/// answered (its sidecar's `source_request_sha256`).
+const D3_CATALOGUE_REQUEST: &str =
+    "589566214e5ab516d415e7a9ea3e143ed63452a8a732de0d50d6cb857c0aef2c";
+
+/// How many of `observed` are that catalogue request.
+fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    observed
+        .iter()
+        .filter(|request| request.request_body_sha256 == D3_CATALOGUE_REQUEST)
+        .count()
+}
+
 fn d3_catalogue() -> String {
     captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml"
@@ -1508,7 +1521,9 @@ async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
     assert!(imports
         .join(format!("{D3_BATCH}.masters_doubt.json"))
         .is_file());
-    assert_eq!(sent(simulator).len(), scripted, "{response}");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
 }
 
 /// The control: the same read finishes the check as unchanged, the step doubt
@@ -1518,6 +1533,7 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
     let mut plans = d3_batch_readback();
     plans.extend(d3_catalogue_read(d3_catalogue()));
     plans.extend(d3_batch_readback());
+    let scripted = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = d3_server(&simulator, directory.path());
@@ -1541,6 +1557,12 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
     assert!(!imports
         .join(format!("{D3_BATCH}.masters_doubt.json"))
         .exists());
+    // The first read finished the check, unchanged: the second read sends no
+    // catalogue request.
+    assert_eq!(masters_check_of(&server, D3_BATCH)["state"], "unchanged");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
 }
 
 /// The catalogue read refused, as Tally answers when the company cannot be
@@ -1598,5 +1620,50 @@ async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_dou
         .join(format!("{D3_BATCH}.masters_doubt.json"))
         .is_file());
     // Both reads ran in full, the refused catalogue pair included.
-    assert_eq!(sent(simulator).len(), scripted, "{response}");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 4, "{response}");
+}
+
+/// A review NAMING the step doubt goes ahead when its first read finishes the
+/// masters check as a second doubt (#756): the person named what they review,
+/// and the record covers only that doubt. The masters doubt stands for its own
+/// review.
+#[tokio::test]
+async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    plans.extend(d3_batch_readback());
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"batch_step"}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    let record: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{D3_BATCH}.batch_step_ack.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(record["doubt"], "batch_step", "{record}");
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_ack.json"))
+        .exists());
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
 }

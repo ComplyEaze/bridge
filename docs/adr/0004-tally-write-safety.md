@@ -560,8 +560,8 @@ is accepted, and loud.
   the check record, which is refused with no name needed; a check still pending or unreadable
   is not observed when the choice is made, which is before the read that can finish it. If a read
   finishes it as a second doubt (the review's first read, its read after the dialog, or another
-  call's read while the dialog is open), an unnamed review is refused as ambiguous after that
-  read, before any record (#756); a named one goes on, since the person named what they review.
+  call's read while the dialog is open), an unnamed review is refused as ambiguous after its
+  next read, before any record (#756); a named one goes on, since the person named what they review.
 - The N-voucher step is PARTIAL on raw-gateway lab scripts (protocol reference §11c.5).
   Through Bridge's own post path it is UNVERIFIED until the lab proof (slice D3).
 - The desktop stays single-voucher `JournalOnly`.

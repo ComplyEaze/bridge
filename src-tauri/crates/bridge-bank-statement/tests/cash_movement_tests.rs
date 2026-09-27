@@ -250,8 +250,9 @@ fn each_answer_maps_to_its_one_entry() {
 
 /// Cash withdrawn from one of our banks and paid into another passes through
 /// cash in hand: each statement's line posts once, on its own date, against
-/// Cash, never as a bank-to-bank Contra that the other statement's truthful
-/// answer would post a second time.
+/// Cash. The pin is the refusal of the three answers that moved it bank to
+/// bank, where truthful answers on both statements posted it twice; the rest
+/// shows the answers that remain.
 #[test]
 fn cash_moved_between_our_own_banks_posts_once_on_each_side() {
     let withdrawal = withdrawal_statement();

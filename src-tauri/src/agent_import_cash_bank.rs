@@ -193,6 +193,23 @@ impl CashBankState {
         )
     }
 
+    /// Whether the ledger's ancestry reaches the reserved Cash-in-Hand
+    /// identity, which a ledger named as cash in hand must.
+    pub(super) fn is_cash_in_hand(&self) -> bool {
+        matches!(self, Self::Established { reserved_group } if *reserved_group == "Cash-in-Hand")
+    }
+
+    /// The reserved group the ancestry reached, when it reached one.
+    pub(super) fn reserved_group(&self) -> Option<&str> {
+        match self {
+            Self::Established { reserved_group } | Self::UnadmittedMoney { reserved_group, .. } => {
+                Some(reserved_group)
+            }
+            Self::OtherReservedGroup { reserved_group } => Some(reserved_group),
+            Self::NotEstablished { .. } => None,
+        }
+    }
+
     /// A stable machine-readable label for the tool result.
     pub(super) fn state(&self) -> &'static str {
         match self {

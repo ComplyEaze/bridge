@@ -13,9 +13,9 @@
 //! decision of 27-Sep-2026: every bank line reaches the books, and a line whose
 //! purpose nobody knows is visible rather than held back.
 //!
-//! Recognition is limited to shapes captured from real statements: SBI's
-//! `ATM WDL` and Union Bank's `BY CASH` ([`crate::bank`]). No other narration is
-//! judged to be cash.
+//! Recognition is by the party name the parser gives a row, and only two
+//! rules, each from a captured statement, give a cash party: SBI's `ATM WDL`
+//! and Union Bank's `BY CASH` ([`crate::bank`]).
 
 use crate::refusal::Refusal;
 use crate::text::{mapping_key, squash, strip};
@@ -181,6 +181,12 @@ impl CashAnswer {
             ),
             _ => None,
         }
+    }
+
+    /// Whether the ledger this answer names must be a cash-in-hand ledger in
+    /// the book: a bank ledger there would move the cash bank to bank.
+    pub fn names_cash_in_hand(self) -> bool {
+        matches!(self, Self::BusinessCash | Self::OwnCashBox)
     }
 
     /// Whether this answer can be given to a line of this movement.

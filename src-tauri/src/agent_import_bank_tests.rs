@@ -1581,6 +1581,89 @@ async fn an_older_proposals_file_with_an_unanswered_cash_line_is_refused() {
     );
 }
 
+/// A ledger a person named as cash in hand for a bank cash line must be one.
+/// Over the captured demo masters, a bank ledger named there is refused with
+/// the reserved group it really reaches, and the real cash ledger passes.
+#[test]
+fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
+    use super::super::super::bank_statement::CashInHandLedger;
+    let masters = observed(&captured_demo_ledger_parents(), captured_demo_groups());
+    let need = |ledger: &str| CashInHandLedger {
+        bridge_txn_id: "st-20260801-0000000000000001".into(),
+        ledger: ledger.into(),
+    };
+    assert_eq!(
+        cash_in_hand_refusals(&[need("Cash")], &masters),
+        Vec::<Value>::new()
+    );
+    let refused = cash_in_hand_refusals(
+        &[
+            need("Cash"),
+            need("HDFC Bank Current Account"),
+            need("HDFC Bank Current Account"),
+        ],
+        &masters,
+    );
+    assert_eq!(refused.len(), 1, "one row per ledger: {refused:?}");
+    assert_eq!(refused[0]["requires"], "cash_in_hand");
+    assert_eq!(refused[0]["state"], "cash_bank");
+    assert_eq!(refused[0]["reserved_group"], "Bank Accounts");
+    assert_eq!(
+        refused[0]["first_bridge_txn_id"],
+        "st-20260801-0000000000000001"
+    );
+    let party = cash_in_hand_refusals(&[need("Gujarat Poly Industries")], &masters);
+    assert_eq!(party[0]["state"], "not_cash_bank");
+}
+
+/// Through the tool: a proposals file whose business-cash answer names a
+/// ledger outside Cash-in-Hand is refused at the first group read, before
+/// any file is written, with the group that ledger really reaches.
+#[tokio::test]
+async fn a_business_cash_answer_naming_a_non_cash_ledger_is_refused_at_build() {
+    let plans = bank_build_plans();
+    let simulator = SequenceSimulator::spawn(plans[..18].to_vec()).expect("refusal plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let payload = captured_bank_payload();
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": payload.vouchers,
+        "records": [{
+            "row": 1, "disposition": {"voucher": "Payment"}, "party": "ATM CASH WITHDRAWAL",
+            "ledger": "Bridge Nested Debtor WR4", "suspense": false, "bridge_txn_id": "txn-001",
+            "cash_movement": "withdrawal", "cash_answer": "business_cash"
+        }],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "cash_ledger_not_cash_in_hand");
+    let refused = result["refused_ledgers"].as_array().unwrap();
+    assert_eq!(refused.len(), 1);
+    let ledger = &refused[0]["ledger"];
+    assert!(
+        ledger == "Bridge Nested Debtor WR4" || marked(ledger) == Some("Bridge Nested Debtor WR4"),
+        "{ledger}"
+    );
+    assert_eq!(refused[0]["reserved_group"], "Sundry Debtors");
+    assert_eq!(refused[0]["first_bridge_txn_id"], "txn-001");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
 /// The build result lists every voucher a bank import sent to suspense, found
 /// by the tag in its narration, and no other.
 #[test]

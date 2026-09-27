@@ -587,7 +587,9 @@ impl Server {
     pub(super) async fn build_import_xml(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         // A proposals file supplies `vouchers`; everything after this line
         // admits them exactly as it admits inline vouchers.
-        let args = &super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
+        let resolved =
+            super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
+        let args = &resolved.args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
         let (debit, credit) = totals(&payload.vouchers)?;
@@ -663,7 +665,7 @@ impl Server {
             // collection, so a Journal-only batch keeps the request sequence its
             // own qualification was measured on.
             let mut group_evidence = None;
-            if renders_bank_shape(&payload.vouchers) {
+            if renders_bank_shape(&payload.vouchers) || !resolved.cash_in_hand.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.parents(), groups);
@@ -677,6 +679,23 @@ impl Server {
                             "refused_ledgers_omitted":refusals.omitted,
                             "group_evidence_sha256":evidence.response_sha256,
                             "next_step":"No file was written. Each refused leg says which ledger and why: cash_bank must reach Bank Accounts or Cash-in-Hand, not_cash_bank must reach a group holding no money, and an unresolvable group is refused either way. Fix the payload or the ledger's group, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
+                        }}),
+                        evidence: accumulated.clone(),
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
+                }
+                // A ledger a person named as cash in hand must be one: a bank
+                // ledger there would move the cash bank to bank, which the
+                // other statement's line then posts a second time.
+                let not_cash = cash_in_hand_refusals(&resolved.cash_in_hand, &observed);
+                if !not_cash.is_empty() {
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                            "state":"refused", "reason":"cash_ledger_not_cash_in_hand",
+                            "refused_ledgers":not_cash,
+                            "group_evidence_sha256":evidence.response_sha256,
+                            "next_step":"No file was written. Each ledger was named as cash in hand for a bank cash line, but its group reaches the reserved group shown, not Cash-in-Hand. Re-run parse_bank_statement with the cash-in-hand ledger for that answer, then build again."
                         }}),
                         evidence: accumulated.clone(),
                         company_guid: Some(payload.company_guid),
@@ -2527,6 +2546,31 @@ fn requested_master_report(
             }),
         })
         .collect()
+}
+
+/// The ledgers named as cash in hand that the book does not hold under
+/// Cash-in-Hand, one row per ledger with the reserved group it does reach.
+fn cash_in_hand_refusals(
+    required: &[super::bank_statement::CashInHandLedger],
+    observed: &ObservedMasters,
+) -> Vec<Value> {
+    let mut refused = BTreeMap::<&str, Value>::new();
+    for need in required {
+        let state = observed.classify(&need.ledger);
+        if state.is_cash_in_hand() {
+            continue;
+        }
+        refused.entry(need.ledger.as_str()).or_insert_with(|| {
+            json!({
+                "ledger": party_name(need.ledger.as_str()),
+                "requires": "cash_in_hand",
+                "state": state.state(),
+                "reserved_group": state.reserved_group(),
+                "first_bridge_txn_id": need.bridge_txn_id,
+            })
+        });
+    }
+    refused.into_values().collect()
 }
 
 /// The vouchers Bridge's bank import sent to suspense, found by the tag it

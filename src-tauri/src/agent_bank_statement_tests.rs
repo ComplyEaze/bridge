@@ -620,8 +620,8 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         persist(directory.path(), &request, &open, &"0".repeat(64)).unwrap();
     let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
     assert_eq!(
-        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)),
-        Err("cash_questions_open".to_string())
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).err(),
+        Some("cash_questions_open".to_string())
     );
 
     args["cash_answers"] =
@@ -632,7 +632,9 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
-    let vouchers = resolved["vouchers"].as_array().unwrap();
+    // Drawings is not named as cash in hand, so build is asked to check nothing.
+    assert!(resolved.cash_in_hand.is_empty());
+    let vouchers = resolved.args["vouchers"].as_array().unwrap();
     assert_eq!(vouchers.len(), 2);
     let drawn = vouchers
         .iter()
@@ -649,4 +651,20 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     assert_eq!(lines.len(), 1, "{summary}");
     assert_eq!(lines[0]["reason"], "party_unmapped_or_mapped_to_suspense");
     assert_ne!(lines[0]["bridge_txn_id"], id.as_str());
+
+    // Business cash names a ledger build must find under Cash-in-Hand.
+    args["cash_answers"] =
+        json!([{"bridge_txn_id": id, "answer": "business_cash", "ledger": "Cash"}]);
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let kept = parsed_with(&request.cash_answers);
+    let (proposals_id, _, digest) =
+        persist(directory.path(), &request, &kept, &"0".repeat(64)).unwrap();
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    let named = resolved
+        .cash_in_hand
+        .iter()
+        .map(|need| (need.bridge_txn_id.as_str(), need.ledger.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(named, [(id.as_str(), "Cash")]);
 }

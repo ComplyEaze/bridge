@@ -1,8 +1,8 @@
 //! bridge#583: the native post driven end to end through the `post_import`
 //! tool call against the protocol simulator, the approval answered by the
 //! test-only seam (`approved_import::test_seam`). No real Tally is involved.
-use super::SCRIPTED_REMOTE_ID;
 use super::*;
+use super::{SCRIPTED_REMOTE_ID, SCRIPTED_REMOTE_IDS};
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use bridge_tally_transport::TallyEndpointConfig;
 use std::time::Duration;
@@ -213,7 +213,7 @@ fn journaled_outcome(
 fn assert_journaled_clean_create(directory: &std::path::Path) {
     let outcome = journaled_outcome(directory).expect("the POST answer was parsed and journaled");
     assert_eq!(outcome.counters().created, 1);
-    assert!(import_outcome_is_clean(Some(&outcome)));
+    assert!(import_outcome_is_clean(Some(&outcome), 1));
 }
 
 fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
@@ -228,6 +228,7 @@ fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Serv
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         writes_enabled: true,
+        batch_post_enabled: false,
     })
 }
 
@@ -456,6 +457,269 @@ async fn race_an_intent_during_approval(
     (response, observed, post_at, intents)
 }
 
+/// #711: while the dialog is open, `change` rewrites this batch's journal;
+/// the check under the admission lock then refuses with `code`, before this
+/// post's intent is appended, and the POST is never sent. `attempt_recorded`
+/// stays what the journal shows (`attempted`), and the batch carries exactly
+/// `intents` dispatch intents: only any `change` wrote, none from this post.
+async fn refused_under_the_admission_lock(
+    change: impl Fn(&std::path::Path, &ImportLedgerLine) + Send + Sync + 'static,
+    code: &str,
+    attempted: Value,
+    intents: usize,
+) {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let batch_id = line.batch_id.clone();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let scripted = ScriptedApproval::approving_after(move || change(&path, &line));
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted, server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], code, "{response}");
+    assert_eq!(result["attempt_recorded"], attempted, "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    let recorded = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap())
+        .filter(|record| {
+            record["record_type"] == "dispatch_intent" && record["batch_id"] == batch_id.as_str()
+        })
+        .count();
+    assert_eq!(recorded, intents, "no intent from this post: {response}");
+}
+
+fn append_record(path: &std::path::Path, record: &impl serde::Serialize) {
+    use std::io::Write;
+    let mut bytes = serde_json::to_vec(record).unwrap();
+    bytes.push(b'\n');
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(path)
+        .unwrap()
+        .write_all(&bytes)
+        .unwrap();
+}
+
+#[tokio::test]
+async fn a_batch_gone_from_the_journal_under_the_lock_is_refused_by_name() {
+    refused_under_the_admission_lock(
+        |path, _| std::fs::write(path, b"").unwrap(),
+        "import_batch_not_found",
+        json!(null),
+        0,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_batch_attempted_while_approval_is_pending_is_refused_by_name() {
+    refused_under_the_admission_lock(
+        |path, line| {
+            append_record(
+                path,
+                &ledger::StatusRecord::dispatch_native(line, "c".repeat(64), Uuid::new_v4()),
+            );
+        },
+        "import_already_attempted",
+        json!(true),
+        1,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_batch_changed_while_approval_is_pending_is_refused_by_name() {
+    refused_under_the_admission_lock(
+        |path, line| {
+            let mut changed = line.clone();
+            changed.sha256 = "d".repeat(64);
+            append_record(path, &changed);
+        },
+        "import_batch_changed",
+        json!(false),
+        0,
+    )
+    .await;
+}
+
+fn batch_server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
+    Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        },
+        data_dir: directory.to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: true,
+    })
+}
+
+/// `saved_batch`, with a second Journal on the same ledgers and day.
+fn saved_batch_of_two(server: &Server) -> (ImportLedgerLine, Value) {
+    let (mut line, args) = saved_batch(server);
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "journal-583-2".into();
+    second
+        .entries
+        .iter_mut()
+        .for_each(|entry| entry.amount = "7.25".into());
+    line.vouchers.push(second);
+    line.txn_ids.push("journal-583-2".into());
+    let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(rendered.as_bytes());
+    bind_to_captured_catalogue(&mut line);
+    server.append_import_ledger(&line).unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        rendered,
+    )
+    .unwrap();
+    (line, args)
+}
+
+/// A batch of two, while another process records `injected` in an intent
+/// during approval; the post mints `minted`.
+async fn race_a_batch_id_during_approval(
+    injected: Uuid,
+    minted: [Uuid; 2],
+) -> (Value, usize, usize) {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+    let mut earlier = line.clone();
+    earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
+    earlier.vouchers.truncate(1);
+    earlier.txn_ids.truncate(1);
+    let mut appended = serde_json::to_vec(&earlier).unwrap();
+    appended.push(b'\n');
+    appended.extend(
+        serde_json::to_vec(&ledger::StatusRecord::dispatch_native(
+            &earlier,
+            "c".repeat(64),
+            injected,
+        ))
+        .unwrap(),
+    );
+    appended.push(b'\n');
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let scripted = ScriptedApproval::approving_after(move || {
+        use std::io::Write;
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(&appended)
+            .unwrap();
+    });
+    let response = SCRIPTED_REMOTE_IDS
+        .scope(
+            minted.to_vec(),
+            SCRIPTED_APPROVAL.scope(scripted, server.call_tool("post_import", args)),
+        )
+        .await;
+    (response, sent(simulator).len(), post_at)
+}
+
+/// A batch's SECOND REMOTEID, recorded by another process while the dialog
+/// is open, is caught inside the queue: no POST. The control, with an
+/// unrelated id recorded instead, posts. So every id is checked, not only
+/// the first.
+#[tokio::test]
+async fn a_batch_whose_second_remote_id_is_recorded_during_approval_is_never_sent() {
+    let minted = [Uuid::new_v4(), Uuid::new_v4()];
+    let (response, observed, post_at) = race_a_batch_id_during_approval(minted[1], minted).await;
+    assert_eq!(observed, post_at, "{response}");
+    let (response, observed, post_at) =
+        race_a_batch_id_during_approval(Uuid::new_v4(), minted).await;
+    assert!(
+        observed > post_at,
+        "the control's POST was sent: {response}"
+    );
+}
+
+/// A live batch post records its step verdict durably, before the readback. Tally's captured answer reports one create for this batch of
+/// two, and the target's mark moves by two: the step doubt is recorded, and
+/// the batch is not verified.
+#[tokio::test]
+async fn a_batch_post_records_its_step_verdict_before_the_readback() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(12, 50, "WR2 Unicode Lab")));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let _ = sent(simulator);
+    // The dialog was asked about both vouchers, the count that its title
+    // names (and on macOS its button, #746); the approval's unit tests check
+    // those words.
+    assert_eq!(scripted.counts(), [2]);
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["state"], "unmatched", "{response}");
+    assert_eq!(doubt["target_voucher_step"]["step"], 2, "{doubt}");
+    assert_eq!(
+        doubt["target_voucher_step"]["reported_created"], 1,
+        "{doubt}"
+    );
+    assert_eq!(
+        super::super::read_masters_check(&imports, &line.batch_id).unwrap()["batch_step"]["state"],
+        "unmatched"
+    );
+    assert_ne!(
+        response["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{response}"
+    );
+}
+
+/// With batch posting off, a batch of two is refused before any request.
+#[tokio::test]
+async fn a_batch_is_refused_while_batch_posting_is_off() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch_of_two(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "import_post_requires_one_voucher",
+        "{response}"
+    );
+    assert!(sent(simulator).is_empty());
+}
+
 /// The same REMOTEID recorded by another process while the dialog is open is
 /// caught as the intent is written: no intent for this batch, and no POST. The
 /// control, an injected intent with another REMOTEID, posts: so the match is
@@ -464,10 +728,15 @@ async fn race_an_intent_during_approval(
 async fn a_remoteid_recorded_while_approval_is_pending_is_never_sent() {
     let raced = Uuid::new_v4();
     let (response, observed, post_at, intents) = race_an_intent_during_approval(raced, raced).await;
-    // A refusal inside the queue still reads as an unknown outcome (#656),
-    // though nothing was sent: the journal and the request count show that.
+    // Refused under the admission lock before the intent (#711): it keeps
+    // its own code, and nothing was recorded or sent.
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "import_dispatch_outcome_unknown",
+        response["structuredContent"]["result"]["error"]["code"], "import_remote_id_reused",
+        "{response}"
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["attempt_recorded"],
+        json!(false),
         "{response}"
     );
     assert_eq!(observed, post_at, "{response}");
@@ -522,7 +791,7 @@ async fn an_approved_post_sends_exactly_the_request_its_intent_recorded() {
     let recorded_id = intent["native_remote_id"].as_str().unwrap();
     assert_eq!(observed[post_at].request_body_sha256, recorded_sha);
     let remote_id = Uuid::parse_str(recorded_id).unwrap();
-    let rendered = native_post_request(&line, remote_id).unwrap();
+    let rendered = native_post_request(&line, RemoteIds::from_ids(vec![remote_id])).unwrap();
     assert_eq!(rendered.request_sha256, recorded_sha);
     assert!(rendered
         .xml
@@ -531,11 +800,13 @@ async fn an_approved_post_sends_exactly_the_request_its_intent_recorded() {
     // REMOTEID renders the same bytes, and another REMOTEID different ones, so
     // the match above could not come from anything else in the request.
     assert_eq!(
-        native_post_request(&line, remote_id).unwrap().xml,
+        native_post_request(&line, RemoteIds::from_ids(vec![remote_id]))
+            .unwrap()
+            .xml,
         rendered.xml
     );
     assert_ne!(
-        native_post_request(&line, Uuid::new_v4())
+        native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()]))
             .unwrap()
             .request_sha256,
         recorded_sha
@@ -601,6 +872,53 @@ async fn post_import_refuses_an_amendment_before_any_read_or_approval() {
     assert!(scripted.previews().is_empty(), "no approval asked");
 }
 
+/// bridge#626: before approval, the post reads the catalogue again and refuses
+/// a named ledger that now folds equal to another live ledger, which Tally's
+/// import lookup could take for it. Refused through the tool, under an
+/// approving script: no approval asked, no request after that catalogue read,
+/// no intent journaled. The twin is a test-local rewrite of the capture (an
+/// unrelated ledger renamed `Cash` plus CR LF), no evidence of Tally behaviour.
+#[tokio::test]
+async fn a_folded_twin_refuses_the_post_before_any_approval() {
+    let captured = catalogue();
+    assert_eq!(
+        captured.matches("Bridge Nested Debtor WR4").count(),
+        2,
+        "name and NAME.LIST"
+    );
+    let twinned = captured.replace("Bridge Nested Debtor WR4", "Cash&#13;&#10;");
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(twinned));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "ledger_has_folded_twin",
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the catalogue read");
+    assert!(scripted.previews().is_empty(), "no approval asked");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
 /// Declined, the post sends nothing past the pre-approval reads and journals
 /// no intent; the approval was asked once.
 #[tokio::test]
@@ -630,6 +948,11 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
     assert_eq!(
         scripted.previews(),
         [admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap()]
+    );
+    assert_eq!(
+        scripted.counts(),
+        [1],
+        "the dialog is asked about one voucher"
     );
 }
 
@@ -702,6 +1025,7 @@ async fn a_dispatch_admission_that_fails_sends_nothing() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             writes_enabled: true,
+            batch_post_enabled: false,
         });
         other.append_import_ledger(&changed).unwrap();
     });
@@ -921,7 +1245,7 @@ async fn each_bank_type_posts_the_request_its_intent_recorded() {
             observed[post_at].request_body_sha256, recorded_sha,
             "{type_name}"
         );
-        let rendered = native_post_request(&line, remote_id).unwrap();
+        let rendered = native_post_request(&line, RemoteIds::from_ids(vec![remote_id])).unwrap();
         assert_eq!(rendered.request_sha256, recorded_sha, "{type_name}");
         assert!(
             rendered.xml.contains(&format!("VCHTYPE=\"{type_name}\"")),
@@ -991,7 +1315,7 @@ async fn a_three_entry_receipt_posts_the_request_its_intent_recorded() {
     assert_eq!(observed[post_at].request_body_sha256, recorded_sha);
     let remote_id = Uuid::parse_str(intent["native_remote_id"].as_str().unwrap()).unwrap();
     assert_eq!(
-        native_post_request(&line, remote_id)
+        native_post_request(&line, RemoteIds::from_ids(vec![remote_id]))
             .unwrap()
             .request_sha256,
         recorded_sha
@@ -1083,6 +1407,113 @@ async fn a_counterparty_moved_under_cash_after_approval_is_refused_before_the_po
 #[tokio::test]
 async fn a_counterparty_group_moved_under_bank_after_approval_is_refused_before_the_post() {
     refused_in_the_queue(catalogue(), groups_with_debtor_group_under_bank()).await;
+}
+
+/// bridge#676: a group collection the classification cannot parse is refused
+/// before approval as `group_export_invalid`, and its `cause` is the group
+/// parser's own data-free code, not dropped. Nothing is read after it.
+async fn refused_on_the_group_read(groups: String, cause: &str) {
+    let mut plans = probe();
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(catalogue()));
+    plans.extend(paired(groups));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch(&server, payment());
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "group_export_invalid", "{response}");
+    assert_eq!(error["cause"], cause, "{response}");
+    assert!(scripted.previews().is_empty(), "no approval asked");
+    assert_eq!(observed.len(), expected, "{response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
+#[tokio::test]
+async fn a_group_collection_of_another_company_is_refused_with_its_cause() {
+    let groups = groups();
+    let other = groups.replacen(
+        ">61c6de69-1748-461c-ad3f-162cb949df9f</BRIDGECOMPANYGUID>",
+        ">00000000-0000-4000-8000-000000000676</BRIDGECOMPANYGUID>",
+        1,
+    );
+    assert_ne!(other, groups, "one row's company GUID changed");
+    refused_on_the_group_read(other, "group_response_company_guid_mismatch").await;
+}
+
+#[tokio::test]
+async fn a_group_collection_that_reports_failure_is_refused_with_its_cause() {
+    let failed = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+    refused_on_the_group_read(failed, "group_status_not_success").await;
+}
+
+/// bridge#717: the group collection the queue re-reads after approval is
+/// refused as `group_export_invalid` with the same data-free `cause` the read
+/// before approval carries, not as a causeless queue failure. Nothing is sent
+/// and no intent is written.
+async fn refused_on_the_queued_group_read(queued_groups: String, cause: &str) {
+    let mut plans = bank_before_approval(catalogue(), groups());
+    let after = bank_after_approval(catalogue(), queued_groups, xml(created_one()));
+    let expected = plans.len() + after.len() - 1;
+    plans.extend(after);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch(&server, payment());
+    let before = journal(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "group_export_invalid",
+        "{response}"
+    );
+    assert_eq!(result["error"]["cause"], cause, "{response}");
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert_eq!(scripted.previews().len(), 1, "approval was asked once");
+    assert_eq!(
+        observed.len(),
+        expected,
+        "the post is never sent: {response}"
+    );
+    assert_eq!(
+        appended_kinds(&before, &journal(directory.path())),
+        ["verification_status"]
+    );
+}
+
+#[tokio::test]
+async fn a_queued_group_collection_of_another_company_is_refused_with_its_cause() {
+    let groups = groups();
+    let other = groups.replacen(
+        ">61c6de69-1748-461c-ad3f-162cb949df9f</BRIDGECOMPANYGUID>",
+        ">00000000-0000-4000-8000-000000000717</BRIDGECOMPANYGUID>",
+        1,
+    );
+    assert_ne!(other, groups, "one row's company GUID changed");
+    refused_on_the_queued_group_read(other, "group_response_company_guid_mismatch").await;
+}
+
+#[tokio::test]
+async fn a_queued_group_collection_that_reports_failure_is_refused_with_its_cause() {
+    let failed = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+    refused_on_the_queued_group_read(failed, "group_status_not_success").await;
 }
 
 /// Already changed since the build: refused before approval is asked, and no
@@ -1448,7 +1879,7 @@ async fn a_post_whose_response_cannot_be_journaled_still_reports_where_it_landed
 fn the_simulated_post_answer_parses_as_one_clean_create() {
     let outcome = parse_import_outcome(&created_one()).expect("the POST answer parses");
     assert_eq!(outcome.counters().created, 1);
-    assert!(import_outcome_is_clean(Some(&outcome)));
+    assert!(import_outcome_is_clean(Some(&outcome), 1));
 }
 
 /// A Journal Bridge posted live (bridge#582's lab qualification), as its
@@ -1885,9 +2316,10 @@ async fn a_new_ledger_under_an_approved_name_during_approval_is_refused_by_ident
 /// bridge#634, #641: the queue's catalogue re-read at post time holds a
 /// repeated ledger. The admission recheck refuses before the intent and the
 /// POST under its own code, not the catch-all that says the outcome is
-/// unknown, and carries the catalogue's typed cause. Below the response
-/// budget the cause is left out, as on the generic refusal, and the fields a
-/// caller acts on survive. The name is never in the response.
+/// unknown, nor #656's `post_queue_read_failed` (the named refusal wins), and
+/// carries the catalogue's typed cause. Below the response budget the cause
+/// is left out, as on the generic refusal, and the fields a caller acts on
+/// survive. The name is never in the response.
 #[tokio::test]
 async fn a_post_time_catalogue_refusal_names_its_cause_and_no_ledger() {
     let repeated = crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
@@ -1991,6 +2423,91 @@ async fn an_unreadable_binding_snapshot_refuses_as_unconfirmed() {
             ["verification_status"]
         );
     }
+}
+
+/// #656: a queue read that fails before the intent is refused under its own
+/// code, not the catch-all that says the outcome is unknown. The queue's
+/// catalogue legs are lost in transport (the queue stops at once), or disagree
+/// (a pair drift); either way no intent is journaled, no POST is sent, and the
+/// cause names the failure.
+#[tokio::test]
+async fn a_queue_read_failing_before_the_intent_is_refused_as_such() {
+    let catalogue_at = probe().len() + 2;
+    let drifted = replaced_once(
+        &catalogue(),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+    );
+    for (lost, cause) in [
+        (true, "response_truncated"),
+        (false, "native_report_pair_changed"),
+    ] {
+        let mut plans = before_approval();
+        let mut after = after_approval(xml(created_one()));
+        let expected = if lost {
+            after[catalogue_at + 1] = xml(catalogue()).with_delivery(Delivery::ResetBeforeBody);
+            plans.len() + catalogue_at + 2
+        } else {
+            after[catalogue_at + 3] = xml(drifted.clone());
+            // Each leg of the paired read is followed by a health check, and
+            // the legs are compared only after the second one.
+            plans.len() + catalogue_at + 5
+        };
+        plans.extend(after);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_, args) = saved_batch(&server);
+        let before = journal(directory.path());
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let observed = sent(simulator).len();
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "post_queue_read_failed", "{response}");
+        assert_eq!(error["cause"], cause, "{response}");
+        assert_eq!(
+            response["structuredContent"]["result"]["attempt_recorded"],
+            json!(false),
+            "{response}"
+        );
+        assert_eq!(observed, expected, "{response}");
+        assert_eq!(
+            appended_kinds(&before, &journal(directory.path())),
+            ["verification_status"]
+        );
+    }
+}
+
+/// #656, the other direction: the pre-intent code must never reach a post
+/// whose bytes were sent. The POST's response is lost in transport, after the
+/// intent was journaled, so the outcome is unknown and the attempt recorded.
+#[tokio::test]
+async fn a_post_lost_after_the_intent_is_still_an_unknown_outcome() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(
+        xml(created_one()).with_delivery(Delivery::ResetBeforeBody),
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_dispatch_outcome_unknown",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
 }
 
 // bridge#239: the ledgers a batch names must still carry the GUIDs its build
@@ -2127,7 +2644,7 @@ async fn a_dispatched_batch_without_identities_still_reconciles() {
     let (mut line, args) = saved_batch(&server);
     line.ledger_identities = None;
     server.append_import_ledger(&line).unwrap();
-    let native = native_post_request(&line, Uuid::new_v4()).unwrap();
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
     {
         let _lock = server.lock_import_admission().unwrap();
         server
@@ -2355,7 +2872,7 @@ async fn reconcile_seeded(
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let line = saved_captured_line(&server);
-    let native = native_post_request(&line, Uuid::new_v4()).unwrap();
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
     {
         let _lock = server.lock_import_admission().unwrap();
         server

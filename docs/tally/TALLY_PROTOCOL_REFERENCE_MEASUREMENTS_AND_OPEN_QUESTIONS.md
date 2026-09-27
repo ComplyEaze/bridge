@@ -929,8 +929,8 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 - **The figures tie to the native trial balance (§5.6)** for the small book's full year. Current liabilities equalled the sundry creditors' TB closing. The P&L line equalled the P&L ledger's TB closing (`0.00`) plus the year's result. `Purchase Accounts` equalled the purchase ledger's TB closing.
 - **A part-year window (PARTIAL: one book, one month).** On the 29,900-voucher book, for 2025-05-01 to 2025-05-31, the statements were read beside the native TB and group tree in the same two minutes. Every line tied.
   - The book's one P&L ledger (sales) had a TB covering the window only. Its `TBALOPENING` was `0.00`, and its `TBALCLOSING` equalled the month's movement, `113726661.73`. That is the P&L's `Sales Accounts` line.
-  - The `Profit & Loss A/c` ledger's `TBALOPENING` was `109235760.65`. That is the negation of the current-asset ledgers' combined opening. No ledger other than those current-asset ledgers and the `Profit & Loss A/c` ledger opened non-zero. So the year's earlier result is carried in that ledger rather than in the P&L ledgers' openings (inferred from the balancing, not from a voucher read).
-  - The Balance Sheet's `Profit & Loss A/c` line, `222962422.38`, equalled that ledger's TB closing plus the P&L ledgers' TB closings.
+  - The `Profit & Loss A/c` ledger's `TBALOPENING` was `109235760.65`. That is the negation of the current-asset ledgers' combined opening. No ledger other than those current-asset ledgers and the `Profit & Loss A/c` ledger opened non-zero. So the year's earlier result is carried in that ledger rather than in the sales ledger's opening (inferred from the balancing, not from a voucher read).
+  - The Balance Sheet's `Profit & Loss A/c` line, `222962422.38`, equalled that ledger's TB closing plus the sales ledger's TB closing.
   - The one-month TB (123 ledgers) was 150 KB, the group tree 54 KB and the one-month P&L 368 B.
 - **Cost:** 0.14–0.72 s and 0.7–1.8 KB per request on the small book; **0.23 s and 1.8 KB for a one-month Balance Sheet on the 29,900-voucher book**. No full year was requested on the larger book.
 

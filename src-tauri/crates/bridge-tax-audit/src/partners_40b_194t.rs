@@ -13,6 +13,16 @@
 //! min(deed rate, rules rate) on each day's capital, a day in debit contributing zero, over actual
 //! days / 365, with three named sensitivities (days / 360, opening balance only, no reduction).
 //!
+//! A credit is read gross of the TDS on its own voucher, the TDS read only through the ledgers the
+//! client's statutory dues classify as TDS payable, where the partner's capital is the only ledger
+//! on the TDS's other side; otherwise the voucher is named as sharing its TDS. A voucher carrying
+//! both the interest and the remuneration ledger is split only where exact, else counted as
+//! interest and named; a set-off on the capital, and a voucher on the partner's ledgers touching no
+//! capital, are named (the latter counted nowhere). A partner whose interest cannot be read exactly
+//! has s.40(b) not computed, never an excess. The s.194T base is gross: a reversal lowers nothing.
+//! The s.40(b)(v) remuneration ceiling is quoted from the rules' `[s40b_v]`, never applied as a
+//! limit. `Walk` and `run` say how each is read.
+//!
 //! Every amount is carried in i128 (a year of capital-paise-days times a rate exceeds i64) and
 //! each figure is checked back into i64.
 //!

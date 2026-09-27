@@ -467,13 +467,13 @@
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",
       "title_text": "Payee over the 194C limit",
-      "limits_sha256_16": "6d304d2d3195d3ac",
+      "limits_sha256_16": "8d8d0fa4c95ea9ee",
       "limits_text": [
         "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
         "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
         "No TDS line (a ledger the client's statutory dues classify as TDS payable) is seen on this payee's vouchers.",
         "2 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: no TDS line is seen on the vouchers touching this payee.",
-        "2 reversal(s) of credits to this payee are not classified in the client's list of reversals, so they are counted gross (the aggregate is not lowered): Journal r05 on 2025-06-07, Journal r06 on 2025-06-08.",
+        "3 reversal(s) of credits to this payee are not classified in the client's list of reversals, so they are counted gross (the aggregate is not lowered): Journal r05 on 2025-06-07, Journal r06 on 2025-06-08, Journal r11 on 2025-06-09.",
         "1 reversal(s) the client's list of reversals classifies as reversing a particular bill, or as a duplicate or error, are NOT applied: the credits are counted gross, pending bill-wise detail from the books, because the part of each reversal that falls on the bill it names cannot yet be read. Adjust for them in judging this payee: Journal r03 on 2025-06-05 (bill-specific, against Journal r01 on 2025-04-05).",
         "Reversals the client's list of reversals classifies as credit notes, kept gross: Journal r04 on 2025-06-06."
       ],

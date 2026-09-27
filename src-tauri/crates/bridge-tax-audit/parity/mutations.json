@@ -1652,16 +1652,16 @@
   "by": "author (Lane C)",
   "what": "entity type matched ignoring case",
   "file": "src/tds_payees.rs",
-  "from": "if entity_type == \"individual\" || entity_type == \"huf\" {",
-  "to": "if entity_type.eq_ignore_ascii_case(\"individual\") || entity_type == \"huf\" {"
+  "from": "    if entity_type != \"individual\" && entity_type != \"huf\" {",
+  "to": "    if !entity_type.eq_ignore_ascii_case(\"individual\") && entity_type != \"huf\" {"
  },
  {
   "id": "C1-26",
   "by": "author (Lane C)",
   "what": "a HUF is always a deductor",
   "file": "src/tds_payees.rs",
-  "from": "if entity_type == \"individual\" || entity_type == \"huf\" {",
-  "to": "if entity_type == \"individual\" {"
+  "from": "    if entity_type != \"individual\" && entity_type != \"huf\" {",
+  "to": "    if entity_type != \"individual\" {"
  },
  {
   "id": "C1-27",

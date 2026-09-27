@@ -13,9 +13,11 @@
 //! decision of 27-Sep-2026: every bank line reaches the books, and a line whose
 //! purpose nobody knows is visible rather than held back.
 //!
-//! Recognition is by the party name the parser gives a row, and only two
-//! rules, each from a captured statement, give a cash party: SBI's `ATM WDL`
-//! and Union Bank's `BY CASH` ([`crate::bank`]).
+//! Recognition is by the party name the parser gives a row: SBI's `ATM WDL`
+//! and Union Bank's `BY CASH` rules, each from a captured statement, name the
+//! two cash parties ([`crate::bank`]). A parser that extracts one of those two
+//! names from other text makes that row a cash line too, which fails safe: it
+//! is asked, never defaulted.
 
 use crate::refusal::Refusal;
 use crate::text::{mapping_key, squash, strip};

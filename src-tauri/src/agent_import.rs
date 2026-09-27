@@ -688,12 +688,17 @@ impl Server {
                 // A ledger a person named as cash in hand must be one: a bank
                 // ledger there would move the cash bank to bank, which the
                 // other statement's line then posts a second time.
-                let not_cash = cash_in_hand_refusals(&resolved.cash_in_hand, &observed);
-                if !not_cash.is_empty() {
+                let (not_cash, not_cash_omitted) = cash_in_hand_refusals(
+                    &resolved.cash_in_hand,
+                    &observed,
+                    self.settings.max_bytes,
+                );
+                if !not_cash.is_empty() || not_cash_omitted > 0 {
                     return Ok(ToolOutcome {
                         payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                             "state":"refused", "reason":"cash_ledger_not_cash_in_hand",
                             "refused_ledgers":not_cash,
+                            "refused_ledgers_omitted":not_cash_omitted,
                             "group_evidence_sha256":evidence.response_sha256,
                             "next_step":"No file was written. Each ledger was named as cash in hand for a bank cash line, but its group reaches the reserved group shown, not Cash-in-Hand. Re-run parse_bank_statement with the cash-in-hand ledger for that answer, then build again."
                         }}),
@@ -2553,7 +2558,8 @@ fn requested_master_report(
 fn cash_in_hand_refusals(
     required: &[super::bank_statement::CashInHandLedger],
     observed: &ObservedMasters,
-) -> Vec<Value> {
+    max_bytes: usize,
+) -> (Vec<Value>, usize) {
     let mut refused = BTreeMap::<&str, Value>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
@@ -2570,7 +2576,23 @@ fn cash_in_hand_refusals(
             })
         });
     }
-    refused.into_values().collect()
+    // Bounded as the cash/bank refusal is: a row that will not fit is
+    // counted as omitted, never cut.
+    let mut budget = refusal_diagnostic_budget(max_bytes);
+    let distinct = refused.len();
+    let rows = refused
+        .into_values()
+        .filter(|row| {
+            let cost = serde_json::to_string(row).map_or(usize::MAX, |text| text.len());
+            let affordable = cost <= budget;
+            if affordable {
+                budget -= cost;
+            }
+            affordable
+        })
+        .collect::<Vec<_>>();
+    let omitted = distinct - rows.len();
+    (rows, omitted)
 }
 
 /// The vouchers Bridge's bank import sent to suspense, found by the tag it

@@ -694,7 +694,25 @@ pub(super) fn resolve_import_arguments(
                 .to_string(),
             ledger: record["ledger"].as_str().unwrap_or_default().to_string(),
         })
-        .collect();
+        .collect::<Vec<_>>();
+    // The requirement binds the voucher actually built: a Contra with that
+    // bridge_txn_id whose debit leg is exactly the ledger the person named.
+    let built = |need: &CashInHandLedger| {
+        vouchers.as_array().is_some_and(|vouchers| {
+            vouchers.iter().any(|voucher| {
+                voucher["bridge_txn_id"] == need.bridge_txn_id.as_str()
+                    && voucher["voucher_type"] == "Contra"
+                    && voucher["entries"].as_array().is_some_and(|entries| {
+                        entries.iter().any(|entry| {
+                            entry["side"] == "Dr" && entry["ledger"] == need.ledger.as_str()
+                        })
+                    })
+            })
+        })
+    };
+    if !cash_in_hand.iter().all(built) {
+        return Err("proposals_file_invalid".into());
+    }
     let mut resolved = object.clone();
     resolved.remove("proposals_id");
     resolved.remove("proposals_sha256");

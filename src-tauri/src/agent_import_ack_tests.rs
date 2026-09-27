@@ -1495,10 +1495,15 @@ async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
     .await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
-    assert_eq!(result["error"]["cause"], "masters_and_batch_step", "{response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
     assert!(approval.reviews().is_empty(), "no dialog: {response}");
     let imports = server.imports_dir().unwrap();
-    assert!(!imports.join(format!("{D3_BATCH}.batch_step_ack.json")).exists());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
     // The read did finish the check as a doubt: that is what refused it.
     assert!(imports
         .join(format!("{D3_BATCH}.masters_doubt.json"))

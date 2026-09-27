@@ -790,10 +790,15 @@ fn a_debit_total_is_the_negated_sum_not_each_lines_magnitude() {
 #[test]
 fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
     use MastersRecord::{DoubtRecordUnavailable, NoDoubt, Pending};
-    let doubt = || MastersRecord::Doubt { raw: b"{}".to_vec() };
+    let doubt = || MastersRecord::Doubt {
+        raw: b"{}".to_vec(),
+    };
     let cases: [([MastersRecord; 2], Result<(), &str>); 6] = [
         ([doubt(), doubt()], Err("ack_doubt_ambiguous")),
-        ([doubt(), DoubtRecordUnavailable], Err("ack_doubt_ambiguous")),
+        (
+            [doubt(), DoubtRecordUnavailable],
+            Err("ack_doubt_ambiguous"),
+        ),
         (
             [DoubtRecordUnavailable, DoubtRecordUnavailable],
             Err("ack_doubt_record_unavailable"),

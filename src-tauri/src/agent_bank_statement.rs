@@ -438,9 +438,11 @@ fn summary(
         .iter()
         .filter(|record| record.disposition == Disposition::Skipped)
         .count();
-    // Unmapped parties first (largest first within each), so a bounded list
-    // always shows the parties that still need a mapping, and each re-run
-    // after mapping some brings the next ones into view.
+    // Suspense parties first (largest first within each): the unmapped and
+    // unidentified, but also parties mapped to the suspense ledger and
+    // dont_know cash lines, which the group cannot tell apart. Mapping some of
+    // those listed and re-running brings others into view; parties kept in
+    // suspense stay at the head.
     let mut groups = parsed.counterparties.iter().collect::<Vec<_>>();
     groups.sort_by_key(|group| !group.suspense);
     let counterparties: Vec<Value> = groups
@@ -471,7 +473,7 @@ fn summary(
     // left out counted; every record stays in the proposals file. The MCP
     // frame carries the result twice, so the lists together take under half:
     // a quarter for the three a person acts on, in that order, an eighth for
-    // the counterparties (largest first) and a sixteenth for the ledgers.
+    // the counterparties (suspense parties first) and a sixteenth for the ledgers.
     let open = records
         .iter()
         .filter(|record| record.disposition == Disposition::NeedsAnswer)
@@ -489,7 +491,7 @@ fn summary(
         &mut (max_bytes / 16),
     );
     let next_step = if open == 0 {
-        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists unmapped parties first; when counterparties_omitted is above zero, map those listed and re-run to see the next, or raise BRIDGE_AGENT_MAX_BYTES; every record is in the proposals file); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
+        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists suspense parties first, largest first: unmapped and unidentified parties, parties mapped to the suspense ledger, and dont_know cash lines. When counterparties_omitted is above zero, mapping some of those listed and re-running brings others into view, unless the listed ones are parties kept in suspense. Otherwise raise BRIDGE_AGENT_MAX_BYTES, or read the proposals file, which holds every record); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
     } else {
         "Ask the person each cash_questions entry in its own words, and re-run with their answers in cash_answers (by bridge_txn_id, with the ledger the answer asks for). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
     };

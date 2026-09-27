@@ -806,7 +806,12 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
         listed("counterparties") + omitted("counterparties_omitted"),
         301
     );
-    assert_eq!(summary["counterparties"][0]["suspense"], true);
+    // The 300 suspense payers fill the budget, so every listed row is one.
+    assert!(summary["counterparties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|group| group["suspense"] == true));
     // The MCP frame carries the result twice, so it must fit in half.
     assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes / 2);
 }

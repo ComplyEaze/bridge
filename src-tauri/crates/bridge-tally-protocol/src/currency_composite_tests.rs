@@ -114,6 +114,41 @@ fn every_composite_in_the_captured_voucher_is_classified() {
     }
 }
 
+/// The second capture of that book's day (#674): the same Sales voucher and a
+/// Receipt whose party entry, its bill allocation and cash entry each hold a
+/// composite at another rate
+/// (fixtures/agent/vouchers-forex-bill-allocation-20260915.PROVENANCE.md).
+#[test]
+fn every_composite_in_the_bill_allocation_capture_is_classified() {
+    let bytes: &[u8] = include_bytes!(
+        "../tests/fixtures/agent/vouchers-forex-bill-allocation-20260915.utf16le.xml"
+    );
+    let capture = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let amounts: Vec<&str> = capture
+        .split("<AMOUNT")
+        .skip(1)
+        .filter_map(|tail| Some(&tail[tail.find('>')? + 1..tail.find("</AMOUNT>")?]))
+        .collect();
+    assert_eq!(amounts.len(), 6, "{amounts:?}");
+    for amount in &amounts {
+        assert!(is_currency_composite(amount), "{amount}");
+    }
+    assert_eq!(
+        amounts
+            .iter()
+            .filter(|amount| amount.contains("@ I₹ 88/$"))
+            .count(),
+        3,
+        "{amounts:?}"
+    );
+}
+
 /// A captured negative composite with a rate, on which each rule that ties a
 /// composite's parts together is broken alone below. Every captured composite
 /// passes all of them (above).

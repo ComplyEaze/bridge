@@ -702,7 +702,10 @@ jobs:
       - name: Prune only obsolete master package compiler objects
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/prune-package-compiler-cache.mjs --apply
+        # Bounded below the job's own timeout: a timed-out job can report
+        # `cancelled`, which required-checks accepts from this job (a newer
+        # master run's prune supersedes it). A hung prune must fail instead.
+        run: timeout 240 node scripts/prune-package-compiler-cache.mjs --apply
 
   tax-audit-mutations:
     name: Tax-audit mutation records

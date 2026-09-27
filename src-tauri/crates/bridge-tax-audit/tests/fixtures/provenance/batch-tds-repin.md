@@ -1,16 +1,16 @@
-# tds_payees re-pin fixture provenance: five invented edge books
+# tds_payees re-pin fixture provenance: six invented edge books
 
 Lane E2, 2026-09-27. Every book here is invented: no fixture is a Tally read of any real assessee.
 
 ## What these fixtures establish, and what they do not
 
 Each book names, in its own `comment`, what it reaches at the reference's current head:
-- `tds_payees_gross_gst`: a credit counted gross of the TDS on its own bill that crosses the aggregate only
-  gross (one bill also debiting the payee); GST left out for a payee whose agreement states it separately
+- `tds_payees_gross_gst`: a payee whose credits cross the aggregate only gross of the TDS on its own bills
+  (Rs 99,960 net, Rs 1,02,000 gross; one bill also debiting the payee); GST left out for a payee whose agreement states it separately
   and counted for one without; a Duties & Taxes credit not classified as TDS making payees possibly over the
   s.194J aggregate and the s.194-I month; TDS on a bill crediting two payees, over the single sum only with
-  it; a payee whose only TDS is a catch-up journal (Form 26A held); an unnamed cash payee; list entries
-  matching nothing.
+  it; a payee whose only TDS is a catch-up journal (Form 26A held), its small credit listed only because TDS
+  is seen; an unnamed cash payee; list entries matching nothing.
 - `tds_payees_21b`: clause 21(b) with no TDS seen (the tranches: a crossing that takes earlier credits with
   it, and a credit over the single sum alone), and with TDS seen (every credit; (ii)(B) where the challans
   show nothing deposited by the due date for a bill's own TDS month); a short and a mid deduction for a
@@ -23,6 +23,8 @@ Each book names, in its own `comment`, what it reaches at the reference's curren
   clause 21(b).
 - `tds_payees_deductor_placeholder`: a placeholder turnover, never "not a deductor"; no TDS ledger
   classified, so deduction is not judged.
+- `tds_payees_deductor_activity_unknown`: an individual recorded as a profession with no receipts supplied:
+  "unknown", and the question names the profession.
 
 Regression fixtures only: the evidence for real books is local parity on the real reads, never committed.
 The refusals the reference raises (a reversal naming a bill credited to no payee, a 194H mapping with no
@@ -42,8 +44,8 @@ reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e7157
 
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
-| `tds_payees_gross_gst.json` | 9,451 | `0ada8e460fde4e9df7763dbf00c4ba27d9c3452e0e3aaabc5dcb7e2cf4ce688c` | `edge-books/tds_payees_gross_gst.json` |
-| `edge.tds_payees_gross_gst.tds_payees.json` | 63,438 | `58f149e11b37377b493a24b7d0da7f263a9f7f42ee3cd5f66cec38f46aa7f4d4` | `golden/edge.tds_payees_gross_gst.tds_payees.json` |
+| `tds_payees_gross_gst.json` | 9,916 | `96cf35c296e957ff156311232053278606e4b0bec9e379c6f8ccba1bb3e81af1` | `edge-books/tds_payees_gross_gst.json` |
+| `edge.tds_payees_gross_gst.tds_payees.json` | 65,520 | `5a510f6ddda837b38fb3c3b467305835f83b7b9464f945dbdc61b9f2b12c3c36` | `golden/edge.tds_payees_gross_gst.tds_payees.json` |
 | `tds_payees_21b.json` | 6,112 | `cbc3543088630157f0a340ddf2e8517c426a81b6f2d543d9b96c3e2f91b1f8a8` | `edge-books/tds_payees_21b.json` |
 | `edge.tds_payees_21b.tds_payees.json` | 53,797 | `beaee53c2477b35215ec641548cde3aaf4c1bed45da9f822417390991d94f2b9` | `golden/edge.tds_payees_21b.tds_payees.json` |
 | `tds_payees_reversals_194h.json` | 6,293 | `a425a894fc7a5f1ab54617c792a2af55f726811a3c8c55c577afd9216b6c01a6` | `edge-books/tds_payees_reversals_194h.json` |
@@ -52,3 +54,5 @@ reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e7157
 | `edge.tds_payees_deductor_both.tds_payees.json` | 17,901 | `0e43833800a4f1114fe3580d4f63b9333c038666b4186e88e3fbe0114b7693e0` | `golden/edge.tds_payees_deductor_both.tds_payees.json` |
 | `tds_payees_deductor_placeholder.json` | 1,632 | `6e6263056f92300780d561ccc58393faec1830d8d3d50d29dabbfc67394e240c` | `edge-books/tds_payees_deductor_placeholder.json` |
 | `edge.tds_payees_deductor_placeholder.tds_payees.json` | 20,327 | `140b4e54cdfd3f13a0bc12156d50560bfd2ab83a4b5c40a849383b68d9071bc5` | `golden/edge.tds_payees_deductor_placeholder.tds_payees.json` |
+| `tds_payees_deductor_activity_unknown.json` | 1,445 | `b7ea95f59f19a30fd4d2feaa5dd9800fed586d40db89dc38d8df744286afadb8` | `edge-books/tds_payees_deductor_activity_unknown.json` |
+| `edge.tds_payees_deductor_activity_unknown.tds_payees.json` | 16,206 | `cf39e0c5f26bf10ceb30be03456bd2367a5438a455a682a19152720b4fbc7693` | `golden/edge.tds_payees_deductor_activity_unknown.tds_payees.json` |

@@ -3,7 +3,7 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "8c13a0f7ae2d7c08c5849ab3619ca4957540045ce714069e9cf728fb70b24199"
+      "sha256": "ed207ec2b3e3d7bf698b84ca676c504ce611ea48829283388d1727122bf5f774"
     },
     {
       "path": ".github/workflows/dependency-security-scheduled.yml",
@@ -11,7 +11,7 @@
     },
     {
       "path": ".github/workflows/dependency-security.yml",
-      "sha256": "2517a2cbd0dd038ded6607455e62f0b9e563f9407354599912c31e7eeb7473a0"
+      "sha256": "011268f61eb283b15903023f2254e20074891d019ca863e407aec9b6203a0673"
     },
     {
       "path": "docs/adr/0004-tally-write-safety.md",
@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "58606d1c6c69b0ba702ad64daa68746716ae62373dcb950f729b667647f0530f"
+      "sha256": "db969c05f1919074bd59c31a63ce5b74bd7f93ecfdcb69dadc0069dae15c8791"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -103,11 +103,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "40ebc1c07130b1a4eea6bd4eab99d93f0ad8c67f9a37fb3a1520e1c7572c9bd6"
+      "sha256": "ad9b1da3d8645f4a4dd49cb6dda1cb0ac15c6c0fc8ee3665fc7f60211cbbd962"
     },
     {
       "path": "pnpm-lock.yaml",
-      "sha256": "98fa3873a5e1c494d9428eea73e6bfb1b696d686334af732bc3c236d69d20a2b"
+      "sha256": "663ddfc3b7a1928e908f9ebe2ef6fcc2bd26e655b3b795d0920aeb73dfc1c6c7"
     },
     {
       "path": "scripts/check-tally-live-read-boundary.mjs",
@@ -151,7 +151,7 @@
     },
     {
       "path": "src-tauri/Cargo.lock",
-      "sha256": "ac2dd86869e6f2a1fef36c950af6963bd458a923881b2c90bdf53f9a7233302e"
+      "sha256": "864030cd55f554c3bc1049a325097b04a03f90786161fd628889e1c8b66c8ff7"
     },
     {
       "path": "src-tauri/Cargo.toml",
@@ -571,7 +571,7 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_parse_tests.rs",
-      "sha256": "60de391aaed6e15e6a8192af034f938243649a8dbb692de3a3f4ab4093fc85da"
+      "sha256": "79d39efc0bf4eba5e936490ed0cc15f2265fd018a987c74fa1dfedaf6c65cc89"
     },
     {
       "path": "src-tauri/src/agent_voucher_scalars.rs",

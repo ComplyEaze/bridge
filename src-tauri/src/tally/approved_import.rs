@@ -187,6 +187,157 @@ impl ApprovedImport {
     }
 }
 
+/// How long a post dialog stays open before it approves nothing: the limit
+/// [`nonce_bound_dialog`] applies. Used only to tell a caller how much of it
+/// remains; the dialog enforces its own.
+const POST_DIALOG_LIMIT: Duration = Duration::from_secs(120);
+
+/// When a post dialog was answered, and whether the answer approved: stamped
+/// by the dialog's own task as it ends, so an approval's age runs from the
+/// click, not from whichever call later collects it (#725). Both clocks are
+/// kept: the monotonic one does not advance while the machine sleeps.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Answered {
+    pub(crate) approved: bool,
+    pub(crate) at: std::time::Instant,
+    pub(crate) at_wall: std::time::SystemTime,
+}
+
+impl Answered {
+    fn now(approved: bool) -> Self {
+        Self {
+            approved,
+            at: std::time::Instant::now(),
+            at_wall: std::time::SystemTime::now(),
+        }
+    }
+}
+
+/// A post dialog left open after the MCP call that asked it returned (#725).
+/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// that the dialog's time limit and its child's exit are observed while no call
+/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
+/// read, so a late click approves nothing.
+pub(crate) struct PendingPostApproval {
+    task: tokio::task::JoinHandle<Result<ApprovedImport, String>>,
+    /// The answer and, for a refusal, its code: one stamp, set once.
+    answered: std::sync::Arc<std::sync::OnceLock<(Answered, Option<String>)>>,
+    started: std::time::Instant,
+}
+
+impl PendingPostApproval {
+    /// Ask the person in a dialog that may outlive the calling call:
+    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
+    /// task. Nothing else can be run there.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn ask(
+        xml: String,
+        preview: String,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        let answered = std::sync::Arc::new(std::sync::OnceLock::new());
+        let stamp = std::sync::Arc::clone(&answered);
+        let dialog = async move {
+            let answer = ApprovedImport::confirm(
+                xml,
+                &preview,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+                company_marks_request,
+            )
+            .await;
+            // Stamped before the task ends, never after: a task seen finished
+            // with no stamp is one that ended without an answer. A refusal's
+            // code is stamped with it, so it can be read without the task.
+            let _ = stamp.set((
+                Answered::now(answer.is_ok()),
+                answer.as_ref().err().cloned(),
+            ));
+            answer
+        };
+        Self {
+            task: tokio::spawn(carry_approval_scope(dialog)),
+            answered,
+            started: std::time::Instant::now(),
+        }
+    }
+
+    /// The person's answer and when it was given, if it arrives within
+    /// `budget`, or the dialog back while it is still open. A task that ended
+    /// without an answer (aborted or panicked) approves nothing.
+    pub(crate) async fn answer_within(
+        mut self,
+        budget: Duration,
+    ) -> Result<(Result<ApprovedImport, String>, Answered), Self> {
+        match tokio::time::timeout(budget, &mut self.task).await {
+            Err(_) => Err(self),
+            Ok(Ok(answer)) => {
+                let at = self
+                    .answered()
+                    .unwrap_or_else(|| Answered::now(answer.is_ok()));
+                Ok((answer, at))
+            }
+            Ok(Err(_)) => Ok((
+                Err("import_approval_unavailable".into()),
+                Answered::now(false),
+            )),
+        }
+    }
+
+    /// Whether the dialog has been answered, and how, without waiting.
+    pub(crate) fn answered(&self) -> Option<Answered> {
+        self.answered.get().map(|(answered, _)| *answered)
+    }
+
+    /// Why the dialog approved nothing, once it has ended without an approval:
+    /// the stamped refusal code, or `import_approval_unavailable` for a task
+    /// that ended with no answer, as [`Self::answer_within`] reports it.
+    /// `None` while the dialog is open, and for an approval.
+    pub(crate) fn refusal(&self) -> Option<String> {
+        // Finished is read before the stamp: the stamp is set before the task
+        // ends, so a task seen finished with no stamp truly ended unanswered.
+        // Read the other way, a dialog stamped and finished between the two
+        // reads would drop a real approval as unavailable.
+        let finished = self.task.is_finished();
+        match self.answered.get() {
+            Some((_, refusal)) => refusal.clone(),
+            None if finished => Some("import_approval_unavailable".into()),
+            None => None,
+        }
+    }
+
+    /// How much of the dialog's time limit remains.
+    pub(crate) fn remaining(&self) -> Duration {
+        POST_DIALOG_LIMIT.saturating_sub(self.started.elapsed())
+    }
+}
+
+impl Drop for PendingPostApproval {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+impl ApprovedImport {
+    /// How many vouchers the person was asked about: the dialog's count is
+    /// taken from these dates (#746), so a redeemed approval can be held to the
+    /// batch it is redeemed for.
+    pub(crate) fn voucher_count(&self) -> usize {
+        self.voucher_dates.len()
+    }
+}
+
 /// A person's answer to the review dialog for a doubted post (#239): that
 /// they checked the voucher in Tally. It changes nothing in Tally and
 /// authorises no post: it is a different type from [`ApprovedImport`], built
@@ -342,6 +493,19 @@ use confirm_review as approve_review;
 #[cfg(test)]
 use test_seam::approve_review;
 
+/// What a post dialog's own task runs under (#725). Outside this crate's unit
+/// tests it is the dialog alone: nothing is carried into the task.
+#[cfg(not(test))]
+use carry_nothing as carry_approval_scope;
+
+#[cfg(test)]
+use test_seam::carry_approval_scope;
+
+#[cfg(not(test))]
+fn carry_nothing<F>(dialog: F) -> F {
+    dialog
+}
+
 /// A scripted answer to the native approval, for this crate's unit tests only
 /// (bridge#583). It is compiled only under bare `cfg(test)`, which Cargo sets
 /// for no shipped build and no feature, variable or flag can set at runtime;
@@ -376,6 +540,10 @@ pub(crate) mod test_seam {
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
         while_pending: Option<Arc<dyn Fn() + Send + Sync>>,
+        /// When set, the post dialog stays open until a test answers it
+        /// through [`ScriptedApproval::answer`], as a person who has not yet
+        /// clicked would (#725). `approve` is then ignored.
+        held: Option<Arc<tokio::sync::watch::Sender<Option<bool>>>>,
     }
 
     impl ScriptedApproval {
@@ -395,6 +563,30 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// A post dialog that stays open until [`ScriptedApproval::answer`].
+        pub(crate) fn held() -> Self {
+            Self {
+                held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
+                ..Self::new(false)
+            }
+        }
+
+        /// Whether a held post dialog is still open: its task is waiting for
+        /// an answer. False once the task was aborted, which closes it.
+        pub(crate) fn is_waiting(&self) -> bool {
+            self.held
+                .as_ref()
+                .is_some_and(|held| held.receiver_count() > 0)
+        }
+
+        /// Answer a held post dialog. Answering one that was closed (its task
+        /// aborted) reaches nothing.
+        pub(crate) fn answer(&self, approve: bool) {
+            if let Some(held) = &self.held {
+                held.send_replace(Some(approve));
+            }
+        }
+
         fn new(approve: bool) -> Self {
             Self {
                 approve,
@@ -403,6 +595,7 @@ pub(crate) mod test_seam {
                 counts: Arc::default(),
                 review_counts: Arc::default(),
                 while_pending: None,
+                held: None,
             }
         }
 
@@ -440,14 +633,49 @@ pub(crate) mod test_seam {
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
-                scripted.approve
+                match &scripted.held {
+                    Some(held) => Err(held.subscribe()),
+                    None => Ok(scripted.approve),
+                }
             })
-            .unwrap_or(false);
+            .unwrap_or(Ok(false));
+        let decision = match decision {
+            Ok(decision) => decision,
+            Err(mut held) => {
+                let answered = held
+                    .wait_for(Option::is_some)
+                    .await
+                    .map(|answer| *answer == Some(true))
+                    .unwrap_or(false);
+                answered
+            }
+        };
         std::hint::black_box(SEAM_MARKER);
         if decision {
             Ok(())
         } else {
             Err("import_approval_declined".into())
+        }
+    }
+
+    /// Carries the test's scripted decision into a post dialog's own task
+    /// (#725). A task-local does not cross `tokio::spawn`, so without this a
+    /// dialog asked from its task would find no decision and decline; with it,
+    /// the task sees exactly the decision the asking test scoped, and an
+    /// unscoped test still declines.
+    pub(crate) fn carry_approval_scope<F>(
+        dialog: F,
+    ) -> impl std::future::Future<Output = F::Output> + Send + 'static
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send,
+    {
+        let scripted = SCRIPTED_APPROVAL.try_with(Clone::clone).ok();
+        async move {
+            match scripted {
+                Some(scripted) => SCRIPTED_APPROVAL.scope(scripted, dialog).await,
+                None => dialog.await,
+            }
         }
     }
 
@@ -553,39 +781,51 @@ pub(crate) mod test_seam {
         assert!(!stub_ran(&script));
     }
 
-    /// Only the token echoing this call's nonce is an answer. An older build
-    /// that ignores `--confirm-review` and exits 0, a process that echoes its
-    /// input, and a token for another nonce are refused; the right token is
-    /// accepted whatever the exit status, which is not an answer.
+    /// Only the token echoing this call's nonce is an answer, and it is
+    /// accepted whatever the exit status. A person's decline is no token and
+    /// exit 1. A clean exit without the token is never that (#689): it is an
+    /// executable that is not this dialog, so it is refused as unavailable:
+    /// an older build that ignores `--confirm-review`, a process that echoes
+    /// its input, a token for another nonce, or the post dialog's token.
     #[cfg(unix)]
     #[tokio::test]
     async fn the_review_is_answered_only_by_the_token_for_its_nonce() {
         let directory = tempfile::tempdir().unwrap();
         let answers = [
-            ("an older build exits 0", "cat > /dev/null; exit 0"),
-            ("an echo of the input", "cat"),
+            (
+                "a person's decline: no token, exit 1",
+                "cat > /dev/null; exit 1",
+                Err("ack_review_declined"),
+            ),
+            (
+                "an older build exits 0",
+                "cat > /dev/null; exit 0",
+                Err("ack_review_unavailable"),
+            ),
+            ("an echo of the input", "cat", Err("ack_review_unavailable")),
             (
                 "a token for another nonce",
                 "cat > /dev/null; echo bridge-review-acknowledged:00000000-0000-4000-8000-000000000000",
+                Err("ack_review_unavailable"),
             ),
             (
                 "the post dialog's token for this nonce",
                 "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
+                Err("ack_review_unavailable"),
             ),
             (
                 "the token, but a failing exit",
                 "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null; exit 1",
+                Ok(()),
             ),
         ];
-        for (name, body) in answers {
+        for (name, body, expected) in answers {
+            // The stand-in must have run: a spawn failure is also
+            // `ack_review_unavailable`, and would pass a row without reaching
+            // the clean-exit-without-token arm it is here to pin.
             let script = stub(directory.path(), body);
             let result = super::confirm_review_with(&script, ONE, "Review").await;
-            let expected = if name == "the token, but a failing exit" {
-                Ok(())
-            } else {
-                Err("ack_review_declined".to_string())
-            };
-            assert_eq!(result, expected, "{name}");
+            assert_eq!(result, expected.map_err(str::to_string), "{name}");
             assert!(stub_ran(&script), "{name}: the stand-in ran");
         }
         // The control: the token for this call's nonce is accepted.
@@ -867,7 +1107,8 @@ async fn confirm_with(
 
 /// The review dialog for a doubted post (#239): its own subprocess mode, so
 /// its title and button never read as approving a post. It is answered by
-/// the token alone, as the post dialog is by the token and a clean exit.
+/// the token alone, as the post dialog is by the token and a clean exit; a
+/// clean exit without the token is unavailable, as the post dialog's is.
 async fn confirm_review(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "ack_review_unavailable")?;
     confirm_review_with(&executable, count, preview).await
@@ -891,6 +1132,11 @@ async fn confirm_review_with(
     .await
     {
         Ok(answer) if answer.token_matched => Ok(()),
+        // A person's decline is no token and exit 1: `run_review_confirmation`
+        // returns false. A clean exit without the token is never that; it is
+        // an executable that is not this dialog, such as one ignoring the
+        // flag (#689).
+        Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
         Err(DialogFailure::TimedOut) => Err("ack_review_timed_out".into()),

@@ -51,6 +51,12 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         // The review dialog for a doubted post (#239), gated the same way.
         ("use confirm_review as approve_review;", "#[cfg(not(test))]"),
         ("use test_seam::approve_review;", "#[cfg(test)]"),
+        // What a post dialog's own task runs under (#725), gated the same way.
+        (
+            "use carry_nothing as carry_approval_scope;",
+            "#[cfg(not(test))]",
+        ),
+        ("use test_seam::carry_approval_scope;", "#[cfg(test)]"),
         ("pub(crate) mod test_seam {", "#[cfg(test)]"),
     ] {
         if lines.iter().filter(|line| **line == item).count() != 1 {
@@ -77,6 +83,42 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
     }
     if source.contains("impl From<") || source.contains("impl Into<") {
         problems.push("no conversion may exist between the approval types".into());
+    }
+    // A dialog outliving its call (#725) runs on one task, spawned in one
+    // place, under the gated scope; outside tests that scope carries nothing.
+    if source.matches("tokio::spawn(").count() != 1
+        || source
+            .matches("task: tokio::spawn(carry_approval_scope(dialog)),")
+            .count()
+            != 1
+    {
+        problems
+            .push("a post dialog's task must be spawned once, under carry_approval_scope".into());
+    }
+    if source
+        .matches("#[cfg(not(test))]\nfn carry_nothing<F>(dialog: F) -> F {\n    dialog\n}")
+        .count()
+        != 1
+    {
+        problems.push("outside tests, carry_approval_scope must carry nothing".into());
+    }
+    // Every other way to run code off the calling task, counted (#725): none
+    // but the one dialog task above. The two `.spawn(` are processes, the
+    // dialog's child and a unit test's stand-in, and the bare word is counted
+    // too, as the cfg census is, so a form nobody listed is caught.
+    for (form, expected) in [
+        ("tokio::task::spawn(", 0),
+        ("task::spawn(", 0),
+        ("spawn_blocking(", 0),
+        ("spawn_local(", 0),
+        ("JoinSet", 0),
+        ("Handle::current()", 0),
+        (".spawn(", 2),
+        ("spawn", 10),
+    ] {
+        if source.matches(form).count() != expected {
+            problems.push(format!("expected {expected} of `{form}`"));
+        }
     }
     problems.extend(widened_test_gates(source));
     problems
@@ -298,6 +340,30 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\nuse test_seam::approve;",
             "use test_seam::approve;",
         ),
+        source.replace(
+            "#[cfg(not(test))]\nuse carry_nothing as carry_approval_scope;",
+            "#[cfg(not(debug_assertions))]\nuse carry_nothing as carry_approval_scope;",
+        ),
+        source.replace(
+            "#[cfg(test)]\nuse test_seam::carry_approval_scope;",
+            "use test_seam::carry_approval_scope;",
+        ),
+        source.replace(
+            "task: tokio::spawn(carry_approval_scope(dialog)),",
+            "task: tokio::spawn(test_seam::carry_approval_scope(dialog)),",
+        ),
+        source.replace(
+            "fn carry_nothing<F>(dialog: F) -> F {\n    dialog\n}",
+            "fn carry_nothing<F>(dialog: F) -> F {\n    std::hint::black_box(dialog)\n}",
+        ),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::spawn(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn_blocking(|| {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::spawn_local(async {{}}); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::task::JoinSet::<()>::new(); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = tokio::runtime::Handle::current(); }}\n"),
+        format!("{source}\nfn elsewhere() {{ let _ = std::process::Command::new(\"x\").spawn(); }}\n"),
+        format!("{source}\nfn respawned() {{}}\n"),
         source.replace(
             "#[cfg(test)]\nuse test_seam::approve;",
             "#[cfg_attr(test, allow(unused))]\nuse test_seam::approve;",
@@ -704,6 +770,11 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
     .await
     {
         Ok(answer) if answer.token_matched => Ok(()),
+        // A person's decline is no token and exit 1: `run_review_confirmation`
+        // returns false. A clean exit without the token is never that; it is
+        // an executable that is not this dialog, such as one ignoring the
+        // flag (#689).
+        Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
         Err(DialogFailure::TimedOut) => Err("ack_review_timed_out".into()),
@@ -747,12 +818,14 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 15] = [
 /// bare text `cfg`, so a `cfg_attr`, a `cfg!`, or a combined predicate such as
 /// `cfg(any(…))` is caught too.
 const CFG_CENSUS: [(&str, usize); 6] = [
-    ("#[cfg(test)]", 5),
-    ("#[cfg(not(test))]", 2),
+    // #725 added one of each seam arm for the dialog task's scope, and the
+    // non-test arm's identity function.
+    ("#[cfg(test)]", 6),
+    ("#[cfg(not(test))]", 4),
     ("#[cfg(unix)]", 7),
     ("#[cfg(windows)]", 6),
     ("#[cfg(not(windows))]", 7),
-    ("cfg", 28),
+    ("cfg", 31),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -852,6 +925,21 @@ fn each_dialog_answers_only_on_its_positive_button() {
                 "        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),",
                 "        Ok(answer) if answer.exited_cleanly => Ok(()),\n        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),",
                 1,
+            ),
+            1,
+        ),
+        // The review dialog's clean-exit arm (#689) turned into an approval.
+        source.replacen(
+            "Ok(answer) if answer.exited_cleanly => Err(\"ack_review_unavailable\".into()),",
+            "Ok(answer) if answer.exited_cleanly => Ok(()),",
+            1,
+        ),
+        // A Windows-only review twin that acknowledges, beside the real one
+        // made non-Windows.
+        source.replacen(
+            CONFIRM_REVIEW_WITH,
+            &format!(
+                "#[cfg(not(windows))]\n{CONFIRM_REVIEW_WITH}\n#[cfg(windows)]\nasync fn confirm_review_with(_: &std::path::Path, _: &str) -> Result<(), String> {{\n    Ok(())\n}}"
             ),
             1,
         ),

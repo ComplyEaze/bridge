@@ -4502,5 +4502,773 @@
   "file": "src/high_value_register.rs",
   "from": "                            capitalize(mode_name)\n                        );\n                    }\n                    if ledger.as_str() == UNIDENTIFIED_PARTY {",
   "to": "                            capitalize(\"cash\")\n                        );\n                    }\n                    if ledger.as_str() == UNIDENTIFIED_PARTY {"
+ },
+ {
+  "id": "E3A-01",
+  "by": "author",
+  "what": "a stock journal's IN/OUT tag is ignored",
+  "file": "src/stock.rs",
+  "from": "if let Some(d) = il.direction {",
+  "to": "if let Some(d) = il.direction.filter(|_| false) {"
+ },
+ {
+  "id": "E3A-02",
+  "by": "author",
+  "what": "a zero amount counts as stock out",
+  "file": "src/stock.rs",
+  "from": "None | Some(0) => None,",
+  "to": "None => None,"
+ },
+ {
+  "id": "E3A-03",
+  "by": "author",
+  "what": "a positive amount counts as stock out",
+  "file": "src/stock.rs",
+  "from": "Some(a) if a > 0 => Some(1.0),",
+  "to": "Some(a) if a > 0 => Some(-1.0),"
+ },
+ {
+  "id": "E3A-04",
+  "by": "author",
+  "what": "an item without a master counts as non-goods",
+  "file": "src/stock.rs",
+  "from": "is_none_or(StockItemMaster::is_goods)",
+  "to": "is_some_and(StockItemMaster::is_goods)"
+ },
+ {
+  "id": "E3A-05",
+  "by": "author",
+  "what": "a master-only item is not seeded",
+  "file": "src/stock.rs",
+  "from": ".filter(|(n, _)| !from_summary.contains(*n))",
+  "to": ".filter(|(n, _)| !from_summary.contains(*n) && false)"
+ },
+ {
+  "id": "E3A-06",
+  "by": "author",
+  "what": "an item negative at opening is not seeded as touched",
+  "file": "src/stock.rs",
+  "from": ".filter(|(_, q)| **q < -QTY_TOL)",
+  "to": ".filter(|(_, q)| **q < -1e9)"
+ },
+ {
+  "id": "E3A-07",
+  "by": "author",
+  "what": "stock-in first sorts like stock-out first",
+  "file": "src/stock.rs",
+  "from": "Order::InFirst => moves.sort_by(|a, b| cmp(b.1, a.1)),",
+  "to": "Order::InFirst => moves.sort_by(|a, b| cmp(a.1, b.1)),"
+ },
+ {
+  "id": "E3A-08",
+  "by": "author",
+  "what": "the running-quantity tolerance is dropped",
+  "file": "src/stock.rs",
+  "from": "            if *q < -QTY_TOL {",
+  "to": "            if *q < 0.0 {"
+ },
+ {
+  "id": "E3A-09",
+  "by": "author",
+  "what": "an integrated company reads No",
+  "file": "src/stock.rs",
+  "from": "Some(true) => \"Yes\",",
+  "to": "Some(true) => \"No\","
+ },
+ {
+  "id": "E3A-10",
+  "by": "author",
+  "what": "a goods line with no quantity field is not refused",
+  "file": "src/stock.rs",
+  "from": ".filter(|(_, il)| !il.qty_field_present)",
+  "to": ".filter(|(_, il)| !il.qty_field_present && false)"
+ },
+ {
+  "id": "E3A-11",
+  "by": "author",
+  "what": "only outgoing value-only lines are counted",
+  "file": "src/stock.rs",
+  "from": ".filter(|(_, il)| il.qty.is_none())",
+  "to": ".filter(|(_, il)| il.qty.is_none() && il.amount_paise.is_some_and(|a| a < 0))"
+ },
+ {
+  "id": "E3A-12",
+  "by": "author",
+  "what": "value-only line values keep their sign",
+  "file": "src/stock.rs",
+  "from": ".checked_abs()",
+  "to": ".checked_neg()"
+ },
+ {
+  "id": "E3A-13",
+  "by": "author",
+  "what": "the period credit is added to the books closing",
+  "file": "src/stock.rs",
+  "from": "let mv = sub(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;",
+  "to": "let mv = add(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;"
+ },
+ {
+  "id": "E3A-14",
+  "by": "author",
+  "what": "the typed-in finding is raised with no Stock-in-Hand ledger",
+  "file": "src/stock.rs",
+  "from": "if typed_in == 0 && !stock_ledgers.is_empty() {",
+  "to": "if typed_in == 0 {"
+ },
+ {
+  "id": "E3A-15",
+  "by": "author",
+  "what": "the no-TB-row figure is written when every ledger has a row",
+  "file": "src/stock.rs",
+  "from": "if !without_tb.is_empty() {",
+  "to": "if without_tb.is_empty() {"
+ },
+ {
+  "id": "E3A-16",
+  "by": "author",
+  "what": "the two-figures finding needs both gaps",
+  "file": "src/stock.rs",
+  "from": "if gap_open != 0 || gap_close != 0 {",
+  "to": "if gap_open != 0 && gap_close != 0 {"
+ },
+ {
+  "id": "E3A-17",
+  "by": "author",
+  "what": "negative at close ignores the tolerance",
+  "file": "src/stock.rs",
+  "from": ".filter(|(n, row)| is_goods(items, n) && row.qty.unwrap_or(0.0) < -QTY_TOL)",
+  "to": ".filter(|(n, row)| is_goods(items, n) && row.qty.unwrap_or(0.0) < 0.0)"
+ },
+ {
+  "id": "E3A-18",
+  "by": "author",
+  "what": "non-goods items with a positive value are counted",
+  "file": "src/stock.rs",
+  "from": "&& row.value_paise.unwrap_or(0) < 0",
+  "to": "&& row.value_paise.unwrap_or(0) > 0"
+ },
+ {
+  "id": "E3A-19",
+  "by": "author",
+  "what": "the differs count takes the matching items",
+  "file": "src/stock.rs",
+  "from": "(summary_qty - m.opening_qty.unwrap_or(0.0)).abs() > QTY_TOL",
+  "to": "(summary_qty - m.opening_qty.unwrap_or(0.0)).abs() < QTY_TOL"
+ },
+ {
+  "id": "E3A-20",
+  "by": "author",
+  "what": "the negative-at-any-point evidence is the intersection",
+  "file": "src/stock.rs",
+  "from": "in_touched.union(&out_touched)",
+  "to": "in_touched.intersection(&out_touched)"
+ },
+ {
+  "id": "E3A-21",
+  "by": "author",
+  "what": "became-negative keeps items negative at opening",
+  "file": "src/stock.rs",
+  "from": "let became_out: BTreeSet<&String> = out_touched.difference(&at_opening).collect();",
+  "to": "let became_out: BTreeSet<&String> = out_touched.iter().collect();"
+ },
+ {
+  "id": "E3A-22",
+  "by": "author",
+  "what": "the went-negative finding is raised when nothing went negative",
+  "file": "src/stock.rs",
+  "from": "if max_a > 0 {",
+  "to": "if max_a >= 0 {"
+ },
+ {
+  "id": "E3A-23",
+  "by": "author",
+  "what": "STK-1 seeds from the master over the summary",
+  "file": "src/stock.rs",
+  "from": "running.insert(n.clone(), row.qty.unwrap_or(0.0));",
+  "to": "running.entry(n.clone()).or_insert(row.qty.unwrap_or(0.0));"
+ },
+ {
+  "id": "E3A-24",
+  "by": "author",
+  "what": "STK-1 has no tolerance",
+  "file": "src/stock.rs",
+  "from": "if (lhs - rhs).abs() > QTY_TOL {",
+  "to": "if (lhs - rhs).abs() > 0.0 {"
+ },
+ {
+  "id": "E3A-25",
+  "by": "author",
+  "what": "a Not Applicable unit reads as goods",
+  "file": "src/stock_read.rs",
+  "from": "xml::reserved_value(&self.base_unit) != Some(NOT_APPLICABLE_BASEUNITS)",
+  "to": "xml::reserved_value(&self.base_unit) == Some(NOT_APPLICABLE_BASEUNITS)"
+ },
+ {
+  "id": "E3A-26",
+  "by": "author",
+  "what": "a nameless stock item is read",
+  "file": "src/stock_read.rs",
+  "from": ".filter_map(|s| s.attr(\"NAME\").filter(|n| !n.is_empty()).map(|n| (s, n)))",
+  "to": ".filter_map(|s| s.attr(\"NAME\").map(|n| (s, n)))"
+ },
+ {
+  "id": "E3A-27",
+  "by": "author",
+  "what": "[stock].items with a read is not refused",
+  "file": "src/stock_read.rs",
+  "from": "if st.contains_key(\"items\") {",
+  "to": "if st.contains_key(\"items_file\") {"
+ },
+ {
+  "id": "E3A-28",
+  "by": "author",
+  "what": "a from_masters opening takes the closing fields",
+  "file": "src/stock_read.rs",
+  "from": "Side::Opening => (it.opening_qty, it.opening_value_paise),",
+  "to": "Side::Opening => (it.closing_qty, it.closing_value_paise),"
+ },
+ {
+  "id": "E3A-29",
+  "by": "author",
+  "what": "a stock_summary part of any date is taken",
+  "file": "src/stock_read.rs",
+  "from": ".filter(|p| p.as_of.as_ref() == Some(&as_of))",
+  "to": ".filter(|p| p.as_of.is_some())"
+ },
+ {
+  "id": "E3A-30",
+  "by": "author",
+  "what": "the positive summary total takes every value",
+  "file": "src/stock_read.rs",
+  "from": "self.sum(|v| v > 0)",
+  "to": "self.sum(|v| v != 0)"
+ },
+ {
+  "id": "E3A-31",
+  "by": "author",
+  "what": "ISINTEGRATED 'Yes' reads as not integrated",
+  "file": "src/book.rs",
+  "from": ".map(|v| crate::support::py_lower(v) == \"yes\")",
+  "to": ".map(|v| crate::support::py_lower(v) != \"yes\")"
+ },
+ {
+  "id": "E3A-32",
+  "by": "author",
+  "what": "the stock_items part is not kept",
+  "file": "src/book.rs",
+  "from": "items: read.one(\"stock_items\").cloned(),",
+  "to": "items: None,"
+ },
+ {
+  "id": "E3A-33",
+  "by": "reviewer-opus",
+  "what": "a repeated Stock Summary name keeps its first row",
+  "file": "src/stock_read.rs",
+  "from": "        rows.insert(name.to_string(), row);",
+  "to": "        rows.entry(name.to_string()).or_insert(row);"
+ },
+ {
+  "id": "E3A-34",
+  "by": "reviewer-opus",
+  "what": "the quantity-field check reads every voucher, not the population",
+  "file": "src/stock.rs",
+  "from": "    let goods_lines: Vec<(&Voucher, &InventoryLine)> = pop\n        .iter()\n        .flat_map(|v| v.inventory.iter().map(move |il| (*v, il)))",
+  "to": "    let goods_lines: Vec<(&Voucher, &InventoryLine)> = book\n        .vouchers\n        .iter()\n        .flat_map(|v| v.inventory.iter().map(move |il| (v, il)))"
+ },
+ {
+  "id": "E3A-35",
+  "by": "reviewer-sonnet",
+  "what": "an absent or empty ISINTEGRATED reads as not integrated, not unknown",
+  "file": "src/book.rs",
+  "from": "        .filter(|v| !v.is_empty())\n        .map(|v| crate::support::py_lower(v) == \"yes\")\n}",
+  "to": "        .map(|v| crate::support::py_lower(v) == \"yes\")\n}"
+ },
+ {
+  "id": "E3A-36",
+  "by": "reviewer-sonnet",
+  "what": "a from_masters closing takes the opening fields",
+  "file": "src/stock_read.rs",
+  "from": "Side::Closing => (it.closing_qty, it.closing_value_paise),",
+  "to": "Side::Closing => (it.opening_qty, it.opening_value_paise),"
+ },
+ {
+  "id": "E3A-37",
+  "by": "reviewer-sonnet",
+  "what": "the Stock-in-Hand voucher count reads every voucher, not the population",
+  "file": "src/stock.rs",
+  "from": "    let typed_in = pop\n",
+  "to": "    let typed_in = book.vouchers\n"
+ },
+ {
+  "id": "E3A-38",
+  "by": "reviewer-sonnet",
+  "what": "an opening summary row with no quantity starts at the master's opening, not nil",
+  "file": "src/stock.rs",
+  "from": "qty.insert(n.clone(), row.qty.unwrap_or(0.0));",
+  "to": "qty.insert(n.clone(), row.qty.or(items.get(n).and_then(|m| m.opening_qty)).unwrap_or(0.0));"
+ },
+ {
+  "id": "E3A-39",
+  "by": "reviewer-sonnet",
+  "what": "negative at close counts a value-only item too",
+  "file": "src/stock.rs",
+  "from": ".filter(|(n, row)| is_goods(items, n) && row.qty.unwrap_or(0.0) < -QTY_TOL)",
+  "to": ".filter(|(_, row)| row.qty.unwrap_or(0.0) < -QTY_TOL)"
+ },
+ {
+  "id": "E3A-40",
+  "by": "reviewer-opus",
+  "what": "the Stock-in-Hand voucher count reads every voucher but a cancelled one (an optional one is counted)",
+  "file": "src/stock.rs",
+  "from": "    let typed_in = pop\n        .iter()\n",
+  "to": "    let typed_in = book\n        .vouchers\n        .iter()\n        .filter(|v| v.status != crate::book::VoucherStatus::Cancelled)\n"
+ },
+ {
+  "id": "E3A-41",
+  "by": "reviewer-opus",
+  "what": "an unknown ISINTEGRATED reaches stock as not integrated",
+  "file": "src/stock_read.rs",
+  "from": "is_integrated: parts.is_integrated,",
+  "to": "is_integrated: parts.is_integrated.or(Some(false)),"
+ },
+ {
+  "id": "E4-01",
+  "by": "author",
+  "what": "a period ending 31 March is not April-to-March",
+  "file": "src/party_monthly.rs",
+  "from": "(sm, sd, em, ed) == (4, 1, 3, 31)",
+  "to": "(sm, sd, em, ed) == (4, 1, 3, 30)"
+ },
+ {
+  "id": "E4-02",
+  "by": "author",
+  "what": "months are off by one",
+  "file": "src/party_monthly.rs",
+  "from": "MONTHS[(m + 8) % 12]",
+  "to": "MONTHS[(m + 9) % 12]"
+ },
+ {
+  "id": "E4-03",
+  "by": "author",
+  "what": "a sub-group party is not a party",
+  "file": "src/party_monthly.rs",
+  "from": ".filter(|l| PARTY_GROUPS.iter().any(|g| l.under(g)))",
+  "to": ".filter(|l| PARTY_GROUPS.iter().any(|g| l.parent == *g))"
+ },
+ {
+  "id": "E4-04",
+  "by": "author",
+  "what": "a missing group's block is run",
+  "file": "src/party_monthly.rs",
+  "from": "if !book.groups.contains_key(group) {\n            r.findings.push(Finding {",
+  "to": "if false && !book.groups.contains_key(group) {\n            r.findings.push(Finding {"
+ },
+ {
+  "id": "E4-05",
+  "by": "author",
+  "what": "several parties go to the first party",
+  "file": "src/party_monthly.rs",
+  "from": "let key = if named.len() == 1 {",
+  "to": "let key = if !named.is_empty() {"
+ },
+ {
+  "id": "E4-06",
+  "by": "author",
+  "what": "expenses get a cash-or-bank row",
+  "file": "src/party_monthly.rs",
+  "from": "(block == \"sales\" || block == \"purchases\")",
+  "to": "(block == \"sales\" || block != \"sales\")"
+ },
+ {
+  "id": "E4-07",
+  "by": "author",
+  "what": "vouchers outside the period count in the year",
+  "file": "src/party_monthly.rs",
+  "from": "            if in_period(&v.date) {",
+  "to": "            if true {"
+ },
+ {
+  "id": "E4-08",
+  "by": "author",
+  "what": "notes are every voucher but credit and debit notes",
+  "file": "src/party_monthly.rs",
+  "from": "if NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns",
+  "to": "if !NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns"
+ },
+ {
+  "id": "E4-09",
+  "by": "author",
+  "what": "every voucher counts as the same one",
+  "file": "src/party_monthly.rs",
+  "from": "row.vouchers.insert(idx);",
+  "to": "row.vouchers.insert(idx.min(0));"
+ },
+ {
+  "id": "E4-10",
+  "by": "author",
+  "what": "parties are shown smallest first",
+  "file": "src/party_monthly.rs",
+  "from": "(Reverse(a.0), a.1).cmp(&(Reverse(b.0), b.1))",
+  "to": "(a.0, a.1).cmp(&(b.0, b.1))"
+ },
+ {
+  "id": "E4-11",
+  "by": "author",
+  "what": "the Others label's singular is wrong",
+  "file": "src/party_monthly.rs",
+  "from": "let label = format!(\"Others ({n} {})\", if n == 1 { \"party\" } else { \"parties\" });",
+  "to": "let label = format!(\"Others ({n} {})\", if n == 2 { \"party\" } else { \"parties\" });"
+ },
+ {
+  "id": "E4-12",
+  "by": "author",
+  "what": "a nil month cell publishes a figure",
+  "file": "src/party_monthly.rs",
+  "from": "if let Some(a) = row.cols.get(c).filter(|a| **a != 0) {",
+  "to": "if let Some(a) = row.cols.get(c).filter(|_| true) {"
+ },
+ {
+  "id": "E4-13",
+  "by": "author",
+  "what": "a nil total row publishes no year",
+  "file": "src/party_monthly.rs",
+  "from": "if row.year != 0 || *is_total {",
+  "to": "if row.year != 0 {"
+ },
+ {
+  "id": "E4-14",
+  "by": "author",
+  "what": "the Trial Balance movement is not business-signed",
+  "file": "src/party_monthly.rs",
+  "from": "let tb_movement = tb_movement.checked_mul(sign)",
+  "to": "let tb_movement = tb_movement.checked_mul(1)"
+ },
+ {
+  "id": "E4-15",
+  "by": "author",
+  "what": "only nil openings are reported",
+  "file": "src/party_monthly.rs",
+  "from": "if t.opening_paise != 0 {",
+  "to": "if t.opening_paise == 0 {"
+ },
+ {
+  "id": "E4-16",
+  "by": "author",
+  "what": "a difference within a rupee is a finding",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(diff)? > TIE_TOLERANCE_PAISE {",
+  "to": "if abs(diff)? > 0 {"
+ },
+ {
+  "id": "E4-17",
+  "by": "author",
+  "what": "no combined set of excluded vouchers is tried",
+  "file": "src/party_monthly.rs",
+  "from": "if candidates.len() > 1 {",
+  "to": "if candidates.len() > 2 {"
+ },
+ {
+  "id": "E4-18",
+  "by": "author",
+  "what": "no set of excluded vouchers ever matches",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
+  "to": "if abs(s)? < 0 {"
+ },
+ {
+  "id": "E4-19",
+  "by": "author",
+  "what": "the first of several matching sets is named",
+  "file": "src/party_monthly.rs",
+  "from": "            } else if matches.len() > 1 {",
+  "to": "            } else if false && matches.len() > 1 {"
+ },
+ {
+  "id": "E4-20",
+  "by": "author",
+  "what": "a repeated figure id is not refused",
+  "file": "src/party_monthly.rs",
+  "from": "if r.figures.iter().any(|f| f.id == id) {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-21",
+  "by": "author",
+  "what": "PWM-1 ignores the Trial Balance movement",
+  "file": "src/party_monthly.rs",
+  "from": "if int(published_mv) != movement {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-22",
+  "by": "author",
+  "what": "PWM-1 ignores rows that do not sum to the total",
+  "file": "src/party_monthly.rs",
+  "from": "if others != cell(&rows[&total], col) {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-23",
+  "by": "author",
+  "what": "PWM-2 ignores months that do not sum to the year",
+  "file": "src/party_monthly.rs",
+  "from": "if months != cell(row, \"year\") {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-24",
+  "by": "author",
+  "what": "PWM-2 ignores a wrong Others label",
+  "file": "src/party_monthly.rs",
+  "from": "if label != want {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-25",
+  "by": "author",
+  "what": "PWM-2 reads no named party's row",
+  "file": "src/party_monthly.rs",
+  "from": "if e.kind == \"ledger\" {",
+  "to": "if e.kind == \"ledger_\" {"
+ },
+ {
+  "id": "E4-26",
+  "by": "reviewer-opus",
+  "what": "a voucher on the period's first day is outside it",
+  "file": "src/party_monthly.rs",
+  "from": "let in_period = |d: &TallyDate| start <= d && d <= end;",
+  "to": "let in_period = |d: &TallyDate| start < d && d <= end;"
+ },
+ {
+  "id": "E4-27",
+  "by": "reviewer-opus",
+  "what": "a TB difference of exactly Re 1 is a finding",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(diff)? > TIE_TOLERANCE_PAISE {",
+  "to": "if abs(diff)? >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-28",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers matching to exactly Re 1 do not match",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
+  "to": "if abs(s)? < TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-29",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers of any date are matched",
+  "file": "src/party_monthly.rs",
+  "from": "                    if in_period(&x.date) {",
+  "to": "                    if true {"
+ },
+ {
+  "id": "E4-30",
+  "by": "reviewer-opus",
+  "what": "named parties tied on amount go in descending name order",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.sort_by(|a, b| (Reverse(a.0), a.1).cmp(&(Reverse(b.0), b.1)));",
+  "to": "named_rows.sort_by(|a, b| (Reverse(a.0), Reverse(a.1)).cmp(&(Reverse(b.0), Reverse(b.1))));"
+ },
+ {
+  "id": "E4-31",
+  "by": "reviewer-opus",
+  "what": "named parties ranked by signed year, not absolute",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.push((abs(row.year)?, name));",
+  "to": "named_rows.push((row.year, name));"
+ },
+ {
+  "id": "E4-32",
+  "by": "reviewer-opus",
+  "what": "the ranking counts amounts dated outside the period",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.push((abs(row.year)?, name));",
+  "to": "named_rows.push((abs(add(row.year, row.cols.get(\"outside\").copied().unwrap_or(0))?)?, name));"
+ },
+ {
+  "id": "E4-33",
+  "by": "reviewer-opus",
+  "what": "a note dated outside the period counts in returns",
+  "file": "src/party_monthly.rs",
+  "from": "                let cell = row.cols.entry(\"outside\").or_insert(0);\n                *cell = add(*cell, amount)?;",
+  "to": "                let cell = row.cols.entry(\"outside\").or_insert(0);\n                *cell = add(*cell, amount)?;\n                if NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns = add(row.returns, amount)?;\n                }"
+ },
+ {
+  "id": "E4-34",
+  "by": "reviewer-opus",
+  "what": "the opening balance is published without the block's sign",
+  "file": "src/party_monthly.rs",
+  "from": "Value::Int(sum.checked_mul(sign).ok_or_else(overflow)?)",
+  "to": "Value::Int(sum)"
+ },
+ {
+  "id": "E4-35",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers dated before the period are matched",
+  "file": "src/party_monthly.rs",
+  "from": "                    if in_period(&x.date) {",
+  "to": "                    if x.date <= *end {"
+ },
+ {
+  "id": "E4-36",
+  "by": "author",
+  "what": "an invoice-class voucher's party is read by side, as any other's",
+  "file": "src/party_monthly.rs",
+  "from": "    if INVOICE_TYPES.contains(&v.base_type.as_str()) {",
+  "to": "    if false && INVOICE_TYPES.contains(&v.base_type.as_str()) {"
+ },
+ {
+  "id": "E4-37",
+  "by": "author",
+  "what": "a debit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Notes\"];"
+ },
+ {
+  "id": "E4-38",
+  "by": "author",
+  "what": "a credit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Notes\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-39",
+  "by": "author",
+  "what": "a sales voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sale\", \"Purchase\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-40",
+  "by": "author",
+  "what": "a purchase voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchases\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-41",
+  "by": "author",
+  "what": "a party on the same side as the block's lines is counted",
+  "file": "src/party_monthly.rs",
+  "from": "(party_net > 0) != (block_net > 0)",
+  "to": "(party_net > 0) == (block_net > 0)"
+ },
+ {
+  "id": "E4-42",
+  "by": "author",
+  "what": "a party netting to nil on the voucher is counted",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if block_net != 0 &&"
+ },
+ {
+  "id": "E4-43",
+  "by": "author",
+  "what": "a party is counted when the block's lines net to nil",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if party_net != 0 &&"
+ },
+ {
+  "id": "E4-44",
+  "by": "author",
+  "what": "a voucher with an uncounted party ledger goes to cash or bank, or no party",
+  "file": "src/party_monthly.rs",
+  "from": "            } else if !on_voucher.is_empty() {",
+  "to": "            } else if false && !on_voucher.is_empty() {"
+ },
+ {
+  "id": "E4-45",
+  "by": "author",
+  "what": "amounts not attributed raise no finding",
+  "file": "src/party_monthly.rs",
+  "from": "        if let Some(na) = rows.get(&Key::NotAttributed) {",
+  "to": "        if let Some(na) = rows.get(&Key::NotAttributed).filter(|_| false) {"
+ },
+ {
+  "id": "E4-46",
+  "by": "author",
+  "what": "the all-together set's statuses are joined with 'and' throughout",
+  "file": "src/party_monthly.rs",
+  "from": "Some((last, head)) => format!(\"{} and {last}\", head.join(\", \")),",
+  "to": "Some((last, head)) => format!(\"{} and {last}\", head.join(\" and \")),"
+ },
+ {
+  "id": "E4-47",
+  "by": "author",
+  "what": "a single match with two statuses tried says it is the only set tried",
+  "file": "src/party_monthly.rs",
+  "from": "            let others_tried = if present.len() > 1 {",
+  "to": "            let others_tried = if present.len() > 2 {"
+ },
+ {
+  "id": "E4-48",
+  "by": "author",
+  "what": "several statuses tried and none matching are listed without 'nor'",
+  "file": "src/party_monthly.rs",
+  "from": "several.join(\", nor the \")",
+  "to": "several.join(\", \")"
+ },
+ {
+  "id": "E4-49",
+  "by": "author",
+  "what": "the several matching sets' evidence repeats a voucher in two sets",
+  "file": "src/party_monthly.rs",
+  "from": "                    if !evidence.contains(&e) {",
+  "to": "                    if true {"
+ },
+ {
+  "id": "E4-50",
+  "by": "author",
+  "what": "the all-together single match is not said to be together",
+  "file": "src/party_monthly.rs",
+  "from": ".map_or_else(|| (all_word(), \" together\"), |w| (w.to_string(), \"\"));",
+  "to": ".map_or_else(|| (all_word(), \"\"), |w| (w.to_string(), \"\"));"
+ },
+ {
+  "id": "E4-51",
+  "by": "author",
+  "what": "each matching set's amount is misstated in the finding's text",
+  "file": "src/party_monthly.rs",
+  "from": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum))));",
+  "to": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum) + 100)));"
+ },
+ {
+  "id": "E4-52",
+  "by": "author",
+  "what": "PWM-2 counts a party netting to nil on a non-invoice voucher",
+  "file": "src/party_monthly.rs",
+  "from": "invoice || net.signum() * raw.signum() < 0",
+  "to": "invoice || net.signum() * raw.signum() <= 0"
+ },
+ {
+  "id": "E4-53",
+  "by": "author",
+  "what": "PWM-2 folds the not-attributed vouchers into the rows with no party",
+  "file": "src/party_monthly.rs",
+  "from": "                (0, false) => Kind::NotAttributed,",
+  "to": "                (0, false) => Kind::Unnamed,"
+ },
+ {
+  "id": "E4-54",
+  "by": "author",
+  "what": "PWM-2 does not find the published not-attributed row",
+  "file": "src/party_monthly.rs",
+  "from": "} else if e.id.ends_with(\":not_attributed\") {",
+  "to": "} else if e.id.ends_with(\":not_attributed_\") {"
+ },
+ {
+  "id": "E4-55",
+  "by": "author",
+  "what": "PWM-2 discards its not-attributed comparison",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
  }
 ]

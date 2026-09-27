@@ -53,6 +53,8 @@ mod vouchers;
 use outstandings::*;
 #[path = "agent_movement.rs"]
 mod movement;
+#[path = "agent_statements.rs"]
+mod statements;
 #[path = "agent_trial_balance.rs"]
 mod trial_balance;
 #[cfg(test)]
@@ -385,6 +387,9 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// A post dialog or approval that outlived the call which asked it
+    /// (#725). In memory only; see `agent_import_approval.rs`.
+    post_approvals: Arc<agent_import::PostApprovals>,
 }
 
 struct ToolOutcome {
@@ -560,6 +565,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if let Some(amount) = cause.downcast_ref::<bridge_tally_protocol::NativeLedgerAmountError>()
         {
             return Some(amount.safe_code());
+        }
+        if let Some(statement) = cause
+            .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
+        {
+            return Some(statement.code());
+        }
+        if let Some(derivation) =
+            cause.downcast_ref::<crate::reports::statements::StatementsError>()
+        {
+            return Some(derivation.code());
         }
         cause
             .downcast_ref::<crate::tally::connection::PairedReadValidationError>()
@@ -818,11 +833,13 @@ impl ToolFailure {
 
 impl Server {
     fn new(settings: Settings) -> Self {
+        let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            post_approvals,
         }
     }
 
@@ -1176,6 +1193,8 @@ impl Server {
             "outstandings" => self.outstandings(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "trial_balance" => self.trial_balance(args).await,
+            "profit_and_loss" => self.profit_and_loss(args).await,
+            "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "egress_log" => self.egress_log(args).map_err(Into::into),
             #[cfg(feature = "lab-writes")]
@@ -1318,6 +1337,9 @@ pub(crate) async fn desktop_selected_vouchers(
             company,
             identity,
             initial_evidence: None,
+            // The desktop screen cannot show a withheld voucher, so a
+            // foreign-currency composite still refuses its window (#674).
+            composites: vouchers::VoucherComposites::Refuse,
         },
     )
     .await

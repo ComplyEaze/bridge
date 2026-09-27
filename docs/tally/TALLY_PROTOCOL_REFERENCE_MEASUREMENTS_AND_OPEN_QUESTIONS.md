@@ -396,9 +396,10 @@ Further observations from the same runs:
 - **Tally allocates bills itself.** A native import to a bill-wise party ledger read back with a bill
   allocation of the full amount already on that line.
 - **Cancelled and optional vouchers read differently.** A cancelled voucher keeps its number but
-  loses its ledger entries in the readback, so Bridge labels it `posted_divergent` (bridge#758). An optional voucher's number changed when it was marked
-  optional, and again, with no AlterID change, when a later voucher of the same type was posted.
-  Its number is not a stable identity.
+  loses its ledger entries in the readback. Bridge labelled it `posted_divergent` at the time
+  (bridge#758); since bridge#771 it reads as `posted_not_effective` (`voucher_cancelled`). An
+  optional voucher's number changed when it was marked optional, and again, with no AlterID
+  change, when a later voucher of the same type was posted. Its number is not a stable identity.
 - **A voucher held open in alteration** blocked none of Bridge's reads, builds or posts, and Tally
   raised no dialog.
 - **Emptied is not never-used.** A company that has never held a voucher omits `ALTVCHID`. After

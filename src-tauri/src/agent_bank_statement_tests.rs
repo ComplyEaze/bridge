@@ -800,8 +800,13 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
         300
     );
     assert!(omitted("suspense_lines_omitted") > 0);
+    // 300 payers and the one cash party, unmapped payers listed first.
     assert!(omitted("counterparties_omitted") > 0);
-    assert!(listed("counterparties") > 0);
+    assert_eq!(
+        listed("counterparties") + omitted("counterparties_omitted"),
+        301
+    );
+    assert_eq!(summary["counterparties"][0]["suspense"], true);
     // The MCP frame carries the result twice, so it must fit in half.
     assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes / 2);
 }
@@ -853,4 +858,92 @@ fn a_deposit_answer_binds_the_credit_leg_of_its_receipt() {
         resolve_import_arguments(directory.path(), &publish("Dr")).err(),
         Some("proposals_file_invalid".to_string())
     );
+}
+
+/// A mapping to hundreds of distinct ledgers keeps ledgers_to_validate
+/// bounded too, and counts the ledgers it left out.
+#[test]
+fn the_ledgers_to_validate_are_bounded_and_counted() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let rows = (0..300)
+        .map(|index| {
+            let narration = format!("BY TRANSFER-UPI/CR/{index:012}/SYNTHETIC PAYER {index}/XYZ");
+            let balance = format!("{}.50", 100_000 - index);
+            Row::from_pairs([
+                ("date", "01Aug2026"),
+                ("narr", narration.as_str()),
+                ("narr_spaced", narration.as_str()),
+                ("ref", ""),
+                ("ref_spaced", ""),
+                ("dr", ""),
+                ("cr", "1.00"),
+                ("bal", balance.as_str()),
+            ])
+        })
+        .collect::<Vec<_>>();
+    let mapping = Mapping::from_rows((0..300).map(|index| MappingRow {
+        origin: format!("mapping[{index}]"),
+        party: format!("SYNTHETIC PAYER {index}"),
+        ledger: format!("Synthetic Payer Ledger {index:03}"),
+        treatment: None,
+    }))
+    .unwrap();
+    let build = build(
+        &rows,
+        Bank::Sbi,
+        &mapping,
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic SB xx1234",
+            account_number: "00000000001234",
+            date_from: None,
+            date_to: None,
+            cash_answers: CashAnswers::none(),
+        },
+    )
+    .unwrap();
+    assert!(build.records.iter().all(|record| !record.suspense));
+    let parsed = ParsedStatement {
+        account_number: "00000000001234".into(),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("0.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    let request = OwnedRequest::from_args(&json!({
+        "statement_path": "/synthetic/statement.pdf",
+        "password_file": "/synthetic/statement.password",
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "0.00",
+        "closing_balance": "0.00",
+        "total_debits": "0.00",
+        "total_credits": "300.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    }))
+    .unwrap();
+    let max_bytes = 40_000;
+    let summary = summary(
+        &request,
+        &parsed,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        max_bytes,
+    );
+    let listed = summary["ledgers_to_validate"].as_array().unwrap().len();
+    let omitted =
+        usize::try_from(summary["ledgers_to_validate_omitted"].as_u64().unwrap()).unwrap();
+    // The bank ledger and the 300 mapped ledgers.
+    assert!(
+        listed > 0 && omitted > 0,
+        "{listed} listed, {omitted} omitted"
+    );
+    assert_eq!(listed + omitted, 301);
+    assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes / 2);
 }

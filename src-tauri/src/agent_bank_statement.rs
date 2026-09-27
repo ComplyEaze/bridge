@@ -438,9 +438,13 @@ fn summary(
         .iter()
         .filter(|record| record.disposition == Disposition::Skipped)
         .count();
-    let counterparties: Vec<Value> = parsed
-        .counterparties
-        .iter()
+    // Unmapped parties first (largest first within each), so a bounded list
+    // always shows the parties that still need a mapping, and each re-run
+    // after mapping some brings the next ones into view.
+    let mut groups = parsed.counterparties.iter().collect::<Vec<_>>();
+    groups.sort_by_key(|group| !group.suspense);
+    let counterparties: Vec<Value> = groups
+        .into_iter()
         .map(|group| {
             json!({
                 "party": party_name(group.party.clone()),
@@ -485,7 +489,7 @@ fn summary(
         &mut (max_bytes / 16),
     );
     let next_step = if open == 0 {
-        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach; check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
+        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists unmapped parties first; when counterparties_omitted is above zero, map those listed and re-run to see the next, or raise BRIDGE_AGENT_MAX_BYTES; every record is in the proposals file); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
     } else {
         "Ask the person each cash_questions entry in its own words, and re-run with their answers in cash_answers (by bridge_txn_id, with the ledger the answer asks for). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
     };
@@ -627,7 +631,8 @@ fn answered_entry(answer: CashAnswer) -> Option<(&'static str, &'static str)> {
 }
 
 /// `rows` that fit `budget` bytes of JSON, in order, and how many did not.
-/// A row that does not fit is counted as omitted, never cut.
+/// A row that does not fit is counted as omitted, never cut, and later
+/// smaller rows may still be kept, so the kept rows are not always a prefix.
 pub(super) fn bounded(rows: Vec<Value>, budget: &mut usize) -> (Vec<Value>, usize) {
     let total = rows.len();
     let kept = rows

@@ -1420,3 +1420,120 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         }
     }
 }
+
+/// The D3 company's ledger catalogue as the post path reads it (one capture,
+/// fixture `d3-amend-lab-ledger-catalogue`), paired and bracketed the way the
+/// D3 capture brackets its reads, with its company extent.
+fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
+    let extent = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+    ));
+    vec![
+        xml(extent.clone()),
+        xml(catalogue.clone()),
+        status(),
+        xml(catalogue),
+        status(),
+        xml(extent),
+    ]
+}
+
+fn d3_catalogue() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml"
+    ))
+}
+
+/// The same catalogue with Cash on another GUID, as a ledger renamed and
+/// replaced would read.
+fn d3_catalogue_with_cash_replaced() -> String {
+    replaced_once(
+        &d3_catalogue(),
+        ">17a10910-773c-42c6-bd66-7bba9a392536-0000001f</GUID>",
+        ">17a10910-773c-42c6-bd66-7bba9a392536-000000ff</GUID>",
+    )
+}
+
+/// The D3 batch with its step doubt observed and its masters check left
+/// pending, as a post that ended before the check finished leaves it.
+fn d3_step_doubt_beside_a_pending_check(server: &Server) {
+    let imports = server.imports_dir().unwrap();
+    let step = json!({"state":"unmatched","target_voucher_step":{
+        "before":1419,"after":1470,"step":51,"reported_created":50,"matches_created":false}});
+    fs::write(
+        imports.join(format!("{D3_BATCH}.batch_step_doubt.json")),
+        serde_json::to_vec(&step).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        imports.join(format!("{D3_BATCH}.masters_check.json")),
+        serde_json::to_vec(&json!({"state":"check_pending","batch_step":step})).unwrap(),
+    )
+    .unwrap();
+}
+
+/// An unnamed review chooses the step doubt, the only one observed, while
+/// the masters check is pending. Its own read finishes that check as a doubt
+/// (#756). The review is refused as ambiguous after that read, with no dialog
+/// and no record, rather than admitting a step review the person did not
+/// name while a masters doubt now stands.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(result["error"]["cause"], "masters_and_batch_step", "{response}");
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports.join(format!("{D3_BATCH}.batch_step_ack.json")).exists());
+    // The read did finish the check as a doubt: that is what refused it.
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    assert_eq!(sent(simulator).len(), scripted, "{response}");
+}
+
+/// The control: the same read finishes the check as unchanged, the step doubt
+/// is still the only one, and the unnamed review goes ahead to its dialog.
+#[tokio::test]
+async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue()));
+    plans.extend(d3_batch_readback());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .exists());
+}

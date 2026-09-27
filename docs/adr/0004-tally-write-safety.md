@@ -558,7 +558,9 @@ is accepted, and loud.
   review's own read finishes as a doubt whose file cannot be written is refused the same way,
   after that read. Beside another observed doubt it needs a name, unless both are held only by
   the check record, which is refused with no name needed; a check still pending or unreadable
-  is not observed when the choice is made, which is before the read that can finish it.
+  is not observed when the choice is made, which is before the read that can finish it. If that
+  read finishes it as a second doubt, an unnamed review is refused as ambiguous after the read,
+  with no dialog (#756); a named one goes on, since the person named what they review.
 - The N-voucher step is PARTIAL on raw-gateway lab scripts (protocol reference §11c.5).
   Through Bridge's own post path it is UNVERIFIED until the lab proof (slice D3).
 - The desktop stays single-voucher `JournalOnly`.

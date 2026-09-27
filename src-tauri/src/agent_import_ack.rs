@@ -159,6 +159,30 @@ fn select_doubt(
     }
 }
 
+/// An unnamed review's choice, checked again against the records as the
+/// review's own read left them (#756). That read can finish a masters check
+/// that was pending when the choice was made, as a doubt beside the one
+/// chosen; the person would then review one doubt without naming it while
+/// another stands. So two observed doubts after the read refuse as
+/// [`select_doubt`] refuses them before it. One or none leaves the choice to
+/// the checks that follow, as before.
+fn still_the_only_doubt(after: &[(DoubtKind, MastersRecord)]) -> Result<(), &'static str> {
+    let observed = after
+        .iter()
+        .filter(|(_, state)| {
+            matches!(
+                state,
+                MastersRecord::Doubt { .. } | MastersRecord::DoubtRecordUnavailable
+            )
+        })
+        .count();
+    if observed > 1 {
+        select_doubt(None, after).map(|_| ())
+    } else {
+        Ok(())
+    }
+}
+
 /// A batch's masters records, read so that an unreadable file stays
 /// distinguishable from a pending check (the verdict path folds the two into
 /// one doubt, which is right for it and wrong here).
@@ -951,6 +975,19 @@ impl Server {
         let evidence = first.evidence.clone();
         let fail = |code: String| ToolFailure::from(code).with_prior_evidence(evidence.clone());
         let rows = rows.unwrap_or_default();
+        if requested.is_none() {
+            let after = DoubtKind::possible(line.vouchers.len())
+                .iter()
+                .map(|kind| (*kind, kind.read(&imports, &line.batch_id)))
+                .collect::<Vec<_>>();
+            still_the_only_doubt(&after).map_err(|code| {
+                let mut failure = fail(code.to_string());
+                if code == "ack_doubt_ambiguous" {
+                    failure.cause = Some("masters_and_batch_step");
+                }
+                failure
+            })?;
+        }
         let shown = admit_review(&imports, &line, &first.payload, &rows, kind).map_err(fail)?;
         let doubt: Value = serde_json::from_slice(&shown.doubt_raw).unwrap_or_default();
         let company_name = line

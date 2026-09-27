@@ -46,6 +46,7 @@ pub use request::{
     NativeBillsReportKind, NativeLedgerExportPeriod, NativeLedgerExportPeriodError,
     NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError,
 };
+pub(crate) use wire::is_foreign_currency_balance;
 pub use wire::{
     parse_company_currency, parse_company_currency_name, parse_native_bill_rows,
     parse_native_group_snapshot, parse_native_group_snapshot_with_evidence,

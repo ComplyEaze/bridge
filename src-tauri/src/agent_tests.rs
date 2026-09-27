@@ -145,6 +145,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     }
 }
 
@@ -187,6 +188,27 @@ fn agent_voucher_profile_uses_literal_filters_and_redaction_never_reveals_party(
         "voucher"
     )
     .is_err());
+}
+
+/// Any redaction drops Tally's LINEERROR text, wherever it sits, and keeps
+/// the count; with none it is shown.
+#[test]
+fn any_redaction_drops_tally_line_error_text_but_keeps_the_count() {
+    let result = json!({"dispatch":{"response":{"outcome":{
+        "counters":{"line_error_count":2},
+        "tally_line_errors":[{"text":"Ledger 'Synthetic' does not exist!","truncated":false}],
+        "tally_line_errors_omitted":1
+    }}}});
+    for redaction in [Redaction::MaskParties, Redaction::DropNarration] {
+        let outcome = &redact_value(result.clone(), redaction)["dispatch"]["response"]["outcome"];
+        assert!(outcome.get("tally_line_errors").is_none(), "{outcome}");
+        assert!(
+            outcome.get("tally_line_errors_omitted").is_none(),
+            "{outcome}"
+        );
+        assert_eq!(outcome["counters"]["line_error_count"], 2);
+    }
+    assert_eq!(redact_value(result.clone(), Redaction::None), result);
 }
 
 #[test]
@@ -603,6 +625,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -656,6 +679,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
@@ -719,6 +743,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -779,6 +804,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -1027,6 +1053,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1463,6 +1490,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
@@ -1766,6 +1794,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -2090,6 +2119,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2152,6 +2182,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             redaction: Redaction::None,
             import_enabled: false,
             writes_enabled: false,
+            batch_post_enabled: false,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

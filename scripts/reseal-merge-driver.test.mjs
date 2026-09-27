@@ -222,6 +222,27 @@ function repositoryState(root, env = gitEnv) {
   };
 }
 
+function shellQuote(value) {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+// Git 2.43 does not pass environment-supplied config (GIT_CONFIG_COUNT or -c)
+// to the upload-pack child of a local-path fetch, so a differently owned
+// source is refused there even when env trusts it. Repeat exactly the env's
+// safe.directory entries on the upload-pack command line; never add others.
+function uploadPackCommand(env) {
+  const trusted = [];
+  const count = Number(env.GIT_CONFIG_COUNT ?? "0");
+  for (let index = 0; index < count; index += 1) {
+    if (env[`GIT_CONFIG_KEY_${index}`]?.toLowerCase() === "safe.directory") {
+      trusted.push(env[`GIT_CONFIG_VALUE_${index}`]);
+    }
+  }
+  return ["git", ...trusted.flatMap((directory) => ["-c", `safe.directory=${directory}`]), "upload-pack"]
+    .map(shellQuote)
+    .join(" ");
+}
+
 function checkoutCapturedSource(
   sourceRoot,
   fixtureRoot,
@@ -239,6 +260,7 @@ function checkoutCapturedSource(
       "--quiet",
       "--no-tags",
       "--depth=1",
+      `--upload-pack=${uploadPackCommand(env)}`,
       sourceRoot,
       captured.head,
     ],
@@ -316,6 +338,81 @@ test("git merge driver: reconciles disjoint pinned-file changes, refuses genuine
   // self-contained.
   fixtureGitOk(["checkout", "-b", base]);
 
+  // GitHub never runs a local merge driver. These merges run as it does: an
+  // info/attributes entry, which outranks .gitattributes, gives the surface and
+  // matrix git's own text merge. (Unsetting the driver's command instead makes
+  // git abort: "custom merge driver ... lacks command line".) Two PRs that pin
+  // different files must then merge cleanly and pass the gate on the merge
+  // result, and two that change one pinned file must still conflict (#740
+  // option A, #760).
+  const withoutDriver = (label, body) => {
+    const listed = fixtureGitOk(["rev-parse", "--git-path", "info/attributes"], `attributes path: ${label}`).trim();
+    const attributes = isAbsolute(listed) ? listed : join(testRoot, listed);
+    mkdirSync(dirname(attributes), { recursive: true });
+    writeFileSync(attributes, `${SURFACE} merge=text\n${MATRIX} merge=text\n`);
+    try {
+      body();
+    } finally {
+      // A failed assertion can leave a merge in progress; later subtests need a clean index.
+      if (fixtureGit(["rev-parse", "-q", "--verify", "MERGE_HEAD"]).status === 0) {
+        fixtureGitOk(["merge", "--abort"], `abort merge: ${label}`);
+      }
+      rmSync(attributes, { force: true });
+    }
+  };
+  const resealedBranch = (branch, file, text) => {
+    fixtureGitOk(["checkout", "-b", branch, base]);
+    appendLine(testRoot, file, text);
+    fixtureReseal();
+    fixtureGitOk(["add", "--", file, SURFACE, MATRIX]);
+    fixtureGitOk(["commit", "-m", `test: ${branch}`]);
+  };
+
+  for (const [name, fileA, fileB] of [
+    ["far apart", "docs/adr/0004-tally-write-safety.md", "docs/adr/0015-tally-selected-read-qualification-authority.md"],
+    [
+      "adjacent in the pin list",
+      "docs/adr/0014-tally-native-outstandings-probe-authority.md",
+      "docs/adr/0015-tally-selected-read-qualification-authority.md",
+    ],
+  ]) {
+    await t.test(`without the driver, pinned files ${name} merge cleanly and pass the gate`, () => {
+      withoutDriver(name, () => {
+        const a = `test/seal-plain-a-${name.replaceAll(" ", "-")}-${suffix}`;
+        const b = `test/seal-plain-b-${name.replaceAll(" ", "-")}-${suffix}`;
+        resealedBranch(a, fileA, `test ${suffix} plain A`);
+        resealedBranch(b, fileB, `test ${suffix} plain B`);
+        fixtureGitOk(["checkout", "-b", `${a}-merge`, a]);
+        const merge = fixtureGit(["merge", b, "--no-edit"]);
+        assert.equal(merge.status, 0, `expected a clean merge; stdout:\n${merge.stdout}\nstderr:\n${merge.stderr}`);
+        const markers = fixtureGit(["grep", "-l", "-e", "<<<<<<<", "--", SURFACE, MATRIX]);
+        assert.equal(markers.status, 1, "expected no conflict markers in the surface or the matrix");
+        assert.deepEqual(hashMismatches(testRoot), [], "every pinned file's recorded hash must match its merged bytes");
+        runGate(testRoot, fixtureEnv);
+        fixtureReseal("--verify");
+      });
+    });
+  }
+
+  await t.test("without the driver, both sides changing one pinned file conflict on its hash line", () => {
+    withoutDriver("same file", () => {
+      const a = `test/seal-plain-same-a-${suffix}`;
+      const b = `test/seal-plain-same-b-${suffix}`;
+      resealedBranch(a, "docs/adr/0005-tally-snapshot-recovery.md", `test ${suffix} same A`);
+      resealedBranch(b, "docs/adr/0005-tally-snapshot-recovery.md", `test ${suffix} same B (different)`);
+      fixtureGitOk(["checkout", "-b", `${a}-merge`, a]);
+      const merge = fixtureGit(["merge", b, "--no-edit"]);
+      assert.notEqual(merge.status, 0, "expected the merge to stop with conflicts");
+      const surface = readFileSync(join(testRoot, SURFACE), "utf8");
+      const conflicted = /<<<<<<< [^\n]*\n([\s\S]*?)=======\n([\s\S]*?)>>>>>>> /.exec(surface);
+      assert.ok(conflicted, "the surface must carry a conflict");
+      for (const side of [conflicted[1], conflicted[2]]) {
+        assert.match(side, /"sha256": "[0-9a-f]{64}"/, "each side of the surface conflict is the file's hash line");
+      }
+      fixtureGit(["merge", "--abort"]);
+    });
+  });
+
   await t.test("disjoint pinned files merge cleanly with byte-correct hashes", () => {
     fixtureGitOk(["checkout", "-b", branchA, base]);
     appendLine(testRoot, "docs/adr/0014-tally-native-outstandings-probe-authority.md", `test ${suffix} branch A`);
@@ -360,11 +457,38 @@ test("git merge driver: reconciles disjoint pinned-file changes, refuses genuine
     assert.notEqual(merge.status, 0, "expected the merge to stop with conflicts");
     assert.match(merge.stderr ?? "", /reseal-merge-driver: refusing to auto-resolve/);
 
-    for (const file of [SURFACE, MATRIX]) {
-      const content = readFileSync(join(testRoot, file), "utf8");
-      assert.match(content, /^<<<<<<< /m, `${file} must be left with ordinary conflict markers for manual resolution`);
-    }
+    const surface = readFileSync(join(testRoot, SURFACE), "utf8");
+    assert.match(surface, /^<<<<<<< /m, `${SURFACE} must be left with ordinary conflict markers for manual resolution`);
+    // A reseal never changes the matrix (bridge#760), so it has nothing to conflict on.
+    assert.doesNotMatch(readFileSync(join(testRoot, MATRIX), "utf8"), /^<<<<<<< /m);
     fixtureGit(["merge", "--abort"]);
+  });
+
+  await t.test("the driver refuses a merge across a schema change rather than writing a mixed file", () => {
+    const older = `test/reseal-driver-schema-older-${suffix}`;
+    const newer = `test/reseal-driver-schema-newer-${suffix}`;
+    fixtureGitOk(["checkout", "-b", older, base]);
+    const surfacePath = join(testRoot, SURFACE);
+    const current = readFileSync(surfacePath, "utf8");
+    assert.equal(current.split('"schema_version": 2').length, 2, "the surface names schema 2 exactly once");
+    writeFileSync(surfacePath, current.replace('"schema_version": 2', '"schema_version": 1'));
+    fixtureGitOk(["add", "--", SURFACE]);
+    fixtureGitOk(["commit", "-m", `test: ${older}`]);
+
+    fixtureGitOk(["checkout", "-b", newer, base]);
+    appendLine(testRoot, "docs/adr/0004-tally-write-safety.md", `test ${suffix} schema newer`);
+    fixtureReseal();
+    fixtureGitOk(["add", "--", "docs/adr/0004-tally-write-safety.md", SURFACE]);
+    fixtureGitOk(["commit", "-m", `test: ${newer}`]);
+
+    fixtureGitOk(["checkout", "-b", `${newer}-merge`, newer]);
+    const merge = fixtureGit(["merge", older, "--no-edit"]);
+    assert.match(merge.stderr ?? "", /reseal-merge-driver: refusing to auto-resolve/, merge.stderr);
+    assert.match(merge.stderr ?? "", /schema_version differs \(ours 2, theirs 1\)/, merge.stderr);
+    assert.match(merge.stderr ?? "", /Migrating an open branch across bridge#760/, merge.stderr);
+    if (fixtureGit(["rev-parse", "-q", "--verify", "MERGE_HEAD"]).status === 0) {
+      fixtureGit(["merge", "--abort"]);
+    }
   });
 
   assert.equal(
@@ -373,6 +497,30 @@ test("git merge driver: reconciles disjoint pinned-file changes, refuses genuine
     "real Cargo outputs must remain below the selected executable scratch root",
   );
 });
+
+// The CI gate, as ci.yml's "Enforce exact Tally compatibility claims" runs it.
+function runGate(root, env) {
+  const result = spawnSync(
+    "cargo",
+    [
+      "run",
+      "--locked",
+      "--quiet",
+      "-p",
+      "bridge-tally-compatibility",
+      "--",
+      "gate",
+      "../docs/tally/compatibility/compatibility-matrix.json",
+      "../docs/tally/compatibility/compatibility-surface.json",
+      "../docs/tally/compatibility/trusted-evidence-keys.json",
+      "../docs/tally/compatibility/evidence",
+      "..",
+    ],
+    { cwd: join(root, "tools"), encoding: "utf8", env },
+  );
+  assert.equal(result.status, 0, `the compatibility gate failed on the merge:\n${result.stderr}`);
+  assert.match(result.stdout, /compatibility_gate_passed/, `unexpected gate output:\n${result.stdout}`);
+}
 
 function appendLine(root, relativePath, text) {
   const path = join(root, relativePath);
@@ -450,8 +598,8 @@ exit 97
 }
 
 // Small real Git repositories exercise source reads even without Rust installed.
-function sourceReadFixture(t, channel = "bridge-unavailable-regression-toolchain") {
-  const sandbox = makeSandbox("bridge-reseal-source-");
+function sourceReadFixture(t, channel = "bridge-unavailable-regression-toolchain", prefix = "bridge-reseal-source-") {
+  const sandbox = makeSandbox(prefix);
   const root = join(sandbox, "repo");
   const emptyTemplate = join(sandbox, "empty-template");
   t.after(() => rmSync(sandbox, { recursive: true, force: true }));
@@ -630,6 +778,38 @@ test("captured checkout trusts only its differently-owned source path", (t) => {
   const refused = git(source, ["rev-parse", "HEAD"], { env: wrongTrust });
   assert.notEqual(refused.status, 0);
   assert.match(refused.stderr, /dubious ownership/);
+
+  // Git 2.43's upload-pack refuses a differently owned source; Git 2.55's
+  // (CI) serves it without an ownership check. Where this Git refuses an
+  // untrusted fetch, the upload-pack child must get only the caller's trust,
+  // so a fetch that trusts another path is still refused.
+  // The probe is a plain fetch with no trust, independent of uploadPackCommand.
+  const probe = join(sandbox, "untrusted-probe");
+  gitOk(sandbox, ["init", "--quiet", `--template=${emptyTemplate}`, probe], "initialize probe", ownerSimulation);
+  const probed = git(probe, ["-c", `safe.directory=${realpathSync(probe)}`, "fetch", "--quiet", "--depth=1", source, before.head], {
+    env: ownerSimulation,
+  });
+  assert.ok(probed.status === 0 || /dubious ownership/.test(probed.stderr), `ownership probe failed:\n${probed.stderr}`);
+  if (probed.status !== 0) {
+    assert.throws(
+      () => checkoutCapturedSource(source, join(sandbox, "untrusted-fixture"), before, emptyTemplate, wrongTrust),
+      /fetch captured source failed:[\s\S]*dubious ownership/,
+    );
+  } else {
+    t.diagnostic("this Git's upload-pack serves a differently owned source without trust; over-trust is not observable");
+  }
+});
+
+test("captured checkout trusts a differently-owned source whose path needs shell quoting", (t) => {
+  const source = sourceReadFixture(t, undefined, "bridge-reseal-source 'quoted' -");
+  const trusted = sourceGitEnvironment(source, { ...gitEnv, GIT_TEST_ASSUME_DIFFERENT_OWNER: "1" });
+  const before = repositoryState(source, trusted);
+  const sandbox = makeSandbox("bridge-owner-quoting-");
+  const emptyTemplate = join(sandbox, "empty-template");
+  mkdirSync(emptyTemplate);
+  t.after(() => rmSync(sandbox, { recursive: true, force: true }));
+  checkoutCapturedSource(source, join(sandbox, "fixture"), before, emptyTemplate, trusted);
+  assert.deepEqual(repositoryState(source, trusted), before);
 });
 
 test("Git environment sanitization removes inherited overrides case-insensitively", () => {

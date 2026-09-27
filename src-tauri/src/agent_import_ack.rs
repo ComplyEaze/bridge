@@ -117,12 +117,11 @@ fn read_step_records(imports: &Path, batch_id: &str) -> MastersRecord {
 /// cannot be read, is not observed: this choice is made from the records
 /// before the read, which can finish a pending check. Two doubts that are
 /// both held only by the check record are refused here
-/// (`ack_doubt_record_unavailable`): neither can be reviewed, so a name could
-/// not help. Refusing here also means a stale review of the one that would
-/// have been chosen cannot answer the unnamed call with `ack_already_recorded`.
-/// A single chosen doubt's review record is still checked first, as before
-/// #722. With none observed, the kind whose record says why (pending,
-/// unreadable) is chosen, so the refusal names it.
+/// (`ack_doubt_record_unavailable`): neither can be reviewed, so the caller
+/// is not asked for a name that could not help. A single chosen or named
+/// doubt held that way is refused by the caller, before any recorded review
+/// is consulted (#770). With none observed, the kind whose record says why
+/// (pending, unreadable) is chosen, so the refusal names it.
 fn select_doubt(
     requested: Option<DoubtKind>,
     states: &[(DoubtKind, MastersRecord)],
@@ -910,6 +909,19 @@ impl Server {
             }
             failure
         })?;
+        let state = states
+            .iter()
+            .find(|(state_kind, _)| *state_kind == kind)
+            .map(|(_, state)| state);
+        // A doubt the check record holds without its own file can take no
+        // review, so it is refused before a recorded review can answer: that
+        // review is stale, and answering `ack_already_recorded` would leave the
+        // doubt unreviewable for good (#770). No read can bring the file back:
+        // a readback records a masters verdict only while the check is
+        // pending, and this one has its verdict.
+        if state == Some(&MastersRecord::DoubtRecordUnavailable) {
+            return Err("ack_doubt_record_unavailable".to_string().into());
+        }
         // A record already answers it. The path is built from the journal's
         // batch id, never the argument.
         let ack_path = kind.ack_path(&imports, &line.batch_id);
@@ -921,16 +933,9 @@ impl Server {
         // doubt of the named kind, or a step verdict left pending, which only
         // a post records. A single post keeps its order: read, then refuse.
         if batch {
-            let state = states
-                .iter()
-                .find(|(state_kind, _)| *state_kind == kind)
-                .map(|(_, state)| state);
             match (kind, state) {
                 (_, Some(MastersRecord::NoDoubt)) => {
                     return Err("ack_no_observed_doubt".to_string().into())
-                }
-                (_, Some(MastersRecord::DoubtRecordUnavailable)) => {
-                    return Err("ack_doubt_record_unavailable".to_string().into())
                 }
                 (DoubtKind::BatchStep, Some(MastersRecord::Pending)) => {
                     return Err("ack_check_pending".to_string().into())

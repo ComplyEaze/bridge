@@ -1025,10 +1025,12 @@ async fn an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any
 
 /// A masters review was recorded while its doubt file existed; that file was
 /// later lost, and the step doubt's own file was never written. An unnamed
-/// review is refused as unavailable before any request, never answered
-/// `ack_already_recorded` by the stale masters review.
+/// review is refused as unavailable before any request, where master before
+/// #769 asked for a name (`ack_doubt_ambiguous`), and a review naming
+/// `masters` is refused the same way, where before #770 the stale review
+/// answered `ack_already_recorded`.
 #[tokio::test]
-async fn two_doubts_without_their_files_refuse_before_a_stale_review_can_answer() {
+async fn two_doubts_without_their_files_are_refused_named_or_not() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -1071,32 +1073,66 @@ async fn two_doubts_without_their_files_refuse_before_a_stale_review_can_answer(
     )
     .unwrap();
     fs::remove_file(&masters_doubt).unwrap();
-    let response = acknowledge(
-        &server,
+    for args in [
         json!({"company_guid":GUID,"batch_id":line.batch_id}),
-        ScriptedApproval::approving(),
-    )
-    .await;
-    assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
-        "{response}"
-    );
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"masters"}),
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"batch_step"}),
+    ] {
+        let response = acknowledge(&server, args.clone(), ScriptedApproval::approving()).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"],
+            "ack_doubt_record_unavailable",
+            "{args}: {response}"
+        );
+    }
     assert!(sent(simulator).is_empty(), "no request");
 }
 
-/// One voucher's doubt recorded only in the check record is refused after
-/// the read, as every single-voucher refusal is, and never as no doubt.
+/// One voucher's doubt recorded only in the check record is refused before
+/// any request, never as no doubt: no read can bring its file back (#770).
 #[tokio::test]
 async fn a_doubt_recorded_only_in_the_check_record_is_refused() {
     let marked = br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#;
-    refused(
-        reconcile_readback(),
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(&simulator, directory.path(), clean(), Some(marked), None);
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(!ack_path(&server).exists(), "nothing written");
+    assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// A review recorded while its doubt file existed, the file then lost: the
+/// doubt is refused as unavailable before any request, not answered
+/// `ack_already_recorded` by the stale review, which would leave it
+/// unreviewable for good (#770). The check record carries no mark, since the
+/// file was written and lost later.
+#[tokio::test]
+async fn a_review_left_by_a_lost_doubt_file_does_not_answer_for_it() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
         clean(),
-        Some(marked),
+        Some(DOUBT.as_bytes()),
         None,
-        "ack_doubt_record_unavailable",
-    )
-    .await;
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert_eq!(fs::read(ack_path(&server)).unwrap(), b"{}", "the record is kept");
+    assert!(sent(simulator).is_empty(), "no request");
 }
 
 /// The live batch post of slice D3 (a licensed TallyPrime 7.1 Silver lab, 50

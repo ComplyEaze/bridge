@@ -28,6 +28,10 @@ const expected = new Set([
   "function-argument-with-space|src-tauri/src/tally/tdl_engine.rs::ledger_period_balances_request|$$NumItems:BRIDGE Ledger Period Collection V1",
 ]);
 
+// Method and function names whose value is money, by suffix. A money method
+// named otherwise is not caught, and a FIELD with no <SET> is not scanned.
+const amountMethod = /(?:Balance|Amount|Opening|Closing|Totals?|Debit|Credit|Value|Limit)$/i;
+
 const actual = new Set();
 for (const sourceRoot of ["src-tauri", "tools"]) {
   for (const path of rustFiles(resolve(repositoryRoot, sourceRoot))) {
@@ -147,6 +151,36 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
     }
     for (const match of literal.value.matchAll(/<REPORT\s+NAME="([^"]+)"/g)) {
       violations.add(`custom-report|${file}::${identifier}|${match[1]}`);
+    }
+    // A report FIELD that SETs an amount-valued method without declaring
+    // <TYPE>Amount</TYPE> returns Tally's display text, with the sign dropped
+    // and digits grouped (protocol reference §6.3). The pinned set for this
+    // kind is empty: every amount FIELD must carry its TYPE.
+    for (const field of literal.value.matchAll(/<FIELD\b([^>]*)>([\s\S]*?)<\/FIELD>/gi)) {
+      const sets = [...field[2].matchAll(/<SET>([\s\S]*?)<\/SET>/gi)].map((set) => set[1]);
+      // Every method and function in every SET counts, so an amount in a
+      // compound expression (`$Quantity + $OpeningBalance`), inside a `$$`
+      // function's argument (`$$Abs:$ClosingBalance`) or at the end of a
+      // sub-object path (`$LedgerEntries[1].Amount`, read as `Amount`, with
+      // one level of brackets inside an index) is caught too.
+      const index = /\[(?:[^[\]]|\[[^[\]]*\])*\]/g;
+      const methods = sets.flatMap((set) =>
+        [...set.matchAll(/\$\$?[A-Za-z_][A-Za-z0-9_]*(?:\[(?:[^[\]]|\[[^[\]]*\])*\]|\.[A-Za-z_][A-Za-z0-9_]*)*/g)].map(
+          (reference) => reference[0].replace(index, "").split(".").pop().replace(/^\$+/, ""),
+        ),
+      );
+      // A formula reference (`@Name`, `@@Name`) hides what it evaluates, so a
+      // SET holding one fails closed unless the FIELD declares a TYPE.
+      const opaque = sets.some((set) => /@@?[A-Za-z_]/.test(set));
+      // A TYPE counts only outside every SET and comment, so TYPE-shaped text
+      // inside an expression or a comment cannot pass for the declaration.
+      const declarations = field[2].replace(/<SET>[\s\S]*?<\/SET>|<!--[\s\S]*?-->/gi, "");
+      const typed = /<TYPE>[\s\S]*?<\/TYPE>/i.test(declarations);
+      const amountTyped = /<TYPE>\s*Amount\s*<\/TYPE>/i.test(declarations);
+      const needsAmountType = methods.some((method) => amountMethod.test(method));
+      if (needsAmountType ? amountTyped : !opaque || typed) continue;
+      const name = /NAME="([^"]*)"/.exec(field[1])?.[1] ?? "<unnamed>";
+      violations.add(`amount-field-without-type|${file}::${identifier}|${name}`);
     }
   }
 }

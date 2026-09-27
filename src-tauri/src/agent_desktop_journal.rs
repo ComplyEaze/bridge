@@ -255,11 +255,13 @@ impl Settings {
 
 impl Server {
     pub(crate) fn with_runtime(settings: Settings, runtime: TallyRuntime) -> Self {
+        let post_approvals = Arc::new(super::PostApprovals::new(&settings.data_dir));
         Self {
             settings,
             runtime,
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
+            post_approvals,
         }
     }
 }

@@ -813,7 +813,7 @@ async fn an_approved_post_sends_exactly_the_request_its_intent_recorded() {
     );
     assert_eq!(
         scripted.previews(),
-        [admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap()]
+        [agent_review_preview(&line, &server.settings.endpoint).unwrap()]
     );
 }
 
@@ -965,7 +965,7 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
     assert!(!markdown.contains("resend"), "{markdown}");
     assert_eq!(
         scripted.previews(),
-        [admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap()]
+        [agent_review_preview(&line, &server.settings.endpoint).unwrap()]
     );
     assert_eq!(
         scripted.counts(),
@@ -1273,7 +1273,7 @@ async fn each_bank_type_posts_the_request_its_intent_recorded() {
         let previews = scripted.previews();
         assert_eq!(
             previews,
-            [admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap()]
+            [agent_review_preview(&line, &server.settings.endpoint).unwrap()]
         );
         assert!(
             previews[0].starts_with(&format!("Create ONE {type_name} in ")),
@@ -3221,3 +3221,5 @@ fn a_pending_mark_never_erases_a_doubt() {
 
 #[path = "agent_import_ack_tests.rs"]
 mod ack_tests;
+#[path = "agent_import_approval_tests.rs"]
+mod approval_tests;

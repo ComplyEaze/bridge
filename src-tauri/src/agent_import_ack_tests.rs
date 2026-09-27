@@ -1421,9 +1421,9 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     }
 }
 
-/// The D3 company's ledger catalogue as the post path reads it (one capture,
-/// fixture `d3-amend-lab-ledger-catalogue`), paired and bracketed the way the
-/// D3 capture brackets its reads, with its company extent.
+/// A paired read of `catalogue`, bracketed the way the D3 capture brackets its
+/// reads, with its company extent. The one capture (fixture
+/// `d3-amend-lab-ledger-catalogue`, read once) answers both reads of the pair.
 fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
     let extent = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
@@ -1548,16 +1548,13 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
 /// scripts, for this company): the masters check cannot finish and stays
 /// pending.
 fn d3_catalogue_refused() -> Vec<ScenarioPlan> {
-    let extent = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
-    ));
-    vec![
-        xml(extent),
-        xml("<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA>\
-             <LINEERROR>Could not set 'SVCurrentCompany' to 'BRIDGE AMEND LAB'</LINEERROR>\
-             </DATA></BODY></ENVELOPE>"
-            .to_string()),
-    ]
+    // Both reads of the pair are sent even when the first is refused.
+    d3_catalogue_read(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA>\
+         <LINEERROR>Could not set 'SVCurrentCompany' to 'BRIDGE AMEND LAB'</LINEERROR>\
+         </DATA></BODY></ENVELOPE>"
+            .to_string(),
+    )
 }
 
 /// The first read cannot finish the pending masters check (its catalogue read
@@ -1570,6 +1567,7 @@ async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_dou
     plans.extend(d3_catalogue_refused());
     plans.extend(d3_batch_readback());
     plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = d3_server(&simulator, directory.path());
@@ -1583,11 +1581,22 @@ async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_dou
     .await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
-    assert_eq!(result["error"]["cause"], "masters_and_batch_step", "{response}");
-    assert_eq!(approval.review_counts(), [50], "the dialog was shown: {response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
+    assert_eq!(
+        approval.review_counts(),
+        [50],
+        "the dialog was shown: {response}"
+    );
     let imports = server.imports_dir().unwrap();
-    assert!(!imports.join(format!("{D3_BATCH}.batch_step_ack.json")).exists());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
     assert!(imports
         .join(format!("{D3_BATCH}.masters_doubt.json"))
         .is_file());
+    // Both reads ran in full, the refused catalogue pair included.
+    assert_eq!(sent(simulator).len(), scripted, "{response}");
 }

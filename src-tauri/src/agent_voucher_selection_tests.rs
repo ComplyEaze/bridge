@@ -524,7 +524,16 @@ async fn call_filtered_vouchers(catalogue: impl Fn(&str) -> String, ledger: &str
     .chunks_exact(2)
     .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
     .collect::<Vec<_>>();
-    let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(String::from_utf16(&words).unwrap()))
+    call_filtered_vouchers_over(String::from_utf16(&words).unwrap(), catalogue, ledger).await
+}
+
+/// [`call_filtered_vouchers`] with `window` as the vouchers response.
+async fn call_filtered_vouchers_over(
+    window: String,
+    catalogue: impl Fn(&str) -> String,
+    ledger: &str,
+) -> Value {
+    let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength);
     let cycle = import_cycle_plans();
@@ -623,4 +632,178 @@ async fn a_refused_ledger_catalogue_names_its_cause_and_no_ledger() {
         assert_eq!(content["evidence"]["reason_code"], "ledger_export_invalid");
         assert!(!response.to_string().contains("Twice"), "{response}");
     }
+}
+
+// -- #674: a foreign-currency composite withholds its voucher, not the window --
+
+use crate::agent::voucher_parse::window_with_composite_vouchers;
+
+fn decoded(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// Voucher 1 of the captured three-voucher window made a composite one.
+fn window_with_a_composite_voucher() -> String {
+    window_with_composite_vouchers(1)
+}
+
+/// The whole-window `vouchers` plans of the timings test, serving `window`.
+fn vouchers_plans(window: String) -> Vec<ScenarioPlan> {
+    let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength);
+    let cycle = import_cycle_plans();
+    let mut plans = cycle[..4].to_vec();
+    plans.extend(cycle[10..16].iter().cloned());
+    plans.extend([
+        cycle[0].clone(),
+        vouchers.clone(),
+        cycle[1].clone(),
+        vouchers,
+        cycle[1].clone(),
+        cycle[0].clone(),
+    ]);
+    plans
+}
+
+async fn call_vouchers_with(plans: Vec<ScenarioPlan>, extra: Value) -> Value {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut args = json!({"company_guid":CAPTURED_GUID, "from":"20260801","to":"20260802"});
+    for (key, value) in extra.as_object().unwrap() {
+        args[key] = value.clone();
+    }
+    let response = server_for(simulator.address(), directory.path())
+        .call_tool("vouchers", args)
+        .await;
+    simulator.cancel();
+    simulator.finish().unwrap();
+    response
+}
+
+#[tokio::test]
+async fn a_composite_voucher_is_withheld_and_the_rest_of_the_window_is_returned() {
+    let response =
+        call_vouchers_with(vouchers_plans(window_with_a_composite_voucher()), json!({})).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    // `items` does not cover the window, and the state says so first.
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], "vouchers_withheld");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    assert_eq!(result["total"], 2);
+    let numbers: Vec<&str> = result["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["voucher_number"].as_str().unwrap())
+        .collect();
+    assert_eq!(numbers, vec!["2", "3"]);
+    assert_eq!(result["withheld_total"], 1);
+    assert_eq!(
+        result["withheld_vouchers"],
+        json!([{
+            "guid": "61c6de69-1748-461c-ad3f-162cb949df9f-00000001",
+            "date": "20260801", "voucher_type": "Sales", "voucher_number": "1",
+            "cause": "foreign_currency_amount_unparsed",
+        }])
+    );
+    assert!(result["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("exclude 1 voucher"));
+    // No composite reaches the payload.
+    assert!(!result.to_string().contains(" @ "), "{result}");
+}
+
+#[tokio::test]
+async fn a_withheld_listing_is_the_same_on_every_page() {
+    let mut pages = Vec::new();
+    for offset in [0, 1] {
+        let response = call_vouchers_with(
+            vouchers_plans(window_with_a_composite_voucher()),
+            json!({"limit": 1, "offset": offset}),
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{response}");
+        pages.push(response["structuredContent"]["result"].clone());
+    }
+    for key in [
+        "withheld_total",
+        "withheld_vouchers",
+        "coverage",
+        "total",
+        "state",
+    ] {
+        assert_eq!(pages[0][key], pages[1][key], "{key}");
+    }
+    assert_ne!(pages[0]["items"], pages[1]["items"]);
+}
+
+#[tokio::test]
+async fn an_ordinary_window_carries_no_withheld_fields() {
+    let response = call_vouchers_with(
+        vouchers_plans(decoded(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        ))),
+        json!({}),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    for key in ["withheld_total", "withheld_vouchers", "coverage"] {
+        assert!(result.get(key).is_none(), "{key}");
+    }
+}
+
+#[tokio::test]
+async fn a_withheld_voucher_is_listed_under_a_ledger_filter_it_touches() {
+    // Voucher 1 posts to this party ledger; its amounts are the composites.
+    let touching = call_filtered_vouchers_over(
+        window_with_a_composite_voucher(),
+        |catalogue| catalogue.to_string(),
+        "नमस्ते ट्रेडर्स",
+    )
+    .await;
+    assert_eq!(touching["isError"], false, "{touching}");
+    let result = &touching["structuredContent"]["result"];
+    assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["withheld_total"], 1);
+    assert_eq!(result["state"], "partial");
+    // A ledger it does not touch lists nothing withheld.
+    let other = call_filtered_vouchers_over(
+        window_with_a_composite_voucher(),
+        |catalogue| catalogue.to_string(),
+        "Café Naïve Traders",
+    )
+    .await;
+    let result = &other["structuredContent"]["result"];
+    assert_eq!(result["total"], 1, "{result}");
+    assert!(result.get("withheld_total").is_none(), "{result}");
+    assert_eq!(result["state"], "complete");
+}
+
+/// A window whose every voucher is withheld is not empty: the empty-window
+/// corroboration does not run, so these plans hold no corroboration read and
+/// `finish` would fail on one.
+#[tokio::test]
+async fn an_all_withheld_window_is_not_empty_and_is_not_corroborated() {
+    let response =
+        call_vouchers_with(vouchers_plans(window_with_composite_vouchers(3)), json!({})).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["items"], json!([]));
+    assert_eq!(result["withheld_total"], 3);
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["reason"], "vouchers_withheld");
 }

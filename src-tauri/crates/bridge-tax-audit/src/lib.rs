@@ -1581,24 +1581,31 @@ pub fn tds_payees_on(
     canonical::canonical_test_result(book, &result, None)
 }
 
+/// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
+/// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
+/// `partners_40b_194t`. Refuses a `[statutory_dues]` that is not a table.
+pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>> {
+    if bound.statutory_dues.not_a_table {
+        return Err(AuditError::Config(
+            "[statutory_dues] is not a table".to_string(),
+        ));
+    }
+    Ok(bound
+        .statutory_dues
+        .nature_by_ledger
+        .iter()
+        .filter(|(_, nature)| nature.as_str() == Some("tds_payable"))
+        .map(|(ledger, _)| ledger.clone())
+        .collect())
+}
+
 /// What the reference's `pack._tds_payees` passes `tds_payees.run()` from tables other than
 /// `[tds]`/`[tds_payees]`, from a bound engagement: the ledgers `[statutory_dues]` classifies as
 /// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
 /// own default: the reference's pack requires the table for its whole run), the `[partners]`
 /// keys, `[client].state` and `[deductor].activity`.
 pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
-    if bound.statutory_dues.not_a_table {
-        return Err(AuditError::Config(
-            "[statutory_dues] is not a table".to_string(),
-        ));
-    }
-    let tds_ledgers = bound
-        .statutory_dues
-        .nature_by_ledger
-        .iter()
-        .filter(|(_, nature)| nature.as_str() == Some("tds_payable"))
-        .map(|(ledger, _)| ledger.clone())
-        .collect();
+    let tds_ledgers = tds_payable_ledgers(bound)?;
     let gst_ledgers = match &bound.book_keeping_quality.tax_ledgers {
         None => BTreeSet::new(),
         Some(TaxLedgers::NotATable) => {
@@ -1637,6 +1644,7 @@ pub fn partners_40b_194t_on(
         &engagement.period,
         &entity_type,
         &bound.partners,
+        &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
 }

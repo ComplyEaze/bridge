@@ -3332,8 +3332,8 @@
   "by": "author (Lane B)",
   "what": "partners: remuneration wins a voucher carrying both ledgers",
   "file": "src/partners_40b_194t.rs",
-  "from": "            if is_interest {",
-  "to": "            if is_interest && !is_remuneration {"
+  "from": "                c.min(int_debit)\n",
+  "to": "                0\n"
  },
  {
   "id": "D2-09",
@@ -3364,8 +3364,8 @@
   "by": "author (Lane B)",
   "what": "partners: a TDS ledger anywhere counts as seen",
   "file": "src/partners_40b_194t.rs",
-  "from": ".is_some_and(|led| led.under(DUTIES_TAXES_GROUP))",
-  "to": ".is_some_and(|_led| true)"
+  "from": "                if v.lines.iter().any(|l| own.contains(l.ledger.as_str())) && has_tds(v) {",
+  "to": "                if has_tds(v) {"
  },
  {
   "id": "D2-13",
@@ -5150,5 +5150,133 @@
   "file": "src/tds_payees.rs",
   "from": "            credit = add(credit, tds)?;",
   "to": "            credit = add(credit, 0)?;"
+ },
+ {
+  "id": "PR-01",
+  "by": "author",
+  "what": "partners re-pin: a partner's TDS not added back",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                lines_here.push(-tds);",
+  "to": "                lines_here.push(0);"
+ },
+ {
+  "id": "PR-02",
+  "by": "author",
+  "what": "partners re-pin: an inexact mixed voucher split anyway",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            let i_part = if int_debit > 0 && exact {",
+  "to": "            let i_part = if int_debit > 0 {"
+ },
+ {
+  "id": "PR-03",
+  "by": "author",
+  "what": "partners re-pin: a mixed voucher that debits the capital not named as a set-off",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                if capital_debited && c > 0 {",
+  "to": "                if false {"
+ },
+ {
+  "id": "PR-04",
+  "by": "author",
+  "what": "partners re-pin: a capital credited and debited on one interest voucher not named",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            && capital_lines().any(|l| l.amount_paise > 0)",
+  "to": "            && false"
+ },
+ {
+  "id": "PR-05",
+  "by": "author",
+  "what": "partners re-pin: off-capital vouchers on the partner's ledgers not named",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if !touches_capital {",
+  "to": "            if false {"
+ },
+ {
+  "id": "PR-06",
+  "by": "author",
+  "what": "partners re-pin: an off-capital interest voucher leaves s.40(b) computed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    w.off_capital_interest_vouchers.insert(guid(), v);",
+  "to": "                    let _ = v;"
+ },
+ {
+  "id": "PR-07",
+  "by": "author",
+  "what": "partners re-pin: a reversal lowers the gross s.194T base",
+  "file": "src/partners_40b_194t.rs",
+  "from": "credits.iter().map(|c| c.2).filter(|p| *p > 0).sum();",
+  "to": "credits.iter().map(|c| c.2).sum();"
+ },
+ {
+  "id": "PR-08",
+  "by": "author",
+  "what": "partners re-pin: a ledger two partners name read as their own",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        .filter(|(_, n)| **n > 1)",
+  "to": "        .filter(|(_, n)| **n > 2)"
+ },
+ {
+  "id": "PR-09",
+  "by": "author",
+  "what": "partners re-pin: a partner's own TDS also counted as unattributed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                if !seen.contains_key(&v.guid)",
+  "to": "                if true"
+ },
+ {
+  "id": "PR-10",
+  "by": "author",
+  "what": "partners re-pin: unattributed TDS alone reads as seen: no",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        let seen_value = if tds_ledgers.is_empty() || (!unattributed.is_empty() && seen.is_empty())",
+  "to": "        let seen_value = if tds_ledgers.is_empty()"
+ },
+ {
+  "id": "PR-11",
+  "by": "author",
+  "what": "partners re-pin: an unknown interest still gets an excess",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        if unknown.is_empty() {\n            let f_excess",
+  "to": "        if true {\n            let f_excess"
+ },
+ {
+  "id": "PR-12",
+  "by": "author",
+  "what": "partners re-pin: shared remuneration TDS not cited",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            remuneration_evidence.extend(shared_rem.clone());",
+  "to": "            let _ = shared_rem;"
+ },
+ {
+  "id": "PR-13",
+  "by": "author",
+  "what": "partners re-pin: the base's shared-TDS notes dropped",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            limits.extend(shared_tds_note(&w));",
+  "to": "            let _ = shared_tds_note(&w);"
+ },
+ {
+  "id": "PR-14",
+  "by": "author",
+  "what": "partners re-pin: reversals not named on the s.194T finding",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                .filter(|c| c.2 < 0)",
+  "to": "                .filter(|c| c.2 < i128::MIN)"
+ },
+ {
+  "id": "PR-15",
+  "by": "author",
+  "what": "partners re-pin: off-shared vouchers not counted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if off_shared > 0 {",
+  "to": "            if off_shared > 2 {"
+ },
+ {
+  "id": "PR-16",
+  "by": "author",
+  "what": "partners re-pin: TDS seen leaves the finding needing a document",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                confidence: if seen.is_empty() {",
+  "to": "                confidence: if true {"
  }
 ]

@@ -1491,6 +1491,61 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
     assert!(from_proposals.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
 }
 
+/// A cash line nobody answered has no voucher. Building the rest would leave
+/// it out of the books unseen, so the proposals are refused until it is
+/// answered, before any Tally read (design v2 §10).
+#[tokio::test]
+async fn a_proposals_file_with_an_open_cash_question_is_refused_before_any_tally_read() {
+    let directory = tempfile::tempdir().unwrap();
+    // port 9: any Tally read would fail differently from the refusal below
+    let server = bank_server(directory.path(), 9);
+    let payload = captured_bank_payload();
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": payload.vouchers,
+        "records": [{"row": 3, "disposition": "needs_answer", "cash_movement": "withdrawal"}],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "cash_questions_open",
+        "{response}"
+    );
+}
+
+/// The build result lists every voucher a bank import sent to suspense, found
+/// by the tag in its narration, and no other.
+#[test]
+fn a_build_lists_every_tagged_suspense_voucher() {
+    let mut payload = captured_bank_payload();
+    let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
+    assert_eq!(payload.vouchers.len(), 2);
+    payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
+    payload.vouchers[1].narration = Some("NEFT from Northwind Traders | ACC".into());
+    let listed = tagged_suspense_vouchers(&payload.vouchers);
+    assert_eq!(listed["count"], 1, "{listed}");
+    assert_eq!(
+        listed["lines"][0]["bridge_txn_id"],
+        payload.vouchers[0].bridge_txn_id.as_str()
+    );
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} Suspense", tags[1]));
+    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 2);
+    payload.vouchers[0].narration = None;
+    payload.vouchers[1].narration = None;
+    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 0);
+}
+
 #[tokio::test]
 async fn a_proposals_file_changed_since_its_parse_is_refused_before_any_tally_read() {
     let directory = tempfile::tempdir().unwrap();

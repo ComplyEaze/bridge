@@ -495,10 +495,32 @@ async fn a_union_bank_statement_parses_without_printed_totals() {
         "suspense_ledger": "Suspense",
         "mapping": [{"party": "CASH DEPOSIT", "ledger": "Cash", "treatment": "contra"}]
     });
+    // A cash party is answered per line, never mapped.
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", args.clone()).await),
+        Some("statement_cash_party_in_mapping")
+    );
+    let mut args = args;
+    args.as_object_mut().unwrap().remove("mapping");
+    let open = server.call_tool("parse_bank_statement", args.clone()).await;
+    let result = &open["structuredContent"]["result"];
+    assert_eq!(result["vouchers"], 5, "{open}");
+    let questions = result["cash_questions"].as_array().unwrap();
+    assert_eq!(questions.len(), 1, "{open}");
+    assert_eq!(questions[0]["movement"], "deposit");
+    assert_eq!(questions[0]["amount"], "750.50");
+    assert_eq!(questions[0]["answers"].as_array().unwrap().len(), 5);
+    args["cash_answers"] =
+        json!([{"bridge_txn_id": questions[0]["bridge_txn_id"], "answer": "dont_know"}]);
     let response = server.call_tool("parse_bank_statement", args.clone()).await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["statement_rows"], 6, "{response}");
     assert_eq!(result["vouchers"], 6);
+    assert_eq!(result["cash_questions"], json!([]));
+    let lines = result["suspense_lines"].as_array().unwrap();
+    assert!(lines
+        .iter()
+        .any(|line| line["reason"] == "cash_purpose_not_confirmed" && line["amount"] == "750.50"));
     assert_eq!(result["reconciled"]["total_debits"], "13250.50");
     assert_eq!(result["reconciled"]["total_credits"], "3750.50");
     assert_eq!(result["reconciled"]["totals_match_statement"], false);

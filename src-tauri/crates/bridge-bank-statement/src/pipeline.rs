@@ -6,6 +6,7 @@
 //! and re-read what was built.
 
 use crate::bank::Bank;
+use crate::cash::CashAnswers;
 use crate::date::Date;
 use crate::geometry::Page;
 use crate::mapping::Mapping;
@@ -25,6 +26,8 @@ pub struct StatementRequest<'a> {
     pub bank_ledger: &'a str,
     pub suspense_ledger: &'a str,
     pub mapping: &'a Mapping,
+    /// A person's answer per cash line.
+    pub cash_answers: &'a CashAnswers,
     pub date_from: Option<Date>,
     pub date_to: Option<Date>,
 }
@@ -75,6 +78,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
             account_number: &account_number,
             date_from: request.date_from,
             date_to: request.date_to,
+            cash_answers: request.cash_answers,
         },
     )?;
     let check = selfcheck(&build, request.bank_ledger)?;

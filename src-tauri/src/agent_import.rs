@@ -898,6 +898,9 @@ impl Server {
                     "batch_id": batch_id, "path": path, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
+                    // Every line a bank import sent to suspense, so none sits
+                    // there unseen (design v2 §10).
+                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers),
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
@@ -2524,6 +2527,33 @@ fn requested_master_report(
             }),
         })
         .collect()
+}
+
+/// The vouchers Bridge's bank import sent to suspense, found by the tag it
+/// writes into their narration ([`bridge_bank_statement::proposals::SUSPENSE_TAGS`]), for a build's result.
+fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
+    let lines = vouchers
+        .iter()
+        .filter(|voucher| {
+            voucher.narration.as_deref().is_some_and(|narration| {
+                bridge_bank_statement::proposals::SUSPENSE_TAGS
+                    .iter()
+                    .any(|tag| narration.contains(tag))
+            })
+        })
+        .map(|voucher| {
+            json!({
+                "bridge_txn_id": voucher.bridge_txn_id,
+                "date": voucher.date,
+                "entries": voucher.entries.iter().map(|entry| json!({
+                    "ledger": party_name(entry.ledger.clone()),
+                    "amount": entry.amount,
+                    "side": if entry.side == EntrySide::Dr { "Dr" } else { "Cr" },
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({"count": lines.len(), "lines": lines})
 }
 
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {

@@ -1,5 +1,5 @@
 {
- "comment": "partners_40b_194t at the reference's current head: TDS on a partner's interest added back (A); an interest-and-remuneration voucher split exactly (A) and one that also credits the bank, not split (B); an interest voucher that also debits the capital (B); vouchers on an interest ledger shared by two partners that touch no capital, one carrying TDS attributed to no one (A, B); interest over the allowable (C); remuneration whose TDS is shared with another credited party (C); a reversal against the gross s.194T base (C). A and B are not computed for s.40(b); C is.",
+ "comment": "partners_40b_194t at the reference's current head: TDS on a partner's interest added back (A); an interest-and-remuneration voucher split exactly (A) and one that also credits the bank and debits the capital, not split and read net (B); an interest voucher that also debits the capital (B); vouchers on an interest ledger shared by two partners that touch no capital, one carrying TDS attributed to no one (A, B); interest over the allowable (C); remuneration whose TDS is shared with another credited party (C); a reversal against the gross s.194T base (C); a partner over the s.194T limit with no TDS line seen (D). A and B are not computed for s.40(b); C and D are.",
  "groups": {
   "Current Assets": null,
   "Bank Accounts": "Current Assets",
@@ -89,6 +89,20 @@
     "Current Liabilities"
    ],
    "guid": "edge-partners_tds_mixed-010"
+  },
+  {
+   "name": "D Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_tds_mixed-011"
+  },
+  {
+   "name": "Interest D",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-012"
   }
  ],
  "tb": [
@@ -102,16 +116,16 @@
   {
    "ledger": "B Capital",
    "opening": -50000000,
-   "debit": 50000,
-   "credit": 2600000,
+   "debit": 150000,
+   "credit": 2700000,
    "closing": -52550000
   },
   {
    "ledger": "Bank",
-   "opening": 0,
+   "opening": 200000000,
    "debit": 0,
    "credit": 440000,
-   "closing": -440000
+   "closing": 199560000
   },
   {
    "ledger": "C Capital",
@@ -121,11 +135,25 @@
    "closing": -23400000
   },
   {
+   "ledger": "D Capital",
+   "opening": -30000000,
+   "debit": 0,
+   "credit": 2500000,
+   "closing": -32500000
+  },
+  {
    "ledger": "Interest C",
    "opening": 0,
    "debit": 3000000,
    "credit": 0,
    "closing": 3000000
+  },
+  {
+   "ledger": "Interest D",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 0,
+   "closing": 2500000
   },
   {
    "ledger": "Interest to Partners",
@@ -228,7 +256,11 @@
     ],
     [
      "B Capital",
-     -2300000
+     -2400000
+    ],
+    [
+     "B Capital",
+     100000
     ],
     [
      "Bank",
@@ -345,6 +377,21 @@
      -500000
     ]
    ]
+  },
+  {
+   "guid": "d1",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest D",
+     2500000
+    ],
+    [
+     "D Capital",
+     -2500000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -372,6 +419,12 @@
    ],
    "interest_ledger": "Interest C",
    "remuneration_ledger": "Remuneration C"
+  },
+  "pd": {
+   "capital_ledgers": [
+    "D Capital"
+   ],
+   "interest_ledger": "Interest D"
   }
  },
  "deed": {

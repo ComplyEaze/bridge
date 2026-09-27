@@ -236,7 +236,8 @@ fn walk<'a>(
                 .lines
                 .iter()
                 .filter(|l| {
-                    i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)
+                    i128::from(l.amount_paise).signum() * tds.signum() < 0
+                        && !tds_ledgers.contains(&l.ledger)
                 })
                 .all(|l| capital.contains(l.ledger.as_str()));
             if opposite_alone {

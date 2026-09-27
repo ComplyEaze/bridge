@@ -233,7 +233,7 @@ pub fn run(
 s40b_interest_rate_bp and rules.entity(...).s194t for this engagement's entity_type -- never from \
 the entity_type string itself. 'no' when both are absent/zero/false.",
         Vec::new(),
-    );
+    )?;
     if !applicable {
         return Ok(r);
     }
@@ -249,7 +249,8 @@ narration."
     let (partners, deed_rate) = partners_config(cfg)?;
     // Each partner's figures are tagged `hash8(key)`, as the reference tags them, so two keys whose
     // tags coincide would name one figure twice. The reference raises there (its `fig` refuses a
-    // duplicate id); refuse the same way before any partner figure is built, never panic in `fig`.
+    // duplicate id); refuse before any partner figure is built, naming both keys, rather than
+    // leave `fig` to refuse the first repeated id.
     let mut tags: BTreeMap<String, &str> = BTreeMap::new();
     for key in partners.keys() {
         let tag = hash8(key);
@@ -282,7 +283,7 @@ bound ({s40b_rate} bp), not a confirmed authorised rate."
             ),
         },
         Vec::new(),
-    );
+    )?;
     if deed_missing {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deed_missing"),
@@ -342,7 +343,7 @@ during the year) showing the authorised interest rate and remuneration clause."
             Unit::Paise,
             &format!("Opening (1-4) balance of partner (tag {h})'s capital ledger(s), Dr+/Cr-."),
             ev_capital.clone(),
-        );
+        )?;
         let f_allow = r.fig(
             &format!("allowable_interest_{h}"),
             int(allowable_365)?,
@@ -354,14 +355,14 @@ on the capital ledger(s) other than an interest/remuneration credit, changing th
 date), actual days / 365, a debit (negative) capital day contributing zero."
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_360day_{h}"),
             int(allowable_360)?,
             Unit::Paise,
             &format!("Same daily-balance walk for partner (tag {h}), but actual days / 360."),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_opening_only_{h}"),
             int(allowable_opening_only)?,
@@ -371,7 +372,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero."
 opening value for the whole year (no intra-year voucher line applied at all)."
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_no_reduction_{h}"),
             int(allowable_no_reduction)?,
@@ -382,7 +383,7 @@ withdrawal or transfer (every debit line on the capital ledger(s) skipped; a cre
 e.g. capital introduced, still applied)."
             ),
             ev_capital,
-        );
+        )?;
 
         let voucher_refs = |vs: &BTreeMap<String, &Voucher>| -> Vec<EvidenceRef> {
             vs.iter()
@@ -399,14 +400,14 @@ e.g. capital introduced, still applied)."
 also carrying a line on their interest_ledger."
             ),
             ev_interest_v.clone(),
-        );
+        )?;
         let f_excess = r.fig(
             &format!("s40b_excess_{h}"),
             int(excess)?,
             Unit::Paise,
             &format!("interest_credited_{h} minus allowable_interest_{h}, floor 0."),
             Vec::new(),
-        );
+        )?;
         excess_total += excess;
         credited_total += credited;
 
@@ -454,7 +455,7 @@ base it applies to."
 their remuneration_ledger. The s.40(b)(v) book-profit limit is NOT computed here."
             ),
             voucher_refs(&w.remuneration_vouchers),
-        );
+        )?;
         remuneration_facts.push((key.clone(), f_rem));
 
         let subject_paise = credited + w.remuneration_credited_paise;
@@ -467,7 +468,7 @@ their remuneration_ledger. The s.40(b)(v) book-profit limit is NOT computed here
 base (salary, remuneration, commission, bonus and interest to a partner)."
             ),
             Vec::new(),
-        );
+        )?;
         let tds_expected = round_half_up(subject_paise * i128::from(tds_rate_bp), 10_000);
         let f_tds = r.fig(
             &format!("s194t_tds_expected_{h}"),
@@ -475,7 +476,7 @@ base (salary, remuneration, commission, bonus and interest to a partner)."
             Unit::Paise,
             &format!("TDS @ {tds_rate_bp} bp on s194t_amount_credited_{h}."),
             Vec::new(),
-        );
+        )?;
         // The remuneration voucher wins a GUID both maps hold, as the reference's
         // `{**interest, **remuneration}` does.
         let mut touched = w.interest_vouchers.clone();
@@ -497,7 +498,7 @@ base (salary, remuneration, commission, bonus and interest to a partner)."
 voucher(s) crediting partner (tag {h})'s interest/remuneration."
             ),
             Vec::new(),
-        );
+        )?;
 
         if subject_paise > i128::from(tds_limit_paise) {
             let mut limits = vec![
@@ -548,7 +549,7 @@ returned the income, tax paid)."
         Unit::Paise,
         "Sum of s40b_excess_<partner> across all partners.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s194t_interest_credited_total",
         int(credited_total)?,
@@ -556,7 +557,7 @@ returned the income, tax paid)."
         "Sum of interest_credited_<partner> across all partners -- cross-check this against a \
 shared interest_ledger's own TB movement when every partner uses the same ledger name.",
         Vec::new(),
-    );
+    )?;
 
     if !remuneration_facts.is_empty() {
         r.findings.push(Finding {

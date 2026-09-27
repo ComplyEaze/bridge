@@ -102,24 +102,6 @@ fn add(a: i64, b: i64) -> Result<i64> {
     a.checked_add(b).ok_or_else(|| overflow(TEST_ID))
 }
 
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
-}
-
 /// The optional `[roles].s194n_withdrawal_narration_terms`, as a set of strings; empty when absent.
 ///
 /// Divergence, deliberate, and not parity (as `bank_reconciliation::charge_terms`): the reference
@@ -480,8 +462,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
          visible in Tally and is never inferred from a ledger's group. s.269ST limb (c) (one event \
          or occasion) is never testable from the books alone, in either direction."
     );
-    fig(
-        &mut r,
+    r.fig(
         "ca_threshold_paise",
         Value::Int(threshold),
         Unit::Paise,
@@ -553,10 +534,10 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         (_, Some(rows)) => summarise(rows, row_threshold)?,
                         _ => unreachable!("one grain is always computed"),
                     };
-                fig(&mut r, &format!("{prefix}_any_amount_count"), count(TEST_ID, any_count)?, Unit::Count,
+                r.fig(&format!("{prefix}_any_amount_count"), count(TEST_ID, any_count)?, Unit::Count,
                     &format!("Distinct (party, {grain}) pairs with a {mode_name} {dir} on a population, \
                               non-Contra voucher."), vec![])?;
-                fig(&mut r, &format!("{prefix}_any_amount_total"), Value::Int(any_total), Unit::Paise,
+                r.fig(&format!("{prefix}_any_amount_total"), Value::Int(any_total), Unit::Paise,
                     &format!("Sum of {mode_name} {dir}s across all (party, {grain}) pairs above, any amount."),
                     evidence)?;
                 let over_what = if is_cash {
@@ -568,12 +549,12 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                     Direction::Receipt => ("debited", "received from"),
                     Direction::Payment => ("credited", "paid to"),
                 };
-                fig(&mut r, &format!("{prefix}_at_or_over_threshold_count"), count(TEST_ID, over_count)?,
+                r.fig(&format!("{prefix}_at_or_over_threshold_count"), count(TEST_ID, over_count)?,
                     Unit::Count,
                     &format!("(party, {grain}) pairs at or over the {over_what} ({row_threshold} paise), \
                               counting a pair only when its vouchers' own {mode_name} {verb} is at or over \
                               it too."), vec![])?;
-                fig(&mut r, &format!("{prefix}_party_side_over_line_below_count"),
+                r.fig(&format!("{prefix}_party_side_over_line_below_count"),
                     count(TEST_ID, line_below_count)?, Unit::Count,
                     &format!("(party, {grain}) pairs whose party side is at or over the {over_what} \
                               ({row_threshold} paise) but whose vouchers' own {mode_name} {verb} is under \
@@ -610,8 +591,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                              vouchers it differs from the {mode_name} line, which is shown with it."
                         ));
                     }
-                    let f_amt = fig(
-                        &mut r,
+                    let f_amt = r.fig(
                         &format!("{prefix}_row_amount_{rid}"),
                         Value::Int(data.paise),
                         Unit::Paise,
@@ -619,7 +599,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         voucher_evidence(&data.vouchers),
                     )?;
                     let f_line = if differs {
-                        Some(fig(&mut r, &format!("{prefix}_row_{mode_name}_line_{rid}"),
+                        Some(r.fig(&format!("{prefix}_row_{mode_name}_line_{rid}"),
                             Value::Int(line_total), Unit::Paise,
                             &format!("The {mode_name} {verb} on the vouchers in this row, summed, whichever \
                                       parties it was for."),
@@ -698,8 +678,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                                 .to_string(),
                         );
                     }
-                    let f_date = fig(
-                        &mut r,
+                    let f_date = r.fig(
                         &format!("{prefix}_row_date_{rid}"),
                         Value::Text(day.clone()),
                         Unit::Text,
@@ -751,10 +730,10 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
             counterparty_types: i.counterparty_type_by_ledger,
         };
         let (rows, skipped) = bill_reference_rows(&pop, book, i.cash, i.bank, direction, &x)?;
-        fig(&mut r, &format!("cash_{dir}_single_transaction_groups_count"), count(TEST_ID, rows.len())?, Unit::Count,
+        r.fig(&format!("cash_{dir}_single_transaction_groups_count"), count(TEST_ID, rows.len())?, Unit::Count,
             &format!("Distinct (party ledger, voucher reference) groups across every date, cash {dir}s only, \
                       voucher.reference non-empty -- s.269ST limb (b)."), vec![])?;
-        fig(&mut r, &format!("cash_{dir}_single_transaction_no_reference_vouchers_count"), count(TEST_ID, skipped)?,
+        r.fig(&format!("cash_{dir}_single_transaction_no_reference_vouchers_count"), count(TEST_ID, skipped)?,
             Unit::Count,
             &format!("Cash {dir} vouchers with a qualifying money leg whose own REFERENCE field is blank -- not \
                       linkable to any other voucher by this books-only signal; limb (b) coverage is partial, \
@@ -767,7 +746,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
         for ((reference, h), ledger, data) in keyed {
             let rh = hash8(&reference);
             let rid = format!("{dir}_{rh}_{h}");
-            let f_amt = fig(&mut r, &format!("cash_{dir}_single_transaction_amount_{rid}"), Value::Int(data.paise),
+            let f_amt = r.fig(&format!("cash_{dir}_single_transaction_amount_{rid}"), Value::Int(data.paise),
                 Unit::Paise,
                 &format!("Cash {dir}s from/to one party ledger (tag {h}) sharing voucher reference (tag {rh}), \
                           summed across every date."), voucher_evidence(&data.vouchers))?;
@@ -824,8 +803,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
         .iter()
         .filter(|j| j.amount_paise >= threshold)
         .collect();
-    fig(
-        &mut r,
+    r.fig(
         "journal_transfer_lines_any_amount_count",
         count(TEST_ID, journal.len())?,
         Unit::Count,
@@ -833,8 +811,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
          Debtors/Sundry Creditors -- a party-to-party transfer with no money-ledger movement.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "journal_transfer_lines_at_or_over_threshold_count",
         count(TEST_ID, over.len())?,
         Unit::Count,
@@ -854,15 +831,14 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
         let vh = hash8(&v.guid);
         let rid = format!("{vh}_{h}");
         let v_ref = EvidenceRef::with_label("voucher", &v.guid, &voucher_label(v));
-        let f_amt = fig(
-            &mut r,
+        let f_amt = r.fig(
             &format!("journal_transfer_amount_{rid}"),
             Value::Int(j.amount_paise),
             Unit::Paise,
             &format!("Journal-entry line against party ledger (tag {h}) on voucher (tag {vh})."),
             vec![v_ref.clone()],
         )?;
-        fig(&mut r, &format!("journal_transfer_code_{rid}"), Value::Text(j.code.to_string()), Unit::Text,
+        r.fig(&format!("journal_transfer_code_{rid}"), Value::Text(j.code.to_string()), Unit::Text,
             "Form 3CD utility Note 1 journal-entry code: I (debit) / J (credit) -- never asserted as a \
              'receipt' or 'payment', which two arbitrary party ledgers do not settle (module docstring).",
             vec![])?;
@@ -889,28 +865,28 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     }
 
     // ------------------------------------------------------------ s.194N (informational)
-    fig(&mut r, "s194n_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_PAISE), Unit::Paise,
+    r.fig("s194n_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_PAISE), Unit::Paise,
         "The s.194N first-proviso annual cash-withdrawal threshold for a recipient who is NOT a \
          co-operative society (rules.s194n.threshold_paise, or this module's own DEFAULT_S194N until \
          that key is added).", vec![])?;
-    fig(&mut r, "s194n_threshold_co_operative_paise", Value::Int(DEFAULT_S194N_THRESHOLD_CO_OPERATIVE_PAISE),
+    r.fig("s194n_threshold_co_operative_paise", Value::Int(DEFAULT_S194N_THRESHOLD_CO_OPERATIVE_PAISE),
         Unit::Paise,
         "The s.194N fourth-proviso threshold where the RECIPIENT (the withdrawer -- this assessee) is \
          itself a co-operative society (rules.s194n.threshold_co_operative_paise).", vec![])?;
-    let f_recipient = fig(&mut r, "s194n_recipient_type",
+    let f_recipient = r.fig("s194n_recipient_type",
         Value::Text(i.s194n_recipient_type.map_or("unknown", Recipient::as_str).to_string()), Unit::Text,
         "Whether this assessee (the RECIPIENT of a s.194N-deducting bank when it withdraws cash) is itself \
          a co-operative society -- derived from the engagement's own entity type; 'unknown' when not \
          supplied or not recognised.", vec![])?;
     match i.s194n_recipient_type {
         Some(Recipient::CoOperative) => {
-            fig(&mut r, "s194n_applicable_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_CO_OPERATIVE_PAISE),
+            r.fig("s194n_applicable_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_CO_OPERATIVE_PAISE),
                 Unit::Paise,
                 "The threshold that applies to THIS recipient: the co-operative-society figure, because \
                  s194n_recipient_type says so.", vec![])?;
         }
         Some(Recipient::NotCoOperative) => {
-            fig(&mut r, "s194n_applicable_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_PAISE), Unit::Paise,
+            r.fig("s194n_applicable_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_PAISE), Unit::Paise,
                 "The threshold that applies to THIS recipient: the ordinary (non-co-operative) figure, \
                  because s194n_recipient_type says so.", vec![])?;
         }
@@ -936,7 +912,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
             });
         }
     }
-    let f_non_filer = fig(&mut r, "s194n_non_filer_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_NON_FILER_PAISE),
+    let f_non_filer = r.fig("s194n_non_filer_threshold_paise", Value::Int(DEFAULT_S194N_THRESHOLD_NON_FILER_PAISE),
         Unit::Paise,
         "The lower threshold (rules.s194n.threshold_non_filer_paise) that applies INSTEAD of the figures \
          above when the recipient has filed no return for ALL THREE preceding assessment years (whose \
@@ -961,8 +937,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
 
     match i.bank_statement {
         None => {
-            fig(
-                &mut r,
+            r.fig(
                 "s194n_coverage",
                 Value::Text("no bank statement supplied for this engagement".to_string()),
                 Unit::Text,
@@ -993,18 +968,18 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                     ));
                 }
             }
-            fig(&mut r, "s194n_coverage",
+            r.fig("s194n_coverage",
                 Value::Text(format!("{}..{} only -- s.194N is an annual test; no other month has a statement in \
                                      this engagement", iso(&statement.start), iso(&statement.end))),
                 Unit::Text,
                 "The calendar window this statement covers; s.194N's ₹1 crore (or ₹20 lakh for a non-filer) \
                  threshold is a FULL-YEAR aggregate this one window cannot establish or rule out.", vec![])?;
-            fig(&mut r, "s194n_narration_matched_withdrawal_total_paise", Value::Int(total), Unit::Paise,
+            r.fig("s194n_narration_matched_withdrawal_total_paise", Value::Int(total), Unit::Paise,
                 "Sum of statement debit rows whose narration matches a caller-supplied withdrawal term, within \
                  the statement's own window only -- informational (the assessee's own exposure as the \
                  RECIPIENT of a s.194N-deducting bank, not a deduction computed here).", evidence)?;
             if terms.is_empty() {
-                fig(&mut r, "s194n_narration_terms_note",
+                r.fig("s194n_narration_terms_note",
                     Value::Text("No cash-withdrawal narration forms were set for this client, so the withdrawal \
                                  total below is nil by construction, not a finding that no cash was withdrawn"
                         .to_string()),
@@ -1014,11 +989,11 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     }
 
     // ------------------------------------------------------------ AIS (not SFT)
-    fig(&mut r, "ais_sft_rows_available_count", Value::Int(0), Unit::Count,
+    r.fig("ais_sft_rows_available_count", Value::Int(0), Unit::Count,
         "AIS Part B2 (SFT) rows tied against the books -- always 0: the AIS reader used for this engagement \
          does not load Part B2 at all (by design, stated in its own documentation). This register cannot tie \
          AIS SFT entries against the books until that reader is extended.", vec![])?;
-    fig(&mut r, "ais_other_rows_supplied_count", count(TEST_ID, i.ais_rows.len())?, Unit::Count,
+    r.fig("ais_other_rows_supplied_count", count(TEST_ID, i.ais_rows.len())?, Unit::Count,
         "AIS rows supplied to this run from parts the AIS reader DOES read (B7 GST turnover/purchases, B3 \
          advance tax, B4 refund) -- informational only; NOT SFT, never conflated with it.", vec![])?;
     if i.ais_rows.is_empty() {

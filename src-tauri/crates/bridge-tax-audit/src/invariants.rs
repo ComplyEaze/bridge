@@ -340,7 +340,8 @@ mod tests {
             Unit::Count,
             "d",
             vec![EvidenceRef::new(kind, guid)],
-        );
+        )
+        .unwrap();
         result_invariants(&book(), &r)
             .1
             .into_iter()

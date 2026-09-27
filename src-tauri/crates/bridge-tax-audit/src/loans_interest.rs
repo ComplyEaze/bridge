@@ -425,7 +425,7 @@ is a taken (credit) or repaid (debit) transaction, never classified by ledger na
 'TDS on payments made': firm/LLP/company always; individual/HUF only if previous-year business \
 turnover exceeded the rules' turnover limit for an individual or HUF.",
         Vec::new(),
-    );
+    )?;
     if status == "unknown" {
         // i64 -> f64 is exact below 2^53 and the division correctly rounded, as Python's is.
         #[allow(clippy::cast_precision_loss)]
@@ -482,7 +482,7 @@ business turnover exceeded ₹{} crore; the current year's books alone cannot es
 classified by the loan ledger this interest pairs with -- never by a word in the ledger name."
             ),
             Vec::new(),
-        );
+        )?;
         let ev_interest = voucher_refs(interest_rows.iter().map(|&(at, _)| pop[at]));
         let f_int = r.fig(
             &format!("interest_total_{h}"),
@@ -493,7 +493,7 @@ classified by the loan ledger this interest pairs with -- never by a word in the
 other line is its configured interest ledger."
             ),
             ev_interest.clone(),
-        );
+        )?;
         r.fig(
             &format!("interest_ledger_{h}"),
             Value::Text(interest_ledger.unwrap_or("").to_string()),
@@ -504,7 +504,7 @@ is interest-free -- this test's own consistency checks read it back to check eac
 loan and that ledger independently of the test's own bucketing."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("clause31_taken_total_{h}"),
             Value::Int(to_i64(taken_total)?),
@@ -514,7 +514,7 @@ loan and that ledger independently of the test's own bucketing."
 taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mode filter."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("clause31_repaid_total_{h}"),
             Value::Int(to_i64(repaid_total)?),
@@ -524,7 +524,7 @@ taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mod
 in the year, before any Clause 31/s.269T lender-exemption or mode filter."
             ),
             Vec::new(),
-        );
+        )?;
 
         let opening_outstanding: i128 = book
             .tb
@@ -558,7 +558,7 @@ negative outstanding -- confirm the opening figure with the client."
                 }
             ),
             Vec::new(),
-        );
+        )?;
 
         // ---------------------------------------------------------------- s.194A TDS
         if !exempt_194a.contains(lender_type)
@@ -637,23 +637,14 @@ s.201(1A) interest still runs either way."
             }
             let vh = hash8(&v.guid);
             let rid = format!("{direction}_{h}_{vh}");
-            let amount_name = format!("clause31_row_amount_{rid}");
-            if r.figures
-                .iter()
-                .any(|f| f.id == format!("{TEST_ID}.{amount_name}"))
-            {
-                // The reference raises on the repeated figure id; this refuses rather than panics.
-                return Err(AuditError::Config(format!(
-                    "{TEST_ID}: two vouchers share the figure id {TEST_ID}.{amount_name}"
-                )));
-            }
+            // Two vouchers with one GUID repeat this id: the reference raises, and `fig` refuses.
             let f_amt = r.fig(
-                &amount_name,
+                &format!("clause31_row_amount_{rid}"),
                 Value::Int(to_i64(amt)?),
                 Unit::Paise,
                 &format!("Loan {direction} on voucher (tag {vh}) against loan ledger (tag {h})."),
                 vec![voucher_ref(v)],
-            );
+            )?;
             let f_mode = r.fig(
                 &format!("clause31_row_mode_{rid}"),
                 Value::Text(m.to_string()),
@@ -664,7 +655,7 @@ group(s): cash/bank if any counter-line is under that group, else journal if the
 is Journal, else other."
                 ),
                 Vec::new(),
-            );
+            )?;
             let code = mode_code(m, direction);
             r.fig(
                 &format!("clause31_row_mode_code_{rid}"),
@@ -675,7 +666,7 @@ is Journal, else other."
 and direction, not read off a specimen utility export -- confirm."
                 ),
                 Vec::new(),
-            );
+            )?;
             r.fig(
                 &format!("clause31_row_outstanding_after_{rid}"),
                 Value::Int(to_i64(after)?),
@@ -687,7 +678,7 @@ walk.",
                     if direction == "taken" { "plus" } else { "minus" }
                 ),
                 Vec::new(),
-            );
+            )?;
             let flagged = NON_ACCOUNT_PAYEE_MODES.contains(&m)
                 && crosses_breach_balance
                 && !exempt_269.contains(lender_type);
@@ -795,7 +786,7 @@ repayments even below ₹20,000 where the loan plus interest is ₹20,000 or mor
 form's reporting exemption, from where the running balance with that lender reaches the s.269SS/269T \
 limit.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "clause31_repaid_reportable_total",
         Value::Int(to_i64(repaid_reportable_total)?),
@@ -804,7 +795,7 @@ limit.",
 form's reporting exemption, where the balance being repaid, with or without the interest credited and \
 not yet paid, or the repayment itself reaches the s.269SS/269T limit.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s269ss_269t_flag_count",
         count(TEST_ID, flag_count)?,
@@ -815,7 +806,7 @@ limit ({limit_269_text}).",
             limit_269_text = rupees(limit_269)
         ),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s194a_tds_over_threshold_lender_count",
         count(TEST_ID, tds_over_threshold_count)?,
@@ -823,7 +814,7 @@ limit ({limit_269_text}).",
         "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A \
 threshold and for which the assessee is a deductor.",
         Vec::new(),
-    );
+    )?;
 
     // Interest ledgers the client config declares shared: the unattributed part is a named figure
     // with its vouchers (the reference's owner decisions of 2026-09-22 and 2026-09-23).
@@ -921,7 +912,7 @@ threshold and for which the assessee is a deductor.",
 excluded) that no paired loan's interest total counts."
             ),
             ev_debits.clone(),
-        );
+        )?;
         let f_reversed = r.fig(
             &format!("shared_interest_reversed_credits_{lh}"),
             Value::Int(to_i64(reversed_total)?),
@@ -940,7 +931,7 @@ since no credit reduces the figure."
                 )
             },
             pair_ev.clone(),
-        );
+        )?;
         let f_unmatched = r.fig(
             &format!("shared_interest_unmatched_credits_{lh}"),
             Value::Int(to_i64(unmatched_total)?),
@@ -957,7 +948,7 @@ shown, never netted."
                 )
             },
             voucher_refs(unmatched.iter().map(|&at| pop[at])),
-        );
+        )?;
         let unattributed = unpaired_debits - reversed_total;
         let un_evidence: Vec<EvidenceRef> = ev_debits
             .iter()
@@ -983,14 +974,14 @@ counts{}{}",
                 shared_netting_note(net_reversals)
             ),
             un_evidence.clone(),
-        );
+        )?;
         r.fig(
             &format!("shared_interest_debits_{lh}"),
             Value::Int(to_i64(debit_on_vouchers)?),
             Unit::Paise,
             &format!("All population debits to shared interest ledger (tag {lh})."),
             Vec::new(),
-        );
+        )?;
         if unattributed > 0 {
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/shared_interest/{lh}"),
@@ -1492,7 +1483,7 @@ mod tests {
         let dup = book(vec![taken("g1", "20250601"), taken("g1", "20250602")]);
         let err = run_on(&dup, &rules).unwrap_err();
         assert!(
-            format!("{err}").contains("two vouchers share the figure id"),
+            matches!(&err, AuditError::DuplicateFigureId(id) if id.contains(".clause31_row_amount_")),
             "{err}"
         );
         // The control: distinct GUIDs give two rows.

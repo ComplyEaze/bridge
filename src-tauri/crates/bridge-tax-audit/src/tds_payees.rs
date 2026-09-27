@@ -317,7 +317,7 @@ netted."
 company always; individual/HUF only if previous-year business turnover exceeded the rules' \
 turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
         Vec::new(),
-    );
+    )?;
     if status == "unknown" {
         // i64 -> f64 is exact below 2^53 and the division correctly rounded, as Python's is.
         #[allow(clippy::cast_precision_loss)]
@@ -356,7 +356,7 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
             .iter()
             .map(|n| EvidenceRef::with_label("ledger", n, n))
             .collect(),
-    );
+    )?;
 
     // ---------------------------------------------------------------- payee rows
     let rows = compute_payee_rows(&pop, book, cfg)?;
@@ -413,7 +413,7 @@ Accounts line{cat_note}: inside a goods invoice, not a separate contract with th
 from the per-payee tests."
             ),
             Vec::new(),
-        );
+        )?;
 
         let payee_entities: BTreeMap<&str, &Summary> = summaries
             .iter()
@@ -434,7 +434,7 @@ once; 'payee not named' counted as one entity, 'within supplier goods invoices' 
 expense ledger line{cat_note}."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("{prefix}_credited_total"),
             Value::Int(credited_total),
@@ -444,7 +444,7 @@ expense ledger line{cat_note}."
 expense ledger line{cat_note} (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test."
             ),
             Vec::new(),
-        );
+        )?;
 
         let is_unmapped_194j = nature == "194J" && subcat == CATEGORY_UNMAPPED;
         let over: BTreeMap<&str, &Summary> = payee_entities
@@ -476,7 +476,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 'unmapped', which is never threshold-tested)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let mut ordered: Vec<(&str, &Summary)> = over.into_iter().collect();
         ordered.sort_by_key(|(e, _)| hash8(e));
@@ -491,14 +491,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
             evidence.sort_by(|a, b| a.id.cmp(&b.id));
             evidence.dedup();
             // Two over-limit entities with one tag (an alias spelled as another ledger's GUID, say)
-            // would repeat a figure id: the reference raises there, so this refuses rather than
-            // letting `TestResult::fig` panic.
-            let row_figure = format!("{TEST_ID}.{prefix}_row_credited_{rid}");
-            if r.figures.iter().any(|f| f.id == row_figure) {
-                return Err(AuditError::Config(format!(
-                    "{TEST_ID}: two payee entities share the figure id {row_figure}"
-                )));
-            }
+            // repeat this figure id: the reference raises there, and `fig` refuses.
             let f_credited = r.fig(
                 &format!("{prefix}_row_credited_{rid}"),
                 Value::Int(s.credited),
@@ -508,7 +501,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 across every population voucher touching a mapped expense ledger."
                 ),
                 evidence.clone(),
-            );
+            )?;
             let f_max_single = r.fig(
                 &format!("{prefix}_row_max_single_{rid}"),
                 Value::Int(s.max_single),
@@ -518,7 +511,7 @@ across every population voucher touching a mapped expense ledger."
 under {nature}{cat_note}."
                 ),
                 Vec::new(),
-            );
+            )?;
             // An unmapped-category amount is never a computed TDS default: its fact key keeps it
             // out of the clause amount sums while the finding still counts toward the clauses.
             let mut facts = vec![
@@ -544,7 +537,7 @@ under {nature}{cat_note}."
 under 194-I."
                     ),
                     Vec::new(),
-                );
+                )?;
                 facts.push(("max_month".to_string(), f_month));
             }
 
@@ -731,7 +724,7 @@ mod tests {
         let rules = Rules::vendored().unwrap();
         let err = run(&book, &rules, "firm", &cfg).unwrap_err();
         assert!(
-            format!("{err}").contains("two payee entities share the figure id"),
+            matches!(&err, AuditError::DuplicateFigureId(id) if id.contains("_row_credited_")),
             "{err}"
         );
         // The control: without the colliding alias both payees are reported.

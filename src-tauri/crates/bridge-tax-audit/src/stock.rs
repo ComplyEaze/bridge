@@ -194,7 +194,7 @@ Non-goods stock items (BASEUNITS == \"Not Applicable\") excluded from every quan
         "Company feature ISINTEGRATED (F11 'Integrate accounts with inventory'), read from the \
 company object when available; 'unknown' if the tag was not found.",
         vec![],
-    );
+    )?;
 
     // ---- quantity field presence ----
     let pop = book.population()?;
@@ -236,7 +236,7 @@ figure can be computed from it",
 vouchers excluded), whose quantity is empty (Tally's value-only line): they move value but no \
 quantity, so the quantity reconstruction skips them. Evidence: the vouchers carrying them.",
         ev_no_qty,
-    );
+    )?;
     let mut no_qty_value = 0_i64;
     for (_, il) in &no_qty {
         let a = il
@@ -253,7 +253,7 @@ quantity, so the quantity reconstruction skips them. Evidence: the vouchers carr
         "Total value of those lines, each taken without its sign (in and out both counted); the \
 vouchers are listed on the line count above.",
         vec![],
-    );
+    )?;
 
     // ---- review: typed in, books two ways, the Stock Summary two dates ----
     let stock_ledgers = book.ledgers_under_any(&[STOCK_IN_HAND_GROUP.to_string()]);
@@ -303,7 +303,7 @@ vouchers are listed on the line count above.",
         Unit::Count,
         "Population vouchers with at least one line on a Stock-in-Hand ledger.",
         ev_stock_ledgers.clone(),
-    );
+    )?;
     if !without_tb.is_empty() {
         r.fig(
             "stock_in_hand_ledgers_without_tb_row_count",
@@ -311,7 +311,7 @@ vouchers are listed on the line count above.",
             Unit::Count,
             "Stock-in-Hand ledgers with no Trial Balance row at all (opening/closing treated as nil).",
             without_tb.iter().map(|n| EvidenceRef::new("ledger", n)).collect(),
-        );
+        )?;
     }
     if typed_in == 0 && !stock_ledgers.is_empty() {
         r.findings.push(Finding {
@@ -342,7 +342,7 @@ cannot show."
         Unit::Paise,
         "Sum of Trial Balance OPENING balances of every Stock-in-Hand ledger.",
         ev_stock_ledgers.clone(),
-    );
+    )?;
     r.fig(
         "books_closing_tb_field_paise",
         Value::Int(books_close_tb),
@@ -350,7 +350,7 @@ cannot show."
         "Sum of Trial Balance CLOSING balances of every Stock-in-Hand ledger, Tally's own closing \
 field.",
         ev_stock_ledgers.clone(),
-    );
+    )?;
     let f_books_close_mv = r.fig(
         "books_closing_movement_paise",
         Value::Int(books_close_mv),
@@ -358,7 +358,7 @@ field.",
         "Sum of (opening + period debit - period credit) of every Stock-in-Hand ledger, from the \
 Trial Balance's own period-movement fields.",
         ev_stock_ledgers.clone(),
-    );
+    )?;
     r.fig(
         "books_closing_tie_diff_paise",
         Value::Int(sub(books_close_tb, books_close_mv)?),
@@ -366,7 +366,7 @@ Trial Balance's own period-movement fields.",
         "books_closing_tb_field_paise minus books_closing_movement_paise. Non-zero shows Tally's own \
 closing field on a Stock-in-Hand ledger does not reflect the year's movement.",
         vec![],
-    );
+    )?;
     let f_sum_open = r.fig(
         "stock_summary_opening_total_paise",
         Value::Int(sum_open),
@@ -374,42 +374,42 @@ closing field on a Stock-in-Hand ledger does not reflect the year's movement.",
         "Sum of every stock item's opening CLOSINGVALUE-as-of-period-start in the Stock Summary \
 (Tally's item-level valuation, independent of the books figure above).",
         vec![],
-    );
+    )?;
     let f_sum_close = r.fig(
         "stock_summary_closing_total_paise",
         Value::Int(sum_close),
         Unit::Paise,
         "Sum of every stock item's closing value in the Stock Summary.",
         vec![],
-    );
+    )?;
     r.fig(
         "stock_summary_closing_positive_paise",
         Value::Int(closing.positive_value_paise()?),
         Unit::Paise,
         "Sum of the Stock Summary's positive-value items at year end.",
         vec![],
-    );
+    )?;
     r.fig(
         "stock_summary_closing_negative_paise",
         Value::Int(closing.negative_value_paise()?),
         Unit::Paise,
         "Sum of the Stock Summary's negative-value items at year end.",
         vec![],
-    );
+    )?;
     r.fig(
         "stock_summary_opening_item_count",
         count(TEST_ID, opening.rows.len())?,
         Unit::Count,
         "Stock items present in the opening Stock Summary read.",
         vec![],
-    );
+    )?;
     r.fig(
         "stock_summary_closing_item_count",
         count(TEST_ID, closing.rows.len())?,
         Unit::Count,
         "Stock items present in the closing Stock Summary read.",
         vec![],
-    );
+    )?;
     let f_gap_open = r.fig(
         "gap_opening_paise",
         Value::Int(gap_open),
@@ -417,7 +417,7 @@ closing field on a Stock-in-Hand ledger does not reflect the year's movement.",
         "stock_summary_opening_total_paise minus books_opening_paise. A figure, not a conclusion \
 about which side is right.",
         vec![],
-    );
+    )?;
     let f_gap_close = r.fig(
         "gap_closing_paise",
         Value::Int(gap_close),
@@ -425,7 +425,7 @@ about which side is right.",
         "stock_summary_closing_total_paise minus books_closing_movement_paise. A figure, not a \
 conclusion about which side is right.",
         vec![],
-    );
+    )?;
     if gap_open != 0 || gap_close != 0 {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/two_stock_figures"),
@@ -466,7 +466,7 @@ the accounts use the ledger-entered figure, not the Stock Summary valuation."
 non-physical item) carrying a negative closing value at year end. Excluded from every \
 quantity-based figure below; shown separately, not silently dropped.",
         item_evidence(nongoods_negative_value.iter().copied()),
-    );
+    )?;
 
     // ---- negative at year end ----
     let ev_close_neg = item_evidence(goods_close_negative.iter().copied());
@@ -476,7 +476,7 @@ quantity-based figure below; shown separately, not silently dropped.",
         Unit::Count,
         "Goods stock items with a negative closing quantity in the Stock Summary at year end.",
         ev_close_neg.clone(),
-    );
+    )?;
     if !goods_close_negative.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/negative_at_close"),
@@ -510,7 +510,7 @@ purchase, or a stock-journal entry was not captured in Tally)."
             iso(&opening.as_of)
         ),
         vec![],
-    );
+    )?;
     r.fig(
         "opening_seed_from_master_count",
         count(TEST_ID, from_master.len())?,
@@ -519,7 +519,7 @@ purchase, or a stock-journal entry was not captured in Tally)."
 opening quantity (the quantity when it was created: the period-start quantity only if the books \
 begin at the period start).",
         item_evidence(&from_master),
-    );
+    )?;
     let no_master: BTreeSet<&String> = from_summary
         .iter()
         .filter(|n| !items.contains_key(*n))
@@ -532,7 +532,7 @@ begin at the period start).",
 started from the summary's quantity, which is the period-start fact, but with no master to say \
 whether each is goods or what its unit is.",
         item_evidence(no_master.iter().copied()),
-    );
+    )?;
     let differs: BTreeSet<&String> = from_summary
         .iter()
         .filter(|n| {
@@ -549,7 +549,7 @@ whether each is goods or what its unit is.",
         "Stock items whose opening Stock Summary quantity differs from their own opening quantity: \
 the items a walk started from the item's own opening would have got wrong.",
         item_evidence(differs.iter().copied()),
-    );
+    )?;
 
     // ---- (a) negative at any point, including opening; (b) became negative ----
     let (in_touched, at_opening) = walk(&pop, &opening_qty, Order::InFirst);
@@ -566,7 +566,7 @@ the items a walk started from the item's own opening would have got wrong.",
         "(a) Items negative at some point in the year, INCLUDING an item already negative at \
 opening, same-day inventory lines ordered stock-in before stock-out.",
         item_evidence(&in_touched),
-    );
+    )?;
     r.fig(
         "negative_any_point_out_first_count",
         count(TEST_ID, out_touched.len())?,
@@ -574,7 +574,7 @@ opening, same-day inventory lines ordered stock-in before stock-out.",
         "(a) Items negative at some point in the year, INCLUDING an item already negative at \
 opening, same-day inventory lines ordered stock-out before stock-in.",
         item_evidence(&out_touched),
-    );
+    )?;
     let f_range_min = r.fig(
         "negative_any_point_range_min",
         count(TEST_ID, min_a)?,
@@ -582,14 +582,14 @@ opening, same-day inventory lines ordered stock-out before stock-in.",
         "(a) min(negative_any_point_in_first_count, negative_any_point_out_first_count): same-day \
 order is not recoverable from the export, so this is a range, never a single count.",
         vec![],
-    );
+    )?;
     let f_range_max = r.fig(
         "negative_any_point_range_max",
         count(TEST_ID, max_a)?,
         Unit::Count,
         "(a) max(negative_any_point_in_first_count, negative_any_point_out_first_count).",
         vec![],
-    );
+    )?;
     let became_in: BTreeSet<&String> = in_touched.difference(&at_opening).collect();
     let became_out: BTreeSet<&String> = out_touched.difference(&at_opening).collect();
     r.fig(
@@ -599,7 +599,7 @@ order is not recoverable from the export, so this is a range, never a single cou
         "(b) Items NOT negative at opening that became negative at some point during the year, \
 same-day inventory lines ordered stock-in before stock-out. A subset of (a).",
         item_evidence(became_in.iter().copied()),
-    );
+    )?;
     r.fig(
         "became_negative_out_first_count",
         count(TEST_ID, became_out.len())?,
@@ -607,21 +607,21 @@ same-day inventory lines ordered stock-in before stock-out. A subset of (a).",
         "(b) Items NOT negative at opening that became negative at some point during the year, \
 same-day inventory lines ordered stock-out before stock-in. A subset of (a).",
         item_evidence(became_out.iter().copied()),
-    );
+    )?;
     let f_became_min = r.fig(
         "became_negative_range_min",
         count(TEST_ID, became_in.len().min(became_out.len()))?,
         Unit::Count,
         "(b) min(became_negative_in_first_count, became_negative_out_first_count).",
         vec![],
-    );
+    )?;
     let f_became_max = r.fig(
         "became_negative_range_max",
         count(TEST_ID, became_in.len().max(became_out.len()))?,
         Unit::Count,
         "(b) max(became_negative_in_first_count, became_negative_out_first_count).",
         vec![],
-    );
+    )?;
     if max_a > 0 {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/went_negative_during_year"),

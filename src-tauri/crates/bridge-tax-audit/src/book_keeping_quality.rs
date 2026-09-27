@@ -462,7 +462,7 @@ pub fn run(
             "Population vouchers with no usable creation-order number; excluded from every \
 entry-order figure.",
             Vec::new(),
-        );
+        )?;
     }
     let mut lag_by_type: BTreeMap<&str, BTreeMap<&str, (i64, &Voucher)>> = BTreeMap::new();
     for (guid, (lag, v)) in &eo.lag {
@@ -487,7 +487,7 @@ entry-order figure.",
 order) after at least one sales voucher, with a lag against the latest sale date already created."
             ),
             Vec::new(),
-        );
+        )?;
         let f_over = r.fig(
             &format!("entry_order_lag_over_30_count_{s}"),
             count(over.len())?,
@@ -498,7 +498,7 @@ order) after a sales voucher, whose own date is more than {LAG_OVER_DAYS} days b
 sale date already created at that point (that sale date less the voucher's own date)."
             ),
             evidence(&over, |v| v),
-        );
+        )?;
         if !over.is_empty() {
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/entry_order/lag_over_30/{s}"),
@@ -538,7 +538,7 @@ document reached the office late, or for some other reason."
         "Population vouchers (any base type) created after the sales voucher with the latest in \
 Tally's creation order.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "entry_order_after_last_sale_value_paise",
         Value::Int(sum_gross(after.values().copied())?),
@@ -546,7 +546,7 @@ Tally's creation order.",
         "Sum of the debit-side (gross) amount of every population voucher (any base type) created \
 after the sales voucher with the latest in Tally's creation order.",
         evidence(after, |v| v),
-    );
+    )?;
     let mut after_by_type: BTreeMap<&str, usize> = BTreeMap::new();
     for v in after.values() {
         *after_by_type.entry(v.base_type.as_str()).or_default() += 1;
@@ -563,7 +563,7 @@ after the sales voucher with the latest in Tally's creation order.",
 '{base_type}'."
             ),
             Vec::new(),
-        );
+        )?;
         after_facts.push((format!("after_last_sale_count_{s}"), fid));
     }
     if !after.is_empty() {
@@ -604,7 +604,7 @@ period the underlying transaction relates to."
         "Debtor ledgers configured as a consolidated payment-channel debtor; a books test with \
 none configured does not apply and reports zero throughout this section.",
         Vec::new(),
-    );
+    )?;
     if !debtors.is_empty() {
         let invoices = payment_channel_invoices(&pop, debtors)?;
         let receipts = payment_channel_receipts(&pop, debtors)?;
@@ -626,7 +626,7 @@ none configured does not apply and reports zero throughout this section.",
             Unit::Count,
             "Sales vouchers with a debit line on a configured payment-channel debtor ledger.",
             evidence(&invoices, |d| d.0),
-        );
+        )?;
         r.fig(
             "pc_invoice_value_total_paise",
             Value::Int(checked_sum(invoices.values().map(|(_, a)| *a))?),
@@ -634,7 +634,7 @@ none configured does not apply and reports zero throughout this section.",
             "Sum of the payment-channel debtor line(s) across the sales vouchers with a debit \
 line on a configured payment-channel debtor ledger.",
             Vec::new(),
-        );
+        )?;
         let f_within3 = r.fig(
             "pc_matched_within_3_days_count",
             count(within3.len())?,
@@ -645,7 +645,7 @@ payment-channel debtor ledger) paired with a receipt of the same amount on the s
 {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days later (greedy match, oldest invoice first)."
             ),
             evidence(&within3, |d| d.0),
-        );
+        )?;
         r.fig(
             "pc_matched_next_day_count",
             count(next_day)?,
@@ -656,7 +656,7 @@ ledger (dated {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days later, gree
 invoice first) whose receipt is dated exactly one day later."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             "pc_unmatched_count",
             count(unmatched)?,
@@ -666,7 +666,7 @@ invoice first) whose receipt is dated exactly one day later."
 within {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days."
             ),
             Vec::new(),
-        );
+        )?;
         let mut per_month: BTreeMap<&str, usize> = BTreeMap::new();
         for (v, _) in invoices.values() {
             *per_month.entry(&v.date.as_str()[..6]).or_default() += 1;
@@ -678,14 +678,14 @@ within {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days."
                 Unit::Count,
                 "Fewest payment-channel invoices in any calendar month touched by the population.",
                 Vec::new(),
-            );
+            )?;
             r.fig(
                 "pc_invoices_per_month_max",
                 count(*max)?,
                 Unit::Count,
                 "Most payment-channel invoices in any calendar month touched by the population.",
                 Vec::new(),
-            );
+            )?;
         }
 
         if !invoices.is_empty() {
@@ -728,7 +728,7 @@ or a single invoice built to match each day's bank credit."
                 "Sales-voucher inventory lines on payment-channel debtor invoices priced against \
 the item's own year-average purchase rate.",
                 Vec::new(),
-            );
+            )?;
             let f_below = r.fig(
                 "pc_margin_below_cost_share_bp",
                 pct_bp(
@@ -740,7 +740,7 @@ the item's own year-average purchase rate.",
                 "Share of the sales-voucher inventory lines on payment-channel debtor invoices \
 where the sale value is less than the item's year-average purchase rate x quantity.",
                 Vec::new(),
-            );
+            )?;
             let f_margin_pc = r.fig(
                 "pc_margin_bp",
                 margin_bp(pc)?,
@@ -748,7 +748,7 @@ where the sale value is less than the item's year-average purchase rate x quanti
                 "Overall (sales - cost) / sales across payment-channel debtor lines, cost from \
 the item's year-average purchase rate.",
                 Vec::new(),
-            );
+            )?;
             let mut facts = vec![
                 ("lines".to_string(), f_lines),
                 ("below_cost_share_bp".to_string(), f_below),
@@ -763,7 +763,7 @@ the item's year-average purchase rate.",
                     "Same overall margin definition, computed on 'named customer' Sales lines \
 (debtor line not a payment-channel debtor or a cash line), for comparison.",
                     Vec::new(),
-                );
+                )?;
                 facts.push(("named_customer_margin_bp".to_string(), f_named));
             }
             let mut limits = vec![
@@ -838,7 +838,7 @@ cost."
         Unit::Count,
         "Ledgers under Tally's 'Stock-in-Hand' group.",
         Vec::new(),
-    );
+    )?;
     let f_untouched = r.fig(
         "stock_ledger_untouched_count",
         count(untouched.len())?,
@@ -846,7 +846,7 @@ cost."
         "Ledgers under Tally's 'Stock-in-Hand' group with zero population vouchers touching them \
 all year.",
         untouched_refs(),
-    );
+    )?;
     for (name, n) in &touches {
         let tag = stable_ledger_tag(book, name)?;
         r.fig(
@@ -855,7 +855,7 @@ all year.",
             Unit::Count,
             &format!("Population vouchers touching one Stock-in-Hand ledger (tag {tag}) all year."),
             Vec::new(),
-        );
+        )?;
     }
     if !untouched.is_empty() {
         r.findings.push(Finding {
@@ -891,7 +891,7 @@ at."
         "GST payment ledgers set for this client; a books test with none configured does not \
 apply and reports only the tax ledgers' own balances, if any.",
         Vec::new(),
-    );
+    )?;
     let mut by_head: BTreeMap<&str, Vec<&String>> = BTreeMap::new();
     for (ledger, head) in &inputs.tax_ledgers_by_head {
         by_head.entry(head.as_str()).or_default().push(ledger);
@@ -912,7 +912,7 @@ apply and reports only the tax ledgers' own balances, if any.",
 '{head}' (Dr+/Cr-)."
             ),
             Vec::new(),
-        );
+        )?;
         head_facts.push((format!("{head}_closing"), fid));
     }
     let mut payment_facts = Vec::new();
@@ -925,7 +925,7 @@ apply and reports only the tax ledgers' own balances, if any.",
             Unit::Paise,
             &format!("TB closing balance of one configured GST payment ledger (tag {h})."),
             Vec::new(),
-        );
+        )?;
         payment_facts.push((format!("payment_closing_{h}"), fid));
         let fid2 = r.fig(
             &format!("gst_setoff_payment_ledger_debit_movement_paise_{h}"),
@@ -936,7 +936,7 @@ apply and reports only the tax ledgers' own balances, if any.",
 payments posted to it during the year."
             ),
             Vec::new(),
-        );
+        )?;
         payment_facts.push((format!("payment_debit_movement_{h}"), fid2));
     }
     if !head_facts.is_empty() && !payment_facts.is_empty() {
@@ -984,7 +984,7 @@ journal entry, and if so, ask for those entries."
         "Population vouchers whose narration matches a configured re-issue/amendment/transfer \
 term.",
         evidence(&reissue, |v| v),
-    );
+    )?;
     r.fig(
         "reissue_narration_match_value_paise",
         Value::Int(sum_gross(reissue.values().copied())?),
@@ -992,7 +992,7 @@ term.",
         "Sum of the debit-side (gross) amount of every population voucher whose narration \
 matches a configured re-issue/amendment/transfer term.",
         Vec::new(),
-    );
+    )?;
     if !reissue.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/reissue_narration"),
@@ -1072,7 +1072,7 @@ November following the financial year)."
         "Journal vouchers debiting a configured discount/write-off ledger and crediting a Sundry \
 Debtors ledger.",
         writeoff_evidence(),
-    );
+    )?;
     r.fig(
         "debtor_writeoff_total_paise",
         Value::Int(checked_sum(writeoffs.values().map(|(_, a)| *a))?),
@@ -1080,7 +1080,7 @@ Debtors ledger.",
         "Sum of the debtor-ledger credit line(s) across the journal vouchers debiting a \
 configured discount/write-off ledger and crediting a Sundry Debtors ledger.",
         Vec::new(),
-    );
+    )?;
     if !writeoffs.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/debtor_writeoff"),
@@ -1137,7 +1137,7 @@ originally."
         "Contra vouchers whose narration claims a direction that their own Cash line's sign \
 contradicts.",
         evidence(&mismatches, |d| d.0),
-    );
+    )?;
     let abs_total = mismatches
         .values()
         .map(|(_, a)| a.checked_abs().ok_or_else(overflow))
@@ -1149,7 +1149,7 @@ contradicts.",
         "Sum of the Cash line amounts, each taken without its sign, across the Contra vouchers \
 whose narration claims a direction that their own Cash line's sign contradicts.",
         Vec::new(),
-    );
+    )?;
     let mut ordered: Vec<(&str, &Voucher, i64)> =
         mismatches.iter().map(|(g, (v, a))| (*g, *v, *a)).collect();
     ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));
@@ -1161,7 +1161,7 @@ whose narration claims a direction that their own Cash line's sign contradicts."
             Unit::Paise,
             "Net Cash-line amount (Dr+/Cr-) on this Contra voucher.",
             one_voucher(v),
-        );
+        )?;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/contra_direction/{h}"),
             clauses: Vec::new(),

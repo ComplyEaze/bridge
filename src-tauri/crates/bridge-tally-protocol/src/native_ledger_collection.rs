@@ -617,19 +617,20 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     // unmeasured, so fail closed rather than silently turning
                     // a missing debtor/creditor balance into zero.
                     if openings.parses(&ledger.name) {
-                        bridge_tally_primitives::ExactDecimal::parse(opening_balance.clone()).map_err(
-                            |error| {
+                        bridge_tally_primitives::ExactDecimal::parse(opening_balance.clone())
+                            .map_err(|error| {
                                 // Classified only to name the refusal: a composite
                                 // is refused exactly as any other non-decimal is.
                                 if crate::native_outstandings::is_foreign_currency_balance(
                                     &opening_balance,
                                 ) {
-                                    anyhow::Error::new(NativeLedgerAmountError::ForeignCurrencyOpening)
+                                    anyhow::Error::new(
+                                        NativeLedgerAmountError::ForeignCurrencyOpening,
+                                    )
                                 } else {
                                     anyhow::Error::from(error)
                                 }
-                            },
-                        )?;
+                            })?;
                     }
                     ledger.opening_balance = Some(opening_balance);
                 }

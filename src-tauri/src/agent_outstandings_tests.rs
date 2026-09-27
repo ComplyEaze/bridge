@@ -177,6 +177,7 @@ async fn forex_outstandings(
         redaction,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let response = server
         .call_tool(

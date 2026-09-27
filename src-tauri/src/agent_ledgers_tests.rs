@@ -2209,7 +2209,7 @@ mod through_the_tool {
             second["structuredContent"]["result"]["snapshot"]["reused"],
             true
         );
-}
+    }
 
     /// A basic read of a book holding a foreign-currency opening is refused as
     /// before, but names why and what to do (#675). The composite is the one in

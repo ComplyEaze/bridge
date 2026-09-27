@@ -1662,8 +1662,13 @@ fn native_preview_refuses_every_other_line_break_and_every_other_field() {
         ("Expense\u{1}\r\n", "import_review_layout_text"),
         ("Expense\u{2028}\r\n", "import_review_layout_text"),
         ("Expense\u{2029}", "import_review_layout_text"),
-        ("Expense\u{200b}\r\n", "import_review_format_text"),
-        ("Expense\u{202e}\r\n", "import_review_format_text"),
+        // The build refuses these bases, so the CR LF is not the admitted
+        // shape and is itself refused as layout.
+        ("Expense\u{200b}\r\n", "import_review_layout_text"),
+        ("Expense\u{202e}\r\n", "import_review_layout_text"),
+        // The build admits a joiner (Indic spelling needs it); the dialog
+        // still refuses it as a hidden character.
+        ("Expense\u{200d}\r\n", "import_review_format_text"),
     ] {
         let (mut line, endpoint) = batch();
         line.vouchers[0].entries[0].ledger = ledger.into();

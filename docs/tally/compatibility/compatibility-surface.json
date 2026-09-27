@@ -167,7 +167,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/cash.rs",
-      "sha256": "537ccc23cdf9a3fde1cb0b51282448e6f8e94df0eb1cb1987d55d68e4f3ea7a1"
+      "sha256": "b9dfe76efa91a737b0a7e5be203300803316451d6518377223f73982000bc468"
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/date.rs",
@@ -435,7 +435,7 @@
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
-      "sha256": "b409c77780b9d173893840a40d839e8abcef134105fb8fd07858c264f48137b4"
+      "sha256": "1575c1784fb014f6dd882aae47e86985ec455fd25d9f143d066c24431435e25f"
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
@@ -467,7 +467,7 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "75a764c1e54642dba07578b1150bf76b569cde636ff67d81ba26cd0ef28069ec"
+      "sha256": "43a9578f5a84b8072b2e7bffdd212a8b1b249ee6cd8b4a6ad4122f3fcbe993dc"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
@@ -479,7 +479,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_cash_bank.rs",
-      "sha256": "2211c0ddab6c198657c21f8a881e8c12c900755b3094ccb7299910b0dd4f31cf"
+      "sha256": "1412846e56ad1fb6eeb18d48168d967bdb5ce89afe59a4bfa58e5a659af1540c"
     },
     {
       "path": "src-tauri/src/agent_import_identity.rs",

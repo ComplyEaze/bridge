@@ -474,6 +474,10 @@
       "sha256": "efc1bf0adbd51b3d9aba922a83a10f154516dbbd21ac82108ab3c590f3c5be91"
     },
     {
+      "path": "src-tauri/src/agent_import_approval.rs",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
       "path": "src-tauri/src/agent_import_cash_bank.rs",
       "sha256": "2211c0ddab6c198657c21f8a881e8c12c900755b3094ccb7299910b0dd4f31cf"
     },

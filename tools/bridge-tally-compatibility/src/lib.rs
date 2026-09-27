@@ -313,7 +313,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // `src-tauri/src/agent_voucher_type_class.rs` (bridge#625) decides which
 // vouchers a type filter returns, and which request is refused as ambiguous;
 // a defect there reports a class of vouchers as absent.
-pub const MAX_SURFACE_FILES: usize = 280;
+// `src-tauri/src/agent_import_approval.rs` (bridge#725) holds the approval a
+// post redeems across calls: what it is bound to, how long it lasts, that it is
+// spent once before the intent, and when it is revoked; a defect there could
+// post a batch on an approval for something else, or on one withdrawn.
+pub const MAX_SURFACE_FILES: usize = 281;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

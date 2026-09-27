@@ -233,3 +233,6 @@ Merged today: #749 and #743. No check-in routine is armed.
 
 ## 2026-09-27T13:48Z: Remaining Lane Q branches handed to other lanes (Lane D2)
 Lane D2 (the fresh orchestrator) says a local lane, Posting thread 2, is doing the schema-2 migrations on `cloud-q/689-review-unavailable` (#731), `cloud-q/632-amendment-overwrite-warning` (#736) and `cloud-q/735-lineerror-cdata` (#763). Lane D2 is updating #733 (`cloud-q/696-lab-lineerror`) itself. Lane Q will not push to any of these four branches.
+
+## 2026-09-27T14:04Z: #733 merged (#696)
+#733 merged after Lane D2 updated it. Lane Q PRs merged so far: #727, #734, #749, #743, #733. Still open and being migrated by other lanes: #731, #736, #763.

@@ -159,13 +159,31 @@ fn select_doubt(
     }
 }
 
-/// An unnamed review's choice, checked again against the records as the
-/// review's own read left them (#756). That read can finish a masters check
-/// that was pending when the choice was made, as a doubt beside the one
-/// chosen; the person would then review one doubt without naming it while
-/// another stands. So two observed doubts after the read refuse as
-/// [`select_doubt`] refuses them before it. One or none leaves the choice to
-/// the checks that follow, as before.
+/// Each doubt kind a batch of `line`'s size can hold, with its records as
+/// they stand now.
+fn doubt_states(imports: &Path, line: &ImportLedgerLine) -> Vec<(DoubtKind, MastersRecord)> {
+    DoubtKind::possible(line.vouchers.len())
+        .iter()
+        .map(|kind| (*kind, kind.read(imports, &line.batch_id)))
+        .collect()
+}
+
+/// A doubt-choice refusal, naming the two kinds when it is the ambiguity.
+fn with_doubt_cause(mut failure: ToolFailure, code: &str) -> ToolFailure {
+    if code == "ack_doubt_ambiguous" {
+        failure.cause = Some("masters_and_batch_step");
+    }
+    failure
+}
+
+/// An unnamed review's choice, checked again against the records as each of
+/// the review's reads left them (#756). A read can finish a masters check that
+/// was pending when the choice was made, as a doubt beside the one chosen: the
+/// review's first read, its read after the dialog, or another call's read
+/// while the dialog is open. The person would then review one doubt without
+/// naming it while another stands. So two observed doubts refuse as
+/// [`select_doubt`] refuses them before any read. One or none leaves the
+/// choice to the checks that follow, as before.
 fn still_the_only_doubt(after: &[(DoubtKind, MastersRecord)]) -> Result<(), &'static str> {
     let observed = after
         .iter()
@@ -922,17 +940,9 @@ impl Server {
                     .ok_or_else(|| "ack_doubt_invalid".to_string())?,
             ),
         };
-        let states = DoubtKind::possible(line.vouchers.len())
-            .iter()
-            .map(|kind| (*kind, kind.read(&imports, &line.batch_id)))
-            .collect::<Vec<_>>();
-        let kind = select_doubt(requested, &states).map_err(|code| {
-            let mut failure = ToolFailure::from(code.to_string());
-            if code == "ack_doubt_ambiguous" {
-                failure.cause = Some("masters_and_batch_step");
-            }
-            failure
-        })?;
+        let states = doubt_states(&imports, &line);
+        let kind = select_doubt(requested, &states)
+            .map_err(|code| with_doubt_cause(ToolFailure::from(code.to_string()), code))?;
         let state = states
             .iter()
             .find(|(state_kind, _)| *state_kind == kind)
@@ -976,17 +986,8 @@ impl Server {
         let fail = |code: String| ToolFailure::from(code).with_prior_evidence(evidence.clone());
         let rows = rows.unwrap_or_default();
         if requested.is_none() {
-            let after = DoubtKind::possible(line.vouchers.len())
-                .iter()
-                .map(|kind| (*kind, kind.read(&imports, &line.batch_id)))
-                .collect::<Vec<_>>();
-            still_the_only_doubt(&after).map_err(|code| {
-                let mut failure = fail(code.to_string());
-                if code == "ack_doubt_ambiguous" {
-                    failure.cause = Some("masters_and_batch_step");
-                }
-                failure
-            })?;
+            still_the_only_doubt(&doubt_states(&imports, &line))
+                .map_err(|code| with_doubt_cause(fail(code.to_string()), code))?;
         }
         let shown = admit_review(&imports, &line, &first.payload, &rows, kind).map_err(fail)?;
         let doubt: Value = serde_json::from_slice(&shown.doubt_raw).unwrap_or_default();
@@ -1043,6 +1044,12 @@ impl Server {
         let fail =
             |code: &str| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone());
         let rows_after = rows_after.unwrap_or_default();
+        // A check that stayed pending through the first read (its catalogue
+        // read failed) can finish as a second doubt now (#756).
+        if requested.is_none() {
+            still_the_only_doubt(&doubt_states(&imports, &line))
+                .map_err(|code| with_doubt_cause(fail(code), code))?;
+        }
         let again = admit_review(&imports, &line, &second.payload, &rows_after, kind);
         if again.as_ref() != Ok(&shown) {
             return Err(fail("ack_changed_while_reviewing"));

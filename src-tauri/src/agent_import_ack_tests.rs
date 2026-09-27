@@ -1542,3 +1542,52 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
         .join(format!("{D3_BATCH}.masters_doubt.json"))
         .exists());
 }
+
+/// The catalogue read refused, as Tally answers when the company cannot be
+/// selected (the live answer `moved_masters_that_cannot_be_re_read_are_not_verified`
+/// scripts, for this company): the masters check cannot finish and stays
+/// pending.
+fn d3_catalogue_refused() -> Vec<ScenarioPlan> {
+    let extent = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+    ));
+    vec![
+        xml(extent),
+        xml("<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA>\
+             <LINEERROR>Could not set 'SVCurrentCompany' to 'BRIDGE AMEND LAB'</LINEERROR>\
+             </DATA></BODY></ENVELOPE>"
+            .to_string()),
+    ]
+}
+
+/// The first read cannot finish the pending masters check (its catalogue read
+/// is refused), so the step doubt is still the only one and the dialog is
+/// shown. The read after the dialog finishes the check as a doubt (#756): the
+/// unnamed review is refused then, and nothing is recorded.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_refused());
+    plans.extend(d3_batch_readback());
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(result["error"]["cause"], "masters_and_batch_step", "{response}");
+    assert_eq!(approval.review_counts(), [50], "the dialog was shown: {response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports.join(format!("{D3_BATCH}.batch_step_ack.json")).exists());
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+}

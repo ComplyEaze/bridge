@@ -203,13 +203,6 @@ fn each_answer_maps_to_its_one_entry() {
             "Drawings",
             "Bank",
         ),
-        (
-            "other_own_bank",
-            Some("HDFC CA"),
-            VoucherType::Contra,
-            "HDFC CA",
-            "Bank",
-        ),
         ("dont_know", None, VoucherType::Payment, "Suspense", "Bank"),
     ] {
         let given = answers(&[(&id, answer, ledger)]).unwrap();
@@ -255,50 +248,71 @@ fn each_answer_maps_to_its_one_entry() {
     }
 }
 
-/// Cash moved between our own banks is one Contra. A deposit from an account
-/// whose statement is not imported is that Contra; either side of a move
-/// already recorded from the other statement posts nothing, and says so.
+/// Cash withdrawn from one of our banks and paid into another passes through
+/// cash in hand: each statement's line posts once, on its own date, against
+/// Cash, never as a bank-to-bank Contra that the other statement's truthful
+/// answer would post a second time.
 #[test]
-fn a_move_between_our_own_banks_is_posted_once() {
-    let deposit = deposit_statement();
-    let id = first_id(&deposit, Bank::Ubi);
-    let given = answers(&[(&id, "from_other_own_bank", Some("SBI CA"))]).unwrap();
-    let built = build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)).unwrap();
-    assert_eq!(built.proposals[0].voucher_type, VoucherType::Contra);
-    assert_eq!(legs(&built), (("Bank", Side::Dr), ("SBI CA", Side::Cr)));
-    refuses(
-        answers(&[(&id, "from_other_own_bank", None)]),
-        "cash_answer_without_ledger",
-    );
-    refuses(
-        answers(&[(&id, "already_recorded", Some("SBI CA"))]),
-        "cash_answer_ledger_not_used",
-    );
-    for (rows, bank) in [
-        (deposit_statement(), Bank::Ubi),
-        (withdrawal_statement(), Bank::Sbi),
-    ] {
-        let id = first_id(&rows, bank);
-        let given = answers(&[(&id, "already_recorded", None)]).unwrap();
-        let built = build(&rows, bank, &no_mapping(), &options(&given)).unwrap();
-        let record = &built.records[0];
-        assert_eq!(record.disposition, Disposition::Skipped);
-        assert_eq!(record.cash_answer, Some(CashAnswer::AlreadyRecorded));
-        assert!(!record.suspense);
-        assert!(built
-            .proposals
-            .iter()
-            .all(|proposal| proposal.bridge_txn_id != record.bridge_txn_id));
-        assert_eq!(selfcheck(&built, "Bank").unwrap().vouchers, rows.len() - 1);
-    }
-    // The deposit's own-bank answer is not the withdrawal's.
+fn cash_moved_between_our_own_banks_posts_once_on_each_side() {
     let withdrawal = withdrawal_statement();
-    let id = first_id(&withdrawal, Bank::Sbi);
-    let given = answers(&[(&id, "from_other_own_bank", Some("UBI SB"))]).unwrap();
+    let withdrawn = first_id(&withdrawal, Bank::Sbi);
+    let deposit = deposit_statement();
+    let paid_in = first_id(&deposit, Bank::Ubi);
+    // The answers that once moved it bank to bank are gone.
+    for answer in ["other_own_bank", "from_other_own_bank", "already_recorded"] {
+        refuses(
+            answers(&[(&withdrawn, answer, None)]),
+            "unknown_cash_answer",
+        );
+    }
+    // The truthful answers: the withdrawal became business cash; the deposit
+    // came from the cash box, which waits for the cash-book check, so until
+    // then the person answers dont_know.
+    let taken = answers(&[(&withdrawn, "business_cash", Some("Cash"))]).unwrap();
+    let mut sbi = options(&taken);
+    sbi.bank_ledger = "SBI CA";
+    let from_sbi = build(&withdrawal, Bank::Sbi, &no_mapping(), &sbi).unwrap();
+    let boxed = answers(&[(&paid_in, "own_cash_box", None)]).unwrap();
+    let mut ubi = options(&boxed);
+    ubi.bank_ledger = "UBI SB";
     refuses(
-        build(&withdrawal, Bank::Sbi, &no_mapping(), &options(&given)),
-        "cash_answer_wrong_direction",
+        build(&deposit, Bank::Ubi, &no_mapping(), &ubi),
+        "cash_answer_not_built",
     );
+    let unknown = answers(&[(&paid_in, "dont_know", None)]).unwrap();
+    ubi.cash_answers = &unknown;
+    let from_ubi = build(&deposit, Bank::Ubi, &no_mapping(), &ubi).unwrap();
+    let cash_vouchers = from_sbi
+        .proposals
+        .iter()
+        .filter(|proposal| proposal.bridge_txn_id == withdrawn)
+        .chain(
+            from_ubi
+                .proposals
+                .iter()
+                .filter(|proposal| proposal.bridge_txn_id == paid_in),
+        )
+        .collect::<Vec<_>>();
+    assert_eq!(cash_vouchers.len(), 2, "one voucher per statement line");
+    for proposal in &cash_vouchers {
+        let ledgers = proposal
+            .entries
+            .iter()
+            .map(|entry| entry.ledger.as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            !(ledgers.contains(&"SBI CA") && ledgers.contains(&"UBI SB")),
+            "no bank-to-bank voucher: {ledgers:?}"
+        );
+    }
+    assert_eq!(legs(&from_sbi), (("Cash", Side::Dr), ("SBI CA", Side::Cr)));
+    assert_eq!(from_sbi.proposals[0].date, "2026-08-01");
+    assert_eq!(
+        legs(&from_ubi),
+        (("UBI SB", Side::Dr), ("Suspense", Side::Cr))
+    );
+    assert_eq!(from_ubi.proposals[0].date, "2026-08-03");
+    assert!(from_ubi.records[0].suspense);
 }
 
 /// Only a tag at the end of a narration, as `build` writes it, marks a
@@ -513,8 +527,8 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
     assert!(withdrawal.contains("withdrawn") && deposit.contains("deposited"));
     assert_eq!(
         taken.len() + given.len(),
-        13,
-        "six and seven, two of them shared"
+        9,
+        "four and five, sharing only dont_know"
     );
     for answer in taken.iter().chain(given) {
         assert_eq!(CashAnswer::parse(answer.as_str()), Some(*answer));
@@ -528,10 +542,7 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
         .iter()
         .filter(|answer| given.contains(answer))
         .collect::<Vec<_>>();
-    assert_eq!(
-        shared,
-        [&CashAnswer::AlreadyRecorded, &CashAnswer::DontKnow]
-    );
+    assert_eq!(shared, [&CashAnswer::DontKnow]);
     assert_eq!(taken.last(), Some(&CashAnswer::DontKnow));
     assert_eq!(given.last(), Some(&CashAnswer::DontKnow));
 }

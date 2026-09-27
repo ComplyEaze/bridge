@@ -65,8 +65,6 @@ impl CashMovement {
                     CashAnswer::BusinessCash,
                     CashAnswer::OwnerUse,
                     CashAnswer::PaidToSomeone,
-                    CashAnswer::OtherOwnBank,
-                    CashAnswer::AlreadyRecorded,
                     CashAnswer::DontKnow,
                 ],
             ),
@@ -77,8 +75,6 @@ impl CashMovement {
                     CashAnswer::UnbookedCashSales,
                     CashAnswer::CustomerPaidIn,
                     CashAnswer::OwnerBroughtIn,
-                    CashAnswer::FromOtherOwnBank,
-                    CashAnswer::AlreadyRecorded,
                     CashAnswer::DontKnow,
                 ],
             ),
@@ -98,9 +94,6 @@ pub enum CashAnswer {
     /// W3: paid straight to someone. Needs a cash Payment to that party too;
     /// not built yet, so refused.
     PaidToSomeone,
-    /// W4: moved to another of our bank accounts. Contra, Dr the named bank
-    /// ledger, Cr this bank.
-    OtherOwnBank,
     /// D1: from our own cash box. A Contra that can drive the cash book
     /// negative, so refused until the cash-book projection is built.
     OwnCashBox,
@@ -111,14 +104,6 @@ pub enum CashAnswer {
     /// D4: the owner or a partner brought it in. Receipt, Dr bank, Cr the
     /// named capital ledger.
     OwnerBroughtIn,
-    /// D5: it came from another of our bank accounts whose statement is not
-    /// imported. Contra, Dr this bank, Cr the named other bank.
-    FromOtherOwnBank,
-    /// Either direction: the other side of a transfer between our own
-    /// accounts, already recorded from the other account's statement. No
-    /// voucher; listed as skipped. Bridge does not check that the other side
-    /// exists in Tally.
-    AlreadyRecorded,
     /// Nobody knows yet. Posted to the suspense ledger, tagged
     /// [`PURPOSE_NOT_CONFIRMED`].
     DontKnow,
@@ -130,13 +115,10 @@ impl CashAnswer {
             "business_cash" => Self::BusinessCash,
             "owner_use" => Self::OwnerUse,
             "paid_to_someone" => Self::PaidToSomeone,
-            "other_own_bank" => Self::OtherOwnBank,
             "own_cash_box" => Self::OwnCashBox,
             "unbooked_cash_sales" => Self::UnbookedCashSales,
             "customer_paid_in" => Self::CustomerPaidIn,
             "owner_brought_in" => Self::OwnerBroughtIn,
-            "from_other_own_bank" => Self::FromOtherOwnBank,
-            "already_recorded" => Self::AlreadyRecorded,
             "dont_know" => Self::DontKnow,
             _ => return None,
         })
@@ -147,13 +129,10 @@ impl CashAnswer {
             Self::BusinessCash => "business_cash",
             Self::OwnerUse => "owner_use",
             Self::PaidToSomeone => "paid_to_someone",
-            Self::OtherOwnBank => "other_own_bank",
             Self::OwnCashBox => "own_cash_box",
             Self::UnbookedCashSales => "unbooked_cash_sales",
             Self::CustomerPaidIn => "customer_paid_in",
             Self::OwnerBroughtIn => "owner_brought_in",
-            Self::FromOtherOwnBank => "from_other_own_bank",
-            Self::AlreadyRecorded => "already_recorded",
             Self::DontKnow => "dont_know",
         }
     }
@@ -166,13 +145,10 @@ impl CashAnswer {
             Self::PaidToSomeone => {
                 "It was paid straight to someone (wages, a supplier, a contractor)."
             }
-            Self::OtherOwnBank => "It was moved to another of our bank accounts.",
             Self::OwnCashBox => "Our own cash box, from cash already recorded in the books.",
             Self::UnbookedCashSales => "Cash sales or collections that are not yet recorded.",
             Self::CustomerPaidIn => "A customer paid it straight into our account.",
             Self::OwnerBroughtIn => "The owner or a partner brought it in.",
-            Self::FromOtherOwnBank => "It came from another of our bank accounts.",
-            Self::AlreadyRecorded => "It is one side of a move between our own bank accounts that is already recorded from the other account's statement.",
             Self::DontKnow => "I don't know yet. It goes to suspense, marked for the CA to move.",
         }
     }
@@ -183,15 +159,11 @@ impl CashAnswer {
         match self {
             Self::BusinessCash => Some("the cash-in-hand ledger"),
             Self::OwnerUse => Some("the drawings or capital ledger"),
-            Self::OtherOwnBank => Some("the other bank's ledger"),
             Self::CustomerPaidIn => Some("the customer's ledger"),
             Self::OwnerBroughtIn => Some("the capital ledger"),
-            Self::FromOtherOwnBank => Some("the other bank's ledger"),
-            Self::PaidToSomeone
-            | Self::OwnCashBox
-            | Self::UnbookedCashSales
-            | Self::AlreadyRecorded
-            | Self::DontKnow => None,
+            Self::PaidToSomeone | Self::OwnCashBox | Self::UnbookedCashSales | Self::DontKnow => {
+                None
+            }
         }
     }
 
@@ -273,7 +245,7 @@ impl CashAnswers {
                     return Err(Refusal::new(
                         "cash_answer_ledger_not_used",
                         format!(
-                            "{}: this answer takes no ledger (dont_know always posts to suspense_ledger; already_recorded posts nothing)",
+                            "{}: this answer takes no ledger (dont_know always posts to suspense_ledger)",
                             row.origin
                         ),
                     ))

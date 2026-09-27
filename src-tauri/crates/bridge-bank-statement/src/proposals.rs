@@ -266,21 +266,11 @@ fn cash_entry(
         ));
     }
     let voucher_type = match answer {
-        CashAnswer::BusinessCash | CashAnswer::OtherOwnBank | CashAnswer::FromOtherOwnBank => {
-            VoucherType::Contra
-        }
+        CashAnswer::BusinessCash => VoucherType::Contra,
         CashAnswer::OwnerUse => VoucherType::Payment,
         CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => VoucherType::Receipt,
         CashAnswer::DontKnow if movement.outward() => VoucherType::Payment,
         CashAnswer::DontKnow => VoucherType::Receipt,
-        // Posts nothing; `build` records it as skipped before asking here.
-        CashAnswer::AlreadyRecorded => {
-            return Err(Refusal::at_row(
-                "cash_answer_posts_nothing",
-                number,
-                format!("row {number}: already_recorded posts no voucher"),
-            ))
-        }
         CashAnswer::PaidToSomeone | CashAnswer::OwnCashBox | CashAnswer::UnbookedCashSales => {
             return Err(Refusal::at_row(
                 "cash_answer_not_built",
@@ -390,23 +380,6 @@ pub fn build(
                     });
                     continue;
                 };
-                if *answer == CashAnswer::AlreadyRecorded {
-                    require_answers(movement, *answer, number)?;
-                    require_unique(&mut seen, &txn_id, number)?;
-                    records.push(StatementRecord {
-                        row: number,
-                        date: date.iso(),
-                        disposition: Disposition::Skipped,
-                        amount: amount_text,
-                        party,
-                        ledger: String::new(),
-                        suspense: false,
-                        bridge_txn_id: txn_id,
-                        cash_movement,
-                        cash_answer: Some(*answer),
-                    });
-                    continue;
-                }
                 let (ledger, voucher_type) =
                     cash_entry(movement, *answer, named, options.suspense_ledger, number)?;
                 (ledger, voucher_type, Some(*answer))

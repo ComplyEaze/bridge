@@ -624,19 +624,29 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         Err("cash_questions_open".to_string())
     );
 
-    args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "dont_know"}]);
+    args["cash_answers"] =
+        json!([{"bridge_txn_id": id, "answer": "owner_use", "ledger": "Drawings"}]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let answered = parsed_with(&request.cash_answers);
     let (proposals_id, _, digest) =
         persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
-    assert_eq!(resolved["vouchers"].as_array().unwrap().len(), 2);
+    let vouchers = resolved["vouchers"].as_array().unwrap();
+    assert_eq!(vouchers.len(), 2);
+    let drawn = vouchers
+        .iter()
+        .find(|voucher| voucher["bridge_txn_id"] == id.as_str())
+        .unwrap();
+    assert_eq!(drawn["voucher_type"], "Payment");
+    assert_eq!(drawn["entries"][0]["ledger"], "Drawings");
+    assert_eq!(drawn["entries"][0]["side"], "Dr");
     let summary = summary(&request, &answered, "statement-x", Path::new("/x"), "0");
     assert_eq!(summary["cash_questions"], json!([]));
+    // Only the unidentified transfer went to suspense; the answered cash line
+    // did not.
     let lines = summary["suspense_lines"].as_array().unwrap();
-    assert_eq!(lines.len(), 2, "{summary}");
-    assert!(lines
-        .iter()
-        .any(|line| line["bridge_txn_id"] == id && line["reason"] == "cash_purpose_not_confirmed"));
+    assert_eq!(lines.len(), 1, "{summary}");
+    assert_eq!(lines[0]["reason"], "party_unmapped_or_mapped_to_suspense");
+    assert_ne!(lines[0]["bridge_txn_id"], id.as_str());
 }

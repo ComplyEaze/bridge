@@ -63,6 +63,10 @@ async fn a_dialog_answered_after_its_call_returned_is_posted_by_a_later_call() {
     );
     assert_eq!(result(&pending)["attempt_recorded"], false, "{pending}");
     assert_eq!(intents(directory.path()), 0);
+    assert!(
+        server.post_approvals.holds(&line.batch_id),
+        "the open dialog is held for the next call"
+    );
 
     scripted.answer(true);
     let approved = server.call_tool("post_import", args.clone()).await;
@@ -216,12 +220,16 @@ async fn another_batch_is_refused_while_one_waits_for_its_person() {
     assert_eq!(scripted.counts(), [1]);
 }
 
-/// Wait until a held dialog's task has ended after its answer.
-/// Wait until a held dialog's answer has been stamped by its task.
+/// Wait until a held dialog's answer has been stamped by its task. Bounded: a
+/// dialog that is no longer held is never stamped, which fails the test.
 async fn until_answered(server: &Server, batch_id: &str) {
-    while !server.post_approvals.answered_for_test(batch_id) {
-        tokio::time::sleep(Duration::from_millis(1)).await;
-    }
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !server.post_approvals.answered_for_test(batch_id) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the held dialog's answer was stamped");
 }
 
 /// A dialog declined while no call waited no longer blocks other batches: the
@@ -531,6 +539,42 @@ async fn nothing_is_held_for_a_withdrawn_call() {
     assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
 }
 
+/// A held dialog whose task ended with no answer (it panicked or was aborted)
+/// can never be answered, so it is let go: another batch is asked, not refused
+/// as busy.
+#[tokio::test]
+async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let dialog = dialog_with(
+        ScriptedApproval::approving_after(|| panic!("the dialog ended without an answer")),
+        1,
+    )
+    .await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !dialog.ended_unanswered() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the dialog's task ended");
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals
+        .hold_pending(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            dialog,
+            native,
+        )
+        .unwrap();
+    assert!(matches!(
+        approvals.begin("bridge-00000000-0000-4000-8000-000000000586"),
+        Begin::Ask
+    ));
+    assert!(!approvals.holds(&line.batch_id));
+}
+
 /// An approval collected by a joined call late in its window reports what is
 /// left of it, counted from the click, not the whole window.
 #[tokio::test]
@@ -816,8 +860,13 @@ fn cash_binding() -> bridge_tally_protocol::StandardLedgerCatalogBinding {
 
 /// A dialog the test seam answers with approval, for `vouchers` vouchers.
 async fn approved_dialog(vouchers: usize) -> PendingPostApproval {
+    dialog_with(ScriptedApproval::approving(), vouchers).await
+}
+
+/// A dialog for `vouchers` vouchers, answered as `scripted` decides.
+async fn dialog_with(scripted: ScriptedApproval, vouchers: usize) -> PendingPostApproval {
     SCRIPTED_APPROVAL
-        .scope(ScriptedApproval::approving(), async {
+        .scope(scripted, async {
             PendingPostApproval::ask(
                 "<ENVELOPE/>".into(),
                 "Synthetic preview".into(),
@@ -1003,17 +1052,20 @@ async fn an_expired_approval_lapses_with_a_note() {
     let directory = tempfile::tempdir().unwrap();
     let (_server, line) = held_line(directory.path());
     let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(1));
+    let binding = binding_of(&line, "Synthetic preview");
     let (request, answered, native) = granted(&line, 1).await;
     approvals
-        .hold_approved(
-            &line.batch_id,
-            binding_of(&line, "Synthetic preview"),
-            request,
-            native,
-            answered,
-        )
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
     std::thread::sleep(Duration::from_millis(5));
+    // Redeemed late, it is refused as expired: the code the catalogue names.
+    assert_eq!(
+        approvals
+            .take_for_dispatch(&line.batch_id, &binding)
+            .err()
+            .as_deref(),
+        Some("import_approval_expired")
+    );
     assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
     let note = approvals.lapse_note(&line.batch_id).unwrap();
     assert_eq!(note["reason"], "approval_expired");

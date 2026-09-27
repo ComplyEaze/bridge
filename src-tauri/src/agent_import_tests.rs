@@ -840,6 +840,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
 #[test]
 fn the_markdown_proof_follows_the_verification_status() {
     let banner = "this report does not confirm posting";
+    let resend = "do not rebuild or resend it";
     let proof = |status: Option<&str>, duplicates: Value| {
         let mut proof = json!({"batch_id":"batch-md","counts":{"posted_verified":1},
             "vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified"}],
@@ -858,20 +859,35 @@ fn the_markdown_proof_follows_the_verification_status() {
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
     assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
     // Not verified with no duplicates, or no status at all, is not clean either:
-    // the banner follows the status, not the duplicate list.
+    // the banner follows the status, not the duplicate list. With no dispatch
+    // record Bridge did not send the batch, so the banner forbids no resend.
     for status in [Some("verification_incomplete"), None] {
         let markdown = render_proof_markdown(&proof(status, json!([])));
         assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(markdown.contains("**Not verified"), "{markdown}");
+        assert!(!markdown.contains(resend), "{markdown}");
         assert!(
             !markdown.contains("| Duplicate in this batch |"),
             "{markdown}"
         );
     }
-    // A dispatch record reading verified does not override the status.
+    // A dispatch record reading verified does not override the status, and a
+    // dispatched batch keeps the instruction not to resend.
     let mut dispatched = proof(Some("verification_incomplete"), json!([]));
     dispatched["dispatch"] = json!({"state":"posted_verified","response_state":"response_clean"});
     let markdown = render_proof_markdown(&dispatched);
-    assert!(markdown.contains(banner), "{markdown}");
+    assert!(markdown.contains(resend), "{markdown}");
+    // An error, or an unverified dispatch, shows the banner on its own, even
+    // beside a verified status.
+    let mut errored = proof(Some("posted_verified"), json!([]));
+    errored["error"] = json!({"code":"import_reconciliation_required"});
+    let mut unreconciled = proof(Some("posted_verified"), json!([]));
+    unreconciled["dispatch"] =
+        json!({"state":"reconciliation_required","response_state":"response_missing"});
+    for flagged in [errored, unreconciled] {
+        let markdown = render_proof_markdown(&flagged);
+        assert!(markdown.contains(resend), "{markdown}");
+    }
     let duplicates = json!([
         {"kind":"remote_id","remote_id":"remote-1","count":2},
         {"kind":"accounting_fingerprint","fingerprint_sha256":"ab12","voucher_ids":["guid:a","guid:b","guid:c"],"remote_ids":[]}

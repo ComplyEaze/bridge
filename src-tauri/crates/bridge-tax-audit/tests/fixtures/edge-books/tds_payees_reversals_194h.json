@@ -1,5 +1,5 @@
 {
- "comment": "tds_payees reversals and s.194H: reversals against an over-limit payee classified bill-specific (named, not applied), as a credit note, not at all, and as a duplicate of another payee's bill (unclassified on this row); a reversal settled partly by bank is its payment, never an unnamed credit; a section that reverses and books reads its cash credit as unnamed; an agent over the s.194H limit with TDS on its bill; an individual recorded as a profession with receipts over the profession limit is a deductor.",
+ "comment": "tds_payees reversals and s.194H: reversals against an over-limit payee classified bill-specific (named, not applied), as a credit note, not at all, and as a duplicate of, or specific to, another payee's bill (unclassified on this row); a reversal settled partly by bank is its payment, never an unnamed credit; a section that reverses and books reads its cash credit as unnamed; an agent over the s.194H limit with TDS on its bill; an individual recorded as a profession with receipts over the profession limit is a deductor.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -117,9 +117,9 @@
   {
    "ledger": "Builder B11",
    "opening": 0,
-   "debit": 1800000,
+   "debit": 1850000,
    "credit": 11000000,
-   "closing": -9200000
+   "closing": -9150000
   },
   {
    "ledger": "Builder B12",
@@ -160,8 +160,8 @@
    "ledger": "Contract Labour",
    "opening": 0,
    "debit": 11500000,
-   "credit": 3100000,
-   "closing": 8400000
+   "credit": 3150000,
+   "closing": 8350000
   },
   {
    "ledger": "Freight",
@@ -344,6 +344,21 @@
      -50000
     ]
    ]
+  },
+  {
+   "guid": "r11",
+   "date": "2025-06-09",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     50000
+    ],
+    [
+     "Contract Labour",
+     -50000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -370,6 +385,10 @@
   },
   "r06": {
    "kind": "duplicate_or_error",
+   "bill": "r07"
+  },
+  "r11": {
+   "kind": "bill_specific",
    "bill": "r07"
   }
  }

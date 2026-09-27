@@ -17,7 +17,7 @@ Each book names, in its own `comment`, what it reaches at the reference's curren
   client recorded in Kerala; Form 26A held and not held; the s.194C(6) question, and a payee on no
   goods-carriage ledger that gets none.
 - `tds_payees_reversals_194h`: reversals classified bill-specific, as a credit note, not at all, and as a
-  duplicate of another payee's bill; a reversal settled partly by bank; a section that reverses and books;
+  duplicate of, or specific to, another payee's bill; a reversal settled partly by bank; a section that reverses and books;
   s.194H with TDS on the bill; an individual recorded as a profession, a deductor by the profession limit.
 - `tds_payees_deductor_both`: both activities under the profession limit, not a deductor: nothing in
   clause 21(b).
@@ -48,8 +48,8 @@ reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e7157
 | `edge.tds_payees_gross_gst.tds_payees.json` | 65,520 | `5a510f6ddda837b38fb3c3b467305835f83b7b9464f945dbdc61b9f2b12c3c36` | `golden/edge.tds_payees_gross_gst.tds_payees.json` |
 | `tds_payees_21b.json` | 6,112 | `cbc3543088630157f0a340ddf2e8517c426a81b6f2d543d9b96c3e2f91b1f8a8` | `edge-books/tds_payees_21b.json` |
 | `edge.tds_payees_21b.tds_payees.json` | 53,797 | `beaee53c2477b35215ec641548cde3aaf4c1bed45da9f822417390991d94f2b9` | `golden/edge.tds_payees_21b.tds_payees.json` |
-| `tds_payees_reversals_194h.json` | 6,293 | `a425a894fc7a5f1ab54617c792a2af55f726811a3c8c55c577afd9216b6c01a6` | `edge-books/tds_payees_reversals_194h.json` |
-| `edge.tds_payees_reversals_194h.tds_payees.json` | 29,440 | `9c320569f28f4e5fa2bfef0d30f92695756fc19d994839e47da9ba3dbc1d9864` | `golden/edge.tds_payees_reversals_194h.tds_payees.json` |
+| `tds_payees_reversals_194h.json` | 6,561 | `1a51ff96db3f173046fb5a7a62cc8c7632c6e7db339f32e3596b94bf045d00ce` | `edge-books/tds_payees_reversals_194h.json` |
+| `edge.tds_payees_reversals_194h.tds_payees.json` | 29,467 | `f2c4730a19b112d8229a67809e91e33d3347bce7dfe282f8938c9116672b445b` | `golden/edge.tds_payees_reversals_194h.tds_payees.json` |
 | `tds_payees_deductor_both.json` | 1,520 | `87efe808595b27026aa8fb065bfda92f633f12bfead20549af917674bd625a0a` | `edge-books/tds_payees_deductor_both.json` |
 | `edge.tds_payees_deductor_both.tds_payees.json` | 17,901 | `0e43833800a4f1114fe3580d4f63b9333c038666b4186e88e3fbe0114b7693e0` | `golden/edge.tds_payees_deductor_both.tds_payees.json` |
 | `tds_payees_deductor_placeholder.json` | 1,632 | `6e6263056f92300780d561ccc58393faec1830d8d3d50d29dabbfc67394e240c` | `edge-books/tds_payees_deductor_placeholder.json` |

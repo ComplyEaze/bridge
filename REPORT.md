@@ -365,3 +365,9 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - E4 full run on 58975ea8 (4 shards on `cloud/lane-e-e4-shards-3`): **639 run, 634 killed**, 5 accepted survivors; all 35 E4 killed. Then E3a's records commit was merged, keeping E4's records; the crate tree is unchanged. `--verify`: 639/639.
 - `batch-e4.md` is reworded (58975ea8); no mention of the private repository in the crate or the messages. Provenance (229) and integrity (349) pass. 352 tests; clippy and fmt clean. Read-only Sonnet pre-push check: none. **Pushed a59eeb58.**
 - State: #744 (E3a) is green on 5a7f8137 and waits on Lane D (real books, review). E4's PR opens after #744 merges; then #644, #662 (check what #727 left), #658, #667.
+
+## 2026-09-27 15:40 UTC — #744: Lane D's second independent review (6914a065): no P1/P2
+
+- Lane D merged master into E3a (6914a065; the crate tree is unchanged, 604/604 proven) and reviewed the delta from 2ce19df6. No P1 or P2. The earlier P2-1 fixes are confirmed, each kill depending on its branch, and the P2-2 docs are true of the code.
+- Its one P3: the body said `load_book`'s `company_is_integrated` call was not driven end to end. It is, through the registry's synthetic golden (`is_integrated` = "No"). Only a hard-coded `Some(false)` would survive, because the synthetic read never says Yes. The body is corrected and the review is recorded. No code change: it is a P3 after the fix rounds.
+- #744 waits on Lane D's real books. E4 (a59eeb58) will merge master when #744 merges.

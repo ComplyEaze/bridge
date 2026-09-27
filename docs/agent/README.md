@@ -225,9 +225,9 @@ too (#692).
   - Tally's own statements carry no company identity; the company, mode and
     book-extent checks around the read are what bind them.
   - The gate has been measured over one full year on one book and one month on
-    another. In a part-year window a P&L ledger's Trial Balance covers the
-    window only, and the year's earlier result sits in the Profit & Loss A/c
-    ledger's opening; the carried line includes both. A window spanning more
+    another. In that one-month window the book's one P&L ledger (sales) had a
+    Trial Balance covering the window only, and the year's earlier result sat
+    in the Profit & Loss A/c ledger's opening; the carried line includes both. A window spanning more
     than one financial year is unmeasured.
 - **Gross and net** are the window's movement, which the Balance Sheet does
   not pin: stock held at `from` and gone by `to` could pass it. So

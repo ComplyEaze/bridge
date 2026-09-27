@@ -9,7 +9,8 @@
 //!
 //! An explicit "don't know" posts the line to the suspense ledger with
 //! [`PURPOSE_NOT_CONFIRMED`] in its narration, listed in the parse and build
-//! results, so the CA can find and move it. That is the owner's
+//! results (or, beyond their size bound, counted), so the CA can find and move
+//! it. That is the owner's
 //! decision of 27-Sep-2026: every bank line reaches the books, and a line whose
 //! purpose nobody knows is visible rather than held back.
 //!

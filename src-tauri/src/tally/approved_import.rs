@@ -305,9 +305,14 @@ impl PendingPostApproval {
     /// that ended with no answer, as [`Self::answer_within`] reports it.
     /// `None` while the dialog is open, and for an approval.
     pub(crate) fn refusal(&self) -> Option<String> {
+        // Finished is read before the stamp: the stamp is set before the task
+        // ends, so a task seen finished with no stamp truly ended unanswered.
+        // Read the other way, a dialog stamped and finished between the two
+        // reads would drop a real approval as unavailable.
+        let finished = self.task.is_finished();
         match self.answered.get() {
             Some((_, refusal)) => refusal.clone(),
-            None if self.task.is_finished() => Some("import_approval_unavailable".into()),
+            None if finished => Some("import_approval_unavailable".into()),
             None => None,
         }
     }

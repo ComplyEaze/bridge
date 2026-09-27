@@ -13,8 +13,10 @@
 //! the dispatch intent is written. A cancelled call, a refused redemption, or a
 //! redemption that ends before its intent lapses it. An approval that lapses
 //! unredeemed leaves a note saying so, and nothing can post from a note. A No,
-//! a timeout or an unanswered end is returned to its batch's next call, which
-//! does not ask the person again.
+//! a timeout or an unanswered end is kept as its code and returned once to its
+//! batch's next call, which does not ask the person again: for as long as an
+//! approval would be kept, at most `MAX_KEPT_REFUSALS` at once, and not across
+//! a withdrawal of the batch or a restart.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
@@ -178,17 +180,19 @@ impl Drop for Redemption<'_> {
 
 /// The refusal of a held dialog that ended without an approval (declined,
 /// timed out, or ended with no answer), and when it was given: the click, or
-/// now for a dialog that ended with no answer.
-fn refusal_of(held: &Held) -> Option<(String, std::time::Instant)> {
+/// now for a dialog that ended with no answer, which has no click.
+fn refusal_of(held: &Held) -> Option<(String, Answered)> {
     match held {
         Held::Pending {
             dialog: Some(dialog),
             ..
         } => dialog.refusal().map(|code| {
-            let at = dialog
-                .answered()
-                .map_or_else(std::time::Instant::now, |answered| answered.at);
-            (code, at)
+            let answered = dialog.answered().unwrap_or_else(|| Answered {
+                approved: false,
+                at: std::time::Instant::now(),
+                at_wall: SystemTime::now(),
+            });
+            (code, answered)
         }),
         _ => None,
     }
@@ -199,7 +203,7 @@ fn refusal_of(held: &Held) -> Option<(String, std::time::Instant)> {
 struct KeptRefusal {
     batch_id: String,
     code: String,
-    at: std::time::Instant,
+    answered: Answered,
 }
 
 /// How many batches' unread refusals are kept at once. Past it the oldest is
@@ -291,18 +295,26 @@ impl PostApprovals {
             .refusals
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        // A refusal is kept as long as an approval would be, from the click.
-        let ttl = self.ttl;
-        refusals.retain(|kept| kept.at.elapsed() < ttl);
+        // A refusal is kept as long as an approval would be, from the click,
+        // on both clocks.
+        refusals.retain(|kept| !self.expired(&kept.answered));
         refusals
     }
 
-    /// Keep `batch_id`'s refusal, given `at`, for its next call, in place of
-    /// any earlier one. One already past its time is dropped when next read.
-    fn keep_refusal(&self, batch_id: String, code: String, at: std::time::Instant) {
+    /// Keep `batch_id`'s refusal, given at `answered`, for its next call, in
+    /// place of any earlier one. One already past its time is not kept, so it
+    /// never pushes a live one out.
+    fn keep_refusal(&self, batch_id: String, code: String, answered: Answered) {
         let mut refusals = self.refusals();
         refusals.retain(|kept| kept.batch_id != batch_id);
-        refusals.push_back(KeptRefusal { batch_id, code, at });
+        if self.expired(&answered) {
+            return;
+        }
+        refusals.push_back(KeptRefusal {
+            batch_id,
+            code,
+            answered,
+        });
         while refusals.len() > MAX_KEPT_REFUSALS {
             refusals.pop_front();
         }
@@ -380,9 +392,9 @@ impl PostApprovals {
     /// collected it yet. Neither blocks another batch. A refusal's code is
     /// kept for its own batch's next call; the dialog itself is dropped.
     fn settle(&self, slot: &mut Option<(String, Held)>) {
-        if let Some((code, at)) = slot.as_ref().and_then(|(_, held)| refusal_of(held)) {
+        if let Some((code, answered)) = slot.as_ref().and_then(|(_, held)| refusal_of(held)) {
             if let Some((batch_id, _dialog)) = slot.take() {
-                self.keep_refusal(batch_id, code, at);
+                self.keep_refusal(batch_id, code, answered);
             }
             return;
         }

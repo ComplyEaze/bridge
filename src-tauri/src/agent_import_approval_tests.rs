@@ -770,12 +770,20 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let directory = tempfile::tempdir().unwrap();
     let (_server, line) = held_line(directory.path());
     let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
+    // Kept while fresh, then aged out.
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(
+        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        "aged out"
+    );
     // The age runs from the click, not from the later call that notices it.
     hold_declined(&approvals, &line, &line.batch_id).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
         matches!(approvals.begin(&line.batch_id), Begin::Ask),
-        "aged out"
+        "aged from the click"
     );
     assert!(!approvals.holds(&line.batch_id));
 
@@ -789,11 +797,12 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
         matches!(approvals.begin(&batch(0)), Begin::Ask),
         "the oldest was dropped"
     );
-    assert!(matches!(approvals.begin(&batch(1)), Begin::Refused(_)));
-    assert!(matches!(
-        approvals.begin(&batch(MAX_KEPT_REFUSALS)),
-        Begin::Refused(_)
-    ));
+    for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
+        assert!(matches!(
+            approvals.begin(&kept),
+            Begin::Refused(code) if code == "import_approval_declined"
+        ));
+    }
 }
 
 /// An approval collected by a joined call late in its window reports what is

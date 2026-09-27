@@ -3,8 +3,8 @@
   "test_id": "loans_interest",
   "test_version": "1",
   "rules_version": "2026-09-17.1",
-  "population_note_sha256_16": "129f841c372e99fc",
-  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger line is its configured interest ledger (the client's list of loans); every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name.",
+  "population_note_sha256_16": "633355ba4551c544",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name.",
   "figures": [
     {
       "id": "loans_interest.clause31_repaid_reportable_total",
@@ -64,8 +64,8 @@
       "id": "loans_interest.clause31_taken_reportable_total",
       "value": 3000000,
       "unit": "paise",
-      "definition_sha256_16": "d7af3e78b067f203",
-      "definition_text": "Sum of the loans taken that Clause 31(a) reports: entries on a loan from a lender outside the form's reporting exemption, from where the running balance with that lender reaches the s.269SS/269T limit.",
+      "definition_sha256_16": "50c18eb5ff17b6b3",
+      "definition_text": "Sum of the loans taken that Clause 31(a) reports: entries on a loan from a lender outside the form's reporting exemption, from where the running balance with that lender reaches the s.269SS/269T limit, or whose own amount does.",
       "evidence": []
     },
     {
@@ -78,7 +78,7 @@
     },
     {
       "id": "loans_interest.deductor_status",
-      "value": "not_deductor",
+      "value": "unknown",
       "unit": "text",
       "definition_sha256_16": "a02e7d371de92a27",
       "definition_text": "Whether the assessee must deduct TDS under s.194A for the year -- the same rule and figure as 'TDS on payments made': firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF.",
@@ -88,16 +88,16 @@
       "id": "loans_interest.interest_ledger_0830d951",
       "value": "Interest on NBFC Loan",
       "unit": "text",
-      "definition_sha256_16": "4aa635e2f5f1ffc9",
-      "definition_text": "The configured interest ledger name for loan ledger (tag 0830d951), or '' if the loan is interest-free -- this test's own consistency checks read it back to check each voucher on this loan and that ledger independently of the test's own bucketing.",
+      "definition_sha256_16": "bbe7dd2db3999480",
+      "definition_text": "The configured interest ledger name(s) for loan ledger (tag 0830d951), one per line, or '' if the loan is interest-free -- this test's own consistency checks read them back to check each voucher on this loan and its interest ledger(s) independently of the test's own bucketing.",
       "evidence": []
     },
     {
       "id": "loans_interest.interest_total_0830d951",
       "value": 1200000,
       "unit": "paise",
-      "definition_sha256_16": "8dfdae6bce0d0bad",
-      "definition_text": "Interest paid/credited on loan ledger (tag 0830d951): sum of every voucher whose only other line is its configured interest ledger.",
+      "definition_sha256_16": "59b29907a0685b07",
+      "definition_text": "Interest paid/credited on loan ledger (tag 0830d951): sum of every voucher whose only other lines are its configured interest ledger(s) and any ledger in the client's statutory dues classified as TDS payable, counted before that TDS.",
       "evidence": [
         {
           "kind": "voucher",
@@ -115,6 +115,30 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.loan_not_listed_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0db09bdab34a2d4e",
+      "definition_text": "Ledgers under Loans (Liability), other than bank and cash ledgers, that moved in the year and are not in the client's list of loans (each has a notice).",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.loan_notice_chain_incomplete_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "e98a3afeb6df0500",
+      "definition_text": "Ledgers that moved in the year, are not in the client's list of loans and are not bank or cash ledgers, whose Tally group chain is incomplete: whether each is under Loans (Liability) cannot be told, so neither notice is raised for it.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.loan_pattern_not_listed_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2bc6287eee8463fa",
+      "definition_text": "Ledgers under Current Liabilities, Sundry Creditors or Suspense A/c, not in the client's list of loans, with bank debits of one amount in 3 or more months narrated with ACH, NACH, ECS or EMI (each has a notice).",
+      "evidence": []
+    },
+    {
       "id": "loans_interest.max_outstanding_paise_0830d951",
       "value": 3000000,
       "unit": "paise",
@@ -123,8 +147,32 @@
       "evidence": []
     },
     {
-      "id": "loans_interest.s194a_tds_over_threshold_lender_count",
+      "id": "loans_interest.s194a_tds_coverage_0830d951",
+      "value": "none",
+      "unit": "text",
+      "definition_sha256_16": "cf9ddcfdac0703e2",
+      "definition_text": "Whether the TDS on loan ledger (tag 0830d951) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_covering_0830d951",
       "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f48bfe282b2a9523",
+      "definition_text": "The TDS on loan ledger (tag 0830d951) that covers its interest: each deduction counts only against interest credited on or before its own date, up to the s.194A rate on that interest.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_expected_0830d951",
+      "value": 120000,
+      "unit": "paise",
+      "definition_sha256_16": "5b45943d9f7072c6",
+      "definition_text": "TDS at the s.194A rate (1000 basis points) on loan ledger (tag 0830d951)'s interest.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.s194a_tds_over_threshold_lender_count",
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "9c8fff5fb794835b",
       "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold and for which the assessee is a deductor.",
@@ -136,6 +184,14 @@
       "unit": "count",
       "definition_sha256_16": "caaf7427c636ca1f",
       "definition_text": "Reportable taken/repaid rows in cash/journal/other mode at or over the s.269SS/269T limit (₹20,000).",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.tds_on_loan_0830d951",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d16b63b0fef2fa28",
+      "definition_text": "TDS deducted on loan ledger (tag 0830d951): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
       "evidence": []
     }
   ],
@@ -178,6 +234,76 @@
       "ask_client_sha256_16": "8c22e5a927638b0c",
       "ask_client_text": [
         "Confirm lender identity (name, address, PAN) for Clause 31."
+      ]
+    },
+    {
+      "id": "loans_interest/deductor_status",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "deductor_status",
+          "figure_id": "loans_interest.deductor_status"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "0ce57b36611ab3b1",
+      "title_text": "Deductor status for s.194A depends on previous-year turnover",
+      "limits_sha256_16": "6e207d695ab5a813",
+      "limits_text": [
+        "An individual/HUF is a s.194A deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
+      ],
+      "ask_client_sha256_16": "6a59a8224649a5d2",
+      "ask_client_text": [
+        "Confirm previous-year turnover or gross receipts, and whether from a business or a profession."
+      ]
+    },
+    {
+      "id": "loans_interest/s194a/0830d951",
+      "clauses": [
+        "s.194A",
+        "3CD-21(b)",
+        "3CD-34(a)",
+        "3CD-34(c)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "interest",
+          "figure_id": "loans_interest.interest_total_0830d951"
+        },
+        {
+          "name": "lender_type",
+          "figure_id": "loans_interest.lender_type_0830d951"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "NBFC Loan",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "li-102",
+          "label": "Journal li-102 on 2025-06-30"
+        }
+      ],
+      "title_sha256_16": "0b322ccb976c9523",
+      "title_text": "Interest to a non-exempt lender over the s.194A threshold, no TDS ledger evidence",
+      "limits_sha256_16": "aa4c25f28642d930",
+      "limits_text": [
+        "Whether the assessee must deduct under s.194A is not known (see the deductor-status question): listed until it is confirmed.",
+        "Books only: lender type ('nbfc') comes from the client's setup, not from a notification lookup; confirm the lender is not itself a body notified as exempt under s.194A(3)(iii) beyond the lender types the rules already exempt.",
+        "s.40(a)(ia) disallows 30% of the interest on TDS default; the second proviso removes this if the lender's Form 26A (Rule 31ACB) shows the interest was returned as income -- s.201(1A) interest still runs either way."
+      ],
+      "ask_client_sha256_16": "0ea73eedec7e5715",
+      "ask_client_text": [
+        "Confirm whether TDS under s.194A was deducted on interest to Invented Finance Ltd.",
+        "If not deducted, confirm whether Form 26A is available for this lender."
       ]
     }
   ],

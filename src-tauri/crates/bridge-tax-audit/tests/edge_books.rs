@@ -116,7 +116,8 @@ fn build(s: &Value) -> Book {
                 name: name.clone(),
                 parent: chain.first().cloned().unwrap_or_default(),
                 chain,
-                chain_complete: true,
+                chain_complete: typed(l, "chain_complete", false, "true or false", Value::as_bool)
+                    .unwrap_or(true),
                 master_opening_paise: 0,
                 guid: l["guid"].as_str().unwrap().to_string(),
                 masterid: None,

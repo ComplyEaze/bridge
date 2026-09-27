@@ -1,0 +1,585 @@
+{
+ "comment": "loans_interest s.194A coverage at the reference's current head, a firm (a deductor): interest booked net of a TDS-payable ledger, counted gross, then a TDS catch-up journal, covering the rate (Covered Loan: no s.194A finding, a TDS-seen finding); TDS short of the rate (Partly Loan: partly covered); TDS dated before any interest covers none of it (Early TDS Loan); a LIC and a financial-corporation lender, which the current rules exempt, over the threshold with no TDS (no finding); two interest ledgers on one loan, one of them also classified TDS payable, which never makes it a TDS line (Multi Loan); one TDS journal debiting two loans, counted for neither, which LOAN-1 names for both (Twin A, Twin B).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-000"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-001"
+  },
+  {
+   "name": "Covered Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-002"
+  },
+  {
+   "name": "Partly Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-003"
+  },
+  {
+   "name": "Early TDS Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-004"
+  },
+  {
+   "name": "LIC Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-005"
+  },
+  {
+   "name": "Fin Corp Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-006"
+  },
+  {
+   "name": "Multi Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-007"
+  },
+  {
+   "name": "Twin A",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-008"
+  },
+  {
+   "name": "Twin B",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-009"
+  },
+  {
+   "name": "Interest Covered",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-010"
+  },
+  {
+   "name": "Interest Partly",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-011"
+  },
+  {
+   "name": "Interest Early",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-012"
+  },
+  {
+   "name": "Interest LIC",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-013"
+  },
+  {
+   "name": "Interest Fin Corp",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-014"
+  },
+  {
+   "name": "Interest Multi",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-015"
+  },
+  {
+   "name": "Processing Fee Multi",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_tds_coverage-016"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 12500000,
+   "credit": 0,
+   "closing": 12500000
+  },
+  {
+   "ledger": "Covered Loan",
+   "opening": 0,
+   "debit": 80000,
+   "credit": 6880000,
+   "closing": -6800000
+  },
+  {
+   "ledger": "Early TDS Loan",
+   "opening": -5000000,
+   "debit": 50000,
+   "credit": 1100000,
+   "closing": -6050000
+  },
+  {
+   "ledger": "Fin Corp Loan",
+   "opening": -8000000,
+   "debit": 0,
+   "credit": 1300000,
+   "closing": -9300000
+  },
+  {
+   "ledger": "Interest Covered",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Interest Early",
+   "opening": 0,
+   "debit": 1100000,
+   "credit": 0,
+   "closing": 1100000
+  },
+  {
+   "ledger": "Interest Fin Corp",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Interest LIC",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 0,
+   "closing": 1500000
+  },
+  {
+   "ledger": "Interest Multi",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Interest Partly",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 0,
+   "closing": 1500000
+  },
+  {
+   "ledger": "LIC Loan",
+   "opening": -10000000,
+   "debit": 0,
+   "credit": 1500000,
+   "closing": -11500000
+  },
+  {
+   "ledger": "Multi Loan",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3045000,
+   "closing": -3045000
+  },
+  {
+   "ledger": "Partly Loan",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4470000,
+   "closing": -4470000
+  },
+  {
+   "ledger": "Processing Fee Multi",
+   "opening": 0,
+   "debit": 150000,
+   "credit": 0,
+   "closing": 150000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 305000,
+   "closing": -305000
+  },
+  {
+   "ledger": "Twin A",
+   "opening": 0,
+   "debit": 10000,
+   "credit": 1000000,
+   "closing": -990000
+  },
+  {
+   "ledger": "Twin B",
+   "opening": 0,
+   "debit": 10000,
+   "credit": 1000000,
+   "closing": -990000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-04-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Covered Loan",
+     -5000000
+    ],
+    [
+     "Bank A",
+     5000000
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Covered",
+     1200000
+    ],
+    [
+     "Covered Loan",
+     -1080000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Covered",
+     800000
+    ],
+    [
+     "Covered Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Covered Loan",
+     80000
+    ],
+    [
+     "TDS Payable",
+     -80000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Partly Loan",
+     -3000000
+    ],
+    [
+     "Bank A",
+     3000000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Partly",
+     1500000
+    ],
+    [
+     "Partly Loan",
+     -1470000
+    ],
+    [
+     "TDS Payable",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "e01",
+   "date": "2025-04-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Early TDS Loan",
+     50000
+    ],
+    [
+     "TDS Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Early",
+     1100000
+    ],
+    [
+     "Early TDS Loan",
+     -1100000
+    ]
+   ]
+  },
+  {
+   "guid": "l01",
+   "date": "2025-07-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest LIC",
+     1500000
+    ],
+    [
+     "LIC Loan",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "f01",
+   "date": "2025-08-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Fin Corp",
+     1300000
+    ],
+    [
+     "Fin Corp Loan",
+     -1300000
+    ]
+   ]
+  },
+  {
+   "guid": "m01",
+   "date": "2025-04-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Multi Loan",
+     -2500000
+    ],
+    [
+     "Bank A",
+     2500000
+    ]
+   ]
+  },
+  {
+   "guid": "m02",
+   "date": "2025-05-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Multi",
+     400000
+    ],
+    [
+     "Processing Fee Multi",
+     100000
+    ],
+    [
+     "Multi Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "m03",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Processing Fee Multi",
+     50000
+    ],
+    [
+     "Multi Loan",
+     -45000
+    ],
+    [
+     "TDS Payable",
+     -5000
+    ]
+   ]
+  },
+  {
+   "guid": "t01",
+   "date": "2025-09-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Twin A",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "t02",
+   "date": "2025-09-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Twin B",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "t03",
+   "date": "2025-11-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Twin A",
+     10000
+    ],
+    [
+     "Twin B",
+     10000
+    ],
+    [
+     "TDS Payable",
+     -20000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Covered Loan": {
+   "lender": "Invented Covered Finance",
+   "lender_type": "nbfc",
+   "interest_ledger": "Interest Covered"
+  },
+  "Partly Loan": {
+   "lender": "Invented Partly Finance",
+   "lender_type": "nbfc",
+   "interest_ledger": "Interest Partly"
+  },
+  "Early TDS Loan": {
+   "lender": "Invented Early Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Early"
+  },
+  "LIC Loan": {
+   "lender": "Invented Life Insurer",
+   "lender_type": "lic",
+   "interest_ledger": "Interest LIC"
+  },
+  "Fin Corp Loan": {
+   "lender": "Invented State Finance Corporation",
+   "lender_type": "financial_corporation",
+   "interest_ledger": "Interest Fin Corp"
+  },
+  "Multi Loan": {
+   "lender": "Invented Multi Finance",
+   "lender_type": "nbfc",
+   "interest_ledger": [
+    "Interest Multi",
+    "Processing Fee Multi"
+   ]
+  },
+  "Twin A": {
+   "lender": "Invented Twin One",
+   "lender_type": "person"
+  },
+  "Twin B": {
+   "lender": "Invented Twin Two",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable",
+  "Processing Fee Multi"
+ ]
+}

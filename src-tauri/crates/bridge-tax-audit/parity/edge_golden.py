@@ -20,7 +20,8 @@ builds the same book in Rust and compares whole dumps. Python 3.13 is pinned bec
 tables (15.1.0) are the ones the crate's case mapping reproduces (`src/support.rs`).
 
 Spec keys: `period` ([start, end], ISO; default the AY 2026-27 previous year), `groups` ({name:
-parent or null}), `ledgers` ([{name, chain, guid}]), `tb` ([{ledger, opening, debit, credit,
+parent or null}), `ledgers` ([{name, chain, guid, chain_complete?}], `chain_complete` a boolean, absent
+meaning true), `tb` ([{ledger, opening, debit, credit,
 closing}]), `vouchers` ([{guid, date, base_type, vtype?, number?, reference?, status?, narration?,
 masterid?, inventory?, lines: [[ledger, paise], ...]}]; `number` defaults to the GUID, so pass `""`
 to test a voucher with no number; `reference` is text, absent meaning ""; `masterid` is text, absent
@@ -97,9 +98,6 @@ def main() -> int:
     status = {s: getattr(VoucherStatus, s.upper()) for s in STATUS}
     start, end = spec.get("period", ["2025-04-01", "2026-03-31"])
     groups = {n: Group(name=n, parent=p) for n, p in spec["groups"].items()}
-    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
-                                 chain=tuple(l["chain"]), chain_complete=True, guid=l.get("guid", ""))
-               for l in spec["ledgers"]}
     # Typed strictly, the same way tests/edge_books.rs reads them, so that a mistyped key fails on
     # both sides instead of building two different books.
     def typed(d, key, ok, what, absent=None, nullable=True):
@@ -108,6 +106,13 @@ def main() -> int:
         if not ok(d[key]):
             raise SystemExit(f"{spec_path.name}: {key} must be {what}, got {d[key]!r}")
         return d[key]
+
+    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
+                                 chain=tuple(l["chain"]),
+                                 chain_complete=typed(l, "chain_complete", lambda x: isinstance(x, bool),
+                                                      "true or false", absent=True, nullable=False),
+                                 guid=l.get("guid", ""))
+               for l in spec["ledgers"]}
 
     def integer(x):
         return isinstance(x, int) and not isinstance(x, bool)

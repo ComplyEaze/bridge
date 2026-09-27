@@ -27,7 +27,7 @@ use crate::rules::Rules;
 use crate::support::{
     count, ledgers_by_tag, overflow, py_lower, py_repr_str, py_strip, rupees, voucher_label,
 };
-use crate::tds_payees::{deductor_status, py_format_g};
+use crate::tds_payees::{deductor_status_business_limit_only, py_format_g};
 
 pub const TEST_ID: &str = "loans_interest";
 pub const VERSION: &str = "1";
@@ -412,7 +412,8 @@ is a taken (credit) or repaid (debit) transaction, never classified by ledger na
     let deductor_threshold = rules
         .deductor_individual_huf_prev_year_turnover_paise
         .ok_or_else(|| missing("deductor"))?;
-    let status = deductor_status(
+    // The reference's rule before its profession limit: this port is not yet re-pinned (#787).
+    let status = deductor_status_business_limit_only(
         entity_type,
         deductor_threshold,
         previous_year_turnover_paise,

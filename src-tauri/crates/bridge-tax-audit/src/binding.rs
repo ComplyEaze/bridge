@@ -691,6 +691,20 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
     if let Some(t) = tds.as_mut() {
         t.nature_by_ledger = lbinder.rebind_map(&t.nature_by_ledger, "tds.nature_by_ledger")?;
         t.payee_aliases = lbinder.rebind_map(&t.payee_aliases, "tds.payee_aliases")?;
+        // `[tds].goods_carriage_ledgers` (a list), between the aliases and the 194J categories,
+        // as in the reference's `LEDGER_PATHS`.
+        if let Some(value) = engagement
+            .raw_cfg
+            .get("tds")
+            .and_then(toml::Value::as_table)
+            .and_then(|tds| tds.get("goods_carriage_ledgers"))
+        {
+            let location = "tds.goods_carriage_ledgers";
+            t.goods_carriage_ledgers = lbinder
+                .bind_list(&names_at(value, location)?, location)?
+                .into_iter()
+                .collect();
+        }
         t.s194j_category_by_ledger = lbinder.rebind_map(
             &t.s194j_category_by_ledger,
             "tds_payees.s194j_category_by_ledger",

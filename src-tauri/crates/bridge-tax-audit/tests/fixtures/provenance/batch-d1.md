@@ -33,10 +33,13 @@ lender and ledger name is invented ("Invented Finance Ltd", "NBFC Loan", ...).
   rate (a TDS-seen finding, no s.194A finding); TDS short of the rate (partly covered); TDS dated before any
   interest, which covers none of it; a LIC and a financial-corporation lender, exempt under the current
   rules, over the threshold with no TDS (no finding); two interest ledgers on one loan, one also classified
-  TDS payable, which never makes it a TDS line; and one TDS journal debiting two loans, counted for
-  neither, which LOAN-1 names for both.
+  TDS payable, which never makes it a TDS line; interest whose s.194A rate ends in half a paisa (rounded up),
+  TDS on a separate voucher the same day (read after the interest) and a TDS reversal, covered only within
+  the rupee of tolerance; and one TDS journal debiting two loans, counted for neither, which LOAN-1 names
+  for both.
 - `edge-books/loans_interest_questions.json` (an individual whose previous-year turnover is a placeholder
-  between the two limits, activity not recorded: status unknown; added at the re-pin below) reaches: an
+  below both limits, activity not recorded: not a deductor, made unknown by the placeholder; added at the
+  re-pin below) reaches: an
   expense credited to a loan and its reversal, each asked about as the lender's charge; an entry against
   only another loan's interest ledger (and LOAN-3 on that ledger); a bank debit and its return by
   identical narration, one by a number in the credit's reference, and a repeated narration; a repayment
@@ -45,7 +48,7 @@ lender and ledger name is invented ("Invented Finance Ltd", "NBFC Loan", ...).
   Government loan taken (reported) and repaid (not); one lender on two ledgers whose names match only
   case-folded; two ledgers with no lender; and the unlisted-loan notices (a loan left out of the list;
   instalments to a creditor in three months; none for suspense in two months, a duties ledger, a bank OD
-  or a ledger whose group chain is incomplete).
+  or a ledger whose group chain is incomplete, though its partial chain reaches Loans (Liability)).
 - Not reached here: LOAN-2's "cites vouchers outside the books population", and the unresolvable-tag
   messages, which need a result the builder never produces. Two vouchers with one GUID on one loan in
   one direction repeat a figure id: the reference raises and the port refuses; a unit test in
@@ -107,16 +110,16 @@ and regenerating all seven goldens there gives byte-identical files.
 | `loans_interest_individual_at.json` | 2,246 | `23f1d587147d0e8163b80cf91c96193c86f086f2b1b8ed7288d37910f9a83c0e` | `edge-books/loans_interest_individual_at.json` |
 | `loans_interest_individual_over.json` | 2,250 | `2fb2d55b6a6c1522a1dc094ec37e1bc3d962bf0e84b427de0a3fa9efaec8d875` | `edge-books/loans_interest_individual_over.json` |
 | `loans_interest_invariants.json` | 6,570 | `5ddaf6edd94c6fc0dfe087c7eba3f35fe54c7139e1dc5d2092837e1c7b346e87` | `edge-books/loans_interest_invariants.json` |
-| `loans_interest_questions.json` | 16,093 | `534df6181af1e7375323f2d4fc0a636c48ec5948ed7d0ea5002922150a69d783` | `edge-books/loans_interest_questions.json` |
+| `loans_interest_questions.json` | 16,159 | `6511dbaf9cee8e2c0586099715bb90a48793b7eb1ae8449c280085f25a74e823` | `edge-books/loans_interest_questions.json` |
 | `loans_interest_shared.json` | 3,883 | `f714219e6bf0aa29a66e109cc1be1523b6549e686c5bf4521a60b871b238b90b` | `edge-books/loans_interest_shared.json` |
 | `loans_interest_shared_reversals.json` | 3,907 | `3e58ab5517e605380cbf4a2f502e700f62fd87ee9ecac4441149286790f88208` | `edge-books/loans_interest_shared_reversals.json` |
-| `loans_interest_tds_coverage.json` | 10,027 | `d83628c76e4857993dd6fb48f64e6949bf2d05265c06a835e0ad5491a8f04c01` | `edge-books/loans_interest_tds_coverage.json` |
+| `loans_interest_tds_coverage.json` | 11,385 | `d1a32587660d4f9de320f0ba575c38d8321a067159195dd80b7a784c2bc1f175` | `edge-books/loans_interest_tds_coverage.json` |
 | `edge.loans_interest_core.loans_interest.json` | 76,187 | `c61674345bd5050a0f29d34fdf84d2ed98e7362a398627c0f2d0b68f23d4f01b` | `golden/edge.loans_interest_core.loans_interest.json` |
 | `edge.loans_interest_individual_at.loans_interest.json` | 14,848 | `0041167f87e001afcba90e77d9d163a7343b9172bbf84bf45ca6efb8aa87eae6` | `golden/edge.loans_interest_individual_at.loans_interest.json` |
 | `edge.loans_interest_individual_over.loans_interest.json` | 13,610 | `1e814b00f322fdbacfe26a1bf98a692962c2a2cc0bac563b2a8e4bf478dca7c7` | `golden/edge.loans_interest_individual_over.loans_interest.json` |
 | `edge.loans_interest_invariants.loans_interest.json` | 31,921 | `fc1d2903cfc25759ade4b32fa67eca55dedee8b780e6b444a39620ddf8476a54` | `golden/edge.loans_interest_invariants.loans_interest.json` |
-| `edge.loans_interest_questions.loans_interest.json` | 131,670 | `9ae0f750094c13d037982013f9c0feaf75637c63eb221bf4574cf332bbb4ad10` | `golden/edge.loans_interest_questions.loans_interest.json` |
+| `edge.loans_interest_questions.loans_interest.json` | 131,690 | `944fd6091d6aad84026b09ca42e01b4802960e9869d8f8ca61521ee2209c77c5` | `golden/edge.loans_interest_questions.loans_interest.json` |
 | `edge.loans_interest_shared.loans_interest.json` | 14,674 | `68cbeebc7cbc91b870512a9e9ddd776a905af2da638398df8f327a461b948cbe` | `golden/edge.loans_interest_shared.loans_interest.json` |
 | `edge.loans_interest_shared_reversals.loans_interest.json` | 15,663 | `7bbb99dcca92484cfc155ce9b81e86c051c2e16e1d8d83da3f2da06e2b3a0190` | `golden/edge.loans_interest_shared_reversals.loans_interest.json` |
-| `edge.loans_interest_tds_coverage.loans_interest.json` | 58,322 | `f7d4eb83bd868dc5f5dd1a44a5b1ad8ada93b30620f7c1638f0fcc04d26881f6` | `golden/edge.loans_interest_tds_coverage.loans_interest.json` |
+| `edge.loans_interest_tds_coverage.loans_interest.json` | 65,157 | `346843840c6109cdc4cf735d0e8020c2e8aa4e4fca1f3d61b5c12d81b17e3d8b` | `golden/edge.loans_interest_tds_coverage.loans_interest.json` |
 | `synthetic.loans_interest.json` | 21,113 | `1e1822b391809d96a48b685c0c393f0a519acc7a9f343909cf87bb47c38fb16c` | `golden/synthetic.loans_interest.json` |

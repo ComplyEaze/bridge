@@ -2647,7 +2647,7 @@
     {
       "invariant": "MAP-1",
       "subject": "Broken Ledger",
-      "detail": "chain incomplete: Missing Group"
+      "detail": "chain incomplete: Missing Group > Loans (Liability)"
     },
     {
       "invariant": "POP-3",

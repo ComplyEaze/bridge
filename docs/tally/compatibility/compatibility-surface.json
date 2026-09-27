@@ -539,7 +539,7 @@
     },
     {
       "path": "src-tauri/src/agent_protocol.rs",
-      "sha256": "68201b12c3da7321d11c5ee0c3bc36a390a493be7992fa7ff21ed1288a8bd07f"
+      "sha256": "107f89129a57ff798ceb4127f74947dab35c5ad2c3ce0c006eb32bfc561fa297"
     },
     {
       "path": "src-tauri/src/agent_read_profiles.rs",

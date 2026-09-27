@@ -499,7 +499,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs",
-      "sha256": "a8ee9ddaab447d8dce60e4e5c006a6a2cd65157f99d14b6f198a05c8182389ef"
+      "sha256": "2233c0c45ead47d84b6e0404904b3232d9bd86c3ff865cf4ccb6291b78083c1c"
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",

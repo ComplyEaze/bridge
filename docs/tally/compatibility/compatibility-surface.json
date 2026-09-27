@@ -103,11 +103,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "40ebc1c07130b1a4eea6bd4eab99d93f0ad8c67f9a37fb3a1520e1c7572c9bd6"
+      "sha256": "ad9b1da3d8645f4a4dd49cb6dda1cb0ac15c6c0fc8ee3665fc7f60211cbbd962"
     },
     {
       "path": "pnpm-lock.yaml",
-      "sha256": "98fa3873a5e1c494d9428eea73e6bfb1b696d686334af732bc3c236d69d20a2b"
+      "sha256": "663ddfc3b7a1928e908f9ebe2ef6fcc2bd26e655b3b795d0920aeb73dfc1c6c7"
     },
     {
       "path": "scripts/check-tally-live-read-boundary.mjs",
@@ -151,7 +151,7 @@
     },
     {
       "path": "src-tauri/Cargo.lock",
-      "sha256": "ac2dd86869e6f2a1fef36c950af6963bd458a923881b2c90bdf53f9a7233302e"
+      "sha256": "864030cd55f554c3bc1049a325097b04a03f90786161fd628889e1c8b66c8ff7"
     },
     {
       "path": "src-tauri/Cargo.toml",

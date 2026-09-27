@@ -5,7 +5,7 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MEASURED_POST,
+    ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
 };
 use crate::agent::agent_protocol::{run_post, Framer};
 use crate::agent::ToolResponse;
@@ -268,6 +268,66 @@ async fn a_decline_between_calls_is_returned_to_the_next_call_not_asked_again() 
     assert_eq!(observed.len(), before_approval().len());
     assert_eq!(intents(directory.path()), 0);
     assert!(!server.post_approvals.holds(&line.batch_id));
+}
+
+/// Two batches refused between calls each read their own No (#725): the
+/// second batch's refusal does not replace the first's, and neither person is
+/// asked again.
+#[tokio::test]
+async fn two_batches_refused_between_calls_each_read_their_own_no() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, first_args) = saved_batch(&server);
+    let second_args = saved_other_batch(&server, &line);
+    let second_batch = second_args["batch_id"].as_str().unwrap().to_string();
+    let first = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(
+            first.clone(),
+            server.call_tool("post_import", first_args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    first.answer(false);
+    until_answered(&server, &line.batch_id).await;
+    let second = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(
+            second.clone(),
+            server.call_tool("post_import", second_args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    second.answer(false);
+    until_answered(&server, &second_batch).await;
+    let first_again = SCRIPTED_APPROVAL
+        .scope(first.clone(), server.call_tool("post_import", first_args))
+        .await;
+    let second_again = SCRIPTED_APPROVAL
+        .scope(second.clone(), server.call_tool("post_import", second_args))
+        .await;
+    let observed = sent(simulator);
+    for (again, scripted) in [(&first_again, &first), (&second_again, &second)] {
+        assert_eq!(
+            result(again)["error"]["code"],
+            "import_approval_declined",
+            "{again}"
+        );
+        assert_eq!(scripted.counts(), [1], "not asked again");
+    }
+    assert_eq!(observed.len(), 2 * before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
 }
 
 /// A dialog declined while no call waited no longer blocks other batches: the
@@ -612,7 +672,7 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
     )
     .await;
     tokio::time::timeout(Duration::from_secs(5), async {
-        while !dialog.ended_unanswered() {
+        while dialog.refusal().is_none() {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
     })
@@ -636,18 +696,103 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
         approvals.lapse_note(&line.batch_id).is_none(),
         "an unanswered dialog leaves no note to read as approved"
     );
-    // Its own batch's next call joins the ended dialog and reads why.
-    let Begin::Join(ended) = approvals.begin(&line.batch_id) else {
-        panic!("the ended dialog is joined, not asked again");
-    };
-    let refusal = ended
-        .answer_within(Duration::from_secs(5))
-        .await
-        .ok()
-        .expect("the dialog has ended")
-        .0
-        .err();
-    assert_eq!(refusal.as_deref(), Some("import_approval_unavailable"));
+    // Its own batch's next call reads why, and is not asked again.
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Refused(code) if code == "import_approval_unavailable"
+    ));
+}
+
+/// A batch id no test keeps a refusal for.
+const OTHER: &str = "bridge-00000000-0000-4000-8000-000000000999";
+
+/// Hold, for `batch_id`, a dialog the person has already declined.
+async fn hold_declined(approvals: &PostApprovals, line: &ImportLedgerLine, batch_id: &str) {
+    let dialog = dialog_with(ScriptedApproval::declining(), 1).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while dialog.refusal().is_none() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the dialog was declined");
+    let native = native_post_request(line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    approvals
+        .hold_pending(
+            batch_id,
+            binding_of(line, "Synthetic preview"),
+            dialog,
+            native,
+        )
+        .unwrap();
+}
+
+/// A refusal no call has read is returned once, to its own batch's next call,
+/// and a withdrawal of that batch drops it. It never holds the slot: another
+/// batch is asked throughout, and nothing is left held after the withdrawal.
+#[tokio::test]
+async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    assert!(
+        matches!(approvals.begin(OTHER), Begin::Ask),
+        "it blocks no other batch"
+    );
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Refused(code) if code == "import_approval_declined"
+    ));
+    assert!(
+        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        "returned once"
+    );
+
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    approvals.revoke(&line.batch_id, "request_cancelled");
+    assert!(
+        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        "a withdrawal drops it"
+    );
+    assert!(!approvals.holds(&line.batch_id));
+    assert!(
+        matches!(approvals.begin(OTHER), Begin::Ask),
+        "nothing is left held"
+    );
+}
+
+/// Kept refusals age out with the approval limit, and past the cap the oldest
+/// is dropped: that batch is asked again, and the others still read their No.
+#[tokio::test]
+async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(
+        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        "aged out"
+    );
+
+    let approvals = PostApprovals::new(directory.path());
+    let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
+    for i in 0..=MAX_KEPT_REFUSALS {
+        hold_declined(&approvals, &line, &batch(i)).await;
+        assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    }
+    assert!(
+        matches!(approvals.begin(&batch(0)), Begin::Ask),
+        "the oldest was dropped"
+    );
+    assert!(matches!(approvals.begin(&batch(1)), Begin::Refused(_)));
+    assert!(matches!(
+        approvals.begin(&batch(MAX_KEPT_REFUSALS)),
+        Begin::Refused(_)
+    ));
 }
 
 /// An approval collected by a joined call late in its window reports what is

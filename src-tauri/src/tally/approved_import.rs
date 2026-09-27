@@ -221,7 +221,8 @@ impl Answered {
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
     task: tokio::task::JoinHandle<Result<ApprovedImport, String>>,
-    answered: std::sync::Arc<std::sync::OnceLock<Answered>>,
+    /// The answer and, for a refusal, its code: one stamp, set once.
+    answered: std::sync::Arc<std::sync::OnceLock<(Answered, Option<String>)>>,
     started: std::time::Instant,
 }
 
@@ -257,8 +258,12 @@ impl PendingPostApproval {
             )
             .await;
             // Stamped before the task ends, never after: a task seen finished
-            // with no stamp is one that ended without an answer.
-            let _ = stamp.set(Answered::now(answer.is_ok()));
+            // with no stamp is one that ended without an answer. A refusal's
+            // code is stamped with it, so it can be read without the task.
+            let _ = stamp.set((
+                Answered::now(answer.is_ok()),
+                answer.as_ref().err().cloned(),
+            ));
             answer
         };
         Self {
@@ -279,9 +284,7 @@ impl PendingPostApproval {
             Err(_) => Err(self),
             Ok(Ok(answer)) => {
                 let at = self
-                    .answered
-                    .get()
-                    .copied()
+                    .answered()
                     .unwrap_or_else(|| Answered::now(answer.is_ok()));
                 Ok((answer, at))
             }
@@ -294,13 +297,19 @@ impl PendingPostApproval {
 
     /// Whether the dialog has been answered, and how, without waiting.
     pub(crate) fn answered(&self) -> Option<Answered> {
-        self.answered.get().copied()
+        self.answered.get().map(|(answered, _)| *answered)
     }
 
-    /// Whether the dialog's task ended with no answer stamped (it panicked or
-    /// was aborted): nothing can come of it.
-    pub(crate) fn ended_unanswered(&self) -> bool {
-        self.task.is_finished() && self.answered.get().is_none()
+    /// Why the dialog approved nothing, once it has ended without an approval:
+    /// the stamped refusal code, or `import_approval_unavailable` for a task
+    /// that ended with no answer, as [`Self::answer_within`] reports it.
+    /// `None` while the dialog is open, and for an approval.
+    pub(crate) fn refusal(&self) -> Option<String> {
+        match self.answered.get() {
+            Some((_, refusal)) => refusal.clone(),
+            None if self.task.is_finished() => Some("import_approval_unavailable".into()),
+            None => None,
+        }
     }
 
     /// How much of the dialog's time limit remains.

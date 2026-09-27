@@ -379,6 +379,7 @@ impl Server {
                     Begin::Ask => false,
                     Begin::Redeem => true,
                     Begin::Busy(code) => return Err(code.to_string().into()),
+                    Begin::Refused(code) => return Err(code.into()),
                     Begin::Waiting => {
                         return Ok(self.approval_outcome(
                             batch_id,

@@ -143,6 +143,8 @@ pub(super) enum Begin {
     Redeem,
     /// Something else is held; refused with this code.
     Busy(&'static str),
+    /// This batch's dialog ended in a refusal no call has read: returned now.
+    Refused(String),
 }
 
 /// What waiting on a joined dialog came to.
@@ -174,23 +176,40 @@ impl Drop for Redemption<'_> {
     }
 }
 
-/// Whether `held` is a dialog that ended without an approval: declined, timed
-/// out, or ended with no answer. Joining it reads the refusal's code.
-fn refused(held: &Held) -> bool {
-    matches!(held, Held::Pending { dialog: Some(dialog), .. }
-        if dialog.ended_unanswered()
-            || dialog.answered().is_some_and(|answered| !answered.approved))
+/// The refusal of a held dialog that ended without an approval: declined,
+/// timed out, or ended with no answer.
+fn refusal_of(held: &Held) -> Option<String> {
+    match held {
+        Held::Pending {
+            dialog: Some(dialog),
+            ..
+        } => dialog.refusal(),
+        _ => None,
+    }
 }
 
-/// The approvals one process holds: at most one batch at a time.
+/// A refusal no call has read yet: the person's No, a timeout, or a dialog that
+/// ended unanswered. It is only a code: it approves nothing and holds nothing.
+struct KeptRefusal {
+    batch_id: String,
+    code: String,
+    at: std::time::Instant,
+}
+
+/// How many batches' unread refusals are kept at once. Past it the oldest is
+/// dropped, and that batch's next call asks the person again.
+pub(super) const MAX_KEPT_REFUSALS: usize = 32;
+
+/// The approvals one process holds: one batch's dialog or approval at a time,
+/// and the unread refusals of other batches.
 pub(in crate::agent) struct PostApprovals {
     imports: PathBuf,
     held: Mutex<Option<(String, Held)>>,
-    /// A refused dialog let go before its own batch's next call read it. That
-    /// call gets the refusal instead of asking the person again (#725). It
-    /// blocks no other batch, and a later refusal replaces it. Locked only
-    /// while `held` is.
-    unread_refusal: Mutex<Option<(String, Held)>>,
+    /// Refusals that landed while no call waited, one per batch, oldest first.
+    /// Each is returned once, to its own batch's next call, instead of asking
+    /// the person again (#725). They block no other batch. Locked only while
+    /// `held` is.
+    refusals: Mutex<std::collections::VecDeque<KeptRefusal>>,
     ttl: Duration,
     measured_post: Duration,
 }
@@ -200,7 +219,7 @@ impl PostApprovals {
         Self {
             imports: data_dir.join("imports"),
             held: Mutex::new(None),
-            unread_refusal: Mutex::new(None),
+            refusals: Mutex::new(std::collections::VecDeque::new()),
             ttl: APPROVAL_TTL,
             measured_post: MEASURED_POST,
         }
@@ -261,10 +280,36 @@ impl PostApprovals {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn unread_refusal(&self) -> std::sync::MutexGuard<'_, Option<(String, Held)>> {
-        self.unread_refusal
+    fn refusals(&self) -> std::sync::MutexGuard<'_, std::collections::VecDeque<KeptRefusal>> {
+        let mut refusals = self
+            .refusals
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // A refusal is kept as long as an approval would be, from its landing.
+        let ttl = self.ttl;
+        refusals.retain(|kept| kept.at.elapsed() < ttl);
+        refusals
+    }
+
+    /// Keep `batch_id`'s refusal for its next call, in place of any earlier one.
+    fn keep_refusal(&self, batch_id: String, code: String) {
+        let mut refusals = self.refusals();
+        refusals.retain(|kept| kept.batch_id != batch_id);
+        refusals.push_back(KeptRefusal {
+            batch_id,
+            code,
+            at: std::time::Instant::now(),
+        });
+        while refusals.len() > MAX_KEPT_REFUSALS {
+            refusals.pop_front();
+        }
+    }
+
+    /// `batch_id`'s kept refusal, removed: it is returned once.
+    fn take_refusal(&self, batch_id: &str) -> Option<String> {
+        let mut refusals = self.refusals();
+        let at = refusals.iter().position(|kept| kept.batch_id == batch_id)?;
+        refusals.remove(at).map(|kept| kept.code)
     }
 
     fn expired(&self, answered: &Answered) -> bool {
@@ -306,17 +351,10 @@ impl PostApprovals {
     pub(super) fn begin(&self, batch_id: &str) -> Begin {
         let mut slot = self.slot();
         self.settle(&mut slot);
-        if slot.is_none() {
-            // A No, a timeout or an unanswered end this batch has not read:
-            // this call joins the ended dialog and returns its refusal, and
-            // the person is not asked again (#725).
-            let mut unread = self.unread_refusal();
-            if unread
-                .as_ref()
-                .is_some_and(|(refused_batch, _)| refused_batch == batch_id)
-            {
-                *slot = unread.take();
-            }
+        // A No, a timeout or an unanswered end this batch has not read is
+        // returned to this call, and the person is not asked again (#725).
+        if let Some(code) = self.take_refusal(batch_id) {
+            return Begin::Refused(code);
         }
         let Some((held_batch, held)) = slot.as_mut() else {
             return Begin::Ask;
@@ -336,11 +374,13 @@ impl PostApprovals {
 
     /// Let go of what can no longer be redeemed: a dialog that ended without
     /// an approval, and an approval past its time, whether or not a call has
-    /// collected it yet. Neither blocks another batch. A refusal is kept aside
-    /// for its own batch's next call to read.
+    /// collected it yet. Neither blocks another batch. A refusal's code is
+    /// kept for its own batch's next call; the dialog itself is dropped.
     fn settle(&self, slot: &mut Option<(String, Held)>) {
-        if slot.as_ref().is_some_and(|(_, held)| refused(held)) {
-            *self.unread_refusal() = slot.take();
+        if let Some(code) = slot.as_ref().and_then(|(_, held)| refusal_of(held)) {
+            if let Some((batch_id, _dialog)) = slot.take() {
+                self.keep_refusal(batch_id, code);
+            }
             return;
         }
         let finished = match slot.as_ref() {
@@ -552,10 +592,12 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw whatever is held for `batch_id`: an open dialog is closed and
-    /// an approval, redeemed or not, can no longer be spent.
+    /// Withdraw whatever is held for `batch_id`: an open dialog is closed, an
+    /// approval, redeemed or not, can no longer be spent, and an unread refusal
+    /// is dropped, so the next call asks again.
     pub(in crate::agent) fn revoke(&self, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
+        self.refusals().retain(|kept| kept.batch_id != batch_id);
         if slot
             .as_ref()
             .is_some_and(|(held_batch, _)| held_batch == batch_id)

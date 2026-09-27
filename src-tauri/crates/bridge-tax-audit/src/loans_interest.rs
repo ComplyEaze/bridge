@@ -3409,6 +3409,69 @@ mod tests {
             .any(|l| l.starts_with("The rules carry no s.194A rate")));
     }
 
+    /// Interest lines the book reads (each within i64) whose total leaves i64 are refused with the
+    /// crate's typed overflow error, never a wrapped figure or a panic.
+    #[test]
+    fn interest_past_i64_is_refused_not_wrapped() {
+        let rules = Rules::vendored().unwrap();
+        let journal = |guid: &str| Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250930".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: vec![
+                LedgerLine {
+                    ledger: "Interest A".to_string(),
+                    amount_paise: 5_000_000_000_000_000_000,
+                },
+                LedgerLine {
+                    ledger: "Loan A".to_string(),
+                    amount_paise: -5_000_000_000_000_000_000,
+                },
+            ],
+            ..Default::default()
+        };
+        let mut b = book(vec![journal("i1"), journal("i2")]);
+        b.ledgers.insert(
+            "Interest A".to_string(),
+            Ledger {
+                name: "Interest A".to_string(),
+                parent: "Indirect Expenses".to_string(),
+                chain: vec!["Indirect Expenses".to_string()],
+                chain_complete: true,
+                master_opening_paise: 0,
+                guid: String::new(),
+                masterid: None,
+            },
+        );
+        let loans = loan_config(&table(
+            "[\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\ninterest_ledger = \"Interest A\"\n",
+        ))
+        .unwrap();
+        let none = BTreeSet::new();
+        let err = run(
+            &b,
+            &rules,
+            "firm",
+            &loans,
+            &Inputs {
+                previous_year_turnover_paise: None,
+                cash: &none,
+                bank: &none,
+                shared_interest_ledgers: &none,
+                tds_payable_ledgers: &none,
+                deductor_activity: None,
+                turnover_is_placeholder: false,
+            },
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, AuditError::Config(m) if m.contains("overflowed")),
+            "{err}"
+        );
+    }
+
     #[test]
     fn rules_without_s194a_are_refused() {
         let mut rules = Rules::vendored().unwrap();

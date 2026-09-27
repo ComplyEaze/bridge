@@ -2433,6 +2433,77 @@ deductor_aliases = 5\n"
         }
     }
 
+    /// `loans_interest_on` passes the test what the reference's pack passes: the ledgers
+    /// `[statutory_dues]` classifies as TDS payable, `[deductor].activity`, and whether
+    /// `[tds].previous_year_turnover_status` is a placeholder. Each is shown to reach the result.
+    #[test]
+    fn loans_interest_on_passes_the_tds_ledgers_activity_and_placeholder() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let mut b = book_with_loan("Loan A", "", "Loan Interest", "");
+        b.ledgers.insert(
+            "TDS Payable".to_string(),
+            ledger("TDS Payable", "Duties & Taxes", "", None),
+        );
+        let line = |ledger: &str, amount_paise: i64| LedgerLine {
+            ledger: ledger.to_string(),
+            amount_paise,
+        };
+        b.vouchers.push(Voucher {
+            guid: "loan-interest-net-of-tds".to_string(),
+            date: TallyDate::parse("20250930".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: vec![
+                line("Loan Interest", 1_200_000),
+                line("Loan A", -1_080_000),
+                line("TDS Payable", -120_000),
+            ],
+            ..Default::default()
+        });
+        let run = |extra: &str| {
+            let mut e = engagement(&format!(
+                "\n[loans.loan_ledgers.\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = \"Loan Interest\"\n{extra}"
+            ));
+            e.entity_type = Some("individual".to_string());
+            crate::loans_interest_on(&e, &b, &rules).unwrap()
+        };
+        let value = |dump: &serde_json::Value, prefix: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"].as_str().unwrap().starts_with(prefix))
+                .map(|f| f["value"].clone())
+        };
+        // Without [statutory_dues] the TDS line is no TDS: the journal is a loan taken.
+        let interest = "loans_interest.interest_total_";
+        assert_eq!(value(&run(""), interest), Some(serde_json::json!(0)));
+        let dues = "\n[statutory_dues.nature_by_ledger]\n\"TDS Payable\" = \"tds_payable\"\n";
+        assert_eq!(
+            value(&run(dues), interest),
+            Some(serde_json::json!(1_200_000))
+        );
+        // Rs 60 lakh: over the profession limit, under the business limit.
+        let status = |activity: &str, turnover_status: &str| {
+            let dump = run(&format!(
+                "\n[tds]\nprevious_year_turnover_paise = 600000000\n{turnover_status}\
+                 \n[deductor]\nactivity = \"{activity}\"\n"
+            ));
+            value(&dump, "loans_interest.deductor_status").unwrap()
+        };
+        assert_eq!(status("profession", ""), serde_json::json!("deductor"));
+        assert_eq!(status("business", ""), serde_json::json!("not_deductor"));
+        assert_eq!(
+            status(
+                "business",
+                "previous_year_turnover_status = \"placeholder\"\n"
+            ),
+            serde_json::json!("unknown")
+        );
+    }
+
     // ---- config parse errors surface through Engagement::from_toml, not bind ----
 
     #[test]

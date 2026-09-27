@@ -834,6 +834,91 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     );
 }
 
+/// A behaviour change of bridge#767, pinned so it is deliberate. A verified
+/// batch voucher A, a cancelled row A′ with A's marker below the pre-import mark
+/// (reachable only through a legacy tag or an amendment lineage), and an
+/// unrelated cancel C of the same date and type. Before bridge#767, A′ and C
+/// paired as a batch duplicate and the batch read verification_incomplete; that
+/// refusal came only from C, since without it the batch read posted_verified.
+/// A cancelled row has no accounting effect, so the verdict no longer depends on C.
+#[test]
+fn a_cancelled_copy_below_the_mark_and_an_unrelated_cancel_do_not_block_a_verified_batch() {
+    let input = payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-cancelled-copy".to_string(),
+        company_guid: GUID.to_string(),
+        company: None,
+        txn_ids: vec!["txn-001".to_string()],
+        date_from: "20260901".to_string(),
+        date_to: "20260901".to_string(),
+        sha256: "hash".to_string(),
+        built_at: now(),
+        status: "built".to_string(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".to_string(),
+            value: Some(10),
+            master_value: Some(7),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let posted = ReadVoucher {
+        remote_id: Some("posted-1".to_string()),
+        guid: Some("posted-guid".to_string()),
+        alter_id: Some(11),
+        date: Some("20260901".to_string()),
+        voucher_type: Some("Payment".to_string()),
+        narration: Some("[BRIDGE:txn-001]".to_string()),
+        voucher_number: None,
+        master_id: None,
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: vec![
+            ReadEntry {
+                ledger: "Expense".to_string(),
+                amount: "-12.50".to_string(),
+                is_deemed_positive: "Yes".to_string(),
+            },
+            ReadEntry {
+                ledger: "Bank".to_string(),
+                amount: "12.50".to_string(),
+                is_deemed_positive: "No".to_string(),
+            },
+        ],
+    };
+    let cancel = |guid: &str, alter_id: u64, narration: Option<&str>| ReadVoucher {
+        remote_id: Some(format!("{guid}-remote")),
+        guid: Some(guid.to_string()),
+        alter_id: Some(alter_id),
+        narration: narration.map(str::to_string),
+        cancelled: Some(true),
+        entries: Vec::new(),
+        ..posted.clone()
+    };
+    let copy = cancel("copy-guid", 5, Some("[BRIDGE:txn-001]"));
+    let unrelated = cancel("unrelated-guid", 3, None);
+    let result =
+        verify_observed_batch(&line, &[posted.clone(), copy.clone(), unrelated.clone()])
+            .expect("verification result");
+    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
+    assert_eq!(result["duplicates"], json!([]), "{result}");
+    assert_eq!(result["unrelated_duplicates_in_window"], json!([]), "{result}");
+    assert_eq!(
+        verification_status(&result, line.vouchers.len()),
+        "posted_verified"
+    );
+    // Without C the verdict was already posted_verified, before and after.
+    let result = verify_observed_batch(&line, &[posted, copy]).expect("verification result");
+    assert_eq!(
+        verification_status(&result, line.vouchers.len()),
+        "posted_verified"
+    );
+}
+
 #[test]
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = payload();

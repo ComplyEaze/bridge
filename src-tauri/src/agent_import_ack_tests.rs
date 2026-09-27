@@ -1255,8 +1255,9 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
 }
 
 /// The same capture with D3-004 read as cancelled too, derived in memory: its
-/// `ISCANCELLED` set to Yes and its ledger entries emptied, as the captured
-/// D3-003 cancel reads. Its GUID and AlterID are kept, so the census still
+/// `ISCANCELLED` and ledger entries as the captured D3-003 cancel reads them,
+/// every other field as captured for D3-004. That is a state Tally would not
+/// produce (a cancel also raised D3-003's AlterID), kept so the census still
 /// counts it; the second cancel is synthetic, not live evidence. Two cancelled
 /// Journals of one date share a fingerprint with no entries, which says nothing
 /// about their content, so they are not duplicates (bridge#767).

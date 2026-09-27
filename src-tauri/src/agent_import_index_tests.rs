@@ -235,6 +235,35 @@ fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
             "{cancelled:?} {optional:?}"
         );
     }
+    // The cancel flag, not an empty entry list, leaves a row out: two rows not
+    // read as cancelled pair on no entries, without the cancel beside them.
+    let captured_cancel = rows
+        .iter()
+        .find(|row| row.cancelled == Some(true))
+        .unwrap();
+    let mut empty = another_voucher(captured_cancel, "4");
+    empty.cancelled = Some(false);
+    let empty_twin = another_voucher(&empty, "5");
+    let found =
+        test_duplicates(&[captured_cancel.clone(), empty.clone(), empty_twin.clone()]).unwrap();
+    let paired = found
+        .iter()
+        .filter(|item| item["kind"] == "accounting_fingerprint")
+        .collect::<Vec<_>>();
+    assert_eq!(paired.len(), 1, "{found:?}");
+    assert_eq!(
+        paired[0]["voucher_ids"],
+        serde_json::json!(["guid:derived-guid-4", "guid:derived-guid-5"]),
+        "{found:?}"
+    );
+    // A row read as cancelled is left out even if entries came back with it.
+    let mut with_entries = effective;
+    with_entries.cancelled = Some(true);
+    let twin = another_voucher(&with_entries, "6");
+    assert_eq!(
+        kinds(test_duplicates(&[with_entries, twin]).unwrap()),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

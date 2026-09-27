@@ -692,19 +692,19 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     let verification_status = proof["verification_status"].as_str();
     let not_verified = verification_status != Some("posted_verified");
     let dispatched = proof.get("dispatch").is_some();
-    if !proof["error"].is_null()
-        || (dispatched && not_verified)
+    let banner = !proof["error"].is_null()
+        || not_verified
         || (dispatched
             && !matches!(
                 dispatch_state,
                 Some("posted_verified" | "previous_attempt_reconciled")
-            ))
-    {
+            ));
+    // Whether to forbid a resend depends only on whether Bridge sent the batch.
+    // With no dispatch record it did not, and the batch may not be in Tally at
+    // all (the readback before a post), so there is nothing to reconcile.
+    if banner && dispatched {
         output.push_str("**Reconciliation required — this report does not confirm posting.**\n\nA matching voucher readback alone is insufficient. Reconcile the original saved batch; do not rebuild or resend it.\n\n");
-    } else if not_verified {
-        // No dispatch record: Bridge did not send this batch, and it may not
-        // be in Tally at all (the readback before a post), so there is
-        // nothing to reconcile and no resend to forbid.
+    } else if banner {
         output.push_str("**Not verified — this report does not confirm posting.**\n\nThe verification status, the counts and any duplicates below say what the readback found.\n\n");
     }
     output.push_str(&format!(

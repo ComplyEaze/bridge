@@ -915,10 +915,11 @@ impl Server {
             .map(|(_, state)| state);
         // A doubt the check record holds without its own file can take no
         // review, so it is refused before a recorded review can answer: that
-        // review is stale, and answering `ack_already_recorded` would leave the
-        // doubt unreviewable for good (#770). No read can bring the file back:
-        // a readback records a masters verdict only while the check is
-        // pending, and this one has its verdict.
+        // review is stale, and the refusal names the missing file, not the
+        // stale record (#770). No read can bring the file back: a readback
+        // records a masters verdict only while the check is pending, and this
+        // one has its verdict. A check the read below finishes as a doubt
+        // whose file cannot be written is refused after it, by `admit_review`.
         if state == Some(&MastersRecord::DoubtRecordUnavailable) {
             return Err("ack_doubt_record_unavailable".to_string().into());
         }
@@ -931,7 +932,8 @@ impl Server {
         let batch = line.vouchers.len() > 1;
         // For a batch, what no read can change is refused before any read: no
         // doubt of the named kind, or a step verdict left pending, which only
-        // a post records. A single post keeps its order: read, then refuse.
+        // a post records. For one voucher, no doubt and a pending check are
+        // refused after the read, which can finish the check.
         if batch {
             match (kind, state) {
                 (_, Some(MastersRecord::NoDoubt)) => {

@@ -1131,7 +1131,11 @@ async fn a_review_left_by_a_lost_doubt_file_does_not_answer_for_it() {
         "{outcome}"
     );
     assert!(approval.reviews().is_empty(), "no dialog");
-    assert_eq!(fs::read(ack_path(&server)).unwrap(), b"{}", "the record is kept");
+    assert_eq!(
+        fs::read(ack_path(&server)).unwrap(),
+        b"{}",
+        "the record is kept"
+    );
     assert!(sent(simulator).is_empty(), "no request");
 }
 

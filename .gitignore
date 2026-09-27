@@ -34,3 +34,6 @@ test-results/
 # Python bytecode from operator scripts
 __pycache__/
 *.pyc
+
+# Written by the install-page deploy job; never committed.
+site/releases.json

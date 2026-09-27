@@ -16,8 +16,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A pull request's newer push supersedes its older run. Every other run (a
+  # master push, a manual dispatch) gets a group of its own, so none is
+  # cancelled mid-run or dropped while pending behind another.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
@@ -712,7 +715,10 @@ jobs:
       - name: Prune only obsolete master compiler caches
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/prune-package-compiler-cache.mjs --apply
+        # Bounded below the job's own timeout: a timed-out job can report
+        # `cancelled`, which required-checks accepts from this job (a newer
+        # master run's prune supersedes it). A hung prune must fail instead.
+        run: timeout 240 node scripts/prune-package-compiler-cache.mjs --apply
 
   tax-audit-mutations:
     name: Tax-audit mutation records
@@ -769,6 +775,10 @@ jobs:
     # crate: it runs the mutation runner's tests and `--verify` (no build), so a
     # bridge-tax-audit change merges only with its selected mutations proven on
     # the merged tree. Skipped on other pull requests, which is a pass here.
+    # compiler-cache-retention alone may be cancelled: master runs overlap, and
+    # its non-cancelling group still drops an older pending prune when a newer
+    # one queues. The newer prune does the same housekeeping; a failed prune
+    # still fails here.
     if: ${{ always() }}
     needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
@@ -785,7 +795,7 @@ jobs:
           printf '%s\n' "$NEEDS_JSON"
           failed="$(
             printf '%s' "$NEEDS_JSON" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
+              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') == 'failure' or (v.get('result') == 'cancelled' and k != 'compiler-cache-retention')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
           )"
           if [[ -n "$failed" ]]; then
             echo "Required jobs did not pass: $failed"

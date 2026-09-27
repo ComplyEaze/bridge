@@ -280,6 +280,34 @@
       ]
     },
     {
+      "id": "party_monthly.indirect_expenses_vouchers_left_out_optional",
+      "value": 33300,
+      "unit": "paise",
+      "definition_sha256_16": "8e57e1be456e919f",
+      "definition_text": "Indirect Expenses: amount on these ledgers (debits less credits) of the optional vouchers cited, which the books leave out: one of several sets that each match the difference.",
+      "evidence": [
+        {
+          "kind": "excluded_voucher",
+          "id": "x04",
+          "label": "Payment x04 on 2026-02-11"
+        }
+      ]
+    },
+    {
+      "id": "party_monthly.indirect_expenses_vouchers_left_out_postdated",
+      "value": 33300,
+      "unit": "paise",
+      "definition_sha256_16": "a306c0ee220a8c54",
+      "definition_text": "Indirect Expenses: amount on these ledgers (debits less credits) of the post-dated vouchers cited, which the books leave out: one of several sets that each match the difference.",
+      "evidence": [
+        {
+          "kind": "excluded_voucher",
+          "id": "x05",
+          "label": "Payment x05 on 2026-02-12"
+        }
+      ]
+    },
+    {
       "id": "party_monthly.indirect_expenses_year_45f857c2",
       "value": 60000,
       "unit": "paise",
@@ -571,8 +599,8 @@
       "id": "party_monthly.purchases_vouchers_left_out",
       "value": 15000,
       "unit": "paise",
-      "definition_sha256_16": "d8afa830383f90ef",
-      "definition_text": "Purchase Accounts: amount on these ledgers (debits less credits) of the optional, cancelled or post-dated vouchers cited, which the books leave out.",
+      "definition_sha256_16": "2d8855e8726d7e4a",
+      "definition_text": "Purchase Accounts: amount on these ledgers (debits less credits) of the post-dated and cancelled vouchers cited, which the books leave out.",
       "evidence": [
         {
           "kind": "excluded_voucher",
@@ -1250,14 +1278,33 @@
         {
           "name": "trial_balance_movement",
           "figure_id": "party_monthly.indirect_expenses_tb_movement"
+        },
+        {
+          "name": "vouchers_left_out_optional",
+          "figure_id": "party_monthly.indirect_expenses_vouchers_left_out_optional"
+        },
+        {
+          "name": "vouchers_left_out_postdated",
+          "figure_id": "party_monthly.indirect_expenses_vouchers_left_out_postdated"
         }
       ],
-      "evidence": [],
-      "title_sha256_16": "9753718028385545",
-      "title_text": "'Indirect Expenses' by party differs from the Trial Balance",
-      "limits_sha256_16": "bf8a2599f46eb1d9",
+      "evidence": [
+        {
+          "kind": "excluded_voucher",
+          "id": "x04",
+          "label": "Payment x04 on 2026-02-11"
+        },
+        {
+          "kind": "excluded_voucher",
+          "id": "x05",
+          "label": "Payment x05 on 2026-02-12"
+        }
+      ],
+      "title_sha256_16": "5390311265134b0c",
+      "title_text": "'Indirect Expenses' by party differs from the Trial Balance by an amount that more than one set of excluded vouchers matches (each listed under Technical definitions)",
+      "limits_sha256_16": "c6cb07f464813b38",
       "limits_text": [
-        "No one set of optional, cancelled or post-dated vouchers matches it. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
+        "Each of these sets, taken as a whole, matches the difference to within a rupee: the post-dated vouchers (₹333); the optional vouchers (₹333). The Trial Balance may include one of them; the books do not say which, so none is chosen. Smaller groups were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1292,11 +1339,11 @@
           "label": "Purchase x03 on 2026-01-11"
         }
       ],
-      "title_sha256_16": "a17e4e3125c5d078",
-      "title_text": "'Purchase Accounts' by party differs from the Trial Balance by an amount matching optional, cancelled or post-dated vouchers (listed under Technical definitions)",
-      "limits_sha256_16": "d61a63d13e018b5b",
+      "title_sha256_16": "ed9ac2d7a036d262",
+      "title_text": "'Purchase Accounts' by party differs from the Trial Balance by an amount matching post-dated and cancelled vouchers together (listed under Technical definitions)",
+      "limits_sha256_16": "3c644785c4217018",
       "limits_text": [
-        "These figures, like every books figure, leave out optional, cancelled or post-dated vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other set of such vouchers matches it. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
+        "These figures, like every books figure, leave out post-dated and cancelled vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other of the sets tried (each status taken as a whole, and all of them together) matches it; smaller groups of them were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1328,9 +1375,9 @@
       ],
       "title_sha256_16": "5bcb9094e6985722",
       "title_text": "'Sales Accounts' by party differs from the Trial Balance by an amount matching optional vouchers (listed under Technical definitions)",
-      "limits_sha256_16": "14d927f1cd887e09",
+      "limits_sha256_16": "d2389dc9abdced8d",
       "limits_text": [
-        "These figures, like every books figure, leave out optional vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other set of such vouchers matches it. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
+        "These figures, like every books figure, leave out optional vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. It is the only set tried; smaller groups of them were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

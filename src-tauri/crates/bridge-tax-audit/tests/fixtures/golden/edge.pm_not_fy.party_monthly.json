@@ -257,9 +257,9 @@
       "evidence": [],
       "title_sha256_16": "9753718028385545",
       "title_text": "'Indirect Expenses' by party differs from the Trial Balance",
-      "limits_sha256_16": "bf8a2599f46eb1d9",
+      "limits_sha256_16": "dc3af916ab5abb3f",
       "limits_text": [
-        "No one set of optional, cancelled or post-dated vouchers matches it. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
+        "No optional, cancelled or post-dated voucher dated in the period moves an amount on these ledgers. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

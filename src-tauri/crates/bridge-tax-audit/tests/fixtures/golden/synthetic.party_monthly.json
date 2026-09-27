@@ -113,16 +113,16 @@
       ]
     },
     {
-      "id": "party_monthly.indirect_expenses_jul_c9fe11d8",
+      "id": "party_monthly.indirect_expenses_jul_6c8f7958",
       "value": 2000000,
       "unit": "paise",
       "definition_sha256_16": "fcb25cccd6fac69b",
       "definition_text": "Indirect Expenses: amount dated in July for this row (debits less credits).",
       "evidence": [
         {
-          "kind": "ledger",
-          "id": "Metro Hardware Distributors",
-          "label": "Metro Hardware Distributors"
+          "kind": "row",
+          "id": "indirect_expenses:not_attributed",
+          "label": "Not attributed: no party on the other side"
         }
       ]
     },
@@ -314,16 +314,16 @@
       ]
     },
     {
-      "id": "party_monthly.indirect_expenses_vouchers_c9fe11d8",
+      "id": "party_monthly.indirect_expenses_vouchers_6c8f7958",
       "value": 1,
       "unit": "count",
       "definition_sha256_16": "2012e77139b808d6",
       "definition_text": "Indirect Expenses: vouchers in this row, including any dated outside the period.",
       "evidence": [
         {
-          "kind": "ledger",
-          "id": "Metro Hardware Distributors",
-          "label": "Metro Hardware Distributors"
+          "kind": "row",
+          "id": "indirect_expenses:not_attributed",
+          "label": "Not attributed: no party on the other side"
         }
       ]
     },
@@ -356,16 +356,16 @@
       ]
     },
     {
-      "id": "party_monthly.indirect_expenses_year_c9fe11d8",
+      "id": "party_monthly.indirect_expenses_year_6c8f7958",
       "value": 2000000,
       "unit": "paise",
       "definition_sha256_16": "7b0935da16718ef0",
       "definition_text": "Indirect Expenses: amount dated inside the period for this row (debits less credits).",
       "evidence": [
         {
-          "kind": "ledger",
-          "id": "Metro Hardware Distributors",
-          "label": "Metro Hardware Distributors"
+          "kind": "row",
+          "id": "indirect_expenses:not_attributed",
+          "label": "Not attributed: no party on the other side"
         }
       ]
     },
@@ -736,7 +736,34 @@
       ]
     }
   ],
-  "findings": [],
+  "findings": [
+    {
+      "id": "party_monthly/not_attributed/indirect_expenses",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "vouchers",
+          "figure_id": "party_monthly.indirect_expenses_vouchers_6c8f7958"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-00000023",
+          "label": "Payment P/20 on 2025-07-02"
+        }
+      ],
+      "title_sha256_16": "1febfc0e0d1d54c2",
+      "title_text": "'Indirect Expenses' amounts on vouchers whose party ledger is not on the other side are not attributed to a party",
+      "limits_sha256_16": "98d0078e0520da7e",
+      "limits_text": [
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Indirect Expenses' lines, so those lines are not that party's: for example bank charges or rent in the same payment as a supplier. They are shown in the row 'Not attributed: no party on the other side', not under any party, and are in the block's total."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    }
+  ],
   "book_invariants_evaluated": [
     "ID-1",
     "MAP-0",

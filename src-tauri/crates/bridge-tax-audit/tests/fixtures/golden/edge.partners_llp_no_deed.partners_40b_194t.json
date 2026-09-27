@@ -210,16 +210,16 @@
       "id": "partners_40b_194t.s194t_amount_credited_a83e6c31",
       "value": 2000000,
       "unit": "paise",
-      "definition_sha256_16": "90fde207b3c2eac9",
-      "definition_text": "Interest + remuneration credited to partner (tag a83e6c31) in the year -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
+      "definition_sha256_16": "4c1e9e013dbb6477",
+      "definition_text": "Interest + remuneration credited to partner (tag a83e6c31) in the year, gross: each voucher's net credit to the partner, a reversal lowering nothing -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_amount_credited_d0893259",
       "value": 5000000,
       "unit": "paise",
-      "definition_sha256_16": "3a5632523f4f84f2",
-      "definition_text": "Interest + remuneration credited to partner (tag d0893259) in the year -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
+      "definition_sha256_16": "2d7d6ea11c9454aa",
+      "definition_text": "Interest + remuneration credited to partner (tag d0893259) in the year, gross: each voucher's net credit to the partner, a reversal lowering nothing -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
       "evidence": []
     },
     {
@@ -248,18 +248,18 @@
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_a83e6c31",
-      "value": "no",
+      "value": "not judged",
       "unit": "text",
-      "definition_sha256_16": "e829e35d78b4b360",
-      "definition_text": "Whether a line under 'Duties & Taxes' with 'tds' in its name appears in the voucher(s) crediting partner (tag a83e6c31)'s interest/remuneration.",
+      "definition_sha256_16": "d81ddff3564b48e4",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag a83e6c31)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, off this partner's capital).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_d0893259",
-      "value": "no",
+      "value": "not judged",
       "unit": "text",
-      "definition_sha256_16": "52439c4f1597c90f",
-      "definition_text": "Whether a line under 'Duties & Taxes' with 'tds' in its name appears in the voucher(s) crediting partner (tag d0893259)'s interest/remuneration.",
+      "definition_sha256_16": "e57d4e44334eeccc",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag d0893259)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, off this partner's capital).",
       "evidence": []
     },
     {
@@ -333,9 +333,10 @@
       "evidence": [],
       "title_sha256_16": "da183c8c78892b0b",
       "title_text": "Remuneration to working partners: the s.40(b)(v) limit depends on book profit, not computed here",
-      "limits_sha256_16": "5ccb7d5428506b19",
+      "limits_sha256_16": "5ccbf8675de928ed",
       "limits_text": [
-        "The s.40(b)(v) remuneration ceiling is a slab on 'book profit' (s.28-44D profit plus remuneration debited, per Explanation 3), which this test does not compute; whether remuneration is authorised and quantified by the deed, and from what date, is a deed reading, not a books fact."
+        "The s.40(b)(v) remuneration ceiling is a slab on 'book profit' (s.28-44D profit plus remuneration debited, per Explanation 3), which this test does not compute; whether remuneration is authorised and quantified by the deed, and from what date, is a deed reading, not a books fact.",
+        "The s.40(b)(v) ceiling (s.40(b)(v) as amended by the Finance (No. 2) Act 2024, from AY 2025-26): on the first ₹6 lakh of book profit (or a loss), ₹3 lakh or 90% of the book profit, whichever is more; on the balance, 60%. It applies to the firm's book profit, which this test does not compute, so no limit is stated here."
       ],
       "ask_client_sha256_16": "bad8e2b6aaefd75b",
       "ask_client_text": [
@@ -367,12 +368,13 @@
           "label": "Journal pl-02 on 2026-03-31"
         }
       ],
-      "title_sha256_16": "d1f70c4ae426e9e2",
-      "title_text": "Payments/credits to a partner over the s.194T threshold with no TDS ledger line seen",
-      "limits_sha256_16": "29a6959b01a5f8b2",
+      "title_sha256_16": "1ad7ff747629b977",
+      "title_text": "Payments/credits to a partner over the s.194T threshold: whether TDS was deducted is not judged",
+      "limits_sha256_16": "32ee6802e705dee7",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
-        "The s.194T rate/limit used here (rate 1000 bp, limit 2000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule."
+        "The s.194T rate/limit used here (rate 1000 bp, limit 2000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule.",
+        "The client's statutory dues classify no ledger as TDS payable, so TDS on the partner's vouchers cannot be seen."
       ],
       "ask_client_sha256_16": "6a80444f273c484e",
       "ask_client_text": [

@@ -571,7 +571,7 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_parse_tests.rs",
-      "sha256": "60de391aaed6e15e6a8192af034f938243649a8dbb692de3a3f4ab4093fc85da"
+      "sha256": "79d39efc0bf4eba5e936490ed0cc15f2265fd018a987c74fa1dfedaf6c65cc89"
     },
     {
       "path": "src-tauri/src/agent_voucher_scalars.rs",

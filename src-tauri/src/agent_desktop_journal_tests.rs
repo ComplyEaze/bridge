@@ -336,12 +336,66 @@ fn review_details_come_from_the_admitted_saved_journal() {
             .collect::<Vec<_>>(),
         vec![
             (
-                &"Expense".to_string(),
+                &r#""Expense""#.to_string(),
                 &"Dr".to_string(),
                 &"12.50".to_string()
             ),
-            (&"Cash".to_string(), &"Cr".to_string(), &"12.50".to_string())
+            (
+                &r#""Cash""#.to_string(),
+                &"Cr".to_string(),
+                &"12.50".to_string()
+            )
         ]
+    );
+    assert_eq!(review.details.ledger_note, None);
+}
+
+/// bridge#626: the desktop review shows a ledger name ending in a line break
+/// as the native dialog does, escaped and quoted with the note, never as the
+/// same name without the break.
+#[test]
+fn review_shows_a_ledger_name_ending_in_a_line_break_escaped() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, mut line) = service(directory.path().join("agent"));
+    std::fs::remove_file(
+        service
+            .server
+            .settings
+            .data_dir
+            .join("agent-import-ledger.jsonl"),
+    )
+    .unwrap();
+    line.vouchers[0].entries[0].ledger = "Expense\r\n".into();
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(xml.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+
+    let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+    let shown = review
+        .details
+        .entries
+        .iter()
+        .map(|entry| entry.ledger.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(shown, [r#""Expense\r\n""#, r#""Cash""#]);
+    assert!(shown
+        .iter()
+        .all(|ledger| !ledger.chars().any(char::is_control)));
+    assert_eq!(
+        review.details.ledger_note.as_deref(),
+        Some(post::LINE_BREAK_NOTE)
     );
 }
 

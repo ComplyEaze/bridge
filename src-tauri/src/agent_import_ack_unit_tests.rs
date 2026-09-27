@@ -170,7 +170,7 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
 /// note; any other line break in it stays refused.
 #[test]
 fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
-    const NOTE: &str = "(this ledger's name ends in a line break)";
+    const NOTE: &str = post::LINE_BREAK_NOTE;
     let only_layout_breaks = |preview: &str| {
         assert!(!preview.as_bytes().contains(&b'\r'), "{preview:?}");
         assert!(
@@ -179,6 +179,8 @@ fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
                 .all(|character| character == '\n' || !character.is_control()),
             "{preview:?}"
         );
+        assert!(!preview.contains(['\u{2028}', '\u{2029}']), "{preview:?}");
+        assert_eq!(preview.matches(NOTE).count(), 1, "{preview}");
     };
     let named = json!({"state":"posted_under_changed_masters","ledgers":["Ledger 0\r\n"]});
     let mut voucher = row_json(2, "Paid");
@@ -186,9 +188,10 @@ fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
     let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
     let preview = review_preview(BATCH, MARKER, "Books", &named, &voucher).unwrap();
     for shown in [
-        format!(r#"  "Ledger 0\r\n" {NOTE}"#),
-        format!(r#"Dr 1.00  "Ledger 0\r\n" {NOTE}"#),
+        r#"  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 1.00  "Ledger 0\r\n""#.to_string(),
         r#"Dr 1.00  "Ledger 1""#.to_string(),
+        NOTE.to_string(),
     ] {
         assert!(
             preview.lines().any(|line| line == shown),
@@ -205,9 +208,10 @@ fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
     let rows = rows.iter().collect::<Vec<_>>();
     let preview = batch_review_preview(&line, DoubtKind::Masters, "Books", &named, &rows).unwrap();
     for shown in [
-        format!(r#"  "Ledger 0\r\n" {NOTE}"#),
-        format!(r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n" {NOTE}"#),
+        r#"  "Ledger 0\r\n""#.to_string(),
+        r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n""#.to_string(),
         r#"Dr 3  Cr 0  3 entries  "Ledger 1""#.to_string(),
+        NOTE.to_string(),
     ] {
         assert!(
             preview.lines().any(|line| line == shown),
@@ -215,8 +219,24 @@ fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
         );
     }
     only_layout_breaks(&preview);
+    // A step doubt names no ledger; its summary shows the name the same way.
+    let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    let preview = batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &rows).unwrap();
+    assert!(
+        preview
+            .lines()
+            .any(|line| line == r#"Dr 3  Cr 0  3 entries  "Ledger 0\r\n""#),
+        "{preview}"
+    );
+    only_layout_breaks(&preview);
 
-    for bad in ["Ledger 0\r", "Ledger 0\n", "Ledger 0\r\n\r\n", "\r\n"] {
+    for (bad, code) in [
+        ("Ledger 0\r", "ack_review_layout_text"),
+        ("Ledger 0\n", "ack_review_layout_text"),
+        ("Ledger 0\r\n\r\n", "ack_review_layout_text"),
+        ("\r\n", "ack_review_layout_text"),
+        ("Ledger 0\u{200d}\r\n", "ack_review_format_text"),
+    ] {
         let doubted = json!({"state":"posted_under_changed_masters","ledgers":[bad]});
         let mut voucher = row_json(2, "Paid");
         voucher["amounts"][0]["ledger"] = json!(bad);
@@ -240,11 +260,7 @@ fn a_ledger_name_ending_in_a_line_break_is_shown_escaped_in_both_reviews() {
                 batch_review_preview(&line, DoubtKind::Masters, "Books", &doubt(), &rows),
             ),
         ] {
-            assert_eq!(
-                preview,
-                Err("ack_review_layout_text".to_string()),
-                "{source} with {bad:?}"
-            );
+            assert_eq!(preview, Err(code.to_string()), "{source} with {bad:?}");
         }
     }
 }

@@ -1541,6 +1541,7 @@ fn admit_fresh_saved_voucher(
             .map(quoted)
             .unwrap_or_else(|| "(none)".into())
     };
+    let note = line_break_note(&ledgers);
     let entries = voucher
         .entries
         .iter()
@@ -1556,6 +1557,7 @@ fn admit_fresh_saved_voucher(
                 entry.amount,
             )
         })
+        .chain(note.map(str::to_string))
         .collect::<Vec<_>>()
         .join("\n");
     let classification = classification_review_line(&voucher.voucher_type)
@@ -1607,6 +1609,7 @@ fn batch_review_text(
         entries.clone().map(|(_, entry)| entry.ledger.as_str()),
     )
     .map_err(|refusal| refusal.import_code().to_string())?;
+    let note = line_break_note(&names);
     for voucher in &line.vouchers {
         require_native_numbering(voucher)?;
     }
@@ -1679,6 +1682,7 @@ fn batch_review_text(
             if *count == 1 { "entry" } else { "entries" },
         ));
     }
+    text.extend(note.map(str::to_string));
     text.push(String::new());
     text.push(format!(
         "Total debit: {}  Total credit: {}",
@@ -1754,15 +1758,22 @@ impl ReviewTextRefusal {
     }
 }
 
-/// A ledger name as an approval dialog shows it, and the only way one enters
-/// a post or review preview (bridge#626). It is held to the rules for all
-/// review text, except that it may end in exactly one CR LF when the rest is a
-/// name the build admits: the one spelling observed to import onto a stored
-/// ledger. It is shown escaped (`"Cash\r\n"`) with a plain note, so no raw
-/// control character reaches `rfd` or `MessageBoxW`, and it never reads as the
-/// same name without the break.
+/// A ledger name as an approval shows it (bridge#626): the only way one
+/// enters the native post and review previews, and the desktop Journal review
+/// of a batch not yet dispatched.
+/// It is held to the rules for all review text, except that it may end in
+/// exactly one CR LF when the rest is a name the build admits: the one spelling
+/// observed to import onto a stored ledger. It is shown JSON-quoted
+/// (`"Cash\r\n"`), so no raw control character reaches `rfd`, `MessageBoxW` or
+/// the webview, and it never reads as the same name without the break. A
+/// preview that shows one adds [`LINE_BREAK_NOTE`] once, on its own line, so
+/// the name's own line grows only by its escape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct ReviewLedgerName<'a>(&'a str);
+
+/// Said once under any approval showing a name that ends in a line break.
+pub(super) const LINE_BREAK_NOTE: &str =
+    "A ledger name ending in \\r\\n has a line break stored at the end of its name.";
 
 impl<'a> ReviewLedgerName<'a> {
     fn parse(name: &'a str) -> Result<Self, ReviewTextRefusal> {
@@ -1773,20 +1784,25 @@ impl<'a> ReviewLedgerName<'a> {
         };
         ReviewTextRefusal::of(shown).map_or(Ok(Self(name)), Err)
     }
+
+    fn ends_in_line_break(self) -> bool {
+        self.0.ends_with("\r\n")
+    }
 }
 
 impl std::fmt::Display for ReviewLedgerName<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let quoted = serde_json::to_string(self.0).map_err(|_| std::fmt::Error)?;
-        if self.0.ends_with("\r\n") {
-            write!(
-                formatter,
-                "{quoted} (this ledger's name ends in a line break)"
-            )
-        } else {
-            formatter.write_str(&quoted)
-        }
+        formatter.write_str(&quoted)
     }
+}
+
+/// [`LINE_BREAK_NOTE`] when any of `names` ends in a line break.
+pub(super) fn line_break_note(names: &[ReviewLedgerName<'_>]) -> Option<&'static str> {
+    names
+        .iter()
+        .any(|name| name.ends_in_line_break())
+        .then_some(LINE_BREAK_NOTE)
 }
 
 /// Checks every value an approval shows: `text` under the plain rules, and

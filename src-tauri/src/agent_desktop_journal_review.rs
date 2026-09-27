@@ -19,6 +19,7 @@ pub(crate) struct DesktopJournalCompany {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DesktopJournalEntry {
+    /// The ledger name as the native dialog shows it: JSON-quoted.
     pub(crate) ledger: String,
     pub(crate) side: String,
     pub(crate) amount: String,
@@ -30,6 +31,8 @@ pub(crate) struct DesktopJournalDetails {
     pub(crate) date: String,
     pub(crate) reference: Option<String>,
     pub(crate) narration: Option<String>,
+    /// Said under the entries when a ledger name ends in a line break.
+    pub(crate) ledger_note: Option<String>,
     pub(crate) entries: Vec<DesktopJournalEntry>,
     pub(crate) total_debit: String,
     pub(crate) total_credit: String,

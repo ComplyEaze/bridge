@@ -1627,8 +1627,6 @@ fn assert_only_layout_line_breaks(preview: &str) {
     assert!(!preview.contains(['\u{2028}', '\u{2029}']), "{preview:?}");
 }
 
-const CRLF_NOTE: &str = "(this ledger's name ends in a line break)";
-
 /// bridge#626 slice 2a: a ledger name ending in one CR LF, as the build admits
 /// it, is shown escaped with a note, and the other ledger is shown as before.
 #[test]
@@ -1638,13 +1636,45 @@ fn native_preview_shows_a_ledger_name_ending_in_a_line_break_escaped() {
     refresh_batch_sha256(&mut line);
     let (_, preview) = admit_saved_journal(&line, &endpoint).unwrap();
     let lines = preview.lines().collect::<Vec<_>>();
-    assert!(
-        lines.contains(&format!(r#"Dr 12.50  "Expense\r\n" {CRLF_NOTE}"#).as_str()),
-        "{preview}"
-    );
+    assert!(lines.contains(&r#"Dr 12.50  "Expense\r\n""#), "{preview}");
+    // The note is said once, on its own line, under the entries.
+    assert!(lines.contains(&LINE_BREAK_NOTE), "{preview}");
     assert!(lines.contains(&r#"Cr 12.50  "Cash""#), "{preview}");
-    assert_eq!(preview.matches(CRLF_NOTE).count(), 1, "{preview}");
+    assert_eq!(preview.matches(LINE_BREAK_NOTE).count(), 1, "{preview}");
     assert_only_layout_line_breaks(&preview);
+    // No note without such a name.
+    let (plain, endpoint) = batch();
+    let (_, preview) = admit_saved_journal(&plain, &endpoint).unwrap();
+    assert!(!preview.contains(LINE_BREAK_NOTE), "{preview}");
+}
+
+/// The note sits on its own line, so a CR LF name's line grows only by its
+/// escape: a realistic long name still fits beside a lakh-sized amount, in the
+/// single and the batch approval alike.
+#[test]
+fn a_long_ledger_name_ending_in_a_line_break_fits_the_approval() {
+    let long = format!(
+        "{}\r\n",
+        "Synthetic Long Supplier Name For Line Cap Pvt Ltd Branch 04"
+    );
+    assert_eq!(long.chars().count(), 61);
+    let (mut line, endpoint) = batch();
+    line.vouchers[0].entries[0].ledger = long.clone();
+    for entry in &mut line.vouchers[0].entries {
+        entry.amount = "100000.00".into();
+    }
+    refresh_batch_sha256(&mut line);
+    let (_, preview) = admit_saved_journal(&line, &endpoint).unwrap();
+    assert!(preview.contains(LINE_BREAK_NOTE), "{preview}");
+    let mut two = batch_of_two();
+    for voucher in &mut two.vouchers {
+        voucher.entries[0].ledger = long.clone();
+        for entry in &mut voucher.entries {
+            entry.amount = "100000.00".into();
+        }
+    }
+    let preview = admit_fresh_saved_voucher(&two, &endpoint).unwrap();
+    assert!(preview.contains(LINE_BREAK_NOTE), "{preview}");
 }
 
 /// Only one trailing CR LF on a name the build admits is shown; every other
@@ -1682,12 +1712,13 @@ fn native_preview_refuses_every_other_line_break_and_every_other_field() {
         );
         assert!(admit_saved_journal(&line, &endpoint).is_err(), "{ledger:?}");
     }
-    for field in ["company", "narration", "reference"] {
+    for field in ["company", "narration", "reference", "voucher number"] {
         let (mut line, endpoint) = batch();
         match field {
             "company" => line.company.as_mut().unwrap().name.push_str("\r\n"),
             "narration" => line.vouchers[0].narration = Some("Synthetic\r\n".into()),
             "reference" => line.vouchers[0].reference = Some("REF-1\r\n".into()),
+            "voucher number" => line.vouchers[0].voucher_number = Some("7\r\n".into()),
             _ => unreachable!(),
         }
         refresh_batch_sha256(&mut line);
@@ -2052,12 +2083,28 @@ fn a_batch_approval_shows_a_line_break_ledger_escaped_and_refuses_others() {
     }
     let preview = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
     assert!(
-        preview.contains(&format!(r#"2 entries  "Expense\r\n" {CRLF_NOTE}"#)),
+        preview
+            .lines()
+            .any(|line| line.ends_with(r#"2 entries  "Expense\r\n""#)),
+        "{preview}"
+    );
+    assert!(
+        preview.lines().any(|line| line == LINE_BREAK_NOTE),
         "{preview}"
     );
     assert!(preview.contains(r#"2 entries  "Cash""#), "{preview}");
-    assert_eq!(preview.matches(CRLF_NOTE).count(), 1, "{preview}");
+    assert_eq!(preview.matches(LINE_BREAK_NOTE).count(), 1, "{preview}");
     assert_only_layout_line_breaks(&preview);
+    // A hidden character in a CR LF name is refused as the single approval
+    // refuses it.
+    let mut hidden = line.clone();
+    hidden.vouchers[1].entries[0].ledger = "Expense\u{200d}\r\n".into();
+    assert_eq!(
+        admit_fresh_saved_voucher(&hidden, &endpoint)
+            .err()
+            .as_deref(),
+        Some("import_review_format_text")
+    );
     line.vouchers[1].entries[1].ledger = "Cash\r".into();
     assert_eq!(
         admit_fresh_saved_voucher(&line, &endpoint).err().as_deref(),

@@ -452,6 +452,7 @@ fn render_review_text(
             .chain(row.entries.iter().map(|entry| entry.ledger.as_str())),
     )
     .map_err(ack_review_code)?;
+    let note = post::line_break_note(&names);
     let entry_names = names.split_off(doubted_ledgers.len());
     // One per line: a changed ledger's name is as long as the book made it.
     let ledgers = names
@@ -478,6 +479,7 @@ fn render_review_text(
             };
             Ok(format!("{side} {shown}  {ledger}"))
         })
+        .chain(note.map(|note| Ok(note.to_string())))
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
     let preview = format!(
@@ -525,6 +527,7 @@ fn batch_review_preview(
             .chain(entries.clone().map(|entry| entry.ledger.as_str())),
     )
     .map_err(ack_review_code)?;
+    let note = post::line_break_note(&names);
     let entry_names = names.split_off(doubted_ledgers.len());
     let mut ledgers =
         BTreeMap::<post::ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
@@ -608,6 +611,7 @@ fn batch_review_preview(
             if *count == 1 { "entry" } else { "entries" },
         ));
     }
+    text.extend(note.map(str::to_string));
     text.push(format!("Batch: {}", line.batch_id));
     text.push(String::new());
     text.push(format!(

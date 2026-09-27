@@ -152,3 +152,133 @@ fn delimiter_bearing_ledger_names_do_not_create_accounting_duplicates() {
     );
     assert!(unrelated.is_empty());
 }
+
+/// The verification rows of the captured D3 readback in which a person
+/// cancelled D3-003 at Tally's screen (fixtures `d3-cancelled-*`).
+fn d3_cancelled_rows() -> Vec<ReadVoucher> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    parse_import_vouchers(&xml, "17a10910-773c-42c6-bd66-7bba9a392536")
+        .unwrap()
+        .rows
+}
+
+/// A second voucher derived from a captured row: another identity and
+/// REMOTEID, no Bridge marker, the same date, type and entries.
+fn another_voucher(row: &ReadVoucher, id: &str) -> ReadVoucher {
+    let mut other = row.clone();
+    other.guid = Some(format!("derived-guid-{id}"));
+    other.master_id = Some(format!("9{id}"));
+    other.remote_id = Some(format!("derived-remote-{id}"));
+    other.narration = None;
+    other
+}
+
+#[test]
+fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
+    // Tally drops a cancelled voucher's entries from this read, so every cancel
+    // of one date and type fingerprints alike (bridge#767). The cancelled row is
+    // D3-003 as captured; its partners are derived from it in memory.
+    let rows = d3_cancelled_rows();
+    let cancelled = rows
+        .iter()
+        .filter(|row| row.cancelled == Some(true))
+        .collect::<Vec<_>>();
+    assert_eq!(cancelled.len(), 1, "the capture holds one cancel");
+    let cancelled = cancelled[0].clone();
+    assert!(cancelled.entries.is_empty());
+    let kinds = |found: Vec<Value>| {
+        found
+            .iter()
+            .map(|item| item["kind"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    let other = another_voucher(&cancelled, "1");
+    assert_eq!(
+        kinds(test_duplicates(&[cancelled.clone(), other.clone()]).unwrap()),
+        Vec::<String>::new()
+    );
+    // A shared REMOTEID is still a duplicate, cancelled or not.
+    let mut same_remote = other;
+    same_remote.remote_id = cancelled.remote_id.clone();
+    assert_eq!(
+        kinds(test_duplicates(&[cancelled, same_remote]).unwrap()),
+        ["remote_id"]
+    );
+    // A row not read as cancelled keeps its fingerprint: an effective or
+    // optional voucher keeps its entries, and an unobserved flag is not a cancel.
+    let effective = rows
+        .iter()
+        .find(|row| row.cancelled == Some(false) && !row.entries.is_empty())
+        .unwrap()
+        .clone();
+    for (cancelled, optional) in [
+        (Some(false), Some(false)),
+        (Some(false), Some(true)),
+        (None, Some(false)),
+    ] {
+        let mut first = effective.clone();
+        first.cancelled = cancelled;
+        first.optional = optional;
+        let second = another_voucher(&first, "2");
+        assert_eq!(
+            kinds(test_duplicates(&[first, second]).unwrap()),
+            ["accounting_fingerprint"],
+            "{cancelled:?} {optional:?}"
+        );
+    }
+}
+
+#[test]
+fn cancelled_vouchers_pair_neither_in_the_batch_nor_in_the_window() {
+    // bridge#767's two cases: two cancelled vouchers of the batch, and two
+    // cancelled vouchers of the window that are not the batch's.
+    let rows = d3_cancelled_rows();
+    let cancelled = rows
+        .iter()
+        .find(|row| row.cancelled == Some(true))
+        .unwrap()
+        .clone();
+    let effective = rows
+        .iter()
+        .find(|row| row.cancelled == Some(false) && !row.entries.is_empty())
+        .unwrap()
+        .clone();
+    let pair = vec![cancelled.clone(), another_voucher(&cancelled, "3")];
+    let identities = pair
+        .iter()
+        .map(observed_voucher_identity)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let fingerprints = pair.iter().map(observed_fingerprint).collect::<Vec<_>>();
+    assert_eq!(fingerprints[0], fingerprints[1]);
+    let batch_fingerprint = observed_fingerprint(&effective);
+    let expected = BTreeMap::from([(&batch_fingerprint, 1)]);
+    for (tags, expected_tags) in [
+        (
+            vec![Some("batch-1"), Some("batch-2")],
+            BTreeSet::from(["batch-1", "batch-2"]),
+        ),
+        (vec![None, None], BTreeSet::new()),
+    ] {
+        let (batch, unrelated) = batch_duplicate_sets(
+            &pair,
+            &identities,
+            &fingerprints,
+            &expected,
+            &tags,
+            &expected_tags,
+            &BTreeSet::new(),
+        );
+        assert!(batch.is_empty(), "{tags:?}: {batch:?}");
+        assert!(unrelated.is_empty(), "{tags:?}: {unrelated:?}");
+    }
+}

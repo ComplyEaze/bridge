@@ -1253,3 +1253,107 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
         }
     }
 }
+
+/// The same capture with D3-004 read as cancelled too, derived in memory: its
+/// `ISCANCELLED` set to Yes and its ledger entries emptied, as the captured
+/// D3-003 cancel reads. Its GUID and AlterID are kept, so the census still
+/// counts it; the second cancel is synthetic, not live evidence. Two cancelled
+/// Journals of one date share a fingerprint with no entries, which says nothing
+/// about their content, so they are not duplicates (bridge#767).
+#[tokio::test]
+async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
+    let readback = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+    ));
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000551</GUID>";
+    assert_eq!(readback.matches(guid).count(), 1);
+    let start = readback[..readback.find(guid).unwrap()]
+        .rfind("<VOUCHER ")
+        .unwrap();
+    let end = start + readback[start..].find("</VOUCHER>").unwrap();
+    let block = &readback[start..end];
+    assert!(block.contains("<VOUCHERNUMBER>4</VOUCHERNUMBER>"), "{block}");
+    let effective = r#"<ISCANCELLED TYPE="Logical">No</ISCANCELLED>"#;
+    assert_eq!(block.matches(effective).count(), 1, "{block}");
+    let first_entry = block.find("<ALLLEDGERENTRIES.LIST>").unwrap();
+    let closing = "</ALLLEDGERENTRIES.LIST>";
+    let after_entries = block.rfind(closing).unwrap() + closing.len();
+    let cancelled_block = format!(
+        "{}<ALLLEDGERENTRIES.LIST>     </ALLLEDGERENTRIES.LIST>{}",
+        block[..first_entry].replace(effective, r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#),
+        &block[after_entries..]
+    );
+    let derived = format!(
+        "{}{cancelled_block}{}",
+        &readback[..start],
+        &readback[end..]
+    );
+    assert_eq!(
+        derived
+            .matches(r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#)
+            .count(),
+        2
+    );
+    let derived = derived
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
+        ),
+        &derived,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_not_effective"], 2, "{verified}");
+    assert_eq!(result["counts"]["posted_verified"], 48, "{verified}");
+    let unverified = result["unverified_vouchers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| (row["bridge_txn_id"].as_str(), row["reason"].as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unverified,
+        [
+            (Some("D3-003"), Some("voucher_cancelled")),
+            (Some("D3-004"), Some("voucher_cancelled"))
+        ],
+        "{verified}"
+    );
+    assert_eq!(result["duplicates"], json!([]), "{verified}");
+    assert_eq!(
+        result["unrelated_duplicates_in_window"],
+        json!([]),
+        "{verified}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{verified}"
+    );
+    let requests = sent(simulator);
+    let expected = d3_batch_requests();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
+}

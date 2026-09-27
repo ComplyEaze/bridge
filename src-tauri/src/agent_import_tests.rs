@@ -1250,6 +1250,12 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     for (date, diffs) in [("20260901", json!([])), ("20260902", json!(["date"]))] {
         let mut redated = cancelled.clone();
         redated.date = Some(date.to_string());
+        verification_window_identities(
+            &ImportReadSource::admit(vec![redated.clone()]).unwrap(),
+            &line.date_from,
+            &line.date_to,
+        )
+        .expect("a date the windowed read can return");
         let result = verify_observed_batch(&line, &[redated]).expect("cancelled voucher");
         let item = &result["vouchers"][0];
         assert_eq!(item["status"], "posted_not_effective", "{result}");

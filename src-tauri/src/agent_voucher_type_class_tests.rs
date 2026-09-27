@@ -609,6 +609,7 @@ mod through_the_tool {
             redaction: Redaction::None,
             import_enabled: false,
             writes_enabled: false,
+            batch_post_enabled: false,
         });
         let mut args = json!({"company_guid": COMPANY, "from": "20250701", "to": "20250731"});
         for (key, value) in filter.as_object().unwrap() {
@@ -654,6 +655,27 @@ mod through_the_tool {
         assert_eq!(nearest[0]["name"], "Purchase");
         assert_eq!(nearest[0]["guid"], format!("{COMPANY}-000000d2"));
         assert_eq!(nearest[1]["name"], "PURCHASE A/C");
+        assert_eq!(simulator.received(), WINDOW_REQUESTS + 6);
+    }
+
+    /// bridge#676: a voucher-type list the parser refuses says why. One row
+    /// of the live capture loses its GUID, so the list is refused as an
+    /// unusable row, not as an unnamed invalid export.
+    #[tokio::test]
+    async fn a_voucher_type_list_with_an_unusable_row_is_refused_with_its_cause() {
+        let captured = captured_voucher_types();
+        let guid = format!("<GUID TYPE=\"String\">{COMPANY}-000000d2</GUID>");
+        assert_eq!(captured.matches(&guid).count(), 1);
+        let mut plans = plans();
+        plans.extend(bracketed(captured.replace(&guid, "")));
+        let (response, simulator) = call_on(plans, json!({"voucher_type": "Purchse"})).await;
+        assert_eq!(response["isError"], true, "{response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "voucher_type_export_invalid", "{response}");
+        assert_eq!(
+            error["cause"], "native_collection_row_unusable",
+            "{response}"
+        );
         assert_eq!(simulator.received(), WINDOW_REQUESTS + 6);
     }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assetName, isInstallablePreview, mergeReleases, releaseAssets, releaseLabel, selectRelease } from "../site/release-catalog.mjs";
+import { assetName, combineReleaseSources, isInstallablePreview, mergeReleases, releaseAssets, releaseLabel, selectRelease } from "../site/release-catalog.mjs";
 
 const preview = {
   draft: false,
@@ -45,6 +45,25 @@ test("the live list and the published snapshot merge newest first, live entry wi
   assert.equal(selectRelease(merged), newerLive);
   // With only the snapshot, its incomplete 0.3.0 entry is skipped and 0.2.0 is still offered.
   assert.equal(selectRelease(mergeReleases([], [older, newerSnapshot])), older);
+});
+
+test("the page's two sources: both failing is unavailable, the snapshot alone is flagged, live alone is not", () => {
+  const ok = (value) => ({ status: "fulfilled", value });
+  const failed = { status: "rejected", reason: new Error("release_lookup_failed:403") };
+  const live = { ...preview, published_at: "2026-09-26T11:19:29Z" };
+
+  assert.deepEqual(combineReleaseSources(failed, failed), { releases: null, snapshotOnly: false });
+  assert.deepEqual(combineReleaseSources(failed, ok([preview])), { releases: [preview], snapshotOnly: true });
+  assert.deepEqual(combineReleaseSources(ok([live]), failed), { releases: [live], snapshotOnly: false });
+  assert.deepEqual(combineReleaseSources(ok([live]), ok([preview])), { releases: [live], snapshotOnly: false });
+  // An empty but successful snapshot is not a failure of both sources.
+  assert.deepEqual(combineReleaseSources(failed, ok([])), { releases: [], snapshotOnly: true });
+});
+
+test("a release without a publication date sorts last instead of breaking the order", () => {
+  const dated = { ...preview, published_at: "2026-09-16T08:33:24Z" };
+  const undated = { ...preview, tag_name: "mcp-preview-0.9.0", published_at: null };
+  assert.deepEqual(mergeReleases([undated, dated], []).map((release) => release.tag_name), ["mcp-preview-0.2.0", "mcp-preview-0.9.0"]);
 });
 
 test("release catalogue requires immutable package and checksum names together", () => {

@@ -1,4 +1,4 @@
-import { mergeReleases, releaseAssets, releaseLabel, repository, selectRelease } from "./release-catalog.mjs";
+import { combineReleaseSources, releaseAssets, releaseLabel, repository, selectRelease } from "./release-catalog.mjs";
 
 const status = document.querySelector("#release-status");
 const channelNote = document.querySelector("#channel-note");
@@ -51,17 +51,15 @@ async function loadReleases() {
     }),
     fetchReleaseList("./releases.json", { cache: "no-cache" }),
   ]);
-  if (live.status === "rejected" && snapshot.status === "rejected") {
+  const combined = combineReleaseSources(live, snapshot);
+  if (!combined.releases) {
     status.textContent = "Release details could not be loaded. Use All releases to choose a download.";
     channelNote.textContent = "The download list is unavailable until the GitHub release service responds.";
     return;
   }
-  releases = mergeReleases(
-    live.status === "fulfilled" ? live.value : [],
-    snapshot.status === "fulfilled" ? snapshot.value : [],
-  );
+  releases = combined.releases;
   renderRelease();
-  if (live.status === "rejected" && selectRelease(releases)) {
+  if (combined.snapshotOnly && selectRelease(releases)) {
     channelNote.textContent = "Showing the release list saved when this page was published; a newer preview may be listed under All releases. Review the checksum and release notes before opening one.";
   }
 }

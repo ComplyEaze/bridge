@@ -34,14 +34,14 @@ jobs:
         run: |
           set -euo pipefail
           gh api "repos/${REPOSITORY}/releases?per_page=100" \
-            --jq '[.[] | {tag_name, draft, prerelease, published_at, assets: [.assets[] | {name, browser_download_url}]}]' \
+            --jq '[.[] | select(.draft == false) | {tag_name, draft, prerelease, published_at, assets: [.assets[] | {name, browser_download_url}]}]' \
             > site/releases.json
-          count="$(jq 'length' site/releases.json)"
+          count="$(jq '[.[] | select(.tag_name | startswith("mcp-preview-"))] | length' site/releases.json)"
           if [ "${count}" -lt 1 ]; then
-            echo "release snapshot is empty; refusing to deploy" >&2
+            echo "release snapshot has no mcp-preview release; refusing to deploy" >&2
             exit 1
           fi
-          echo "release snapshot: ${count} releases"
+          echo "release snapshot: ${count} mcp-preview releases"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

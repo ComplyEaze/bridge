@@ -21,7 +21,23 @@ export function mergeReleases(live, snapshot) {
   for (const release of [...live, ...snapshot]) {
     if (!byTag.has(release.tag_name)) byTag.set(release.tag_name, release);
   }
-  return [...byTag.values()].sort((a, b) => Date.parse(b.published_at ?? 0) - Date.parse(a.published_at ?? 0));
+  const published = (release) => Date.parse(release.published_at ?? "1970-01-01T00:00:00Z") || 0;
+  return [...byTag.values()].sort((a, b) => published(b) - published(a));
+}
+
+// Takes the two Promise.allSettled results the page gets and says what it can show: the merged
+// list, and whether it came only from the snapshot. `releases` is null when neither source answered.
+export function combineReleaseSources(live, snapshot) {
+  if (live.status === "rejected" && snapshot.status === "rejected") {
+    return { releases: null, snapshotOnly: false };
+  }
+  return {
+    releases: mergeReleases(
+      live.status === "fulfilled" ? live.value : [],
+      snapshot.status === "fulfilled" ? snapshot.value : [],
+    ),
+    snapshotOnly: live.status === "rejected",
+  };
 }
 
 export function assetName(tag, platform) {

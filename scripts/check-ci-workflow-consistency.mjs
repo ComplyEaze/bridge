@@ -43,6 +43,21 @@ if (!/^    needs: \[[^\n]*\bworkflow-consistency\b[^\n]*\]$/m.test(requiredCheck
   failures.push("required-checks must propagate workflow-consistency failures");
 }
 
+// bridge#583: the release positive control is what makes a clean seam scan of the shipped
+// executables mean anything. It runs in its own job, so that job must stay required, keep
+// bundle-smoke's scope, and keep running the control.
+const seamControl = jobBlock(workflow, "seam-control");
+const bundleScope = jobBlock(workflow, "bundle-smoke").match(/^    if: .*$/m)?.[0];
+if (!/^    needs: \[[^\n]*\bseam-control\b[^\n]*\]$/m.test(requiredChecks)) {
+  failures.push("required-checks must propagate seam-control failures");
+}
+if (!bundleScope || seamControl.match(/^    if: .*$/m)?.[0] !== bundleScope) {
+  failures.push("seam-control must run whenever bundle-smoke runs");
+}
+if (!/^        run: node scripts\/check-no-test-seam\.mjs --test-harness --release$/m.test(seamControl)) {
+  failures.push("seam-control must run the release seam positive control");
+}
+
 for (const step of parseWorkflowSteps(workflow)) {
   for (const command of cargoCommands(step.run)) {
     const packages = [...command.matchAll(/(?:^|\s)-p\s+([A-Za-z0-9_.-]+)/g)].map((match) => match[1]);

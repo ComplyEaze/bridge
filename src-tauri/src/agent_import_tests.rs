@@ -54,6 +54,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let mut input = payload();
     for entry in input
@@ -143,6 +144,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     };
     let server = Server::new(settings.clone());
     let append_admission = server
@@ -181,6 +183,7 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
@@ -350,6 +353,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -711,6 +715,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let input = payload();
     let line = ImportLedgerLine {
@@ -1154,6 +1159,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     divergent.entries[0].amount = "-12.51".to_string();
     let result = verify_observed_batch(&line, &[divergent]).expect("numeric divergence");
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
+    assert_eq!(result["vouchers"][0]["alter_id"], 11);
 }
 
 #[test]
@@ -1210,18 +1216,45 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
             ["vouchers"][0]["status"],
         "posted_verified"
     );
-    for (cancelled, optional) in [(Some(true), Some(false)), (Some(false), Some(true))] {
+    for (cancelled, optional, reason) in [
+        (Some(true), Some(false), "voucher_cancelled"),
+        (Some(false), Some(true), "voucher_optional"),
+        (Some(true), Some(true), "voucher_cancelled"),
+    ] {
         let mut ineffective = observed.clone();
         ineffective.cancelled = cancelled;
         ineffective.optional = optional;
         let result =
             verify_observed_batch(&line, &[ineffective]).expect("ineffective voucher result");
         assert_eq!(result["vouchers"][0]["status"], "posted_not_effective");
+        assert_eq!(result["vouchers"][0]["reason"], reason);
         assert_eq!(
             result["vouchers"][0]["not_observed"],
             json!(["effective_date"])
         );
         assert_eq!(result["counts"]["posted_not_effective"], 1);
+    }
+    // An optional voucher keeps its entries (observed once, 2026-09-26), so a
+    // change to them still diverges. A cancelled one loses them (bridge#758),
+    // so only its header is compared: the cancel alone shows no diff, and a
+    // re-date before the cancel still shows.
+    let mut changed = observed.clone();
+    changed.entries[0].amount = "-12.51".to_string();
+    let mut optional = changed.clone();
+    optional.optional = Some(true);
+    let result = verify_observed_batch(&line, &[optional]).expect("changed optional voucher");
+    assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
+    let mut cancelled = changed;
+    cancelled.cancelled = Some(true);
+    cancelled.entries.clear();
+    for (date, diffs) in [("20260901", json!([])), ("20260902", json!(["date"]))] {
+        let mut redated = cancelled.clone();
+        redated.date = Some(date.to_string());
+        let result = verify_observed_batch(&line, &[redated]).expect("cancelled voucher");
+        let item = &result["vouchers"][0];
+        assert_eq!(item["status"], "posted_not_effective", "{result}");
+        assert_eq!(item["reason"], "voucher_cancelled", "{result}");
+        assert_eq!(item["diffs"], diffs, "{result}");
     }
     let mut missing = observed;
     missing.optional = None;
@@ -1468,6 +1501,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             writes_enabled: false,
+            batch_post_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -1889,6 +1923,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let response = server
         .call_tool_response("build_import_xml", serde_json::to_value(unique).unwrap())
@@ -1942,6 +1977,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             writes_enabled,
+            batch_post_enabled: false,
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -2187,6 +2223,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -2315,6 +2352,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             writes_enabled: false,
+            batch_post_enabled: false,
         })
     };
     let page = json!({"items": [], "dispatch": {"response": {"outcome": {
@@ -2359,6 +2397,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             redaction: super::super::Redaction::None,
             import_enabled: true,
             writes_enabled: false,
+            batch_post_enabled: false,
         })
     };
     let server = server_with(200_000);
@@ -2484,6 +2523,7 @@ async fn verify_saved_batch_after_dispatch(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -2568,6 +2608,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         redaction: super::super::Redaction::None,
         import_enabled: true,
         writes_enabled: true,
+        batch_post_enabled: false,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -2727,6 +2768,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             redaction: super::super::Redaction::None,
             import_enabled: true,
             writes_enabled: false,
+            batch_post_enabled: false,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))

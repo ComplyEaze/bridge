@@ -640,7 +640,12 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
         proof["batch_id"].as_str().unwrap_or("unknown")
     );
     let dispatch_state = proof["dispatch"]["state"].as_str();
+    // The banner follows the verdict itself, so a hand-imported batch (no
+    // dispatch record) that is not verified never reads clean; an absent
+    // status is not a verified one (bridge#804).
+    let verification_status = proof["verification_status"].as_str();
     if !proof["error"].is_null()
+        || verification_status != Some("posted_verified")
         || (proof.get("dispatch").is_some()
             && !matches!(
                 dispatch_state,
@@ -649,6 +654,10 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     {
         output.push_str("**Reconciliation required — this report does not confirm posting.**\n\nA matching voucher readback alone is insufficient. Reconcile the original saved batch; do not rebuild or resend it.\n\n");
     }
+    output.push_str(&format!(
+        "- Verification status: `{}`\n",
+        verification_status.unwrap_or("unknown")
+    ));
     if let Some(state) = dispatch_state {
         output.push_str(&format!(
             "- Dispatch verdict: `{state}`\n- Response state: `{}`\n",
@@ -660,13 +669,35 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: `{}`\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", proof["company"]["name"].as_str().unwrap_or("unknown"), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: `{}`\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", proof["company"]["name"].as_str().unwrap_or("unknown"), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",
             row["bridge_txn_id"].as_str().unwrap_or("unknown"),
             row["status"].as_str().unwrap_or("unknown")
         ));
+    }
+    let batch_duplicates = proof["duplicates"].as_array().cloned().unwrap_or_default();
+    if !batch_duplicates.is_empty() {
+        output.push_str("\n| Duplicate in this batch | Key | Vouchers |\n| --- | --- | --- |\n");
+        for duplicate in &batch_duplicates {
+            let (key, vouchers) = if duplicate["kind"] == "remote_id" {
+                (
+                    &duplicate["remote_id"],
+                    duplicate["count"].as_u64().unwrap_or(0),
+                )
+            } else {
+                (
+                    &duplicate["fingerprint_sha256"],
+                    duplicate["voucher_ids"].as_array().map_or(0, Vec::len) as u64,
+                )
+            };
+            output.push_str(&format!(
+                "| {} | `{}` | {vouchers} |\n",
+                duplicate["kind"].as_str().unwrap_or("unknown"),
+                key.as_str().unwrap_or("unknown")
+            ));
+        }
     }
     output.push_str(&format!(
         "\nEvidence hashes: company `{}`, voucher read `{}`.\n",

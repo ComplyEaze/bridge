@@ -320,7 +320,12 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // statements from the Trial Balance and group tree, and decide which result
 // `profit_and_loss` and `balance_sheet` report as established; a defect there
 // reports a profit that omits a line.
-pub const MAX_SURFACE_FILES: usize = 284;
+// `bridge-tally-protocol/src/currency_composite.rs` (bridge#674) decides
+// whether an amount is a foreign-currency composite, which decides whether a
+// `vouchers` read withholds a voucher or refuses its window; a defect there
+// sets aside an amount that should have refused, or refuses a window that
+// should have been read.
+pub const MAX_SURFACE_FILES: usize = 285;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

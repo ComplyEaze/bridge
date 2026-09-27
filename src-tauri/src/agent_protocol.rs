@@ -485,11 +485,14 @@ where
     W: AsyncWrite + Unpin,
 {
     let cancellation = tokio_util::sync::CancellationToken::new();
+    // Boxed: the post's state machine is large (#725 added the dialog wait),
+    // and held inline it overflowed a Windows debug test thread's stack. The
+    // MCP loop runs on the main thread, whose stack is 1 MB on Windows.
     await_post(
-        crate::tally::runtime::TOOL_CANCELLATION.scope(
+        Box::pin(crate::tally::runtime::TOOL_CANCELLATION.scope(
             cancellation.clone(),
             server.call_tool_response("post_import", args.clone()),
-        ),
+        )),
         PostRequest {
             id,
             args,

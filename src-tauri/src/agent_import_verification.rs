@@ -650,20 +650,34 @@ pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> 
 }
 
 /// `text` as a code span inside a Markdown table cell. A REMOTEID comes from
-/// Tally and may hold `|` or a backtick: the pipe is escaped so the row keeps
-/// its cells, and the span's fence is one backtick longer than any run inside.
+/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped and
+/// control characters become spaces, so the row keeps its cells; the span's
+/// fence is one backtick longer than any run inside; and a text that starts
+/// and ends with a space is padded, since a code span drops one from each end.
 fn markdown_table_code(text: &str) -> String {
-    let text = text.replace('|', "\\|");
+    let text = text
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect::<String>()
+        .replace('|', "\\|");
     let longest_run = text
         .split(|character| character != '`')
         .map(str::len)
         .max()
         .unwrap_or(0);
-    if longest_run == 0 {
-        format!("`{text}`")
-    } else {
-        let fence = "`".repeat(longest_run + 1);
+    let padded =
+        longest_run > 0 || (text.starts_with(' ') && text.ends_with(' ') && text.trim() != "");
+    let fence = "`".repeat(longest_run + 1);
+    if padded {
         format!("{fence} {text} {fence}")
+    } else {
+        format!("{fence}{text}{fence}")
     }
 }
 
@@ -673,19 +687,25 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
         proof["batch_id"].as_str().unwrap_or("unknown")
     );
     let dispatch_state = proof["dispatch"]["state"].as_str();
-    // The banner follows the verdict itself, so a hand-imported batch (no
-    // dispatch record) that is not verified never reads clean; an absent
-    // status is not a verified one (bridge#804).
+    // The banner follows the verdict itself, so a batch that is not verified
+    // never reads clean; an absent status is not a verified one (bridge#804).
     let verification_status = proof["verification_status"].as_str();
+    let not_verified = verification_status != Some("posted_verified");
+    let dispatched = proof.get("dispatch").is_some();
     if !proof["error"].is_null()
-        || verification_status != Some("posted_verified")
-        || (proof.get("dispatch").is_some()
+        || (dispatched && not_verified)
+        || (dispatched
             && !matches!(
                 dispatch_state,
                 Some("posted_verified" | "previous_attempt_reconciled")
             ))
     {
         output.push_str("**Reconciliation required — this report does not confirm posting.**\n\nA matching voucher readback alone is insufficient. Reconcile the original saved batch; do not rebuild or resend it.\n\n");
+    } else if not_verified {
+        // No dispatch record: Bridge did not send this batch, and it may not
+        // be in Tally at all (the readback before a post), so there is
+        // nothing to reconcile and no resend to forbid.
+        output.push_str("**Not verified — this report does not confirm posting.**\n\nThe verification status, the counts and any duplicates below say what the readback found.\n\n");
     }
     output.push_str(&format!(
         "- Verification status: `{}`\n",

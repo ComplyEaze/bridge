@@ -1276,7 +1276,10 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // The files record the verdict the ledger records, whatever the caller's
+        // copy says, so the proof and the ledger status cannot disagree.
+        local_proof["verification_status"] = json!(update.status);
         let json = serde_json::to_vec_pretty(&local_proof)
             .map_err(|_| "proof_serialization_failed".to_string())?;
         let markdown = render_proof_markdown(&local_proof);

@@ -1418,6 +1418,7 @@ fn published_proposals(directory: &std::path::Path, payload: &ImportPayload) -> 
         "schema": "bridge.bank_statement.proposals.v1",
         "proposals_id": proposals_id,
         "vouchers": payload.vouchers,
+        "records": [],
     });
     let bytes = serde_json::to_vec_pretty(&document).unwrap();
     let statements = directory.join("bank-statements");
@@ -1470,6 +1471,7 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         .value;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 2, "{response}");
+    assert_eq!(result["suspense_lines"], json!({"count": 0, "lines": []}));
     // the same request sequence was consumed, so the same admission ran
     assert_eq!(simulator.finish().expect("requests").len(), 44);
     assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
@@ -1493,7 +1495,7 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
 
 /// A cash line nobody answered has no voucher. Building the rest would leave
 /// it out of the books unseen, so the proposals are refused until it is
-/// answered, before any Tally read (design v2 §10).
+/// answered, before any Tally read.
 #[tokio::test]
 async fn a_proposals_file_with_an_open_cash_question_is_refused_before_any_tally_read() {
     let directory = tempfile::tempdir().unwrap();
@@ -1524,6 +1526,61 @@ async fn a_proposals_file_with_an_open_cash_question_is_refused_before_any_tally
     );
 }
 
+/// A file written before cash lines were asked holds a cash line as a suspense
+/// entry nobody answered. It is refused like an open question, and a file
+/// with no records at all is refused as invalid.
+#[tokio::test]
+async fn an_older_proposals_file_with_an_unanswered_cash_line_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), 9);
+    let payload = captured_bank_payload();
+    let publish = |records: Option<Value>| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let mut document = json!({
+            "schema": "bridge.bank_statement.proposals.v1",
+            "proposals_id": proposals_id,
+            "vouchers": payload.vouchers,
+        });
+        if let Some(records) = records {
+            document["records"] = records;
+        }
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join("bank-statements");
+        std::fs::create_dir_all(&statements).unwrap();
+        std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let code = |response: Value| {
+        response["structuredContent"]["result"]["error"]["code"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
+    };
+    let legacy = publish(Some(json!([{
+        "row": 1, "disposition": {"voucher": "Payment"}, "party": "ATM CASH WITHDRAWAL",
+        "ledger": "Suspense", "suspense": true, "bridge_txn_id": "txn-001"
+    }])));
+    assert_eq!(
+        code(
+            server
+                .call_tool_response("build_import_xml", legacy)
+                .await
+                .value
+        ),
+        "cash_questions_open"
+    );
+    let missing = publish(None);
+    assert_eq!(
+        code(
+            server
+                .call_tool_response("build_import_xml", missing)
+                .await
+                .value
+        ),
+        "proposals_file_invalid"
+    );
+}
+
 /// The build result lists every voucher a bank import sent to suspense, found
 /// by the tag in its narration, and no other.
 #[test]
@@ -1539,8 +1596,14 @@ fn a_build_lists_every_tagged_suspense_voucher() {
         listed["lines"][0]["bridge_txn_id"],
         payload.vouchers[0].bridge_txn_id.as_str()
     );
+    // The unidentified tag counts only with the voucher's own ledger after it.
     payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} Suspense", tags[1]));
+    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 1);
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
     assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 2);
+    // A tag's text anywhere but the end marks nothing: an account label.
+    payload.vouchers[1].narration = Some(format!("NEFT | {} | 01-Sep", tags[0]));
+    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 1);
     payload.vouchers[0].narration = None;
     payload.vouchers[1].narration = None;
     assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 0);

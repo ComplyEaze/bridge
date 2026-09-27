@@ -313,10 +313,10 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // `src-tauri/src/agent_voucher_type_class.rs` (bridge#625) decides which
 // vouchers a type filter returns, and which request is refused as ambiguous;
 // a defect there reports a class of vouchers as absent.
-// `src-tauri/crates/bridge-bank-statement/src/cash.rs` (design v2 §10, item 90)
-// decides which statement text is a cash withdrawal or deposit, which answers
-// a person may give for one, and which of them Bridge refuses; a defect there
-// could post a cash line to a ledger nobody chose, or to suspense silently.
+// `src-tauri/crates/bridge-bank-statement/src/cash.rs` decides which parsed
+// party is a cash withdrawal or deposit, which answers a person may give for
+// one, which need a ledger and which Bridge refuses; a defect there could post
+// a cash line to a ledger nobody chose.
 pub const MAX_SURFACE_FILES: usize = 281;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;

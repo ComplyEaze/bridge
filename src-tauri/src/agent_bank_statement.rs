@@ -26,7 +26,7 @@
 
 use super::*;
 use bridge_bank_statement::bank::Bank;
-use bridge_bank_statement::cash::{CashAnswerRow, CashAnswers};
+use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::money::Controls;
@@ -88,7 +88,7 @@ pub(super) fn input_schema() -> Value {
                     "type":"object", "additionalProperties":false, "required":["bridge_txn_id","answer"],
                     "properties":{
                         "bridge_txn_id":{"type":"string","minLength":1,"maxLength":64,"pattern":r"\S"},
-                        "answer":{"type":"string","enum":["business_cash","owner_use","paid_to_someone","other_own_bank","own_cash_box","unbooked_cash_sales","customer_paid_in","owner_brought_in","dont_know"]},
+                        "answer":{"type":"string","enum":["business_cash","owner_use","paid_to_someone","other_own_bank","own_cash_box","unbooked_cash_sales","customer_paid_in","owner_brought_in","from_other_own_bank","already_recorded","dont_know"]},
                         "ledger":{"type":"string","maxLength":agent_import::MAX_MASTER_NAME_CHARS}
                     }
                 }
@@ -97,7 +97,7 @@ pub(super) fn input_schema() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row, for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, total, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. A cash withdrawal or deposit is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is listed in suspense_lines. An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
+pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row, for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, total, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. A cash withdrawal or deposit the parser recognises (SBI 'ATM WDL', Union Bank 'BY CASH'; no other bank's cash text yet, which falls to the UNIDENTIFIED fallback) is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. already_recorded (the other side of a move between our own accounts, recorded from the other statement) posts nothing and is listed in skipped_lines; Bridge does not check that the other side exists. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is listed in suspense_lines. An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
 
 impl Server {
     pub(super) async fn parse_bank_statement(
@@ -478,6 +478,7 @@ fn summary(
         "skipped": skipped,
         "suspense_rows": records.iter().filter(|record| record.suspense).count(),
         "suspense_lines": suspense_lines(records),
+        "skipped_lines": skipped_lines(records),
         "cash_questions": cash_questions,
         "bank_ledger_out": format_amount(&parsed.check.bank_out),
         "bank_ledger_in": format_amount(&parsed.check.bank_in),
@@ -522,6 +523,31 @@ fn cash_questions(records: &[StatementRecord]) -> Vec<Value> {
         .collect()
 }
 
+/// Every line that posts nothing, and why. A cash line answered
+/// already_recorded says plainly that Bridge did not look for its other side.
+fn skipped_lines(records: &[StatementRecord]) -> Vec<Value> {
+    records
+        .iter()
+        .filter(|record| record.disposition == Disposition::Skipped)
+        .map(|record| {
+            let recorded = record.cash_answer == Some(CashAnswer::AlreadyRecorded);
+            json!({
+                "bridge_txn_id": record.bridge_txn_id,
+                "row": record.row,
+                "date": record.date,
+                "amount": record.amount,
+                "printed_as": party_name(record.party.clone()),
+                "reason": if recorded { "cash_already_recorded" } else { "mapped_skip" },
+                "check": if recorded {
+                    "Bridge did not check that the other side exists in Tally."
+                } else {
+                    "Carried by the other account's Contra, per the mapping."
+                },
+            })
+        })
+        .collect()
+}
+
 /// Every line sent to the suspense ledger, and why, so none sits there unseen.
 fn suspense_lines(records: &[StatementRecord]) -> Vec<Value> {
     records
@@ -538,7 +564,7 @@ fn suspense_lines(records: &[StatementRecord]) -> Vec<Value> {
                 "reason": if record.cash_answer.is_some() {
                     "cash_purpose_not_confirmed"
                 } else {
-                    "party_not_identified"
+                    "party_unmapped_or_mapped_to_suspense"
                 },
             })
         })
@@ -618,11 +644,19 @@ pub(super) fn resolve_import_arguments(data_dir: &Path, args: &Value) -> Result<
         .filter(|vouchers| vouchers.is_array())
         .ok_or_else(|| "proposals_file_invalid".to_string())?;
     // A cash line nobody answered has no voucher; building the rest would
-    // leave it out of the books silently.
-    if document["records"].as_array().is_some_and(|records| {
-        records
-            .iter()
-            .any(|record| record["disposition"] == "needs_answer")
+    // leave it out of the books silently. A file written before cash lines
+    // were asked holds them as suspense entries nobody answered, with no
+    // answer recorded: refused the same way.
+    let records = document["records"]
+        .as_array()
+        .ok_or_else(|| "proposals_file_invalid".to_string())?;
+    if records.iter().any(|record| {
+        record["disposition"] == "needs_answer"
+            || (record["party"]
+                .as_str()
+                .and_then(CashMovement::of_party)
+                .is_some()
+                && record["cash_answer"].is_null())
     }) {
         return Err("cash_questions_open".into());
     }

@@ -899,7 +899,7 @@ impl Server {
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
                     // Every line a bank import sent to suspense, so none sits
-                    // there unseen (design v2 §10).
+                    // there unseen.
                     "suspense_lines": tagged_suspense_vouchers(&line.vouchers),
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
@@ -2530,15 +2530,17 @@ fn requested_master_report(
 }
 
 /// The vouchers Bridge's bank import sent to suspense, found by the tag it
-/// writes into their narration ([`bridge_bank_statement::proposals::SUSPENSE_TAGS`]), for a build's result.
+/// writes at the end of their narration
+/// ([`bridge_bank_statement::proposals::suspense_tagged`]), for a build's result.
 fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
     let lines = vouchers
         .iter()
         .filter(|voucher| {
             voucher.narration.as_deref().is_some_and(|narration| {
-                bridge_bank_statement::proposals::SUSPENSE_TAGS
-                    .iter()
-                    .any(|tag| narration.contains(tag))
+                bridge_bank_statement::proposals::suspense_tagged(
+                    narration,
+                    voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+                )
             })
         })
         .map(|voucher| {

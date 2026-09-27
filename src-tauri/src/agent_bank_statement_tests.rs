@@ -533,3 +533,110 @@ async fn a_union_bank_statement_parses_without_printed_totals() {
         Some("statement_extent_unproven")
     );
 }
+
+/// What `build` writes is what build_import_xml reads: a cash line left open
+/// by a real build, persisted by this tool, is refused at resolve, and the
+/// same statement answered resolves. No PDF is read; the rows are SBI shapes.
+#[test]
+fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let directory = tempfile::tempdir().unwrap();
+    let sbi = |date: &str, narration: &str, dr: &str, cr: &str, bal: &str| {
+        Row::from_pairs([
+            ("date", date),
+            ("narr", narration),
+            ("narr_spaced", narration),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", dr),
+            ("cr", cr),
+            ("bal", bal),
+        ])
+    };
+    let rows = [
+        sbi(
+            "01Aug2026",
+            "ATM WDL ATM CASH 1234 SYNTHETIC BRANCH",
+            "500.00",
+            "",
+            "9500.00",
+        ),
+        sbi(
+            "02Aug2026",
+            "BY TRANSFER-NEFT*SYNTHETIC SUPPLIER",
+            "",
+            "100.00",
+            "9600.00",
+        ),
+    ];
+    let parsed_with = |answers: &CashAnswers| {
+        let build = build(
+            &rows,
+            Bank::Sbi,
+            &Mapping::default(),
+            &BuildOptions {
+                bank_ledger: "Synthetic Bank Ledger",
+                suspense_ledger: "Suspense",
+                account_label: "Synthetic SB xx1234",
+                account_number: "00000000001234",
+                date_from: None,
+                date_to: None,
+                cash_answers: answers,
+            },
+        )
+        .unwrap();
+        ParsedStatement {
+            account_number: "00000000001234".into(),
+            statement_rows: rows.len(),
+            closing: bridge_tally_core::ExactDecimal::parse("9600.00").unwrap(),
+            totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+            check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+            counterparties: group_counterparties(&build.records).unwrap(),
+            build,
+        }
+    };
+    let mut args = json!({
+        "statement_path": "/synthetic/statement.pdf",
+        "password_file": "/synthetic/statement.password",
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "10,000.00",
+        "closing_balance": "9,600.00",
+        "total_debits": "500.00",
+        "total_credits": "100.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let open = parsed_with(&request.cash_answers);
+    let summary_open = summary(&request, &open, "statement-x", Path::new("/x"), "0");
+    assert_eq!(summary_open["cash_questions"].as_array().unwrap().len(), 1);
+    let id = summary_open["cash_questions"][0]["bridge_txn_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (proposals_id, _, digest) =
+        persist(directory.path(), &request, &open, &"0".repeat(64)).unwrap();
+    let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
+    assert_eq!(
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)),
+        Err("cash_questions_open".to_string())
+    );
+
+    args["cash_answers"] = json!([{"bridge_txn_id": id, "answer": "dont_know"}]);
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let answered = parsed_with(&request.cash_answers);
+    let (proposals_id, _, digest) =
+        persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    assert_eq!(resolved["vouchers"].as_array().unwrap().len(), 2);
+    let summary = summary(&request, &answered, "statement-x", Path::new("/x"), "0");
+    assert_eq!(summary["cash_questions"], json!([]));
+    let lines = summary["suspense_lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 2, "{summary}");
+    assert!(lines
+        .iter()
+        .any(|line| line["bridge_txn_id"] == id && line["reason"] == "cash_purpose_not_confirmed"));
+}

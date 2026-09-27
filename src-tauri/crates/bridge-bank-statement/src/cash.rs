@@ -8,8 +8,8 @@
 //! defaulted: it stays open, and `build_import_xml` refuses the proposals.
 //!
 //! An explicit "don't know" posts the line to the suspense ledger with
-//! [`PURPOSE_NOT_CONFIRMED`] in its narration, counted and listed wherever the
-//! import is reported, so the CA can find and move it. That is the owner's
+//! [`PURPOSE_NOT_CONFIRMED`] in its narration, listed in the parse and build
+//! results, so the CA can find and move it. That is the owner's
 //! decision of 27-Sep-2026: every bank line reaches the books, and a line whose
 //! purpose nobody knows is visible rather than held back.
 //!
@@ -66,6 +66,7 @@ impl CashMovement {
                     CashAnswer::OwnerUse,
                     CashAnswer::PaidToSomeone,
                     CashAnswer::OtherOwnBank,
+                    CashAnswer::AlreadyRecorded,
                     CashAnswer::DontKnow,
                 ],
             ),
@@ -76,6 +77,8 @@ impl CashMovement {
                     CashAnswer::UnbookedCashSales,
                     CashAnswer::CustomerPaidIn,
                     CashAnswer::OwnerBroughtIn,
+                    CashAnswer::FromOtherOwnBank,
+                    CashAnswer::AlreadyRecorded,
                     CashAnswer::DontKnow,
                 ],
             ),
@@ -83,7 +86,7 @@ impl CashMovement {
     }
 }
 
-/// One answer to a cash line's question (design v2 §5).
+/// One answer to a cash line's question.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CashAnswer {
@@ -108,6 +111,14 @@ pub enum CashAnswer {
     /// D4: the owner or a partner brought it in. Receipt, Dr bank, Cr the
     /// named capital ledger.
     OwnerBroughtIn,
+    /// D5: it came from another of our bank accounts whose statement is not
+    /// imported. Contra, Dr this bank, Cr the named other bank.
+    FromOtherOwnBank,
+    /// Either direction: the other side of a transfer between our own
+    /// accounts, already recorded from the other account's statement. No
+    /// voucher; listed as skipped. Bridge does not check that the other side
+    /// exists in Tally.
+    AlreadyRecorded,
     /// Nobody knows yet. Posted to the suspense ledger, tagged
     /// [`PURPOSE_NOT_CONFIRMED`].
     DontKnow,
@@ -124,6 +135,8 @@ impl CashAnswer {
             "unbooked_cash_sales" => Self::UnbookedCashSales,
             "customer_paid_in" => Self::CustomerPaidIn,
             "owner_brought_in" => Self::OwnerBroughtIn,
+            "from_other_own_bank" => Self::FromOtherOwnBank,
+            "already_recorded" => Self::AlreadyRecorded,
             "dont_know" => Self::DontKnow,
             _ => return None,
         })
@@ -139,6 +152,8 @@ impl CashAnswer {
             Self::UnbookedCashSales => "unbooked_cash_sales",
             Self::CustomerPaidIn => "customer_paid_in",
             Self::OwnerBroughtIn => "owner_brought_in",
+            Self::FromOtherOwnBank => "from_other_own_bank",
+            Self::AlreadyRecorded => "already_recorded",
             Self::DontKnow => "dont_know",
         }
     }
@@ -156,6 +171,8 @@ impl CashAnswer {
             Self::UnbookedCashSales => "Cash sales or collections that are not yet recorded.",
             Self::CustomerPaidIn => "A customer paid it straight into our account.",
             Self::OwnerBroughtIn => "The owner or a partner brought it in.",
+            Self::FromOtherOwnBank => "It came from another of our bank accounts.",
+            Self::AlreadyRecorded => "It is one side of a move between our own bank accounts that is already recorded from the other account's statement.",
             Self::DontKnow => "I don't know yet. It goes to suspense, marked for the CA to move.",
         }
     }
@@ -169,9 +186,12 @@ impl CashAnswer {
             Self::OtherOwnBank => Some("the other bank's ledger"),
             Self::CustomerPaidIn => Some("the customer's ledger"),
             Self::OwnerBroughtIn => Some("the capital ledger"),
-            Self::PaidToSomeone | Self::OwnCashBox | Self::UnbookedCashSales | Self::DontKnow => {
-                None
-            }
+            Self::FromOtherOwnBank => Some("the other bank's ledger"),
+            Self::PaidToSomeone
+            | Self::OwnCashBox
+            | Self::UnbookedCashSales
+            | Self::AlreadyRecorded
+            | Self::DontKnow => None,
         }
     }
 
@@ -253,7 +273,7 @@ impl CashAnswers {
                     return Err(Refusal::new(
                         "cash_answer_ledger_not_used",
                         format!(
-                            "{}: this answer takes no ledger (dont_know always posts to suspense_ledger)",
+                            "{}: this answer takes no ledger (dont_know always posts to suspense_ledger; already_recorded posts nothing)",
                             row.origin
                         ),
                     ))

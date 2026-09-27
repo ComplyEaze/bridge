@@ -39,6 +39,17 @@ pub const UNIDENTIFIED: &str = "UNIDENTIFIED - reallocate from";
 /// one read can find them all.
 pub const SUSPENSE_TAGS: [&str; 2] = [PURPOSE_NOT_CONFIRMED, UNIDENTIFIED];
 
+/// Whether a narration ends in a suspense tag as `build` writes it: the
+/// last segment, and for [`UNIDENTIFIED`] followed by one of the voucher's own
+/// `ledgers`. A tag's text anywhere else (an account label, a party name)
+/// never counts.
+pub fn suspense_tagged<'a>(narration: &str, ledgers: impl IntoIterator<Item = &'a str>) -> bool {
+    narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}"))
+        || ledgers
+            .into_iter()
+            .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Side {
     Dr,
@@ -212,8 +223,31 @@ fn require_unique(
     }
 }
 
-/// The one entry an answer maps to: the non-bank leg's ledger and the type
-/// (design v2 §5). Only "don't know" reaches the suspense ledger.
+fn require_answers(
+    movement: CashMovement,
+    answer: CashAnswer,
+    number: usize,
+) -> Result<(), Refusal> {
+    if answer.answers(movement) {
+        return Ok(());
+    }
+    Err(Refusal::at_row(
+        "cash_answer_wrong_direction",
+        number,
+        format!(
+            "row {number} is a cash {}, and {} is not one of its answers",
+            if movement.outward() {
+                "withdrawal"
+            } else {
+                "deposit"
+            },
+            answer.as_str()
+        ),
+    ))
+}
+
+/// The one entry an answer maps to: the non-bank leg's ledger and the type.
+/// Only "don't know" reaches the suspense ledger.
 fn cash_entry(
     movement: CashMovement,
     answer: CashAnswer,
@@ -221,21 +255,7 @@ fn cash_entry(
     suspense_ledger: &str,
     number: usize,
 ) -> Result<(String, VoucherType), Refusal> {
-    if !answer.answers(movement) {
-        return Err(Refusal::at_row(
-            "cash_answer_wrong_direction",
-            number,
-            format!(
-                "row {number} is a cash {}, and {} is not one of its answers",
-                if movement.outward() {
-                    "withdrawal"
-                } else {
-                    "deposit"
-                },
-                answer.as_str()
-            ),
-        ));
-    }
+    require_answers(movement, answer, number)?;
     if answer != CashAnswer::DontKnow && ledger_key(named) == ledger_key(suspense_ledger) {
         return Err(Refusal::at_row(
             "cash_answer_names_suspense",
@@ -246,11 +266,21 @@ fn cash_entry(
         ));
     }
     let voucher_type = match answer {
-        CashAnswer::BusinessCash | CashAnswer::OtherOwnBank => VoucherType::Contra,
+        CashAnswer::BusinessCash | CashAnswer::OtherOwnBank | CashAnswer::FromOtherOwnBank => {
+            VoucherType::Contra
+        }
         CashAnswer::OwnerUse => VoucherType::Payment,
         CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => VoucherType::Receipt,
         CashAnswer::DontKnow if movement.outward() => VoucherType::Payment,
         CashAnswer::DontKnow => VoucherType::Receipt,
+        // Posts nothing; `build` records it as skipped before asking here.
+        CashAnswer::AlreadyRecorded => {
+            return Err(Refusal::at_row(
+                "cash_answer_posts_nothing",
+                number,
+                format!("row {number}: already_recorded posts no voucher"),
+            ))
+        }
         CashAnswer::PaidToSomeone | CashAnswer::OwnCashBox | CashAnswer::UnbookedCashSales => {
             return Err(Refusal::at_row(
                 "cash_answer_not_built",
@@ -360,6 +390,23 @@ pub fn build(
                     });
                     continue;
                 };
+                if *answer == CashAnswer::AlreadyRecorded {
+                    require_answers(movement, *answer, number)?;
+                    require_unique(&mut seen, &txn_id, number)?;
+                    records.push(StatementRecord {
+                        row: number,
+                        date: date.iso(),
+                        disposition: Disposition::Skipped,
+                        amount: amount_text,
+                        party,
+                        ledger: String::new(),
+                        suspense: false,
+                        bridge_txn_id: txn_id,
+                        cash_movement,
+                        cash_answer: Some(*answer),
+                    });
+                    continue;
+                }
                 let (ledger, voucher_type) =
                     cash_entry(movement, *answer, named, options.suspense_ledger, number)?;
                 (ledger, voucher_type, Some(*answer))

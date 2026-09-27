@@ -1,6 +1,5 @@
 //! A cash withdrawal or deposit becomes the entry a person's answer names, or,
-//! on an explicit "don't know", a tagged suspense line; never a silent default
-//! (design v2 §5 and §10).
+//! on an explicit "don't know", a tagged suspense line; never a silent default.
 //!
 //! The narrations are synthetic twins of shapes captured from real statements:
 //! the SBI `ATM WDL` rule and the Union Bank `BY CASH` rule each came from a
@@ -16,8 +15,8 @@ use bridge_bank_statement::cash::{
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, selfcheck, Build, BuildOptions, Disposition, Side, VoucherType, SUSPENSE_TAGS,
-    UNIDENTIFIED,
+    build, selfcheck, suspense_tagged, Build, BuildOptions, Disposition, Side, VoucherType,
+    SUSPENSE_TAGS, UNIDENTIFIED,
 };
 use common::*;
 
@@ -256,6 +255,101 @@ fn each_answer_maps_to_its_one_entry() {
     }
 }
 
+/// Cash moved between our own banks is one Contra. A deposit from an account
+/// whose statement is not imported is that Contra; either side of a move
+/// already recorded from the other statement posts nothing, and says so.
+#[test]
+fn a_move_between_our_own_banks_is_posted_once() {
+    let deposit = deposit_statement();
+    let id = first_id(&deposit, Bank::Ubi);
+    let given = answers(&[(&id, "from_other_own_bank", Some("SBI CA"))]).unwrap();
+    let built = build(&deposit, Bank::Ubi, &no_mapping(), &options(&given)).unwrap();
+    assert_eq!(built.proposals[0].voucher_type, VoucherType::Contra);
+    assert_eq!(legs(&built), (("Bank", Side::Dr), ("SBI CA", Side::Cr)));
+    refuses(
+        answers(&[(&id, "from_other_own_bank", None)]),
+        "cash_answer_without_ledger",
+    );
+    refuses(
+        answers(&[(&id, "already_recorded", Some("SBI CA"))]),
+        "cash_answer_ledger_not_used",
+    );
+    for (rows, bank) in [
+        (deposit_statement(), Bank::Ubi),
+        (withdrawal_statement(), Bank::Sbi),
+    ] {
+        let id = first_id(&rows, bank);
+        let given = answers(&[(&id, "already_recorded", None)]).unwrap();
+        let built = build(&rows, bank, &no_mapping(), &options(&given)).unwrap();
+        let record = &built.records[0];
+        assert_eq!(record.disposition, Disposition::Skipped);
+        assert_eq!(record.cash_answer, Some(CashAnswer::AlreadyRecorded));
+        assert!(!record.suspense);
+        assert!(built
+            .proposals
+            .iter()
+            .all(|proposal| proposal.bridge_txn_id != record.bridge_txn_id));
+        assert_eq!(selfcheck(&built, "Bank").unwrap().vouchers, rows.len() - 1);
+    }
+    // The deposit's own-bank answer is not the withdrawal's.
+    let withdrawal = withdrawal_statement();
+    let id = first_id(&withdrawal, Bank::Sbi);
+    let given = answers(&[(&id, "from_other_own_bank", Some("UBI SB"))]).unwrap();
+    refuses(
+        build(&withdrawal, Bank::Sbi, &no_mapping(), &options(&given)),
+        "cash_answer_wrong_direction",
+    );
+}
+
+/// Only a tag at the end of a narration, as `build` writes it, marks a
+/// suspense line: the same text in an account label or party does not.
+#[test]
+fn only_a_tag_where_build_writes_it_marks_a_suspense_line() {
+    let rows = withdrawal_statement();
+    let id = first_id(&rows, Bank::Sbi);
+    let given = answers(&[(&id, "dont_know", None)]).unwrap();
+    let built = build(&rows, Bank::Sbi, &no_mapping(), &options(&given)).unwrap();
+    for (proposal, record) in built.proposals.iter().zip(&built.records) {
+        let ledgers = proposal.entries.iter().map(|entry| entry.ledger.as_str());
+        assert_eq!(
+            suspense_tagged(&proposal.narration, ledgers),
+            record.suspense,
+            "{}",
+            proposal.narration
+        );
+    }
+    // A label carrying a tag's text marks nothing. (That statement holds no
+    // cash line, so it takes no answers.)
+    let mut labelled = options(CashAnswers::none());
+    labelled.account_label = "Bridge: purpose not confirmed; reclassify";
+    let mapped = mapping(&[("SYNTHETIC SUPPLIER", "Supplier", None)]).unwrap();
+    let rows = [sbi(
+        "02Aug2026",
+        "BY TRANSFER-NEFT*SYNT0000001*N123456789*SYNTHETIC SUPPLIER",
+        "",
+        "100.00",
+        "9600.00",
+    )];
+    let built = build(&rows, Bank::Sbi, &mapped, &labelled).unwrap();
+    assert!(!built.records[0].suspense, "mapped, not suspense");
+    let proposal = &built.proposals[0];
+    assert_eq!(proposal.entries[1].ledger, "Supplier");
+    assert!(proposal.narration.contains(PURPOSE_NOT_CONFIRMED));
+    assert!(!suspense_tagged(
+        &proposal.narration,
+        proposal.entries.iter().map(|entry| entry.ledger.as_str())
+    ));
+    // The unidentified tag counts only with the voucher's own ledger after it.
+    assert!(!suspense_tagged(
+        "x | UNIDENTIFIED - reallocate from Suspense",
+        ["Bank", "Cash"]
+    ));
+    assert!(suspense_tagged(
+        "x | UNIDENTIFIED - reallocate from Suspense",
+        ["Bank", "Suspense"]
+    ));
+}
+
 /// Only an explicit "don't know" reaches suspense, and it says so in the
 /// narration with its own tag, never the unidentified-party tag.
 #[test]
@@ -330,7 +424,7 @@ fn an_answer_for_the_other_direction_is_refused() {
 }
 
 #[test]
-fn answers_are_checked_before_any_row_is_read() {
+fn answers_are_checked_when_they_are_parsed() {
     refuses(
         answers(&[("st-x", "contra", Some("Cash"))]),
         "unknown_cash_answer",
@@ -419,8 +513,8 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
     assert!(withdrawal.contains("withdrawn") && deposit.contains("deposited"));
     assert_eq!(
         taken.len() + given.len(),
-        10,
-        "four each, plus dont_know twice"
+        13,
+        "six and seven, two of them shared"
     );
     for answer in taken.iter().chain(given) {
         assert_eq!(CashAnswer::parse(answer.as_str()), Some(*answer));
@@ -430,9 +524,14 @@ fn each_question_offers_every_answer_of_its_direction_and_none_other() {
             assert!(!answer.text().contains(jargon), "{answer:?}: {jargon}");
         }
     }
-    assert!(taken
+    let shared = taken
         .iter()
-        .all(|answer| !given.contains(answer) || *answer == CashAnswer::DontKnow));
+        .filter(|answer| given.contains(answer))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        shared,
+        [&CashAnswer::AlreadyRecorded, &CashAnswer::DontKnow]
+    );
     assert_eq!(taken.last(), Some(&CashAnswer::DontKnow));
     assert_eq!(given.last(), Some(&CashAnswer::DontKnow));
 }

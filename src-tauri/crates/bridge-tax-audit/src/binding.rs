@@ -1693,6 +1693,65 @@ mod tests {
         assert_eq!(report.drifts[0].current_name, "Freight (renamed)");
     }
 
+    /// What `tds_payees` reads from the other tables comes from the BOUND engagement, as the
+    /// reference's pack passes it: `[tds].goods_carriage_ledgers` bound by identity (a rename is
+    /// followed), the `[statutory_dues]` ledgers classified `tds_payable` (and no other), every
+    /// `[roles].tax_ledgers` ledger, the `[partners]` keys without `deed`, `[client].state` and
+    /// `[deductor].activity`. Without `[roles].tax_ledgers` there are no GST ledgers.
+    #[test]
+    fn tds_payees_inputs_come_from_the_bound_tables() {
+        let toml = |tax_ledgers: &str| {
+            format!(
+                "[client]\nlabel = \"Test\"\nassessment_year = \"2026-27\"\nstate = \" Kerala \"\n\
+                 [period]\nstart = \"2025-04-01\"\nend = \"2026-03-31\"\n\
+                 [snapshot]\nformat = \"tally-read-v1\"\npath = \"unused\"\n\
+                 [roles]\ncash_groups = [\"Cash-in-Hand\"]\nbank_groups = []\n{tax_ledgers}\n\
+                 [ledger_ids]\n\"Freight\" = {G_ROUNDOFF:?}\n\
+                 [deductor]\nactivity = \"profession\"\n\
+                 [partners.p1]\ncapital_ledgers = []\n[partners.deed]\ninterest_rate_bp = 1200\n\
+                 [statutory_dues.nature_by_ledger]\n\"TDS Payable\" = \"tds_payable\"\n\"Input CGST\" = \"gst_payable\"\n\
+                 [tds]\ngoods_carriage_ledgers = [\"Freight\"]\n{TDS_TABLES}"
+            )
+        };
+        let mut b = book_with_tds_ledgers("Freight (renamed)", G_ROUNDOFF);
+        for name in ["TDS Payable", "Input CGST"] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, "Duties & Taxes", "", None));
+        }
+        let e = Engagement::from_toml(
+            &toml("tax_ledgers = { cgst = [\"Input CGST\"] }"),
+            Path::new("."),
+        )
+        .unwrap();
+        let (bound, _report) = e.bind(&b).unwrap();
+        let tds = bound.tds.as_ref().unwrap();
+        assert_eq!(
+            tds.goods_carriage_ledgers.iter().collect::<Vec<_>>(),
+            ["Freight (renamed)"]
+        );
+        let inputs = crate::tds_payees_inputs(&bound).unwrap();
+        assert_eq!(
+            inputs.tds_ledgers.iter().collect::<Vec<_>>(),
+            ["TDS Payable"]
+        );
+        assert_eq!(
+            inputs.gst_ledgers.iter().collect::<Vec<_>>(),
+            ["Input CGST"]
+        );
+        assert_eq!(inputs.other_names.iter().collect::<Vec<_>>(), ["p1"]);
+        assert_eq!(inputs.client_state.as_deref(), Some(" Kerala "));
+        assert_eq!(
+            inputs.deductor_activity,
+            Some(crate::tds_payees::DeductorActivity::Profession)
+        );
+        let e = Engagement::from_toml(&toml(""), Path::new(".")).unwrap();
+        let (bound, _report) = e.bind(&b).unwrap();
+        assert!(crate::tds_payees_inputs(&bound)
+            .unwrap()
+            .gst_ledgers
+            .is_empty());
+    }
+
     /// A payee ledger and a 194J category ledger renamed in Tally but bound by identity keep their
     /// alias and category under the new names: without this a renamed 194J ledger would keep its
     /// nature and lose its category, turning computed findings into unmapped ones.

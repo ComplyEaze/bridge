@@ -41,6 +41,12 @@
 //!   admits them and the month then matches no deduction;
 //! * with more than one `[tds_payees.reversals]` entry naming a bill credited to no payee, the
 //!   first in key order is named, where the reference names the first in file order;
+//! * a `[tds].previous_year_turnover_paise` that is a TOML boolean is refused, where the reference
+//!   reads `true` as 1 and `false` as 0;
+//! * without `[roles].tax_ledgers` no ledger is read as GST (the module's own default), where the
+//!   reference's pack refuses its whole run;
+//! * with a 194H mapping and no `[s194h]` rules as well as a goods-carriage ledger not mapped to
+//!   194C, the 194H refusal is reported, where the reference's config reader reports the other;
 //! * `[tds_payees]` without `[tds]` is neither read nor bound here;
 //! * a missing `[client].entity_type` is refused here; the reference's engagement always has one;
 //! * two over-limit entities sharing a figure id are refused, as the reference raises;
@@ -1452,7 +1458,8 @@ Worldwide); its current status was not checked.";
 
 /// Python's `s.casefold() in ("kerala", "lakshadweep")`. Full case folding maps to one of these
 /// two only through ASCII letters, U+212A KELVIN SIGN (to "k") and U+017F LATIN SMALL LETTER LONG S
-/// (to "s"): neither word holds "ss" or "i", the only other folds that reach ASCII letters.
+/// (to "s"): the other folds that reach ASCII letters are multi-letter ("ss", "i" with a dot,
+/// ligatures such as "ff" and "fi"), and neither word holds any of their sequences.
 fn in_kerala_hc(state: &str) -> bool {
     let fold = |c: char| match c {
         '\u{212A}' => 'k',

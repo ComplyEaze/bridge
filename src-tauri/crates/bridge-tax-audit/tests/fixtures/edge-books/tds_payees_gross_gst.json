@@ -195,9 +195,9 @@
   {
    "ledger": "Freight",
    "opening": 0,
-   "debit": 27200000,
+   "debit": 26280000,
    "credit": 0,
-   "closing": 27200000
+   "closing": 26280000
   },
   {
    "ledger": "Input CGST",
@@ -224,8 +224,8 @@
    "ledger": "P1 Carrier",
    "opening": 0,
    "debit": 20000,
-   "credit": 10898000,
-   "closing": -10878000
+   "credit": 9996000,
+   "closing": -9976000
   },
   {
    "ledger": "P2 Builder",
@@ -294,8 +294,8 @@
    "ledger": "TDS Payable 194C",
    "opening": 0,
    "debit": 0,
-   "credit": 462000,
-   "closing": -462000
+   "credit": 444000,
+   "closing": -444000
   }
  ],
  "vouchers": [
@@ -306,15 +306,15 @@
    "lines": [
     [
      "Freight",
-     3000000
+     2550000
     ],
     [
      "P1 Carrier",
-     -2940000
+     -2499000
     ],
     [
      "TDS Payable 194C",
-     -60000
+     -51000
     ]
    ]
   },
@@ -325,15 +325,15 @@
    "lines": [
     [
      "Freight",
-     7100000
+     2550000
     ],
     [
      "P1 Carrier",
-     -6958000
+     -2499000
     ],
     [
      "TDS Payable 194C",
-     -142000
+     -51000
     ]
    ]
   },
@@ -344,7 +344,7 @@
    "lines": [
     [
      "Freight",
-     1000000
+     2530000
     ],
     [
      "P1 Carrier",
@@ -352,11 +352,30 @@
     ],
     [
      "P1 Carrier",
-     -1000000
+     -2499000
     ],
     [
      "TDS Payable 194C",
-     -20000
+     -51000
+    ]
+   ]
+  },
+  {
+   "guid": "g14",
+   "date": "2025-08-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     2550000
+    ],
+    [
+     "P1 Carrier",
+     -2499000
+    ],
+    [
+     "TDS Payable 194C",
+     -51000
     ]
    ]
   },

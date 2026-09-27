@@ -5142,5 +5142,13 @@
   "file": "src/tds_tranches.rs",
   "from": "                if e.3.is_none() {",
   "to": "                if false {"
+ },
+ {
+  "id": "TR-40",
+  "by": "author",
+  "what": "tds_payees re-pin: a bill's own TDS not added back to the payee's credit",
+  "file": "src/tds_payees.rs",
+  "from": "            credit = add(credit, tds)?;",
+  "to": "            credit = add(credit, 0)?;"
  }
 ]

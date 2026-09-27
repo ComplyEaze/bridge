@@ -1586,7 +1586,7 @@ pub fn tds_payees_on(
 /// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
 /// own default: the reference's pack requires the table for its whole run), the `[partners]`
 /// keys, `[client].state` and `[deductor].activity`.
-fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
+pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
     if bound.statutory_dues.not_a_table {
         return Err(AuditError::Config(
             "[statutory_dues] is not a table".to_string(),

@@ -14,6 +14,11 @@
 //! * The shared-ledger rule is switched by `net_reversals`: [`run`] and [`check_invariants`] pass
 //!   [`NET_REVERSALS`], and the tests reach the dormant reversal rule through [`run_with`] and
 //!   [`check_invariants_with`] instead of rebinding a module global.
+//! * Until this port is re-pinned to the reference's current head (#787), it reads the rules as
+//!   the crate vendors them now, which is the current head's: `[s194a].exempt_lender_types` names
+//!   seven lender types where the reference this port follows named three, so a loan from a
+//!   financial corporation, LIC, UTI or a notified institution is exempt from s.194A here. Its
+//!   deductor status keeps the reference's previous rule (the business limit alone).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 

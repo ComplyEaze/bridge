@@ -1378,6 +1378,39 @@ fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
     );
 }
 
+/// PWM-2 checks the not-attributed row on its own: a voucher count the vouchers do not give is
+/// reported against that row, not folded into the rows with no party.
+#[test]
+fn pwm_2_checks_the_not_attributed_row_on_its_own() {
+    let s = spec("pm_attribution");
+    let (book, rules) = (build(&s), rules(&s));
+    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+    let window = period(&s);
+    let mut r = party_monthly::run(
+        &book,
+        &rules,
+        &window,
+        &set("cash"),
+        &set("bank"),
+        party_monthly::PARTY_TOP_N,
+    )
+    .unwrap();
+    assert!(party_monthly::check_invariants(&book, &window, &r)
+        .unwrap()
+        .is_empty());
+    nudge(
+        &mut r,
+        "party_monthly.indirect_expenses_vouchers_",
+        "Not attributed: no party on the other side",
+    );
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert!(
+        out.iter().any(|v| v
+            == "PWM-2: the indirect_expenses not-attributed row has 4p in vouchers but the vouchers give 3p"),
+        "{out:?}"
+    );
+}
+
 /// PWM-2 fires when a named party's row is not what its vouchers give, and when the Others row's
 /// label does not count the parties it holds.
 #[test]

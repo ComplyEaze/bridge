@@ -4980,8 +4980,8 @@
   "by": "author",
   "what": "the first of several matching sets is named",
   "file": "src/party_monthly.rs",
-  "from": "if matches.len() == 1 {",
-  "to": "if !matches.is_empty() {"
+  "from": "            } else if matches.len() > 1 {",
+  "to": "            } else if false && matches.len() > 1 {"
  },
  {
   "id": "E4-20",
@@ -5110,5 +5110,165 @@
   "file": "src/party_monthly.rs",
   "from": "                    if in_period(&x.date) {",
   "to": "                    if x.date <= *end {"
+ },
+ {
+  "id": "E4-36",
+  "by": "author",
+  "what": "an invoice-class voucher's party is read by side, as any other's",
+  "file": "src/party_monthly.rs",
+  "from": "    if INVOICE_TYPES.contains(&v.base_type.as_str()) {",
+  "to": "    if false && INVOICE_TYPES.contains(&v.base_type.as_str()) {"
+ },
+ {
+  "id": "E4-37",
+  "by": "author",
+  "what": "a debit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Notes\"];"
+ },
+ {
+  "id": "E4-38",
+  "by": "author",
+  "what": "a credit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Notes\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-39",
+  "by": "author",
+  "what": "a sales voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sale\", \"Purchase\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-40",
+  "by": "author",
+  "what": "a purchase voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchases\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-41",
+  "by": "author",
+  "what": "a party on the same side as the block's lines is counted",
+  "file": "src/party_monthly.rs",
+  "from": "(party_net > 0) != (block_net > 0)",
+  "to": "(party_net > 0) == (block_net > 0)"
+ },
+ {
+  "id": "E4-42",
+  "by": "author",
+  "what": "a party netting to nil on the voucher is counted",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if block_net != 0 &&"
+ },
+ {
+  "id": "E4-43",
+  "by": "author",
+  "what": "a party is counted when the block's lines net to nil",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if party_net != 0 &&"
+ },
+ {
+  "id": "E4-44",
+  "by": "author",
+  "what": "a voucher with an uncounted party ledger goes to cash or bank, or no party",
+  "file": "src/party_monthly.rs",
+  "from": "            } else if !on_voucher.is_empty() {",
+  "to": "            } else if false && !on_voucher.is_empty() {"
+ },
+ {
+  "id": "E4-45",
+  "by": "author",
+  "what": "amounts not attributed raise no finding",
+  "file": "src/party_monthly.rs",
+  "from": "        if let Some(na) = rows.get(&Key::NotAttributed) {",
+  "to": "        if let Some(na) = rows.get(&Key::NotAttributed).filter(|_| false) {"
+ },
+ {
+  "id": "E4-46",
+  "by": "author",
+  "what": "the all-together set's statuses are joined with 'and' throughout",
+  "file": "src/party_monthly.rs",
+  "from": "Some((last, head)) => format!(\"{} and {last}\", head.join(\", \")),",
+  "to": "Some((last, head)) => format!(\"{} and {last}\", head.join(\" and \")),"
+ },
+ {
+  "id": "E4-47",
+  "by": "author",
+  "what": "a single match with two statuses tried says it is the only set tried",
+  "file": "src/party_monthly.rs",
+  "from": "            let others_tried = if present.len() > 1 {",
+  "to": "            let others_tried = if present.len() > 2 {"
+ },
+ {
+  "id": "E4-48",
+  "by": "author",
+  "what": "several statuses tried and none matching are listed without 'nor'",
+  "file": "src/party_monthly.rs",
+  "from": "several.join(\", nor the \")",
+  "to": "several.join(\", \")"
+ },
+ {
+  "id": "E4-49",
+  "by": "author",
+  "what": "the several matching sets' evidence repeats a voucher in two sets",
+  "file": "src/party_monthly.rs",
+  "from": "                    if !evidence.contains(&e) {",
+  "to": "                    if true {"
+ },
+ {
+  "id": "E4-50",
+  "by": "author",
+  "what": "the all-together single match is not said to be together",
+  "file": "src/party_monthly.rs",
+  "from": ".map_or_else(|| (all_word(), \" together\"), |w| (w.to_string(), \"\"));",
+  "to": ".map_or_else(|| (all_word(), \"\"), |w| (w.to_string(), \"\"));"
+ },
+ {
+  "id": "E4-51",
+  "by": "author",
+  "what": "each matching set's amount is misstated in the finding's text",
+  "file": "src/party_monthly.rs",
+  "from": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum))));",
+  "to": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum) + 100)));"
+ },
+ {
+  "id": "E4-52",
+  "by": "author",
+  "what": "PWM-2 counts a party netting to nil on a non-invoice voucher",
+  "file": "src/party_monthly.rs",
+  "from": "invoice || net.signum() * raw.signum() < 0",
+  "to": "invoice || net.signum() * raw.signum() <= 0"
+ },
+ {
+  "id": "E4-53",
+  "by": "author",
+  "what": "PWM-2 folds the not-attributed vouchers into the rows with no party",
+  "file": "src/party_monthly.rs",
+  "from": "                (0, false) => Kind::NotAttributed,",
+  "to": "                (0, false) => Kind::Unnamed,"
+ },
+ {
+  "id": "E4-54",
+  "by": "author",
+  "what": "PWM-2 does not find the published not-attributed row",
+  "file": "src/party_monthly.rs",
+  "from": "} else if e.id.ends_with(\":not_attributed\") {",
+  "to": "} else if e.id.ends_with(\":not_attributed_\") {"
+ },
+ {
+  "id": "E4-55",
+  "by": "author",
+  "what": "PWM-2 discards its not-attributed comparison",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
  }
 ]

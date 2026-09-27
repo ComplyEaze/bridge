@@ -5,20 +5,27 @@
 //! * Four blocks by group ancestry (Sales Accounts, Purchase Accounts, Direct Expenses, Indirect
 //!   Expenses). A block whose group the book does not carry publishes nothing and raises a finding.
 //! * A voucher's amount is its lines on the block's ledgers, business-signed (sales negated). Its
-//!   party is its one line under Sundry Debtors or Creditors; several such lines are "Several
-//!   parties"; none is "Cash or bank (no party)" for sales and purchases with a cash or bank line,
-//!   else "No party". Parties are per ledger, never merged.
+//!   party is a ledger under Sundry Debtors or Creditors that counts: on an invoice-class voucher
+//!   (Sales, Purchase, Credit Note, Debit Note) every such ledger; on any other, only one whose net
+//!   on the voucher is on the other side from the block's lines. One counted ledger is that party;
+//!   several are "Several parties"; none counted while a party ledger is on the voucher is "Not
+//!   attributed: no party on the other side", with a finding; no party ledger at all is "Cash or
+//!   bank (no party)" for sales and purchases with a cash or bank line, else "No party". Parties
+//!   are per ledger, never merged.
 //! * Month columns only for an April-to-March period; a voucher dated outside the period is in its
 //!   own column, not the year. Credit and debit notes are also shown as their own column.
 //! * The top `top_n` parties by absolute year total are shown by name, the rest as one "Others"
 //!   row, then the fixed rows and a total. A nil cell publishes no figure.
 //! * Each block's total is set beside the Trial Balance's period movement on its ledgers. A
-//!   difference over a rupee is a finding, which names excluded vouchers only when exactly one set
-//!   of them (one status, or all together) matches it.
+//!   difference over a rupee is a finding. The sets of excluded vouchers tried are each status
+//!   taken whole, and all of them together. The finding names a set when exactly one matches; when
+//!   several match it lists each and chooses none; when none matches it says which were tried.
 //! * Vouchers are counted as vouchers, never by GUID: a blank or repeated GUID never merges two.
 //!
 //! A figure id the reference would repeat (two ledgers sharing a tag) is refused with an error, as
-//! the reference's `fig` raises, never a panic (#644).
+//! the reference's `fig` raises, never a panic (#644). Where several sets match, two distinct
+//! evidence refs sharing an id keep their first-seen order; the reference's set order is undefined
+//! there (the canonical dump sorts evidence either way).
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,7 +38,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::Window;
 use crate::rules::Rules;
-use crate::support::{count, hash8, py_repr_str, voucher_label};
+use crate::support::{count, hash8, py_repr_str, rupees, voucher_label};
 
 pub const TEST_ID: &str = "party_monthly";
 pub const VERSION: &str = "1";
@@ -65,6 +72,9 @@ const MONTH_NAMES: [&str; 12] = [
     "March",
 ];
 const NOTE_TYPES: [&str; 2] = ["Credit Note", "Debit Note"];
+/// Tally's reserved invoice-class base types: on these the block's lines belong to the voucher's
+/// party (see the module docs).
+const INVOICE_TYPES: [&str; 4] = ["Sales", "Purchase", "Credit Note", "Debit Note"];
 /// The excluded statuses in the reference's `STATUS_WORDS` order: (status, key, word).
 const STATUSES: [(VoucherStatus, &str, &str); 3] = [
     (VoucherStatus::Postdated, "postdated", "post-dated"),
@@ -129,6 +139,7 @@ enum Key {
     CashBank,
     NoParty,
     Several,
+    NotAttributed,
 }
 
 #[derive(Default)]
@@ -151,6 +162,45 @@ impl Row {
         self.vouchers.extend(other.vouchers.iter().copied());
         Ok(())
     }
+}
+
+/// The party ledgers on a voucher, sorted.
+fn parties_on<'a>(v: &'a Voucher, parties: &BTreeSet<&str>) -> BTreeSet<&'a str> {
+    v.lines
+        .iter()
+        .map(|l| l.ledger.as_str())
+        .filter(|l| parties.contains(l))
+        .collect()
+}
+
+/// The party ledgers a block's lines on this voucher belong to. On an invoice-class voucher every
+/// party ledger on it; on any other, only one whose net on the voucher is on the other side from
+/// the block's lines (raw, debit-positive): a supplier paid in the same payment as rent is not the
+/// rent's party.
+fn counted_parties<'a>(
+    v: &Voucher,
+    on_voucher: &BTreeSet<&'a str>,
+    scope: &BTreeSet<&str>,
+) -> Result<Vec<&'a str>> {
+    if INVOICE_TYPES.contains(&v.base_type.as_str()) {
+        return Ok(on_voucher.iter().copied().collect());
+    }
+    let net_on = |pick: &dyn Fn(&str) -> bool| -> Result<i64> {
+        let mut s = 0_i64;
+        for l in v.lines.iter().filter(|l| pick(l.ledger.as_str())) {
+            s = add(s, l.amount_paise)?;
+        }
+        Ok(s)
+    };
+    let block_net = net_on(&|n| scope.contains(n))?;
+    let mut named = Vec::new();
+    for p in on_voucher {
+        let party_net = net_on(&|n| n == *p)?;
+        if party_net != 0 && block_net != 0 && (party_net > 0) != (block_net > 0) {
+            named.push(*p);
+        }
+    }
+    Ok(named)
 }
 
 fn row_hash(block: &str, key: &str) -> String {
@@ -240,16 +290,14 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
                 continue;
             }
             let amount = signed_sum(v)?;
-            let named: BTreeSet<&str> = v
-                .lines
-                .iter()
-                .map(|l| l.ledger.as_str())
-                .filter(|l| parties.contains(l))
-                .collect();
+            let on_voucher = parties_on(v, &parties);
+            let named = counted_parties(v, &on_voucher, &scope)?;
             let key = if named.len() == 1 {
-                Key::Party(named.iter().next().copied().unwrap_or_default().to_string())
+                Key::Party(named[0].to_string())
             } else if !named.is_empty() {
                 Key::Several
+            } else if !on_voucher.is_empty() {
+                Key::NotAttributed
             } else if (block == "sales" || block == "purchases")
                 && v.lines
                     .iter()
@@ -323,6 +371,11 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
             (Key::CashBank, "cash_bank", "Cash or bank (no party)"),
             (Key::NoParty, "no_party", "No party"),
             (Key::Several, "several", "Several parties"),
+            (
+                Key::NotAttributed,
+                "not_attributed",
+                "Not attributed: no party on the other side",
+            ),
         ] {
             if let Some(row) = rows.get(&k) {
                 ordered.push((
@@ -389,6 +442,38 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
                 &format!("{group}: vouchers in this row, including any dated outside the period."),
                 vec![label_ref.clone()],
             )?;
+        }
+
+        if let Some(na) = rows.get(&Key::NotAttributed) {
+            let h_na = row_hash(block, "not_attributed");
+            let mut cited: Vec<&Voucher> = na.vouchers.iter().map(|i| pop[*i]).collect();
+            cited.sort_by(|a, b| (&a.date, &a.guid).cmp(&(&b.date, &b.guid))); // stable, as sorted()
+            r.findings.push(Finding {
+                id: format!("{TEST_ID}/not_attributed/{block}"),
+                clauses: Vec::new(),
+                title: format!(
+                    "'{group}' amounts on vouchers whose party ledger is not on the other side are \
+not attributed to a party"
+                ),
+                facts: vec![(
+                    "vouchers".to_string(),
+                    format!("{TEST_ID}.{block}_vouchers_{h_na}"),
+                )],
+                evidence: cited
+                    .iter()
+                    .map(|x| EvidenceRef::with_label("voucher", &x.guid, &voucher_label(x)))
+                    .collect(),
+                confidence: Confidence::JudgementRequired,
+                limits: vec![format!(
+                    "On each voucher cited (none of them a sales, purchase, credit or debit note \
+voucher) a party ledger is present, but none is on the other side from the '{group}' lines, so those \
+lines are not that party's: for example bank charges or rent in the same payment as a supplier. They \
+are shown in the row 'Not attributed: no party on the other side', not under any party, and are in \
+the block's total."
+                )],
+                // A working-paper observation for the CA, not a question to the client.
+                ask_client: Vec::new(),
+            });
         }
 
         // ---- the Trial Balance ----
@@ -490,6 +575,12 @@ between the two includes it."
                     .collect();
                 candidates.push(("excluded", all));
             }
+            // What was tried, in words true for every case: each status present taken whole, and
+            // all of them together.
+            let present: Vec<&str> = candidates
+                .iter()
+                .filter_map(|(k, _)| status_word(k))
+                .collect();
             let mut matches = Vec::new();
             for (k, es) in candidates {
                 let mut s = diff;
@@ -504,23 +595,105 @@ between the two includes it."
                 ("difference".to_string(), f_diff),
                 ("trial_balance_movement".to_string(), f_tb),
             ];
-            if matches.len() == 1 {
-                let (k, mut es) = matches.remove(0);
-                let word = STATUSES
-                    .iter()
-                    .find(|(_, key, _)| *key == k)
-                    .map_or("optional, cancelled or post-dated", |(_, _, w)| *w);
-                es.sort_by(|a, b| a.0.guid.cmp(&b.0.guid)); // stable, as Python's sorted
-                let mut sum = 0_i64;
-                for (_, a) in &es {
-                    sum = add(sum, *a)?;
+            let all_word = || match present.split_last() {
+                Some((last, head)) => format!("{} and {last}", head.join(", ")),
+                None => String::new(),
+            };
+            let others_tried = if present.len() > 1 {
+                "No other of the sets tried (each status taken as a whole, and all of them together) \
+matches it; smaller groups of them were not tried."
+            } else {
+                "It is the only set tried; smaller groups of them were not tried."
+            };
+            if matches.is_empty() {
+                let searched = match present.as_slice() {
+                    [] => "No optional, cancelled or post-dated voucher dated in the period moves an \
+amount on these ledgers."
+                        .to_string(),
+                    [one] => format!(
+                        "The {one} vouchers on these ledgers, taken as a whole, do not match it; \
+smaller groups of them were not tried."
+                    ),
+                    several => format!(
+                        "Neither the {} vouchers on these ledgers, each status taken as a whole, nor \
+all of them together, match it; smaller groups of them were not tried.",
+                        several.join(", nor the ")
+                    ),
+                };
+                r.findings.push(Finding {
+                    id: format!("{TEST_ID}/tb_difference/{block}"),
+                    clauses: Vec::new(),
+                    title: format!("'{group}' by party differs from the Trial Balance"),
+                    facts,
+                    evidence: Vec::new(),
+                    confidence: Confidence::Computed,
+                    limits: vec![format!(
+                        "{searched} Possible causes: a voucher the Trial Balance and the voucher \
+export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with \
+vouchers but no Trial Balance row. It is not balanced away."
+                    )],
+                    ask_client: Vec::new(),
+                });
+            } else if matches.len() > 1 {
+                // Several sets each match: list every one and choose none (picking one would be a
+                // guess).
+                let mut facts = facts;
+                let (mut named, mut cited) = (Vec::new(), Vec::new());
+                for (k, mut es) in matches {
+                    let label = status_word(k).map_or_else(
+                        || format!("all the {} vouchers together", all_word()),
+                        |w| format!("the {w} vouchers"),
+                    );
+                    let (sum, evidence) = left_out(&mut es)?;
+                    let f_set = fig(
+                        &mut r,
+                        &format!("{block}_vouchers_left_out_{k}"),
+                        Value::Int(sum),
+                        Unit::Paise,
+                        &format!(
+                            "{group}: amount on these ledgers ({sense}) of {label} cited, which the \
+books leave out: one of several sets that each match the difference."
+                        ),
+                        evidence.clone(),
+                    )?;
+                    facts.push((format!("vouchers_left_out_{k}"), f_set));
+                    named.push(format!("{label} ({})", rupees(i128::from(sum))));
+                    cited.extend(evidence);
                 }
-                let evidence: Vec<EvidenceRef> = es
-                    .iter()
-                    .map(|(x, _)| {
-                        EvidenceRef::with_label("excluded_voucher", &x.guid, &voucher_label(x))
-                    })
-                    .collect();
+                // As the reference's sorted(set(cited), key=id): distinct refs by id. Refs sharing
+                // an id keep their first-seen order here, where Python's set order is undefined.
+                let mut evidence: Vec<EvidenceRef> = Vec::new();
+                for e in cited {
+                    if !evidence.contains(&e) {
+                        evidence.push(e);
+                    }
+                }
+                evidence.sort_by(|a, b| a.id.cmp(&b.id));
+                r.findings.push(Finding {
+                    id: format!("{TEST_ID}/tb_difference/{block}"),
+                    clauses: Vec::new(),
+                    title: format!(
+                        "'{group}' by party differs from the Trial Balance by an amount that more \
+than one set of excluded vouchers matches (each listed under Technical definitions)"
+                    ),
+                    facts,
+                    evidence,
+                    confidence: Confidence::Computed,
+                    limits: vec![format!(
+                        "Each of these sets, taken as a whole, matches the difference to within a \
+rupee: {}. The Trial Balance may include one of them; the books do not say which, so none is \
+chosen. Smaller groups were not tried. Whether they belong to this year is for the CA to confirm \
+from the vouchers themselves.",
+                        named.join("; ")
+                    )],
+                    ask_client: Vec::new(),
+                });
+            } else {
+                let (k, mut es) = matches.remove(0);
+                // The all-together set names the statuses present.
+                let (word, together) = status_word(k)
+                    .map_or_else(|| (all_word(), " together"), |w| (w.to_string(), ""));
+                let (sum, evidence) = left_out(&mut es)?;
                 let f_out = fig(&mut r, &format!("{block}_vouchers_left_out"), Value::Int(sum), Unit::Paise,
                     &format!("{group}: amount on these ledgers ({sense}) of the {word} vouchers cited, which \
                               the books leave out."),
@@ -531,36 +704,43 @@ between the two includes it."
                     id: format!("{TEST_ID}/tb_difference/{block}"),
                     clauses: Vec::new(),
                     title: format!("'{group}' by party differs from the Trial Balance by an amount matching \
-                                    {word} vouchers (listed under Technical definitions)"),
+                                    {word} vouchers{together} (listed under Technical definitions)"),
                     facts,
                     evidence,
                     confidence: Confidence::Computed,
                     limits: vec![format!("These figures, like every books figure, leave out {word} vouchers. \
 The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference \
 to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read \
-from the Trial Balance. No other set of such vouchers matches it. Whether they belong to this year is \
-for the CA to confirm from the vouchers themselves.")],
-                    ask_client: Vec::new(),
-                });
-            } else {
-                r.findings.push(Finding {
-                    id: format!("{TEST_ID}/tb_difference/{block}"),
-                    clauses: Vec::new(),
-                    title: format!("'{group}' by party differs from the Trial Balance"),
-                    facts,
-                    evidence: Vec::new(),
-                    confidence: Confidence::Computed,
-                    limits: vec!["No one set of optional, cancelled or post-dated vouchers matches it. \
-Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the \
-books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not \
-balanced away."
-                        .to_string()],
+from the Trial Balance. {others_tried} Whether they belong to this year is for the CA to confirm from \
+the vouchers themselves.")],
                     ask_client: Vec::new(),
                 });
             }
         }
     }
     Ok(r)
+}
+
+/// A set of excluded vouchers: its amount, and its vouchers cited by GUID.
+fn left_out(es: &mut [(&Voucher, i64)]) -> Result<(i64, Vec<EvidenceRef>)> {
+    es.sort_by(|a, b| a.0.guid.cmp(&b.0.guid)); // stable, as Python's sorted
+    let mut sum = 0_i64;
+    for (_, a) in es.iter() {
+        sum = add(sum, *a)?;
+    }
+    let evidence = es
+        .iter()
+        .map(|(x, _)| EvidenceRef::with_label("excluded_voucher", &x.guid, &voucher_label(x)))
+        .collect();
+    Ok((sum, evidence))
+}
+
+/// The word for a status key; `None` for the all-together set.
+fn status_word(key: &str) -> Option<&'static str> {
+    STATUSES
+        .iter()
+        .find(|(_, k, _)| *k == key)
+        .map(|(_, _, w)| *w)
 }
 
 /// One row as PWM reads it back from the published figures.
@@ -581,7 +761,8 @@ fn int(v: &Value) -> i128 {
 /// data matter. Scope is the group name anywhere in a ledger's chain; rows are found from the
 /// published figures and their evidence and compared with fresh sums from the vouchers, each
 /// voucher counted once. Sums are i128, so no check can overflow where the reference's integers
-/// would not.
+/// would not. PWM-2 compares the not-attributed row on its own, as it does the several-parties
+/// row.
 #[allow(clippy::too_many_lines)] // one pass per block, as the reference lays it out
 pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Result<Vec<String>> {
     let mut out = Vec::new();
@@ -702,11 +883,13 @@ pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Re
             }
         }
 
-        // Fresh figures from the vouchers: a named party, several parties, or no party.
+        // Fresh figures from the vouchers: a named party, several parties, a party ledger not
+        // counted (not attributed), or no party.
         #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
         enum Kind {
             Party(String),
             Several,
+            NotAttributed,
             Unnamed,
         }
         let mut fresh: BTreeMap<Kind, BTreeMap<String, i128>> = BTreeMap::new();
@@ -720,16 +903,36 @@ pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Re
             if in_scope.is_empty() {
                 continue;
             }
-            let amount = sign * in_scope.iter().sum::<i128>();
-            let named: BTreeSet<&str> = v
+            let raw = in_scope.iter().sum::<i128>();
+            let amount = sign * raw;
+            // A party counts on an invoice-class voucher always; on any other only if its net is
+            // opposite in sign to the block's lines. A party ledger present but not counted: not
+            // attributed. No party ledger at all: unnamed (cash or bank and no party together).
+            let present: BTreeSet<&str> = v
                 .lines
                 .iter()
                 .map(|l| l.ledger.as_str())
                 .filter(|l| parties.contains(l))
                 .collect();
-            let kind = match named.len() {
-                1 => Kind::Party(named.iter().next().copied().unwrap_or_default().to_string()),
-                0 => Kind::Unnamed,
+            let invoice =
+                ["Sales", "Purchase", "Credit Note", "Debit Note"].contains(&v.base_type.as_str());
+            let named: BTreeSet<&str> = present
+                .iter()
+                .copied()
+                .filter(|p| {
+                    let net: i128 = v
+                        .lines
+                        .iter()
+                        .filter(|l| l.ledger == *p)
+                        .map(|l| i128::from(l.amount_paise))
+                        .sum();
+                    invoice || net.signum() * raw.signum() < 0
+                })
+                .collect();
+            let kind = match (named.len(), present.is_empty()) {
+                (1, _) => Kind::Party(named.iter().next().copied().unwrap_or_default().to_string()),
+                (0, true) => Kind::Unnamed,
+                (0, false) => Kind::NotAttributed,
                 _ => Kind::Several,
             };
             let c = fresh.entry(kind).or_default();
@@ -785,7 +988,7 @@ pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Re
             })
             .collect();
         let mut shown: BTreeSet<String> = BTreeSet::new();
-        let (mut others, mut several) = (None, None);
+        let (mut others, mut several, mut not_attributed) = (None, None, None);
         let mut unnamed: Vec<&Published> = Vec::new();
         for (h, row) in &rows {
             let Some(e) = row.evidence.as_ref().filter(|_| *h != total) else {
@@ -803,6 +1006,8 @@ pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Re
                 others = Some(row);
             } else if e.id.ends_with(":several") {
                 several = Some(row);
+            } else if e.id.ends_with(":not_attributed") {
+                not_attributed = Some(row);
             } else {
                 unnamed.push(row);
             }
@@ -845,6 +1050,11 @@ pub fn check_invariants(book: &Book, period: &Window, result: &TestResult) -> Re
             &format!("the {block} several-parties row"),
             several.unwrap_or(&Published::default()),
             fresh.get(&Kind::Several).unwrap_or(&empty),
+        ));
+        out.extend(compare(
+            &format!("the {block} not-attributed row"),
+            not_attributed.unwrap_or(&Published::default()),
+            fresh.get(&Kind::NotAttributed).unwrap_or(&empty),
         ));
         let unnamed_published = Published {
             evidence: None,

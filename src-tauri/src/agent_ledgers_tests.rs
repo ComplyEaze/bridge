@@ -2099,6 +2099,64 @@ mod through_the_tool {
         assert_eq!(error["cause"], "native_ledger_group_changed");
     }
 
+    /// bridge#551: the compliance source checks the master response as soon
+    /// as it is read, so a master that repeats a ledger's identity is refused
+    /// before the balance request is sent. The captured master with its second
+    /// ledger block repeated, and nothing else changed.
+    #[tokio::test]
+    async fn a_repeated_master_identity_is_refused_before_the_balance_read() {
+        let forex = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+        let companies = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+        )));
+        let extent = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+        )));
+        let fixture = |bytes: &[u8]| xml(captured(bytes));
+        let master = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/compliance_master_forex_live.utf16le.xml"
+        ));
+        let start = master.match_indices("<LEDGER NAME=").nth(1).unwrap().0;
+        let end = start + master[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let repeated = format!(
+            "{}{}{}",
+            &master[..end],
+            &master[start..end],
+            &master[end..]
+        );
+        let mut plans = Vec::new();
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.push(companies.clone());
+        plans.extend([status(), companies.clone(), companies.clone()]);
+        pair(&mut plans, extent);
+        pair(&mut plans, xml(repeated));
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let response = one
+            .call(json!({"company_guid":forex,"fields":"compliance"}))
+            .await;
+        assert_eq!(one.requests(), total, "{response}");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed", "{error}");
+        assert_eq!(error["cause"], "duplicate_master_identity", "{error}");
+    }
+
     /// bridge#551, through the tool on the several-currency book's captures:
     /// the compliance read admits it through the classified base, returns its
     /// plain rupee ledgers only, and names the three dollar ledgers and the

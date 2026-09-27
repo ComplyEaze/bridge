@@ -943,7 +943,7 @@
     },
     {
       "path": "src-tauri/src/tally/runtime_trial_balance_tests.rs",
-      "sha256": "0b3b4e0f6db7e04139e35fa300cf35c87ff80a2fe0fab6102be48382af2e877c"
+      "sha256": "9787c16f0e1be6f51e7a5e95f8fdaff7f0dc9c8f3050a78330f75b4846a64b9f"
     },
     {
       "path": "src-tauri/src/tally/serial_queue.rs",

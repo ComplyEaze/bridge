@@ -729,8 +729,10 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
                     "",
                     format!("{}.00", 100_000 - index),
                 ),
+                // A distinct payer per row, as SBI's UPI rule names them, so
+                // the counterparty list grows with the statement too.
                 row(
-                    format!("BY TRANSFER-NEFT*SYNTHETIC PAYER {index}"),
+                    format!("BY TRANSFER-UPI/CR/{index:012}/SYNTHETIC PAYER {index}/XYZ"),
                     "",
                     "1.00",
                     format!("{}.50", 100_000 - index),
@@ -798,5 +800,57 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
         300
     );
     assert!(omitted("suspense_lines_omitted") > 0);
-    assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes);
+    assert!(omitted("counterparties_omitted") > 0);
+    assert!(listed("counterparties") > 0);
+    // The MCP frame carries the result twice, so it must fit in half.
+    assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes / 2);
+}
+
+/// A customer's deposit is a Receipt crediting the customer: build is asked
+/// to check that ledger (not as cash in hand), and a file whose voucher puts
+/// it on the other side is refused.
+#[test]
+fn a_deposit_answer_binds_the_credit_leg_of_its_receipt() {
+    let directory = tempfile::tempdir().unwrap();
+    let publish = |side: &str| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let (bank_side, customer_side) = if side == "Cr" {
+            ("Dr", "Cr")
+        } else {
+            ("Cr", "Dr")
+        };
+        let document = json!({
+            "schema": PROPOSALS_SCHEMA,
+            "proposals_id": proposals_id,
+            "vouchers": [{"bridge_txn_id":"st-1","date":"2026-08-03","voucher_type":"Receipt",
+                "narration":"CASH from Synthetic Customer | UBI SB xx7788 | 03-Aug-2026",
+                "entries":[{"ledger":"Union Bank","amount":"750.50","side":bank_side},
+                           {"ledger":"Synthetic Customer","amount":"750.50","side":customer_side}]}],
+            "records": [{"row":1,"date":"2026-08-03","disposition":{"voucher":"Receipt"},"amount":"750.50",
+                "party":"CASH DEPOSIT","ledger":"Synthetic Customer","suspense":false,"bridge_txn_id":"st-1",
+                "cash_movement":"deposit","cash_answer":"customer_paid_in"}],
+        });
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join(PROPOSALS_DIRECTORY);
+        fs::create_dir_all(&statements).unwrap();
+        fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let resolved = resolve_import_arguments(directory.path(), &publish("Cr")).unwrap();
+    let named = resolved
+        .cash_ledgers
+        .iter()
+        .map(|need| {
+            (
+                need.bridge_txn_id.as_str(),
+                need.ledger.as_str(),
+                need.cash_in_hand,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(named, [("st-1", "Synthetic Customer", false)]);
+    assert_eq!(
+        resolve_import_arguments(directory.path(), &publish("Dr")).err(),
+        Some("proposals_file_invalid".to_string())
+    );
 }

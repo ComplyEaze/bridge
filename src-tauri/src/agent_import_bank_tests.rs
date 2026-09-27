@@ -1639,6 +1639,13 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
     let party = answered_ledger_refusals(&[need("Gujarat Poly Industries")], &masters, 200_000)
         .unwrap()
         .1;
+    // A ledger a non-cash answer names (a customer, drawings) passes when it
+    // is outside Suspense A/c: only that group is refused for it.
+    let named = AnsweredCashLedger {
+        cash_in_hand: false,
+        ..need("Gujarat Poly Industries")
+    };
+    assert_eq!(answered_ledger_refusals(&[named], &masters, 200_000), None);
     assert_eq!(party[0]["state"], "not_cash_bank");
 }
 

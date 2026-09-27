@@ -699,7 +699,7 @@ impl Server {
                             "refused_ledgers":refused,
                             "refused_ledgers_omitted":omitted,
                             "group_evidence_sha256":evidence.response_sha256,
-                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c, where only dont_know lines go, tagged and listed. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
+                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c; only a dont_know answer may post a cash line there, where it is tagged and listed. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
                         }}),
                         evidence: accumulated.clone(),
                         company_guid: Some(payload.company_guid),

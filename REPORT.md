@@ -378,3 +378,10 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - Merged master into E4 (e11a2958). Master's crate equals E3a's 5a7f8137 (769ccc25), checked by an explicit equality test this time, so every crate conflict resolved to E4's side. The crate tree is unchanged (cb5699ff). Each crate file equals master plus E4's own patch; `batch-e4.md` also has its one reworded line. Non-crate files equal master. `--verify` 639/639; provenance (247) and integrity (371) pass; 352 tests; clippy and fmt clean. Read-only Sonnet pre-push check: none. **Pushed e11a2958.**
 - #788's body: candidate SHA e11a2958, a note that #744 is merged, net LOC against master; the rest is Lane D's text, unchanged. Subscribed.
 - Next: #788 waits on CI, Lane V2's independent review and the merge. Then, one PR each, in order: #644, #662 (check what #727 left), #658, #667.
+
+## 2026-09-27 20:30 UTC — #788: Lane D re-pinned E4, committed its records and merged master (c32e1ab4); ready for review
+
+- Lane D re-pinned E4 to the reference's current head (1c31c959: attribution by side, the "Not attributed" row, the Trial Balance sets tried, PWM-2 on that row; 659 mutations, E4-01..55; 353 tests). It committed the nightly workflow's records (5edcae94: 659 run, 654 killed, the 5 accepted survivors) and merged master c0578fcd (c32e1ab4, crate tree 3ee9aeee unchanged). It also updated #788's body and marked it ready for review.
+- This lane's parallel merge of master (3ae9b23d) was checked read-only by Sonnet: the merge was clean, but it did not fast-forward over 5edcae94, so it was **not pushed**. Lane D's c32e1ab4 covers the same work. This lane's local full run on the same crate tree is left to finish (runs are never interrupted); its shards are corroboration only.
+- The red "Required checks" on 5edcae94 came from a run cancelled by the ready-for-review run. On the new run, "Tax-audit mutation records" passes and the rest is in progress.
+- Next: #788 waits on CI and the merge (Lane D). Then, one PR each: #644, #662 (check what #727 left), #658, #667.

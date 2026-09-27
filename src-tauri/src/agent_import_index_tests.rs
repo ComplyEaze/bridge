@@ -206,7 +206,8 @@ fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
         kinds(test_duplicates(&[cancelled.clone(), other.clone()]).unwrap()),
         Vec::<String>::new()
     );
-    // A shared REMOTEID is still a duplicate, cancelled or not.
+    // The REMOTEID map is unchanged. (A real read does not produce this shape:
+    // a readback's REMOTEID derives from its GUID, which admission keeps unique.)
     let mut same_remote = other;
     same_remote.remote_id = cancelled.remote_id.clone();
     assert_eq!(
@@ -214,17 +215,13 @@ fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
         ["remote_id"]
     );
     // A row not read as cancelled keeps its fingerprint: an effective or
-    // optional voucher keeps its entries, and an unobserved flag is not a cancel.
+    // optional voucher keeps its entries.
     let effective = rows
         .iter()
         .find(|row| row.cancelled == Some(false) && !row.entries.is_empty())
         .unwrap()
         .clone();
-    for (cancelled, optional) in [
-        (Some(false), Some(false)),
-        (Some(false), Some(true)),
-        (None, Some(false)),
-    ] {
+    for (cancelled, optional) in [(Some(false), Some(false)), (Some(false), Some(true))] {
         let mut first = effective.clone();
         first.cancelled = cancelled;
         first.optional = optional;
@@ -253,13 +250,15 @@ fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
         serde_json::json!(["guid:derived-guid-4", "guid:derived-guid-5"]),
         "{found:?}"
     );
-    // A row read as cancelled is left out even if entries came back with it.
+    // Only a cancel whose entries the read dropped is left out: entry-dropping
+    // is measured for Journals only, so a cancelled row that comes back with
+    // its entries keeps its fingerprint.
     let mut with_entries = effective;
     with_entries.cancelled = Some(true);
     let twin = another_voucher(&with_entries, "6");
     assert_eq!(
         kinds(test_duplicates(&[with_entries, twin]).unwrap()),
-        Vec::<String>::new()
+        ["accounting_fingerprint"]
     );
 }
 

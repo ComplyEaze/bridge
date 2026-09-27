@@ -840,7 +840,8 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
 /// cancelled copy A′ carrying verified A's marker, beside an unrelated cancel C
 /// of the same date and type, is refused before any duplicate check, with or
 /// without C. If that admission rule ever loosens, this fails and the verdict
-/// question must be asked again.
+/// question must be asked again. A cancelled copy that kept its entries is not
+/// left out, so it still blocks the batch as it did before.
 #[test]
 fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = payload();
@@ -911,11 +912,25 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         );
     }
     // With the marker only on A, the unrelated cancel does not touch the verdict.
-    let result = verify_observed_batch(&line, &[posted, unrelated]).expect("verification result");
+    let result =
+        verify_observed_batch(&line, &[posted.clone(), unrelated]).expect("verification result");
     assert_eq!(result["duplicates"], json!([]), "{result}");
     assert_eq!(
         verification_status(&result, line.vouchers.len()),
         "posted_verified"
+    );
+    // An unmarked cancelled copy that came back WITH A's entries still pairs
+    // with A: dropped entries are measured for Journals only, and a cancel that
+    // keeps them is not left out, so this verdict is what it was before #767.
+    let mut kept = cancel("kept-guid", 5, None);
+    kept.entries = posted.entries.clone();
+    let result = verify_observed_batch(&line, &[posted, kept]).expect("verification result");
+    let duplicates = result["duplicates"].as_array().unwrap();
+    assert_eq!(duplicates.len(), 1, "{result}");
+    assert_eq!(duplicates[0]["kind"], "accounting_fingerprint", "{result}");
+    assert_eq!(
+        verification_status(&result, line.vouchers.len()),
+        "verification_incomplete"
     );
 }
 

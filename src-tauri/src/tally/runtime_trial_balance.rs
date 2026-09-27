@@ -32,10 +32,11 @@ pub struct StatementsRead {
     pub derived: crate::reports::statements::DerivedStatements,
 }
 
-/// Sealed so that nothing outside it can build a [`SingleInrAdmission`]; even
-/// the rest of this module can obtain one only from `admit_single_inr`.
+/// Sealed so that nothing outside it can build a [`SingleInrAdmission`] or a
+/// [`SingleCurrencyTrialBalance`]: the rest of this module can obtain the first
+/// only from `admit_single_inr`, and the second only from `admitted` with it.
 mod single_inr {
-    use super::CompanyCurrencyRead;
+    use super::{CompanyCurrencyRead, NativeTrialBalance};
 
     /// Proof that a currency read found exactly one Currency master, and that it
     /// is INR: `admit_single_inr` is the only way to obtain one, and it succeeds
@@ -52,31 +53,34 @@ mod single_inr {
             self.admit_inr().map(|_| SingleInrAdmission { _sealed: () })
         }
     }
+
+    /// A Trial Balance whose company passed the single-INR admission: every
+    /// ledger of a book with one currency master. It is built only from a
+    /// [`SingleInrAdmission`] taken in the same bracket, so a read of a
+    /// several-currency book can never become one. The statement derivation
+    /// accepts nothing else (#692).
+    #[derive(Debug, Clone)]
+    pub(crate) struct SingleCurrencyTrialBalance(NativeTrialBalance);
+
+    impl SingleCurrencyTrialBalance {
+        pub(super) fn admitted(
+            report: NativeTrialBalance,
+            _admission: &SingleInrAdmission,
+        ) -> Self {
+            Self(report)
+        }
+
+        pub(crate) fn report(&self) -> &NativeTrialBalance {
+            &self.0
+        }
+
+        #[cfg(test)]
+        pub(crate) fn admitted_for_tests(report: NativeTrialBalance) -> Self {
+            Self(report)
+        }
+    }
 }
-use single_inr::SingleInrAdmission;
-
-/// A Trial Balance whose company passed the single-INR admission: every ledger
-/// of a book with one currency master. It is built only from a
-/// [`SingleInrAdmission`] taken in the same bracket, so a read of a
-/// several-currency book can never become one. The statement derivation
-/// accepts nothing else (#692).
-#[derive(Debug, Clone)]
-pub(crate) struct SingleCurrencyTrialBalance(NativeTrialBalance);
-
-impl SingleCurrencyTrialBalance {
-    fn admitted(report: NativeTrialBalance, _admission: &SingleInrAdmission) -> Self {
-        Self(report)
-    }
-
-    pub(crate) fn report(&self) -> &NativeTrialBalance {
-        &self.0
-    }
-
-    #[cfg(test)]
-    pub(crate) fn admitted_for_tests(report: NativeTrialBalance) -> Self {
-        Self(report)
-    }
-}
+pub(crate) use single_inr::SingleCurrencyTrialBalance;
 
 /// What a statement read adds to a Trial Balance read.
 struct StatementSources {

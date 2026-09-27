@@ -925,6 +925,15 @@ fn the_markdown_proof_follows_the_verification_status() {
         markdown.contains("| remote_id | ``` a\\|b`c``d ``` | 2 |"),
         "{markdown}"
     );
+    // A line break or a space at each end keeps the row and the text whole.
+    let odd = json!([{"kind":"remote_id","remote_id":"x\ny","count":2},
+        {"kind":"remote_id","remote_id":" z ","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(markdown.contains("| remote_id | `x y` | 2 |"), "{markdown}");
+    assert!(
+        markdown.contains("| remote_id | `  z  ` | 2 |"),
+        "{markdown}"
+    );
 }
 
 #[test]

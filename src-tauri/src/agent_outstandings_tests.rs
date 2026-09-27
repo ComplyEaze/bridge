@@ -178,6 +178,7 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         writes_enabled: false,
+        batch_post_enabled: false,
     });
     let response = server
         .call_tool(

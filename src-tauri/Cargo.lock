@@ -372,7 +372,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -456,6 +456,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bridge-tally-primitives",
+ "icu_properties",
  "proptest",
  "quick-xml",
  "serde",

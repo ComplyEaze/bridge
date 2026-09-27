@@ -239,3 +239,6 @@ Lane D2 (the fresh orchestrator) says a local lane, Posting thread 2, is doing t
 
 ## 2026-09-27T14:27Z: #731 merged (#689)
 #731 merged at `29aef0a`, on top of the local lane's schema-2 migration. The earlier red "Required checks" at `91cd9c6` was a cancelled run on a superseded head. Lane Q PRs merged so far: #727, #734, #749, #743, #733, #731. Still open and with other lanes: #736, #763.
+
+## 2026-09-27T14:52Z: #736 merged (part of #632)
+#736 merged at `47311f3`, after the local lane's schema-2 update. Lane Q PRs merged so far: #727, #734, #749, #743, #733, #731, #736. Still open and with other lanes: #763.

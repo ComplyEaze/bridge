@@ -44,9 +44,10 @@ impl Server {
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));
         let derived = read.derived;
-        let (lines, headline) = match kind {
+        let (lines, established, headline) = match kind {
             NativeStatementKind::ProfitAndLoss => (
                 &derived.profit_and_loss,
+                &derived.net_result,
                 json!({
                     "gross_result": established_json(&derived.gross_result),
                     "net_result": established_json(&derived.net_result),
@@ -54,6 +55,7 @@ impl Server {
             ),
             NativeStatementKind::BalanceSheet => (
                 &derived.balance_sheet,
+                &derived.balance_sheet_profit_and_loss,
                 json!({
                     "profit_and_loss": {
                         "ledger": derived.profit_and_loss_ledger.as_ref().map(|ledger| json!({
@@ -65,6 +67,10 @@ impl Server {
                 }),
             ),
         };
+        // The derived lines are the statement only once its result is
+        // established; until then they are withheld, and the gates show how
+        // each of Tally's own lines compared.
+        let lines = matches!(established, Established::Established { .. }).then_some(lines);
         let unclassified_total = derived.unclassified.len();
         let unclassified = derived
             .unclassified
@@ -98,6 +104,7 @@ impl Server {
                         "Each line sums the Trial Balance amounts Tally returned under one reserved primary group, and counts the empty amounts it left out",
                         "A ledger under a user-created primary group, or with an incomplete group chain, is listed in unclassified; while any carries an amount, no result is established",
                         "Closing stock is not derived: with a Stock-in-Hand balance no result is established",
+                        "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
                         "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; a book with stock items is expected to refuse, and no inventory book has been measured",
                         "A book with more than one currency master is refused before the Trial Balance is read",
                         "A Tally line the derivation has no counterpart for, such as a heading with an amount or a difference in opening balances, refuses the results rather than being guessed at",

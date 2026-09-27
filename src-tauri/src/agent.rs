@@ -53,10 +53,10 @@ mod vouchers;
 use outstandings::*;
 #[path = "agent_movement.rs"]
 mod movement;
-#[path = "agent_trial_balance.rs"]
-mod trial_balance;
 #[path = "agent_statements.rs"]
 mod statements;
+#[path = "agent_trial_balance.rs"]
+mod trial_balance;
 #[cfg(test)]
 use movement::parse_movement_vouchers;
 #[path = "agent_responses.rs"]
@@ -568,7 +568,8 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(statement.code());
         }
-        if let Some(derivation) = cause.downcast_ref::<crate::reports::statements::StatementsError>()
+        if let Some(derivation) =
+            cause.downcast_ref::<crate::reports::statements::StatementsError>()
         {
             return Some(derivation.code());
         }

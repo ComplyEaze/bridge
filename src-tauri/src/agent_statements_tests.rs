@@ -149,11 +149,16 @@ async fn profit_and_loss_reads_both_statements_and_reports_gated_results() {
     let (response, sent, expected) = call("profit_and_loss", plans("-11027.00", true)).await;
     let result = result(&response);
     assert_eq!(sent, expected);
-    assert!(value(&result["result"]["net_result"]).numeric_eq(&bridge_tally_core::ExactDecimal::parse("4027.00").unwrap()));
-    assert!(value(&result["result"]["gross_result"]).numeric_eq(&bridge_tally_core::ExactDecimal::parse("4027.00").unwrap()));
+    assert!(value(&result["result"]["net_result"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("4027.00").unwrap()));
+    assert!(value(&result["result"]["gross_result"])
+        .numeric_eq(&bridge_tally_core::ExactDecimal::parse("4027.00").unwrap()));
     let gate = result["balance_sheet_gate"]["lines"].as_array().unwrap();
     assert_eq!(gate.len(), 2);
-    assert!(gate.iter().all(|line| line["status"] == "matched"), "{gate:?}");
+    assert!(
+        gate.iter().all(|line| line["status"] == "matched"),
+        "{gate:?}"
+    );
     assert_eq!(result["tie_out"]["lines"][0]["status"], "matched");
     assert_eq!(result["lines"].as_array().unwrap().len(), 6);
 }
@@ -180,25 +185,59 @@ async fn a_balance_sheet_that_does_not_tie_names_the_line_and_establishes_nothin
         assert_eq!(refused["reason"], "tally_balance_sheet_differs");
         assert_eq!(refused["lines"], json!(["Current Assets"]));
     }
+    // The derived lines are withheld, not shown as the statement.
+    assert!(result["lines"].is_null(), "{result}");
+    assert_eq!(
+        result["balance_sheet_gate"]["lines"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn a_balance_sheet_that_does_not_tie_withholds_its_lines() {
+    let (response, sent, expected) = call("balance_sheet", plans("-11026.00", false)).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    let carried = &result["result"]["profit_and_loss"]["carried"];
+    assert_eq!(carried["state"], "not_established", "{carried}");
+    assert_eq!(carried["reason"], "tally_balance_sheet_differs");
+    assert!(result["lines"].is_null(), "{result}");
 }
 
 #[tokio::test]
 async fn a_masked_refusal_hides_the_lines_it_names() {
-    let (response, sent, expected) =
-        call_with("profit_and_loss", plans("-11026.00", true), Redaction::MaskParties).await;
+    let (response, sent, expected) = call_with(
+        "profit_and_loss",
+        plans("-11026.00", true),
+        Redaction::MaskParties,
+    )
+    .await;
     assert_eq!(sent, expected);
     let refused = &result(&response)["result"]["net_result"];
-    assert_eq!(refused["reason"], "tally_balance_sheet_differs", "{refused}");
+    assert_eq!(
+        refused["reason"], "tally_balance_sheet_differs",
+        "{refused}"
+    );
     assert_eq!(refused["lines"].as_array().unwrap().len(), 1);
     assert_ne!(refused["lines"][0], "Current Assets", "{refused}");
 }
 
 #[tokio::test]
 async fn a_masked_response_hides_the_line_names_a_ledger_can_carry() {
-    let (response, sent, expected) =
-        call_with("balance_sheet", plans("-11027.00", false), Redaction::MaskParties).await;
+    let (response, sent, expected) = call_with(
+        "balance_sheet",
+        plans("-11027.00", false),
+        Redaction::MaskParties,
+    )
+    .await;
     assert_eq!(sent, expected);
     let text = result(&response).to_string();
-    assert!(text.contains("Current Assets"), "group names stay readable: {text}");
+    assert!(
+        text.contains("Current Assets"),
+        "group names stay readable: {text}"
+    );
     assert!(!text.contains("Profit & Loss A/c"), "{text}");
 }

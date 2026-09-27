@@ -20,7 +20,10 @@ use quick_xml::{
 use serde::Serialize;
 use std::{collections::HashSet, fmt};
 
-use crate::{native_outstandings::NativeLedgerSnapshotPeriod, tolerant_xml::sanitize_invalid_numeric_references};
+use crate::{
+    native_outstandings::NativeLedgerSnapshotPeriod,
+    tolerant_xml::sanitize_invalid_numeric_references,
+};
 
 /// Which built-in statement a request names and a response is parsed as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -119,7 +122,11 @@ impl NativeStatementError {
 
 impl fmt::Display for NativeStatementError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "native statement response refused ({})", self.code())
+        write!(
+            formatter,
+            "native statement response refused ({})",
+            self.code()
+        )
     }
 }
 
@@ -201,8 +208,9 @@ pub fn parse_native_statement(
                     }
                     pending_name = Some(text);
                 } else if name.as_slice() == shape.amounts {
-                    let line_name =
-                        pending_name.take().ok_or(invalid("statement_amounts_without_name"))?;
+                    let line_name = pending_name
+                        .take()
+                        .ok_or(invalid("statement_amounts_without_name"))?;
                     let (sub, main) = read_amounts(&mut reader, &element, shape)?;
                     if !names.insert(line_name.to_lowercase()) {
                         return Err(invalid("statement_duplicate_line"));
@@ -388,7 +396,9 @@ fn read_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> Result<String, Nati
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Text(text) => {
-                let decoded = text.decode().map_err(|_| invalid("statement_xml_invalid_encoding"))?;
+                let decoded = text
+                    .decode()
+                    .map_err(|_| invalid("statement_xml_invalid_encoding"))?;
                 let unescaped = quick_xml::escape::unescape(&decoded)
                     .map_err(|_| invalid("statement_xml_invalid_escape"))?;
                 value.push_str(&unescaped);

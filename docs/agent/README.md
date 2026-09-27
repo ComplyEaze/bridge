@@ -192,6 +192,10 @@ too (#692).
   - Signs follow the Trial Balance: a debit is negative, so a profit is positive.
   - Each line's `amount` sums the amounts Tally returned and counts the empty
     ones it left out.
+  - `lines` is null while the tool's result (`net_result`, or the Balance
+    Sheet's `carried`) is not established, so a derived line is never shown
+    as the statement. `balance_sheet_gate` and `tie_out` then show how each
+    of Tally's own lines compared.
 - **When a result is established.** Only when all of these hold:
   - every ledger is classified; a ledger under a user-created primary group,
     or with an incomplete chain, is listed in `unclassified`, and blocks the

@@ -88,14 +88,22 @@ fn derive(report: NativeTrialBalance, tally: &NativeStatement) -> DerivedStateme
 }
 
 fn assert_sum(sum: &StatementSum, value: &str, present: usize, empty: usize) {
-    assert!(sum.sum.numeric_eq(&decimal(value)), "{} != {value}", sum.sum.as_str());
+    assert!(
+        sum.sum.numeric_eq(&decimal(value)),
+        "{} != {value}",
+        sum.sum.as_str()
+    );
     assert_eq!((sum.present_count, sum.empty_count), (present, empty));
 }
 
 fn assert_established(result: &Established, value: &str) {
     match result {
         Established::Established { value: got } => {
-            assert!(got.numeric_eq(&decimal(value)), "{} != {value}", got.as_str())
+            assert!(
+                got.numeric_eq(&decimal(value)),
+                "{} != {value}",
+                got.as_str()
+            )
         }
         other => panic!("expected {value}, got {other:?}"),
     }
@@ -192,15 +200,35 @@ fn an_opening_only_book_keeps_its_opening_difference_visible() {
     // opening balances line for this book, which the gate would refuse.
     let derived = derive(report, &tally);
 
-    assert!(derived.profit_and_loss.iter().all(|line| line.ledger_count == 0));
-    assert_sum(&line(&derived.balance_sheet, "Capital Account").amount, "125000.00", 1, 0);
-    assert_sum(&line(&derived.balance_sheet, "Current Liabilities").amount, "88000.00", 1, 0);
-    assert_sum(&line(&derived.balance_sheet, "Current Assets").amount, "-262833.50", 4, 1);
+    assert!(derived
+        .profit_and_loss
+        .iter()
+        .all(|line| line.ledger_count == 0));
+    assert_sum(
+        &line(&derived.balance_sheet, "Capital Account").amount,
+        "125000.00",
+        1,
+        0,
+    );
+    assert_sum(
+        &line(&derived.balance_sheet, "Current Liabilities").amount,
+        "88000.00",
+        1,
+        0,
+    );
+    assert_sum(
+        &line(&derived.balance_sheet, "Current Assets").amount,
+        "-262833.50",
+        4,
+        1,
+    );
     // No line is invented to balance: the three lines net to §5.6's -49833.50.
     let net: ExactDecimal = derived
         .balance_sheet
         .iter()
-        .try_fold(ExactDecimal::zero(), |total, line| total.checked_add(&line.amount.sum))
+        .try_fold(ExactDecimal::zero(), |total, line| {
+            total.checked_add(&line.amount.sum)
+        })
         .unwrap();
     assert!(net.numeric_eq(&decimal("-49833.50")));
     assert_established(&derived.net_result, "0");
@@ -220,7 +248,12 @@ fn a_p_and_l_line_is_the_window_movement_not_the_closing() {
     ]);
     let derived = derive(report, &tally);
 
-    assert_sum(&line(&derived.profit_and_loss, "Sales Accounts").amount, "4027.00", 1, 1);
+    assert_sum(
+        &line(&derived.profit_and_loss, "Sales Accounts").amount,
+        "4027.00",
+        1,
+        1,
+    );
     assert_established(&derived.net_result, "4027.00");
     // The carried line is closings: 7000.00 on the ledger and 4127.00 of sales.
     assert_established(&derived.balance_sheet_profit_and_loss, "11127.00");
@@ -242,7 +275,10 @@ fn a_ledger_under_a_user_created_primary_group_blocks_every_result() {
 
     let derived =
         derive_statements(&admitted(report), &groups, &known_lab_balance_sheet(), None).unwrap();
-    assert_eq!(line(&derived.profit_and_loss, "Sales Accounts").ledger_count, 0);
+    assert_eq!(
+        line(&derived.profit_and_loss, "Sales Accounts").ledger_count,
+        0
+    );
     assert_eq!(derived.unclassified.len(), 1);
     assert_eq!(derived.unclassified[0].reason, "primary_group_user_created");
     assert_every_result(&derived, &blocked("unclassified_ledger_carries_an_amount"));
@@ -272,7 +308,10 @@ fn a_stock_balance_blocks_every_result_including_the_carried_line() {
 
     let derived = derive(report, &known_lab_balance_sheet());
     assert_eq!(derived.stock_ledger_count, 1);
-    assert_every_result(&derived, &blocked("closing_stock_not_derivable_from_trial_balance"));
+    assert_every_result(
+        &derived,
+        &blocked("closing_stock_not_derivable_from_trial_balance"),
+    );
 }
 
 #[test]
@@ -349,7 +388,13 @@ fn a_row_whose_columns_do_not_add_up_is_refused() {
     row(&mut report, "Ageing Customer A").closing =
         NativeTrialBalanceAmount::Present(decimal("-7277.01"));
     assert_eq!(
-        derive_statements(&admitted(report), &groups(), &known_lab_balance_sheet(), None).unwrap_err(),
+        derive_statements(
+            &admitted(report),
+            &groups(),
+            &known_lab_balance_sheet(),
+            None
+        )
+        .unwrap_err(),
         StatementsError::RowInconsistent
     );
 }
@@ -361,7 +406,13 @@ fn a_closing_that_no_movement_explains_is_refused_even_with_empty_columns() {
     let mut report = known_lab();
     row(&mut report, "Ageing Sales").credit = NativeTrialBalanceAmount::PresentEmpty;
     assert_eq!(
-        derive_statements(&admitted(report), &groups(), &known_lab_balance_sheet(), None).unwrap_err(),
+        derive_statements(
+            &admitted(report),
+            &groups(),
+            &known_lab_balance_sheet(),
+            None
+        )
+        .unwrap_err(),
         StatementsError::RowInconsistent
     );
 }
@@ -373,15 +424,23 @@ fn a_second_root_ledger_is_refused() {
     let root = root_parent(&report);
     row(&mut report, "Cash").parent = root;
     assert_eq!(
-        derive_statements(&admitted(report), &groups(), &known_lab_balance_sheet(), None).unwrap_err(),
+        derive_statements(
+            &admitted(report),
+            &groups(),
+            &known_lab_balance_sheet(),
+            None
+        )
+        .unwrap_err(),
         StatementsError::RootLedgerRepeated
     );
 }
 
 #[test]
 fn each_gate_takes_only_its_own_statement() {
-    let profit_and_loss =
-        statement(NativeStatementKind::ProfitAndLoss, &[("Sales Accounts", "", "4027.00")]);
+    let profit_and_loss = statement(
+        NativeStatementKind::ProfitAndLoss,
+        &[("Sales Accounts", "", "4027.00")],
+    );
     assert_eq!(
         derive_statements(&admitted(known_lab()), &groups(), &profit_and_loss, None).unwrap_err(),
         StatementsError::GateNotABalanceSheet
@@ -403,8 +462,17 @@ fn profit_and_loss(lines: &[(&str, &str, &str)]) -> NativeStatement {
 }
 
 /// Known lab with Tally's Balance Sheet tying and `tally` as its P&L.
-fn derive_with_profit_and_loss(report: NativeTrialBalance, tally: &NativeStatement) -> DerivedStatements {
-    derive_statements(&admitted(report), &groups(), &known_lab_balance_sheet(), Some(tally)).unwrap()
+fn derive_with_profit_and_loss(
+    report: NativeTrialBalance,
+    tally: &NativeStatement,
+) -> DerivedStatements {
+    derive_statements(
+        &admitted(report),
+        &groups(),
+        &known_lab_balance_sheet(),
+        Some(tally),
+    )
+    .unwrap()
 }
 
 fn assert_movement_refused(derived: &DerivedStatements, lines: &[&str]) {
@@ -420,8 +488,10 @@ fn assert_movement_refused(derived: &DerivedStatements, lines: &[&str]) {
 
 #[test]
 fn a_profit_and_loss_that_ties_establishes_gross_and_net() {
-    let derived =
-        derive_with_profit_and_loss(known_lab(), &profit_and_loss(&[("Sales Accounts", "", "4027.00")]));
+    let derived = derive_with_profit_and_loss(
+        known_lab(),
+        &profit_and_loss(&[("Sales Accounts", "", "4027.00")]),
+    );
     assert_established(&derived.gross_result, "4027.00");
     assert_established(&derived.net_result, "4027.00");
 }
@@ -430,7 +500,10 @@ fn a_profit_and_loss_that_ties_establishes_gross_and_net() {
 fn a_stock_line_on_tallys_profit_and_loss_refuses_gross_and_net() {
     let derived = derive_with_profit_and_loss(
         known_lab(),
-        &profit_and_loss(&[("Closing Stock", "", "100.00"), ("Sales Accounts", "", "4027.00")]),
+        &profit_and_loss(&[
+            ("Closing Stock", "", "100.00"),
+            ("Sales Accounts", "", "4027.00"),
+        ]),
     );
     assert_movement_refused(&derived, &["Closing Stock"]);
 }
@@ -455,7 +528,9 @@ fn stock_held_at_the_window_start_refuses_even_when_the_balance_sheet_ties() {
 fn a_renamed_derived_line_is_derived_only_and_refuses() {
     let derived =
         derive_with_profit_and_loss(known_lab(), &profit_and_loss(&[("Sales", "", "4027.00")]));
-    let sales = line(&derived.profit_and_loss, "Sales Accounts").display_name.clone();
+    let sales = line(&derived.profit_and_loss, "Sales Accounts")
+        .display_name
+        .clone();
     assert_movement_refused(&derived, &["Sales", &sales]);
 }
 
@@ -481,22 +556,39 @@ struct Capture {
 }
 
 impl Capture {
-    fn parts(&self) -> (NativeTrialBalance, Vec<TallyNamedMaster>, NativeStatement, NativeStatement) {
+    fn parts(
+        &self,
+    ) -> (
+        NativeTrialBalance,
+        Vec<TallyNamedMaster>,
+        NativeStatement,
+        NativeStatement,
+    ) {
         (
             parse_native_trial_balance(&utf16(self.trial_balance), self.guid).unwrap(),
             parse_native_group_snapshot(&utf16(self.groups), self.guid).unwrap(),
-            parse_native_statement(NativeStatementKind::BalanceSheet, &utf16(self.balance_sheet))
-                .unwrap(),
-            parse_native_statement(NativeStatementKind::ProfitAndLoss, &utf16(self.profit_and_loss))
-                .unwrap(),
+            parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                &utf16(self.balance_sheet),
+            )
+            .unwrap(),
+            parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                &utf16(self.profit_and_loss),
+            )
+            .unwrap(),
         )
     }
 
     fn derive(&self) -> (DerivedStatements, TieOut) {
         let (report, groups, balance_sheet, profit_and_loss) = self.parts();
-        let derived =
-            derive_statements(&admitted(report), &groups, &balance_sheet, Some(&profit_and_loss))
-                .unwrap();
+        let derived = derive_statements(
+            &admitted(report),
+            &groups,
+            &balance_sheet,
+            Some(&profit_and_loss),
+        )
+        .unwrap();
         let tie = derived.profit_and_loss_tie.clone().unwrap();
         (derived, tie)
     }
@@ -522,8 +614,13 @@ const READS_LAB: Capture = Capture {
 /// heading allowance measured against the one book it was observed on.
 fn reads_lab_with_profit_and_loss(lines: &[(&str, &str, &str)]) -> DerivedStatements {
     let (report, groups, balance_sheet, _) = READS_LAB.parts();
-    derive_statements(&admitted(report), &groups, &balance_sheet, Some(&profit_and_loss(lines)))
-        .unwrap()
+    derive_statements(
+        &admitted(report),
+        &groups,
+        &balance_sheet,
+        Some(&profit_and_loss(lines)),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -545,16 +642,25 @@ fn the_cost_of_sales_heading_passes_only_at_exactly_the_derived_cost_of_sales() 
     };
     // Off by one paisa.
     refused(
-        &[("Cost of Sales :", "", "-4250.01"), ("Purchase Accounts", "-4250.00", "")],
+        &[
+            ("Cost of Sales :", "", "-4250.01"),
+            ("Purchase Accounts", "-4250.00", ""),
+        ],
         "Cost of Sales :",
     );
     // Any other spelling is not the heading.
     refused(
-        &[("Cost of sales :", "", "-4250.00"), ("Purchase Accounts", "-4250.00", "")],
+        &[
+            ("Cost of sales :", "", "-4250.00"),
+            ("Purchase Accounts", "-4250.00", ""),
+        ],
         "Cost of sales :",
     );
     refused(
-        &[("Cost of Sales", "", "-4250.00"), ("Purchase Accounts", "-4250.00", "")],
+        &[
+            ("Cost of Sales", "", "-4250.00"),
+            ("Purchase Accounts", "-4250.00", ""),
+        ],
         "Cost of Sales",
     );
 }
@@ -574,8 +680,18 @@ fn a_same_company_full_year_passes_the_gate() {
     let (derived, tie) = READS_LAB.derive();
 
     assert!(derived.unclassified.is_empty());
-    assert_sum(&line(&derived.profit_and_loss, "Purchase Accounts").amount, "-4250.00", 1, 1);
-    assert_sum(&line(&derived.balance_sheet, "Current Liabilities").amount, "4250.00", 1, 3);
+    assert_sum(
+        &line(&derived.profit_and_loss, "Purchase Accounts").amount,
+        "-4250.00",
+        1,
+        1,
+    );
+    assert_sum(
+        &line(&derived.balance_sheet, "Current Liabilities").amount,
+        "4250.00",
+        1,
+        3,
+    );
     assert_established(&derived.gross_result, "-4250.00");
     assert_established(&derived.net_result, "-4250.00");
     assert_established(&derived.balance_sheet_profit_and_loss, "-4250.00");
@@ -628,8 +744,16 @@ fn a_same_company_part_year_window_on_a_heavy_book_passes_the_gate() {
     .derive();
 
     assert!(derived.unclassified.is_empty());
-    assert_sum(&line(&derived.profit_and_loss, "Sales Accounts").amount, "113726661.73", 1, 1);
-    assert_eq!(line(&derived.balance_sheet, "Current Assets").ledger_count, 121);
+    assert_sum(
+        &line(&derived.profit_and_loss, "Sales Accounts").amount,
+        "113726661.73",
+        1,
+        1,
+    );
+    assert_eq!(
+        line(&derived.balance_sheet, "Current Assets").ledger_count,
+        121
+    );
     let root = derived.profit_and_loss_ledger.as_ref().unwrap();
     assert_eq!(
         root.closing,

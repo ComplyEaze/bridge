@@ -32,17 +32,39 @@ pub struct StatementsRead {
     pub derived: crate::reports::statements::DerivedStatements,
 }
 
+/// Sealed so that nothing outside it can build a [`SingleInrAdmission`]; even
+/// the rest of this module can obtain one only from `admit_single_inr`.
+mod single_inr {
+    use super::CompanyCurrencyRead;
+
+    /// Proof that a currency read found exactly one Currency master, and that it
+    /// is INR: `admit_single_inr` is the only way to obtain one, and it succeeds
+    /// only where `admit_inr` does. A several-currency book's admission is a
+    /// different type and cannot stand in for it (#692; #715 admits its partial
+    /// read by another path).
+    #[derive(Debug)]
+    pub(crate) struct SingleInrAdmission {
+        _sealed: (),
+    }
+
+    impl CompanyCurrencyRead {
+        pub(crate) fn admit_single_inr(self) -> Result<SingleInrAdmission, &'static str> {
+            self.admit_inr().map(|_| SingleInrAdmission { _sealed: () })
+        }
+    }
+}
+use single_inr::SingleInrAdmission;
+
 /// A Trial Balance whose company passed the single-INR admission: every ledger
-/// of a book with one currency master. What guarantees that is that only this
-/// module constructs it, in one place, right after `admit_inr` succeeds in the
-/// same bracket; the admission argument records the dependency, and cannot by
-/// itself prove it. A read of a several-currency book can never become one. The statement derivation accepts nothing else (#692; the
-/// currency-scope work in #715 keeps its partial read a different type).
+/// of a book with one currency master. It is built only from a
+/// [`SingleInrAdmission`] taken in the same bracket, so a read of a
+/// several-currency book can never become one. The statement derivation
+/// accepts nothing else (#692).
 #[derive(Debug, Clone)]
 pub(crate) struct SingleCurrencyTrialBalance(NativeTrialBalance);
 
 impl SingleCurrencyTrialBalance {
-    fn admitted(report: NativeTrialBalance, _admission: &PartyLedgerMasterCurrencyAssertion) -> Self {
+    fn admitted(report: NativeTrialBalance, _admission: &SingleInrAdmission) -> Self {
         Self(report)
     }
 
@@ -168,7 +190,11 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
         statement: Option<NativeStatementKind>,
-    ) -> anyhow::Result<(TrialBalanceRead, Option<StatementSources>, CompanyBookExtent)> {
+    ) -> anyhow::Result<(
+        TrialBalanceRead,
+        Option<StatementSources>,
+        CompanyBookExtent,
+    )> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
@@ -215,7 +241,7 @@ impl TallyRuntime {
                             extent: extent.clone(),
                             evidence: evidence.clone(),
                         }
-                        .admit_inr()
+                        .admit_single_inr()
                         .map_err(TrialBalanceReadError::Currency)?;
 
                         let request =
@@ -257,9 +283,12 @@ impl TallyRuntime {
                                 evidence = evidence
                                     .clone()
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                let balance_sheet =
-                                    parse_native_statement(NativeStatementKind::BalanceSheet, &xml)?;
-                                let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss {
+                                let balance_sheet = parse_native_statement(
+                                    NativeStatementKind::BalanceSheet,
+                                    &xml,
+                                )?;
+                                let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss
+                                {
                                     let request = render_native_statement_request(
                                         kind,
                                         identity.display_name(),
@@ -268,10 +297,12 @@ impl TallyRuntime {
                                     let (xml, bytes, hash) = client
                                         .fetch_native_report_paired(request.clone())
                                         .await?
-                                        .require_stable(PairedReadValidationError::NativeStatement)?;
-                                    evidence = evidence
-                                        .clone()
-                                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                                        .require_stable(
+                                            PairedReadValidationError::NativeStatement,
+                                        )?;
+                                    evidence = evidence.clone().combine(
+                                        RuntimeReadEvidence::paired(&request, hash, bytes),
+                                    );
                                     Some(parse_native_statement(kind, &xml)?)
                                 } else {
                                     None

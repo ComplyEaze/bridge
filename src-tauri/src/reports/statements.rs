@@ -23,13 +23,14 @@
 //! pin: stock held at `from` and gone by `to` could pass it. So where Tally's
 //! own Profit and Loss is supplied, gross and net are gated on it too.
 
-use bridge_tally_core::ExactDecimal;
 use crate::tally::runtime::SingleCurrencyTrialBalance;
+use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::{
     group_ancestry::{AncestryGap, GroupIndex},
+    is_tally_reserved_root,
     native_statement_reports::{NativeStatement, NativeStatementAmount, NativeStatementKind},
     native_trial_balance::{NativeTrialBalanceAmount, NativeTrialBalanceRow},
-    is_tally_reserved_root, TallyNamedMaster,
+    TallyNamedMaster,
 };
 use serde::Serialize;
 
@@ -235,8 +236,7 @@ pub fn derive_statements(
     if tally_balance_sheet.kind != NativeStatementKind::BalanceSheet {
         return Err(StatementsError::GateNotABalanceSheet);
     }
-    if tally_profit_and_loss.is_some_and(|tally| tally.kind != NativeStatementKind::ProfitAndLoss)
-    {
+    if tally_profit_and_loss.is_some_and(|tally| tally.kind != NativeStatementKind::ProfitAndLoss) {
         return Err(StatementsError::GateNotAProfitAndLoss);
     }
     let trial_balance = trial_balance.report();
@@ -325,10 +325,18 @@ pub fn derive_statements(
             amount: StatementSum::new(),
             ledger_count: 0,
         };
-        if let Some(slot) = PROFIT_AND_LOSS_PRIMARY_GROUPS.iter().position(|name| *name == reserved) {
-            profit_and_loss[slot].get_or_insert_with(|| empty_line(PROFIT_AND_LOSS_PRIMARY_GROUPS[slot]));
-        } else if let Some(slot) = BALANCE_SHEET_PRIMARY_GROUPS.iter().position(|name| *name == reserved) {
-            balance_sheet[slot].get_or_insert_with(|| empty_line(BALANCE_SHEET_PRIMARY_GROUPS[slot]));
+        if let Some(slot) = PROFIT_AND_LOSS_PRIMARY_GROUPS
+            .iter()
+            .position(|name| *name == reserved)
+        {
+            profit_and_loss[slot]
+                .get_or_insert_with(|| empty_line(PROFIT_AND_LOSS_PRIMARY_GROUPS[slot]));
+        } else if let Some(slot) = BALANCE_SHEET_PRIMARY_GROUPS
+            .iter()
+            .position(|name| *name == reserved)
+        {
+            balance_sheet[slot]
+                .get_or_insert_with(|| empty_line(BALANCE_SHEET_PRIMARY_GROUPS[slot]));
         }
     }
     let profit_and_loss: Vec<_> = profit_and_loss.into_iter().flatten().collect();
@@ -351,7 +359,10 @@ pub fn derive_statements(
     };
     let sum_of = |filter: &dyn Fn(&str) -> bool| -> Result<ExactDecimal, StatementsError> {
         let mut total = StatementSum::new();
-        for line in profit_and_loss.iter().filter(|line| filter(line.reserved_name)) {
+        for line in profit_and_loss
+            .iter()
+            .filter(|line| filter(line.reserved_name))
+        {
             total.merge(&line.amount)?;
         }
         Ok(total.sum)
@@ -562,8 +573,12 @@ pub enum TieStatus {
     Matched,
     /// Tally left the line empty, and the derived sum is zero.
     MatchedEmptyAsZero,
-    Differs { derived: ExactDecimal },
-    NotCompared { reason: &'static str },
+    Differs {
+        derived: ExactDecimal,
+    },
+    NotCompared {
+        reason: &'static str,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -592,7 +607,9 @@ fn tie_lines(
         .lines
         .iter()
         .map(|line| {
-            let status = if let Some(group) = lines.iter().find(|group| group.display_name == line.name) {
+            let status = if let Some(group) =
+                lines.iter().find(|group| group.display_name == line.name)
+            {
                 named.push(group.display_name.as_str());
                 compare(&line.sub, &line.main, &group.amount.sum)
             } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
@@ -615,7 +632,9 @@ fn tie_lines(
         .collect();
     let derived_only = lines
         .iter()
-        .filter(|group| !named.contains(&group.display_name.as_str()) && !group.amount.sum.is_zero())
+        .filter(|group| {
+            !named.contains(&group.display_name.as_str()) && !group.amount.sum.is_zero()
+        })
         .map(|group| group.display_name.clone())
         .collect();
     TieOut {
@@ -624,7 +643,11 @@ fn tie_lines(
     }
 }
 
-fn compare(sub: &NativeStatementAmount, main: &NativeStatementAmount, derived: &ExactDecimal) -> TieStatus {
+fn compare(
+    sub: &NativeStatementAmount,
+    main: &NativeStatementAmount,
+    derived: &ExactDecimal,
+) -> TieStatus {
     let tally = match (sub, main) {
         (NativeStatementAmount::Present(value), NativeStatementAmount::Empty)
         | (NativeStatementAmount::Empty, NativeStatementAmount::Present(value)) => value,

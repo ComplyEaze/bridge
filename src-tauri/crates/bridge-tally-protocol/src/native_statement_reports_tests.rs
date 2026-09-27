@@ -6,8 +6,10 @@ use bridge_tally_primitives::TallyDate;
 
 use crate::outstandings_shared::DateBoundaryProfile;
 
-const BS_FY: &[u8] = include_bytes!("../tests/fixtures/statement_balance_sheet_fy_live.utf16le.xml");
-const PL_FY: &[u8] = include_bytes!("../tests/fixtures/statement_profit_and_loss_fy_live.utf16le.xml");
+const BS_FY: &[u8] =
+    include_bytes!("../tests/fixtures/statement_balance_sheet_fy_live.utf16le.xml");
+const PL_FY: &[u8] =
+    include_bytes!("../tests/fixtures/statement_profit_and_loss_fy_live.utf16le.xml");
 const BS_EMPTY_MONTH: &[u8] =
     include_bytes!("../tests/fixtures/statement_balance_sheet_empty_month_live.utf16le.xml");
 const BS_DENSE_MONTH: &[u8] =
@@ -39,7 +41,11 @@ fn present(value: &str) -> NativeStatementAmount {
     NativeStatementAmount::Present(ExactDecimal::parse(value).unwrap())
 }
 
-fn line(name: &str, sub: NativeStatementAmount, main: NativeStatementAmount) -> NativeStatementLine {
+fn line(
+    name: &str,
+    sub: NativeStatementAmount,
+    main: NativeStatementAmount,
+) -> NativeStatementLine {
     NativeStatementLine {
         name: name.to_string(),
         sub,
@@ -51,7 +57,8 @@ use NativeStatementAmount::Empty;
 
 #[test]
 fn a_captured_full_year_balance_sheet_parses_to_its_five_lines() {
-    let parsed = parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_FY)).unwrap();
+    let parsed =
+        parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_FY)).unwrap();
     assert_eq!(
         parsed.lines,
         vec![
@@ -66,7 +73,8 @@ fn a_captured_full_year_balance_sheet_parses_to_its_five_lines() {
 
 #[test]
 fn a_captured_full_year_profit_and_loss_keeps_both_columns() {
-    let parsed = parse_native_statement(NativeStatementKind::ProfitAndLoss, &response(PL_FY)).unwrap();
+    let parsed =
+        parse_native_statement(NativeStatementKind::ProfitAndLoss, &response(PL_FY)).unwrap();
     assert_eq!(
         parsed.lines,
         vec![
@@ -79,15 +87,20 @@ fn a_captured_full_year_profit_and_loss_keeps_both_columns() {
 #[test]
 fn an_empty_month_keeps_every_amount_empty_not_zero() {
     let parsed =
-        parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_EMPTY_MONTH)).unwrap();
+        parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_EMPTY_MONTH))
+            .unwrap();
     assert_eq!(parsed.lines.len(), 5);
-    assert!(parsed.lines.iter().all(|l| l.sub == Empty && l.main == Empty));
+    assert!(parsed
+        .lines
+        .iter()
+        .all(|l| l.sub == Empty && l.main == Empty));
 }
 
 #[test]
 fn a_heavy_book_month_keeps_large_signed_amounts_exact() {
     let parsed =
-        parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_DENSE_MONTH)).unwrap();
+        parse_native_statement(NativeStatementKind::BalanceSheet, &response(BS_DENSE_MONTH))
+            .unwrap();
     let mains: Vec<_> = parsed.lines.iter().map(|l| l.main.clone()).collect();
     assert!(mains.contains(&present("222962422.38")));
     assert!(mains.contains(&present("-222962422.38")));
@@ -143,7 +156,14 @@ fn the_control_line_parses() {
 
 #[test]
 fn display_formatted_amounts_are_refused() {
-    for formatted in ["4,250.00", "1500.00 Dr", "(-)10.00", "₹ 10.00", " 10.00", "10.00 "] {
+    for formatted in [
+        "4,250.00",
+        "1500.00 Dr",
+        "(-)10.00",
+        "₹ 10.00",
+        " 10.00",
+        "10.00 ",
+    ] {
         assert_eq!(
             parse_native_statement(NativeStatementKind::BalanceSheet, &bs(formatted)).unwrap_err(),
             NativeStatementError::InvalidAmount,
@@ -155,10 +175,22 @@ fn display_formatted_amounts_are_refused() {
 #[test]
 fn failure_signals_and_unknown_reports_are_refused() {
     let cases = [
-        ("<RESPONSE>Unknown Request, cannot be processed</RESPONSE>", NativeStatementError::UnknownReport),
-        ("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>", NativeStatementError::InvalidResponse("statement_unexpected_element")),
-        ("<ENVELOPE><STATUS>1</STATUS></ENVELOPE>", NativeStatementError::TallyReportedFailure),
-        ("<ENVELOPE><LINEERROR>Could not set company</LINEERROR></ENVELOPE>", NativeStatementError::TallyReportedFailure),
+        (
+            "<RESPONSE>Unknown Request, cannot be processed</RESPONSE>",
+            NativeStatementError::UnknownReport,
+        ),
+        (
+            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>",
+            NativeStatementError::InvalidResponse("statement_unexpected_element"),
+        ),
+        (
+            "<ENVELOPE><STATUS>1</STATUS></ENVELOPE>",
+            NativeStatementError::TallyReportedFailure,
+        ),
+        (
+            "<ENVELOPE><LINEERROR>Could not set company</LINEERROR></ENVELOPE>",
+            NativeStatementError::TallyReportedFailure,
+        ),
     ];
     for (xml, expected) in cases {
         assert_eq!(
@@ -171,7 +203,8 @@ fn failure_signals_and_unknown_reports_are_refused() {
 
 #[test]
 fn structural_breaks_are_refused_with_their_own_codes() {
-    let name = "<BSNAME><DSPACCNAME><DSPDISPNAME>Capital Account</DSPDISPNAME></DSPACCNAME></BSNAME>";
+    let name =
+        "<BSNAME><DSPACCNAME><DSPDISPNAME>Capital Account</DSPDISPNAME></DSPACCNAME></BSNAME>";
     let amounts = "<BSAMT><BSSUBAMT></BSSUBAMT><BSMAINAMT>1.00</BSMAINAMT></BSAMT>";
     let cases = [
         ("<ENVELOPE></ENVELOPE>".to_string(), "statement_empty"),
@@ -210,7 +243,9 @@ fn structural_breaks_are_refused_with_their_own_codes() {
 fn an_empty_element_amount_is_empty_like_an_open_close_pair() {
     let xml = "<ENVELOPE><BSNAME><DSPACCNAME><DSPDISPNAME>Capital Account</DSPDISPNAME></DSPACCNAME></BSNAME><BSAMT><BSSUBAMT/><BSMAINAMT/></BSAMT></ENVELOPE>";
     assert_eq!(
-        parse_native_statement(NativeStatementKind::BalanceSheet, xml).unwrap().lines,
+        parse_native_statement(NativeStatementKind::BalanceSheet, xml)
+            .unwrap()
+            .lines,
         vec![line("Capital Account", Empty, Empty)]
     );
 }

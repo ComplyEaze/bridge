@@ -6,8 +6,9 @@
 //!   Expenses). A block whose group the book does not carry publishes nothing and raises a finding.
 //! * A voucher's amount is its lines on the block's ledgers, business-signed (sales negated). Its
 //!   party is a ledger under Sundry Debtors or Creditors that counts: on an invoice-class voucher
-//!   (Sales, Purchase, Credit Note, Debit Note) every such ledger; on any other, only one whose net
-//!   on the voucher is on the other side from the block's lines. One counted ledger is that party;
+//!   (Sales, Purchase, Credit Note, Debit Note) every such ledger; on any other, each one whose net
+//!   on the voucher is on the other side from the block's lines (a supplier paid in the same payment
+//!   as rent is not the rent's party). One counted ledger is that party;
 //!   several are "Several parties"; none counted while a party ledger is on the voucher is "Not
 //!   attributed: no party on the other side", with a finding; no party ledger at all is "Cash or
 //!   bank (no party)" for sales and purchases with a cash or bank line, else "No party". Parties
@@ -23,7 +24,9 @@
 //! * Vouchers are counted as vouchers, never by GUID: a blank or repeated GUID never merges two.
 //!
 //! A figure id the reference would repeat (two ledgers sharing a tag) is refused with an error, as
-//! the reference's `fig` raises, never a panic (#644). Where several sets match, two distinct
+//! the reference's `fig` raises, never a panic (#644). Every sum is checked in i64: an amount the
+//! reference's unbounded integers would still carry is refused with an error instead, which no real
+//! book reaches. Where several sets match, two distinct
 //! evidence refs sharing an id keep their first-seen order; the reference's set order is undefined
 //! there (the canonical dump sorts evidence either way).
 
@@ -174,9 +177,9 @@ fn parties_on<'a>(v: &'a Voucher, parties: &BTreeSet<&str>) -> BTreeSet<&'a str>
 }
 
 /// The party ledgers a block's lines on this voucher belong to. On an invoice-class voucher every
-/// party ledger on it; on any other, only one whose net on the voucher is on the other side from
-/// the block's lines (raw, debit-positive): a supplier paid in the same payment as rent is not the
-/// rent's party.
+/// party ledger on it; on any other, each one whose net on the voucher is on the other side from
+/// the block's lines (raw, debit-positive; a nil net on either side counts none): a supplier paid
+/// in the same payment as rent is not the rent's party.
 fn counted_parties<'a>(
     v: &Voucher,
     on_voucher: &BTreeSet<&'a str>,
@@ -558,6 +561,8 @@ between the two includes it."
                 if let Some((_, key, _)) = STATUSES.iter().find(|(s, _, _)| *s == x.status) {
                     if in_period(&x.date) {
                         let amount = signed_sum(x)?;
+                        // Lines here netting to nil move no amount: such a voucher is in no set,
+                        // and the no-match text speaks of vouchers that move an amount.
                         if amount != 0 {
                             outside.entry(*key).or_default().push((x, amount));
                         }

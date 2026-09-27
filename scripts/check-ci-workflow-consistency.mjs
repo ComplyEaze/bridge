@@ -45,17 +45,83 @@ if (!/^    needs: \[[^\n]*\bworkflow-consistency\b[^\n]*\]$/m.test(requiredCheck
 
 // bridge#583: the release positive control is what makes a clean seam scan of the shipped
 // executables mean anything. It runs in its own job, so that job must stay required, keep
-// bundle-smoke's scope, and keep running the control.
+// bundle-smoke's scope and platforms, and keep its whole shape: a single pinned line would still
+// pass with an extra `needs`, a `continue-on-error`, a step-level `if`, one OS dropped or an env
+// override. Change the job and this copy together, deliberately.
+const expectedSeamControl = [
+  "  seam-control:",
+  "    name: Seam positive control (${{ matrix.os }})",
+  "    needs: changes",
+  "    # The release-profile half of bundle-smoke's seam proof, run beside it",
+  "    # rather than after it: it builds the bridge lib unit-test executable in",
+  "    # release and requires the marker there, so a clean scan of the shipped",
+  "    # executables means the scan could have seen the seam. Same scope and",
+  "    # platforms as bundle-smoke, whose runs it guards.",
+  "    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'",
+  "    runs-on: ${{ matrix.os }}",
+  "    timeout-minutes: 45",
+  "    permissions:",
+  "      contents: read",
+  "    strategy:",
+  "      fail-fast: false",
+  "      matrix:",
+  "        os: [windows-latest, macos-latest]",
+  "    steps:",
+  "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7",
+  "        with:",
+  "          persist-credentials: false",
+  "      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6",
+  "        with:",
+  "          node-version-file: .node-version",
+  "      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable",
+  "        with:",
+  "          toolchain: 1.96.0",
+  "      - name: Match macOS cache inputs to the Tauri deployment target",
+  "        if: runner.os == 'macOS'",
+  "        shell: bash",
+  "        run: |",
+  "          node --input-type=module <<'JS'",
+  "          import { appendFileSync, readFileSync } from 'node:fs';",
+  "          const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));",
+  "          const target = config.bundle?.macOS?.minimumSystemVersion;",
+  "          if (typeof target !== 'string' || !/^\\d+\\.\\d+(?:\\.\\d+)?$/.test(target)) {",
+  "            throw new Error('Expected an explicit macOS minimumSystemVersion in tauri.conf.json');",
+  "          }",
+  "          appendFileSync(process.env.GITHUB_ENV, `MACOSX_DEPLOYMENT_TARGET=${target}\\n`);",
+  "          JS",
+  "      # Restores bundle-smoke's release dependencies (same key) and never saves:",
+  "      # a second cache family would only compete for the repository's quota.",
+  "      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2",
+  "        with:",
+  "          workspaces: src-tauri -> target",
+  "          shared-key: bundle-smoke",
+  "          env-vars: ${{ runner.os == 'macOS' && 'MACOSX_DEPLOYMENT_TARGET' || '' }}",
+  "          save-if: false",
+  "      - name: Set up Windows native prerequisites",
+  "        if: runner.os == 'Windows'",
+  "        uses: ./.github/actions/setup-windows-native",
+  "      - name: Prove the seam scan sees a release test build",
+  "        shell: bash",
+  "        run: node scripts/check-no-test-seam.mjs --test-harness --release",
+].join("\n");
 const seamControl = jobBlock(workflow, "seam-control");
-const bundleScope = jobBlock(workflow, "bundle-smoke").match(/^    if: .*$/m)?.[0];
+const bundleSmoke = jobBlock(workflow, "bundle-smoke");
+const bundleScope = bundleSmoke.match(/^    if: .*$/m)?.[0];
+const bundleOs = bundleSmoke.match(/^        os: .*$/m)?.[0];
 if (!/^    needs: \[[^\n]*\bseam-control\b[^\n]*\]$/m.test(requiredChecks)) {
   failures.push("required-checks must propagate seam-control failures");
+}
+if (seamControl.trimEnd() !== expectedSeamControl) {
+  failures.push("seam-control changed shape; review it against bridge#583 and update expectedSeamControl");
 }
 if (!bundleScope || seamControl.match(/^    if: .*$/m)?.[0] !== bundleScope) {
   failures.push("seam-control must run whenever bundle-smoke runs");
 }
-if (!/^        run: node scripts\/check-no-test-seam\.mjs --test-harness --release$/m.test(seamControl)) {
-  failures.push("seam-control must run the release seam positive control");
+if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
+  failures.push("seam-control must cover every platform bundle-smoke builds");
+}
+if (/^env:/m.test(workflow)) {
+  failures.push("a workflow-level env reaches seam-control's release build; set env per job instead");
 }
 
 for (const step of parseWorkflowSteps(workflow)) {

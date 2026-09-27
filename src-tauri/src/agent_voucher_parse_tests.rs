@@ -1287,3 +1287,252 @@ fn a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped()
         .iter()
         .any(|row| row["narration"] == json!("A\u{fffd}#65533;#5;")));
 }
+
+// -- #674: a foreign-currency composite withholds its voucher ------------------
+
+const FOREX_COMPANY_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+
+/// A live `vouchers` read of the synthetic several-currency book: one Sales
+/// voucher whose party entry, bill allocation and sales entry each hold a
+/// composite (fixtures/agent/vouchers-forex-composite-20260915.PROVENANCE.md).
+fn captured_forex_composite_vouchers() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml"
+    );
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+fn withheld_view(row: &VoucherRow) -> Value {
+    match row {
+        VoucherRow::Withheld(withheld) => withheld.filter_view(),
+        VoucherRow::Read(read) => panic!("expected a withheld voucher, read {read}"),
+    }
+}
+
+#[test]
+fn a_captured_composite_voucher_is_withheld_with_its_identity_and_no_amount() {
+    let rows =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert_eq!(rows.len(), 1);
+    let view = withheld_view(&rows[0]);
+    assert_eq!(view[WITHHELD_MARKER], WITHHELD_FOREIGN_CURRENCY);
+    assert_eq!(view["date"], "20260915");
+    assert_eq!(view["voucher_type"], "Sales");
+    assert_eq!(view["voucher_number"], "1");
+    assert_eq!(view["alter_id"], 18);
+    assert!(view["guid"]
+        .as_str()
+        .unwrap()
+        .starts_with(FOREX_COMPANY_GUID));
+    // Its entries keep their ledgers, for the ledger filter, and nothing else.
+    let entries = view["amounts"].as_array().unwrap();
+    assert_eq!(entries.len(), 2);
+    for entry in entries {
+        assert_eq!(
+            entry.as_object().unwrap().keys().collect::<Vec<_>>(),
+            vec!["ledger"]
+        );
+        assert!(entry["ledger"].is_string());
+    }
+    assert!(!view.to_string().contains(" @ "), "{view}");
+}
+
+#[test]
+fn every_amount_consuming_parse_still_refuses_the_composite_window() {
+    let captured = captured_forex_composite_vouchers();
+    // The bill allocation closes before its entry, so it is refused first.
+    assert_eq!(
+        parse_agent_rows(&captured, FOREX_COMPANY_GUID).unwrap_err(),
+        "bill_allocation_amount_invalid"
+    );
+    assert_eq!(
+        parse_agent_changed_rows(&captured, FOREX_COMPANY_GUID).unwrap_err(),
+        "bill_allocation_amount_invalid"
+    );
+    assert_eq!(
+        parse_import_verification_rows(&captured, FOREX_COMPANY_GUID).unwrap_err(),
+        "bill_allocation_amount_invalid"
+    );
+}
+
+#[test]
+fn only_a_whole_composite_withholds_anything_else_still_refuses() {
+    let captured = captured_forex_composite_vouchers();
+    let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
+    assert!(captured.contains(composite));
+    // The party entry's amount comes first in the text, its bill allocation's
+    // second. Cut either short and it is no composite, so its window refuses.
+    let at = captured.find(composite).unwrap();
+    let cut_entry = format!(
+        "{}-$ 100.00 @ I\u{20b9} 86/${}",
+        &captured[..at],
+        &captured[at + composite.len()..]
+    );
+    assert_eq!(
+        parse_agent_rows_withholding(&cut_entry, FOREX_COMPANY_GUID).unwrap_err(),
+        "voucher_amount_invalid"
+    );
+    // Not the next occurrence: a VATEXPAMOUNT between them carries one too.
+    let allocations = captured.find("<BILLALLOCATIONS.LIST").unwrap();
+    let second = allocations + captured[allocations..].find(composite).unwrap();
+    let cut_allocation = format!(
+        "{}-$ 100.00 @ I\u{20b9} 86/${}",
+        &captured[..second],
+        &captured[second + composite.len()..]
+    );
+    assert_eq!(
+        parse_agent_rows_withholding(&cut_allocation, FOREX_COMPANY_GUID).unwrap_err(),
+        "bill_allocation_amount_invalid"
+    );
+    // A plain garbled amount on an ordinary voucher still refuses.
+    let garbled = captured_native_vouchers().replacen(
+        "<AMOUNT TYPE=\"Amount\">-101.01</AMOUNT>",
+        "<AMOUNT TYPE=\"Amount\">Maybe</AMOUNT>",
+        1,
+    );
+    assert_eq!(
+        parse_agent_rows_withholding(&garbled, CAPTURED_VOUCHER_COMPANY_GUID).unwrap_err(),
+        "voucher_amount_invalid"
+    );
+    // A structural fault in a withheld voucher still refuses: an entry with
+    // no ledger name is refused as in any other voucher.
+    let unnamed = captured.replacen(
+        "<LEDGERNAME>FX Party 01</LEDGERNAME>",
+        "<LEDGERNAME></LEDGERNAME>",
+        1,
+    );
+    assert_ne!(unnamed, captured);
+    assert_eq!(
+        parse_agent_rows_withholding(&unnamed, FOREX_COMPANY_GUID).unwrap_err(),
+        "agent_read_protocol_invalid"
+    );
+}
+
+#[test]
+fn a_rupee_voucher_beside_a_composite_one_is_read_whole() {
+    let captured = captured_native_vouchers();
+    let mutated = window_with_composite_vouchers(1);
+    let rows = parse_agent_rows_withholding(&mutated, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    let ordinary = parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert_eq!(rows.len(), 3);
+    assert_eq!(withheld_view(&rows[0])["voucher_number"], "1");
+    for (row, expected) in rows[1..].iter().zip(&ordinary[1..]) {
+        match row {
+            VoucherRow::Read(read) => assert_eq!(read, expected),
+            VoucherRow::Withheld(_) => panic!("a rupee voucher was withheld"),
+        }
+    }
+}
+
+#[test]
+fn the_captured_empty_rate_composite_withholds_too() {
+    // Synthetic mutation: the sales entry's amount replaced by the empty-rate
+    // composite captured in the several-currency Trial Balance.
+    let captured = captured_forex_composite_vouchers();
+    let sales = "$ 100.00 @ I\u{20b9} 86/$  = I\u{20b9} 8600.00";
+    assert!(captured.contains(sales));
+    let trial_balance = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/trial_balance_currency_forex_live.utf16le.xml"
+    );
+    let trial_balance = String::from_utf16(
+        &trial_balance
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let empty_rate = trial_balance
+        .split('>')
+        .filter_map(|tail| tail.split('<').next())
+        .find(|text| text.contains(" /$") && text.contains(" @ "))
+        .expect("the captured empty-rate composite");
+    assert!(bridge_tally_protocol::currency_composite::is_currency_composite(empty_rate));
+    let mutated = captured.replacen(sales, empty_rate, 1);
+    let rows = parse_agent_rows_withholding(&mutated, FOREX_COMPANY_GUID).unwrap();
+    assert_eq!(
+        withheld_view(&rows[0])[WITHHELD_MARKER],
+        WITHHELD_FOREIGN_CURRENCY
+    );
+}
+
+#[test]
+fn the_captured_request_is_what_vouchers_renders_today() {
+    let request = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.request.xml"
+    );
+    assert_eq!(
+        render_agent_vouchers("BRIDGE CORPUS FOREX", "20260915", "20260915", None).unwrap(),
+        request
+    );
+}
+
+/// Synthetic mutation: the captured forex voucher with the party entry's own
+/// AMOUNT (its first composite in the text) replaced by `amount`.
+fn forex_with_party_entry_amount(amount: &str) -> String {
+    let captured = captured_forex_composite_vouchers();
+    let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
+    let at = captured
+        .find(&format!("<AMOUNT>{composite}</AMOUNT>"))
+        .unwrap()
+        + "<AMOUNT>".len();
+    format!(
+        "{}{amount}{}",
+        &captured[..at],
+        &captured[at + composite.len()..]
+    )
+}
+
+#[test]
+fn a_voucher_composite_whose_amounts_differ_in_sign_still_refuses() {
+    // A balance can pair opposite signs, so the shape passes; a voucher entry
+    // cannot, so its window refuses by the entry's amount code.
+    let opposite = "-$ 100.00 @ I\u{20b9} 86/$  = I\u{20b9} 8600.00";
+    assert!(bridge_tally_protocol::currency_composite::is_currency_composite(opposite));
+    let mutated = forex_with_party_entry_amount(opposite);
+    assert_eq!(
+        parse_agent_rows_withholding(&mutated, FOREX_COMPANY_GUID).unwrap_err(),
+        "voucher_amount_invalid"
+    );
+}
+
+#[test]
+fn a_zero_foreign_amount_withholds_whatever_the_base_sign() {
+    // A base-only adjustment: no foreign amount, so no sign to disagree with.
+    for zero in [
+        "$ 0.00 @ I\u{20b9} /$  = -I\u{20b9} 8600.00",
+        "$ 0.00 @ I\u{20b9} /$  = I\u{20b9} 8600.00",
+    ] {
+        let mutated = forex_with_party_entry_amount(zero);
+        let rows = parse_agent_rows_withholding(&mutated, FOREX_COMPANY_GUID).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(withheld_view(&rows[0])["voucher_number"], "1", "{zero}");
+    }
+}
+
+#[test]
+fn a_composite_on_an_entry_with_no_bill_allocation_withholds_or_refuses_by_its_own_code() {
+    // Synthetic mutation: the party entry's bill allocation removed, so the
+    // entry's own AMOUNT is the first composite the parser meets.
+    let captured = captured_forex_composite_vouchers();
+    let start = captured.find("<BILLALLOCATIONS.LIST>\r\n").unwrap();
+    let end = start
+        + captured[start..].find("</BILLALLOCATIONS.LIST>").unwrap()
+        + "</BILLALLOCATIONS.LIST>".len();
+    let entry_only = format!("{}{}", &captured[..start], &captured[end..]);
+    assert!(captured[start..end].contains(" @ "));
+    assert_eq!(entry_only.matches("<BILLALLOCATIONS.LIST").count(), 1);
+    assert_eq!(
+        parse_agent_rows(&entry_only, FOREX_COMPANY_GUID).unwrap_err(),
+        "voucher_amount_invalid"
+    );
+    let rows = parse_agent_rows_withholding(&entry_only, FOREX_COMPANY_GUID).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(withheld_view(&rows[0])["voucher_number"], "1");
+}

@@ -47,6 +47,11 @@ path, the gross s.194T base, TDS read through the ledgers classified as TDS paya
 quoted from `[s40b_v]` (vendored at the same head). `synthetic.partners_40b_194t.json` and
 `edge.partners_not_applicable.partners_40b_194t.json` regenerate byte-identical.
 
+After the review round changed `edge-books/partners_tds_mixed.json` (a balanced Trial Balance, a capital
+debit on the unsplit mixed voucher, and a partner with no TDS seen), its golden was regenerated at
+`87e2f03e0f5687692c638c17b66b92341c99534f`. Between `e2456bcf` and that commit the reference's engine source
+changes only `loans_interest.py` and `party_monthly.py`, neither of which `partners_40b_194t` imports.
+
 ## Real books (local only; nothing from them is in this repository)
 
 `examples/local_parity` compared the port with the reference at `1038dc05` on three real client reads,
@@ -73,12 +78,12 @@ that commit with no client data, under Python 3.13, with ENGINE the archive:
 
 | Fixture | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
-| `partners_firm_deed.json` | 5,597 | `eeeeedb294d954be4baff81635bfea456363c262f63a929647e553cb1f692e93` | `edge-books/partners_firm_deed.json` |
-| `partners_llp_no_deed.json` | 3,630 | `4c72097876a7670a5f0f8138f17d5fd419eaaf2d547cc0f515f54a1d8aa08126` | `edge-books/partners_llp_no_deed.json` |
+| `partners_firm_deed.json` | 5,760 | `d255f66534825da51bb667ff38c255123bf8ad9e3377c927eb30f6f5ac42ee9b` | `edge-books/partners_firm_deed.json` |
+| `partners_llp_no_deed.json` | 3,670 | `890f8981cc2676050db816d31857f3549f192dceef2fe9fab95cad2dc169cee8` | `edge-books/partners_llp_no_deed.json` |
 | `partners_not_applicable.json` | 2,796 | `c5141157e39743f91fa0ba1817af82da293537d2bc510de9e932d5a395f9becb` | `edge-books/partners_not_applicable.json` |
 | `edge.partners_firm_deed.partners_40b_194t.json` | 22,952 | `555e89b24faba9dd7a66c4f43a601dbaac52df15be5a13f5f235df4429063777` | `golden/edge.partners_firm_deed.partners_40b_194t.json` |
 | `edge.partners_llp_no_deed.partners_40b_194t.json` | 18,026 | `724532ef889b996a047d305364062f2ed34818728da153f158a7f72ceb144853` | `golden/edge.partners_llp_no_deed.partners_40b_194t.json` |
 | `edge.partners_not_applicable.partners_40b_194t.json` | 1,049 | `d03a931902fd87eb43fcf832cc2bb5297e03da9e34d7dfb0b3a4c51c57677e73` | `golden/edge.partners_not_applicable.partners_40b_194t.json` |
 | `synthetic.partners_40b_194t.json` | 1,605 | `671f8ecaa00a79a50499fa1853abfe156c08c48ded2496210c330fb956fae1c5` | `golden/synthetic.partners_40b_194t.json` |
-| `partners_tds_mixed.json` | 6,381 | `d05d518e05c2638c437d3d0f967d7b8339dd895909f086a776532beeef43124f` | `edge-books/partners_tds_mixed.json` |
-| `edge.partners_tds_mixed.partners_40b_194t.json` | 34,981 | `f598a81c11177dc29bd6fa3e3e232dd6f0d927769d7fdff6ea165916f59f65d9` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |
+| `partners_tds_mixed.json` | 7,287 | `02131072cdb9b14bf679953e695acfbf6383b9d7a9dc2972676aafe4367a0520` | `edge-books/partners_tds_mixed.json` |
+| `edge.partners_tds_mixed.partners_40b_194t.json` | 41,275 | `9017f22ee717bdc52a0b52809e9999cf02f8a358c93f828151cadd893fd29f49` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |

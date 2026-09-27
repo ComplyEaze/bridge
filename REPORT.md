@@ -385,3 +385,13 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - This lane's parallel merge of master (3ae9b23d) was checked read-only by Sonnet: the merge was clean, but it did not fast-forward over 5edcae94, so it was **not pushed**. Lane D's c32e1ab4 covers the same work. This lane's local full run on the same crate tree is left to finish (runs are never interrupted); its shards are corroboration only.
 - The red "Required checks" on 5edcae94 came from a run cancelled by the ready-for-review run. On the new run, "Tax-audit mutation records" passes and the rest is in progress.
 - Next: #788 waits on CI and the merge (Lane D). Then, one PR each: #644, #662 (check what #727 left), #658, #667.
+
+## 2026-09-27 23:00 UTC — #788 (E4) merged; #644 opened as draft #826
+
+- **#788 merged** (abc3d2b6). The E stack (E2a, E2b, E3a, E4) is on master.
+- **#644:** `TestResult::fig` returns `Result<String>`; a repeated id is `AuditError::DuplicateFigureId`, and nothing is appended. Every call site propagates it with `?`. The five module-local wrappers and the tds_payees/loans_interest inline checks are deleted. partners_40b_194t's pre-check stays: it names both keys.
+- Failing first at b73782f5: 7 tests panic at the old assert. At 6b27a3ed they pass. The four edge-book tests match the typed variant (d54bf5b5). 354 tests; clippy and fmt clean. Net LOC +456 / −607.
+- Mutations: 656 in the list. F644-01 and F644-02 are new; C1-39, C2-28, D1-19, E2A-13 and E4-20 are retired; C2-26 is retargeted.
+- Reviews: Opus and Sonnet both found no P1. The only P2 is the records, which the full run answers. P3s are in the PR body.
+- **Pushed d54bf5b5; draft #826 opened and subscribed.** The full run on d54bf5b5 is sharded to `cloud/lane-e-644-shards-1`. Then: `--merge`, the records commit, `--verify`, a pre-push check, and a push.
+- Next: #662 (check what #727 left), #658, #667.

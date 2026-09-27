@@ -13,9 +13,7 @@ use bridge_tally_core::master_binding::{
     MasterClass, SourceEntity,
 };
 use bridge_tally_core::ExactDecimal;
-use bridge_tally_protocol::native_outstandings::{
-    parse_native_group_snapshot, NativeOutstandingsError,
-};
+use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
@@ -1366,13 +1364,7 @@ impl Server {
                     .with_prior_evidence(evidence.clone());
                 // The snapshot parser already names each refusal with a data-free
                 // code; keep it as the cause instead of dropping it (bridge#676).
-                failure.cause = match error {
-                    NativeOutstandingsError::InvalidResponse(code) => Some(code),
-                    NativeOutstandingsError::TallyReportedFailure => {
-                        Some("group_status_not_success")
-                    }
-                    _ => None,
-                };
+                failure.cause = crate::tally::approved_import::group_snapshot_cause(&error);
                 failure
             })?;
         Ok((groups, evidence))
@@ -1645,11 +1637,11 @@ impl Server {
     }
 }
 
-const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; not yet for an edit made in Tally's own screens). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra; an import through Tally's own Import menu was not measured.";
+const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; not yet for an edit made in Tally's own screens). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra; an import through Tally's own Import menu was not measured.";
 
 const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. Bridge does not post amendments (post_import refuses them), so import the written file by hand, promptly, then use verify_import; do not call post_import for this batch.";
 
-const AMENDMENT_NEXT_STEP: &str = "Import promptly: an edit made in Tally before the import is overwritten, so build the amendment again first if anyone may have changed these vouchers, and re-enter any allocation afterwards. Verify right after importing: that first verification is what a later amendment compares against. Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers) and check that it reports altered vouchers and none created, then call verify_import with this batch_id. If any voucher was created, do not import again: call verify_import and reconcile the duplicate by hand.";
+const AMENDMENT_NEXT_STEP: &str = "Import promptly: an edit made in Tally before the import is overwritten, so build the amendment again first if anyone may have changed these vouchers, and re-enter any allocation afterwards. Verify right after importing: that first verification is what a later amendment compares against. Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers) and check that it reports altered vouchers and none created, then call verify_import with this batch_id. If any voucher was created, do not import again: call verify_import and reconcile the duplicate by hand. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins.";
 
 const AMENDMENT_REFUSED_NEXT_STEP: &str = "No file was written. An amendment alters vouchers in place, so it is admitted only while each one is still in the book as a build of this batch wrote it, in the fields Bridge compares (date, a bank voucher's effective date when Tally returns one, type, number when set, entries' ledger, amount and side, narration). not_in_book means no voucher in the window carries this batch's marker: it was never imported, was deleted, or had its narration edited, so reconcile with verify_import instead. book_voucher_diverged means the voucher changed after Bridge built it, and an amendment would overwrite that change, so a person must decide what the voucher should hold. voucher_cancelled_or_optional is refused because importing over such a voucher was not measured. voucher_altered_since_verified means the voucher's ALTERID is not the one Bridge recorded when it first verified a build the book matches, or was not read: Tally has altered the voucher since, which can be an edit to a field Bridge does not compare, such as a reference or an allocation. Correct the voucher in Tally directly; a fresh batch would duplicate it unless the existing voucher is first cancelled or deleted in Tally. voucher_never_verified means no build the book matches has a verification Bridge recorded for this voucher: most often the last import was never verified, or it was verified before Bridge kept these records. Verifying now records this voucher exactly as it stands in Tally, including any changes made since Bridge built it. Check the voucher in Tally first; if someone has edited it, correct it there instead of amending. If it is unchanged, verify the batch named in book_matches_batch_ids and build the amendment again.";
 
@@ -2893,6 +2885,17 @@ fn batch_step_doubt_path(imports: &Path, batch_id: &str) -> PathBuf {
     imports.join(format!("{batch_id}.batch_step_doubt.json"))
 }
 
+/// Write an observed doubt to its own file. When that fails, the verdict that
+/// goes into the check record says so (`doubt_record: unavailable`, #722):
+/// it still holds the doubt, and it says in-band why no review can find it.
+/// The readers decide from the file's absence, not from this mark, so a file
+/// lost later is refused the same way.
+fn record_doubt(path: &Path, verdict: &mut Value) {
+    if write_masters_record(path, verdict).is_err() {
+        verdict["doubt_record"] = json!("unavailable");
+    }
+}
+
 /// The durable checks recorded for this batch: the masters verdict (#239),
 /// with the batch step verdict beside it as `batch_step` when the post was a
 /// batch. An observed doubt of either kind is kept in a file of its own that
@@ -2978,13 +2981,13 @@ impl Server {
         let Ok(imports) = self.imports_dir() else {
             return;
         };
-        let verdict = if target_voucher_step["matches_created"] == true {
+        let mut verdict = if target_voucher_step["matches_created"] == true {
             json!({"state": "matched", "target_voucher_step": target_voucher_step})
         } else {
             json!({"state": "unmatched", "target_voucher_step": target_voucher_step})
         };
         if verdict["state"] != "matched" {
-            let _ = write_masters_record(&batch_step_doubt_path(&imports, batch_id), &verdict);
+            record_doubt(&batch_step_doubt_path(&imports, batch_id), &mut verdict);
         }
         let path = masters_check_path(&imports, batch_id);
         if let Some(mut check) = read_masters_record(&path) {
@@ -3020,13 +3023,13 @@ impl Server {
         let Ok(imports) = self.imports_dir() else {
             return pending;
         };
+        let mut verdict = verdict;
         if verdict["state"] == "posted_under_changed_masters" {
-            let _ = write_masters_record(&masters_doubt_path(&imports, batch_id), &verdict);
+            record_doubt(&masters_doubt_path(&imports, batch_id), &mut verdict);
         }
         // The batch step verdict beside it is kept, never overwritten; for a
         // batch whose step verdict cannot be read, it stays pending (doubt).
         let path = masters_check_path(&imports, batch_id);
-        let mut verdict = verdict;
         let step = read_masters_record(&path)
             .and_then(|check| check.get("batch_step").cloned())
             .or_else(|| batch.then(|| json!({"state": MASTERS_CHECK_PENDING})));

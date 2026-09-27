@@ -1383,8 +1383,10 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
 
 /// Add a synthetic, unmarked voucher to one captured response: a copy of
 /// D3-005 under a new GUID, MASTERID and AlterID, with Bridge's marker removed
-/// from its narration. It is not live evidence; it stands for a person entering
-/// the same voucher again by hand.
+/// from its narration. It is not live evidence. Its IDs are arbitrary, chosen
+/// only to be unused in the capture: AlterID 1419 with MASTERID 1998 is not a
+/// pair Tally would produce for a voucher entered again by hand. The outcome
+/// does not depend on them, since D3-005 itself matches by its marker.
 fn with_d3_005_copy(bytes: &[u8]) -> Vec<u8> {
     let text = captured(bytes);
     let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000552</GUID>";

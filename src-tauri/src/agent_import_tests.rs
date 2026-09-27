@@ -856,6 +856,22 @@ fn the_markdown_proof_follows_the_verification_status() {
         "{clean}"
     );
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
+    assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // Not verified with no duplicates, or no status at all, is not clean either:
+    // the banner follows the status, not the duplicate list.
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, json!([])));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(
+            !markdown.contains("| Duplicate in this batch |"),
+            "{markdown}"
+        );
+    }
+    // A dispatch record reading verified does not override the status.
+    let mut dispatched = proof(Some("verification_incomplete"), json!([]));
+    dispatched["dispatch"] = json!({"state":"posted_verified","response_state":"response_clean"});
+    let markdown = render_proof_markdown(&dispatched);
+    assert!(markdown.contains(banner), "{markdown}");
     let duplicates = json!([
         {"kind":"remote_id","remote_id":"remote-1","count":2},
         {"kind":"accounting_fingerprint","fingerprint_sha256":"ab12","voucher_ids":["guid:a","guid:b","guid:c"],"remote_ids":[]}
@@ -883,6 +899,13 @@ fn the_markdown_proof_follows_the_verification_status() {
             "{markdown}"
         );
     }
+    // A REMOTEID holding a pipe or backticks keeps its row and its code span.
+    let odd = json!([{"kind":"remote_id","remote_id":"a|b`c``d","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(
+        markdown.contains("| remote_id | ``` a\\|b`c``d ``` | 2 |"),
+        "{markdown}"
+    );
 }
 
 #[test]

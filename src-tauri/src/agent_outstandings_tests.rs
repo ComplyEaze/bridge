@@ -262,6 +262,98 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
     }
 }
 
+/// bridge#642: a book with several Currency masters but no ledger kept in
+/// another currency, where only rupee ledgers with a composite value are set
+/// aside, is still partial: never Complete with a party silently missing. It is
+/// the captured post-invoice book with its three `$` ledgers' CURRENCYNAME
+/// rewritten to the base `I₹`, and nothing else changed: two of them then hold a
+/// composite and join the three mixed rupee ledgers; the third closes 0.00.
+#[tokio::test]
+async fn a_book_with_only_mixed_ledgers_set_aside_is_still_partial() {
+    let snapshot: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/balance_snapshot_forex_live.utf16le.xml"
+    );
+    let text = String::from_utf16(
+        &snapshot
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let dollar = r#"<CURRENCYNAME TYPE="String">$</CURRENCYNAME>"#;
+    assert_eq!(text.matches(dollar).count(), 3);
+    let rupees_only = text
+        .replace(dollar, r#"<CURRENCYNAME TYPE="String">I₹</CURRENCYNAME>"#)
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<u8>>();
+    let response = forex_outstandings(
+        Some(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+        )),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_post_c1_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/group_snapshot_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_post_c1_live.utf16le.xml"
+        ),
+        &rupees_only,
+        "20260915",
+        Redaction::None,
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let content = &response["structuredContent"];
+    let result = &content["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(content["evidence"]["state"], "partial");
+    assert_eq!(result["partial_reason"], "currency_ledgers_excluded");
+    assert_eq!(
+        result["partial_reasons"],
+        json!(["mixed_currency_ledgers_excluded"])
+    );
+    assert_eq!(result["foreign_currency_ledgers_excluded"]["count"], 0);
+    let mixed = &result["base_currency_ledgers_mixed_excluded"];
+    assert_eq!(mixed["count"], 5);
+    assert_eq!(
+        mixed["ledgers"],
+        json!([
+            "BRIDGE FX DEBTOR A",
+            "FX Party 01",
+            "FX Sales",
+            "FX USD Debtor 02",
+            "Profit & Loss A/c"
+        ])
+    );
+    for book_level in ["totals", "ageing_buckets", "top_parties", "open_bills"] {
+        assert!(
+            result.get(book_level).is_none(),
+            "{book_level} at book level"
+        );
+    }
+    let bills = result["base_currency_ledgers"]["open_bills"]
+        .as_array()
+        .unwrap();
+    for bill in bills {
+        let party = bill["party"].as_str().unwrap();
+        assert!(
+            !mixed["ledgers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|ledger| ledger == party),
+            "a set-aside party's bill is listed: {party}"
+        );
+    }
+    assert!(
+        !response.to_string().contains(" @ "),
+        "a composite reached the response"
+    );
+}
+
 /// bridge#642, through the MCP tool on the book after a dollar invoice to the
 /// rupee party `FX Party 01`, every source from one moment of the book
 /// (FOREX_601D_CAPTURE_PROVENANCE, PARTIAL). That party's balance is a

@@ -4345,8 +4345,17 @@ impl TallyRuntime {
                         // A book with one Currency master holds no composite
                         // legitimately. Its read keeps the refusal it had
                         // before bridge#642, at the same point and naming the
-                        // ledger, rather than setting the ledger aside.
-                        if currency_witness.classified_base().is_none() {
+                        // ledger, rather than setting the ledger aside. This is
+                        // decided by the base's master count, not the witness
+                        // kind: production reads a one-master book through the
+                        // classified witness too. A base that is not known
+                        // refuses as one master does.
+                        let one_master = currency_witness
+                            .assertion()
+                            .base
+                            .as_ref()
+                            .map_or(true, |base| base.is_single_master());
+                        if one_master {
                             if let Some(ledger) = snapshot.mixed.first() {
                                 return Ok((
                                     partial_result(

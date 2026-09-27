@@ -252,8 +252,12 @@ fn single_company_forex_ledger_capture_returns_a_typed_partial() {
     ));
 }
 
-#[tokio::test]
-async fn single_company_read_returns_the_forex_capture_partial() {
+/// The single-company outstandings read of the captured book whose ledger
+/// snapshot holds a composite, under the currency witness `witness` builds
+/// from the scripted extent.
+async fn forex_capture_read(
+    witness: impl FnOnce(&str, &VerifiedCompanyIdentity) -> OutstandingsCurrencyWitness,
+) -> OutstandingsLoadResult {
     const EXTENT: &str = include_str!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     );
@@ -330,19 +334,68 @@ async fn single_company_read_returns_the_forex_capture_partial() {
             },
             &identity,
             TallyDate::parse("20260401").expect("captured book as-of"),
-            inr_witness_for_tests(extent, &identity),
+            witness(extent, &identity),
             OutstandingsAgeingAnchor::DueDate,
         )
         .await
         .expect("foreign-currency capture returns an in-band partial");
-
-    assert!(matches!(
-        result,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "company_foreign_currency_ledger_balance"
-                && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
-    ));
     server.await.expect("synthetic outstandings server task");
+    result
+}
+
+fn assert_forex_capture_refused(result: &OutstandingsLoadResult) {
+    assert!(
+        matches!(
+            result,
+            OutstandingsLoadResult::Partial { reason, .. }
+                if reason.reason_code == "company_foreign_currency_ledger_balance"
+                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
+        ),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn single_company_read_returns_the_forex_capture_partial() {
+    let result =
+        forex_capture_read(|extent, identity| inr_witness_for_tests(extent, identity).into()).await;
+    assert_forex_capture_refused(&result);
+}
+
+/// bridge#642: every production outstandings read admits its currency through
+/// `admit_inr_classified`, which also admits a book with one Currency master.
+/// Such a book keeps its refusal of a composite value, as before, under that
+/// witness: the one-master INR currency capture, identified as production
+/// identifies it.
+#[tokio::test]
+async fn a_one_master_book_under_the_production_witness_keeps_its_composite_refusal() {
+    const CURRENCY: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    );
+    let currency = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        CURRENCY,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        CURRENCY.len(),
+    )
+    .expect("captured currency response decodes")
+    .text;
+    let masters =
+        bridge_tally_protocol::native_outstandings::parse_currency_master_list(&currency).unwrap();
+    assert_eq!(masters.count(), 1);
+    let result = forex_capture_read(|extent, identity| {
+        ClassifiedCompanyCurrencyRead {
+            currency_count: masters.count(),
+            identified: masters.identify_base(None),
+            extent: inr_witness_for_tests(extent, identity).currency_read_extent,
+            evidence: RuntimeReadEvidence::empty(),
+        }
+        .admit_inr_classified()
+        .expect("one INR master admits")
+        .into()
+    })
+    .await;
+    assert_forex_capture_refused(&result);
 }
 
 #[test]

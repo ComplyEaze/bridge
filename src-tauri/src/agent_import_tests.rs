@@ -834,6 +834,57 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     );
 }
 
+/// The Markdown proof carries `verification_status`, lists the batch's own
+/// duplicates, and shows the reconciliation banner whenever the status is not
+/// `posted_verified`, including when it is absent (bridge#804).
+#[test]
+fn the_markdown_proof_follows_the_verification_status() {
+    let banner = "this report does not confirm posting";
+    let proof = |status: Option<&str>, duplicates: Value| {
+        let mut proof = json!({"batch_id":"batch-md","counts":{"posted_verified":1},
+            "vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified"}],
+            "duplicates":duplicates,"unrelated_duplicates_in_window":[]});
+        if let Some(status) = status {
+            proof["verification_status"] = json!(status);
+        }
+        proof
+    };
+    let clean = render_proof_markdown(&proof(Some("posted_verified"), json!([])));
+    assert!(!clean.contains(banner), "{clean}");
+    assert!(
+        clean.contains("- Verification status: `posted_verified`"),
+        "{clean}"
+    );
+    assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
+    let duplicates = json!([
+        {"kind":"remote_id","remote_id":"remote-1","count":2},
+        {"kind":"accounting_fingerprint","fingerprint_sha256":"ab12","voucher_ids":["guid:a","guid:b","guid:c"],"remote_ids":[]}
+    ]);
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, duplicates.clone()));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(
+            markdown.contains(&format!(
+                "- Verification status: `{}`",
+                status.unwrap_or("unknown")
+            )),
+            "{status:?}: {markdown}"
+        );
+        assert!(
+            markdown.contains("- Duplicates in this batch: 2"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| remote_id | `remote-1` | 2 |"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| accounting_fingerprint | `ab12` | 3 |"),
+            "{markdown}"
+        );
+    }
+}
+
 #[test]
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = payload();

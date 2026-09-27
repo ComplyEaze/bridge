@@ -1025,10 +1025,12 @@ async fn an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any
 
 /// A masters review was recorded while its doubt file existed; that file was
 /// later lost, and the step doubt's own file was never written. An unnamed
-/// review is refused as unavailable before any request, never answered
-/// `ack_already_recorded` by the stale masters review.
+/// review is refused as unavailable before any request, where master before
+/// #769 asked for a name (`ack_doubt_ambiguous`), and a review naming
+/// `masters` is refused the same way, where before #770 the stale review
+/// answered `ack_already_recorded`.
 #[tokio::test]
-async fn two_doubts_without_their_files_refuse_before_a_stale_review_can_answer() {
+async fn two_doubts_without_their_files_are_refused_named_or_not() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -1071,32 +1073,70 @@ async fn two_doubts_without_their_files_refuse_before_a_stale_review_can_answer(
     )
     .unwrap();
     fs::remove_file(&masters_doubt).unwrap();
-    let response = acknowledge(
-        &server,
+    for args in [
         json!({"company_guid":GUID,"batch_id":line.batch_id}),
-        ScriptedApproval::approving(),
-    )
-    .await;
-    assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
-        "{response}"
-    );
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"masters"}),
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"batch_step"}),
+    ] {
+        let response = acknowledge(&server, args.clone(), ScriptedApproval::approving()).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"],
+            "ack_doubt_record_unavailable",
+            "{args}: {response}"
+        );
+    }
     assert!(sent(simulator).is_empty(), "no request");
 }
 
-/// One voucher's doubt recorded only in the check record is refused after
-/// the read, as every single-voucher refusal is, and never as no doubt.
+/// One voucher's doubt recorded only in the check record is refused before
+/// any request, never as no doubt: no read can bring its file back (#770).
 #[tokio::test]
 async fn a_doubt_recorded_only_in_the_check_record_is_refused() {
     let marked = br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#;
-    refused(
-        reconcile_readback(),
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(&simulator, directory.path(), clean(), Some(marked), None);
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(!ack_path(&server).exists(), "nothing written");
+    assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// A review recorded while its doubt file existed, the file then lost: the
+/// doubt is refused as unavailable before any request, not answered
+/// `ack_already_recorded` by the stale review, which would leave it
+/// unreviewable for good (#770). The check record carries no mark, since the
+/// file was written and lost later.
+#[tokio::test]
+async fn a_review_left_by_a_lost_doubt_file_does_not_answer_for_it() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
         clean(),
-        Some(marked),
+        Some(DOUBT.as_bytes()),
         None,
-        "ack_doubt_record_unavailable",
-    )
-    .await;
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert_eq!(
+        fs::read(ack_path(&server)).unwrap(),
+        b"{}",
+        "the record is kept"
+    );
+    assert!(sent(simulator).is_empty(), "no request");
 }
 
 /// The live batch post of slice D3 (a licensed TallyPrime 7.1 Silver lab, 50
@@ -1502,4 +1542,115 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
         markdown.contains(&format!("| accounting_fingerprint | `{fingerprint}` | 2 |")),
         "{markdown}"
     );
+}
+
+/// The same capture with D3-004 read as cancelled too, derived in memory: its
+/// `ISCANCELLED` and ledger entries as the captured D3-003 cancel reads them,
+/// every other field as captured for D3-004. That is a state Tally would not
+/// produce (a cancel also raised D3-003's AlterID), kept so the census still
+/// counts it; the second cancel is synthetic, not live evidence. Two cancelled
+/// Journals of one date share a fingerprint with no entries, which says nothing
+/// about their content, so they are not duplicates (bridge#767).
+#[tokio::test]
+async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
+    let readback = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+    ));
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000551</GUID>";
+    assert_eq!(readback.matches(guid).count(), 1);
+    let start = readback[..readback.find(guid).unwrap()]
+        .rfind("<VOUCHER ")
+        .unwrap();
+    let end = start + readback[start..].find("</VOUCHER>").unwrap();
+    let block = &readback[start..end];
+    assert!(
+        block.contains("<VOUCHERNUMBER>4</VOUCHERNUMBER>"),
+        "{block}"
+    );
+    let effective = r#"<ISCANCELLED TYPE="Logical">No</ISCANCELLED>"#;
+    assert_eq!(block.matches(effective).count(), 1, "{block}");
+    let first_entry = block.find("<ALLLEDGERENTRIES.LIST>").unwrap();
+    let closing = "</ALLLEDGERENTRIES.LIST>";
+    let after_entries = block.rfind(closing).unwrap() + closing.len();
+    let cancelled_block = format!(
+        "{}<ALLLEDGERENTRIES.LIST>     </ALLLEDGERENTRIES.LIST>{}",
+        block[..first_entry].replace(
+            effective,
+            r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#
+        ),
+        &block[after_entries..]
+    );
+    let derived = format!(
+        "{}{cancelled_block}{}",
+        &readback[..start],
+        &readback[end..]
+    );
+    assert_eq!(
+        derived
+            .matches(r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#)
+            .count(),
+        2
+    );
+    let derived = derived
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
+        ),
+        &derived,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_not_effective"], 2, "{verified}");
+    assert_eq!(result["counts"]["posted_verified"], 48, "{verified}");
+    let unverified = result["unverified_vouchers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| (row["bridge_txn_id"].as_str(), row["reason"].as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unverified,
+        [
+            (Some("D3-003"), Some("voucher_cancelled")),
+            (Some("D3-004"), Some("voucher_cancelled"))
+        ],
+        "{verified}"
+    );
+    assert_eq!(result["duplicates"], json!([]), "{verified}");
+    assert_eq!(
+        result["unrelated_duplicates_in_window"],
+        json!([]),
+        "{verified}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{verified}"
+    );
+    let requests = sent(simulator);
+    let expected = d3_batch_requests();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
 }

@@ -403,9 +403,10 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
           <p id="trial-balance-parent-search-note" className="section-note">{parentDiscoveryError ?? (discoveringParents ? "Finding parent values in this capture…" : parentOptionsHasMore ? `Showing the first ${PARENT_OPTION_LIMIT} matching parent values. Refine the search to find another.` : parentOptions.length === 0 ? "No matching parent values. Change or clear the search; your current selection stays available." : `${parentOptions.length} matching parent values from ${parentSourceRowCount} captured rows. Search and selection use this capture without rereading Tally.`)}</p>
           {partialScope && (
             <div className="trial-balance-scope" role="note">
+              <p className="section-note">Base-currency ledgers only. Ledgers left out: {partialScope.foreign.length} kept in another currency · {partialScope.mixed.length} with a value Tally shows in another currency.</p>
               <p className="section-note">{result?.scope_limitation}</p>
               <details>
-                <summary>Ledgers left out: {partialScope.foreign.length} kept in another currency · {partialScope.mixed.length} with a value Tally shows in another currency</summary>
+                <summary>The ledgers left out</summary>
                 <ul>
                   {partialScope.foreign.map((ledger, index) => <li key={`foreign-${index}`}>{ledger.ledger}: kept in {ledger.currency}</li>)}
                   {partialScope.mixed.map((ledger, index) => <li key={`mixed-${index}`}>{ledger}: a base-currency ledger with a value Tally shows in another currency</li>)}

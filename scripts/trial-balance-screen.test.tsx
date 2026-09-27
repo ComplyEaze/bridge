@@ -147,6 +147,41 @@ test("renders exact amounts and exports the captured report without another Tall
   root.unmount();
 });
 
+// bridge#709: a several-currency book's base-ledgers-only read says what it
+// left out, with its counts, before any total, and never labels its opening
+// net as a balance difference.
+test("labels a base-ledgers-only Trial Balance before its totals", async () => {
+  const partial = {
+    ...report,
+    read: {
+      ...report.read,
+      currency: { symbol: "$", mailing_name: "US Dollar", currency_count: 2, decimal_places: 2, is_inr: false },
+      ledger_scope: { kind: "base_currency_ledgers_only", base_name: "I₹", decimal_places: 2, foreign: [{ ledger: "FX Debtor", currency: "$" }], mixed: ["Rupee Party", "Cash"] },
+    },
+    scope_limitation: "Totals cover this book's plain base-currency ledgers only.",
+  };
+  queueInvoke({ responses: [partial] });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(<TrialBalanceScreen config={{ host: "127.0.0.1", port: 9000 }} company={company} liveReadNavigationLocked={false} liveReadSuppressed={false} onChangeSetup={() => {}} onTallyReadActivityChange={() => {}} />));
+  await chooseEndDate(host);
+  await act(async () => button(host, "Refresh report").click());
+  const text = host.textContent ?? "";
+  const counts = text.indexOf("Base-currency ledgers only. Ledgers left out: 1 kept in another currency · 2 with a value Tally shows in another currency.");
+  const statement = text.indexOf("Totals cover this book's plain base-currency ledgers only.");
+  const totals = text.indexOf("Opening net, base-currency ledgers only");
+  expect(counts).toBeGreaterThanOrEqual(0);
+  expect(statement).toBeGreaterThan(counts);
+  expect(totals).toBeGreaterThan(statement);
+  expect(text.indexOf("Debit total")).toBeGreaterThan(totals);
+  expect(text).not.toContain("Difference in opening balances");
+  expect(text).toContain("I₹1.25");
+  expect(text).not.toContain("US Dollar");
+  await waitForParentDiscovery();
+  root.unmount();
+});
+
 test("queries an exact retained parent only on request and keeps Excel as the full capture", async () => {
   const parentQuery = {
     query: {

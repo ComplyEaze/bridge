@@ -960,4 +960,13 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
     );
     assert_eq!(listed + omitted, 301);
     assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes / 2);
+    // With no cash line, nothing row-level leaves: the same contract the
+    // PDFium test pins (no transaction label, date or row identity).
+    let text = summary.to_string();
+    for private in ["bridge_txn_id", "st-2026", "2026-08-01", "\"row\""] {
+        assert!(
+            !text.contains(private),
+            "{private} left the machine: {text}"
+        );
+    }
 }

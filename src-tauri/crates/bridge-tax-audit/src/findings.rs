@@ -145,10 +145,9 @@ impl TestResult {
         evidence: Vec<EvidenceRef>,
     ) -> Result<String> {
         let id = format!("{}.{name}", self.test_id);
-        assert!(
-            self.figures.iter().all(|f| f.id != id),
-            "duplicate figure id {id}"
-        );
+        if self.figures.iter().any(|f| f.id == id) {
+            return Err(AuditError::DuplicateFigureId(id));
+        }
         self.figures.push(Figure {
             id: id.clone(),
             value,

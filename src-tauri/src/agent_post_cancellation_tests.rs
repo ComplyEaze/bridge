@@ -8,6 +8,37 @@ use std::{
 };
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, ReadBuf};
 
+/// What a withdrawn post answers once it stops. Its answer is replaced by the
+/// cancellation's, so what it holds is never read.
+fn stand_in_response() -> ToolResponse {
+    ToolResponse {
+        value: json!({}),
+        egress: EgressContext {
+            evidence: None,
+            tool: "post_import".into(),
+            args_sha256: sha256_hex(b"post"),
+            company_guid: None,
+        },
+        recovery_batch_id: None,
+    }
+}
+
+/// A post that stops when withdrawn, as a real one does before its next queued
+/// Tally operation (#725). A withdrawn post is awaited until it stops, so a
+/// stand-in that never stopped would hold the call forever.
+async fn stand_in(withdrawal: tokio_util::sync::CancellationToken) -> ToolResponse {
+    withdrawal.cancelled().await;
+    stand_in_response()
+}
+
+/// Awaits a call whose post is withdrawn. A withdrawal that no longer stops the
+/// post fails the test here instead of hanging the suite.
+async fn stops<F: std::future::Future>(call: F) -> F::Output {
+    tokio::time::timeout(std::time::Duration::from_secs(5), call)
+        .await
+        .expect("a withdrawn post stops once its token is cancelled")
+}
+
 fn server(path: &Path) -> Server {
     Server::new(Settings {
         endpoint: TallyEndpointConfig {
@@ -49,6 +80,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
 
 #[tokio::test]
 async fn contended_cancellation_answers_ping_and_suspends_the_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (_, args) = saved_batch(&server);
@@ -67,11 +99,16 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
         let result = await_post(
             std::future::poll_fn(|_| {
                 polls.set(polls.get() + 1);
-                Poll::<ToolResponse>::Pending
+                if cancellation.is_cancelled() {
+                    Poll::Ready(stand_in_response())
+                } else {
+                    Poll::<ToolResponse>::Pending
+                }
             }),
             PostRequest {
                 id: &json!(7),
                 args: &args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -95,6 +132,10 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
             json!({"jsonrpc":"2.0","id":8,"result":{}})
         );
         let polls_after_cancellation = polls.get();
+        // While another admission holds the journal, whether the post wrote an
+        // intent cannot be read, so it is not polled at all.
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        assert_eq!(polls.get(), polls_after_cancellation);
         drop(admission);
         // Keep stdin active more often than the classifier retry period. This
         // catches a retry sleep that restarts after every incoming frame.
@@ -107,7 +148,9 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
                 }
             }
         }
-        assert_eq!(polls.get(), polls_after_cancellation);
+        // Once it reads as not dispatched, the post is withdrawn (#725): it is
+        // polled until it stops, as this stand-in does once withdrawn.
+        assert!(polls.get() > polls_after_cancellation);
     };
     let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(2), async {
         tokio::join!(serve, client)
@@ -123,6 +166,7 @@ async fn contended_cancellation_answers_ping_and_suspends_the_post() {
 
 #[tokio::test]
 async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (line, args) = saved_batch(&server);
@@ -144,6 +188,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
         PostRequest {
             id: &id,
             args: &args,
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
@@ -185,6 +230,7 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
 
 #[tokio::test]
 async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let (client, source) = tokio::io::duplex(4096);
@@ -197,10 +243,11 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
         let args = json!({});
         let mut framer = Framer::default();
         let serve = await_post(
-            std::future::pending(),
+            stand_in(cancellation.clone()),
             PostRequest {
                 id: &id,
                 args: &args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -235,7 +282,8 @@ async fn ping_responds_before_pending_approval_and_keeps_tools_queued() {
 }
 
 #[tokio::test]
-async fn cancellation_drops_pending_post_before_its_side_effect() {
+async fn cancellation_before_intent_withdraws_the_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let (mut client, source) = tokio::io::duplex(1024);
     let mut reader = BufReader::new(source);
     let mut framer = Framer::default();
@@ -244,44 +292,45 @@ async fn cancellation_drops_pending_post_before_its_side_effect() {
     let server = server(directory.path());
     let mut output = Vec::new();
     client.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n").await.unwrap();
-    let future = async {
-        std::future::pending::<()>().await;
-        panic!("must not dispatch");
-    };
-    assert!(await_post(
+    // Withdrawn, the post is awaited until it stops, then answers as cancelled.
+    let future = stand_in(cancellation.clone());
+    assert!(stops(await_post(
         future,
         PostRequest {
             id: &json!(7),
-            args: &json!({})
+            args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
         &mut framer,
         &mut pending,
         &mut output,
-    )
+    ))
     .await
     .unwrap()
     .is_none());
 }
 
 #[tokio::test]
-async fn disconnect_drops_pending_post() {
+async fn disconnect_before_intent_withdraws_the_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let mut reader = BufReader::new(&b""[..]);
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
-    let result = await_post(
-        std::future::pending(),
+    let result = stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
         &mut Framer::default(),
         &mut std::collections::VecDeque::new(),
         &mut Vec::new(),
-    )
+    ))
     .await;
     assert_eq!(result.err().as_deref(), Some("stdio_client_disconnected"));
 }
@@ -315,6 +364,7 @@ async fn interrupted_partial_frame_is_preserved() {
 
 #[tokio::test]
 async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/list\"}\n".repeat(9),
@@ -324,18 +374,19 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut output = Vec::new();
-    let result = await_post(
-        std::future::pending(),
+    let result = stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await;
     assert!(result.unwrap().is_none());
     assert_eq!(pending.len(), 8);
@@ -350,6 +401,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
 
 #[tokio::test]
 async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let oversized = "é\"".repeat(100);
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"ping\"}}\n{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
@@ -362,18 +414,19 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
     let mut server = server(directory.path());
     server.settings.max_bytes = 256;
     let mut output = Vec::new();
-    let result = await_post(
-        std::future::pending(),
+    let result = stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await;
     assert!(result.unwrap().is_none());
     assert_eq!(pending.len(), 8);
@@ -385,6 +438,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
 
 #[tokio::test]
 async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receipt() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let input = format!(
         "{}{{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{{\"name\":\"voucher_schema\",\"arguments\":{{}}}}}}\n{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{{\"requestId\":7}}}}\n",
         "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/list\"}\n".repeat(8),
@@ -394,18 +448,19 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut output = Vec::new();
-    assert!(await_post(
-        std::future::pending(),
+    assert!(stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
-            args: &json!({})
+            args: &json!({}),
+            cancellation: &cancellation,
         },
         &server,
         &mut reader,
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await
     .unwrap()
     .is_none());
@@ -444,6 +499,7 @@ impl AsyncBufRead for AlwaysReadable {
 
 #[tokio::test]
 async fn readable_queue_traffic_cannot_starve_the_pending_post() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut reader = AlwaysReadable {
@@ -470,6 +526,7 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
             PostRequest {
                 id: &json!(7),
                 args: &json!({}),
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -480,4 +537,39 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
     )
     .await;
     assert!(completed.unwrap().unwrap().is_some());
+}
+
+/// A cancellation before the intent withdraws the post (#725): its token is
+/// cancelled, so it starts no further queued operation, and the batch's held
+/// approval is revoked, so no intent can be written for it. The same holds
+/// when the input ends instead.
+#[tokio::test]
+async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
+    for input in [
+        &b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n"[..],
+        &b""[..],
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let server = server(directory.path());
+        let (_, args) = saved_batch(&server);
+        let batch_id = args["batch_id"].as_str().unwrap().to_string();
+        let _held = server.post_approvals.redeeming_for_test(&batch_id);
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let _ = stops(await_post(
+            stand_in(cancellation.clone()),
+            PostRequest {
+                id: &json!(7),
+                args: &args,
+                cancellation: &cancellation,
+            },
+            &server,
+            &mut BufReader::new(input),
+            &mut Framer::default(),
+            &mut std::collections::VecDeque::new(),
+            &mut Vec::new(),
+        ))
+        .await;
+        assert!(cancellation.is_cancelled());
+        assert!(!server.post_approvals.holds(&batch_id));
+    }
 }

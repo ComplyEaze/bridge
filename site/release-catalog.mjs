@@ -1,15 +1,27 @@
 export const repository = "lamemustafa/bridge";
 const platforms = ["windows-x64", "macos-arm64"];
 
+// A preview is identified by its tag and its complete asset set, not by GitHub's pre-release
+// flag: clearing that flag is what lets a preview be marked "Latest", and it must stay
+// installable from this page when that happens.
 export function isInstallablePreview(release) {
   return !release.draft
-    && release.prerelease
     && /^mcp-preview-[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$/.test(release.tag_name)
     && platforms.every((platform) => releaseAssets(release, platform));
 }
 
 export function selectRelease(releases) {
   return releases.find(isInstallablePreview);
+}
+
+// Joins the live GitHub list with the snapshot published beside this page, newest first. A tag
+// present in both keeps the live entry, since a release can gain assets after the snapshot.
+export function mergeReleases(live, snapshot) {
+  const byTag = new Map();
+  for (const release of [...live, ...snapshot]) {
+    if (!byTag.has(release.tag_name)) byTag.set(release.tag_name, release);
+  }
+  return [...byTag.values()].sort((a, b) => Date.parse(b.published_at ?? 0) - Date.parse(a.published_at ?? 0));
 }
 
 export function assetName(tag, platform) {

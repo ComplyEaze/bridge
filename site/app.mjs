@@ -1,4 +1,4 @@
-import { releaseAssets, releaseLabel, repository, selectRelease } from "./release-catalog.mjs";
+import { mergeReleases, releaseAssets, releaseLabel, repository, selectRelease } from "./release-catalog.mjs";
 
 const status = document.querySelector("#release-status");
 const channelNote = document.querySelector("#channel-note");
@@ -33,17 +33,36 @@ function renderRelease() {
   });
 }
 
+async function fetchReleaseList(url, init) {
+  const response = await fetch(url, init);
+  if (!response.ok) throw new Error(`release_lookup_failed:${response.status}`);
+  const list = await response.json();
+  if (!Array.isArray(list)) throw new Error("release_lookup_malformed");
+  return list;
+}
+
+// The live GitHub API allows 60 unauthenticated requests an hour per address, so the page also
+// reads the snapshot the deploy job saved beside it. Either source alone is enough to offer a
+// download; a failure of one is never shown as "no release exists".
 async function loadReleases() {
-  try {
-    const response = await fetch(`https://api.github.com/repos/${repository}/releases?per_page=100`, {
+  const [live, snapshot] = await Promise.allSettled([
+    fetchReleaseList(`https://api.github.com/repos/${repository}/releases?per_page=100`, {
       headers: { Accept: "application/vnd.github+json" },
-    });
-    if (!response.ok) throw new Error(`release_lookup_failed:${response.status}`);
-    releases = await response.json();
-    renderRelease();
-  } catch {
+    }),
+    fetchReleaseList("./releases.json", { cache: "no-cache" }),
+  ]);
+  if (live.status === "rejected" && snapshot.status === "rejected") {
     status.textContent = "Release details could not be loaded. Use All releases to choose a download.";
     channelNote.textContent = "The download list is unavailable until the GitHub release service responds.";
+    return;
+  }
+  releases = mergeReleases(
+    live.status === "fulfilled" ? live.value : [],
+    snapshot.status === "fulfilled" ? snapshot.value : [],
+  );
+  renderRelease();
+  if (live.status === "rejected" && selectRelease(releases)) {
+    channelNote.textContent = "Showing the release list saved when this page was published; a newer preview may be listed under All releases. Review the checksum and release notes before opening one.";
   }
 }
 

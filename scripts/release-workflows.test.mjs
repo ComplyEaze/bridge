@@ -86,6 +86,13 @@ function assertInstallPageWorkflow(page) {
   assertUnconditional(upload, "Pages upload step");
   assertUnconditional(publish, "Pages deployment step");
   assert.equal(upload.with.path, "site");
+  const snapshot = deploy.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
+  assert.ok(snapshot, "the install page must ship a release snapshot for when the GitHub API refuses it");
+  assertUnconditional(snapshot, "release snapshot step");
+  assert.ok(deploy.steps.indexOf(snapshot) < deploy.steps.indexOf(upload), "the snapshot must be written before the site is uploaded");
+  assert.match(snapshot.run, /set -euo pipefail/);
+  assert.match(snapshot.run, /> site\/releases\.json/);
+  assert.match(snapshot.run, /refusing to deploy/);
 }
 
 test("publication workflows enforce their parsed trigger, dependency, branch, and platform controls", async () => {

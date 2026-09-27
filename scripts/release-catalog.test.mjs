@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assetName, isInstallablePreview, releaseAssets, releaseLabel, selectRelease } from "../site/release-catalog.mjs";
+import { assetName, isInstallablePreview, mergeReleases, releaseAssets, releaseLabel, selectRelease } from "../site/release-catalog.mjs";
 
 const preview = {
   draft: false,
@@ -22,6 +22,29 @@ test("release catalogue selects the newest usable unsigned preview, not an unrel
   assert.equal(isInstallablePreview(incompleteNewestPreview), false);
   assert.equal(selectRelease([unrelatedNewest, incompleteNewestPreview, preview]), preview);
   assert.match(releaseLabel(preview), /unsigned preview/);
+});
+
+test("a preview marked Latest (pre-release flag cleared) stays installable", () => {
+  const latest = { ...preview, prerelease: false };
+  assert.equal(isInstallablePreview(latest), true);
+  assert.equal(selectRelease([latest]), latest);
+  assert.equal(isInstallablePreview({ ...latest, draft: true }), false);
+});
+
+test("the live list and the published snapshot merge newest first, live entry winning a shared tag", () => {
+  const older = { ...preview, published_at: "2026-09-16T08:33:24Z" };
+  const newerTag = "mcp-preview-0.3.0";
+  const newerAssets = preview.assets.map((asset) => ({ ...asset, name: asset.name.replace("0.2.0", "0.3.0") }));
+  const newerLive = { ...preview, tag_name: newerTag, prerelease: false, published_at: "2026-09-26T11:19:29Z", assets: newerAssets };
+  const newerSnapshot = { ...newerLive, assets: newerAssets.slice(0, 2) };
+
+  assert.deepEqual(mergeReleases([], [older, newerSnapshot]).map((release) => release.tag_name), [newerTag, "mcp-preview-0.2.0"]);
+  const merged = mergeReleases([newerLive], [older, newerSnapshot]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0], newerLive);
+  assert.equal(selectRelease(merged), newerLive);
+  // With only the snapshot, its incomplete 0.3.0 entry is skipped and 0.2.0 is still offered.
+  assert.equal(selectRelease(mergeReleases([], [older, newerSnapshot])), older);
 });
 
 test("release catalogue requires immutable package and checksum names together", () => {

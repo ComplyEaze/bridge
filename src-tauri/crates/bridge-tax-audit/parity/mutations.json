@@ -2900,8 +2900,8 @@
   "by": "author (Lane B)",
   "what": "a loan's interest_ledger not bound",
   "file": "src/binding.rs",
-  "from": "                let name = lbinder.bind_one(name, &location)?;",
-  "to": "                let name = name.to_string();"
+  "from": "                        toml::Value::from(lbinder.bind_one(name, &location)?)",
+  "to": "                        toml::Value::from(name.clone())"
  },
  {
   "id": "LB-02",
@@ -2916,16 +2916,16 @@
   "by": "author (Lane B)",
   "what": "the bound interest ledger not written back",
   "file": "src/binding.rs",
-  "from": "                t.insert(\"interest_ledger\".to_string(), toml::Value::from(name));",
-  "to": "                let _ = name;"
+  "from": "                t.insert(\"interest_ledger\".to_string(), bound);",
+  "to": "                let _ = bound;"
  },
  {
   "id": "LB-04",
   "by": "author (Lane B)",
   "what": "a non-string interest_ledger not refused as malformed",
   "file": "src/binding.rs",
-  "from": "                let name = v.as_str().ok_or_else(|| {",
-  "to": "                let name = v.as_str().or(Some(\"5\")).ok_or_else(|| {"
+  "from": "                    _ => return Err(malformed()),",
+  "to": "                    _ => toml::Value::from(\"5\"),"
  },
  {
   "id": "LB-05",
@@ -2934,6 +2934,14 @@
   "file": "src/binding.rs",
   "from": "    let raw_loan_ledgers = table_at(&engagement.raw_cfg, &[\"loans\", \"loan_ledgers\"])?;",
   "to": "    let raw_loan_ledgers = table_at(&engagement.raw_cfg, &[\"loans\", \"loan_ledgers\"]).unwrap_or(None);"
+ },
+ {
+  "id": "LB-06",
+  "by": "author (Lane E2)",
+  "what": "an empty interest_ledger list not refused as malformed",
+  "file": "src/binding.rs",
+  "from": "                    toml::Value::Array(items) if !items.is_empty() => {",
+  "to": "                    toml::Value::Array(_) => {"
  },
  {
   "id": "D1-01",

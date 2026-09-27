@@ -199,6 +199,13 @@ impl CashBankState {
         matches!(self, Self::Established { reserved_group } if *reserved_group == "Cash-in-Hand")
     }
 
+    /// Whether the ledger's ancestry reaches the reserved Suspense A/c
+    /// identity, where only a line tagged for the CA may go.
+    pub(super) fn is_suspense(&self) -> bool {
+        self.reserved_group()
+            .is_some_and(|group| normalize(group) == normalize("Suspense A/c"))
+    }
+
     /// The reserved group the ancestry reached, when it reached one.
     pub(super) fn reserved_group(&self) -> Option<&str> {
         match self {

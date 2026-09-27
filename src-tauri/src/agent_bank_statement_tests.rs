@@ -610,7 +610,14 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     });
     let request = OwnedRequest::from_args(&args).unwrap();
     let open = parsed_with(&request.cash_answers);
-    let summary_open = summary(&request, &open, "statement-x", Path::new("/x"), "0");
+    let summary_open = summary(
+        &request,
+        &open,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        200_000,
+    );
     assert_eq!(summary_open["cash_questions"].as_array().unwrap().len(), 1);
     let id = summary_open["cash_questions"][0]["bridge_txn_id"]
         .as_str()
@@ -632,8 +639,20 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
-    // Drawings is not named as cash in hand, so build is asked to check nothing.
-    assert!(resolved.cash_in_hand.is_empty());
+    // Drawings is carried to build for the Suspense-group check, not as cash
+    // in hand.
+    let named = resolved
+        .cash_ledgers
+        .iter()
+        .map(|need| {
+            (
+                need.bridge_txn_id.as_str(),
+                need.ledger.as_str(),
+                need.cash_in_hand,
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(named, [(id.as_str(), "Drawings", false)]);
     let vouchers = resolved.args["vouchers"].as_array().unwrap();
     assert_eq!(vouchers.len(), 2);
     let drawn = vouchers
@@ -643,7 +662,14 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     assert_eq!(drawn["voucher_type"], "Payment");
     assert_eq!(drawn["entries"][0]["ledger"], "Drawings");
     assert_eq!(drawn["entries"][0]["side"], "Dr");
-    let summary = summary(&request, &answered, "statement-x", Path::new("/x"), "0");
+    let summary = summary(
+        &request,
+        &answered,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        200_000,
+    );
     assert_eq!(summary["cash_questions"], json!([]));
     // Only the unidentified transfer went to suspense; the answered cash line
     // did not.
@@ -662,9 +688,115 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
     let named = resolved
-        .cash_in_hand
+        .cash_ledgers
         .iter()
-        .map(|need| (need.bridge_txn_id.as_str(), need.ledger.as_str()))
+        .map(|need| {
+            (
+                need.bridge_txn_id.as_str(),
+                need.ledger.as_str(),
+                need.cash_in_hand,
+            )
+        })
         .collect::<Vec<_>>();
-    assert_eq!(named, [(id.as_str(), "Cash")]);
+    assert_eq!(named, [(id.as_str(), "Cash", true)]);
+}
+
+/// A statement with hundreds of open cash lines and suspense lines keeps a
+/// result small enough to return: each list is bounded, says how many it left
+/// out, and the counts still cover every line.
+#[test]
+fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let row = |narration: String, dr: &str, cr: &str, balance: String| {
+        Row::from_pairs([
+            ("date", "01Aug2026"),
+            ("narr", narration.as_str()),
+            ("narr_spaced", narration.as_str()),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", dr),
+            ("cr", cr),
+            ("bal", balance.as_str()),
+        ])
+    };
+    let rows = (0..300)
+        .flat_map(|index| {
+            [
+                row(
+                    format!("ATM WDL ATM CASH {index} SYNTHETIC BRANCH"),
+                    "1.00",
+                    "",
+                    format!("{}.00", 100_000 - index),
+                ),
+                row(
+                    format!("BY TRANSFER-NEFT*SYNTHETIC PAYER {index}"),
+                    "",
+                    "1.00",
+                    format!("{}.50", 100_000 - index),
+                ),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let build = build(
+        &rows,
+        Bank::Sbi,
+        &Mapping::default(),
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic SB xx1234",
+            account_number: "00000000001234",
+            date_from: None,
+            date_to: None,
+            cash_answers: CashAnswers::none(),
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: "00000000001234".into(),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("0.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    let request = OwnedRequest::from_args(&json!({
+        "statement_path": "/synthetic/statement.pdf",
+        "password_file": "/synthetic/statement.password",
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "0.00",
+        "closing_balance": "0.00",
+        "total_debits": "300.00",
+        "total_credits": "300.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    }))
+    .unwrap();
+    let max_bytes = 40_000;
+    let summary = summary(
+        &request,
+        &parsed,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        max_bytes,
+    );
+    let listed = |key: &str| summary[key].as_array().unwrap().len();
+    let omitted = |key: &str| usize::try_from(summary[key].as_u64().unwrap()).unwrap();
+    assert_eq!(summary["cash_questions_open"], 300);
+    assert!(listed("cash_questions") > 0 && listed("cash_questions") < 300);
+    assert_eq!(
+        listed("cash_questions") + omitted("cash_questions_omitted"),
+        300
+    );
+    assert_eq!(summary["suspense_rows"], 300);
+    assert_eq!(
+        listed("suspense_lines") + omitted("suspense_lines_omitted"),
+        300
+    );
+    assert!(omitted("suspense_lines_omitted") > 0);
+    assert!(serde_json::to_vec(&summary).unwrap().len() < max_bytes);
 }

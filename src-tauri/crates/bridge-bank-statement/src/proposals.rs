@@ -300,6 +300,7 @@ pub fn build(
     let mut records = Vec::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
+    let mut window_ids = BTreeSet::new();
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -320,6 +321,7 @@ pub fn build(
         {
             continue;
         }
+        window_ids.insert(txn_id.clone());
         let debit = money(row.get(DEBIT), DEBIT, number)?;
         let credit = money(row.get(CREDIT), CREDIT, number)?;
         let (amount, outward) = match (debit, credit) {
@@ -513,6 +515,20 @@ pub fn build(
         return Err(Refusal::new(
             "cash_answer_not_in_statement",
             format!("cash_answers names {stale}, which no row of this statement carries"),
+        ));
+    }
+    // An answer for a row the date window leaves out would post nothing and
+    // say nothing: refused, so the person knows it was not used.
+    if let Some(outside) = options
+        .cash_answers
+        .ids()
+        .find(|id| !window_ids.contains(*id))
+    {
+        return Err(Refusal::new(
+            "cash_answer_outside_window",
+            format!(
+                "cash_answers names {outside}, a row outside the from/to window; nothing would post for it, so answer only rows inside the window"
+            ),
         ));
     }
     if records.is_empty() {

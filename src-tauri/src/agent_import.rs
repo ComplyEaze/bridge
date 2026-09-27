@@ -665,7 +665,7 @@ impl Server {
             // collection, so a Journal-only batch keeps the request sequence its
             // own qualification was measured on.
             let mut group_evidence = None;
-            if renders_bank_shape(&payload.vouchers) || !resolved.cash_in_hand.is_empty() {
+            if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.parents(), groups);
@@ -688,19 +688,18 @@ impl Server {
                 // A ledger a person named as cash in hand must be one: a bank
                 // ledger there would move the cash bank to bank, which the
                 // other statement's line then posts a second time.
-                let (not_cash, not_cash_omitted) = cash_in_hand_refusals(
-                    &resolved.cash_in_hand,
+                if let Some((reason, refused, omitted)) = answered_ledger_refusals(
+                    &resolved.cash_ledgers,
                     &observed,
                     self.settings.max_bytes,
-                );
-                if !not_cash.is_empty() || not_cash_omitted > 0 {
+                ) {
                     return Ok(ToolOutcome {
                         payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                            "state":"refused", "reason":"cash_ledger_not_cash_in_hand",
-                            "refused_ledgers":not_cash,
-                            "refused_ledgers_omitted":not_cash_omitted,
+                            "state":"refused", "reason":reason,
+                            "refused_ledgers":refused,
+                            "refused_ledgers_omitted":omitted,
                             "group_evidence_sha256":evidence.response_sha256,
-                            "next_step":"No file was written. Each ledger was named as cash in hand for a bank cash line, but its group reaches the reserved group shown, not Cash-in-Hand. Re-run parse_bank_statement with the cash-in-hand ledger for that answer, then build again."
+                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c, where only dont_know lines go, tagged and listed. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
                         }}),
                         evidence: accumulated.clone(),
                         company_guid: Some(payload.company_guid),
@@ -924,7 +923,7 @@ impl Server {
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
                     // Every line a bank import sent to suspense, so none sits
                     // there unseen.
-                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers),
+                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers, self.settings.max_bytes),
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
@@ -2553,52 +2552,54 @@ fn requested_master_report(
         .collect()
 }
 
-/// The ledgers named as cash in hand that the book does not hold under
-/// Cash-in-Hand, one row per ledger with the reserved group it does reach.
-fn cash_in_hand_refusals(
-    required: &[super::bank_statement::CashInHandLedger],
+/// The ledgers named in bank cash answers that the book's groups refuse: a
+/// cash-in-hand answer's ledger outside Cash-in-Hand
+/// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
+/// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
+/// reserved group it reaches, bounded like the cash/bank refusal.
+fn answered_ledger_refusals(
+    required: &[super::bank_statement::AnsweredCashLedger],
     observed: &ObservedMasters,
     max_bytes: usize,
-) -> (Vec<Value>, usize) {
-    let mut refused = BTreeMap::<&str, Value>::new();
+) -> Option<(&'static str, Vec<Value>, usize)> {
+    let mut not_cash = BTreeMap::<&str, Value>::new();
+    let mut in_suspense = BTreeMap::<&str, Value>::new();
     for need in required {
         let state = observed.classify(&need.ledger);
-        if state.is_cash_in_hand() {
+        let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
+            (&mut not_cash, "cash_in_hand")
+        } else if !need.cash_in_hand && state.is_suspense() {
+            (&mut in_suspense, "not_suspense")
+        } else {
             continue;
-        }
+        };
         refused.entry(need.ledger.as_str()).or_insert_with(|| {
             json!({
                 "ledger": party_name(need.ledger.as_str()),
-                "requires": "cash_in_hand",
+                "requires": requires,
                 "state": state.state(),
                 "reserved_group": state.reserved_group(),
                 "first_bridge_txn_id": need.bridge_txn_id,
             })
         });
     }
-    // Bounded as the cash/bank refusal is: a row that will not fit is
-    // counted as omitted, never cut.
+    let (reason, refused) = if !not_cash.is_empty() {
+        ("cash_ledger_not_cash_in_hand", not_cash)
+    } else if !in_suspense.is_empty() {
+        ("cash_answer_ledger_in_suspense", in_suspense)
+    } else {
+        return None;
+    };
     let mut budget = refusal_diagnostic_budget(max_bytes);
-    let distinct = refused.len();
-    let rows = refused
-        .into_values()
-        .filter(|row| {
-            let cost = serde_json::to_string(row).map_or(usize::MAX, |text| text.len());
-            let affordable = cost <= budget;
-            if affordable {
-                budget -= cost;
-            }
-            affordable
-        })
-        .collect::<Vec<_>>();
-    let omitted = distinct - rows.len();
-    (rows, omitted)
+    let (rows, omitted) =
+        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    Some((reason, rows, omitted))
 }
 
 /// The vouchers Bridge's bank import sent to suspense, found by the tag it
 /// writes at the end of their narration
 /// ([`bridge_bank_statement::proposals::suspense_tagged`]), for a build's result.
-fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
+fn tagged_suspense_vouchers(vouchers: &[ImportVoucher], max_bytes: usize) -> Value {
     let lines = vouchers
         .iter()
         .filter(|voucher| {
@@ -2621,7 +2622,12 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
             })
         })
         .collect::<Vec<_>>();
-    json!({"count": lines.len(), "lines": lines})
+    // Bounded, so a large batch's result is never withheld whole; the count
+    // is always every line.
+    let count = lines.len();
+    let mut budget = max_bytes / 4;
+    let (lines, omitted) = super::bank_statement::bounded(lines, &mut budget);
+    json!({"count": count, "lines": lines, "omitted": omitted})
 }
 
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {

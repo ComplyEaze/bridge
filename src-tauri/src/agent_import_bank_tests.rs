@@ -1471,7 +1471,10 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         .value;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 2, "{response}");
-    assert_eq!(result["suspense_lines"], json!({"count": 0, "lines": []}));
+    assert_eq!(
+        result["suspense_lines"],
+        json!({"count": 0, "lines": [], "omitted": 0})
+    );
     // the same request sequence was consumed, so the same admission ran
     assert_eq!(simulator.finish().expect("requests").len(), 44);
     assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
@@ -1602,17 +1605,18 @@ async fn an_older_proposals_file_with_an_unanswered_cash_line_is_refused() {
 /// the reserved group it really reaches, and the real cash ledger passes.
 #[test]
 fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
-    use super::super::super::bank_statement::CashInHandLedger;
+    use super::super::super::bank_statement::AnsweredCashLedger;
     let masters = observed(&captured_demo_ledger_parents(), captured_demo_groups());
-    let need = |ledger: &str| CashInHandLedger {
+    let need = |ledger: &str| AnsweredCashLedger {
         bridge_txn_id: "st-20260801-0000000000000001".into(),
         ledger: ledger.into(),
+        cash_in_hand: true,
     };
     assert_eq!(
-        cash_in_hand_refusals(&[need("Cash")], &masters, 200_000).0,
-        Vec::<Value>::new()
+        answered_ledger_refusals(&[need("Cash")], &masters, 200_000),
+        None
     );
-    let refused = cash_in_hand_refusals(
+    let (reason, refused, omitted) = answered_ledger_refusals(
         &[
             need("Cash"),
             need("HDFC Bank Current Account"),
@@ -1621,7 +1625,9 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
         &masters,
         200_000,
     )
-    .0;
+    .unwrap();
+    assert_eq!(reason, "cash_ledger_not_cash_in_hand");
+    assert_eq!(omitted, 0);
     assert_eq!(refused.len(), 1, "one row per ledger: {refused:?}");
     assert_eq!(refused[0]["requires"], "cash_in_hand");
     assert_eq!(refused[0]["state"], "cash_bank");
@@ -1630,7 +1636,9 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
         refused[0]["first_bridge_txn_id"],
         "st-20260801-0000000000000001"
     );
-    let party = cash_in_hand_refusals(&[need("Gujarat Poly Industries")], &masters, 200_000).0;
+    let party = answered_ledger_refusals(&[need("Gujarat Poly Industries")], &masters, 200_000)
+        .unwrap()
+        .1;
     assert_eq!(party[0]["state"], "not_cash_bank");
 }
 
@@ -1729,6 +1737,96 @@ async fn a_business_cash_record_that_does_not_match_its_voucher_is_refused() {
     );
 }
 
+/// Only dont_know may post a cash line to suspense, where it is tagged and
+/// listed. An owner's-use answer naming a ledger under Suspense A/c would post
+/// there untagged, so build refuses it with the group reached. The captured
+/// catalogue's `WR2 Sales` is moved under Suspense A/c for this test only (the
+/// served group snapshot holds that reserved group); that exercises Bridge's
+/// own refusal and is no evidence of what Tally does.
+#[tokio::test]
+async fn a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build() {
+    let plans = bank_build_plans()[..18]
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Suspense A/c</PARENT>",
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).expect("refusal plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let payment = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment",
+        "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": payment,
+        "records": [{
+            "row": 1, "disposition": {"voucher": "Payment"}, "party": "ATM CASH WITHDRAWAL",
+            "ledger": "WR2 Sales", "suspense": false, "bridge_txn_id": "txn-001",
+            "cash_movement": "withdrawal", "cash_answer": "owner_use"
+        }],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "cash_answer_ledger_in_suspense");
+    let refused = result["refused_ledgers"].as_array().unwrap();
+    assert_eq!(refused.len(), 1);
+    assert_eq!(refused[0]["requires"], "not_suspense");
+    assert_eq!(refused[0]["reserved_group"], "Suspense A/c");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
+/// A batch with hundreds of suspense lines still returns its listing: bounded,
+/// with the full count and the number omitted.
+#[test]
+fn the_build_suspense_listing_is_bounded_and_counts_every_line() {
+    let payload = captured_bank_payload();
+    let tag = bridge_bank_statement::proposals::SUSPENSE_TAGS[0];
+    let vouchers = (0..300)
+        .map(|index| {
+            let mut voucher = payload.vouchers[0].clone();
+            voucher.bridge_txn_id = format!("txn-{index:04}");
+            voucher.narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {tag}"));
+            voucher
+        })
+        .collect::<Vec<_>>();
+    let max_bytes = 40_000;
+    let listed = tagged_suspense_vouchers(&vouchers, max_bytes);
+    let lines = listed["lines"].as_array().unwrap().len();
+    assert_eq!(listed["count"], 300);
+    assert!(lines > 0 && lines < 300, "{lines}");
+    assert_eq!(
+        lines + usize::try_from(listed["omitted"].as_u64().unwrap()).unwrap(),
+        300
+    );
+    assert!(serde_json::to_vec(&listed).unwrap().len() < max_bytes / 2);
+}
+
 /// The build result lists every voucher a bank import sent to suspense, found
 /// by the tag in its narration, and no other.
 #[test]
@@ -1738,7 +1836,7 @@ fn a_build_lists_every_tagged_suspense_voucher() {
     assert_eq!(payload.vouchers.len(), 2);
     payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
     payload.vouchers[1].narration = Some("NEFT from Northwind Traders | ACC".into());
-    let listed = tagged_suspense_vouchers(&payload.vouchers);
+    let listed = tagged_suspense_vouchers(&payload.vouchers, 200_000);
     assert_eq!(listed["count"], 1, "{listed}");
     assert_eq!(
         listed["lines"][0]["bridge_txn_id"],
@@ -1746,15 +1844,27 @@ fn a_build_lists_every_tagged_suspense_voucher() {
     );
     // The unidentified tag counts only with the voucher's own ledger after it.
     payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} Suspense", tags[1]));
-    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 1);
+    assert_eq!(
+        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
+        1
+    );
     payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
-    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 2);
+    assert_eq!(
+        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
+        2
+    );
     // A tag's text anywhere but the end marks nothing: an account label.
     payload.vouchers[1].narration = Some(format!("NEFT | {} | 01-Sep", tags[0]));
-    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 1);
+    assert_eq!(
+        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
+        1
+    );
     payload.vouchers[0].narration = None;
     payload.vouchers[1].narration = None;
-    assert_eq!(tagged_suspense_vouchers(&payload.vouchers)["count"], 0);
+    assert_eq!(
+        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
+        0
+    );
 }
 
 #[tokio::test]

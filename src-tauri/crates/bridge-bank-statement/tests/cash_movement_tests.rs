@@ -488,6 +488,26 @@ fn an_answer_must_name_a_cash_line_of_this_statement() {
     );
 }
 
+/// An answer for a row the date window leaves out would post nothing and say
+/// nothing, so it is refused.
+#[test]
+fn an_answer_for_a_row_outside_the_window_is_refused() {
+    let rows = withdrawal_statement();
+    let id = first_id(&rows, Bank::Sbi);
+    let given = answers(&[(&id, "dont_know", None)]).unwrap();
+    let mut windowed = options(&given);
+    windowed.date_from = bridge_bank_statement::date::Date::parse_iso("2026-08-02");
+    let refusal = refuses(
+        build(&rows, Bank::Sbi, &no_mapping(), &windowed),
+        "cash_answer_outside_window",
+    );
+    assert!(refusal.message.contains(&id), "{refusal}");
+    // Inside the window it is used.
+    let mut whole = options(&given);
+    whole.date_from = bridge_bank_statement::date::Date::parse_iso("2026-08-01");
+    assert!(build(&rows, Bank::Sbi, &no_mapping(), &whole).is_ok());
+}
+
 /// The same text covers business cash, drawings and a customer paying in, so
 /// no per-party rule may decide it.
 #[test]

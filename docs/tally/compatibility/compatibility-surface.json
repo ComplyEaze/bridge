@@ -143,7 +143,7 @@
     },
     {
       "path": "scripts/trial-balance-screen.test.tsx",
-      "sha256": "6b4a4bc1b31eba12282bd24dddb540bcb1421c04c14ebc6636b377bb41391fc0"
+      "sha256": "d62db14efcd3eeb6f32fc5241a9c1c96d8f86a3f145f4b291b5e112c07bec3ac"
     },
     {
       "path": "scripts/ux1-shell.test.mjs",
@@ -1019,7 +1019,7 @@
     },
     {
       "path": "src/TrialBalanceScreen.tsx",
-      "sha256": "3368c9aed23498c9522761de40f6c7cc3b59571c99cad73a453f047ffb4fb216"
+      "sha256": "2d939d90ab416e6f7cb60a8a95e829e7eeaac5b698bd4163b39da9be73693394"
     },
     {
       "path": "src/client-grouping.ts",

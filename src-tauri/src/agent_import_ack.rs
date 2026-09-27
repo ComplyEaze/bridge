@@ -394,6 +394,14 @@ fn review_preview(
     }
 }
 
+fn ack_review_code(refusal: post::ReviewTextRefusal) -> String {
+    match refusal {
+        post::ReviewTextRefusal::Layout => "ack_review_layout_text",
+        post::ReviewTextRefusal::Format => "ack_review_format_text",
+    }
+    .into()
+}
+
 /// The review text before the caps: every value checked, nothing truncated.
 fn render_review_text(
     batch_id: &str,
@@ -403,15 +411,6 @@ fn render_review_text(
     row: &ReadVoucher,
 ) -> Result<String, String> {
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    // One per line: a changed ledger's name is as long as the book made it.
-    let ledgers = doubt["ledgers"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .map(|ledger| format!("  {}", quoted(ledger)))
-        .collect::<Vec<_>>()
-        .join("\n");
     // Only this batch's own marker, exactly where Bridge wrote it (the
     // end), is left to the Batch line. Anything else, including text added
     // after it or another marker, is shown: the record binds all of it.
@@ -434,35 +433,32 @@ fn render_review_text(
     };
     // Every value read from Tally or the doubt, checked on its own: the
     // preview's own line breaks are layout, a value's are not.
-    let text_read = std::iter::once(company_name)
-        .chain(
-            doubt["ledgers"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str),
-        )
-        .chain(
-            row.entries
-                .iter()
-                .flat_map(|entry| [entry.ledger.as_str(), entry.amount.as_str()]),
-        )
-        .chain(row.narration.as_deref())
-        .chain(row.voucher_number.as_deref())
-        .chain(row.voucher_type.as_deref())
-        .chain(row.date.as_deref());
-    if text_read
-        .clone()
-        .any(post::has_unsafe_review_layout_character)
-    {
-        return Err("ack_review_layout_text".into());
-    }
-    if text_read
-        .clone()
-        .any(post::has_unreviewable_format_character)
-    {
-        return Err("ack_review_format_text".into());
-    }
+    let doubted_ledgers = doubt["ledgers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    let mut names = post::admit_review_text(
+        std::iter::once(company_name)
+            .chain(row.entries.iter().map(|entry| entry.amount.as_str()))
+            .chain(row.narration.as_deref())
+            .chain(row.voucher_number.as_deref())
+            .chain(row.voucher_type.as_deref())
+            .chain(row.date.as_deref()),
+        doubted_ledgers
+            .iter()
+            .copied()
+            .chain(row.entries.iter().map(|entry| entry.ledger.as_str())),
+    )
+    .map_err(ack_review_code)?;
+    let entry_names = names.split_off(doubted_ledgers.len());
+    // One per line: a changed ledger's name is as long as the book made it.
+    let ledgers = names
+        .iter()
+        .map(|ledger| format!("  {ledger}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     // Tally signs a debit negative. A debit is shown negated, in the digits
     // Tally sent, and a credit as it is (#730), so a debit with an unexpected
     // sign still shows as it is. Negated as #721's batch totals are, but not
@@ -471,7 +467,8 @@ fn render_review_text(
     let entries = row
         .entries
         .iter()
-        .map(|entry| {
+        .zip(entry_names)
+        .map(|(entry, ledger)| {
             let amount = ExactDecimal::parse(entry.amount.clone())
                 .map_err(|_| "ack_readback_not_matched".to_string())?;
             let (side, shown) = if entry.is_deemed_positive.eq_ignore_ascii_case("yes") {
@@ -479,7 +476,7 @@ fn render_review_text(
             } else {
                 ("Cr", amount.as_str().to_string())
             };
-            Ok(format!("{side} {shown}  {}", quoted(&entry.ledger)))
+            Ok(format!("{side} {shown}  {ledger}"))
         })
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
@@ -513,33 +510,29 @@ fn batch_review_preview(
         .flatten()
         .filter_map(Value::as_str)
         .collect::<Vec<_>>();
-    let text_read = std::iter::once(company_name)
-        .chain(doubted_ledgers.iter().copied())
-        .chain(rows.iter().flat_map(|row| {
+    let entries = rows.iter().flat_map(|row| &row.entries);
+    let mut names = post::admit_review_text(
+        std::iter::once(company_name).chain(rows.iter().flat_map(|row| {
             row.entries
                 .iter()
-                .flat_map(|entry| [entry.ledger.as_str(), entry.amount.as_str()])
+                .map(|entry| entry.amount.as_str())
                 .chain(row.date.as_deref())
                 .chain(row.voucher_type.as_deref())
-        }));
-    if text_read
-        .clone()
-        .any(post::has_unsafe_review_layout_character)
-    {
-        return Err("ack_review_layout_text".into());
-    }
-    if text_read
-        .clone()
-        .any(post::has_unreviewable_format_character)
-    {
-        return Err("ack_review_format_text".into());
-    }
-    let mut ledgers = BTreeMap::<&str, (ExactDecimal, ExactDecimal, usize)>::new();
-    for entry in rows.iter().flat_map(|row| &row.entries) {
+        })),
+        doubted_ledgers
+            .iter()
+            .copied()
+            .chain(entries.clone().map(|entry| entry.ledger.as_str())),
+    )
+    .map_err(ack_review_code)?;
+    let entry_names = names.split_off(doubted_ledgers.len());
+    let mut ledgers =
+        BTreeMap::<post::ReviewLedgerName, (ExactDecimal, ExactDecimal, usize)>::new();
+    for (entry, name) in entries.zip(entry_names) {
         let amount = ExactDecimal::parse(entry.amount.clone())
             .map_err(|_| "ack_readback_not_matched".to_string())?;
         let totals = ledgers
-            .entry(entry.ledger.as_str())
+            .entry(name)
             .or_insert_with(|| (ExactDecimal::zero(), ExactDecimal::zero(), 0));
         totals.2 += 1;
         // Tally signs a debit negative. The debit total is shown as the
@@ -563,11 +556,7 @@ fn batch_review_preview(
         DoubtKind::Masters => {
             text.push("Bridge posted them, but these ledgers no longer resolve".into());
             text.push("to the master you approved:".into());
-            text.extend(
-                doubted_ledgers
-                    .iter()
-                    .map(|ledger| format!("  {}", quoted(ledger))),
-            );
+            text.extend(names.iter().map(|ledger| format!("  {ledger}")));
         }
         DoubtKind::BatchStep => {
             // Each case in its own words: a mark never read, one that went
@@ -613,11 +602,10 @@ fn batch_review_preview(
     ));
     for (ledger, (dr, cr, count)) in &ledgers {
         text.push(format!(
-            "Dr {}  Cr {}  {count} {}  {}",
+            "Dr {}  Cr {}  {count} {}  {ledger}",
             dr.as_str(),
             cr.as_str(),
             if *count == 1 { "entry" } else { "entries" },
-            quoted(ledger)
         ));
     }
     text.push(format!("Batch: {}", line.batch_id));

@@ -1613,14 +1613,86 @@ fn a_masters_doubt_after_the_post_downgrades_a_clean_verified_post() {
     );
 }
 
-/// bridge#626 slice 1 changes no post code: this pins the refusal that already
-/// applies to a ledger name ending in CR LF. Such a name can now be built and
-/// imported from the file, but the native dialog cannot yet show it so that an
-/// operator can tell it from its twin; slice 2 changes that, and this test.
+/// What a native dialog may hold: its own line breaks and printable text,
+/// asserted on the bytes, so no raw CR, other control character or line
+/// separator from a value reaches `rfd` or `MessageBoxW`.
+fn assert_only_layout_line_breaks(preview: &str) {
+    assert!(!preview.as_bytes().contains(&b'\r'), "{preview:?}");
+    assert!(
+        preview
+            .chars()
+            .all(|character| character == '\n' || !character.is_control()),
+        "{preview:?}"
+    );
+    assert!(!preview.contains(['\u{2028}', '\u{2029}']), "{preview:?}");
+}
+
+const CRLF_NOTE: &str = "(this ledger's name ends in a line break)";
+
+/// bridge#626 slice 2a: a ledger name ending in one CR LF, as the build admits
+/// it, is shown escaped with a note, and the other ledger is shown as before.
 #[test]
-fn native_preview_refuses_a_ledger_name_ending_in_a_line_break() {
+fn native_preview_shows_a_ledger_name_ending_in_a_line_break_escaped() {
     let (mut line, endpoint) = batch();
     line.vouchers[0].entries[0].ledger.push_str("\r\n");
+    refresh_batch_sha256(&mut line);
+    let (_, preview) = admit_saved_journal(&line, &endpoint).unwrap();
+    let lines = preview.lines().collect::<Vec<_>>();
+    assert!(
+        lines.contains(&format!(r#"Dr 12.50  "Expense\r\n" {CRLF_NOTE}"#).as_str()),
+        "{preview}"
+    );
+    assert!(lines.contains(&r#"Cr 12.50  "Cash""#), "{preview}");
+    assert_eq!(preview.matches(CRLF_NOTE).count(), 1, "{preview}");
+    assert_only_layout_line_breaks(&preview);
+}
+
+/// Only one trailing CR LF on a name the build admits is shown; every other
+/// line break or hidden character in a ledger name, and a CR LF in any other
+/// field, stays refused.
+#[test]
+fn native_preview_refuses_every_other_line_break_and_every_other_field() {
+    for (ledger, code) in [
+        ("Expense\r", "import_review_layout_text"),
+        ("Expense\n", "import_review_layout_text"),
+        ("Expense\n\r", "import_review_layout_text"),
+        ("Expense\r\n\r\n", "import_review_layout_text"),
+        ("Exp\r\nense", "import_review_layout_text"),
+        ("\r\n", "import_review_layout_text"),
+        ("Expense\u{1}\r\n", "import_review_layout_text"),
+        ("Expense\u{2028}\r\n", "import_review_layout_text"),
+        ("Expense\u{2029}", "import_review_layout_text"),
+        ("Expense\u{200b}\r\n", "import_review_format_text"),
+        ("Expense\u{202e}\r\n", "import_review_format_text"),
+    ] {
+        let (mut line, endpoint) = batch();
+        line.vouchers[0].entries[0].ledger = ledger.into();
+        refresh_batch_sha256(&mut line);
+        assert_eq!(
+            admit_saved_journal(&line, &endpoint).unwrap_err(),
+            code,
+            "{ledger:?}"
+        );
+    }
+    for field in ["company", "narration", "reference"] {
+        let (mut line, endpoint) = batch();
+        match field {
+            "company" => line.company.as_mut().unwrap().name.push_str("\r\n"),
+            "narration" => line.vouchers[0].narration = Some("Synthetic\r\n".into()),
+            "reference" => line.vouchers[0].reference = Some("REF-1\r\n".into()),
+            _ => unreachable!(),
+        }
+        refresh_batch_sha256(&mut line);
+        assert_eq!(
+            admit_saved_journal(&line, &endpoint).unwrap_err(),
+            "import_review_layout_text",
+            "{field}"
+        );
+    }
+    // A layout character anywhere is reported before a format one anywhere.
+    let (mut line, endpoint) = batch();
+    line.vouchers[0].narration = Some("Synthetic\u{200b}".into());
+    line.vouchers[0].entries[1].ledger = "Cash\n".into();
     refresh_batch_sha256(&mut line);
     assert_eq!(
         admit_saved_journal(&line, &endpoint).unwrap_err(),
@@ -1958,6 +2030,30 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
     assert!(admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .starts_with("Create ONE Journal"));
+}
+
+/// The batch approval shows a ledger name ending in CR LF as the single
+/// approval does, through the same type, and refuses any other line break.
+#[test]
+fn a_batch_approval_shows_a_line_break_ledger_escaped_and_refuses_others() {
+    let (_, endpoint) = batch();
+    let mut line = batch_of_two();
+    for voucher in &mut line.vouchers {
+        voucher.entries[0].ledger.push_str("\r\n");
+    }
+    let preview = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    assert!(
+        preview.contains(&format!(r#"2 entries  "Expense\r\n" {CRLF_NOTE}"#)),
+        "{preview}"
+    );
+    assert!(preview.contains(r#"2 entries  "Cash""#), "{preview}");
+    assert_eq!(preview.matches(CRLF_NOTE).count(), 1, "{preview}");
+    assert_only_layout_line_breaks(&preview);
+    line.vouchers[1].entries[1].ledger = "Cash\r".into();
+    assert_eq!(
+        admit_fresh_saved_voucher(&line, &endpoint).err().as_deref(),
+        Some("import_review_layout_text")
+    );
 }
 
 /// A batch whose summary would not fit one dialog is refused, never cut;

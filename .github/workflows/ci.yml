@@ -622,8 +622,8 @@ jobs:
       # custom-protocol feature and native build environment.
       # bridge#583: no shipped executable may hold the test-only approval seam.
       # tauri build already ran this as its beforeBundleCommand; it is repeated
-      # here on the exact files uploaded, and on the release-profile unit-test
-      # executable as the positive control that the optimiser keeps the marker.
+      # here on the exact files uploaded. The positive control, that the
+      # optimiser keeps the marker in a release build, is the seam-control job.
       - name: Prove shipped executables lack the test-only approval seam
         shell: bash
         run: |
@@ -633,7 +633,6 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos
           fi
-          node scripts/check-no-test-seam.mjs --test-harness --release
       - name: Stage host MCPB binary, PDFium and legal resources
         shell: bash
         run: >-
@@ -690,6 +689,61 @@ jobs:
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: ${{ steps.package-sccache-cache.outputs.cache-primary-key }}
+
+  seam-control:
+    name: Seam positive control (${{ matrix.os }})
+    needs: changes
+    # The release-profile half of bundle-smoke's seam proof, run beside it
+    # rather than after it: it builds the bridge lib unit-test executable in
+    # release and requires the marker there, so a clean scan of the shipped
+    # executables means the scan could have seen the seam. Same scope and
+    # platforms as bundle-smoke, whose runs it guards.
+    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.96.0
+      - name: Match macOS cache inputs to the Tauri deployment target
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const target = config.bundle?.macOS?.minimumSystemVersion;
+          if (typeof target !== 'string' || !/^\d+\.\d+(?:\.\d+)?$/.test(target)) {
+            throw new Error('Expected an explicit macOS minimumSystemVersion in tauri.conf.json');
+          }
+          appendFileSync(process.env.GITHUB_ENV, `MACOSX_DEPLOYMENT_TARGET=${target}\n`);
+          JS
+      # Restores bundle-smoke's release dependencies (same key) and never saves:
+      # a second cache family would only compete for the repository's quota.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: bundle-smoke
+          env-vars: ${{ runner.os == 'macOS' && 'MACOSX_DEPLOYMENT_TARGET' || '' }}
+          save-if: false
+      - name: Set up Windows native prerequisites
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/setup-windows-native
+      - name: Prove the seam scan sees a release test build
+        shell: bash
+        run: node scripts/check-no-test-seam.mjs --test-harness --release
 
   compiler-cache-retention:
     name: Retain current compiler caches
@@ -777,7 +831,7 @@ jobs:
     # bridge-tax-audit change merges only with its selected mutations proven on
     # the merged tree. Skipped on other pull requests, which is a pass here.
     if: ${{ always() }}
-    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, compiler-cache-retention, tax-audit-mutations]
+    needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

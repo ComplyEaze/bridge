@@ -58,8 +58,11 @@ fn fits_with(measured: Duration, elapsed: Duration, vouchers: usize) -> bool {
             .is_some_and(|total| total <= CALL_CEILING)
 }
 
-/// How long an answered approval may wait to be redeemed, from the click. The
-/// owner's decision (#725); 15 minutes is the proposal it was put to them with.
+/// How long an answered approval may wait to be taken for posting, from the
+/// click. The owner approved 15 minutes (#725) after it was compared with 5, 10
+/// and 30 minutes, a limit scaled by voucher count, and one renewed per chunk
+/// (bridge#792): a late take re-runs every check, and 15 is the smallest round
+/// value the projected chunked runs also fit.
 pub(super) const APPROVAL_TTL: Duration = Duration::from_secs(15 * 60);
 /// A dialog is given at least this long in the call that starts it, so the
 /// dialog is up before the call returns even when the checks used the budget.

@@ -359,10 +359,7 @@ fn no_trial_balance_value_is_read_from_a_composite() {
     let composites = captured_composites(&capture);
     assert_eq!(composites.len(), 11, "{composites:?}");
     for composite in &composites {
-        assert!(
-            super::scalar::is_currency_composite(composite),
-            "{composite}"
-        );
+        assert!(super::is_currency_composite(composite), "{composite}");
     }
     let scoped =
         parse_native_trial_balance_with_currency(&capture, FOREX_COMPANY, &forex_base()).unwrap();
@@ -391,7 +388,7 @@ fn no_trial_balance_value_is_read_from_a_composite() {
 /// it is refused as an invalid amount rather than set aside.
 #[test]
 fn a_damaged_composite_is_refused_not_set_aside() {
-    use super::scalar::is_currency_composite;
+    use super::is_currency_composite;
     let capture = forex_with_currency();
     let empty_rate = captured_composites(&capture)
         .into_iter()

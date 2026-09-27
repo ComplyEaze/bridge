@@ -42,11 +42,12 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   // The voucher source read is bounded before it is sent (protocol reference
   // §11c): `read_entry_window_rows`, which parses each row under the composite
   // policy (#674), plans it through `read_voucher_window` with the shape's
-  // limits, as `read_entry_window_shaped` does; a type filter alone switches it
+  // limits, as `read_entry_window_shaped` does (neither pattern may cross into
+  // another function); a type filter alone switches it
   // to the class-resolving shape (#625). The ledger catalogue is read before
   // and again after it.
-  assert.match(vouchers, /read_ledger_catalogue[\s\S]*?read_entry_window_rows\([\s\S]*?read_ledger_catalogue/);
-  assert.match(vouchers, /async fn read_entry_window_rows[\s\S]*?self\.read_voucher_window\([\s\S]*?WindowReadLimits::for_shape\(shape\)/);
+  assert.match(vouchers, /read_ledger_catalogue(?:(?!\bfn\s)[\s\S])*?read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_ledger_catalogue/);
+  assert.match(vouchers, /async fn read_entry_window_rows(?:(?!\bfn\s)[\s\S])*?self\.read_voucher_window\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
   assert.match(vouchers, /type_selector\.is_some\(\) \{\s*VoucherReadShape::ClassEntryWildcard\s*\} else \{\s*VoucherReadShape::EntryWildcard/);
   assert.match(vouchers, /fn read_entry_wildcard_window[\s\S]*?VoucherReadShape::EntryWildcard/);
   assert.match(vouchers, /filter_voucher_rows_for_ledger[\s\S]*?skip\(offset\)[\s\S]*?take\(limit\)/);

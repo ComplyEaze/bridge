@@ -289,9 +289,12 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
         older
             .persist_import_verification(&stale_proof, &retry.batch, retry.generation)
             .unwrap();
+        // The file is the retry's proof, carrying the status the ledger records.
+        let mut expected = stale_proof.clone();
+        expected["verification_status"] = json!(retry.batch.status);
         assert_eq!(
             serde_json::from_slice::<Value>(&fs::read(&paths[1]).unwrap()).unwrap(),
-            stale_proof
+            expected
         );
     }
 }

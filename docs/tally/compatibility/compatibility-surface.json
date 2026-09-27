@@ -123,7 +123,7 @@
     },
     {
       "path": "scripts/ledger-entries-ui.test.mjs",
-      "sha256": "27701b1a7ccb101ca8943f1b382ca4790eb9c36a982a1c2875f104cacdda7f38"
+      "sha256": "8cc98a367b2fe28f1a5e1985818e1d18231184457f401717cb412142864db076"
     },
     {
       "path": "scripts/outstandings-copy.test.mjs",

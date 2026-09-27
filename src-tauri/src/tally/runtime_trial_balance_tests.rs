@@ -360,6 +360,48 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
     }
 }
 
+/// bridge#551 with #692: a statement is derived only from a single-currency
+/// Trial Balance, so a several-currency book's Profit and Loss or Balance Sheet
+/// read refuses after its currency read and sends nothing more: no base
+/// identification, no Trial Balance, no group tree and no statement. A read
+/// that asked for the base-currency ledgers here would send those.
+#[tokio::test]
+async fn a_statement_read_refuses_a_several_currency_book_after_its_currency_read() {
+    let currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    for kind in [
+        bridge_tally_protocol::native_statement_reports::NativeStatementKind::BalanceSheet,
+        bridge_tally_protocol::native_statement_reports::NativeStatementKind::ProfitAndLoss,
+    ] {
+        let plans = opening_plans(currency.clone());
+        let total = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let error = TallyRuntime::default()
+            .fetch_statements(
+                config(&simulator),
+                &identity(),
+                TrialBalancePeriod::new(
+                    TallyDate::parse("20260401").unwrap(),
+                    TallyDate::parse("20260902").unwrap(),
+                )
+                .unwrap(),
+                kind,
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            error.chain().find_map(
+                |cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()
+            ),
+            Some(super::trial_balance::TrialBalanceReadError::Currency(
+                "company_base_currency_undetermined"
+            ))
+        ));
+        assert_eq!(simulator.finish().unwrap().len(), total);
+    }
+}
+
 /// bridge#709: the desktop's read, which opts in to the base-currency
 /// ledgers, reads a several-currency book's plain base-currency ledgers
 /// through the base Tally identifies, sets the rest aside by name, and

@@ -881,13 +881,20 @@ fn the_markdown_proof_follows_the_verification_status() {
     let markdown = render_proof_markdown(&dispatched);
     assert!(markdown.contains(resend), "{markdown}");
     // An error, or an unverified dispatch, shows the banner on its own, even
-    // beside a verified status.
+    // beside a verified status. Only a dispatched batch is told not to resend:
+    // the wording follows the dispatch record, not the error.
     let mut errored = proof(Some("posted_verified"), json!([]));
     errored["error"] = json!({"code":"import_reconciliation_required"});
+    let markdown = render_proof_markdown(&errored);
+    assert!(markdown.contains(banner), "{markdown}");
+    assert!(!markdown.contains(resend), "{markdown}");
     let mut unreconciled = proof(Some("posted_verified"), json!([]));
     unreconciled["dispatch"] =
         json!({"state":"reconciliation_required","response_state":"response_missing"});
-    for flagged in [errored, unreconciled] {
+    let mut errored_after_dispatch = errored.clone();
+    errored_after_dispatch["dispatch"] =
+        json!({"state":"posted_verified","response_state":"response_clean"});
+    for flagged in [unreconciled, errored_after_dispatch] {
         let markdown = render_proof_markdown(&flagged);
         assert!(markdown.contains(resend), "{markdown}");
     }

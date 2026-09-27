@@ -68,8 +68,9 @@ Cursor uses the same server object in `.cursor/mcp.json`:
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `vouchers`,
-`voucher_presence`, `read_evidence`, and `egress_log`. For a command-line
+`ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
+`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
+`egress_log`. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -176,6 +177,70 @@ company, mode and extent checks detect observed changes, but do not prove an
 atomic snapshot or voucher-level reconciliation. Keep the company quiet during
 reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 
+### Profit and Loss and Balance Sheet
+
+`profit_and_loss` and `balance_sheet` take the same `company_guid`, `from` and
+`to` as `trial_balance`, and read that Trial Balance under the same checks.
+Inside the same bracket they also read the group tree and Tally's own Balance
+Sheet for the window, and `profit_and_loss` reads Tally's own Profit and Loss
+too (#692).
+
+- **Lines.** Each ledger is classified by the reserved identity of its primary
+  group, the last group in its chain. That identity survives renaming.
+  - A P&L line is the window's debit plus credit movement.
+  - A Balance Sheet line is the closing balance at `to`.
+  - Signs follow the Trial Balance: a debit is negative, so a profit is positive.
+  - Each line's `amount` sums the amounts Tally returned and counts the empty
+    ones it left out.
+  - `lines` is null while the tool's result (`net_result`, or the Balance
+    Sheet's `carried`) is not established, so a derived line is never shown
+    as the statement. `balance_sheet_gate` and `tie_out` then show how each
+    of Tally's own lines compared.
+- **When a result is established.** Only when all of these hold:
+  - every ledger is classified; a ledger under a user-created primary group,
+    or with an incomplete chain, is listed in `unclassified`, and blocks the
+    results while it carries an amount;
+  - no Stock-in-Hand ledger carries an amount, since closing stock is not
+    derived from the Trial Balance;
+  - Tally's own Balance Sheet for the window, read in the same bracket, ties
+    line for line to the derived one (`balance_sheet_gate`). A line that
+    differs, a Tally line with an amount nothing derived matches, or a derived
+    line Tally does not show, refuses every result as
+    `tally_balance_sheet_differs`, with those lines named;
+  - the Profit & Loss A/c ledger is returned in the Trial Balance.
+- **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
+  `closing_stock_not_derivable_from_trial_balance`,
+  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
+  gross and net `tally_profit_and_loss_differs`.
+- **Limits.**
+  - The gates are what catch what the Trial Balance cannot see, such as stock
+    valued from stock items. No inventory book has been measured; one is
+    expected to refuse.
+  - A book with more than one currency master is refused before the Trial
+    Balance is read (measured once on the lab's multi-currency book), so an
+    unadjusted forex difference (#683) never reaches the gate.
+  - A Tally line the derivation has no counterpart for, such as a heading with
+    an amount or a difference in opening balances, refuses the results rather
+    than being guessed at.
+  - Tally's own statements carry no company identity; the company, mode and
+    book-extent checks around the read are what bind them.
+  - The gate has been measured over one full year on one book and one month on
+    another. In that one-month window the book's one P&L ledger (sales) had a
+    Trial Balance covering the window only, and the year's earlier result sat
+    in the Profit & Loss A/c ledger's opening; the carried line includes both. A window spanning more
+    than one financial year is unmeasured.
+- **Gross and net** are the window's movement, which the Balance Sheet does
+  not pin: stock held at `from` and gone by `to` could pass it. So
+  `profit_and_loss` also reads Tally's own Profit and Loss and compares it in
+  `tie_out`. Gross and net are refused as `tally_profit_and_loss_differs`
+  unless it ties:
+  - no line differs, and no derived line with an amount is missing from it;
+  - no line of its with an amount is uncompared, except the `Cost of Sales :`
+    heading, spelled exactly so, while its amount is exactly the derived
+    Purchase Accounts plus Direct Expenses (the cost of sales without stock).
+    That allowance was observed once, on one book.
+  - An Opening or Closing Stock line refuses.
+
 ### Ledger-movement opening decision
 
 `ledger_movement` reads the native ledger opening with `SVFROMDATE` set to the
@@ -234,6 +299,27 @@ setup commitment. Historical commitments without a tier retain their exact bytes
 If discovery rejects company identity fields, `tally_status` reports the profile
 refusal reason and partial evidence with the completed source commitments. A
 valid empty collection remains distinguishable from invalid discovery.
+
+### Foreign-currency composites in `vouchers`
+
+A foreign amount entered on a rupee ledger can be stored by Tally as a
+composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
+
+- **`vouchers` withholds that voucher.** It passes every date, ledger and
+  voucher-type check like any other, and is then listed in `withheld_vouchers`
+  instead of `items`. The listing gives its GUID, date, type, number and cause,
+  up to 100 vouchers, with an exact `withheld_total` that is the same on every
+  page.
+- **The result says so.** `state` is `partial` with `reason`
+  `vouchers_withheld`, `total` counts `items` only, and `coverage` says what
+  was left out.
+- **No amount is read from a composite.** Anything that is neither a plain
+  decimal nor an exact composite still refuses the whole window. So does a
+  composite whose foreign and base amounts carry opposite signs, unless the
+  foreign amount is zero: a voucher entry's two amounts share one sign.
+- **Every other voucher reader still refuses such a window** (for example
+  `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
+  voucher screen), because each of them sums, matches or verifies amounts.
 
 ## Voucher-file preparation and verification
 

@@ -424,19 +424,23 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
             withdrawn.clone(),
             SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
         ));
-        // Drive the call until its dialog is open.
-        while !scripted.is_waiting() {
-            tokio::select! {
-                biased;
-                response = &mut post => panic!("the call ended early: {response}"),
-                () = tokio::time::sleep(Duration::from_millis(1)) => {}
+        tokio::time::timeout(Duration::from_secs(5), async {
+            // Drive the call until its dialog is open.
+            while !scripted.is_waiting() {
+                tokio::select! {
+                    biased;
+                    response = &mut post => panic!("the call ended early: {response}"),
+                    () = tokio::time::sleep(Duration::from_millis(1)) => {}
+                }
             }
-        }
-        // Answer, and let the dialog's task finish, without polling the call.
-        scripted.answer(true);
-        while scripted.is_waiting() {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+            // Answer, and let the dialog's task finish, without polling the call.
+            scripted.answer(true);
+            while scripted.is_waiting() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the dialog opened and its task took the answer");
         tokio::time::sleep(Duration::from_millis(10)).await;
         withdrawn.cancel();
         let response = post.await;
@@ -457,9 +461,13 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
 async fn the_wait_takes_a_ready_withdrawal_over_a_ready_answer() {
     for _ in 0..32 {
         let dialog = approved_dialog(1).await;
-        while dialog.answered().is_none() {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while dialog.answered().is_none() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the approving dialog was answered");
         let withdrawn = tokio_util::sync::CancellationToken::new();
         withdrawn.cancel();
         let waited = crate::tally::runtime::TOOL_CANCELLATION
@@ -1058,7 +1066,17 @@ async fn an_expired_approval_lapses_with_a_note() {
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
     std::thread::sleep(Duration::from_millis(5));
-    // Redeemed late, it is refused as expired: the code the catalogue names.
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    let note = approvals.lapse_note(&line.batch_id).unwrap();
+    assert_eq!(note["reason"], "approval_expired");
+    assert_eq!(note["state"], "approval_lapsed_unposted");
+
+    // Redeemed late, one is refused as expired: the code the catalogue names.
+    let (request, answered, native) = granted(&line, 1).await;
+    approvals
+        .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(5));
     assert_eq!(
         approvals
             .take_for_dispatch(&line.batch_id, &binding)
@@ -1066,10 +1084,6 @@ async fn an_expired_approval_lapses_with_a_note() {
             .as_deref(),
         Some("import_approval_expired")
     );
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
-    let note = approvals.lapse_note(&line.batch_id).unwrap();
-    assert_eq!(note["reason"], "approval_expired");
-    assert_eq!(note["state"], "approval_lapsed_unposted");
 }
 
 /// A process that ends holds nothing a new one can redeem: its approval

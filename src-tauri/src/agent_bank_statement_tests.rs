@@ -64,6 +64,15 @@ fn arguments(statement: &Path, password_file: &Path) -> Value {
     })
 }
 
+/// An absolute path on this platform (a Unix-style "/x" is not absolute on
+/// Windows) for a file the test never opens.
+fn never_opened(name: &str) -> String {
+    std::env::temp_dir()
+        .join(format!("bridge-never-opened-{name}"))
+        .to_string_lossy()
+        .into_owned()
+}
+
 fn error_code(response: &Value) -> Option<&str> {
     response["structuredContent"]["result"]["error"]["code"].as_str()
 }
@@ -597,8 +606,8 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         }
     };
     let mut args = json!({
-        "statement_path": "/synthetic/statement.pdf",
-        "password_file": "/synthetic/statement.password",
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
@@ -765,8 +774,8 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
         build,
     };
     let request = OwnedRequest::from_args(&json!({
-        "statement_path": "/synthetic/statement.pdf",
-        "password_file": "/synthetic/statement.password",
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "0.00",
@@ -920,8 +929,8 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
         build,
     };
     let request = OwnedRequest::from_args(&json!({
-        "statement_path": "/synthetic/statement.pdf",
-        "password_file": "/synthetic/statement.password",
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "0.00",

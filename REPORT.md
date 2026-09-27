@@ -371,3 +371,10 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - Lane D merged master into E3a (6914a065; the crate tree is unchanged, 604/604 proven) and reviewed the delta from 2ce19df6. No P1 or P2. The earlier P2-1 fixes are confirmed, each kill depending on its branch, and the P2-2 docs are true of the code.
 - Its one P3: the body said `load_book`'s `company_is_integrated` call was not driven end to end. It is, through the registry's synthetic golden (`is_integrated` = "No"). Only a hard-coded `Some(false)` would survive, because the synthetic read never says Yes. The body is corrected and the review is recorded. No code change: it is a P3 after the fix rounds.
 - #744 waits on Lane D's real books. E4 (a59eeb58) will merge master when #744 merges.
+
+## 2026-09-27 16:55 UTC — #744 (E3a) merged; E4 on master, pushed at e11a2958; #788 updated
+
+- **#744 merged** (02b61c9b). Lane D had merged master into E3a (6914a065) and E3a into E4 (1c8b88d1), and opened #788 for E4, with real books EQUAL on all three and the reference-drift check passing.
+- Merged master into E4 (e11a2958). Master's crate equals E3a's 5a7f8137 (769ccc25), checked by an explicit equality test this time, so every crate conflict resolved to E4's side. The crate tree is unchanged (cb5699ff). Each crate file equals master plus E4's own patch; `batch-e4.md` also has its one reworded line. Non-crate files equal master. `--verify` 639/639; provenance (247) and integrity (371) pass; 352 tests; clippy and fmt clean. Read-only Sonnet pre-push check: none. **Pushed e11a2958.**
+- #788's body: candidate SHA e11a2958, a note that #744 is merged, net LOC against master; the rest is Lane D's text, unchanged. Subscribed.
+- Next: #788 waits on CI, Lane V2's independent review and the merge. Then, one PR each, in order: #644, #662 (check what #727 left), #658, #667.

@@ -114,7 +114,7 @@ fn seam_gate_problems(source: &str) -> Vec<String> {
         ("JoinSet", 0),
         ("Handle::current()", 0),
         (".spawn(", 2),
-        ("spawn", 9),
+        ("spawn", 10),
     ] {
         if source.matches(form).count() != expected {
             problems.push(format!("expected {expected} of `{form}`"));

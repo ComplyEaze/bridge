@@ -444,7 +444,10 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    are not yet measured. A queue catalogue re-read that does not parse as this
    company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
-   again until it is corrected in Tally. Separately, the build records each ledger's GUID, and a
+   again until it is corrected in Tally. A queue re-read of the group collection
+   (for a Payment, Receipt or Contra) that does not parse refuses with
+   `group_export_invalid`, with the same `cause` the read before approval names,
+   and nothing is sent. Separately, the build records each ledger's GUID, and a
    post refuses any ledger now on another GUID (renamed and replaced, or deleted
    and recreated, since the build) with `import_masters_changed_since_build`,
    naming it. The name now means a different ledger: confirm the intended one
@@ -453,7 +456,12 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_batch_predates_ledger_binding`, before any Tally request; build it
    again. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
-   the post can be re-run. Rebuild only when `attempt_recorded` is `false`.
+   the post can be re-run. Checked under the admission lock as the attempt is
+   about to be recorded, a batch no longer in the journal, already attempted,
+   changed since approval, or whose REMOTEID the journal already records refuses
+   with `import_batch_not_found`, `import_already_attempted`,
+   `import_batch_changed` or `import_remote_id_reused`, and this post sends
+   nothing. Rebuild only when `attempt_recorded` is `false`.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the

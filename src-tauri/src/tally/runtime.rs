@@ -62,11 +62,14 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
+pub(crate) use trial_balance::SingleCurrencyTrialBalance;
 pub(crate) use trial_balance::{
     base_currency_ledgers_only_label, TrialBalanceCurrencyScope, TrialBalanceReadError,
     BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
 };
-pub use trial_balance::{TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead};
+pub use trial_balance::{
+    StatementsRead, TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead,
+};
 
 #[cfg(test)]
 #[path = "runtime_trial_balance_tests.rs"]

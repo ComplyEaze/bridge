@@ -232,8 +232,47 @@ async fn until_answered(server: &Server, batch_id: &str) {
     .expect("the held dialog's answer was stamped");
 }
 
+/// A No given while no call waits is not lost (#725): the same batch's next
+/// call returns `import_approval_declined`, sends nothing past the first call's
+/// checks, and does not ask the person again.
+#[tokio::test]
+async fn a_decline_between_calls_is_returned_to_the_next_call_not_asked_again() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    scripted.answer(false);
+    until_answered(&server, &line.batch_id).await;
+    let declined = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        result(&declined)["error"]["code"],
+        "import_approval_declined",
+        "{declined}"
+    );
+    assert_eq!(scripted.counts(), [1], "the person was not asked again");
+    assert_eq!(observed.len(), before_approval().len());
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+}
+
 /// A dialog declined while no call waited no longer blocks other batches: the
-/// next call, for another batch, settles it and asks about its own.
+/// next call, for another batch, settles it and asks about its own. The
+/// declined batch's own next call still reads its No, and is not asked again.
 #[tokio::test]
 async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     let mut plans = before_approval();
@@ -245,7 +284,10 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     let other = saved_other_batch(&server, &line);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
-        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .scope(
+            scripted.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
         .await;
     assert_eq!(
         result(&pending)["approval"]["state"],
@@ -258,6 +300,9 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
     let declined = SCRIPTED_APPROVAL
         .scope(asked.clone(), server.call_tool("post_import", other))
         .await;
+    let again = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
     let observed = sent(simulator);
     assert_eq!(
         result(&declined)["error"]["code"],
@@ -265,6 +310,12 @@ async fn a_dialog_declined_while_nobody_waits_does_not_block_another_batch() {
         "the other batch was asked, not refused as busy: {declined}"
     );
     assert_eq!(asked.counts(), [1]);
+    assert_eq!(
+        result(&again)["error"]["code"],
+        "import_approval_declined",
+        "the declined batch read its No: {again}"
+    );
+    assert_eq!(scripted.counts(), [1], "and was not asked again");
     assert_eq!(observed.len(), 2 * before_approval().len());
 }
 
@@ -585,6 +636,18 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
         approvals.lapse_note(&line.batch_id).is_none(),
         "an unanswered dialog leaves no note to read as approved"
     );
+    // Its own batch's next call joins the ended dialog and reads why.
+    let Begin::Join(ended) = approvals.begin(&line.batch_id) else {
+        panic!("the ended dialog is joined, not asked again");
+    };
+    let refusal = ended
+        .answer_within(Duration::from_secs(5))
+        .await
+        .ok()
+        .expect("the dialog has ended")
+        .0
+        .err();
+    assert_eq!(refusal.as_deref(), Some("import_approval_unavailable"));
 }
 
 /// An approval collected by a joined call late in its window reports what is

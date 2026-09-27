@@ -8,11 +8,13 @@
 //! Everything here is in memory, in the one process that showed the dialog. A
 //! restarted process holds nothing, so no approval can be redeemed that a
 //! person did not give to this process. An approval is bound to what the
-//! person was shown, runs out a fixed time after the click, is redeemed once,
-//! and is spent under the import admission lock before the dispatch intent is
-//! written. A cancelled call, a refused redemption, or a redemption that ends
-//! before its intent lapses it. An approval that lapses unredeemed leaves a
-//! note saying so, and nothing can post from a note.
+//! person was shown, must be taken for posting within a fixed time of the
+//! click, is redeemed once, and is spent under the import admission lock before
+//! the dispatch intent is written. A cancelled call, a refused redemption, or a
+//! redemption that ends before its intent lapses it. An approval that lapses
+//! unredeemed leaves a note saying so, and nothing can post from a note. A No,
+//! a timeout or an unanswered end is returned to its batch's next call, which
+//! does not ask the person again.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
@@ -172,10 +174,23 @@ impl Drop for Redemption<'_> {
     }
 }
 
+/// Whether `held` is a dialog that ended without an approval: declined, timed
+/// out, or ended with no answer. Joining it reads the refusal's code.
+fn refused(held: &Held) -> bool {
+    matches!(held, Held::Pending { dialog: Some(dialog), .. }
+        if dialog.ended_unanswered()
+            || dialog.answered().is_some_and(|answered| !answered.approved))
+}
+
 /// The approvals one process holds: at most one batch at a time.
 pub(in crate::agent) struct PostApprovals {
     imports: PathBuf,
     held: Mutex<Option<(String, Held)>>,
+    /// A refused dialog let go before its own batch's next call read it. That
+    /// call gets the refusal instead of asking the person again (#725). It
+    /// blocks no other batch, and a later refusal replaces it. Locked only
+    /// while `held` is.
+    unread_refusal: Mutex<Option<(String, Held)>>,
     ttl: Duration,
     measured_post: Duration,
 }
@@ -185,6 +200,7 @@ impl PostApprovals {
         Self {
             imports: data_dir.join("imports"),
             held: Mutex::new(None),
+            unread_refusal: Mutex::new(None),
             ttl: APPROVAL_TTL,
             measured_post: MEASURED_POST,
         }
@@ -245,6 +261,12 @@ impl PostApprovals {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
+    fn unread_refusal(&self) -> std::sync::MutexGuard<'_, Option<(String, Held)>> {
+        self.unread_refusal
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn expired(&self, answered: &Answered) -> bool {
         self.remaining(answered).is_zero()
     }
@@ -284,6 +306,18 @@ impl PostApprovals {
     pub(super) fn begin(&self, batch_id: &str) -> Begin {
         let mut slot = self.slot();
         self.settle(&mut slot);
+        if slot.is_none() {
+            // A No, a timeout or an unanswered end this batch has not read:
+            // this call joins the ended dialog and returns its refusal, and
+            // the person is not asked again (#725).
+            let mut unread = self.unread_refusal();
+            if unread
+                .as_ref()
+                .is_some_and(|(refused_batch, _)| refused_batch == batch_id)
+            {
+                *slot = unread.take();
+            }
+        }
         let Some((held_batch, held)) = slot.as_mut() else {
             return Begin::Ask;
         };
@@ -300,10 +334,15 @@ impl PostApprovals {
         }
     }
 
-    /// Let go of what can no longer be redeemed: a dialog answered with a
-    /// decline, a lapse or a failure, and an approval past its time, whether
-    /// or not a call has collected it yet. Neither blocks another batch.
+    /// Let go of what can no longer be redeemed: a dialog that ended without
+    /// an approval, and an approval past its time, whether or not a call has
+    /// collected it yet. Neither blocks another batch. A refusal is kept aside
+    /// for its own batch's next call to read.
     fn settle(&self, slot: &mut Option<(String, Held)>) {
+        if slot.as_ref().is_some_and(|(_, held)| refused(held)) {
+            *self.unread_refusal() = slot.take();
+            return;
+        }
         let finished = match slot.as_ref() {
             Some((
                 _,
@@ -311,12 +350,9 @@ impl PostApprovals {
                     dialog: Some(dialog),
                     ..
                 },
-            )) => {
-                dialog.ended_unanswered()
-                    || dialog
-                        .answered()
-                        .is_some_and(|answered| !answered.approved || self.expired(&answered))
-            }
+            )) => dialog
+                .answered()
+                .is_some_and(|answered| self.expired(&answered)),
             Some((_, Held::Approved { answered, .. })) => self.expired(answered),
             _ => false,
         };

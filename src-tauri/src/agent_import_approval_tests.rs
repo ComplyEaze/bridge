@@ -581,6 +581,10 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
         Begin::Ask
     ));
     assert!(!approvals.holds(&line.batch_id));
+    assert!(
+        approvals.lapse_note(&line.batch_id).is_none(),
+        "an unanswered dialog leaves no note to read as approved"
+    );
 }
 
 /// An approval collected by a joined call late in its window reports what is

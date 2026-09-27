@@ -304,15 +304,16 @@ pub(super) fn verify_batch(
                 json!({"bridge_txn_id":expected.bridge_txn_id,"status":"matching_content_observed","marker":marker,"attribution":"not_established","accounting_effective":voucher_is_accounting_effective(matched)?,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
             } else if matched.cancelled == Some(true) {
                 // Tally drops a cancelled voucher's entries from this read
-                // (protocol reference §9.14 for a gateway cancel; a screen
-                // cancel is captured in fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md),
-                // so its entries never match: it is cancelled, not changed.
+                // (measured for Journals only: protocol reference §9.14, PARTIAL,
+                // for a gateway cancel; a screen cancel is captured in
+                // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
+                // need not match: it is cancelled, not changed.
                 // Only the header is compared, so a re-date before the cancel
                 // still shows, if it stays inside the read window: a voucher
                 // re-dated out of it is not read, so is not found unless another
                 // voucher in the window has its content. The fingerprint branch
-                // above cannot see a cancelled row: with no entries, no build's
-                // fingerprint matches.
+                // above cannot see a cancelled row whose entries were dropped:
+                // with no entries, no build's fingerprint matches.
                 counts
                     .entry("posted_not_effective")
                     .and_modify(|count| *count += 1);
@@ -597,11 +598,12 @@ pub(super) fn duplicates(
                 .or_default()
                 .insert(identity.clone());
         }
-        // Tally drops a cancelled voucher's entries from this read (see
-        // `verify_batch`), so every cancel of one date and type shares a
-        // fingerprint that says nothing of what it recorded (bridge#767). Here,
-        // only its REMOTEID, above, can show it duplicated.
-        if voucher.cancelled != Some(true) {
+        // A cancel whose entries this read dropped (measured for Journals only;
+        // see `verify_batch`) fingerprints as its date and type alone, which
+        // says nothing of what it recorded, so every such cancel of one date
+        // and type would pair (bridge#767). It is left out; a cancelled row
+        // that came back with its entries keeps its fingerprint.
+        if !(voucher.cancelled == Some(true) && voucher.entries.is_empty()) {
             fingerprints
                 .entry(fingerprint.clone())
                 .or_default()

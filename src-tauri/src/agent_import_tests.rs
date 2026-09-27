@@ -834,15 +834,15 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     );
 }
 
-/// A behaviour change of bridge#767, pinned so it is deliberate. A verified
-/// batch voucher A, a cancelled row A′ with A's marker below the pre-import mark
-/// (reachable only through a legacy tag or an amendment lineage), and an
-/// unrelated cancel C of the same date and type. Before bridge#767, A′ and C
-/// paired as a batch duplicate and the batch read verification_incomplete; that
-/// refusal came only from C, since without it the batch read posted_verified.
-/// A cancelled row has no accounting effect, so the verdict no longer depends on C.
+/// Why leaving cancelled rows out of the fingerprint check (bridge#767) changes
+/// no verdict. A cancelled pair could only reach `duplicates` through a batch
+/// row with no entries, and a batch row is the one holder of its marker. So a
+/// cancelled copy A′ carrying verified A's marker, beside an unrelated cancel C
+/// of the same date and type, is refused before any duplicate check, with or
+/// without C. If that admission rule ever loosens, this fails and the verdict
+/// question must be asked again.
 #[test]
-fn a_cancelled_copy_below_the_mark_and_an_unrelated_cancel_do_not_block_a_verified_batch() {
+fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -901,18 +901,18 @@ fn a_cancelled_copy_below_the_mark_and_an_unrelated_cancel_do_not_block_a_verifi
     };
     let copy = cancel("copy-guid", 5, Some("[BRIDGE:txn-001]"));
     let unrelated = cancel("unrelated-guid", 3, None);
-    let result =
-        verify_observed_batch(&line, &[posted.clone(), copy.clone(), unrelated.clone()])
-            .expect("verification result");
-    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
+    for observed in [
+        vec![posted.clone(), copy.clone(), unrelated.clone()],
+        vec![posted.clone(), copy],
+    ] {
+        assert_eq!(
+            verify_observed_batch(&line, &observed),
+            Err("import_verification_tag_ambiguous".into())
+        );
+    }
+    // With the marker only on A, the unrelated cancel does not touch the verdict.
+    let result = verify_observed_batch(&line, &[posted, unrelated]).expect("verification result");
     assert_eq!(result["duplicates"], json!([]), "{result}");
-    assert_eq!(result["unrelated_duplicates_in_window"], json!([]), "{result}");
-    assert_eq!(
-        verification_status(&result, line.vouchers.len()),
-        "posted_verified"
-    );
-    // Without C the verdict was already posted_verified, before and after.
-    let result = verify_observed_batch(&line, &[posted, copy]).expect("verification result");
     assert_eq!(
         verification_status(&result, line.vouchers.len()),
         "posted_verified"
@@ -1260,7 +1260,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         company: None,
         txn_ids: vec!["txn-001".to_string()],
         date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_to: "20260902".to_string(),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1322,7 +1322,8 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     // An optional voucher keeps its entries (observed once, 2026-09-26), so a
     // change to them still diverges. A cancelled one loses them (bridge#758),
     // so only its header is compared: the cancel alone shows no diff, and a
-    // re-date before the cancel still shows.
+    // re-date before the cancel still shows while it stays inside the read
+    // window, which is widened here to hold it.
     let mut changed = observed.clone();
     changed.entries[0].amount = "-12.51".to_string();
     let mut optional = changed.clone();

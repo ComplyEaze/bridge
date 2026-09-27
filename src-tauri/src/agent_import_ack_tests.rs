@@ -1273,7 +1273,10 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         .unwrap();
     let end = start + readback[start..].find("</VOUCHER>").unwrap();
     let block = &readback[start..end];
-    assert!(block.contains("<VOUCHERNUMBER>4</VOUCHERNUMBER>"), "{block}");
+    assert!(
+        block.contains("<VOUCHERNUMBER>4</VOUCHERNUMBER>"),
+        "{block}"
+    );
     let effective = r#"<ISCANCELLED TYPE="Logical">No</ISCANCELLED>"#;
     assert_eq!(block.matches(effective).count(), 1, "{block}");
     let first_entry = block.find("<ALLLEDGERENTRIES.LIST>").unwrap();
@@ -1281,7 +1284,10 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
     let after_entries = block.rfind(closing).unwrap() + closing.len();
     let cancelled_block = format!(
         "{}<ALLLEDGERENTRIES.LIST>     </ALLLEDGERENTRIES.LIST>{}",
-        block[..first_entry].replace(effective, r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#),
+        block[..first_entry].replace(
+            effective,
+            r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#
+        ),
         &block[after_entries..]
     );
     let derived = format!(

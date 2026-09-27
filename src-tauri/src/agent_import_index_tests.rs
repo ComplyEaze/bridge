@@ -237,10 +237,7 @@ fn cancelled_vouchers_of_one_date_and_type_are_not_accounting_duplicates() {
     }
     // The cancel flag, not an empty entry list, leaves a row out: two rows not
     // read as cancelled pair on no entries, without the cancel beside them.
-    let captured_cancel = rows
-        .iter()
-        .find(|row| row.cancelled == Some(true))
-        .unwrap();
+    let captured_cancel = rows.iter().find(|row| row.cancelled == Some(true)).unwrap();
     let mut empty = another_voucher(captured_cancel, "4");
     empty.cancelled = Some(false);
     let empty_twin = another_voucher(&empty, "5");

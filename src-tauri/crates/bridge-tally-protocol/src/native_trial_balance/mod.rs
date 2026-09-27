@@ -6,7 +6,8 @@ use serde::Serialize;
 use std::fmt;
 mod scalar;
 mod wire;
-pub(crate) use scalar::is_currency_composite;
+// One classifier for every reader, shared with `vouchers` (bridge#674).
+pub(crate) use crate::currency_composite::is_currency_composite;
 pub use wire::{parse_native_trial_balance, parse_native_trial_balance_with_currency};
 
 /// One amount exactly as the native collection exposed it.

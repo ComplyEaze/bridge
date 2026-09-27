@@ -1,8 +1,8 @@
 //! Envelope and ledger-row admission for the native Trial Balance collection.
 use super::scalar::*;
 use super::{
-    CurrencyScopedTrialBalance, NativeTrialBalance, NativeTrialBalanceAmount,
-    NativeTrialBalanceError, NativeTrialBalanceRow,
+    is_currency_composite, CurrencyScopedTrialBalance, NativeTrialBalance,
+    NativeTrialBalanceAmount, NativeTrialBalanceError, NativeTrialBalanceRow,
 };
 use crate::native_outstandings::{classify_ledger_currencies, BaseCurrencyName};
 use crate::{

@@ -526,10 +526,10 @@ async fn a_union_bank_statement_parses_without_printed_totals() {
     assert_eq!(result["statement_rows"], 6, "{response}");
     assert_eq!(result["vouchers"], 6);
     assert_eq!(result["cash_questions"], json!([]));
-    let lines = result["suspense_lines"].as_array().unwrap();
-    assert!(lines
-        .iter()
-        .any(|line| line["reason"] == "cash_purpose_not_confirmed" && line["amount"] == "750.50"));
+    assert_eq!(
+        result["suspense_by_reason"]["cash_purpose_not_confirmed"], 1,
+        "{response}"
+    );
     assert_eq!(result["reconciled"]["total_debits"], "13250.50");
     assert_eq!(result["reconciled"]["total_credits"], "3750.50");
     assert_eq!(result["reconciled"]["totals_match_statement"], false);
@@ -682,10 +682,11 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     assert_eq!(summary["cash_questions"], json!([]));
     // Only the unidentified transfer went to suspense; the answered cash line
     // did not.
-    let lines = summary["suspense_lines"].as_array().unwrap();
-    assert_eq!(lines.len(), 1, "{summary}");
-    assert_eq!(lines[0]["reason"], "party_unmapped_or_mapped_to_suspense");
-    assert_ne!(lines[0]["bridge_txn_id"], id.as_str());
+    assert_eq!(
+        summary["suspense_by_reason"],
+        json!({"cash_purpose_not_confirmed": 0, "party_unmapped_or_mapped_to_suspense": 1}),
+        "{summary}"
+    );
 
     // Business cash names a ledger build must find under Cash-in-Hand.
     args["cash_answers"] =
@@ -805,10 +806,9 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
     );
     assert_eq!(summary["suspense_rows"], 300);
     assert_eq!(
-        listed("suspense_lines") + omitted("suspense_lines_omitted"),
+        summary["suspense_by_reason"]["party_unmapped_or_mapped_to_suspense"],
         300
     );
-    assert!(omitted("suspense_lines_omitted") > 0);
     // 300 payers and the one cash party, unmapped payers listed first.
     assert!(omitted("counterparties_omitted") > 0);
     assert_eq!(

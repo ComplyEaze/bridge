@@ -97,7 +97,7 @@ pub(super) fn input_schema() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, total, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. Only SBI 'ATM WDL' withdrawals and Union Bank 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is listed in suspense_lines or, beyond the size bound, counted in suspense_rows. Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, suspense_lines_omitted, skipped_lines_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
+pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, total, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. Only SBI 'ATM WDL' withdrawals and Union Bank 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and each suspense party is in counterparties with its rows and total; a line's own date, amount and label stay in the local file. Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
 
 impl Server {
     pub(super) async fn parse_bank_statement(
@@ -469,19 +469,19 @@ fn summary(
             .collect();
     ledgers.sort_unstable();
     ledgers.dedup();
-    // Every list grows with the statement, so each is bounded, with what was
-    // left out counted; every record stays in the proposals file. The MCP
+    // Row-level content (a line's date, amount or label) stays in the local
+    // file; suspense lines are counted by reason, and each suspense party is
+    // in counterparties with its rows and total. Every list grows with the
+    // statement, so each is bounded, with what was left out counted. The MCP
     // frame carries the result twice, so the lists together take under half:
-    // a quarter for the three a person acts on, in that order, an eighth for
-    // the counterparties (suspense parties first) and a sixteenth for the ledgers.
+    // a quarter for the cash questions, an eighth for the counterparties
+    // (suspense parties first) and a sixteenth for the ledgers.
     let open = records
         .iter()
         .filter(|record| record.disposition == Disposition::NeedsAnswer)
         .count();
     let mut budget = max_bytes / 4;
     let (cash_questions, cash_questions_omitted) = bounded(cash_questions(records), &mut budget);
-    let (suspense_lines, suspense_lines_omitted) = bounded(suspense_lines(records), &mut budget);
-    let (skipped_lines, skipped_lines_omitted) = bounded(skipped_lines(records), &mut budget);
     let (counterparties, counterparties_omitted) = bounded(counterparties, &mut (max_bytes / 8));
     let (ledgers_to_validate, ledgers_to_validate_omitted) = bounded(
         ledgers
@@ -506,10 +506,7 @@ fn summary(
         "vouchers": parsed.build.proposals.len(),
         "skipped": skipped,
         "suspense_rows": records.iter().filter(|record| record.suspense).count(),
-        "suspense_lines": suspense_lines,
-        "suspense_lines_omitted": suspense_lines_omitted,
-        "skipped_lines": skipped_lines,
-        "skipped_lines_omitted": skipped_lines_omitted,
+        "suspense_by_reason": suspense_by_reason(records),
         "cash_questions_open": open,
         "cash_questions": cash_questions,
         "cash_questions_omitted": cash_questions_omitted,
@@ -558,46 +555,19 @@ fn cash_questions(records: &[StatementRecord]) -> Vec<Value> {
         .collect()
 }
 
-/// Every line that posts nothing, and why.
-fn skipped_lines(records: &[StatementRecord]) -> Vec<Value> {
-    records
-        .iter()
-        .filter(|record| record.disposition == Disposition::Skipped)
-        .map(|record| {
-            json!({
-                "bridge_txn_id": record.bridge_txn_id,
-                "row": record.row,
-                "date": record.date,
-                "amount": record.amount,
-                "printed_as": party_name(record.party.clone()),
-                "reason": "mapped_skip",
-                "check": "Carried by the other account's Contra, per the mapping.",
-            })
-        })
-        .collect()
-}
-
-/// Every line sent to the suspense ledger, and why, so none sits there unseen.
-fn suspense_lines(records: &[StatementRecord]) -> Vec<Value> {
-    records
-        .iter()
-        .filter(|record| record.suspense)
-        .map(|record| {
-            json!({
-                "bridge_txn_id": record.bridge_txn_id,
-                "row": record.row,
-                "date": record.date,
-                "amount": record.amount,
-                "printed_as": party_name(record.party.clone()),
-                "ledger": party_name(record.ledger.clone()),
-                "reason": if record.cash_answer.is_some() {
-                    "cash_purpose_not_confirmed"
-                } else {
-                    "party_unmapped_or_mapped_to_suspense"
-                },
-            })
-        })
-        .collect()
+/// How many lines went to the suspense ledger, by why: a person answered
+/// dont_know for a cash line, or a party was unmapped, unidentified or mapped
+/// to the suspense ledger. Counts only: a line's own detail stays local.
+fn suspense_by_reason(records: &[StatementRecord]) -> Value {
+    let suspense = records.iter().filter(|record| record.suspense);
+    let answered = suspense
+        .clone()
+        .filter(|record| record.cash_answer.is_some())
+        .count();
+    json!({
+        "cash_purpose_not_confirmed": answered,
+        "party_unmapped_or_mapped_to_suspense": suspense.count() - answered,
+    })
 }
 
 /// A ledger a person named in answering a bank cash line, which the build

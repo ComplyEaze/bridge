@@ -1627,6 +1627,26 @@ fn assert_only_layout_line_breaks(preview: &str) {
     assert!(!preview.contains(['\u{2028}', '\u{2029}']), "{preview:?}");
 }
 
+/// Text that did not pass review is still shown with nothing invisible: each
+/// character a reader could not see is written as `\uXXXX`.
+#[test]
+fn a_name_shown_without_admission_hides_nothing() {
+    for (name, shown) in [
+        ("Cash", r#""Cash""#),
+        ("Cash\r\n", r#""Cash\r\n""#),
+        ("Ca\u{200d}sh", r#""Ca\u200dsh""#),
+        ("Ca\u{202e}sh", r#""Ca\u202esh""#),
+        ("Ca\u{85}sh", r#""Ca\u0085sh""#),
+        ("Ca\u{2028}sh", r#""Ca\u2028sh""#),
+        ("Ca\u{1}sh", r#""Ca\u0001sh""#),
+        ("Ca\u{e0001}sh", r#""Ca\udb40\udc01sh""#),
+        ("Say \"hi\" \\ bye", r#""Say \"hi\" \\ bye""#),
+        ("रामलाल\u{200c}", r#""रामलाल\u200c""#),
+    ] {
+        assert_eq!(quoted_visibly(name), shown, "{name:?}");
+    }
+}
+
 /// bridge#626 slice 2a: a ledger name ending in one CR LF, as the build admits
 /// it, is shown escaped with a note, and the other ledger is shown as before.
 #[test]

@@ -8,6 +8,7 @@ use super::desktop_journal_review::{
 };
 use super::post::{
     admit_review_text, admit_saved_journal, admit_saved_journal_integrity, line_break_note,
+    quoted_visibly,
 };
 use super::*;
 use crate::tally::{TallyConfig, TallyRuntime};
@@ -143,7 +144,8 @@ impl DesktopJournalService {
         // Each ledger as the native dialog shows it (bridge#626): quoted, so a
         // name ending in a line break never renders as its twin without one.
         // A fresh batch passed this admission above. A dispatched one is shown
-        // for reconciliation whatever it holds, quoted the same way, unnoted.
+        // for reconciliation whatever it holds: quoted, with every character a
+        // reader could not see written as \uXXXX, and no note.
         let (ledgers, ledger_note) = match admit_review_text(
             std::iter::empty::<&str>(),
             voucher.entries.iter().map(|entry| entry.ledger.as_str()),
@@ -156,7 +158,7 @@ impl DesktopJournalService {
                 voucher
                     .entries
                     .iter()
-                    .map(|entry| serde_json::to_string(&entry.ledger).unwrap_or_default())
+                    .map(|entry| quoted_visibly(&entry.ledger))
                     .collect(),
                 None,
             ),

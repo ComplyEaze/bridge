@@ -518,12 +518,13 @@ async fn review_refuses_fresh_unreviewable_text_but_retains_dispatched_reconcili
             uuid::Uuid::new_v4(),
         ))
         .unwrap();
-    assert!(
-        service
-            .review_selected_xml(xml.as_bytes())
-            .unwrap()
-            .dispatched
-    );
+    let dispatched = service.review_selected_xml(xml.as_bytes()).unwrap();
+    assert!(dispatched.dispatched);
+    // Shown for reconciliation, but never with the hidden joiner raw.
+    let shown = &dispatched.details.entries[0].ledger;
+    assert_eq!(shown, r#""Cash\u200d""#);
+    assert!(!shown.contains('\u{200d}'), "{shown:?}");
+    assert_eq!(dispatched.details.ledger_note, None);
     let reconciliation = service
         .reconcile(&line.batch_id, &line.sha256, &line.company_guid)
         .await;

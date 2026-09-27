@@ -1826,6 +1826,36 @@ pub(super) fn admit_review_text<'a>(
     }
 }
 
+/// A name quoted as [`ReviewLedgerName`] shows it, for text that did not
+/// pass review admission: every character a reader could not see, or that
+/// would move or reorder the text (control, line or paragraph separator,
+/// format or default-ignorable), is written as `\uXXXX`, so none reaches the
+/// screen raw.
+pub(super) fn quoted_visibly(name: &str) -> String {
+    let mut shown = String::with_capacity(name.len() + 2);
+    shown.push('"');
+    for character in name.chars() {
+        let mut buffer = [0_u8; 4];
+        match character {
+            '"' => shown.push_str("\\\""),
+            '\\' => shown.push_str("\\\\"),
+            '\n' => shown.push_str("\\n"),
+            '\r' => shown.push_str("\\r"),
+            '\t' => shown.push_str("\\t"),
+            _ if has_unsafe_review_layout_character(character.encode_utf8(&mut buffer))
+                || has_unreviewable_format_character(character.encode_utf8(&mut buffer)) =>
+            {
+                for unit in character.encode_utf16(&mut [0_u16; 2]) {
+                    shown.push_str(&format!("\\u{unit:04x}"));
+                }
+            }
+            _ => shown.push(character),
+        }
+    }
+    shown.push('"');
+    shown
+}
+
 pub(super) fn has_unsafe_review_layout_character(value: &str) -> bool {
     value
         .chars()

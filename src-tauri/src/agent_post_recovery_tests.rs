@@ -30,6 +30,14 @@ async fn stand_in(withdrawal: tokio_util::sync::CancellationToken) -> ToolRespon
     stand_in_response()
 }
 
+/// Awaits a call whose post is withdrawn. A withdrawal that no longer stops the
+/// post fails the test here instead of hanging the suite.
+async fn stops<F: std::future::Future>(call: F) -> F::Output {
+    tokio::time::timeout(std::time::Duration::from_secs(5), call)
+        .await
+        .expect("a withdrawn post stops once its token is cancelled")
+}
+
 const BATCH: &str = "bridge-00000000-0000-4000-8000-000000000001";
 const COMPANY: &str = "00000000-0000-4000-8000-000000000002";
 
@@ -240,7 +248,7 @@ async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
         .await
         .unwrap();
     let cancellation = tokio_util::sync::CancellationToken::new();
-    let result = await_post(
+    let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -252,7 +260,7 @@ async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
         &mut Framer::default(),
         &mut std::collections::VecDeque::new(),
         &mut Vec::new(),
-    )
+    ))
     .await
     .unwrap();
     assert!(result.is_none());
@@ -383,7 +391,7 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
     let cancellation = tokio_util::sync::CancellationToken::new();
-    assert!(await_post(
+    assert!(stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -395,7 +403,7 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
         &mut Framer::default(),
         &mut pending,
         &mut output
-    )
+    ))
     .await
     .unwrap()
     .is_none());

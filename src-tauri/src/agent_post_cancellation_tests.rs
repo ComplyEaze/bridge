@@ -31,6 +31,14 @@ async fn stand_in(withdrawal: tokio_util::sync::CancellationToken) -> ToolRespon
     stand_in_response()
 }
 
+/// Awaits a call whose post is withdrawn. A withdrawal that no longer stops the
+/// post fails the test here instead of hanging the suite.
+async fn stops<F: std::future::Future>(call: F) -> F::Output {
+    tokio::time::timeout(std::time::Duration::from_secs(5), call)
+        .await
+        .expect("a withdrawn post stops once its token is cancelled")
+}
+
 fn server(path: &Path) -> Server {
     Server::new(Settings {
         endpoint: TallyEndpointConfig {
@@ -286,7 +294,7 @@ async fn cancellation_before_intent_withdraws_the_post() {
     client.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n").await.unwrap();
     // Withdrawn, the post is awaited until it stops, then answers as cancelled.
     let future = stand_in(cancellation.clone());
-    assert!(await_post(
+    assert!(stops(await_post(
         future,
         PostRequest {
             id: &json!(7),
@@ -298,7 +306,7 @@ async fn cancellation_before_intent_withdraws_the_post() {
         &mut framer,
         &mut pending,
         &mut output,
-    )
+    ))
     .await
     .unwrap()
     .is_none());
@@ -310,7 +318,7 @@ async fn disconnect_before_intent_withdraws_the_post() {
     let mut reader = BufReader::new(&b""[..]);
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
-    let result = await_post(
+    let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -322,7 +330,7 @@ async fn disconnect_before_intent_withdraws_the_post() {
         &mut Framer::default(),
         &mut std::collections::VecDeque::new(),
         &mut Vec::new(),
-    )
+    ))
     .await;
     assert_eq!(result.err().as_deref(), Some("stdio_client_disconnected"));
 }
@@ -366,7 +374,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut output = Vec::new();
-    let result = await_post(
+    let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -378,7 +386,7 @@ async fn queue_overflow_is_refused_in_band_and_waits_for_cancellation() {
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await;
     assert!(result.unwrap().is_none());
     assert_eq!(pending.len(), 8);
@@ -406,7 +414,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
     let mut server = server(directory.path());
     server.settings.max_bytes = 256;
     let mut output = Vec::new();
-    let result = await_post(
+    let result = stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -418,7 +426,7 @@ async fn queue_overflow_refuses_an_oversized_id_without_ending_the_post_wait() {
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await;
     assert!(result.unwrap().is_none());
     assert_eq!(pending.len(), 8);
@@ -440,7 +448,7 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path());
     let mut output = Vec::new();
-    assert!(await_post(
+    assert!(stops(await_post(
         stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
@@ -452,7 +460,7 @@ async fn queue_overflow_tool_request_has_a_prepared_and_completed_refusal_receip
         &mut Framer::default(),
         &mut pending,
         &mut output,
-    )
+    ))
     .await
     .unwrap()
     .is_none());
@@ -547,9 +555,7 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
         let batch_id = args["batch_id"].as_str().unwrap().to_string();
         let _held = server.post_approvals.redeeming_for_test(&batch_id);
         let cancellation = tokio_util::sync::CancellationToken::new();
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            await_post(
+        let _ = stops(await_post(
             stand_in(cancellation.clone()),
             PostRequest {
                 id: &json!(7),
@@ -561,11 +567,8 @@ async fn a_withdrawn_post_revokes_its_approval_and_cancels_its_operations() {
             &mut Framer::default(),
             &mut std::collections::VecDeque::new(),
             &mut Vec::new(),
-        )
-        ,
-        )
-        .await
-        .expect("a withdrawn post stops once its token is cancelled");
+        ))
+        .await;
         assert!(cancellation.is_cancelled());
         assert!(!server.post_approvals.holds(&batch_id));
     }

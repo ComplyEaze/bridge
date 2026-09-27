@@ -374,7 +374,11 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
         }
         withdrawn.cancel();
     };
-    let (response, ()) = tokio::join!(post, cancel);
+    // Bounded: a call that ends before its dialog opens leaves `cancel` waiting.
+    let (response, ()) =
+        tokio::time::timeout(Duration::from_secs(5), async { tokio::join!(post, cancel) })
+            .await
+            .expect("the withdrawn call stops");
     let observed = sent(simulator);
     assert_eq!(
         result(&response)["error"]["code"],

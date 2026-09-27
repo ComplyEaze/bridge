@@ -1673,11 +1673,14 @@ fn native_preview_refuses_every_other_line_break_and_every_other_field() {
         let (mut line, endpoint) = batch();
         line.vouchers[0].entries[0].ledger = ledger.into();
         refresh_batch_sha256(&mut line);
+        // The dialog's own guard, and the whole admission, which may refuse
+        // earlier (the build's checks run first).
         assert_eq!(
-            admit_saved_journal(&line, &endpoint).unwrap_err(),
-            code,
+            admit_fresh_saved_voucher(&line, &endpoint).err().as_deref(),
+            Some(code),
             "{ledger:?}"
         );
+        assert!(admit_saved_journal(&line, &endpoint).is_err(), "{ledger:?}");
     }
     for field in ["company", "narration", "reference"] {
         let (mut line, endpoint) = batch();
@@ -1689,10 +1692,11 @@ fn native_preview_refuses_every_other_line_break_and_every_other_field() {
         }
         refresh_batch_sha256(&mut line);
         assert_eq!(
-            admit_saved_journal(&line, &endpoint).unwrap_err(),
-            "import_review_layout_text",
+            admit_fresh_saved_voucher(&line, &endpoint).err().as_deref(),
+            Some("import_review_layout_text"),
             "{field}"
         );
+        assert!(admit_saved_journal(&line, &endpoint).is_err(), "{field}");
     }
     // A layout character anywhere is reported before a format one anywhere.
     let (mut line, endpoint) = batch();
@@ -1700,8 +1704,8 @@ fn native_preview_refuses_every_other_line_break_and_every_other_field() {
     line.vouchers[0].entries[1].ledger = "Cash\n".into();
     refresh_batch_sha256(&mut line);
     assert_eq!(
-        admit_saved_journal(&line, &endpoint).unwrap_err(),
-        "import_review_layout_text"
+        admit_fresh_saved_voucher(&line, &endpoint).err().as_deref(),
+        Some("import_review_layout_text")
     );
 }
 

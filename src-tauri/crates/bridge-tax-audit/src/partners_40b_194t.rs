@@ -380,11 +380,33 @@ fn walk<'a>(
             .map(|l| i128::from(l.amount_paise))
             .collect();
         if lines_here.is_empty() {
-            let touches_capital = v.lines.iter().any(|l| {
-                (capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))
-                    && l.amount_paise != 0
-            });
-            if !touches_capital {
+            let any_capital = |n: &str| capital.contains(n) || all_capitals.contains(n);
+            let touches_capital = v
+                .lines
+                .iter()
+                .any(|l| any_capital(l.ledger.as_str()) && l.amount_paise != 0);
+            // Another partner's capital on the voucher leaves it out only where the side opposite
+            // this partner's interest and remuneration lines, apart from TDS, is partners' capitals
+            // alone (the shared-TDS rule's test for whose TDS it is). A bank, a payable, or nothing
+            // but TDS on that side may be this partner's payment: listed. Lines netting to nil on
+            // those ledgers leave no side: the rule before.
+            let own_net: i128 = v
+                .lines
+                .iter()
+                .filter(|l| own_ledgers.contains(l.ledger.as_str()))
+                .map(|l| i128::from(l.amount_paise))
+                .sum();
+            let side: BTreeSet<&str> = v
+                .lines
+                .iter()
+                .filter(|l| {
+                    i128::from(l.amount_paise) * own_net < 0 && !tds_ledgers.contains(&l.ledger)
+                })
+                .map(|l| l.ledger.as_str())
+                .collect();
+            let partners_alone =
+                own_net == 0 || (!side.is_empty() && side.iter().all(|n| any_capital(n)));
+            if !(touches_capital && partners_alone) {
                 let on = |ledger: Option<&str>| {
                     ledger.is_some_and(|n| {
                         v.lines.iter().any(|l| l.ledger == n && l.amount_paise != 0)
@@ -1051,7 +1073,8 @@ also carrying a line on their interest_ledger.{unusable}"
         if !off.is_empty() {
             let mut limits = vec![format!(
                 "{} voucher(s) post to this partner's interest or remuneration ledger without \
-touching any partner's capital ({}): paid by bank or cash, credited to a payable, or a reclass -- \
+touching this partner's capital, and are not booked against partners' capitals alone ({}): paid by \
+bank or cash, credited to a payable, or a reclass -- \
 the books do not say which. They are not counted in the interest or remuneration credited, or in \
 the s.194T base; any that is a payment or credit to this partner is missing from them.",
                 off.len(),
@@ -1067,8 +1090,8 @@ is is not judged either.",
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/off_capital/{h}"),
                 clauses: vec!["s.194T".to_string(), "s.40(b)".to_string()],
-                title: "Vouchers on a partner's interest or remuneration ledger that touch no \
-partner's capital: not counted for this partner"
+                title: "Vouchers on a partner's interest or remuneration ledger not booked against \
+partners' capitals alone: not counted for this partner"
                     .to_string(),
                 facts: Vec::new(),
                 evidence: voucher_refs(off),
@@ -1201,8 +1224,8 @@ even under the limit.",
             }
             if !w.off_capital_interest_vouchers.is_empty() {
                 reasons.push(format!(
-                    "{} voucher(s) post to this partner's interest ledger without touching any \
-partner's capital ({}): not counted in the interest credited, which may therefore be understated \
+                    "{} voucher(s) post to this partner's interest ledger without touching this \
+partner's capital, and are not booked against partners' capitals alone ({}): not counted in the interest credited, which may therefore be understated \
 (see the off-capital finding).",
                     w.off_capital_interest_vouchers.len(),
                     labels(&w.off_capital_interest_vouchers)
@@ -3128,6 +3151,176 @@ is net of an unknown part of it."
         for key in ["partner_a", "partner_b"] {
             assert_eq!(tds_seen(&r, key), "yes", "{key}");
         }
+    }
+
+    // ---- item 7's off-capital rule, with no TDS on the voucher (queue item 10, 28-Sep) ----
+
+    #[test]
+    fn a_shared_interest_voucher_crediting_one_partner_and_a_bank_is_listed_for_the_other() {
+        // Shared interest 1,20,000 credited 60,000 to A's capital and paid 60,000 by bank, no
+        // TDS. The bank half may be B's interest: B lists the voucher and is not computed.
+        // Before, a non-zero line on any partner's capital left it out of B's off-capital check,
+        // so none of B's findings named it: a silent miss for B.
+        let s2 = voucher(
+            "s2",
+            &[
+                ("Interest to Partners", 12_000_000),
+                ("Partner A", -6_000_000),
+                ("Bank", -6_000_000),
+            ],
+        );
+        let r = go_shared(vec![s2], &format!("{SHARED}{DEED}"), &[]);
+        let hb = hash8("partner_b");
+        let off = found(&r, &format!("off_capital/{hb}"));
+        assert_eq!(off.len(), 1);
+        assert!(off[0].evidence.iter().any(|e| e.id == "s2"));
+        assert!(
+            off[0]
+                .limits
+                .iter()
+                .any(|x| x.contains("shared by partners")),
+            "{:?}",
+            off[0].limits
+        );
+        assert!(
+            off[0]
+                .limits
+                .iter()
+                .any(|x| x.contains("not booked against partners' capitals alone")),
+            "{:?}",
+            off[0].limits
+        );
+        let nc = found(&r, &format!("s40b_not_computed/{hb}"));
+        assert_eq!(nc.len(), 1);
+        assert!(nc[0].evidence.iter().any(|e| e.id == "s2"));
+        // A's own capital is on it: A reads it, not as off-capital.
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_a"))).is_empty());
+    }
+
+    #[test]
+    fn own_interest_paid_partly_through_another_partners_capital_and_a_bank_is_listed() {
+        let own_b = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+[partner_b]\ncapital_ledgers = [\"Partner B\"]\ninterest_ledger = \"Interest to B\"\n";
+        let o2 = voucher(
+            "o2",
+            &[
+                ("Interest to B", 5_000_000),
+                ("Partner A", -2_000_000),
+                ("Bank", -3_000_000),
+            ],
+        );
+        let r = go_shared(vec![o2], own_b, &["Interest to B"]);
+        let off = found(&r, &format!("off_capital/{}", hash8("partner_b")));
+        assert_eq!(off.len(), 1);
+        assert!(off[0].evidence.iter().any(|e| e.id == "o2"));
+        assert!(
+            !off[0]
+                .limits
+                .iter()
+                .any(|x| x.contains("shared by partners")),
+            "{:?}",
+            off[0].limits
+        );
+    }
+
+    #[test]
+    fn a_shared_interest_voucher_against_one_partners_capital_and_tds_is_not_listed_for_the_other()
+    {
+        // The TDS is set aside: the rest of that side is A's capital alone, so it is A's (V2 on
+        // #820, P2-2).
+        let a2 = voucher(
+            "a2",
+            &[
+                ("Interest to Partners", 6_000_000),
+                ("Partner A", -5_400_000),
+                ("TDS Payable", -600_000),
+            ],
+        );
+        let r = go_shared(vec![a2], &format!("{SHARED}{DEED}"), &[]);
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
+    fn a_joint_journal_without_tds_is_not_off_capital_for_a_partner_it_does_not_credit() {
+        let j2 = voucher(
+            "j2",
+            &[
+                ("Interest to Partners", 9_000_000),
+                ("Partner A", -4_500_000),
+                ("Partner C", -4_500_000),
+            ],
+        );
+        let r = go_shared(
+            vec![j2],
+            &format!("{SHARED}{PARTNER_C}{DEED}"),
+            &["Partner C"],
+        );
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
+    fn a_reversal_through_one_partners_capital_is_not_listed_for_the_other() {
+        // A's capital debited against the shared ledger credited: the side opposite the interest
+        // is A's capital alone, so it is A's reversal.
+        let r2 = voucher(
+            "r2",
+            &[
+                ("Partner A", 3_000_000),
+                ("Interest to Partners", -3_000_000),
+            ],
+        );
+        let r = go_shared(vec![r2], &format!("{SHARED}{DEED}"), &[]);
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
+    fn a_shared_interest_voucher_whose_other_side_is_only_tds_beside_a_capital_is_listed() {
+        // Interest against TDS alone, with A's capital debited on the same side as the interest:
+        // nothing but TDS is on the interest's other side, so it names no one and is listed for B
+        // (an empty side is no partner's).
+        let t2 = voucher(
+            "t2",
+            &[
+                ("Interest to Partners", 600_000),
+                ("Partner A", 100_000),
+                ("TDS Payable", -700_000),
+            ],
+        );
+        let r = go_shared(vec![t2], &format!("{SHARED}{DEED}"), &[]);
+        assert!(!found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
+    fn shared_lines_netting_to_nil_keep_the_rule_before() {
+        // A reclass on the shared ledger netting to nil leaves no side: a capital touched leaves
+        // it out, as before.
+        let n2 = voucher(
+            "n2",
+            &[
+                ("Interest to Partners", 500_000),
+                ("Interest to Partners", -500_000),
+                ("Partner A", 100_000),
+                ("Bank", -100_000),
+            ],
+        );
+        let r = go_shared(vec![n2], &format!("{SHARED}{DEED}"), &[]);
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
+    fn a_shared_remuneration_voucher_crediting_one_partner_and_a_bank_is_listed_for_the_other() {
+        let m2 = voucher(
+            "m2",
+            &[
+                ("Remuneration to Partners", 10_000_000),
+                ("Partner A", -5_000_000),
+                ("Bank", -5_000_000),
+            ],
+        );
+        let r = go_shared(vec![m2], &format!("{SHARED}{DEED}"), &[]);
+        let off = found(&r, &format!("off_capital/{}", hash8("partner_b")));
+        assert_eq!(off.len(), 1);
+        assert!(off[0].evidence.iter().any(|e| e.id == "m2"));
     }
 
     #[test]

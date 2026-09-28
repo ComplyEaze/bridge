@@ -542,6 +542,16 @@
       "evidence": [
         {
           "kind": "voucher",
+          "id": "b1",
+          "label": "Journal b1 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "b2",
+          "label": "Journal b2 on 2025-10-01"
+        },
+        {
+          "kind": "voucher",
           "id": "b3",
           "label": "Journal b3 on 2025-11-01"
         },
@@ -551,12 +561,12 @@
           "label": "Journal b4 on 2025-12-01"
         }
       ],
-      "title_sha256_16": "7bf079205546fe6d",
-      "title_text": "Vouchers on a partner's interest or remuneration ledger that touch no partner's capital: not counted for this partner",
-      "limits_sha256_16": "dd0e3704aa537081",
+      "title_sha256_16": "dc1c799e17716f5b",
+      "title_text": "Vouchers on a partner's interest or remuneration ledger not booked against partners' capitals alone: not counted for this partner",
+      "limits_sha256_16": "f24581e0cd5c5751",
       "limits_text": [
-        "2 voucher(s) post to this partner's interest or remuneration ledger without touching any partner's capital (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): paid by bank or cash, credited to a payable, or a reclass -- the books do not say which. They are not counted in the interest or remuneration credited, or in the s.194T base; any that is a payment or credit to this partner is missing from them.",
-        "2 of them are on a ledger shared by partners, so whose each of those is is not judged either."
+        "4 voucher(s) post to this partner's interest or remuneration ledger without touching this partner's capital, and are not booked against partners' capitals alone (Journal b1 on 2026-03-31, Journal b2 on 2025-10-01, Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): paid by bank or cash, credited to a payable, or a reclass -- the books do not say which. They are not counted in the interest or remuneration credited, or in the s.194T base; any that is a payment or credit to this partner is missing from them.",
+        "4 of them are on a ledger shared by partners, so whose each of those is is not judged either."
       ],
       "ask_client_sha256_16": "7b2531111c47fcf5",
       "ask_client_text": [
@@ -583,11 +593,11 @@
           "label": "Journal b4 on 2025-12-01"
         }
       ],
-      "title_sha256_16": "7bf079205546fe6d",
-      "title_text": "Vouchers on a partner's interest or remuneration ledger that touch no partner's capital: not counted for this partner",
-      "limits_sha256_16": "dd0e3704aa537081",
+      "title_sha256_16": "dc1c799e17716f5b",
+      "title_text": "Vouchers on a partner's interest or remuneration ledger not booked against partners' capitals alone: not counted for this partner",
+      "limits_sha256_16": "976abce7c78596eb",
       "limits_text": [
-        "2 voucher(s) post to this partner's interest or remuneration ledger without touching any partner's capital (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): paid by bank or cash, credited to a payable, or a reclass -- the books do not say which. They are not counted in the interest or remuneration credited, or in the s.194T base; any that is a payment or credit to this partner is missing from them.",
+        "2 voucher(s) post to this partner's interest or remuneration ledger without touching this partner's capital, and are not booked against partners' capitals alone (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): paid by bank or cash, credited to a payable, or a reclass -- the books do not say which. They are not counted in the interest or remuneration credited, or in the s.194T base; any that is a payment or credit to this partner is missing from them.",
         "2 of them are on a ledger shared by partners, so whose each of those is is not judged either."
       ],
       "ask_client_sha256_16": "7b2531111c47fcf5",
@@ -690,10 +700,10 @@
       ],
       "title_sha256_16": "1bf0ea7c56ab393c",
       "title_text": "Payments/credits to a partner over the s.194T threshold, with TDS seen on its vouchers: which credits it covers, and its deposit, are the CA's to determine",
-      "limits_sha256_16": "86ca8b01b18a871d",
+      "limits_sha256_16": "9c7ccdaba7bb3903",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
-        "2 voucher(s) touching this partner are not read exactly (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): this base may be wrong in either direction.",
+        "4 voucher(s) touching this partner are not read exactly (Journal b1 on 2026-03-31, Journal b2 on 2025-10-01, Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): this base may be wrong in either direction.",
         "TDS of ₹4,700 (net) is seen on 2 voucher(s) touching this partner: Journal a2 on 2026-03-31, Journal a3 on 2026-03-31.",
         "TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared by partners whose TDS is not booked against partners' capitals alone: Journal b4 on 2025-12-01. Which partner's TDS they are is not judged."
       ],
@@ -859,6 +869,16 @@
       "evidence": [
         {
           "kind": "voucher",
+          "id": "b1",
+          "label": "Journal b1 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "b2",
+          "label": "Journal b2 on 2025-10-01"
+        },
+        {
+          "kind": "voucher",
           "id": "b3",
           "label": "Journal b3 on 2025-11-01"
         },
@@ -870,10 +890,10 @@
       ],
       "title_sha256_16": "464e668e461c33ef",
       "title_text": "s.40(b) not computed for partner (tag 379fc0d5): its interest credited cannot be read exactly; the CA computes it",
-      "limits_sha256_16": "66ebe608e0c6d46f",
+      "limits_sha256_16": "1eaaa8f0c295f0b8",
       "limits_text": [
         "This test computes the s.40(b) excess for no partner: its reading of a partner's interest from the books can miss or misread some bookings (another partner's interest or remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, the capital accounts and the interest credited. What this test could see is named below, and the interest credited and allowable-interest figures are working figures only.",
-        "2 voucher(s) post to this partner's interest ledger without touching any partner's capital (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): not counted in the interest credited, which may therefore be understated (see the off-capital finding).",
+        "4 voucher(s) post to this partner's interest ledger without touching this partner's capital, and are not booked against partners' capitals alone (Journal b1 on 2026-03-31, Journal b2 on 2025-10-01, Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): not counted in the interest credited, which may therefore be understated (see the off-capital finding).",
         "No s.40(b) excess is stated for this partner, and none is listed in clause 21(c). Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
       ],
       "ask_client_sha256_16": "c81c446f1191f54a",
@@ -954,7 +974,7 @@
       ],
       "title_sha256_16": "da2fd34c172872b6",
       "title_text": "s.40(b) not computed for partner (tag b1fa6f10): its interest credited cannot be read exactly; the CA computes it",
-      "limits_sha256_16": "03ca1883ae451ded",
+      "limits_sha256_16": "b5f9cf2e35303cdb",
       "limits_text": [
         "This test computes the s.40(b) excess for no partner: its reading of a partner's interest from the books can miss or misread some bookings (another partner's interest or remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, the capital accounts and the interest credited. What this test could see is named below, and the interest credited and allowable-interest figures are working figures only.",
         "1 voucher(s) on this partner's capital are not of the plain shape this test reads exactly (Journal b1 on 2026-03-31): this partner's own interest or remuneration ledger debited, its own capital credited, and TDS on a ledger classified as TDS payable, balanced. Each carries a line this test does not read as plain, so the interest counted may be wrong in either direction.",
@@ -962,7 +982,7 @@
         "1 interest voucher(s) also credit a ledger this test does not read (Journal b2 on 2025-10-01; ledger tag(s) c01700fb): the partner may be credited net of it, so the interest counted may be understated. If the ledger is TDS on this partner's interest alone, classify it as TDS payable in the client's statutory dues and the interest is counted gross; on a voucher that credits several partners the TDS is not divided, and if it is a payable, a round-off or a payment, the CA reads the interest from the voucher.",
         "1 voucher(s) carry both the interest and the remuneration ledger and are not split (Journal b1 on 2026-03-31): each credits another ledger as well, debits this partner's capital, or reverses such a voucher. The books do not show which part is interest, so the interest counted may be wrong in either direction.",
         "1 interest or remuneration voucher(s) also debit this partner's capital (Journal b2 on 2025-10-01): the debit may be TDS booked through the capital or a withdrawal, which the books do not distinguish. It is kept out of the capital walk, so the allowable interest may be wrong; if it is a withdrawal, the interest counted and the s.194T base are read net of it and may be understated, even under the limit.",
-        "2 voucher(s) post to this partner's interest ledger without touching any partner's capital (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): not counted in the interest credited, which may therefore be understated (see the off-capital finding).",
+        "2 voucher(s) post to this partner's interest ledger without touching this partner's capital, and are not booked against partners' capitals alone (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): not counted in the interest credited, which may therefore be understated (see the off-capital finding).",
         "No s.40(b) excess is stated for this partner, and none is listed in clause 21(c). Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
       ],
       "ask_client_sha256_16": "6e6e8ac5def680d9",

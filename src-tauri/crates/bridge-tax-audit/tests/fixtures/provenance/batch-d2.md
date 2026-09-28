@@ -42,6 +42,16 @@ branch the real book does not reach. This bends the two-book bar; the owner may 
   interest ledger (its interest counted, and asked for as all disallowed) and one without (its own title, no
   s.40(b) question); the firm total withheld.
 
+## Re-pin at the off-capital rule (Lane E3, 2026-09-28, last)
+
+At `c0b7e2103279589df984a3bb9dc77faa3e348b5c` (the reference's main) a voucher on a partner's interest or remuneration ledger that touches another partner's
+capital, but not this partner's, is left out of the walk only where the side opposite this partner's interest and
+remuneration lines, apart from the TDS, is partners' capitals alone; otherwise it is listed as off-capital (a bank, a
+payable or nothing but TDS on that side may be this partner's payment). Lines netting to nil keep the rule before. The
+off-capital title, limit and not-computed reason say "not booked against partners' capitals alone". The goldens of
+`partners_firm_deed` (a new off-capital finding) and `partners_tds_mixed` (off-capital evidence and texts) are
+regenerated there; every other partners golden regenerates byte-identical. The books are unchanged.
+
 ## Re-pin at the s.194T TDS rule (Lane E3, 2026-09-28, later)
 
 At `38846495ef3ded7d6504ef8cf75ee18e5b562675` (the reference's main) a zero line never touches a ledger; a TDS voucher on a ledger shared by partners is listed for
@@ -109,11 +119,11 @@ that commit with no client data, under Python 3.13, with ENGINE the archive:
 | `partners_firm_deed.json` | 5,704 | `c660779bcef45cec82a2c495068262cd0f58ff9f8efa1f75e62f76ce26fba8ae` | `edge-books/partners_firm_deed.json` |
 | `partners_llp_no_deed.json` | 3,670 | `890f8981cc2676050db816d31857f3549f192dceef2fe9fab95cad2dc169cee8` | `edge-books/partners_llp_no_deed.json` |
 | `partners_not_applicable.json` | 2,796 | `c5141157e39743f91fa0ba1817af82da293537d2bc510de9e932d5a395f9becb` | `edge-books/partners_not_applicable.json` |
-| `edge.partners_firm_deed.partners_40b_194t.json` | 32,926 | `96c78196dec1b7e8ea34f5101eeff225ef2746154bcef30a327e223c61ae9ba4` | `golden/edge.partners_firm_deed.partners_40b_194t.json` |
+| `edge.partners_firm_deed.partners_40b_194t.json` | 34,950 | `bbe06e80b04477a8519857c4a6c66556bcd9bb0009f15686282e8bca6301d194` | `golden/edge.partners_firm_deed.partners_40b_194t.json` |
 | `edge.partners_llp_no_deed.partners_40b_194t.json` | 25,299 | `fc735f7c6882fddf5d50ef52bfc6ea27d73249e7ded02528396e7a25836d278d` | `golden/edge.partners_llp_no_deed.partners_40b_194t.json` |
 | `edge.partners_not_applicable.partners_40b_194t.json` | 1,049 | `d03a931902fd87eb43fcf832cc2bb5297e03da9e34d7dfb0b3a4c51c57677e73` | `golden/edge.partners_not_applicable.partners_40b_194t.json` |
 | `synthetic.partners_40b_194t.json` | 1,605 | `671f8ecaa00a79a50499fa1853abfe156c08c48ded2496210c330fb956fae1c5` | `golden/synthetic.partners_40b_194t.json` |
 | `partners_tds_mixed.json` | 7,336 | `6a5722722fea285506982aaaebd8afc9fa70defb77e26faf3ed6ab0de9baf9e8` | `edge-books/partners_tds_mixed.json` |
-| `edge.partners_tds_mixed.partners_40b_194t.json` | 50,861 | `1021c4ae1ba92d6a6754a0fbf75ff1f18216730fed9b04c528c4cb7657b6c66b` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |
+| `edge.partners_tds_mixed.partners_40b_194t.json` | 51,729 | `57c6f2f0d10fd7a49bb7507e3d2ce661998b7b87b25004de6457e0ee6828f963` | `golden/edge.partners_tds_mixed.partners_40b_194t.json` |
 | `partners_deed_no_interest.json` | 3,935 | `38e10d442f3fb66572909c4dab815b39d648b878a263cde8edcb95ddb4128a92` | `edge-books/partners_deed_no_interest.json` |
 | `edge.partners_deed_no_interest.partners_40b_194t.json` | 21,981 | `57a3f63896ee617b024356bd710fc68d312e056f3783788eec912fb8170f9968` | `golden/edge.partners_deed_no_interest.partners_40b_194t.json` |

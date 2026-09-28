@@ -6742,5 +6742,29 @@
   "file": "src/partners_40b_194t.rs",
   "from": "            evidence.extend(unattributed.clone());",
   "to": "            let _ = &unattributed;"
+ },
+ {
+  "id": "PR-63",
+  "by": "author",
+  "what": "partners: off-capital side check always partners' alone (the rule before)",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            let partners_alone =\n                own_net == 0 || (!side.is_empty() && side.iter().all(|n| any_capital(n)));",
+  "to": "            let partners_alone = true;"
+ },
+ {
+  "id": "PR-64",
+  "by": "author",
+  "what": "partners: off-capital net-nil fallback dropped",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            let partners_alone =\n                own_net == 0 || (!side.is_empty() && side.iter().all(|n| any_capital(n)));",
+  "to": "            let partners_alone =\n                !side.is_empty() && side.iter().all(|n| any_capital(n));"
+ },
+ {
+  "id": "PR-65",
+  "by": "author",
+  "what": "partners: off-capital non-empty side requirement dropped",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            let partners_alone =\n                own_net == 0 || (!side.is_empty() && side.iter().all(|n| any_capital(n)));",
+  "to": "            let partners_alone =\n                own_net == 0 || side.iter().all(|n| any_capital(n));"
  }
 ]

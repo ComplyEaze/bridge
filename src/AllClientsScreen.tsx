@@ -7,6 +7,7 @@ import { applyClientGroupLabel, ClientGroupLabelSaveSequence, ClientGroupLabels,
 import {
   outstandingsAgeingAnchorLabel,
   outstandingsPartialState,
+  type ExcludedCurrencyLedger,
   type OutstandingsAgeingAnchor,
 } from "./outstandings-copy";
 import {
@@ -56,6 +57,8 @@ type LoadResult =
       requested_as_of_yyyymmdd?: string;
       tally_as_of_yyyymmdd?: string;
       foreign_currency_ledger_name?: string;
+      foreign_currency_ledgers_excluded?: Array<ExcludedCurrencyLedger>;
+      base_currency_ledgers_mixed_excluded?: Array<string>;
     };
 
 type Entry = {
@@ -301,6 +304,8 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
           requestedAsOf: entry.result.state === "partial" ? entry.result.requested_as_of_yyyymmdd : undefined,
           tallyAsOf: entry.result.state === "partial" ? entry.result.tally_as_of_yyyymmdd : undefined,
           foreignCurrencyLedgerName: entry.result.state === "partial" ? entry.result.foreign_currency_ledger_name : undefined,
+          excludedLedgers: entry.result.state === "partial" ? entry.result.foreign_currency_ledgers_excluded : undefined,
+          mixedLedgers: entry.result.state === "partial" ? entry.result.base_currency_ledgers_mixed_excluded : undefined,
           receivable: complete ? amountOf(complete.report.receivable_total) : null,
           overdue: complete ? amountOf(complete.report.ageing.days_90_plus) : null,
           unallocated: complete ? amountOf(complete.unallocated_total) : null,
@@ -409,6 +414,8 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
         row.requestedAsOf,
         row.tallyAsOf,
         row.foreignCurrencyLedgerName,
+        row.excludedLedgers,
+        row.mixedLedgers,
       )
       : null;
     return (

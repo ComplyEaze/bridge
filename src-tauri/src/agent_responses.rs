@@ -13,6 +13,40 @@ const CHANGE_AXES: [(&str, &str, &str); 2] = [
     ("masters", "next_master_alter_id", "master_alter_id"),
 ];
 
+/// A base-currency-ledgers-only outstandings result's lists of ledgers left
+/// out: those kept in another currency (bridge#551) and base-currency ones
+/// with a composite value (bridge#642).
+const OUTSTANDINGS_EXCLUDED_AXES: [&str; 2] = [
+    "foreign_currency_ledgers_excluded",
+    "base_currency_ledgers_mixed_excluded",
+];
+
+/// The rows an outstandings result pages by one shared `offset`: open bills
+/// and unallocated parties, at the top of the result or, for a
+/// base-currency-ledgers-only result, under `base_currency_ledgers`; and that
+/// result's excluded ledgers. `None` for any other result.
+fn outstandings_axis_widths(result: &Value) -> Option<[usize; 4]> {
+    let figures = if result["base_currency_ledgers"].is_object() {
+        &result["base_currency_ledgers"]
+    } else {
+        result
+    };
+    let [foreign, mixed] = OUTSTANDINGS_EXCLUDED_AXES.map(|key| &result[key]["ledgers"]);
+    (figures["open_bills"].is_array()
+        || figures["unallocated"]["parties"].is_array()
+        || foreign.is_array()
+        || mixed.is_array())
+    .then(|| {
+        [
+            &figures["open_bills"],
+            &figures["unallocated"]["parties"],
+            foreign,
+            mixed,
+        ]
+        .map(|rows| rows.as_array().map_or(0, Vec::len))
+    })
+}
+
 fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
     let result = &response["result"];
     let change_width = CHANGE_AXES
@@ -27,14 +61,10 @@ fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
     if change_width > 0 {
         return Some((PageShape::Changes, change_width));
     }
-    if result["open_bills"].is_array() || result["unallocated"]["parties"].is_array() {
+    if let Some(widths) = outstandings_axis_widths(result) {
         return Some((
             PageShape::Outstandings,
-            result["open_bills"].as_array().map_or(0, Vec::len).max(
-                result["unallocated"]["parties"]
-                    .as_array()
-                    .map_or(0, Vec::len),
-            ),
+            widths.into_iter().max().unwrap_or(0),
         ));
     }
     ["items", "ledgers"].into_iter().find_map(|key| {
@@ -49,7 +79,10 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
         return Err("agent_response_too_large".into());
     }
     let result = &mut response["result"];
-    let offset = result["offset"].as_u64().unwrap_or(0);
+    let offset = result["offset"]
+        .as_u64()
+        .or_else(|| result["base_currency_ledgers"]["offset"].as_u64())
+        .unwrap_or(0);
     match shape {
         PageShape::Changes => {
             for (key, cursor, fallback) in CHANGE_AXES {
@@ -69,22 +102,43 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
             }
         }
         PageShape::Outstandings => {
-            // Both collections consume one input offset. Keep their shared
+            // Every collection consumes one input offset. Keep their shared
             // prefix width; exhausted shorter axes retain their null cursor.
-            if let Some(rows) = result["open_bills"]
-                .as_array_mut()
-                .filter(|rows| rows.len() > width)
-            {
-                rows.truncate(width);
-                result["next_offset"] = json!(offset + width as u64);
+            // `get_mut`, not indexing: indexing a `Value` mutably inserts a
+            // missing key, which would add an empty excluded list to a
+            // complete result.
+            for key in OUTSTANDINGS_EXCLUDED_AXES {
+                let Some(list) = result.get_mut(key) else {
+                    continue;
+                };
+                if let Some(rows) = list["ledgers"]
+                    .as_array_mut()
+                    .filter(|rows| rows.len() > width)
+                {
+                    rows.truncate(width);
+                    list["next_offset"] = json!(offset + width as u64);
+                    list["truncated"] = json!(true);
+                }
             }
-            if let Some(rows) = result["unallocated"]["parties"]
+            let figures = if result["base_currency_ledgers"].is_object() {
+                &mut result["base_currency_ledgers"]
+            } else {
+                result
+            };
+            if let Some(rows) = figures["open_bills"]
                 .as_array_mut()
                 .filter(|rows| rows.len() > width)
             {
                 rows.truncate(width);
-                result["unallocated"]["next_offset"] = json!(offset + width as u64);
-                result["unallocated"]["truncated"] = json!(true);
+                figures["next_offset"] = json!(offset + width as u64);
+            }
+            if let Some(rows) = figures["unallocated"]["parties"]
+                .as_array_mut()
+                .filter(|rows| rows.len() > width)
+            {
+                rows.truncate(width);
+                figures["unallocated"]["next_offset"] = json!(offset + width as u64);
+                figures["unallocated"]["truncated"] = json!(true);
             }
         }
         PageShape::Rows(key) => {
@@ -209,16 +263,12 @@ pub(super) fn response_row_count(response: &Value) -> Option<usize> {
     if let Some(vouchers) = result["vouchers"].as_array() {
         return Some(vouchers.len() + result["masters"].as_array().map_or(0, Vec::len));
     }
-    // Receipts count each released outstandings row collection: open bills and
-    // unallocated parties. Top parties are a derived ranking summary, not a
-    // separately paged row collection, so they are intentionally excluded.
-    if result["open_bills"].is_array() || result["unallocated"]["parties"].is_array() {
-        return Some(
-            result["open_bills"].as_array().map_or(0, Vec::len)
-                + result["unallocated"]["parties"]
-                    .as_array()
-                    .map_or(0, Vec::len),
-        );
+    // Receipts count each released outstandings row collection: open bills,
+    // unallocated parties and both lists of excluded ledgers. Top parties
+    // are a derived ranking summary, not a separately paged row collection,
+    // so they are intentionally excluded.
+    if let Some(widths) = outstandings_axis_widths(result) {
+        return Some(widths.into_iter().sum());
     }
     // Receipt counting does not imply pagination support. Only page_shape
     // determines which arrays can be trimmed with a resumable cursor.

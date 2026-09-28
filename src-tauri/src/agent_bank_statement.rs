@@ -365,10 +365,16 @@ fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Valu
     ))
 }
 
-/// A parse result's hash and size as the caller receives it: after the
-/// configured redaction, which the response applies to the result.
+/// A parse result's hash and size as the caller receives it: redacted by the
+/// same function, for the same tool, that redacts the response, so the two
+/// cannot differ.
 fn returned_evidence(result: &Value, redaction: Redaction) -> (String, usize) {
-    let returned = redact_value(result.clone(), redaction);
+    let returned = redact_tool_response(
+        "parse_bank_statement",
+        json!({ "result": result }),
+        redaction,
+    )["result"]
+        .take();
     let bytes = serde_json::to_vec(&returned).map_or(0, |bytes| bytes.len());
     (sha256_json(&returned), bytes)
 }

@@ -63,6 +63,11 @@ mod standard_ledger_catalog;
 mod text_encoding;
 mod tolerant_xml;
 pub mod xml_read_profiles;
+/// The one shared XML text-escaping routine every request renderer in this
+/// crate (and the app crate, via a `use` alias) now calls. See its module
+/// doc comment for why CR/LF escaping is part of the contract and why this
+/// cannot protect a value placed inside a quoted TDL formula literal.
+pub mod xml_text;
 
 pub use import_outcome::{
     parse_import_evidence, parse_import_outcome, parse_import_result, ParsedImportEvidence,
@@ -3925,3 +3930,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
     }
     encoded
 }
+
+/// One table-driven cross-renderer check for `escape_text`'s contract
+/// (bridge#832), rather than a near-duplicate test in each renderer file.
+#[cfg(test)]
+#[path = "company_name_escaping_tests.rs"]
+mod company_name_escaping_tests;

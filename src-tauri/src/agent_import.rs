@@ -15,6 +15,7 @@ use bridge_tally_core::master_binding::{
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -2937,21 +2938,6 @@ pub(super) fn render_import_verification_in_span(
 ) -> String {
     let span_filter = span.map(super::AlterIdSpan::filter).unwrap_or_default();
     format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
-}
-
-/// Escapes text for the import file. CR and LF are written as character
-/// references: raw, an XML reader folds CR LF to LF and the file would name a
-/// ledger the book does not hold. Only a ledger name ending in a line break can
-/// carry either here (bridge#626); every other field refuses control text.
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-        .replace('\r', "&#13;")
-        .replace('\n', "&#10;")
 }
 
 pub(super) fn local_evidence(label: &str) -> Evidence {

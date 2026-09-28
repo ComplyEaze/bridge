@@ -62,8 +62,12 @@
 //  - The lints name specific methods. An egress path through a method they do
 //    not name (a crate on neither list, an FFI function not listed, a native
 //    library) is outside them; the deny-list and the cargo-tree half narrow
-//    that. The webview CSP (`ipc:` only) governs the page's own requests; the
-//    Rust calls that navigate the webview or run script in it are linted.
+//    that. The Rust calls that navigate the webview or run script in it are
+//    linted; what the page's own script can reach is the webview CSP's
+//    concern, and the CSP does not govern a top-level navigation.
+//  - The declaration scan reads ordinary `mod` lines and `#[path]`/`include!`
+//    forms. A declaration written some other way (an attribute on the same
+//    line, a `cfg_attr` path, a macro-built attribute) is not seen.
 //  - On Windows, opening a UNC or WebDAV path through std::fs reaches the
 //    network; no method list can tell such a path from a local one.
 //  - A lint fires only in code a CI clippy step compiles: a cfg branch or
@@ -191,9 +195,9 @@ function directDependents(manifestPath, packageName) {
 // reqwest only through the transport; hyper is reqwest's own transport, and
 // a first-party crate using it directly would build an HTTP client that
 // bypasses reqwest and bridge-tally-transport's loopback check entirely.
-// Network crates already in the lockfiles under reqwest and tokio. The deny-list below cannot
-// refuse them, since they are legitimately present, so no first-party crate may depend on one
-// directly: each is a way to open a connection that names no linted method.
+// Network crates such as these sit in the lockfiles under reqwest and tokio, so the deny-list
+// below cannot refuse them; no first-party crate may depend on one directly, since each is a way
+// to open a connection that names no linted method. The list is not exhaustive.
 const LOWER_LEVEL_NETWORK = { h2: [], "hyper-util": [], socket2: [], mio: [], "tower-service": [] };
 
 const workspaces = [
@@ -281,12 +285,11 @@ function trackedFiles() {
   return result.stdout.split("\0").filter(Boolean);
 }
 
-// A file is test-only when Cargo builds it only for tests (under a crate's tests/ directory), or
-// when its one declaration is a module line carrying exactly `#[cfg(test)]`, or
+// A file is test-only when Cargo builds it only for tests (under a crate's tests/ directory, and
+// declared or included by nothing), or when its one declaration is a module line carrying exactly `#[cfg(test)]`, or
 // `#[cfg(all(test, ...))]` with `test` as its first condition. A second declaration, or an
 // `include!` of the file anywhere, makes it production.
 function isTestOnly(path, rustSources) {
-  if (/^src-tauri\/(?:crates\/[^/]+\/)?tests\//.test(path)) return true;
   // Where a plain `mod name;` for this file would be written: name/mod.rs belongs to the directory above.
   let moduleDirectory = posix.dirname(path);
   let moduleName = posix.basename(path, ".rs");
@@ -314,6 +317,8 @@ function isTestOnly(path, rustSources) {
       if (posix.normalize(`${candidateDirectory}/${included}`) === path) declarations.push([]);
     }
   }
+  // An integration test is its own crate root: test-only only while nothing else pulls it in.
+  if (/^src-tauri\/(?:crates\/[^/]+\/)?tests\//.test(path)) return declarations.length === 0;
   return (
     declarations.length === 1 &&
     declarations[0].some((attribute) => attribute === "#[cfg(test)]" || /^#\[cfg\(all\(test,/.test(attribute))
@@ -360,7 +365,7 @@ for (const path of EGRESS_EXEMPTIONS.keys()) {
 // The lint configuration itself. Clippy reads the nearest clippy.toml, so a second one under
 // src-tauri would replace these lists for its crate; a lint table, a CI flag or CLIPPY_CONF_DIR could
 // switch them off.
-const CLIPPY_CONFIG_DIGEST = "68ae937585ee4db8039f4c4186e2ee811596aca0ccdf4dd0e96f755dc33bccae";
+const CLIPPY_CONFIG_DIGEST = "9e77707784b1a70a2a69a95137c300afc41012f14ff25aab7f4a680cfa45083e";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);

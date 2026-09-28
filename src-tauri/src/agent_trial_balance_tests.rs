@@ -367,6 +367,11 @@ mod listing {
                 .unwrap()
                 .iter()
                 .any(|line| line.as_str().unwrap().contains("expected to differ")));
+            // The partial read says so first, with its counts (bridge#709).
+            assert_eq!(
+                page["limitations"][0],
+                "Base-currency ledgers only: 3 ledgers kept in another currency and 3 base-currency ledgers with a value Tally shows in another currency are excluded and listed."
+            );
             assert!(!holds_key(response, "balanced"), "{response}");
             assert!(!response.to_string().contains(" @ "), "{response}");
             names.extend(

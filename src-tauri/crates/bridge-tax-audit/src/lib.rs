@@ -1100,8 +1100,10 @@ fn bound_loans(bound: &Engagement) -> Result<BTreeMap<String, loans_interest::Lo
 }
 
 /// Run `loans_interest` on a book and return its canonical parity dump, with the module's own
-/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, as
-/// the reference's pack reads it; absent without a `[tds]` table.
+/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, and
+/// whether it is a placeholder `[tds].previous_year_turnover_status`, as the reference's pack reads
+/// them (absent without a `[tds]` table); the TDS-payable ledgers and `[deductor].activity` are read
+/// as for `tds_payees`.
 pub fn loans_interest_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1129,10 +1131,18 @@ pub fn loans_interest_on(
         rules,
         &entity_type,
         &loans,
-        turnover,
-        &cash,
-        &bank,
-        &shared,
+        &loans_interest::Inputs {
+            previous_year_turnover_paise: turnover,
+            cash: &cash,
+            bank: &bank,
+            shared_interest_ledgers: &shared,
+            tds_payable_ledgers: &tds_payable_ledgers(&bound)?,
+            deductor_activity: bound.deductor_activity,
+            turnover_is_placeholder: bound
+                .tds
+                .as_ref()
+                .is_some_and(|t| t.turnover_is_placeholder),
+        },
     )?;
     let module_check = loans_interest::check_invariants(book, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
@@ -1605,24 +1615,31 @@ pub fn tds_payees_on(
     canonical::canonical_test_result(book, &result, None)
 }
 
+/// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
+/// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
+/// `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
+pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>> {
+    if bound.statutory_dues.not_a_table {
+        return Err(AuditError::Config(
+            "[statutory_dues] is not a table".to_string(),
+        ));
+    }
+    Ok(bound
+        .statutory_dues
+        .nature_by_ledger
+        .iter()
+        .filter(|(_, nature)| nature.as_str() == Some("tds_payable"))
+        .map(|(ledger, _)| ledger.clone())
+        .collect())
+}
+
 /// What the reference's `pack._tds_payees` passes `tds_payees.run()` from tables other than
 /// `[tds]`/`[tds_payees]`, from a bound engagement: the ledgers `[statutory_dues]` classifies as
 /// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
 /// own default: the reference's pack requires the table for its whole run), the `[partners]`
 /// keys, `[client].state` and `[deductor].activity`.
 pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
-    if bound.statutory_dues.not_a_table {
-        return Err(AuditError::Config(
-            "[statutory_dues] is not a table".to_string(),
-        ));
-    }
-    let tds_ledgers = bound
-        .statutory_dues
-        .nature_by_ledger
-        .iter()
-        .filter(|(_, nature)| nature.as_str() == Some("tds_payable"))
-        .map(|(ledger, _)| ledger.clone())
-        .collect();
+    let tds_ledgers = tds_payable_ledgers(bound)?;
     let gst_ledgers = match &bound.book_keeping_quality.tax_ledgers {
         None => BTreeSet::new(),
         Some(TaxLedgers::NotATable) => {

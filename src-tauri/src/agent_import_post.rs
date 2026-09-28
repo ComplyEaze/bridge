@@ -442,6 +442,12 @@ impl Server {
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let redeeming = match scope {
+                // Only an agent's Join hands on a redeem; the desktop's post
+                // asks through its own dialog below, so a redeem-only pass of
+                // it is refused before anything could ask (#725 slice 2.0).
+                PostScope::JournalOnly if redeem_only => {
+                    return Err("import_approval_revoked".to_string().into())
+                }
                 PostScope::JournalOnly => false,
                 // Re-entered to redeem what its Join found: only that
                 // approval lets it go on, and it never asks (#725 slice 2.0).

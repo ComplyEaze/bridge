@@ -1915,3 +1915,44 @@ async fn a_cancel_between_the_passes_posts_nothing() {
         "request_cancelled"
     );
 }
+
+/// A redeem-only pass of the desktop's Journal post, which only an agent's
+/// Join could hand on, is refused before anything could ask the person: the
+/// desktop asks through its own dialog, so no redeem-only pass of any scope
+/// shows a second one (#725 slice 2.0).
+#[tokio::test]
+async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let refused = SCRIPTED_APPROVAL
+        .scope(
+            scripted.clone(),
+            server.post_import_entry(
+                &args,
+                None,
+                PostScope::JournalOnly,
+                Entry::RedeemOnly {
+                    evidence: evidence_from_runtime_read(
+                        crate::tally::runtime::RuntimeReadEvidence::empty(),
+                    ),
+                },
+            ),
+        )
+        .await
+        .unwrap();
+    let Pass::Done(refused) = refused else {
+        panic!("a redeem-only pass never hands on another redeem");
+    };
+    let observed = sent(simulator);
+    assert_eq!(
+        refused.payload["result"]["error"]["code"], "import_approval_revoked",
+        "{}",
+        refused.payload
+    );
+    assert!(scripted.counts().is_empty(), "no dialog was asked");
+    assert!(observed.is_empty(), "nothing was sent to Tally");
+    assert_eq!(intents(directory.path()), 0);
+}

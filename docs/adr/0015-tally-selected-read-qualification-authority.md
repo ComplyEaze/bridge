@@ -164,3 +164,66 @@ decision here or in a superseding ADR — not by re-adding a pinned
 "deliberately unexposed" allow-list, which this PR also removed from
 `scripts/tauri-command-registration.test.mjs` as no longer meaningful once
 nothing is deliberately unexposed.
+
+## Amendment (2026-09-26, #732): the runtime qualification path is deleted
+
+The 2026-09-17 amendment left the runtime layer "a separate decision". #732 made it. The path's
+ledger read (`ledgers_v1`) SETs `$OpeningBalance` in a FIELD without `<TYPE>Amount</TYPE>`. For
+`$ClosingBalance`, such a FIELD was measured returning a display string with the sign dropped
+(protocol reference §6.3). The same for `$OpeningBalance` is inferred, not measured. Tracing who
+consumed that read showed nothing live reached the path. Following AGENTS.md P4, the path is
+deleted rather than fixed.
+
+**Deleted:**
+- `TallyRuntime::qualify_selected_ledgers`, `TallyRuntime::qualify_selected_vouchers` and
+  `TallyRuntime::fetch_companies_for_reservation`. The last one existed, by its own doc, so a
+  reservation owner could qualify its selected reads.
+- `TallyClient::qualify_selected_ledgers` and `TallyClient::qualify_selected_vouchers`,
+  `SelectedReadObservation`, and `SELECTED_LEDGER_QUERY_PROFILE_ID` and
+  `SELECTED_VOUCHER_QUERY_PROFILE_ID`.
+- What the compiler then reported as unused:
+  - `post_xml_with_request_wire_sha256` and `observed_encoding_label`;
+  - `validate_selected_read_identity_evidence`, `validate_selected_ledgers` and
+    `verify_selected_company_name`;
+  - `EducationReportFamilyRefusal` and `refuse_report_formula_in_education`;
+  - `CachedProbeReservation::authorize`;
+  - the `runtime_identity` fields that only `authorize` read.
+- `tdl_engine::sales_vouchers_request` and `tdl_engine::selected_vouchers_request`, which nothing
+  called. `tdl_engine::ledgers_request` is now `#[cfg(test)]`, as `groups_request` already was.
+- The five tests that called the deleted methods. A sixth test,
+  `ordinary_read_admission_and_review_reservation_are_mutually_exclusive`, keeps its live
+  assertions and drops the two that called `authorize`.
+
+**Kept:**
+- `CachedProbeReservation`, which `reserve_cached_probe_fresh` still creates for two commands.
+- The `db::tally_mirror` commitment material.
+- The `ledgers_v1` and `vouchers_v2` profiles in `bridge-tally-protocol`, which
+  `tools/bridge-tally-live-read` still sends. `ledgers_v1`'s opening-balance FIELD now declares
+  `<TYPE>Amount</TYPE>`. Its sealed template digest and the ledger canary's, which derives from it,
+  are updated deliberately. The changed request has not been sent to a live Tally: the typed
+  response is unmeasured until the live-read tool next runs. The parser keeps the field as text,
+  and nothing reads its value.
+
+**Gated:** `scripts/check-tally-request-builder-hazards.mjs` now fails on a request-builder FIELD
+that lacks `<TYPE>Amount</TYPE>` while any of its `<SET>`s names a method or `$$` function whose
+name ends in Balance, Amount, Opening, Closing, Total(s), Debit, Credit, Value or Limit. The last
+name of a sub-object path counts (`$LedgerEntries[1].Amount`, with one level of brackets inside an
+index). A SET holding a formula reference (`@Name`, `@@Name`) fails unless the FIELD declares some
+TYPE; so does any other `@` followed by a letter, which fails closed. A TYPE counts only outside
+every SET and XML comment. A money method named otherwise, an index nested deeper, and a FIELD with
+no `<SET>`, are not caught. Its pinned set for that kind is empty, so
+`scripts/check-tally-request-builder-hazards.test.mjs` is its positive control: it plants each of
+those shapes in a synthetic tree and requires each to be reported. Removing the TYPE from
+`ledgers_v1`, or from the period-balance request's closing FIELD, makes the gate fail.
+
+**How this was measured:**
+- **Compiler.** `cargo check --locked --workspace --all-targets --all-features` for `src-tauri/`
+  and for `tools/` builds with every deleted item gone. `cargo clippy` with `--all-features` and
+  `-D warnings` reports nothing.
+- **Tests.** Counted with `git grep -hE '^[[:space:]]*#\[(tokio::)?test' -- src-tauri/src | wc -l`,
+  `bridge`'s sources carry exactly five fewer test attributes than the branch's base (1574 at
+  8563ed31 to 1569): the five deleted tests.
+- **Results** (rustc 1.96.0, macOS, on this branch merged with master a04020c9).
+  `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge --lib`: 1445
+  passed, 0 failed, 6 ignored. The merged tree carries five fewer test attributes than that master
+  (1596 to 1591), counted as above.

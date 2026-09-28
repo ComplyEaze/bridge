@@ -275,9 +275,10 @@ or an owner decision to amend the requirement instead:
     Open: a delete or locate tool built on it, under the requirements listed on #579.
 13. **Multi-currency books, #551.** A voucher's amounts are plain base-currency figures, and a
     foreign-currency ledger's balance can read as a plain amount too, so only the ledger's own
-    currency tells them apart. Which Currency master is the base cannot be identified among
-    several until #601. Until then every post reads the company's Currency masters before
-    approval and again inside the queue, in the same identity brackets as the catalogue, and is
+    currency tells them apart. Among several Currency masters, only the outstandings reads
+    identify the base (bridge#551, TALLY_PROTOCOL_REFERENCE §9.10a.2); the write path does not
+    compare a leg's currency with it yet. Until it does, every post reads the company's Currency
+    masters before approval and again inside the queue, in the same identity brackets as the catalogue, and is
     refused unless there is exactly one (`import_multi_currency_unsupported`, naming the masters
     seen, or `import_base_currency_undetermined` when the response parses to no master or does not
     parse, as a master without a name does not). A transport failure of that read is reported as any failed read
@@ -287,7 +288,7 @@ or an owner decision to amend the requirement instead:
     A master added during the few requests between the queue's read and the POST is not caught,
     the same window as the catalogue re-read (#239). This refuses every post
     into a book that defines a second currency, even one whose legs are all in the base. When
-    #601 can name the base, each leg's own `CURRENCYNAME` is compared with it instead.
+    the write path uses the identified base, each leg's own `CURRENCYNAME` is compared with it instead.
 14. **Amendments can overwrite work done in Tally, #239. Named, not closed.** An amendment
     (`amends_batch_id`) is refused unless each voucher it alters is still in the book as a build of
     that batch wrote it, in these fields only: the date, a bank voucher's effective date when Tally
@@ -552,9 +553,16 @@ is accepted, and loud.
   any voucher makes it stale, naming the voucher. It is refused unless all N read back. It
   changes no verdict. A `batch_step` review attests only the batch's own vouchers, not that
   nothing else in the company changed. A doubt the check record holds without its own file
-  has no bytes to bind, so it is refused (`ack_doubt_record_unavailable`, #722). Beside
-  another observed doubt it needs a name; a check still pending or unreadable is not observed
-  when the choice is made, which is before the read that can finish it.
+  has no bytes to bind, so it is refused (`ack_doubt_record_unavailable`, #722), named or
+  chosen, before any recorded review of that kind is consulted: such a review is stale, so the
+  refusal names the missing file rather than the stale record (#770). A pending check that the
+  review's own read finishes as a doubt whose file cannot be written is refused the same way,
+  after that read. Beside another observed doubt it needs a name, unless both are held only by
+  the check record, which is refused with no name needed; a check still pending or unreadable
+  is not observed when the choice is made, which is before the read that can finish it. If a read
+  finishes it as a second doubt (the review's first read, its read after the dialog, or another
+  call's read while the dialog is open), an unnamed review is refused as ambiguous after its
+  next read, before any record (#756); a named one goes on, since the person named what they review.
 - The N-voucher step is PARTIAL on raw-gateway lab scripts (protocol reference §11c.5).
   Through Bridge's own post path it is UNVERIFIED until the lab proof (slice D3).
 - The desktop stays single-voucher `JournalOnly`.

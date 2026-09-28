@@ -1,15 +1,43 @@
 export const repository = "lamemustafa/bridge";
 const platforms = ["windows-x64", "macos-arm64"];
 
+// A preview is identified by its tag and its complete asset set, not by GitHub's pre-release
+// flag: clearing that flag is what lets a preview be marked "Latest", and it must stay
+// installable from this page when that happens.
 export function isInstallablePreview(release) {
   return !release.draft
-    && release.prerelease
     && /^mcp-preview-[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$/.test(release.tag_name)
     && platforms.every((platform) => releaseAssets(release, platform));
 }
 
 export function selectRelease(releases) {
   return releases.find(isInstallablePreview);
+}
+
+// Joins the live GitHub list with the snapshot published beside this page, newest first. A tag
+// present in both keeps the live entry, since a release can gain assets after the snapshot.
+export function mergeReleases(live, snapshot) {
+  const byTag = new Map();
+  for (const release of [...live, ...snapshot]) {
+    if (!byTag.has(release.tag_name)) byTag.set(release.tag_name, release);
+  }
+  const published = (release) => Date.parse(release.published_at ?? "1970-01-01T00:00:00Z") || 0;
+  return [...byTag.values()].sort((a, b) => published(b) - published(a));
+}
+
+// Takes the two Promise.allSettled results the page gets and says what it can show: the merged
+// list, and whether it came only from the snapshot. `releases` is null when neither source answered.
+export function combineReleaseSources(live, snapshot) {
+  if (live.status === "rejected" && snapshot.status === "rejected") {
+    return { releases: null, snapshotOnly: false };
+  }
+  return {
+    releases: mergeReleases(
+      live.status === "fulfilled" ? live.value : [],
+      snapshot.status === "fulfilled" ? snapshot.value : [],
+    ),
+    snapshotOnly: live.status === "rejected",
+  };
 }
 
 export function assetName(tag, platform) {

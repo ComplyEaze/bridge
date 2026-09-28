@@ -26,9 +26,9 @@ use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::{
     bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-    high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, stale_balances_41_1,
-    statutory_dues_43b, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts,
-    PartnersConfig, Tds26asConfig, TdsConfig,
+    high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly,
+    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
+    trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -116,7 +116,8 @@ fn build(s: &Value) -> Book {
                 name: name.clone(),
                 parent: chain.first().cloned().unwrap_or_default(),
                 chain,
-                chain_complete: true,
+                chain_complete: typed(l, "chain_complete", false, "true or false", Value::as_bool)
+                    .unwrap_or(true),
                 master_opening_paise: 0,
                 guid: l["guid"].as_str().unwrap().to_string(),
                 masterid: None,
@@ -193,6 +194,7 @@ fn build(s: &Value) -> Book {
         ledgers,
         vouchers,
         tb,
+        ..Default::default()
     }
 }
 
@@ -205,6 +207,7 @@ fn rules(s: &Value) -> Rules {
             "s36_1_va" => rules.s36_1_va_due_day = None,
             "s194j" => rules.s194j_aggregate_paise = None,
             "s194t" => rules.s194t = None,
+            "tds_rates" => rules.tds_rates = None,
             other => panic!("rules_without {other} is not wired here"),
         }
     }
@@ -257,9 +260,47 @@ fn creditor_ageing_params(c: &Value) -> creditor_ageing_43bh::Params {
     }
 }
 
+/// A table of the spec's keys that are present, as TOML (a challan's `date` string as a TOML date).
+fn toml_table(s: &Value, keys: &[&str]) -> toml::Table {
+    keys.iter()
+        .filter(|k| !s[**k].is_null())
+        .map(|k| {
+            let mut v = toml_of(&s[*k]);
+            if *k == "challans" {
+                for c in v.as_array_mut().into_iter().flatten() {
+                    if let Some(d) = c.get("date").and_then(toml::Value::as_str) {
+                        let date: toml::value::Datetime = d.parse().expect("an ISO date");
+                        c.as_table_mut()
+                            .unwrap()
+                            .insert("date".to_string(), toml::Value::Datetime(date));
+                    }
+                }
+            }
+            ((*k).to_string(), v)
+        })
+        .collect()
+}
+
 /// The `[tds]`/`[tds_payees]` values `parity/edge_golden.py` passes `tds_payees`: a
 /// `s194j_category_by_ledger` value that is not a string is kept as `None`, as `TdsConfig` keeps it.
+/// The lists are read by the crate's own readers from the spec's keys, as the edge runner reads
+/// them through the reference's.
 fn tds_config(s: &Value) -> TdsConfig {
+    let tds = toml_table(
+        s,
+        &[
+            "nature_by_ledger",
+            "previous_year_turnover_status",
+            "goods_carriage_ledgers",
+            "form_26a",
+            "challans",
+        ],
+    );
+    let tds_payees = toml_table(
+        s,
+        &["reversals", "gst_separate_by_agreement", "foreseeability"],
+    );
+    let lists = tds_payees::read_config_lists(&tds, Some(&tds_payees)).unwrap();
     let map = |key: &str| -> BTreeMap<String, String> {
         s[key]
             .as_object()
@@ -282,6 +323,38 @@ fn tds_config(s: &Value) -> TdsConfig {
                     .collect()
             })
             .unwrap_or_default(),
+        reversals: lists.reversals,
+        gst_separate: lists.gst_separate,
+        foreseeability_names: lists.foreseeability_names,
+        challans: lists.challans,
+        form_26a: lists.form_26a,
+        turnover_is_placeholder: lists.turnover_is_placeholder,
+        goods_carriage_ledgers: strs(&s["goods_carriage_ledgers"]).into_iter().collect(),
+    }
+}
+
+/// What the edge runner passes `tds_payees` from the other tables: the spec's `tds_payable_ledgers`,
+/// `gst_ledgers`, `partners` keys, `client_state` and `deductor_activity`.
+fn tds_inputs(s: &Value) -> tds_payees::Inputs {
+    let mut client = toml::Table::new();
+    if let Some(state) = s.get("client_state") {
+        client.insert("state".to_string(), toml_of(state));
+    }
+    let mut cfg = toml::Table::new();
+    if let Some(activity) = s.get("deductor_activity") {
+        let mut deductor = toml::Table::new();
+        deductor.insert("activity".to_string(), toml_of(activity));
+        cfg.insert("deductor".to_string(), toml::Value::Table(deductor));
+    }
+    tds_payees::Inputs {
+        tds_ledgers: strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+        gst_ledgers: strs(&s["gst_ledgers"]).into_iter().collect(),
+        other_names: s["partners"]
+            .as_object()
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default(),
+        client_state: tds_payees::read_client_state(&client).unwrap(),
+        deductor_activity: tds_payees::read_deductor_activity(&cfg).unwrap(),
     }
 }
 
@@ -312,25 +385,14 @@ fn partners(s: &Value) -> PartnersConfig {
     }
 }
 
-/// The `loans` table `parity/edge_golden.py` passes `loans_interest`, typed as the crate types a
-/// bound `[loans.loan_ledgers]`.
+/// The `loans` table `parity/edge_golden.py` passes `loans_interest`, typed by the crate's own
+/// reader of a bound `[loans.loan_ledgers]` (an `interest_ledger` one name or a list).
 fn loans(s: &Value) -> BTreeMap<String, loans_interest::LoanConfig> {
-    s["loans"]
+    let entries: BTreeMap<String, toml::Value> = s["loans"]
         .as_object()
-        .map(|o| {
-            o.iter()
-                .map(|(k, v)| {
-                    let text = |key: &str| v[key].as_str().unwrap().to_string();
-                    let cfg = loans_interest::LoanConfig {
-                        lender: text("lender"),
-                        lender_type: text("lender_type"),
-                        interest_ledger: v["interest_ledger"].as_str().map(str::to_string),
-                    };
-                    (k.clone(), cfg)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+        .map(|o| o.iter().map(|(k, v)| (k.clone(), toml_of(v))).collect())
+        .unwrap_or_default();
+    loans_interest::loan_config(&entries).unwrap()
 }
 
 /// The `[tds_tcs_26as]` values `parity/edge_golden.py` passes both 26AS tests.
@@ -374,6 +436,68 @@ fn bkq_inputs(s: &Value) -> book_keeping_quality::Inputs {
         gst_payment_ledgers: set("gst_payment_ledgers"),
         reissue_narration_terms: strs(&b["reissue_narration_terms"]),
         writeoff_discount_ledgers: set("writeoff_discount_ledgers"),
+    }
+}
+
+/// `stock`'s inputs from the spec, typed as `parity/edge_golden.py` types them: `stock_items`
+/// ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?, closing_value?}}),
+/// `stock_opening`/`stock_closing` ({as_of, rows: {name: {qty?, value?, rate?}}}) and
+/// `is_integrated` (a boolean, absent or null for unknown).
+fn stock_inputs(s: &Value) -> stock_read::StockInputs {
+    let qty = |d: &Value, key: &str| typed(d, key, true, "a number or null", Value::as_f64);
+    let paise = |d: &Value, key: &str| typed(d, key, true, "an integer or null", Value::as_i64);
+    let text = |d: &Value, key: &str| {
+        typed(d, key, false, "text", |v| v.as_str().map(str::to_string)).unwrap_or_default()
+    };
+    let items = s["stock_items"]
+        .as_object()
+        .map(|o| {
+            o.iter()
+                .map(|(n, m)| {
+                    let master = stock_read::StockItemMaster {
+                        name: n.clone(),
+                        guid: text(m, "guid"),
+                        parent: String::new(),
+                        base_unit: text(m, "base_unit"),
+                        opening_qty: qty(m, "opening_qty"),
+                        opening_value_paise: paise(m, "opening_value"),
+                        closing_qty: qty(m, "closing_qty"),
+                        closing_value_paise: paise(m, "closing_value"),
+                    };
+                    (n.clone(), master)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let snapshot = |key: &str| stock_read::StockSnapshot {
+        as_of: date(s[key]["as_of"].as_str().unwrap()),
+        rows: s[key]["rows"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(n, r)| {
+                let row = stock_read::StockSnapshotRow {
+                    name: n.clone(),
+                    guid: String::new(),
+                    qty: qty(r, "qty"),
+                    value_paise: paise(r, "value"),
+                    rate_paise: paise(r, "rate"),
+                };
+                (n.clone(), row)
+            })
+            .collect(),
+    };
+    stock_read::StockInputs {
+        items,
+        opening: snapshot("stock_opening"),
+        closing: snapshot("stock_closing"),
+        is_integrated: typed(
+            s,
+            "is_integrated",
+            true,
+            "true, false or null",
+            Value::as_bool,
+        ),
     }
 }
 
@@ -456,7 +580,9 @@ fn check(name: &str) {
             }
             "tds_payees" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
-                let r = tds_payees::run(&book, &rules, entity_type, &tds_config(&s)).unwrap();
+                let r =
+                    tds_payees::run(&book, &rules, entity_type, &tds_config(&s), &tds_inputs(&s))
+                        .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
                 let rust = canonical_test_result(&book, &r, None).unwrap();
                 let golden = common::golden_named(&format!("edge.{name}.{test}"));
@@ -469,22 +595,25 @@ fn check(name: &str) {
                 let shared: BTreeSet<String> =
                     strs(&s["shared_interest_ledgers"]).into_iter().collect();
                 let loans = loans(&s);
-                let turnover = s["previous_year_turnover_paise"].as_i64();
+                let tds_payable: BTreeSet<String> =
+                    strs(&s["tds_payable_ledgers"]).into_iter().collect();
+                // The activity and the turnover's status through the crate's own readers, as the
+                // edge runner reads them through the reference's.
+                let inputs = loans_interest::Inputs {
+                    previous_year_turnover_paise: s["previous_year_turnover_paise"].as_i64(),
+                    cash: &cash,
+                    bank: &bank,
+                    shared_interest_ledgers: &shared,
+                    tds_payable_ledgers: &tds_payable,
+                    deductor_activity: tds_inputs(&s).deductor_activity,
+                    turnover_is_placeholder: tds_config(&s).turnover_is_placeholder,
+                };
                 // Without a net_reversals key the book runs the rule in force, through run() and
                 // check_invariants(), so the default switch is what that golden pins.
                 match typed(&s, "net_reversals", false, "true or false", Value::as_bool) {
                     None => {
-                        let r = loans_interest::run(
-                            &book,
-                            &rules,
-                            entity_type,
-                            &loans,
-                            turnover,
-                            &cash,
-                            &bank,
-                            &shared,
-                        )
-                        .unwrap();
+                        let r = loans_interest::run(&book, &rules, entity_type, &loans, &inputs)
+                            .unwrap();
                         let c = loans_interest::check_invariants(&book, &r).unwrap();
                         (r, c)
                     }
@@ -494,10 +623,7 @@ fn check(name: &str) {
                             &rules,
                             entity_type,
                             &loans,
-                            turnover,
-                            &cash,
-                            &bank,
-                            &shared,
+                            &inputs,
                             net_reversals,
                         )
                         .unwrap();
@@ -589,6 +715,23 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "party_monthly" => {
+                // `top_n` a non-negative integer, the module's own cut when absent.
+                let top_n = typed(&s, "top_n", false, "a non-negative integer", |v| {
+                    v.as_u64().and_then(|n| usize::try_from(n).ok())
+                })
+                .unwrap_or(party_monthly::PARTY_TOP_N);
+                let r =
+                    party_monthly::run(&book, &rules, &period(&s), &cash, &bank, top_n).unwrap();
+                let c = party_monthly::check_invariants(&book, &period(&s), &r).unwrap();
+                (r, c)
+            }
+            "stock" => {
+                let inputs = stock_inputs(&s);
+                let r = stock::run(&book, &rules, &inputs).unwrap();
+                let c = stock::check_invariants(&book, &r, &inputs).unwrap();
+                (r, c)
+            }
             "twentysixas_receipts" => {
                 let docs = traces_documents_from_json(&s).unwrap();
                 let aliases = tds_26as_config(&s).deductor_aliases;
@@ -622,7 +765,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 14] = [
+const EDGE_TESTS: [&str; 16] = [
     "bank_reconciliation",
     "book_keeping_quality",
     "cash_book_integrity",
@@ -631,8 +774,10 @@ const EDGE_TESTS: [&str; 14] = [
     "ledger_scrutiny",
     "loans_interest",
     "partners_40b_194t",
+    "party_monthly",
     "stale_balances_41_1",
     "statutory_dues_43b",
+    "stock",
     "tds_payees",
     "tds_tcs_26as",
     "trial_balance",
@@ -1128,5 +1273,233 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
     assert!(
         format!("{err}").contains("journal_transfer_amount_0bce8b28_0431f39b"),
         "{err}"
+    );
+}
+
+/// Three rules no edge book reaches: the Stock-in-Hand voucher count reads the population only
+/// (not an optional or a cancelled voucher),
+/// an opening Stock Summary row with no quantity starts the walk at nil (not the master's
+/// opening), and negative at close counts goods items only.
+#[test]
+fn stock_counts_the_population_seeds_nil_and_goods_only_at_close() {
+    let mut s = spec("stock_quiet");
+    s["ledgers"].as_array_mut().unwrap().push(serde_json::json!(
+        {"name": "Shop Stock", "chain": ["Stock-in-Hand", "Current Assets"], "guid": "edge-stock_quiet-t01"}
+    ));
+    for (guid, status) in [("q02", "optional"), ("q03", "cancelled")] {
+        s["vouchers"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!(
+                {"guid": guid, "date": "2025-05-01", "base_type": "Journal", "status": status,
+                 "lines": [["Shop Stock", 500], ["Cash", -500]]}
+            ));
+    }
+    s["vouchers"][0]["inventory"] =
+        serde_json::json!([{"item": "Widget", "qty": 3, "amount": -300}]);
+    s["stock_items"] = serde_json::json!({
+        "Widget": {"base_unit": "Nos", "opening_qty": 5, "opening_value": 500},
+        "Freight Placeholder": {"base_unit": "\u{fffd}#4; Not Applicable"}
+    });
+    s["stock_opening"]["rows"] = serde_json::json!({"Widget": {"value": 500}});
+    s["stock_closing"]["rows"] = serde_json::json!({
+        "Widget": {"qty": 2, "value": 200},
+        "Freight Placeholder": {"qty": -1, "value": -100}
+    });
+    let (book, rules) = (build(&s), rules(&s));
+    let r = stock::run(&book, &rules, &stock_inputs(&s)).unwrap();
+    let figure = |id: &str| {
+        let f = r.figures.iter().find(|f| f.id == format!("stock.{id}"));
+        f.unwrap_or_else(|| panic!("no figure {id}")).value.clone()
+    };
+    let int = bridge_tax_audit::findings::Value::Int;
+    assert_eq!(
+        figure("stock_in_hand_voucher_count"),
+        int(0),
+        "optional and cancelled"
+    );
+    assert_eq!(figure("opening_seed_from_summary_count"), int(1));
+    // Seeded at nil, Widget goes to -3; from the master's 5 it would stay at 2.
+    assert_eq!(figure("negative_any_point_range_min"), int(1));
+    assert_eq!(
+        figure("negative_at_close_count"),
+        int(0),
+        "a value-only item"
+    );
+    assert_eq!(figure("non_goods_negative_value_item_count"), int(1));
+}
+
+/// A goods inventory line whose quantity field is absent means the read did not carry quantities:
+/// the reference raises, naming the count and the first line, and the port refuses the same book
+/// with an error rather than skipping the line as a value-only one.
+#[test]
+fn a_goods_line_without_a_quantity_field_is_refused() {
+    let mut s = spec("stock_quiet");
+    s["vouchers"][0]["inventory"] =
+        serde_json::json!([{"item": "Widget", "amount": 100, "qty_field_present": false}]);
+    let (book, rules) = (build(&s), rules(&s));
+    let err = stock::run(&book, &rules, &stock_inputs(&s)).expect_err("refused");
+    assert!(
+        format!("{err}")
+            .contains("1 goods inventory line(s) in the population carry no quantity field (BILLEDQTY/ACTUALQTY) at all, first 'Widget' on Receipt q01 on 2025-04-05;"),
+        "{err}"
+    );
+    // Outside the population (a cancelled voucher) the same line is not read.
+    s["vouchers"][0]["status"] = Value::from("cancelled");
+    let book = build(&s);
+    stock::run(&book, &rules, &stock_inputs(&s)).expect("a cancelled voucher's line is not read");
+}
+
+/// A party ledger whose tag equals a fixed row's (a blank-GUID ledger named "sales:total" hashes
+/// to the Total row's tag) repeats a figure id: the reference raises `duplicate figure id
+/// party_monthly.sales_jun_a64cfcd9` on this book, and the port refuses with an error, not a panic.
+#[test]
+fn a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked() {
+    let mut s = spec("pm_empty");
+    s["ledgers"].as_array_mut().unwrap().push(serde_json::json!(
+        {"name": "sales:total", "chain": ["Sundry Debtors", "Current Assets"], "guid": ""}
+    ));
+    s["vouchers"] = serde_json::json!([{"guid": "c01", "date": "2025-06-01", "base_type": "Sales",
+        "lines": [["sales:total", 1000], ["Sales", -1000]]}]);
+    let (book, rules) = (build(&s), rules(&s));
+    let none = BTreeSet::new();
+    let result = std::panic::catch_unwind(|| {
+        party_monthly::run(
+            &book,
+            &rules,
+            &period(&s),
+            &none,
+            &none,
+            party_monthly::PARTY_TOP_N,
+        )
+    })
+    .expect("refused, not panicked");
+    let err = result.expect_err("a repeated figure id is refused");
+    assert!(
+        format!("{err}").contains("party_monthly.sales_jun_a64cfcd9"),
+        "{err}"
+    );
+}
+
+/// The pm_paths result, and a way to change one published figure: the PWM checks read figures
+/// back, so a changed figure is what an engine fault would look like to them.
+fn pm_paths_result() -> (Book, Window, bridge_tax_audit::findings::TestResult) {
+    let s = spec("pm_paths");
+    let (book, rules) = (build(&s), rules(&s));
+    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+    let r = party_monthly::run(&book, &rules, &period(&s), &set("cash"), &set("bank"), 2).unwrap();
+    let window = period(&s);
+    assert!(party_monthly::check_invariants(&book, &window, &r)
+        .unwrap()
+        .is_empty());
+    (book, window, r)
+}
+
+fn nudge(r: &mut bridge_tax_audit::findings::TestResult, prefix: &str, label: &str) {
+    let f = r
+        .figures
+        .iter_mut()
+        .find(|f| f.id.starts_with(prefix) && f.evidence.first().is_some_and(|e| e.label == label))
+        .unwrap_or_else(|| panic!("no {prefix} figure for {label}"));
+    match &mut f.value {
+        bridge_tax_audit::findings::Value::Int(v) => *v += 1,
+        other => panic!("{other:?}"),
+    }
+}
+
+/// PWM-1 fires when a block's rows stop summing to its total row, and when the published Trial
+/// Balance movement is not the Trial Balance's; PWM-2 when a row's months stop summing to its year.
+/// Both are silent on the untouched result.
+#[test]
+fn pwm_1_fires_on_a_total_or_movement_that_does_not_tie() {
+    let (book, window, mut r) = pm_paths_result();
+    nudge(&mut r, "party_monthly.sales_year_", "Total");
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert!(
+        out.iter()
+            .any(|v| v.starts_with("PWM-1: the sales rows sum to")),
+        "{out:?}"
+    );
+    // The same change leaves the total row's months short of its year, which PWM-2 also reports.
+    assert!(
+        out.iter()
+            .any(|v| v.starts_with("PWM-2: a sales row's months sum to")),
+        "{out:?}"
+    );
+
+    let (book, window, mut r) = pm_paths_result();
+    let f = r
+        .figures
+        .iter_mut()
+        .find(|f| f.id == "party_monthly.purchases_tb_movement")
+        .unwrap();
+    f.value = bridge_tax_audit::findings::Value::Int(0);
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert_eq!(
+        out,
+        vec!["PWM-1: purchases_tb_movement is 0p but the Trial Balance's period columns give 675000p"]
+    );
+}
+
+/// PWM-2 checks the not-attributed row on its own: a voucher count the vouchers do not give is
+/// reported against that row, not folded into the rows with no party.
+#[test]
+fn pwm_2_checks_the_not_attributed_row_on_its_own() {
+    let s = spec("pm_attribution");
+    let (book, rules) = (build(&s), rules(&s));
+    let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+    let window = period(&s);
+    let mut r = party_monthly::run(
+        &book,
+        &rules,
+        &window,
+        &set("cash"),
+        &set("bank"),
+        party_monthly::PARTY_TOP_N,
+    )
+    .unwrap();
+    assert!(party_monthly::check_invariants(&book, &window, &r)
+        .unwrap()
+        .is_empty());
+    nudge(
+        &mut r,
+        "party_monthly.indirect_expenses_vouchers_",
+        "Not attributed: no party on the other side",
+    );
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert!(
+        out.iter().any(|v| v
+            == "PWM-2: the indirect_expenses not-attributed row has 4p in vouchers but the vouchers give 3p"),
+        "{out:?}"
+    );
+}
+
+/// PWM-2 fires when a named party's row is not what its vouchers give, and when the Others row's
+/// label does not count the parties it holds.
+#[test]
+fn pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong() {
+    let (book, window, mut r) = pm_paths_result();
+    nudge(&mut r, "party_monthly.sales_vouchers_", "Cust A");
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert!(
+        out.iter().any(|v| v
+            == "PWM-2: the sales row for 'Cust A' has 4p in vouchers but the vouchers give 3p"),
+        "{out:?}"
+    );
+
+    let (book, window, mut r) = pm_paths_result();
+    for f in &mut r.figures {
+        if let Some(e) = f
+            .evidence
+            .first_mut()
+            .filter(|e| e.label == "Others (2 parties)")
+        {
+            e.label = "Others (9 parties)".to_string();
+        }
+    }
+    let out = party_monthly::check_invariants(&book, &window, &r).unwrap();
+    assert_eq!(
+        out,
+        vec!["PWM-2: the sales Others row is labelled 'Others (9 parties)' but 2 parties are not shown by name"]
     );
 }

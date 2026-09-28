@@ -329,7 +329,7 @@ const rustSources = new Map(
 for (const [path, lines] of rustSources) {
   const text = lines.join("\n");
   if (LINT_ESCAPE.test(text)) {
-    egressViolations.push(`${path} silences a whole lint group (warnings, clippy::all or clippy::style), which includes the egress lints`);
+    egressViolations.push(`${path} silences a lint group that includes the egress lints (warnings, clippy::all, clippy::style) or re-enables their old names (renamed_and_removed_lints)`);
   }
   const count = text.match(MENTION)?.length ?? 0;
   if (EGRESS_EXEMPTIONS.has(path)) {

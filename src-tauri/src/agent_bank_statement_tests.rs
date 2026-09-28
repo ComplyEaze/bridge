@@ -456,12 +456,14 @@ async fn mask_parties_masks_every_name_in_the_summary() {
 }
 
 /// The evidence of a parse result is its hash and size as the caller receives
-/// it: with mask_parties, the masked names.
+/// it: with mask_parties, the masked names; with drop_narration, no narration.
 #[test]
 fn the_evidence_describes_the_result_as_returned() {
-    let result = json!({"party": party_name("SYNTHETIC PAYER"), "rows": 3});
-    let masked = json!({"party": "SY…ER", "rows": 3});
-    let plain = json!({"party": "SYNTHETIC PAYER", "rows": 3});
+    let result =
+        json!({"party": party_name("SYNTHETIC PAYER"), "rows": 3, "narration": "SYNTHETIC TEXT"});
+    let masked = json!({"party": "SY…ER", "rows": 3, "narration": "SYNTHETIC TEXT"});
+    let plain = json!({"party": "SYNTHETIC PAYER", "rows": 3, "narration": "SYNTHETIC TEXT"});
+    let dropped = json!({"party": "SYNTHETIC PAYER", "rows": 3});
     let size = |value: &Value| serde_json::to_vec(value).unwrap().len();
     assert_eq!(
         returned_evidence(&result, Redaction::MaskParties),
@@ -470,6 +472,10 @@ fn the_evidence_describes_the_result_as_returned() {
     assert_eq!(
         returned_evidence(&result, Redaction::None),
         (sha256_json(&plain), size(&plain))
+    );
+    assert_eq!(
+        returned_evidence(&result, Redaction::DropNarration),
+        (sha256_json(&dropped), size(&dropped))
     );
 }
 

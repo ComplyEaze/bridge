@@ -1,0 +1,76 @@
+E2A-03 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-04 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-02 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-01 killed (full) by 2: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-06 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2A-05 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-07 killed (full) by 2: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-10 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2A-12 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2A-09 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+E2A-11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-14 killed (full) by 2: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-17 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-16 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+E2A-18 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-19 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+E2A-25 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-23 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-24 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+E2A-26 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-27 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-28 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-29 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-31 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-36 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-32 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-30 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-39 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-37 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-38 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-40 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-42 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-41 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-43 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-44 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-45 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-47 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+E2A-46 killed (full) by 1: src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+
+39 of 39 killed
+
+warning: 33 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  E2A-02 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-03 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-04 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-05 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2A-09 (full): src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+  E2A-11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2A-16 (full): src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+  E2A-17 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-18 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-19 (full): src/lib.rs::bank_reconciliation::tests::the_window_holds_its_first_and_last_days_and_lies_inside_the_year
+  E2A-23 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-24 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-25 (full): src/lib.rs::bank_reconciliation::tests::a_match_takes_the_nearest_row_within_re_1_and_7_days_once_in_date_order
+  E2A-26 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-27 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-28 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-29 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-30 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-31 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-32 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-36 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-37 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-38 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-39 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-40 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-41 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-42 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-43 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-44 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-45 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-46 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows
+  E2A-47 (full): src/lib.rs::bank_reconciliation::tests::splits_take_the_first_combination_in_date_order_within_7_days_and_retire_their_rows

@@ -3755,4 +3755,47 @@ figure."
 supplied and that interest was authorised for the whole year; confirm both against the deed."
         );
     }
+
+    #[test]
+    fn the_total_is_withheld_when_one_partner_is_computed_and_another_is_not() {
+        // Ported from the reference's PlainVoucherGate (queue item 10, 28-Sep): B's voucher is odd
+        // by a set-off on B's own capital (two lines on "Partner B"), so the side opposite the
+        // interest is partners' capitals alone and A is not affected (a cash line there would list
+        // it for A too, as off-capital).
+        let plain = voucher(
+            "p1",
+            &[
+                ("Interest to Partners", 50_000_000),
+                ("Partner A", -50_000_000),
+            ],
+        );
+        let odd = voucher(
+            "p2",
+            &[
+                ("Interest to Partners", 5_000_000),
+                ("Partner B", -6_000_000),
+                ("Partner B", 1_000_000),
+            ],
+        );
+        let r = go_with(
+            vec![plain, odd],
+            &format!("{TWO}{DEED}"),
+            &["TDS Payable"],
+            true,
+        )
+        .unwrap();
+        let ha = hash8("partner_a");
+        let hb = hash8("partner_b");
+        assert!(found(&r, &format!("s40b_not_computed/{ha}")).is_empty());
+        assert!(!found(&r, &format!("s40b_not_computed/{hb}")).is_empty());
+        assert!(has_fig(&r, &format!("s40b_excess_{ha}")));
+        assert!(!has_fig(&r, "s40b_excess_total"));
+        assert_eq!(
+            fig(&r, "s40b_excess_total_not_computed").value,
+            Value::Text("not computed: s.40(b) is not computed for 1 partner(s)".to_string())
+        );
+        // Implied by the Python: A's own capital never appears off-capital here, since p2's side
+        // opposite A's interest ledger is B's capital alone.
+        assert!(found(&r, &format!("off_capital/{ha}")).is_empty());
+    }
 }

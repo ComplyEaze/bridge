@@ -433,7 +433,6 @@ fn counterparties_group_by_mapping_key() {
     assert_eq!(groups.len(), 2);
     // one line for two spellings, labelled with the one the bank printed
     assert_eq!(groups[0].party, "MERCURY MANUFACTURERS");
-    assert_eq!(groups[0].total, "280000.00");
     assert_eq!(groups[0].rows, 2);
     assert_eq!(groups[0].also_printed_as, ["MERCURY M ANUFACTURERS"]);
     assert_eq!(groups[1].party, "AMBIKA INDUSTRIES");

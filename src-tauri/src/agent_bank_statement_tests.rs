@@ -1329,6 +1329,15 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             "",
             "9495.00",
         ),
+        // A second unmapped payer, first by name but later in the statement
+        // and larger, so only the name puts it first.
+        (
+            "06Aug2026",
+            "BY TRANSFER-UPI/CR/698765432109/AARDVARK BUYER/XYZ",
+            "",
+            "90.00",
+            "9585.00",
+        ),
     ]
     .map(|(date, narration, dr, cr, bal)| sbi(date, narration, dr, cr, bal));
     let mut args = json!({
@@ -1337,9 +1346,9 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
-        "closing_balance": "9,495.00",
+        "closing_balance": "9,585.00",
         "total_debits": "576.00",
-        "total_credits": "71.00",
+        "total_credits": "161.00",
         "bank_ledger": "Synthetic Bank Ledger",
         "suspense_ledger": "Suspense"
     });
@@ -1362,7 +1371,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         ParsedStatement {
             account_number: "00000000001234".into(),
             statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9495.00").unwrap(),
+            closing: bridge_tally_core::ExactDecimal::parse("9585.00").unwrap(),
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
@@ -1380,48 +1389,145 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     let summary = summary(&request, &parsed, "statement-x", "0", 200_000);
     assert_eq!(summary["cash_questions"].as_array().unwrap().len(), 1);
 
-    // Every string that reads as an amount (a date reads as one too), with
-    // where it sits.
-    fn amounts(value: &Value, path: &str, found: &mut Vec<(String, String)>) {
+    // Every leaf of the result, by path (array positions as *), so no field
+    // can be added anywhere unseen; every number must be a count; and every
+    // string holding a digit is listed with where it sits.
+    fn leaves(value: &Value, path: &str, found: &mut Vec<(String, String, Value)>) {
         match value {
-            Value::String(text)
-                if text.chars().any(|c| c.is_ascii_digit())
-                    && text
-                        .chars()
-                        .all(|c| c.is_ascii_digit() || ".,-".contains(c)) =>
-            {
-                found.push((path.to_string(), text.clone()));
-            }
             Value::Array(items) => {
                 for (index, item) in items.iter().enumerate() {
-                    amounts(item, &format!("{path}/{index}"), found);
+                    leaves(item, &format!("{path}/{index}"), found);
                 }
             }
             Value::Object(fields) => {
                 for (key, field) in fields {
-                    amounts(field, &format!("{path}/{key}"), found);
+                    leaves(field, &format!("{path}/{key}"), found);
                 }
             }
-            _ => {}
+            leaf => {
+                let shape = path
+                    .split('/')
+                    .map(|part| {
+                        if part.parse::<usize>().is_ok() {
+                            "*"
+                        } else {
+                            part
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("/");
+                found.push((shape, path.to_string(), leaf.clone()));
+            }
         }
     }
     let mut found = Vec::new();
-    amounts(&summary, "", &mut found);
-    found.sort();
+    leaves(&summary, "", &mut found);
+    let shape: std::collections::BTreeSet<&str> =
+        found.iter().map(|(shape, _, _)| shape.as_str()).collect();
+    let marker = "$bridge_agent_party_name";
     assert_eq!(
-        found,
+        shape,
+        [
+            "/account_last4".to_string(),
+            "/bank".into(),
+            "/cash_questions/*/amount".into(),
+            "/cash_questions/*/answers/*/answer".into(),
+            "/cash_questions/*/answers/*/ledger_needed".into(),
+            "/cash_questions/*/answers/*/not_built".into(),
+            "/cash_questions/*/answers/*/text".into(),
+            "/cash_questions/*/bridge_txn_id".into(),
+            "/cash_questions/*/date".into(),
+            "/cash_questions/*/movement".into(),
+            format!("/cash_questions/*/printed_as/{marker}"),
+            "/cash_questions/*/question".into(),
+            "/cash_questions_omitted".into(),
+            "/cash_questions_open".into(),
+            "/counterparties/*/disposition".into(),
+            format!("/counterparties/*/ledger/{marker}"),
+            format!("/counterparties/*/party/{marker}"),
+            "/counterparties/*/rows".into(),
+            "/counterparties/*/suspense".into(),
+            "/counterparties_omitted".into(),
+            format!("/ledgers_to_validate/*/{marker}"),
+            "/ledgers_to_validate_omitted".into(),
+            "/next_step".into(),
+            "/proposals_id".into(),
+            "/reconciled/closing_balance".into(),
+            "/reconciled/running_balance_every_row".into(),
+            "/reconciled/total_credits".into(),
+            "/reconciled/total_debits".into(),
+            "/reconciled/totals_match_statement".into(),
+            "/rows_in_window".into(),
+            "/sha256".into(),
+            "/skipped".into(),
+            "/statement_rows".into(),
+            "/suspense_by_reason/cash_purpose_not_confirmed".into(),
+            "/suspense_by_reason/party_unmapped_or_mapped_to_suspense".into(),
+            "/suspense_rows".into(),
+            "/vouchers".into(),
+        ]
+        .iter()
+        .map(String::as_str)
+        .collect(),
+        "{summary}"
+    );
+    let numbers: std::collections::BTreeSet<&str> = found
+        .iter()
+        .filter(|(_, _, leaf)| leaf.is_number())
+        .map(|(shape, _, _)| shape.as_str())
+        .collect();
+    // Numbers are counts, and only counts.
+    assert_eq!(
+        numbers,
+        [
+            "/cash_questions_omitted",
+            "/cash_questions_open",
+            "/counterparties/*/rows",
+            "/counterparties_omitted",
+            "/ledgers_to_validate_omitted",
+            "/rows_in_window",
+            "/skipped",
+            "/statement_rows",
+            "/suspense_by_reason/cash_purpose_not_confirmed",
+            "/suspense_by_reason/party_unmapped_or_mapped_to_suspense",
+            "/suspense_rows",
+            "/vouchers",
+        ]
+        .into_iter()
+        .collect(),
+        "{summary}"
+    );
+    let mut digits: Vec<(String, String)> = found
+        .iter()
+        .filter_map(|(_, path, leaf)| {
+            leaf.as_str()
+                .filter(|text| text.chars().any(|c| c.is_ascii_digit()))
+                .map(|text| (path.clone(), text.to_string()))
+        })
+        .collect();
+    digits.sort();
+    // A digit appears only in the caller's echoes, the open cash line's
+    // fields (b1), the account's last four digits and the file digest.
+    let open_id = summary["cash_questions"][0]["bridge_txn_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        digits,
         [
             ("/account_last4", "1234"),
             ("/cash_questions/0/amount", "64.00"),
+            ("/cash_questions/0/bridge_txn_id", open_id.as_str()),
             ("/cash_questions/0/date", "2026-08-05"),
-            ("/reconciled/closing_balance", "9495.00"),
-            ("/reconciled/total_credits", "71.00"),
+            ("/reconciled/closing_balance", "9585.00"),
+            ("/reconciled/total_credits", "161.00"),
             ("/reconciled/total_debits", "576.00"),
             ("/sha256", "0"),
         ]
         .map(|(path, text)| (path.to_string(), text.to_string())),
         "{summary}"
     );
+    assert!(open_id.starts_with("st-20260805-"), "{open_id}");
     // Ordered by suspense, rows, name and disposition, never by amount: the
     // answered 512.00 line and the open 64.00 line share a spelling, and the
     // open one (NeedsAnswer) comes first by disposition.
@@ -1435,6 +1541,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     assert_eq!(
         order,
         [
+            (party("AARDVARK BUYER"), json!("Receipt")),
             (party("SYNTHETIC PAYER"), json!("Receipt")),
             (party("ATM CASH WITHDRAWAL"), json!("NeedsAnswer")),
             (party("ATM CASH WITHDRAWAL"), json!("Payment")),

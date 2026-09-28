@@ -395,3 +395,10 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - Reviews: Opus and Sonnet both found no P1. The only P2 is the records, which the full run answers. P3s are in the PR body.
 - **Pushed d54bf5b5; draft #826 opened and subscribed.** The full run on d54bf5b5 is sharded to `cloud/lane-e-644-shards-1`. Then: `--merge`, the records commit, `--verify`, a pre-push check, and a push.
 - Next: #662 (check what #727 left), #658, #667.
+
+## 2026-09-28 01:55 UTC — #826 (#644): records committed and pushed (2e474bd4)
+
+- Two container restarts killed the full run before any shard finished (the first run had started at 22:39 UTC). The runner's own push also failed: `*.log` is gitignored, so its `git add` refused. The third run used eight shards, and each was pushed by hand with `git add -f` to `cloud/lane-e-644-shards-1`.
+- **656 in the list, 656 run, 651 killed.** The 5 that survive are the accepted survivors. F644-01, F644-02 and C2-26 are killed. `--verify --changed-since origin/master` → 494 selected, 494 proven, on crate tree 417ae43f. Master has not touched the crate.
+- Read-only Sonnet pre-push check: none. **Pushed 2e474bd4.** #826's body now names the candidate SHA and the numbers, and a comment gives them.
+- Next: #826 waits on CI, review and the merge (Lane D). Then #662: only the CI wiring of `check-unbounded-reads.mjs` is left, an owner option (a) or (b). Then #658 and #667.

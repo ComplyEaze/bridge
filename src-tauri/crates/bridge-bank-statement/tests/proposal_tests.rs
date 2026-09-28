@@ -7,6 +7,7 @@
 mod common;
 
 use bridge_bank_statement::bank::Bank;
+use bridge_bank_statement::cash::CashAnswers;
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
@@ -24,6 +25,7 @@ fn options<'a>(suspense: &'a str) -> BuildOptions<'a> {
         account_number: "00000000001234",
         date_from: None,
         date_to: None,
+        cash_answers: CashAnswers::none(),
     }
 }
 
@@ -415,6 +417,8 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         ledger: "SUSP".to_string(),
         suspense: true,
         bridge_txn_id: "st-x".to_string(),
+        cash_movement: None,
+        cash_answer: None,
     }
 }
 

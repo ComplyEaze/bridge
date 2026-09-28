@@ -1418,6 +1418,7 @@ fn published_proposals(directory: &std::path::Path, payload: &ImportPayload) -> 
         "schema": "bridge.bank_statement.proposals.v1",
         "proposals_id": proposals_id,
         "vouchers": payload.vouchers,
+        "records": [],
     });
     let bytes = serde_json::to_vec_pretty(&document).unwrap();
     let statements = directory.join("bank-statements");
@@ -1470,6 +1471,10 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         .value;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 2, "{response}");
+    assert_eq!(
+        result["suspense_lines"],
+        json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
+    );
     // the same request sequence was consumed, so the same admission ran
     assert_eq!(simulator.finish().expect("requests").len(), 44);
     assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
@@ -1489,6 +1494,349 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         without_batch_identity(&read(inline_directory.path(), inline_result))
     );
     assert!(from_proposals.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
+}
+
+/// A cash line nobody answered has no voucher. Building the rest would leave
+/// it out of the books unseen, so the proposals are refused until it is
+/// answered, before any Tally read.
+#[tokio::test]
+async fn a_proposals_file_with_an_open_cash_question_is_refused_before_any_tally_read() {
+    let directory = tempfile::tempdir().unwrap();
+    // port 9: any Tally read would fail differently from the refusal below
+    let server = bank_server(directory.path(), 9);
+    let payload = captured_bank_payload();
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": payload.vouchers,
+        "records": [{"row": 3, "disposition": "needs_answer", "cash_movement": "withdrawal"}],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "cash_questions_open",
+        "{response}"
+    );
+}
+
+/// A file written before cash lines were asked holds a cash line as a suspense
+/// entry nobody answered. It is refused like an open question, and a file
+/// with no records at all is refused as invalid.
+#[tokio::test]
+async fn an_older_proposals_file_with_an_unanswered_cash_line_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), 9);
+    let payload = captured_bank_payload();
+    let publish = |records: Option<Value>| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let mut document = json!({
+            "schema": "bridge.bank_statement.proposals.v1",
+            "proposals_id": proposals_id,
+            "vouchers": payload.vouchers,
+        });
+        if let Some(records) = records {
+            document["records"] = records;
+        }
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join("bank-statements");
+        std::fs::create_dir_all(&statements).unwrap();
+        std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let code = |response: Value| {
+        response["structuredContent"]["result"]["error"]["code"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
+    };
+    let legacy = publish(Some(json!([{
+        "row": 1, "disposition": {"voucher": "Payment"}, "party": "ATM CASH WITHDRAWAL",
+        "ledger": "Suspense", "suspense": true, "bridge_txn_id": "txn-001"
+    }])));
+    assert_eq!(
+        code(
+            server
+                .call_tool_response("build_import_xml", legacy)
+                .await
+                .value
+        ),
+        "cash_questions_open"
+    );
+    // An answer this version no longer offers, from an earlier build of this
+    // work, is refused the same way.
+    let stale = publish(Some(json!([{
+        "row": 1, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
+        "ledger": "UBI SB", "suspense": false, "bridge_txn_id": "txn-001",
+        "cash_movement": "withdrawal", "cash_answer": "other_own_bank"
+    }])));
+    assert_eq!(
+        code(
+            server
+                .call_tool_response("build_import_xml", stale)
+                .await
+                .value
+        ),
+        "cash_questions_open"
+    );
+    let missing = publish(None);
+    assert_eq!(
+        code(
+            server
+                .call_tool_response("build_import_xml", missing)
+                .await
+                .value
+        ),
+        "proposals_file_invalid"
+    );
+}
+
+/// A ledger a person named as cash in hand for a bank cash line must be one.
+/// Over the captured demo masters, a bank ledger named there is refused with
+/// the reserved group it really reaches, and the real cash ledger passes.
+#[test]
+fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
+    use super::super::super::bank_statement::AnsweredCashLedger;
+    let masters = observed(&captured_demo_ledger_parents(), captured_demo_groups());
+    let need = |ledger: &str| AnsweredCashLedger {
+        bridge_txn_id: "st-20260801-0000000000000001".into(),
+        ledger: ledger.into(),
+        cash_in_hand: true,
+    };
+    assert_eq!(
+        answered_ledger_refusals(&[need("Cash")], &masters, 200_000),
+        None
+    );
+    let (reason, refused, omitted) = answered_ledger_refusals(
+        &[
+            need("Cash"),
+            need("HDFC Bank Current Account"),
+            need("HDFC Bank Current Account"),
+        ],
+        &masters,
+        200_000,
+    )
+    .unwrap();
+    assert_eq!(reason, "cash_ledger_not_cash_in_hand");
+    assert_eq!(omitted, 0);
+    assert_eq!(refused.len(), 1, "one row per ledger: {refused:?}");
+    assert_eq!(refused[0]["requires"], "cash_in_hand");
+    assert_eq!(refused[0]["state"], "cash_bank");
+    assert_eq!(refused[0]["reserved_group"], "Bank Accounts");
+    assert_eq!(
+        refused[0]["first_bridge_txn_id"],
+        "st-20260801-0000000000000001"
+    );
+    let party = answered_ledger_refusals(&[need("Gujarat Poly Industries")], &masters, 200_000)
+        .unwrap()
+        .1;
+    // A ledger a non-cash answer names (a customer, drawings) passes when it
+    // is outside Suspense A/c: only that group is refused for it.
+    let named = AnsweredCashLedger {
+        cash_in_hand: false,
+        ..need("Gujarat Poly Industries")
+    };
+    assert_eq!(answered_ledger_refusals(&[named], &masters, 200_000), None);
+    assert_eq!(party[0]["state"], "not_cash_bank");
+}
+
+/// Publish a proposals file holding `vouchers` and one business-cash record
+/// naming `ledger` for `txn-001`, returning build_import_xml's arguments.
+fn business_cash_proposals(directory: &std::path::Path, vouchers: Value, ledger: &str) -> Value {
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": vouchers,
+        "records": [{
+            "row": 1, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
+            "ledger": ledger, "suspense": false, "bridge_txn_id": "txn-001",
+            "cash_movement": "withdrawal", "cash_answer": "business_cash"
+        }],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+}
+
+/// Through the tool: a business-cash answer naming a bank ledger is refused
+/// at the first group read, before any file is written, with the group it
+/// really reaches. The captured catalogue's `WR2 Sales` is rewritten under
+/// Bank Accounts for this test only (the served group snapshot holds that
+/// reserved group); that exercises Bridge's own refusal and is no evidence of
+/// what Tally does.
+#[tokio::test]
+async fn a_business_cash_answer_naming_a_bank_ledger_is_refused_at_build() {
+    let plans = bank_build_plans()[..18]
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).expect("refusal plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let contra = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
+        "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let args = business_cash_proposals(directory.path(), contra, "WR2 Sales");
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "cash_ledger_not_cash_in_hand");
+    assert_eq!(result["refused_ledgers_omitted"], 0);
+    let refused = result["refused_ledgers"].as_array().unwrap();
+    assert_eq!(refused.len(), 1);
+    let ledger = &refused[0]["ledger"];
+    assert!(
+        ledger == "WR2 Sales" || marked(ledger) == Some("WR2 Sales"),
+        "{ledger}"
+    );
+    assert_eq!(refused[0]["state"], "cash_bank");
+    assert_eq!(refused[0]["reserved_group"], "Bank Accounts");
+    assert_eq!(refused[0]["first_bridge_txn_id"], "txn-001");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
+/// The requirement binds the voucher actually built: a record naming Cash for
+/// a line whose voucher is not a Contra debiting Cash is refused before any
+/// Tally read.
+#[tokio::test]
+async fn a_business_cash_record_that_does_not_match_its_voucher_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    // port 9: any Tally read would fail differently from the refusal below
+    let server = bank_server(directory.path(), 9);
+    let payment = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
+    let args = business_cash_proposals(directory.path(), payment, "Cash");
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "proposals_file_invalid",
+        "{response}"
+    );
+}
+
+/// Only dont_know may post a cash line to suspense, where it is tagged and
+/// listed. An owner's-use answer naming a ledger under Suspense A/c would post
+/// there untagged, so build refuses it with the group reached. The captured
+/// catalogue's `WR2 Sales` is moved under Suspense A/c for this test only (the
+/// served group snapshot holds that reserved group); that exercises Bridge's
+/// own refusal and is no evidence of what Tally does.
+#[tokio::test]
+async fn a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build() {
+    let plans = bank_build_plans()[..18]
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Suspense A/c</PARENT>",
+                    );
+                    assert_ne!(&moved, body, "the rewrite must apply");
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).expect("refusal plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let payment = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment",
+        "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v1",
+        "proposals_id": proposals_id,
+        "vouchers": payment,
+        "records": [{
+            "row": 1, "disposition": {"voucher": "Payment"}, "party": "ATM CASH WITHDRAWAL",
+            "ledger": "WR2 Sales", "suspense": false, "bridge_txn_id": "txn-001",
+            "cash_movement": "withdrawal", "cash_answer": "owner_use"
+        }],
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.path().join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "cash_answer_ledger_in_suspense");
+    let refused = result["refused_ledgers"].as_array().unwrap();
+    assert_eq!(refused.len(), 1);
+    assert_eq!(refused[0]["requires"], "not_suspense");
+    assert_eq!(refused[0]["reserved_group"], "Suspense A/c");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+}
+
+/// The build result counts every voucher a bank import sent to suspense, by
+/// the tag in its narration, and no other.
+#[test]
+fn a_build_counts_every_tagged_suspense_voucher_by_tag() {
+    let mut payload = captured_bank_payload();
+    let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
+    assert_eq!(payload.vouchers.len(), 2);
+    let counted = |payload: &ImportPayload| {
+        let counted = tagged_suspense_vouchers(&payload.vouchers);
+        (
+            counted["count"].as_u64().unwrap(),
+            counted["purpose_not_confirmed"].as_u64().unwrap(),
+            counted["unidentified"].as_u64().unwrap(),
+        )
+    };
+    payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
+    payload.vouchers[1].narration = Some("NEFT from Northwind Traders | ACC".into());
+    assert_eq!(counted(&payload), (1, 1, 0));
+    // The unidentified tag counts only with the voucher's own ledger after it.
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} Suspense", tags[1]));
+    assert_eq!(counted(&payload), (1, 1, 0));
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
+    assert_eq!(counted(&payload), (2, 1, 1));
+    // A tag's text anywhere but the end marks nothing: an account label.
+    payload.vouchers[1].narration = Some(format!("NEFT | {} | 01-Sep", tags[0]));
+    assert_eq!(counted(&payload), (1, 1, 0));
+    payload.vouchers[0].narration = None;
+    payload.vouchers[1].narration = None;
+    assert_eq!(counted(&payload), (0, 0, 0));
 }
 
 #[tokio::test]
@@ -2097,6 +2445,67 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
                     .next()
                     .is_none(),
             "{ledger:?}"
+        );
+    }
+}
+
+/// A build from a proposals file counts its suspense lines by tag and never
+/// lists them. Two batch-level fields are built from the vouchers and are set
+/// aside by name, after they are asserted: the verification window's bounds
+/// (the earliest and latest voucher dates) and the batch totals. Outside them
+/// no voucher's id, date or amount appears. (An amendment's lists and some
+/// refusals name vouchers by id; this build does neither.)
+#[tokio::test]
+async fn a_proposals_build_counts_its_suspense_lines_and_never_lists_them() {
+    let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
+    let mut payload = captured_bank_payload();
+    payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
+    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("proposals plan");
+    let directory = tempfile::tempdir().unwrap();
+    let (proposals_id, digest) = published_proposals(directory.path(), &payload);
+    let response = bank_server(directory.path(), simulator.address().port())
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": digest}),
+        )
+        .await
+        .value;
+    let _ = simulator.finish();
+    let mut result = response["structuredContent"]["result"].clone();
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    assert_eq!(
+        result["suspense_lines"],
+        json!({"count": 2, "purpose_not_confirmed": 1, "unidentified": 1})
+    );
+    // The window runs from the batch's first voucher date to its last, and
+    // the totals sum every voucher.
+    assert_eq!(result["verification_preflight"]["from"], "20260901");
+    assert_eq!(result["verification_preflight"]["to"], "20260902");
+    assert_eq!(result["total_debit"], "20");
+    for key in ["from", "to"] {
+        result["verification_preflight"]
+            .as_object_mut()
+            .unwrap()
+            .remove(key);
+    }
+    let text = result.to_string();
+    for private in [
+        "txn-001",
+        "txn-002",
+        "2026-09-01",
+        "2026-09-02",
+        "20260901",
+        "20260902",
+        "12.5",
+        "7.5",
+        "UNRESOLVED",
+        "ATM CASH WITHDRAWAL",
+        "| ACC",
+    ] {
+        assert!(
+            !text.contains(private),
+            "{private} left the machine: {text}"
         );
     }
 }

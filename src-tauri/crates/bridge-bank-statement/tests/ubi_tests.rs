@@ -7,13 +7,14 @@
 mod common;
 
 use bridge_bank_statement::bank::{Bank, UNRESOLVED};
+use bridge_bank_statement::cash::{CashAnswers, CashMovement, CASH_DEPOSIT};
 use bridge_bank_statement::date::{parse_day_month_year_hyphenated, Date};
 use bridge_bank_statement::geometry::{Page, Word};
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::money::Controls;
 use bridge_bank_statement::parse::{parse_statement, require_account_match, Row};
 use bridge_bank_statement::pipeline::{prepare, StatementRequest};
-use bridge_bank_statement::proposals::format_amount;
+use bridge_bank_statement::proposals::{format_amount, Disposition};
 use common::*;
 
 const HEADER: &str = "Date Transaction Id Remarks Amount( ) Balance( )";
@@ -338,6 +339,7 @@ fn request<'a>(bank: Bank, controls: &'a Controls, mapping: &'a Mapping) -> Stat
         bank_ledger: "Union Bank",
         suspense_ledger: "Suspense",
         mapping,
+        cash_answers: CashAnswers::none(),
         date_from: None,
         date_to: None,
     }
@@ -356,7 +358,19 @@ fn a_union_bank_statement_proves_itself_without_printed_totals() {
     assert_eq!(parsed.statement_rows, 5);
     assert_eq!(format_amount(&parsed.totals.debits), "13250.50");
     assert_eq!(format_amount(&parsed.totals.credits), "3250.50");
-    assert_eq!(parsed.build.proposals.len(), 5);
+    // The BY CASH deposit is a cash line nobody has answered: it stays open,
+    // with no voucher, never a silent suspense Receipt.
+    assert_eq!(parsed.build.proposals.len(), 4);
+    let open = parsed
+        .build
+        .records
+        .iter()
+        .filter(|record| record.disposition == Disposition::NeedsAnswer)
+        .collect::<Vec<_>>();
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].party, CASH_DEPOSIT);
+    assert_eq!(open[0].cash_movement, Some(CashMovement::Deposit));
+    assert_eq!(parsed.check.vouchers, 4);
 
     // supplied totals are still checked
     let wrong = Controls::parse("10,000.00", "0.00", "13,250.50", "3,250.51").unwrap();

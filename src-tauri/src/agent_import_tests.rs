@@ -3328,5 +3328,12 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     );
     assert_eq!(decoded_element_text(&xml, "REFERENCE"), reference);
     assert_eq!(decoded_element_text(&xml, "LEDGERNAME"), ledger);
+    // A conforming XML parser folds a literal CR LF (and a lone CR) to LF
+    // before the application sees the text (XML 1.0, end-of-line handling);
+    // character references are not folded. quick_xml's decode() skips that
+    // step, so apply it here: only an escaped CR LF survives it (bridge#626).
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "LEDGERNAME"), ledger);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
     assert_eq!(decoded_element_text(&xml, "SVCURRENTCOMPANY"), company);
 }

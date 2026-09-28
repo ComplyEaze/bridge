@@ -9,6 +9,7 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
+use crate::encode_tally_xml_request_utf16le;
 #[cfg(feature = "voucher-scan")]
 use crate::outstandings::{
     render_empty_partition_witness_template, render_ledger_opening_coverage,
@@ -17,7 +18,6 @@ use crate::outstandings::{
 #[cfg(feature = "voucher-scan")]
 use crate::outstandings_shared::PinnedCompany;
 use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
-use crate::encode_tally_xml_request_utf16le;
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_FROM: &str = "20000101";
@@ -26,15 +26,12 @@ const TEMPLATE_TO: &str = "20000102";
 const TEMPLATE_ALTER_ID_START: u64 = 0;
 #[cfg(feature = "voucher-scan")]
 const TEMPLATE_ALTER_ID_END: u64 = 1;
-const BRIDGE_CANARY_LEDGER_PREFIX: &str = "BRIDGE-CANARY-";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
     CompanyInvalid,
     DateInvalid,
     DateRangeInvalid,
-    CanaryLedgerInvalid,
-    IdentityQueryInvalid,
 }
 
 impl fmt::Display for ReadProfileValidationError {
@@ -43,8 +40,6 @@ impl fmt::Display for ReadProfileValidationError {
             Self::CompanyInvalid => "read profile company input was invalid",
             Self::DateInvalid => "read profile date input was invalid",
             Self::DateRangeInvalid => "read profile date range was invalid",
-            Self::CanaryLedgerInvalid => "read profile canary ledger input was invalid",
-            Self::IdentityQueryInvalid => "read profile identity query input was invalid",
         })
     }
 }
@@ -71,63 +66,6 @@ impl ValidatedCompanyName {
 impl fmt::Debug for ValidatedCompanyName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("ValidatedCompanyName([redacted])")
-    }
-}
-
-/// A deliberately narrow name for a Bridge-generated write-canary ledger.
-/// It is safe to place in the exact TDL filter formula used by the readback
-/// profile and cannot represent an arbitrary operator-supplied ledger name.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedCanaryLedgerName(String);
-
-impl ValidatedCanaryLedgerName {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.is_empty()
-            || value.len() > 128
-            || value
-                .strip_prefix(BRIDGE_CANARY_LEDGER_PREFIX)
-                .is_none_or(str::is_empty)
-            || !value.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-' | b'_' | b'.')
-            })
-        {
-            return Err(ReadProfileValidationError::CanaryLedgerInvalid);
-        }
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedCanaryLedgerName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedCanaryLedgerName([redacted])")
-    }
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedIdentityQuerySha256(String);
-
-impl ValidatedIdentityQuerySha256 {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(ReadProfileValidationError::IdentityQueryInvalid);
-        }
-        Ok(Self(value.to_ascii_lowercase()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedIdentityQuerySha256 {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedIdentityQuerySha256([redacted])")
     }
 }
 

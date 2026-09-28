@@ -47,32 +47,6 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         assert_eq!(ValidatedDateRange::new(from, to), Err(expected));
     }
     assert!(ValidatedDateRange::new("20240229", "20240229").is_ok());
-    for ledger_name in [
-        "",
-        "Cash",
-        "BRIDGE-CANARY-",
-        "canary\nledger",
-        "canary\"ledger",
-        "canary:$ledger",
-    ] {
-        assert_eq!(
-            ValidatedCanaryLedgerName::new(ledger_name),
-            Err(ReadProfileValidationError::CanaryLedgerInvalid)
-        );
-    }
-    assert_eq!(
-        ValidatedCanaryLedgerName::new("x".repeat(129)),
-        Err(ReadProfileValidationError::CanaryLedgerInvalid)
-    );
-    assert!(ValidatedCanaryLedgerName::new("BRIDGE-CANARY-LEDGER-001").is_ok());
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("a".repeat(63)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("g".repeat(64)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
 }
 
 #[test]

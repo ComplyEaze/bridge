@@ -1473,7 +1473,7 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
     assert_eq!(result["voucher_count"], 2, "{response}");
     assert_eq!(
         result["suspense_lines"],
-        json!({"count": 0, "lines": [], "omitted": 0})
+        json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
     );
     // the same request sequence was consumed, so the same admission ran
     assert_eq!(simulator.finish().expect("requests").len(), 44);
@@ -1808,70 +1808,35 @@ async fn a_cash_answer_naming_a_suspense_group_ledger_is_refused_at_build() {
     assert_eq!(simulator.finish().expect("requests").len(), 18);
 }
 
-/// A batch with hundreds of suspense lines still returns its listing: bounded,
-/// with the full count and the number omitted.
+/// The build result counts every voucher a bank import sent to suspense, by
+/// the tag in its narration, and no other.
 #[test]
-fn the_build_suspense_listing_is_bounded_and_counts_every_line() {
-    let payload = captured_bank_payload();
-    let tag = bridge_bank_statement::proposals::SUSPENSE_TAGS[0];
-    let vouchers = (0..300)
-        .map(|index| {
-            let mut voucher = payload.vouchers[0].clone();
-            voucher.bridge_txn_id = format!("txn-{index:04}");
-            voucher.narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {tag}"));
-            voucher
-        })
-        .collect::<Vec<_>>();
-    let max_bytes = 40_000;
-    let listed = tagged_suspense_vouchers(&vouchers, max_bytes);
-    let lines = listed["lines"].as_array().unwrap().len();
-    assert_eq!(listed["count"], 300);
-    assert!(lines > 0 && lines < 300, "{lines}");
-    assert_eq!(
-        lines + usize::try_from(listed["omitted"].as_u64().unwrap()).unwrap(),
-        300
-    );
-    assert!(serde_json::to_vec(&listed).unwrap().len() < max_bytes / 2);
-}
-
-/// The build result lists every voucher a bank import sent to suspense, found
-/// by the tag in its narration, and no other.
-#[test]
-fn a_build_lists_every_tagged_suspense_voucher() {
+fn a_build_counts_every_tagged_suspense_voucher_by_tag() {
     let mut payload = captured_bank_payload();
     let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
     assert_eq!(payload.vouchers.len(), 2);
+    let counted = |payload: &ImportPayload| {
+        let counted = tagged_suspense_vouchers(&payload.vouchers);
+        (
+            counted["count"].as_u64().unwrap(),
+            counted["purpose_not_confirmed"].as_u64().unwrap(),
+            counted["unidentified"].as_u64().unwrap(),
+        )
+    };
     payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
     payload.vouchers[1].narration = Some("NEFT from Northwind Traders | ACC".into());
-    let listed = tagged_suspense_vouchers(&payload.vouchers, 200_000);
-    assert_eq!(listed["count"], 1, "{listed}");
-    assert_eq!(
-        listed["lines"][0]["bridge_txn_id"],
-        payload.vouchers[0].bridge_txn_id.as_str()
-    );
+    assert_eq!(counted(&payload), (1, 1, 0));
     // The unidentified tag counts only with the voucher's own ledger after it.
     payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} Suspense", tags[1]));
-    assert_eq!(
-        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
-        1
-    );
+    assert_eq!(counted(&payload), (1, 1, 0));
     payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
-    assert_eq!(
-        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
-        2
-    );
+    assert_eq!(counted(&payload), (2, 1, 1));
     // A tag's text anywhere but the end marks nothing: an account label.
     payload.vouchers[1].narration = Some(format!("NEFT | {} | 01-Sep", tags[0]));
-    assert_eq!(
-        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
-        1
-    );
+    assert_eq!(counted(&payload), (1, 1, 0));
     payload.vouchers[0].narration = None;
     payload.vouchers[1].narration = None;
-    assert_eq!(
-        tagged_suspense_vouchers(&payload.vouchers, 200_000)["count"],
-        0
-    );
+    assert_eq!(counted(&payload), (0, 0, 0));
 }
 
 #[tokio::test]
@@ -2480,6 +2445,65 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
                     .next()
                     .is_none(),
             "{ledger:?}"
+        );
+    }
+}
+
+/// A build from a proposals file returns no value of any statement row: its
+/// suspense lines, under either tag, are counted, not listed. What remains
+/// row-derived is batch-level: the verification window's first and last dates
+/// and the batch's totals.
+#[tokio::test]
+async fn a_proposals_build_returns_no_row_value_of_its_suspense_lines() {
+    let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
+    let mut payload = captured_bank_payload();
+    payload.vouchers[0].narration = Some(format!("ATM CASH WITHDRAWAL | ACC | {}", tags[0]));
+    payload.vouchers[1].narration = Some(format!("from UNRESOLVED | ACC | {} WR2 Sales", tags[1]));
+    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("proposals plan");
+    let directory = tempfile::tempdir().unwrap();
+    let (proposals_id, digest) = published_proposals(directory.path(), &payload);
+    let response = bank_server(directory.path(), simulator.address().port())
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": digest}),
+        )
+        .await
+        .value;
+    let _ = simulator.finish();
+    let mut result = response["structuredContent"]["result"].clone();
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    assert_eq!(
+        result["suspense_lines"],
+        json!({"count": 2, "purpose_not_confirmed": 1, "unidentified": 1})
+    );
+    // The batch-level fields, named: the window spans the batch's dates, and
+    // the totals sum every voucher.
+    assert_eq!(result["verification_preflight"]["from"], "20260901");
+    assert_eq!(result["verification_preflight"]["to"], "20260902");
+    assert_eq!(result["total_debit"], "20");
+    for key in ["from", "to"] {
+        result["verification_preflight"]
+            .as_object_mut()
+            .unwrap()
+            .remove(key);
+    }
+    let text = result.to_string();
+    for private in [
+        "txn-001",
+        "txn-002",
+        "2026-09-01",
+        "2026-09-02",
+        "20260901",
+        "20260902",
+        "12.5",
+        "7.5",
+        "UNRESOLVED",
+        "ATM CASH WITHDRAWAL",
+        "| ACC",
+    ] {
+        assert!(
+            !text.contains(private),
+            "{private} left the machine: {text}"
         );
     }
 }

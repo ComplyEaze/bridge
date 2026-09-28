@@ -1194,7 +1194,10 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
                 record.bridge_txn_id.clone(),
                 record.date.clone(),
                 record.date.replace('-', ""),
+                narration_date(&record.date),
+                slashed_date(&record.date),
                 record.amount.clone(),
+                record.amount.trim_end_matches(".00").to_string(),
             ]
         })
         .collect();
@@ -1204,6 +1207,11 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             "st-2026",
             "Aug2026",
             "9488",
+            "9,488",
+            "9,559",
+            "9,495",
+            "9,524",
+            "9,236",
             "9559",
             "9495",
             "9524",
@@ -1232,6 +1240,32 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             "{token} left the machine: {text}"
         );
     }
+
+    // Under mask_parties the open lines' party name is masked like every
+    // other party name.
+    let masked = super::super::redact_tool_response(
+        "parse_bank_statement",
+        json!({ "result": summary_before }),
+        Redaction::MaskParties,
+    )
+    .to_string();
+    assert!(!masked.contains("ATM CASH WITHDRAWAL"), "{masked}");
+    assert!(!masked.contains("SYNTHETIC PAYER"), "{masked}");
+}
+
+/// 2026-08-01 as a statement narration prints it: 01-Aug-2026.
+fn narration_date(iso: &str) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let [year, month, day] = [&iso[0..4], &iso[5..7], &iso[8..10]];
+    let month = MONTHS[month.parse::<usize>().unwrap() - 1];
+    format!("{day}-{month}-{year}")
+}
+
+/// 2026-08-01 as 01/08/2026.
+fn slashed_date(iso: &str) -> String {
+    format!("{}/{}/{}", &iso[8..10], &iso[5..7], &iso[0..4])
 }
 
 /// A known gap, pinned so it cannot pass unseen: a counterparty of one row
@@ -1340,4 +1374,6 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
     // The bank ledger's totals are built from the same single rows.
     assert_eq!(summary["bank_ledger_out"], "512.00");
     assert_eq!(summary["bank_ledger_in"], "71.00");
+    assert_eq!(summary["reconciled"]["total_debits"], "512.00");
+    assert_eq!(summary["reconciled"]["total_credits"], "71.00");
 }

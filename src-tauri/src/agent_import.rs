@@ -924,9 +924,9 @@ impl Server {
                     "batch_id": batch_id, "path": path, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
-                    // Every line a bank import sent to suspense, so none sits
-                    // there unseen.
-                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers, self.settings.max_bytes),
+                    // How many lines a bank import sent to suspense, by tag,
+                    // so none sits there uncounted.
+                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers),
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
@@ -2600,38 +2600,30 @@ fn answered_ledger_refusals(
     Some((reason, rows, omitted))
 }
 
-/// The vouchers Bridge's bank import sent to suspense, found by the tag it
+/// How many vouchers Bridge's bank import sent to suspense, by the tag it
 /// writes at the end of their narration
-/// ([`bridge_bank_statement::proposals::suspense_tagged`]), for a build's result.
-fn tagged_suspense_vouchers(vouchers: &[ImportVoucher], max_bytes: usize) -> Value {
-    let lines = vouchers
-        .iter()
-        .filter(|voucher| {
-            voucher.narration.as_deref().is_some_and(|narration| {
-                bridge_bank_statement::proposals::suspense_tagged(
-                    narration,
-                    voucher.entries.iter().map(|entry| entry.ledger.as_str()),
-                )
-            })
-        })
-        .map(|voucher| {
-            json!({
-                "bridge_txn_id": voucher.bridge_txn_id,
-                "date": voucher.date,
-                "entries": voucher.entries.iter().map(|entry| json!({
-                    "ledger": party_name(entry.ledger.clone()),
-                    "amount": entry.amount,
-                    "side": if entry.side == EntrySide::Dr { "Dr" } else { "Cr" },
-                })).collect::<Vec<_>>(),
-            })
-        })
-        .collect::<Vec<_>>();
-    // Bounded, so a large batch's result is never withheld whole; the count
-    // is always every line.
-    let count = lines.len();
-    let mut budget = max_bytes / 4;
-    let (lines, omitted) = super::bank_statement::bounded(lines, &mut budget);
-    json!({"count": count, "lines": lines, "omitted": omitted})
+/// ([`bridge_bank_statement::proposals::suspense_tag`]), for a build's result.
+/// Counts only: a line's date and amounts stay local, as in the parse result.
+fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
+    let (mut purpose_not_confirmed, mut unidentified) = (0_usize, 0_usize);
+    for voucher in vouchers {
+        let tag = voucher.narration.as_deref().and_then(|narration| {
+            bridge_bank_statement::proposals::suspense_tag(
+                narration,
+                voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+            )
+        });
+        match tag {
+            Some(bridge_bank_statement::cash::PURPOSE_NOT_CONFIRMED) => purpose_not_confirmed += 1,
+            Some(_) => unidentified += 1,
+            None => {}
+        }
+    }
+    json!({
+        "count": purpose_not_confirmed + unidentified,
+        "purpose_not_confirmed": purpose_not_confirmed,
+        "unidentified": unidentified,
+    })
 }
 
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {

@@ -44,10 +44,25 @@ pub const SUSPENSE_TAGS: [&str; 2] = [PURPOSE_NOT_CONFIRMED, UNIDENTIFIED];
 /// `ledgers`. A tag's text anywhere else (an account label, a party name)
 /// never counts.
 pub fn suspense_tagged<'a>(narration: &str, ledgers: impl IntoIterator<Item = &'a str>) -> bool {
-    narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}"))
-        || ledgers
-            .into_iter()
-            .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
+    suspense_tag(narration, ledgers).is_some()
+}
+
+/// Which of [`SUSPENSE_TAGS`] a narration ends in, as [`suspense_tagged`]
+/// finds it.
+pub fn suspense_tag<'a>(
+    narration: &str,
+    ledgers: impl IntoIterator<Item = &'a str>,
+) -> Option<&'static str> {
+    if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
+        Some(PURPOSE_NOT_CONFIRMED)
+    } else if ledgers
+        .into_iter()
+        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
+    {
+        Some(UNIDENTIFIED)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

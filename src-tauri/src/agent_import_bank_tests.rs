@@ -2450,11 +2450,11 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
 }
 
 /// A build from a proposals file counts its suspense lines by tag and never
-/// lists them: no suspense line's id, date or amount is returned. Three
-/// batch-level fields are built from the vouchers and are set aside by name:
-/// the verification window's bounds (the batch's first and last voucher
-/// dates) and the batch totals, asserted here; and voucher ids, which an
-/// amendment's lists and some refusals carry but this build does not.
+/// lists them. Two batch-level fields are built from the vouchers and are set
+/// aside by name, after they are asserted: the verification window's bounds
+/// (the earliest and latest voucher dates) and the batch totals. Outside them
+/// no voucher's id, date or amount appears. (An amendment's lists and some
+/// refusals name vouchers by id; this build does neither.)
 #[tokio::test]
 async fn a_proposals_build_counts_its_suspense_lines_and_never_lists_them() {
     let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;

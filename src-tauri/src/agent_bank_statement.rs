@@ -11,8 +11,8 @@
 //! Every name in that summary is marked as a party name, so the
 //! `mask_parties` redaction preset masks it. Beyond a total built from one row,
 //! which is that row's amount, the only row-level values returned are an open
-//! cash line's: `cash_questions` identifies it by its id, date and amount so a
-//! person can answer it (owner ruling b1).
+//! cash line's: `cash_questions` identifies it by its id, date, amount, party
+//! name and movement so a person can answer it (owner ruling b1).
 //!
 //! **The password never enters the conversation.** It is read from a local
 //! owner-only file named by `password_file`, held in a zeroizing buffer, handed

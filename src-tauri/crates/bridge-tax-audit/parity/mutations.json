@@ -3336,14 +3336,6 @@
   "to": "                0\n"
  },
  {
-  "id": "D2-09",
-  "by": "author (Lane B)",
-  "what": "partners: a capital ledger named twice counts its opening once",
-  "file": "src/partners_40b_194t.rs",
-  "from": "    let opening_paise = p\n        .capital_ledgers\n        .iter()\n        .filter_map(|n| book.tb.get(n))",
-  "to": "    let opening_paise = capital\n        .iter()\n        .filter_map(|n| book.tb.get(*n))"
- },
- {
   "id": "D2-10",
   "by": "author (Lane B)",
   "what": "partners: the higher of deed and statutory rate",
@@ -3356,8 +3348,8 @@
   "by": "author (Lane B)",
   "what": "partners: s.194T at the limit is a finding",
   "file": "src/partners_40b_194t.rs",
-  "from": "if subject_paise > i128::from(tds_limit_paise) {",
-  "to": "if subject_paise >= i128::from(tds_limit_paise) {"
+  "from": "let over = subject_paise > i128::from(tds_limit_paise);",
+  "to": "let over = subject_paise >= i128::from(tds_limit_paise);"
  },
  {
   "id": "D2-12",
@@ -5804,8 +5796,8 @@
   "by": "author",
   "what": "partners re-pin: an unknown interest still gets an excess",
   "file": "src/partners_40b_194t.rs",
-  "from": "        if unknown.is_empty() {\n            let f_excess",
-  "to": "        if true {\n            let f_excess"
+  "from": "let not_computed = read_fails || !excess_computed;",
+  "to": "let not_computed = !excess_computed;"
  },
  {
   "id": "PR-12",
@@ -5846,5 +5838,269 @@
   "file": "src/partners_40b_194t.rs",
   "from": "                confidence: if seen.is_empty() {",
   "to": "                confidence: if true {"
+ },
+ {
+  "id": "PR-17",
+  "by": "author",
+  "what": "partners closing rule: the s.40(b) excess computed again",
+  "file": "src/partners_40b_194t.rs",
+  "from": "pub const S40B_EXCESS_COMPUTED: bool = false;",
+  "to": "pub const S40B_EXCESS_COMPUTED: bool = true;"
+ },
+ {
+  "id": "PR-18",
+  "by": "author",
+  "what": "partners 4a: the no-interest flag ignored",
+  "file": "src/partners_40b_194t.rs",
+  "from": "let no_interest = deed.is_some_and(|d| d.no_interest_authorised);",
+  "to": "let no_interest = deed.is_some_and(|_| false);"
+ },
+ {
+  "id": "PR-19",
+  "by": "author",
+  "what": "partners 4a: the no-interest flag beside a rate of 0 accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if no_interest_authorised && interest_rate_bp.is_some() {",
+  "to": "if no_interest_authorised && interest_rate_bp.is_some_and(|r| r > 0) {"
+ },
+ {
+  "id": "PR-20",
+  "by": "author",
+  "what": "partners 4a: a no-interest flag that is not a boolean read as true",
+  "file": "src/partners_40b_194t.rs",
+  "from": "Some(v) => v.as_bool().ok_or_else(|| {",
+  "to": "Some(v) => Some(v.as_bool().unwrap_or(true)).ok_or_else(|| {"
+ },
+ {
+  "id": "PR-21",
+  "by": "author",
+  "what": "partners config: a negative deed rate accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "Some(rate) if rate >= 0 => Some(rate),",
+  "to": "Some(rate) => Some(rate),"
+ },
+ {
+  "id": "PR-22",
+  "by": "author",
+  "what": "partners config: an interest or remuneration ledger that is a capital ledger accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if seen_caps.contains_key(led.as_str()) || tds_ledgers.contains(led) {",
+  "to": "if tds_ledgers.contains(led) {"
+ },
+ {
+  "id": "PR-23",
+  "by": "author",
+  "what": "partners config: an interest or remuneration ledger that is a TDS ledger accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if seen_caps.contains_key(led.as_str()) || tds_ledgers.contains(led) {",
+  "to": "if seen_caps.contains_key(led.as_str()) {"
+ },
+ {
+  "id": "PR-24",
+  "by": "author",
+  "what": "partners config: one ledger as both interest and remuneration accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if il == rl {",
+  "to": "            if false && il == rl {"
+ },
+ {
+  "id": "PR-25",
+  "by": "author",
+  "what": "partners config: a capital ledger listed twice accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "distinct.len() != caps.len()",
+  "to": "distinct.len() > caps.len()"
+ },
+ {
+  "id": "PR-26",
+  "by": "author",
+  "what": "partners config: a capital ledger shared by two partners accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if let Some(other) = seen_caps.insert(c.as_str(), key.as_str()) {",
+  "to": "if let Some(other) = seen_caps.insert(c.as_str(), key.as_str()).filter(|_| false) {"
+ },
+ {
+  "id": "PR-27",
+  "by": "author",
+  "what": "partners config: a ledger not in the books accepted",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if !book.ledgers.contains_key(led) {",
+  "to": "if led.is_empty() {"
+ },
+ {
+  "id": "PR-28",
+  "by": "author",
+  "what": "partners plain gate: a non-plain voucher not named",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.nonplain_vouchers.insert(guid(), v);",
+  "to": "                let _ = v;"
+ },
+ {
+  "id": "PR-29",
+  "by": "author",
+  "what": "partners plain gate: an unbalanced voucher read as plain",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                && nz().map(|l| i128::from(l.amount_paise)).sum::<i128>() == 0",
+  "to": "                && nz().map(|l| i128::from(l.amount_paise)).sum::<i128>() >= 0"
+ },
+ {
+  "id": "PR-30",
+  "by": "author",
+  "what": "partners plain gate: another partner's ledger on this capital not seen",
+  "file": "src/partners_40b_194t.rs",
+  "from": ".any(|l| all_int_rem.contains(&l.ledger) && !own_ledgers.contains(l.ledger.as_str()));",
+  "to": ".any(|l| all_int_rem.contains(&l.ledger) && own_ledgers.contains(l.ledger.as_str()));"
+ },
+ {
+  "id": "PR-31",
+  "by": "author",
+  "what": "partners: a zero capital line touches the capital",
+  "file": "src/partners_40b_194t.rs",
+  "from": ".filter(|l| capital.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": ".filter(|l| capital.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "PR-32",
+  "by": "author",
+  "what": "partners: a zero line on any partner's capital hides an off-capital voucher",
+  "file": "src/partners_40b_194t.rs",
+  "from": "(capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))\n                    && l.amount_paise != 0",
+  "to": "(capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))\n                    && l.amount_paise != 1"
+ },
+ {
+  "id": "PR-33",
+  "by": "author",
+  "what": "partners: a credit net of an unread ledger not named",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            w.unread_credit_vouchers.insert(guid(), (v, unread));",
+  "to": "            let _ = (v, unread);"
+ },
+ {
+  "id": "PR-34",
+  "by": "author",
+  "what": "partners: an interest credit net of an unread ledger not named for s.40(b)",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                w.unread_credit_interest_vouchers.insert(guid(), v);",
+  "to": "                let _ = v;"
+ },
+ {
+  "id": "PR-35",
+  "by": "author",
+  "what": "partners: a partner with no interest ledger read as reading exactly",
+  "file": "src/partners_40b_194t.rs",
+  "from": "let read_fails = !unknown.is_empty() || no_interest_ledger;",
+  "to": "let read_fails = !unknown.is_empty();"
+ },
+ {
+  "id": "PR-36",
+  "by": "author",
+  "what": "partners closing rule: the firm total stated beside a not-computed partner",
+  "file": "src/partners_40b_194t.rs",
+  "from": "    if !partners.is_empty() && not_computed_count == 0 {",
+  "to": "    if !partners.is_empty() {"
+ },
+ {
+  "id": "PR-37",
+  "by": "author",
+  "what": "partners: a firm with no partner configured not asked",
+  "file": "src/partners_40b_194t.rs",
+  "from": "    if partners.is_empty() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "PR-38",
+  "by": "author",
+  "what": "partners: the s.194T question silent under the limit when the base is uncertain",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        if over || base_uncertain {",
+  "to": "        if over {"
+ },
+ {
+  "id": "PR-39",
+  "by": "author",
+  "what": "partners: a base not read exactly titled as merely not confirmed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            } else if read_fails\n                || !w.off_capital_vouchers.is_empty()",
+  "to": "            } else if false\n                || !w.off_capital_vouchers.is_empty()"
+ },
+ {
+  "id": "PR-40",
+  "by": "author",
+  "what": "partners 4a: the no-interest title never used",
+  "file": "src/partners_40b_194t.rs",
+  "from": "let title = if no_interest && no_interest_ledger && unknown.is_empty() {",
+  "to": "let title = if false {"
+ },
+ {
+  "id": "PR-41",
+  "by": "author",
+  "what": "partners 4a: a partner with no interest ledger asked for the computation anyway",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if !excess_computed && !(no_interest && no_interest_ledger) {",
+  "to": "if !excess_computed {"
+ },
+ {
+  "id": "PR-42",
+  "by": "author",
+  "what": "partners 4a: the no-interest disallowance not stated",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if no_interest {\n                reasons.push(format!(",
+  "to": "            if false {\n                reasons.push(format!("
+ },
+ {
+  "id": "PR-43",
+  "by": "author",
+  "what": "partners 4a: the no-interest-ledger reason kept beside the no-interest deed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if no_interest_ledger && !no_interest {\n                reasons.push(",
+  "to": "            if no_interest_ledger {\n                reasons.push("
+ },
+ {
+  "id": "PR-44",
+  "by": "author",
+  "what": "partners: an unread-credit voucher also named as of another shape",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                        && !w.unread_credit_interest_vouchers.contains_key(*g)\n                        && !w.shared_tds_interest_vouchers.contains_key(*g)",
+  "to": "                        && !w.shared_tds_interest_vouchers.contains_key(*g)"
+ },
+ {
+  "id": "PR-45",
+  "by": "author",
+  "what": "partners: another partner's own TDS on a shared ledger made unattributed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger))",
+  "to": "                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger) && false)"
+ },
+ {
+  "id": "PR-46",
+  "by": "author",
+  "what": "partners: remuneration inside an unsplit voucher not said",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        if !mixed_here.is_empty() && p.remuneration_ledger.is_some() {",
+  "to": "        if false {"
+ },
+ {
+  "id": "PR-47",
+  "by": "author",
+  "what": "partners: remuneration net of an unread ledger not said",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        if !unread_rem.is_empty() {",
+  "to": "        if false {"
+ },
+ {
+  "id": "PR-48",
+  "by": "author",
+  "what": "partners: a missing remuneration ledger not stated on the allowable interest",
+  "file": "src/partners_40b_194t.rs",
+  "from": "let no_remuneration_note = if p.remuneration_ledger.is_none() {",
+  "to": "let no_remuneration_note = if false {"
+ },
+ {
+  "id": "PR-49",
+  "by": "author",
+  "what": "partners 4a: a no-interest deed read as a deed without its rate",
+  "file": "src/partners_40b_194t.rs",
+  "from": "        Some(0)\n    } else {\n        deed.and_then(|d| d.interest_rate_bp)",
+  "to": "        None\n    } else {\n        deed.and_then(|d| d.interest_rate_bp)"
  }
 ]

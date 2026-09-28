@@ -18,16 +18,41 @@
 //! on the TDS's other side; otherwise the voucher is named as sharing its TDS. A voucher carrying
 //! both the interest and the remuneration ledger is split only where exact, else counted as
 //! interest and named; a set-off on the capital, and a voucher on the partner's ledgers touching no
-//! capital, are named (the latter counted nowhere). A partner whose interest cannot be read exactly
-//! has s.40(b) not computed, never an excess. The s.194T base is gross: a reversal lowers nothing.
-//! The s.40(b)(v) remuneration ceiling is quoted from the rules' `[s40b_v]`, never applied as a
-//! limit. `Walk` and `run` say how each is read.
+//! capital, are named (the latter counted nowhere). Only a non-zero line touches a ledger. A
+//! voucher on the partner's capital carrying its own interest or remuneration ledger, or another
+//! partner's, is read exactly only in the forward plain shape (its own ledger debited, its own
+//! capital credited, TDS credited on a TDS-payable ledger, balanced); any other is named, as is an
+//! interest or remuneration voucher that also credits a ledger this test does not read. A partner
+//! whose interest cannot be read exactly, or who has no interest ledger, has s.40(b) not computed,
+//! never an excess. The s.194T base is gross: a reversal lowers nothing, and the s.194T question
+//! is raised under the limit whenever the base may be wrong. The s.40(b)(v) remuneration ceiling
+//! is quoted from the rules' `[s40b_v]`, never applied as a limit. `Walk` and `run` say how each
+//! is read.
+//!
+//! The closing rule ([`S40B_EXCESS_COMPUTED`] = false): the s.40(b) excess is computed for NO
+//! partner. Every partner of a firm or LLP gets the not-computed question, with the reasons and
+//! vouchers this test can name; no excess figure or finding is produced, and the firm total is
+//! withheld (`s40b_excess_total_not_computed` stands in its place). The computation stays, behind
+//! the switch, reached by the tests through [`run_with`] instead of rebinding a module global.
+//!
+//! `[partners.deed] no_interest_authorised = true` records a deed that authorises no interest on
+//! capital: the rate used is 0 and no deed-rate question is raised; the partner stays not
+//! computed, and its finding says any interest paid or credited to it, through any ledger, is
+//! disallowed in full, that this test does not look for it, and states no amount. It is refused
+//! beside any `interest_rate_bp` (0 included) and in any form but a boolean; `false` is the same as
+//! absent.
+//!
+//! The configuration is refused, never read, where it could mislead (the reference's
+//! `check_partners_config`, run after the applicability gate and before any voucher is read): a
+//! deed that is not a table, a deed rate that is not a whole number of basis points 0 or more, the
+//! flag above, a capital-ledger list that is empty, names "" or one ledger twice, a capital ledger
+//! shared by two partners, a ledger not in the books, one ledger as both a partner's interest and
+//! remuneration ledger, and an interest or remuneration ledger that is a partner's capital or a
+//! TDS ledger. Where several are wrong, which is reported first can differ from the reference:
+//! partners are visited in key order, where the reference visits them in the file's.
 //!
 //! Every amount is carried in i128 (a year of capital-paise-days times a rate exceeds i64) and
 //! each figure is checked back into i64.
-//!
-//! One narrowing, typed at the boundary: the deed's `interest_rate_bp` must be an integer. The
-//! reference would also take a float (and fail on text); no real deed carries either.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -37,14 +62,19 @@ use crate::book::{Book, Voucher};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
+use crate::ledger_ids::stable_ledger_tag;
 use crate::read::Window;
 use crate::rules::Rules;
-use crate::support::{overflow, rupees, voucher_label};
+use crate::support::{overflow, py_repr_str, rupees, voucher_label};
 use crate::tds_payees::py_format_g;
 use crate::PartnersConfig;
 
 pub const TEST_ID: &str = "partners_40b_194t";
 pub const VERSION: &str = "1";
+
+/// The reference's `S40B_EXCESS_COMPUTED`: Lane D2's closing rule (28-Sep) computes the s.40(b)
+/// excess for no partner, the computation kept behind this switch (see the module docs).
+pub const S40B_EXCESS_COMPUTED: bool = false;
 
 /// The reference's `DEFAULT_S194T`, used (and said so) when the rules carry no `[s194t]` table.
 const DEFAULT_S194T_RATE_BP: i64 = 1000;
@@ -58,10 +88,62 @@ pub struct Partner {
     pub remuneration_ledger: Option<String>,
 }
 
-/// The partners and the deed's interest rate, typed from the bound `[partners]` table. A partner
-/// without `capital_ledgers` is refused, as the reference's `p["capital_ledgers"]` raises; the
-/// shapes of the three name locations were already checked when they were bound.
-pub fn partners_config(cfg: &PartnersConfig) -> Result<(BTreeMap<String, Partner>, Option<i64>)> {
+/// `[partners.deed]`, typed: the interest rate it authorises, and whether it records that the deed
+/// authorises no interest on capital (`false` when the key is absent).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Deed {
+    pub interest_rate_bp: Option<i64>,
+    pub no_interest_authorised: bool,
+}
+
+/// The partners and the deed, typed from the bound `[partners]` table. The deed is checked first,
+/// as the reference's `check_partners_config` checks it: a table, its `interest_rate_bp` a whole
+/// number of basis points 0 or more (a float, a boolean, text or a negative number is refused),
+/// its `no_interest_authorised` a boolean, never `true` beside an `interest_rate_bp`. A partner
+/// that is not a table or has no `capital_ledgers` list of names is refused; the list's contents
+/// and the ledgers themselves are checked by [`check_partners_config`], against the book.
+pub fn partners_config(cfg: &PartnersConfig) -> Result<(BTreeMap<String, Partner>, Option<Deed>)> {
+    let deed = match &cfg.deed {
+        None => None,
+        Some(deed) => {
+            let t = deed.as_table().ok_or_else(|| {
+                AuditError::Config(format!(
+                    "{TEST_ID}: [partners.deed] must be a table; got {deed}"
+                ))
+            })?;
+            let interest_rate_bp = match t.get("interest_rate_bp") {
+                None => None,
+                Some(v) => match v.as_integer() {
+                    Some(rate) if rate >= 0 => Some(rate),
+                    _ => {
+                        return Err(AuditError::Config(format!(
+                            "{TEST_ID}: [partners.deed].interest_rate_bp must be a whole number \
+of basis points, 0 or more; got {v}"
+                        )))
+                    }
+                },
+            };
+            let no_interest_authorised = match t.get("no_interest_authorised") {
+                None => false,
+                Some(v) => v.as_bool().ok_or_else(|| {
+                    AuditError::Config(format!(
+                        "{TEST_ID}: [partners.deed].no_interest_authorised must be true or false; \
+got {v}"
+                    ))
+                })?,
+            };
+            if no_interest_authorised && interest_rate_bp.is_some() {
+                return Err(AuditError::Config(format!(
+                    "{TEST_ID}: [partners.deed] sets no_interest_authorised and an \
+interest_rate_bp; the deed either authorises no interest or authorises a rate"
+                )));
+            }
+            Some(Deed {
+                interest_rate_bp,
+                no_interest_authorised,
+            })
+        }
+    };
     let mut partners = BTreeMap::new();
     for (key, entry) in &cfg.partners {
         let t = entry.as_table().ok_or_else(|| {
@@ -101,23 +183,79 @@ pub fn partners_config(cfg: &PartnersConfig) -> Result<(BTreeMap<String, Partner
             },
         );
     }
-    let deed_rate = match &cfg.deed {
-        None => None,
-        Some(deed) => {
-            let t = deed.as_table().ok_or_else(|| {
-                AuditError::Config(format!("{TEST_ID}: [partners].deed is not a table"))
-            })?;
-            match t.get("interest_rate_bp") {
-                None => None,
-                Some(v) => Some(v.as_integer().ok_or_else(|| {
-                    AuditError::Config(format!(
-                        "{TEST_ID}: [partners].deed.interest_rate_bp is not an integer"
-                    ))
-                })?),
+    Ok((partners, deed))
+}
+
+/// The reference's `check_partners_config`, for a firm or LLP (after the applicability gate,
+/// before any voucher is read): each partner's `capital_ledgers` a non-empty list of distinct,
+/// non-empty names, none shared with another partner; every ledger named in the books, by its
+/// exact name; the interest and remuneration ledgers never the same ledger; and neither ever a
+/// partner's capital ledger or a TDS ledger. Refused, never read, otherwise.
+fn check_partners_config(
+    partners: &BTreeMap<String, Partner>,
+    book: &Book,
+    tds_ledgers: &BTreeSet<String>,
+) -> Result<()> {
+    let refuse = |m: String| AuditError::Config(format!("{TEST_ID}: {m}"));
+    let mut seen_caps: BTreeMap<&str, &str> = BTreeMap::new();
+    for (key, p) in partners {
+        let caps = &p.capital_ledgers;
+        let distinct: BTreeSet<&str> = caps.iter().map(String::as_str).collect();
+        if caps.is_empty() || caps.iter().any(String::is_empty) || distinct.len() != caps.len() {
+            let listed: Vec<String> = caps.iter().map(|c| py_repr_str(c)).collect();
+            return Err(refuse(format!(
+                "[partners.{key}].capital_ledgers must be a non-empty list of distinct ledger \
+names; got [{}]",
+                listed.join(", ")
+            )));
+        }
+        for c in caps {
+            if let Some(other) = seen_caps.insert(c.as_str(), key.as_str()) {
+                return Err(refuse(format!(
+                    "[partners.{key}].capital_ledgers names {}, which is also partner {}'s capital \
+ledger",
+                    py_repr_str(c),
+                    py_repr_str(other)
+                )));
             }
         }
-    };
-    Ok((partners, deed_rate))
+        for led in caps
+            .iter()
+            .chain(p.interest_ledger.iter())
+            .chain(p.remuneration_ledger.iter())
+        {
+            if !book.ledgers.contains_key(led) {
+                return Err(refuse(format!(
+                    "[partners.{key}] names ledger {}, which is not in the books",
+                    py_repr_str(led)
+                )));
+            }
+        }
+        if let (Some(il), Some(rl)) = (&p.interest_ledger, &p.remuneration_ledger) {
+            if il == rl {
+                return Err(refuse(format!(
+                    "[partners.{key}] names {} as both its interest and its remuneration ledger",
+                    py_repr_str(il)
+                )));
+            }
+        }
+    }
+    for (key, p) in partners {
+        for (role, led) in [
+            ("interest_ledger", &p.interest_ledger),
+            ("remuneration_ledger", &p.remuneration_ledger),
+        ] {
+            if let Some(led) = led {
+                if seen_caps.contains_key(led.as_str()) || tds_ledgers.contains(led) {
+                    return Err(refuse(format!(
+                        "[partners.{key}].{role} {} is a partner's capital ledger or a TDS ledger",
+                        py_repr_str(led)
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The reference's `_hash`: the first 8 hex characters of the key's SHA-1.
@@ -144,7 +282,16 @@ type Vouchers<'a> = BTreeMap<String, &'a Voucher>;
 /// and the remuneration ledger is split only where it is exact; otherwise it counts as interest and
 /// is named. A voucher on one of the two ledgers that both credits and debits the capital is named.
 /// A voucher on this partner's interest or remuneration ledger touching no partner's capital is
-/// counted nowhere and named.
+/// counted nowhere and named. Only a non-zero line touches a ledger.
+///
+/// The plain-voucher gate: a voucher on this partner's capital carrying its own interest or
+/// remuneration ledger, or any other partner's, is read exactly only in the forward plain shape --
+/// its own interest or remuneration ledger debited, its own capital credited, TDS credited on a
+/// TDS-payable ledger, balanced, every line non-zero. Any other is `nonplain_vouchers` (and
+/// `nonplain_interest_vouchers` when it carries this partner's interest ledger or another
+/// partner's ledger). An interest or remuneration voucher that also credits a ledger this test
+/// does not read (no partner's capital, no TDS-payable ledger, neither of this partner's own
+/// ledgers) is `unread_credit_vouchers`, with those ledgers.
 struct Walk<'a> {
     opening_paise: i128,
     /// (day number, delta paise), sorted by day.
@@ -163,6 +310,10 @@ struct Walk<'a> {
     off_capital_vouchers: Vouchers<'a>,
     off_capital_interest_vouchers: Vouchers<'a>,
     capital_set_off_vouchers: Vouchers<'a>,
+    unread_credit_vouchers: BTreeMap<String, (&'a Voucher, BTreeSet<String>)>,
+    unread_credit_interest_vouchers: Vouchers<'a>,
+    nonplain_vouchers: Vouchers<'a>,
+    nonplain_interest_vouchers: Vouchers<'a>,
 }
 
 fn walk<'a>(
@@ -171,9 +322,10 @@ fn walk<'a>(
     p: &Partner,
     tds_ledgers: &BTreeSet<String>,
     all_capitals: &BTreeSet<String>,
+    all_int_rem: &BTreeSet<String>,
 ) -> Walk<'a> {
     let capital: BTreeSet<&str> = p.capital_ledgers.iter().map(String::as_str).collect();
-    // A ledger named twice in capital_ledgers counts twice, as the reference's sum over the list does.
+    // The reference's sum over the list; `check_partners_config` refuses a ledger named twice.
     let opening_paise = p
         .capital_ledgers
         .iter()
@@ -197,23 +349,29 @@ fn walk<'a>(
         off_capital_vouchers: BTreeMap::new(),
         off_capital_interest_vouchers: BTreeMap::new(),
         capital_set_off_vouchers: BTreeMap::new(),
+        unread_credit_vouchers: BTreeMap::new(),
+        unread_credit_interest_vouchers: BTreeMap::new(),
+        nonplain_vouchers: BTreeMap::new(),
+        nonplain_interest_vouchers: BTreeMap::new(),
     };
     let interest = p.interest_ledger.as_deref();
     let remuneration = p.remuneration_ledger.as_deref();
+    let own_ledgers: BTreeSet<&str> = [interest, remuneration].into_iter().flatten().collect();
     for &v in pop {
         let guid = || v.guid.clone();
         // The capital lines' amounts, and the TDS added back as one more line where it applies.
+        // Only a non-zero line touches a ledger (a zero capital line let TDS be added back to it).
         let mut lines_here: Vec<i128> = v
             .lines
             .iter()
-            .filter(|l| capital.contains(l.ledger.as_str()))
+            .filter(|l| capital.contains(l.ledger.as_str()) && l.amount_paise != 0)
             .map(|l| i128::from(l.amount_paise))
             .collect();
         if lines_here.is_empty() {
-            let touches_capital = v
-                .lines
-                .iter()
-                .any(|l| capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger));
+            let touches_capital = v.lines.iter().any(|l| {
+                (capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))
+                    && l.amount_paise != 0
+            });
             if !touches_capital {
                 let on = |ledger: Option<&str>| {
                     ledger.is_some_and(|n| {
@@ -230,10 +388,33 @@ fn walk<'a>(
             }
             continue;
         }
-        let carries =
-            |ledger: Option<&str>| ledger.is_some_and(|n| v.lines.iter().any(|l| l.ledger == n));
+        // A zero line on the interest or remuneration ledger makes no such voucher.
+        let carries = |ledger: Option<&str>| {
+            ledger.is_some_and(|n| v.lines.iter().any(|l| l.ledger == n && l.amount_paise != 0))
+        };
         let is_interest = carries(interest);
         let is_remuneration = carries(remuneration);
+        // The plain-voucher gate (see `Walk`). Another partner's interest or remuneration ledger
+        // never passes it: `check_partners_config` refuses one that is a capital or TDS ledger.
+        let nz = || v.lines.iter().filter(|l| l.amount_paise != 0);
+        let other_touch = nz()
+            .any(|l| all_int_rem.contains(&l.ledger) && !own_ledgers.contains(l.ledger.as_str()));
+        if is_interest || is_remuneration || other_touch {
+            let plain = (is_interest || is_remuneration)
+                && nz().map(|l| i128::from(l.amount_paise)).sum::<i128>() == 0
+                && nz().all(|l| {
+                    (own_ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)
+                        || ((capital.contains(l.ledger.as_str())
+                            || tds_ledgers.contains(&l.ledger))
+                            && l.amount_paise < 0)
+                });
+            if !plain {
+                w.nonplain_vouchers.insert(guid(), v);
+                if is_interest || other_touch {
+                    w.nonplain_interest_vouchers.insert(guid(), v);
+                }
+            }
+        }
         let tds: i128 = -v
             .lines
             .iter()
@@ -306,6 +487,27 @@ fn walk<'a>(
             w.interest_credited_paise += i_part;
             w.remuneration_credited_paise += c - i_part;
             continue;
+        }
+        // An interest or remuneration voucher that also credits a ledger this test does not read
+        // credits the partner net of it: named, with the ledgers, never a smaller computed excess.
+        let unread: BTreeSet<String> = v
+            .lines
+            .iter()
+            .filter(|l| {
+                l.amount_paise < 0
+                    && !capital.contains(l.ledger.as_str())
+                    && !all_capitals.contains(&l.ledger)
+                    && !tds_ledgers.contains(&l.ledger)
+                    && Some(l.ledger.as_str()) != interest
+                    && Some(l.ledger.as_str()) != remuneration
+            })
+            .map(|l| l.ledger.clone())
+            .collect();
+        if !unread.is_empty() && (is_interest || is_remuneration) {
+            if is_interest {
+                w.unread_credit_interest_vouchers.insert(guid(), v);
+            }
+            w.unread_credit_vouchers.insert(guid(), (v, unread));
         }
         // A voucher on one of the two ledgers that both credits and debits the capital is read net
         // and named.
@@ -397,9 +599,25 @@ fn labels(vs: &BTreeMap<String, &Voucher>) -> String {
         .join(", ")
 }
 
+/// [`labels`] for a map whose values carry their voucher first.
+fn labels_of<T>(vs: &BTreeMap<String, (&Voucher, T)>) -> String {
+    vs.values()
+        .map(|(v, _)| voucher_label(v))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// The reference's `_shared_tds_note`: what the s.194T base may miss.
 fn shared_tds_note(w: &Walk) -> Vec<String> {
     let mut notes = Vec::new();
+    if !w.unread_credit_vouchers.is_empty() {
+        notes.push(format!(
+            "{} interest or remuneration voucher(s) also credit a ledger this test does not read \
+({}): the partner may be credited net of it, so this base may be understated.",
+            w.unread_credit_vouchers.len(),
+            labels_of(&w.unread_credit_vouchers)
+        ));
+    }
     if !w.capital_set_off_vouchers.is_empty() {
         notes.push(format!(
             "{} interest or remuneration voucher(s) also debit this partner's capital ({}): if a \
@@ -460,8 +678,9 @@ this test does not compute, so no limit is stated here.",
     )
 }
 
-/// Run the test. `tds_ledgers` are the ledgers the client's statutory dues classify as TDS
-/// payable: the s.194T finding reads the TDS on a partner's vouchers through them only.
+/// Run the test under the closing rule in force ([`S40B_EXCESS_COMPUTED`]). `tds_ledgers` are the
+/// ledgers the client's statutory dues classify as TDS payable: the s.194T finding reads the TDS on
+/// a partner's vouchers through them only.
 pub fn run(
     book: &Book,
     rules: &Rules,
@@ -469,6 +688,29 @@ pub fn run(
     entity_type: &str,
     cfg: &PartnersConfig,
     tds_ledgers: &BTreeSet<String>,
+) -> Result<TestResult> {
+    run_with(
+        book,
+        rules,
+        period,
+        entity_type,
+        cfg,
+        tds_ledgers,
+        S40B_EXCESS_COMPUTED,
+    )
+}
+
+/// [`run`], with the closing rule's switch given: `excess_computed` true reaches the s.40(b)
+/// computation the reference keeps behind `S40B_EXCESS_COMPUTED`.
+#[allow(clippy::too_many_lines)] // one section per figure and finding, as the reference lays them out
+pub fn run_with(
+    book: &Book,
+    rules: &Rules,
+    period: &Window,
+    entity_type: &str,
+    cfg: &PartnersConfig,
+    tds_ledgers: &BTreeSet<String>,
+    excess_computed: bool,
 ) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let s40b_rate = rules.s40b_interest_rate_bp(entity_type)?;
@@ -487,6 +729,9 @@ the entity_type string itself. 'no' when both are absent/zero/false.",
         return Ok(r);
     }
 
+    // The configuration is refused, never read, where it could mislead: before any voucher.
+    let (partners, deed) = partners_config(cfg)?;
+    check_partners_config(&partners, book, tds_ledgers)?;
     let pop = book.population()?;
     r.population_note = "Books population (optional, cancelled and post-dated vouchers excluded). \
 A capital-ledger line is excluded from the daily-balance walk, and counted as interest/remuneration \
@@ -495,7 +740,6 @@ remuneration ledger -- identified from the voucher's other lines, never from a d
 narration."
         .to_string();
 
-    let (partners, deed_rate) = partners_config(cfg)?;
     // Each partner's figures are tagged `hash8(key)`, as the reference tags them, so two keys whose
     // tags coincide would name one figure twice. The reference raises there (its `fig` refuses a
     // duplicate id); refuse the same way before any partner figure is built, never panic in `fig`.
@@ -509,7 +753,17 @@ the reference refuses a duplicate figure id"
             )));
         }
     }
+    // A deed recorded as authorising no interest on capital: s.40(b) allows none, so the rate is
+    // 0; the partner is still not computed.
+    let no_interest = deed.is_some_and(|d| d.no_interest_authorised);
+    let deed_rate = if no_interest {
+        Some(0)
+    } else {
+        deed.and_then(|d| d.interest_rate_bp)
+    };
     let deed_missing = deed_rate.is_none();
+    // A deed is on file, its rate is not.
+    let rate_not_recorded = deed.is_some() && deed_missing;
     let rate_bp = deed_rate.map_or(s40b_rate, |d| d.min(s40b_rate));
     let (tds_rate_bp, tds_limit_paise, s194t_is_default) = match rules.s194t {
         Some(t) => (t.rate_bp, t.limit_paise, false),
@@ -521,6 +775,9 @@ the reference refuses a duplicate figure id"
         Value::Int(rate_bp),
         Unit::BasisPoints,
         &match deed_rate {
+            _ if no_interest => "Rate used for s.40(b) allowable interest: 0, as the deed \
+authorises no interest on capital (recorded in the configuration)."
+                .to_string(),
             Some(d) => format!(
                 "Rate used for s.40(b) allowable interest: min(deed interest_rate_bp {d}, rules \
 s40b_interest_rate_bp {s40b_rate})."
@@ -532,7 +789,28 @@ bound ({s40b_rate} bp), not a confirmed authorised rate."
         },
         Vec::new(),
     );
-    if deed_missing {
+    if rate_not_recorded {
+        r.findings.push(Finding {
+            id: format!("{TEST_ID}/deed_rate_missing"),
+            clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
+            title: "Partnership deed recorded without its interest rate; s.40(b) interest rate \
+assumed at the statutory cap"
+                .to_string(),
+            facts: vec![("rate_used".to_string(), f_rate)],
+            evidence: Vec::new(),
+            confidence: Confidence::JudgementRequired,
+            limits: vec![format!(
+                "A deed is recorded for this firm, but not the interest rate it authorises. s.40(b) \
+allows interest only as authorised by the deed, so the statutory cap ({s40b_rate} bp) is used here \
+as an upper bound on allowable interest, not a confirmed rate."
+            )],
+            ask_client: vec![
+                "The interest rate the partnership deed authorises (and any supplementary deed in \
+force during the year)."
+                    .to_string(),
+            ],
+        });
+    } else if deed_missing {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deed_missing"),
             clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
@@ -590,10 +868,48 @@ during the year) showing the authorised interest rate and remuneration clause."
         .values()
         .flat_map(|q| q.capital_ledgers.iter().cloned())
         .collect();
+    // Every partner's interest and remuneration ledger ("" is refused by the configuration check).
+    let all_int_rem: BTreeSet<String> = partners
+        .values()
+        .flat_map(|q| {
+            q.interest_ledger
+                .iter()
+                .chain(q.remuneration_ledger.iter())
+                .cloned()
+        })
+        .collect();
+
+    if partners.is_empty() {
+        // A firm with no partner configured is asked about, never a silent nil excess.
+        r.findings.push(Finding {
+            id: format!("{TEST_ID}/partners_not_configured"),
+            clauses: vec![
+                "s.40(b)".to_string(),
+                "s.194T".to_string(),
+                "3CD-21(c)".to_string(),
+            ],
+            title: "No partner is configured for this firm: s.40(b) interest and s.194T are not \
+computed"
+                .to_string(),
+            facts: Vec::new(),
+            evidence: Vec::new(),
+            confidence: Confidence::JudgementRequired,
+            limits: vec![
+                "s.40(b) and s.194T apply to this entity, but the client's configuration names no \
+partner, so no partner's capital, interest or remuneration is read. No excess is stated, and none \
+is listed in clause 21(c)."
+                    .to_string(),
+            ],
+            ask_client: vec![
+                "The partners, and for each the capital, interest and remuneration ledgers."
+                    .to_string(),
+            ],
+        });
+    }
 
     for (key, p) in &partners {
         let h = hash8(key);
-        let w = walk(&pop, book, p, tds_ledgers, &all_capitals);
+        let w = walk(&pop, book, p, tds_ledgers, &all_capitals, &all_int_rem);
         let days_primary = capital_paise_days(w.opening_paise, &w.events, period);
         let days_opening_only = capital_paise_days(w.opening_paise, &[], period);
         let reductions_skipped: Vec<(i64, i128)> =
@@ -605,16 +921,23 @@ during the year) showing the authorised interest rate and remuneration clause."
         let allowable_no_reduction = interest_from_capital_days(days_no_reduction, rate_bp, 365);
         let credited = w.interest_credited_paise;
         let excess = (credited - allowable_365).max(0);
-        // A partner whose interest cannot be read exactly has s.40(b) NOT COMPUTED, and said so.
+        // A partner whose interest cannot be read exactly has s.40(b) NOT COMPUTED, and said so;
+        // under the closing rule every partner is not computed.
         let mut unknown: BTreeMap<String, &Voucher> = w.mixed_unsplit_vouchers.clone();
         unknown.extend(w.shared_tds_interest_vouchers.clone());
         unknown.extend(w.off_capital_interest_vouchers.clone());
         unknown.extend(w.capital_set_off_vouchers.clone());
-        let unusable = if unknown.is_empty() {
-            ""
-        } else {
+        unknown.extend(w.unread_credit_interest_vouchers.clone());
+        unknown.extend(w.nonplain_vouchers.clone());
+        // With no interest ledger its interest cannot be told from capital.
+        let no_interest_ledger = p.interest_ledger.is_none();
+        let read_fails = !unknown.is_empty() || no_interest_ledger;
+        let not_computed = read_fails || !excess_computed;
+        let unusable = if not_computed {
             " Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding \
 that says so)."
+        } else {
+            ""
         };
 
         let ev_capital: Vec<EvidenceRef> = p
@@ -629,6 +952,12 @@ that says so)."
             &format!("Opening (1-4) balance of partner (tag {h})'s capital ledger(s), Dr+/Cr-."),
             ev_capital.clone(),
         );
+        let no_remuneration_note = if p.remuneration_ledger.is_none() {
+            " No remuneration ledger is configured for this partner: remuneration credits, if any, \
+are read as capital; configure the remuneration ledger."
+        } else {
+            ""
+        };
         let f_allow = r.fig(
             &format!("allowable_interest_{h}"),
             int(allowable_365)?,
@@ -637,7 +966,8 @@ that says so)."
                 "s.40(b) allowable interest for partner (tag {h}): simple interest at {rate_bp} bp \
 on the capital balance walked day by day (opening TB balance, then every population voucher line \
 on the capital ledger(s) other than an interest/remuneration credit, changing the balance ON its \
-date), actual days / 365, a debit (negative) capital day contributing zero.{unusable}"
+date), actual days / 365, a debit (negative) capital day contributing zero.{unusable}\
+{no_remuneration_note}"
             ),
             ev_capital.clone(),
         );
@@ -735,52 +1065,103 @@ which."
                 ],
             });
         }
-        if unknown.is_empty() {
-            let f_excess = r.fig(
-                &format!("s40b_excess_{h}"),
-                int(excess)?,
-                Unit::Paise,
-                &format!("interest_credited_{h} minus allowable_interest_{h}, floor 0."),
-                Vec::new(),
-            );
-            excess_total += excess;
-            if excess > 0 {
-                r.findings.push(Finding {
-                    id: format!("{TEST_ID}/s40b_excess/{h}"),
-                    clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
-                    title: "Interest credited to a partner exceeds the s.40(b) allowable amount"
-                        .to_string(),
-                    facts: vec![
-                        ("credited".to_string(), f_credited),
-                        ("allowable".to_string(), f_allow),
-                        ("excess".to_string(), f_excess),
-                    ],
-                    evidence: ev_interest_v,
-                    confidence: if deed_missing {
-                        Confidence::JudgementRequired
-                    } else {
-                        Confidence::Computed
-                    },
-                    limits: vec![if deed_missing {
-                        "No deed was available; the excess shown uses the statutory cap as the \
-assumed authorised rate -- confirm the deed's actual rate and terms before relying on this figure."
-                            .to_string()
-                    } else {
-                        "Allowable interest here assumes the capital base is exactly the capital \
-ledger(s) supplied and that interest was authorised for the whole year; confirm both against the \
-deed."
-                            .to_string()
-                    }],
-                    ask_client: vec![
-                        "Confirm the deed's authorised interest rate and the capital \
-base it applies to."
-                            .to_string(),
-                    ],
-                });
-            }
-        } else {
+        // The interest vouchers that also credit a ledger this test does not read, and those
+        // ledgers, sorted (both named by the not-computed finding).
+        let unread: BTreeMap<&String, &(&Voucher, BTreeSet<String>)> = w
+            .unread_credit_vouchers
+            .iter()
+            .filter(|(g, _)| w.unread_credit_interest_vouchers.contains_key(*g))
+            .collect();
+        let unread_ledgers: BTreeSet<&String> =
+            unread.values().flat_map(|(_, ls)| ls.iter()).collect();
+        if not_computed {
             not_computed_count += 1;
             let mut reasons = Vec::new();
+            if !excess_computed {
+                reasons.push(
+                    "This test computes the s.40(b) excess for no partner: its reading of a \
+partner's interest from the books can miss or misread some bookings (another partner's interest or \
+remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no \
+excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, \
+the capital accounts and the interest credited. What this test could see is named below, and the \
+interest credited and allowable-interest figures are working figures only."
+                        .to_string(),
+                );
+            }
+            if no_interest {
+                reasons.push(format!(
+                    "The deed authorises no interest on capital (as recorded in the configuration), \
+so s.40(b) allows none: interest paid or credited to this partner, through any ledger (its \
+remuneration ledger included), is disallowed in full. This test does not search the books for such \
+interest{}, and states no disallowed amount.",
+                    if no_interest_ledger {
+                        ""
+                    } else {
+                        ", beyond reading its configured interest ledger as a working figure \
+(marked not usable)"
+                    }
+                ));
+            }
+            if no_interest_ledger && !no_interest {
+                reasons.push(
+                    "No interest ledger is configured for this partner, so interest credited to its \
+capital cannot be told from capital introduced: the capital walk reads every credit to it as \
+capital, except remuneration on a configured remuneration ledger, and no interest credited is \
+counted. If the deed authorises no interest on capital, the configuration can record that \
+([partners.deed] no_interest_authorised)."
+                        .to_string(),
+                );
+            }
+            let other_shape: BTreeMap<String, &Voucher> = w
+                .nonplain_vouchers
+                .iter()
+                .filter(|(g, _)| {
+                    !w.capital_set_off_vouchers.contains_key(*g)
+                        && !w.unread_credit_interest_vouchers.contains_key(*g)
+                        && !w.shared_tds_interest_vouchers.contains_key(*g)
+                })
+                .map(|(g, v)| (g.clone(), *v))
+                .collect();
+            if !other_shape.is_empty() {
+                reasons.push(format!(
+                    "{} voucher(s) on this partner's capital are not of the plain shape this test \
+reads exactly ({}): this partner's own interest or remuneration ledger debited, its own capital \
+credited, and TDS on a ledger classified as TDS payable, balanced. Each carries a line this test \
+does not read as plain, so the interest counted may be wrong in either direction.",
+                    other_shape.len(),
+                    labels(&other_shape)
+                ));
+            }
+            if !w.nonplain_vouchers.is_empty() {
+                reasons.push(
+                    "This test reads only that plain shape. Correct bookings of other shapes are \
+not computed here either: a year-end journal crediting several partners at once, a reversal or \
+correction, interest on per-partner ledgers in one journal, one TDS line for several partners, TDS \
+booked through the capital, or a round-off. The CA computes the excess from the vouchers named."
+                        .to_string(),
+                );
+            }
+            if !unread.is_empty() {
+                let tags = unread_ledgers
+                    .iter()
+                    .map(|x| stable_ledger_tag(book, x))
+                    .collect::<Result<Vec<_>>>()?;
+                reasons.push(format!(
+                    "{} interest voucher(s) also credit a ledger this test does not read ({}; \
+ledger tag(s) {}): the partner may be credited net of it, so the interest counted may be \
+understated. If the ledger is TDS on this partner's interest alone, classify it as TDS payable in \
+the client's statutory dues and the interest is counted gross; on a voucher that credits several \
+partners the TDS is not divided, and if it is a payable, a round-off or a payment, the CA reads the \
+interest from the voucher.",
+                    unread.len(),
+                    unread
+                        .values()
+                        .map(|(v, _)| voucher_label(v))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    tags.join(", ")
+                ));
+            }
             if !w.mixed_unsplit_vouchers.is_empty() {
                 reasons.push(format!(
                     "{} voucher(s) carry both the interest and the remuneration ledger and are not \
@@ -824,23 +1205,133 @@ is not divided between them, so the interest counted is net of an unknown part o
 Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
                     .to_string(),
             );
-            r.findings.push(Finding {
-                id: format!("{TEST_ID}/s40b_not_computed/{h}"),
-                clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
-                title: format!(
+            let title = if no_interest && no_interest_ledger && unknown.is_empty() {
+                format!(
+                    "s.40(b) not computed for partner (tag {h}): the deed authorises no interest \
+on capital, so any interest is disallowed in full"
+                )
+            } else if read_fails {
+                format!(
                     "s.40(b) not computed for partner (tag {h}): its interest credited cannot be \
 read exactly; the CA computes it"
-                ),
-                facts: Vec::new(),
-                evidence: voucher_refs(&unknown),
-                confidence: Confidence::JudgementRequired,
-                limits: reasons,
-                ask_client: vec![
+                )
+            } else {
+                format!(
+                    "s.40(b) not computed for partner (tag {h}): this test computes the excess for \
+no partner; the CA computes it"
+                )
+            };
+            let mut evidence = voucher_refs(&unknown);
+            evidence.extend(unread_ledgers.iter().map(|x| EvidenceRef::new("ledger", x)));
+            if no_interest_ledger {
+                evidence.extend(
+                    p.capital_ledgers
+                        .iter()
+                        .map(|n| EvidenceRef::new("ledger", n)),
+                );
+            }
+            let mut ask_client = Vec::new();
+            // Asked for the computation unless it is computed, or the deed authorises no interest
+            // and no interest ledger is configured (nothing to ask).
+            if !excess_computed && !(no_interest && no_interest_ledger) {
+                ask_client.push(if no_interest {
+                    "The s.40(b) computation for this partner: the interest credited (the deed \
+authorises none, so all of it is disallowed)."
+                        .to_string()
+                } else {
+                    "The s.40(b) computation for this partner: the deed's authorised interest \
+rate, the capital balances through the year, and the interest credited."
+                        .to_string()
+                });
+            }
+            if !unknown.is_empty() {
+                ask_client.push(
                     "The partner's interest for the year, with the interest and remuneration in \
 each voucher named here and the TDS on each."
                         .to_string(),
-                ],
+                );
+            }
+            if !unread.is_empty() {
+                ask_client.push(format!(
+                    "If {} carries TDS on this partner's interest, classify it as TDS payable in \
+your statutory dues; otherwise, what it is.",
+                    unread_ledgers
+                        .iter()
+                        .map(|x| py_repr_str(x))
+                        .collect::<Vec<_>>()
+                        .join(" or ")
+                ));
+            }
+            if no_interest_ledger && !no_interest {
+                ask_client.push("The ledger that carries this partner's interest.".to_string());
+            }
+            r.findings.push(Finding {
+                id: format!("{TEST_ID}/s40b_not_computed/{h}"),
+                clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
+                title,
+                facts: Vec::new(),
+                evidence,
+                confidence: Confidence::JudgementRequired,
+                limits: reasons,
+                ask_client,
             });
+        } else {
+            let f_excess = r.fig(
+                &format!("s40b_excess_{h}"),
+                int(excess)?,
+                Unit::Paise,
+                &format!("interest_credited_{h} minus allowable_interest_{h}, floor 0."),
+                Vec::new(),
+            );
+            excess_total += excess;
+            if excess > 0 {
+                let mut limits = vec![if rate_not_recorded {
+                    "The deed's interest rate is not recorded; the excess shown uses the statutory \
+cap as the assumed authorised rate -- confirm the deed's actual rate and terms before relying on \
+this figure."
+                        .to_string()
+                } else if deed_missing {
+                    "No deed was available; the excess shown uses the statutory cap as the \
+assumed authorised rate -- confirm the deed's actual rate and terms before relying on this figure."
+                        .to_string()
+                } else {
+                    "Allowable interest here assumes the capital base is exactly the capital \
+ledger(s) supplied and that interest was authorised for the whole year; confirm both against the \
+deed."
+                        .to_string()
+                }];
+                if p.remuneration_ledger.is_none() {
+                    limits.push(
+                        "No remuneration ledger is configured for this partner: remuneration \
+credits, if any, are read as capital, which would raise the allowable interest and lower this \
+excess; configure the remuneration ledger."
+                            .to_string(),
+                    );
+                }
+                r.findings.push(Finding {
+                    id: format!("{TEST_ID}/s40b_excess/{h}"),
+                    clauses: vec!["s.40(b)".to_string(), "3CD-21(c)".to_string()],
+                    title: "Interest credited to a partner exceeds the s.40(b) allowable amount"
+                        .to_string(),
+                    facts: vec![
+                        ("credited".to_string(), f_credited),
+                        ("allowable".to_string(), f_allow),
+                        ("excess".to_string(), f_excess),
+                    ],
+                    evidence: ev_interest_v,
+                    confidence: if deed_missing {
+                        Confidence::JudgementRequired
+                    } else {
+                        Confidence::Computed
+                    },
+                    limits,
+                    ask_client: vec![
+                        "Confirm the deed's authorised interest rate and the capital \
+base it applies to."
+                            .to_string(),
+                    ],
+                });
+            }
         }
 
         let f_rem = r.fig(
@@ -849,11 +1340,64 @@ each voucher named here and the TDS on each."
             Unit::Paise,
             &format!(
                 "Remuneration credited to partner (tag {h}), in a voucher also carrying a line on \
-their remuneration_ledger. The s.40(b)(v) book-profit limit is NOT computed here."
+their remuneration_ledger. The s.40(b)(v) book-profit limit is NOT computed here.{}",
+                if w.mixed_unsplit_vouchers.is_empty() {
+                    ""
+                } else {
+                    " A voucher carrying both the interest and the remuneration ledger that is not \
+split is counted as interest, not here."
+                }
             ),
             voucher_refs(&w.remuneration_vouchers),
         );
         remuneration_facts.push((key.clone(), f_rem));
+        let mixed_here = &w.mixed_unsplit_vouchers;
+        if !mixed_here.is_empty() && p.remuneration_ledger.is_some() {
+            // The remuneration inside an unsplit voucher is counted as interest.
+            remuneration_evidence.extend(mixed_here.clone());
+            remuneration_notes.push(format!(
+                "Partner (tag {h}): {} voucher(s) carrying both the interest and the remuneration \
+ledger are not split ({}): their credit is counted as interest, so remuneration_credited_{h} leaves \
+out the remuneration in them.",
+                mixed_here.len(),
+                labels(mixed_here)
+            ));
+        }
+        let unread_rem: BTreeMap<String, &Voucher> = w
+            .unread_credit_vouchers
+            .iter()
+            .filter(|(g, _)| !w.unread_credit_interest_vouchers.contains_key(*g))
+            .map(|(g, (v, _))| (g.clone(), *v))
+            .collect();
+        let other_rem: BTreeMap<String, &Voucher> = w
+            .nonplain_vouchers
+            .iter()
+            .filter(|(g, _)| {
+                !w.nonplain_interest_vouchers.contains_key(*g)
+                    && !unread_rem.contains_key(*g)
+                    && !w.shared_tds_remuneration_vouchers.contains_key(*g)
+            })
+            .map(|(g, v)| (g.clone(), *v))
+            .collect();
+        if !other_rem.is_empty() {
+            remuneration_evidence.extend(other_rem.clone());
+            remuneration_notes.push(format!(
+                "Partner (tag {h}): {} remuneration voucher(s) are not of the plain shape this test \
+reads exactly ({}): remuneration_credited_{h} may be wrong in either direction.",
+                other_rem.len(),
+                labels(&other_rem)
+            ));
+        }
+        if !unread_rem.is_empty() {
+            remuneration_evidence.extend(unread_rem.clone());
+            remuneration_notes.push(format!(
+                "Partner (tag {h}): {} remuneration voucher(s) also credit a ledger this test does \
+not read ({}): remuneration_credited_{h} may be net of it. If that ledger is TDS on this partner's \
+remuneration alone, classify it as TDS payable in the client's statutory dues.",
+                unread_rem.len(),
+                labels(&unread_rem)
+            ));
+        }
         let shared_rem = &w.shared_tds_remuneration_vouchers;
         if !shared_rem.is_empty() {
             remuneration_evidence.extend(shared_rem.clone());
@@ -866,6 +1410,12 @@ part of it.",
             ));
         }
 
+        // With no interest ledger, or a credit this test does not read, the base may be wrong, so
+        // the s.194T question is raised whatever the base -- never a silence under the limit (a
+        // non-plain voucher leaves the partner not computed, so `not_computed` covers it).
+        let base_uncertain = not_computed
+            || !w.off_capital_vouchers.is_empty()
+            || !w.unread_credit_vouchers.is_empty();
         // Gross: each voucher's net credit to the partner, a reversal lowering nothing.
         let credits = s194t_credits(&w);
         let subject_paise: i128 = credits.iter().map(|c| c.2).filter(|p| *p > 0).sum();
@@ -876,7 +1426,12 @@ part of it.",
             &format!(
                 "Interest + remuneration credited to partner (tag {h}) in the year, gross: each \
 voucher's net credit to the partner, a reversal lowering nothing -- the s.194T base (salary, \
-remuneration, commission, bonus and interest to a partner)."
+remuneration, commission, bonus and interest to a partner).{}",
+                if base_uncertain {
+                    " It may be wrong in either direction: see this partner's s.194T question."
+                } else {
+                    ""
+                }
             ),
             Vec::new(),
         );
@@ -924,6 +1479,8 @@ remuneration, commission, bonus and interest to a partner)."
                     seen.insert(v.guid.clone(), v);
                 }
             }
+            // On a shared ledger, TDS on a voucher that touches a partner's capital is that
+            // partner's, never "whose is not judged" for another.
             for &v in &pop {
                 if !seen.contains_key(&v.guid)
                     && has_tds(v)
@@ -931,6 +1488,7 @@ remuneration, commission, bonus and interest to a partner)."
                         ledgers.contains(l.ledger.as_str())
                             && shared_ledgers.contains(l.ledger.as_str())
                     })
+                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger))
                 {
                     unattributed.insert(v.guid.clone(), v);
                 }
@@ -958,18 +1516,44 @@ remuneration, commission, bonus and interest to a partner)."
                 "Whether a line on a ledger the client's statutory dues classify as TDS payable \
 appears on a voucher touching partner (tag {h})'s capital, interest or remuneration ledgers (\"not \
 judged\" when none is classified, or when the only such lines are on a ledger shared by partners, \
-off this partner's capital)."
+on a voucher that touches no partner's capital)."
             ),
             Vec::new(),
         );
 
-        if subject_paise > i128::from(tds_limit_paise) {
+        let over = subject_paise > i128::from(tds_limit_paise);
+        if over || base_uncertain {
             let mut limits = vec![
                 "Books only: TAN registration, challans filed and any Form 26A \
 route are not visible from vouchers."
                     .to_string(),
             ];
             limits.extend(shared_tds_note(&w));
+            if no_interest_ledger {
+                limits.push(
+                    "No interest ledger is configured for this partner, so interest credited to its \
+capital is not in this base, which may therefore be understated."
+                        .to_string(),
+                );
+            }
+            let mut odd = w.nonplain_vouchers.clone();
+            odd.extend(w.off_capital_vouchers.clone());
+            if !odd.is_empty() {
+                limits.push(format!(
+                    "{} voucher(s) touching this partner are not read exactly ({}): this base may \
+be wrong in either direction.",
+                    odd.len(),
+                    labels(&odd)
+                ));
+            }
+            if !over {
+                limits.push(format!(
+                    "This base ({}) is under the s.194T threshold ({}) as read, but it may be wrong \
+(above), so whether it crosses the threshold is not computed.",
+                    rupees(subject_paise),
+                    rupees(i128::from(tds_limit_paise))
+                ));
+            }
             let mut reversals: Vec<(&Voucher, &String)> = credits
                 .iter()
                 .filter(|c| c.2 < 0)
@@ -992,6 +1576,17 @@ exceeds the interest and remuneration credited net of them ({}).",
                     rupees(net_paise)
                 ));
             }
+            // With the switch off a plain partner's base is read, but not confirmed: say which.
+            let thr = if over {
+                "over the s.194T threshold"
+            } else if read_fails
+                || !w.off_capital_vouchers.is_empty()
+                || !w.unread_credit_vouchers.is_empty()
+            {
+                "whose s.194T base is not read exactly"
+            } else {
+                "whose s.194T base is not confirmed: s.40(b) is not computed"
+            };
             if s194t_is_default {
                 limits.push(format!(
                     "The s.194T rate/limit used here (rate {tds_rate_bp} bp, limit \
@@ -1020,16 +1615,16 @@ the rules table -- not yet a verified rule."
                     }
                 )
             };
-            let not_judged =
-                "Payments/credits to a partner over the s.194T threshold: whether TDS \
-was deducted is not judged";
+            let not_judged = format!(
+                "Payments/credits to a partner {thr}: whether TDS was deducted is not judged"
+            );
             let title = if tds_ledgers.is_empty() {
                 limits.push(
                     "The client's statutory dues classify no ledger as TDS payable, so TDS on the \
 partner's vouchers cannot be seen."
                         .to_string(),
                 );
-                not_judged.to_string()
+                not_judged
             } else if !seen.is_empty() {
                 limits.push(format!(
                     "TDS of {} (net) is seen on {} voucher(s) touching this partner: {}.",
@@ -1037,26 +1632,44 @@ partner's vouchers cannot be seen."
                     seen.len(),
                     first12(&by_date(&seen))
                 ));
-                "Payments/credits to a partner over the s.194T threshold, with TDS seen on its \
-vouchers: which credits it covers, and its deposit, are the CA's to determine"
-                    .to_string()
+                format!(
+                    "Payments/credits to a partner {thr}, with TDS seen on its vouchers: which \
+credits it covers, and its deposit, are the CA's to determine"
+                )
             } else if !unattributed.is_empty() {
-                not_judged.to_string()
+                not_judged
             } else {
-                "Payments/credits to a partner over the s.194T threshold with no TDS ledger line \
-seen"
-                    .to_string()
+                format!("Payments/credits to a partner {thr} with no TDS ledger line seen")
             };
             if !tds_ledgers.is_empty() && !unattributed.is_empty() {
                 let l = by_date(&unattributed);
                 limits.push(format!(
                     "TDS lines are seen on {} voucher(s) on an interest or remuneration ledger \
-shared by partners that do not touch this partner's capital: {}. Which partner's TDS they are is \
-not judged.",
+shared by partners that touch no partner's capital: {}. Which partner's TDS they are is not \
+judged.",
                     l.len(),
                     first12(&l)
                 ));
             }
+            let mut ask_client = Vec::new();
+            if base_uncertain {
+                ask_client.push(
+                    "The partner's interest and remuneration for the year, and the TDS deducted on \
+each."
+                        .to_string(),
+                );
+            }
+            ask_client.push(
+                "Confirm the firm's TAN and whether TDS under s.194T was deposited (this is \
+not visible from the books shown here if it went through a ledger not captured in \
+touched_vouchers)."
+                    .to_string(),
+            );
+            ask_client.push(
+                "If not deducted, confirm whether Form 26A relief is available (partner \
+returned the income, tax paid)."
+                    .to_string(),
+            );
             let mut evidence = touched.clone();
             evidence.extend(seen.clone());
             r.findings.push(Finding {
@@ -1078,33 +1691,37 @@ not judged.",
                     Confidence::JudgementRequired
                 },
                 limits,
-                ask_client: vec![
-                    "Confirm the firm's TAN and whether TDS under s.194T was deposited (this is \
-not visible from the books shown here if it went through a ledger not captured in \
-touched_vouchers)."
-                        .to_string(),
-                    "If not deducted, confirm whether Form 26A relief is available (partner \
-returned the income, tax paid)."
-                        .to_string(),
-                ],
+                ask_client,
             });
         }
     }
 
-    r.fig(
-        "s40b_excess_total",
-        int(excess_total)?,
-        Unit::Paise,
-        &if not_computed_count == 0 {
-            "Sum of s40b_excess_<partner> across all partners.".to_string()
-        } else {
-            format!(
-                "Sum of s40b_excess_<partner> across the partners for whom it is computed: \
-{not_computed_count} partner(s) not computed (their s40b_not_computed findings) are not in it."
-            )
-        },
-        Vec::new(),
-    );
+    // A total over some partners reads as "no disallowance" beside a bare figure: it is withheld
+    // whenever a partner is not computed or none is configured, and the reason stands in its place.
+    if !partners.is_empty() && not_computed_count == 0 {
+        r.fig(
+            "s40b_excess_total",
+            int(excess_total)?,
+            Unit::Paise,
+            "Sum of s40b_excess_<partner> across all partners.",
+            Vec::new(),
+        );
+    } else {
+        r.fig(
+            "s40b_excess_total_not_computed",
+            Value::Text(if partners.is_empty() {
+                "not computed: no partner is configured for this firm".to_string()
+            } else {
+                format!("not computed: s.40(b) is not computed for {not_computed_count} partner(s)")
+            }),
+            Unit::Text,
+            "The sum of the s.40(b) excess across the firm's partners is not stated: it would leave \
+out the partners whose excess is not computed (their s40b_not_computed findings), or no partner is \
+configured (see that question). Where a partner's excess is computed, it is that partner's own \
+figure.",
+            Vec::new(),
+        );
+    }
     r.fig(
         "s194t_interest_credited_total",
         int(credited_total)?,
@@ -1197,6 +1814,160 @@ mod tests {
         }
     }
 
+    /// An invented ledger with no GUID (its stable tag is the hash of its name).
+    fn ledger(name: &str) -> crate::book::Ledger {
+        crate::book::Ledger {
+            name: name.to_string(),
+            parent: "Capital Account".to_string(),
+            chain: vec!["Capital Account".to_string()],
+            chain_complete: true,
+            master_opening_paise: 0,
+            guid: String::new(),
+            masterid: None,
+        }
+    }
+
+    /// The reference selftest's ledgers (`CAPITAL_A`, `CAPITAL_B`, the interest, remuneration,
+    /// cash and TDS ledgers, and `UNCLASSIFIED`).
+    const LEDGERS: [&str; 7] = [
+        "Partner A",
+        "Partner B",
+        "Interest to Partners",
+        "Remuneration to Partners",
+        "Cash",
+        "TDS Payable",
+        "TDS on Partners 194T",
+    ];
+
+    /// The selftest's `go` book: partner A opens with Rs 10,00,000 of capital (a credit), B with
+    /// none.
+    fn book_of(vouchers: Vec<Voucher>) -> Book {
+        let row = |opening_paise| crate::book::TbRow {
+            opening_paise,
+            debit_paise: 0,
+            credit_paise: 0,
+            closing_paise: 0,
+        };
+        Book {
+            company_name: "Invented".to_string(),
+            company_guid: "invented".to_string(),
+            ledgers: LEDGERS
+                .iter()
+                .map(|n| ((*n).to_string(), ledger(n)))
+                .collect(),
+            vouchers,
+            tb: BTreeMap::from([
+                ("Partner A".to_string(), row(-10_00_000_00)),
+                ("Partner B".to_string(), row(0)),
+            ]),
+            ..Default::default()
+        }
+    }
+
+    /// A regular journal with no number (its label uses the GUID), on `date` (YYYYMMDD).
+    fn voucher_on(guid: &str, date: &str, lines: &[(&str, i64)]) -> Voucher {
+        Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse(date).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: lines
+                .iter()
+                .map(|(ledger, amount_paise)| LedgerLine {
+                    ledger: (*ledger).to_string(),
+                    amount_paise: *amount_paise,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn voucher(guid: &str, lines: &[(&str, i64)]) -> Voucher {
+        voucher_on(guid, "20260331", lines)
+    }
+
+    const ONE: &str = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+interest_ledger = \"Interest to Partners\"\n";
+    const TWO: &str = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+[partner_b]\ncapital_ledgers = [\"Partner B\"]\n\
+interest_ledger = \"Interest to Partners\"\n";
+    const DEED: &str = "[deed]\ninterest_rate_bp = 1000\n";
+
+    /// The selftest's `go`: a firm under the vendored rules, the given partners and deed, "TDS
+    /// Payable" classified as TDS payable unless `tds` says otherwise.
+    fn go_with(
+        vouchers: Vec<Voucher>,
+        config: &str,
+        tds: &[&str],
+        excess_computed: bool,
+    ) -> Result<TestResult> {
+        let tds: BTreeSet<String> = tds.iter().map(|s| (*s).to_string()).collect();
+        run_with(
+            &book_of(vouchers),
+            &Rules::vendored().unwrap(),
+            &year(),
+            "firm",
+            &cfg(config),
+            &tds,
+            excess_computed,
+        )
+    }
+
+    fn go(vouchers: Vec<Voucher>, config: &str) -> TestResult {
+        go_with(vouchers, config, &["TDS Payable"], S40B_EXCESS_COMPUTED).unwrap()
+    }
+
+    fn fig<'r>(r: &'r TestResult, name: &str) -> &'r crate::findings::Figure {
+        let id = format!("{TEST_ID}.{name}");
+        r.figures
+            .iter()
+            .find(|f| f.id == id)
+            .unwrap_or_else(|| panic!("no figure {id}"))
+    }
+
+    fn has_fig(r: &TestResult, name: &str) -> bool {
+        let id = format!("{TEST_ID}.{name}");
+        r.figures.iter().any(|f| f.id == id)
+    }
+
+    fn found<'r>(r: &'r TestResult, prefix: &str) -> Vec<&'r Finding> {
+        let prefix = format!("{TEST_ID}/{prefix}");
+        r.findings
+            .iter()
+            .filter(|f| f.id.starts_with(&prefix))
+            .collect()
+    }
+
+    fn config_refusal(result: Result<TestResult>) -> String {
+        match result {
+            Err(AuditError::Config(m)) => m,
+            other => panic!("expected a Config refusal, got {other:?}"),
+        }
+    }
+
+    const LEAD: &str = "This test computes the s.40(b) excess for no partner: its reading of a \
+partner's interest from the books can miss or misread some bookings (another partner's interest or \
+remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no \
+excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, \
+the capital accounts and the interest credited. What this test could see is named below, and the \
+interest credited and allowable-interest figures are working figures only.";
+    const CLOSING: &str = "No s.40(b) excess is stated for this partner, and none is listed in \
+clause 21(c). Its interest credited and allowable-interest figures are marked not usable for \
+s.40(b).";
+    const PLAIN_ONLY: &str = "This test reads only that plain shape. Correct bookings of other \
+shapes are not computed here either: a year-end journal crediting several partners at once, a \
+reversal or correction, interest on per-partner ledgers in one journal, one TDS line for several \
+partners, TDS booked through the capital, or a round-off. The CA computes the excess from the \
+vouchers named.";
+    const ASK_RATE: &str = "The s.40(b) computation for this partner: the deed's authorised \
+interest rate, the capital balances through the year, and the interest credited.";
+    const ASK_VOUCHERS: &str = "The partner's interest for the year, with the interest and \
+remuneration in each voucher named here and the TDS on each.";
+    const ASK_BASE: &str =
+        "The partner's interest and remuneration for the year, and the TDS deducted on each.";
+
     #[test]
     fn the_partner_tag_is_the_references() {
         // As the reference's golden names partner_a: sha1("partner_a")[:8].
@@ -1215,22 +1986,33 @@ mod tests {
                 "{text}"
             );
         }
-        let (partners, rate) = partners_config(&cfg(
+        // Typing reads the list as written; `check_partners_config` refuses a name listed twice
+        // (a_capital_ledger_list_the_reference_cannot_read_is_refused).
+        let (partners, deed) = partners_config(&cfg(
             "[a]\ncapital_ledgers = [\"A\", \"A\"]\n[deed]\ninterest_rate_bp = 1000\n",
         ))
         .unwrap();
         assert_eq!(partners["a"].capital_ledgers, ["A", "A"]);
-        assert_eq!(rate, Some(1000));
+        assert_eq!(
+            deed,
+            Some(Deed {
+                interest_rate_bp: Some(1000),
+                no_interest_authorised: false
+            })
+        );
     }
 
     #[test]
     fn two_partner_keys_sharing_a_figure_tag_are_refused_not_a_panic() {
         // SHA-1 of "p30395" and of "p89343" both begin 47ff8a3d.
         assert_eq!(hash8("p30395"), hash8("p89343"));
-        let book = Book {
+        let mut book = Book {
             vouchers: Vec::new(),
             ..unreadable_book()
         };
+        for name in ["A Capital", "B Capital"] {
+            book.ledgers.insert(name.to_string(), ledger(name));
+        }
         let rules = Rules::vendored().unwrap();
         let two = "[p30395]\ncapital_ledgers = [\"A Capital\"]\n\
 [p89343]\ncapital_ledgers = [\"B Capital\"]\n";
@@ -1321,5 +2103,902 @@ mod tests {
             ),
             Err(AuditError::Config(_))
         ));
+    }
+
+    // ---- the configuration the reference refuses (check_partners_config) ----
+
+    const NOINT: &str = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+remuneration_ledger = \"Remuneration to Partners\"\n";
+
+    #[test]
+    fn the_no_interest_flag_is_refused_in_any_form_but_a_boolean_or_beside_any_rate() {
+        for (deed, why) in [
+            (
+                "no_interest_authorised = \"yes\"",
+                "[partners.deed].no_interest_authorised must be true or false; got ",
+            ),
+            (
+                "no_interest_authorised = 1",
+                "[partners.deed].no_interest_authorised must be true or false; got ",
+            ),
+            (
+                "no_interest_authorised = true\ninterest_rate_bp = 0",
+                "[partners.deed] sets no_interest_authorised and an interest_rate_bp; the deed \
+either authorises no interest or authorises a rate",
+            ),
+            (
+                "no_interest_authorised = true\ninterest_rate_bp = 1000",
+                "[partners.deed] sets no_interest_authorised and an interest_rate_bp; the deed \
+either authorises no interest or authorises a rate",
+            ),
+            // The rate is checked first, as the reference checks it.
+            (
+                "no_interest_authorised = 1\ninterest_rate_bp = -100",
+                "[partners.deed].interest_rate_bp must be a whole number of basis points, 0 or \
+more; got ",
+            ),
+        ] {
+            let config = format!("{NOINT}[deed]\n{deed}\n");
+            let m = config_refusal(go_with(Vec::new(), &config, &["TDS Payable"], false));
+            // The value refused is quoted as TOML writes it; the text before it is the reference's.
+            assert!(m.starts_with(&format!("{TEST_ID}: {why}")), "{deed}: {m}");
+        }
+        // A rate that is not a whole number of basis points, 0 or more, is refused too.
+        for rate in ["12.5", "true", "\"1200\""] {
+            let config = format!("{NOINT}[deed]\ninterest_rate_bp = {rate}\n");
+            let m = config_refusal(go_with(Vec::new(), &config, &["TDS Payable"], false));
+            assert!(
+                m.starts_with(&format!(
+                    "{TEST_ID}: [partners.deed].interest_rate_bp must be a whole number"
+                )),
+                "{m}"
+            );
+        }
+        // A deed that is not a table is refused.
+        let m = config_refusal(go_with(
+            Vec::new(),
+            &format!("deed = 1000\n{NOINT}"),
+            &["TDS Payable"],
+            false,
+        ));
+        assert!(
+            m.starts_with(&format!("{TEST_ID}: [partners.deed] must be a table; got ")),
+            "{m}"
+        );
+    }
+
+    #[test]
+    fn a_ledger_configured_in_two_roles_is_refused() {
+        let a = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n";
+        let b = "[partner_b]\ncapital_ledgers = [\"Partner B\"]\n\
+interest_ledger = \"Interest to Partners\"\n";
+        let role = |role: &str, led: &str| {
+            format!(
+                "[partners.partner_a].{role} '{led}' is a partner's capital ledger or a TDS ledger"
+            )
+        };
+        for (config, why) in [
+            (
+                format!(
+                    "{a}interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Interest to Partners\"\n"
+                ),
+                "[partners.partner_a] names 'Interest to Partners' as both its interest and its \
+remuneration ledger"
+                    .to_string(),
+            ),
+            (
+                format!("{a}interest_ledger = \"Partner A\"\n"),
+                role("interest_ledger", "Partner A"),
+            ),
+            (
+                format!("{a}interest_ledger = \"Partner B\"\n{b}"),
+                role("interest_ledger", "Partner B"),
+            ),
+            (
+                format!(
+                    "{a}interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Partner A\"\n"
+                ),
+                role("remuneration_ledger", "Partner A"),
+            ),
+            (
+                format!("{a}interest_ledger = \"TDS Payable\"\n"),
+                role("interest_ledger", "TDS Payable"),
+            ),
+            (
+                format!(
+                    "{a}interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"TDS Payable\"\n"
+                ),
+                role("remuneration_ledger", "TDS Payable"),
+            ),
+        ] {
+            let m = config_refusal(go_with(Vec::new(), &config, &["TDS Payable"], false));
+            assert_eq!(m, format!("{TEST_ID}: {why}"), "{config}");
+        }
+        // The control: the TDS ledger is refused only because it is classified as TDS payable.
+        let config = format!("{a}interest_ledger = \"TDS Payable\"\n");
+        assert!(go_with(Vec::new(), &config, &[], false).is_ok());
+    }
+
+    #[test]
+    fn a_capital_ledger_list_or_ledger_the_reference_cannot_read_is_refused() {
+        let list = |caps: &str| {
+            format!(
+                "[partner_a]\ncapital_ledgers = {caps}\ninterest_ledger = \"Interest to Partners\"\n"
+            )
+        };
+        let shape = |got: &str| {
+            format!(
+                "[partners.partner_a].capital_ledgers must be a non-empty list of distinct ledger \
+names; got {got}"
+            )
+        };
+        for (config, why) in [
+            (
+                list("[\"Partner A\", \"Partner A\"]"),
+                shape("['Partner A', 'Partner A']"),
+            ),
+            (list("[]"), shape("[]")),
+            (list("[\"\"]"), shape("['']")),
+            (
+                format!(
+                    "{}{}",
+                    list("[\"Partner A\"]"),
+                    list("[\"Partner A\"]").replace("partner_a", "partner_b")
+                ),
+                "[partners.partner_b].capital_ledgers names 'Partner A', which is also partner \
+'partner_a''s capital ledger"
+                    .to_string(),
+            ),
+            (
+                list("[\"Partner Z\"]"),
+                "[partners.partner_a] names ledger 'Partner Z', which is not in the books"
+                    .to_string(),
+            ),
+            (
+                "[partner_a]\ncapital_ledgers = [\"Partner A\"]\ninterest_ledger = \"\"\n"
+                    .to_string(),
+                "[partners.partner_a] names ledger '', which is not in the books".to_string(),
+            ),
+        ] {
+            let m = config_refusal(go_with(Vec::new(), &config, &["TDS Payable"], false));
+            assert_eq!(m, format!("{TEST_ID}: {why}"), "{config}");
+        }
+    }
+
+    // ---- the closing rule: the excess is computed for no partner ----
+
+    #[test]
+    fn the_switch_is_off_in_run() {
+        // `run` itself, as production calls it: a plain partner is asked, never computed.
+        let book = book_of(vec![voucher(
+            "p1",
+            &[
+                ("Interest to Partners", 5_00_000_00),
+                ("Partner A", -5_00_000_00),
+            ],
+        )]);
+        let tds = BTreeSet::from(["TDS Payable".to_string()]);
+        let rules = Rules::vendored().unwrap();
+        let r = run(
+            &book,
+            &rules,
+            &year(),
+            "firm",
+            &cfg(&format!("{ONE}{DEED}")),
+            &tds,
+        )
+        .unwrap();
+        assert_eq!(found(&r, "s40b_not_computed/").len(), 1);
+        assert!(found(&r, "s40b_excess/").is_empty());
+    }
+
+    #[test]
+    fn a_plain_partner_with_an_excess_is_asked_not_computed_and_the_total_withheld() {
+        let plain = || {
+            vec![voucher(
+                "p1",
+                &[
+                    ("Interest to Partners", 5_00_000_00),
+                    ("Partner A", -5_00_000_00),
+                ],
+            )]
+        };
+        let r = go(plain(), &format!("{ONE}{DEED}"));
+        let h = hash8("partner_a");
+        let f = found(&r, "s40b_not_computed/");
+        assert_eq!(f.len(), 1);
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {h}): this test computes the excess for no \
+partner; the CA computes it"
+            )
+        );
+        assert_eq!(f[0].limits, [LEAD, CLOSING]);
+        assert!(f[0].evidence.is_empty());
+        assert_eq!(f[0].ask_client, [ASK_RATE]);
+        assert!(!has_fig(&r, &format!("s40b_excess_{h}")));
+        assert!(found(&r, "s40b_excess/").is_empty());
+        assert!(!has_fig(&r, "s40b_excess_total"));
+        assert_eq!(
+            fig(&r, "s40b_excess_total_not_computed").value,
+            Value::Text("not computed: s.40(b) is not computed for 1 partner(s)".to_string())
+        );
+        assert_eq!(
+            fig(&r, &format!("interest_credited_{h}")).value,
+            Value::Int(5_00_000_00)
+        );
+        for name in ["interest_credited", "allowable_interest"] {
+            assert!(fig(&r, &format!("{name}_{h}"))
+                .definition
+                .contains("Not usable for s.40(b)"));
+        }
+        assert!(fig(&r, &format!("allowable_interest_{h}")).definition.ends_with(
+            " No remuneration ledger is configured for this partner: remuneration credits, if any, \
+are read as capital; configure the remuneration ledger."
+        ));
+        // Over the limit, with the question raised whatever the base.
+        let t = found(&r, &format!("s194t/{h}"));
+        assert_eq!(
+            t[0].title,
+            "Payments/credits to a partner over the s.194T threshold with no TDS ledger line seen"
+        );
+        assert_eq!(t[0].ask_client[0], ASK_BASE);
+
+        // The control: the same book computes the excess with the switch on. Opening capital
+        // Rs 10,00,000 all year at 1000 bp is Rs 1,00,000 allowable; Rs 5,00,000 credited.
+        let r = go_with(plain(), &format!("{ONE}{DEED}"), &["TDS Payable"], true).unwrap();
+        assert!(found(&r, "s40b_not_computed/").is_empty());
+        assert_eq!(
+            fig(&r, &format!("allowable_interest_{h}")).value,
+            Value::Int(1_00_000_00)
+        );
+        assert_eq!(
+            fig(&r, &format!("s40b_excess_{h}")).value,
+            Value::Int(4_00_000_00)
+        );
+        assert_eq!(fig(&r, "s40b_excess_total").value, Value::Int(4_00_000_00));
+        assert!(!has_fig(&r, "s40b_excess_total_not_computed"));
+        let e = found(&r, "s40b_excess/");
+        assert_eq!(e.len(), 1);
+        assert_eq!(
+            e[0].limits[1],
+            "No remuneration ledger is configured for this partner: remuneration credits, if any, \
+are read as capital, which would raise the allowable interest and lower this excess; configure the \
+remuneration ledger."
+        );
+    }
+
+    #[test]
+    fn at_exactly_the_s194t_limit_the_base_is_not_over_it() {
+        // The vendored [s194t] limit is Rs 20,000.
+        let credit = |paise: i64| {
+            vec![voucher(
+                "p1",
+                &[("Interest to Partners", paise), ("Partner A", -paise)],
+            )]
+        };
+        let r = go(credit(20_000_00), &format!("{ONE}{DEED}"));
+        let h = hash8("partner_a");
+        let t = found(&r, &format!("s194t/{h}"));
+        assert_eq!(
+            t[0].title,
+            "Payments/credits to a partner whose s.194T base is not confirmed: s.40(b) is not \
+computed with no TDS ledger line seen"
+        );
+        assert!(t[0].limits.contains(
+            &"This base (₹20,000) is under the s.194T threshold (₹20,000) as read, but it may be \
+wrong (above), so whether it crosses the threshold is not computed."
+                .to_string()
+        ));
+        assert!(fig(&r, &format!("s194t_amount_credited_{h}"))
+            .definition
+            .ends_with(
+                " It may be wrong in either direction: see this partner's s.194T question."
+            ));
+        let r = go(credit(20_000_01), &format!("{ONE}{DEED}"));
+        assert_eq!(
+            found(&r, &format!("s194t/{h}"))[0].title,
+            "Payments/credits to a partner over the s.194T threshold with no TDS ledger line seen"
+        );
+        // With the switch on, a base read exactly and not over the limit is silent.
+        let on = |paise| {
+            go_with(
+                credit(paise),
+                &format!("{ONE}{DEED}"),
+                &["TDS Payable"],
+                true,
+            )
+        };
+        assert!(found(&on(20_000_00).unwrap(), "s194t/").is_empty());
+        assert_eq!(found(&on(20_000_01).unwrap(), "s194t/").len(), 1);
+    }
+
+    #[test]
+    fn a_firm_with_no_partner_configured_is_asked_and_its_total_withheld() {
+        let r = go(Vec::new(), DEED);
+        let q = found(&r, "partners_not_configured");
+        assert_eq!(q.len(), 1);
+        assert_eq!(q[0].clauses, ["s.40(b)", "s.194T", "3CD-21(c)"]);
+        assert_eq!(
+            q[0].title,
+            "No partner is configured for this firm: s.40(b) interest and s.194T are not computed"
+        );
+        assert_eq!(
+            q[0].ask_client,
+            ["The partners, and for each the capital, interest and remuneration ledgers."]
+        );
+        assert!(!has_fig(&r, "s40b_excess_total"));
+        assert_eq!(
+            fig(&r, "s40b_excess_total_not_computed").value,
+            Value::Text("not computed: no partner is configured for this firm".to_string())
+        );
+    }
+
+    #[test]
+    fn a_deed_without_its_rate_is_asked_for_the_rate_not_the_deed() {
+        let r = go(
+            Vec::new(),
+            &format!("{ONE}[deed]\nremuneration_authorised = true\n"),
+        );
+        assert!(found(&r, "deed_missing").is_empty());
+        let q = found(&r, "deed_rate_missing");
+        assert_eq!(q.len(), 1);
+        assert_eq!(
+            q[0].title,
+            "Partnership deed recorded without its interest rate; s.40(b) interest rate assumed at \
+the statutory cap"
+        );
+        assert_eq!(fig(&r, "interest_rate_bp_used").value, Value::Int(1200));
+    }
+
+    // ---- P2-3: one TDS line shared by two partners' interest ----
+
+    #[test]
+    fn one_tds_line_for_two_partners_is_named_and_leaves_both_not_computed() {
+        let j1 = voucher(
+            "j1",
+            &[
+                ("Interest to Partners", 44_000_00),
+                ("Partner A", -19_800_00),
+                ("Partner B", -19_800_00),
+                ("TDS Payable", -4_400_00),
+            ],
+        );
+        let r = go(vec![j1], &format!("{TWO}{DEED}"));
+        let h = hash8("partner_a");
+        // Not added back: the partner's interest is read net of an unknown part of it.
+        assert_eq!(
+            fig(&r, &format!("interest_credited_{h}")).value,
+            Value::Int(19_800_00)
+        );
+        let f = found(&r, &format!("s40b_not_computed/{h}"));
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {h}): its interest credited cannot be read \
+exactly; the CA computes it"
+            )
+        );
+        assert_eq!(
+            f[0].limits,
+            [
+                LEAD,
+                PLAIN_ONLY,
+                "1 interest voucher(s) carry TDS but also credit another party (Journal j1 on \
+2026-03-31): the TDS is not divided between them, so the interest counted is net of an unknown part \
+of it.",
+                CLOSING,
+            ]
+        );
+        assert_eq!(
+            f[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "j1",
+                "Journal j1 on 2026-03-31"
+            )]
+        );
+        assert_eq!(f[0].ask_client, [ASK_RATE, ASK_VOUCHERS]);
+        assert_eq!(
+            found(&r, &format!("s40b_not_computed/{}", hash8("partner_b"))).len(),
+            1
+        );
+        // Under the limit as read, the s.194T question is still raised.
+        let t = found(&r, &format!("s194t/{h}"));
+        assert_eq!(
+            t[0].title,
+            "Payments/credits to a partner whose s.194T base is not read exactly, with TDS seen on \
+its vouchers: which credits it covers, and its deposit, are the CA's to determine"
+        );
+        assert_eq!(
+            t[0].limits,
+            [
+                "Books only: TAN registration, challans filed and any Form 26A route are not \
+visible from vouchers.",
+                "1 interest or remuneration voucher(s) carry TDS but also credit another party \
+(Journal j1 on 2026-03-31): their TDS is not added back, so the interest or remuneration counted may \
+be understated by it.",
+                "1 voucher(s) touching this partner are not read exactly (Journal j1 on \
+2026-03-31): this base may be wrong in either direction.",
+                "This base (₹19,800) is under the s.194T threshold (₹20,000) as read, but it may be \
+wrong (above), so whether it crosses the threshold is not computed.",
+                "TDS of ₹4,400 (net) is seen on 1 voucher(s) touching this partner: Journal j1 on \
+2026-03-31.",
+            ]
+        );
+        assert_eq!(t[0].ask_client[0], ASK_BASE);
+    }
+
+    // ---- a credit net of a ledger this test does not read ----
+
+    #[test]
+    fn a_credit_net_of_an_unclassified_ledger_names_the_ledger_and_its_fix() {
+        let i1 = || {
+            vec![voucher(
+                "i1",
+                &[
+                    ("Interest to Partners", 90_000_00),
+                    ("Partner A", -81_000_00),
+                    ("TDS on Partners 194T", -9_000_00),
+                ],
+            )]
+        };
+        let config = format!("{ONE}{DEED}");
+        let r = go(i1(), &config);
+        let h = hash8("partner_a");
+        assert_eq!(
+            fig(&r, &format!("interest_credited_{h}")).value,
+            Value::Int(81_000_00)
+        );
+        let f = found(&r, &format!("s40b_not_computed/{h}"));
+        assert_eq!(
+            f[0].limits,
+            [
+                LEAD.to_string(),
+                PLAIN_ONLY.to_string(),
+                format!(
+                    "1 interest voucher(s) also credit a ledger this test does not read (Journal i1 \
+on 2026-03-31; ledger tag(s) {}): the partner may be credited net of it, so the interest counted may \
+be understated. If the ledger is TDS on this partner's interest alone, classify it as TDS payable in \
+the client's statutory dues and the interest is counted gross; on a voucher that credits several \
+partners the TDS is not divided, and if it is a payable, a round-off or a payment, the CA reads the \
+interest from the voucher.",
+                    hash8("TDS on Partners 194T")
+                ),
+                CLOSING.to_string(),
+            ]
+        );
+        assert_eq!(
+            f[0].evidence,
+            [
+                EvidenceRef::with_label("voucher", "i1", "Journal i1 on 2026-03-31"),
+                EvidenceRef::new("ledger", "TDS on Partners 194T"),
+            ]
+        );
+        assert_eq!(
+            f[0].ask_client,
+            [
+                ASK_RATE,
+                ASK_VOUCHERS,
+                "If 'TDS on Partners 194T' carries TDS on this partner's interest, classify it as \
+TDS payable in your statutory dues; otherwise, what it is.",
+            ]
+        );
+        let t = found(&r, &format!("s194t/{h}"));
+        assert_eq!(
+            t[0].limits[1],
+            "1 interest or remuneration voucher(s) also credit a ledger this test does not read \
+(Journal i1 on 2026-03-31): the partner may be credited net of it, so this base may be understated."
+        );
+        // Classified as TDS payable, the same voucher is plain and read gross.
+        let r = go_with(i1(), &config, &["TDS on Partners 194T"], true).unwrap();
+        assert!(found(&r, "s40b_not_computed/").is_empty());
+        assert_eq!(
+            fig(&r, &format!("interest_credited_{h}")).value,
+            Value::Int(90_000_00)
+        );
+    }
+
+    // ---- the plain-voucher gate ----
+
+    #[test]
+    fn an_unbalanced_interest_voucher_is_not_plain_and_is_named() {
+        let t7 = voucher(
+            "t7",
+            &[
+                ("Interest to Partners", 50_000_00),
+                ("Partner A", -45_000_00),
+            ],
+        );
+        let r = go(vec![t7], &format!("{ONE}{DEED}"));
+        let f = found(&r, "s40b_not_computed/");
+        assert_eq!(
+            f[0].limits,
+            [
+                LEAD,
+                "1 voucher(s) on this partner's capital are not of the plain shape this test reads \
+exactly (Journal t7 on 2026-03-31): this partner's own interest or remuneration ledger debited, its \
+own capital credited, and TDS on a ledger classified as TDS payable, balanced. Each carries a line \
+this test does not read as plain, so the interest counted may be wrong in either direction.",
+                PLAIN_ONLY,
+                CLOSING,
+            ]
+        );
+        assert_eq!(
+            f[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "t7",
+                "Journal t7 on 2026-03-31"
+            )]
+        );
+    }
+
+    #[test]
+    fn another_partners_ledger_on_this_capital_is_named_not_read_as_nothing() {
+        let config = format!(
+            "{ONE}[partner_b]\ncapital_ledgers = [\"Partner B\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Remuneration to Partners\"\n{DEED}"
+        );
+        let o1 = || {
+            vec![voucher(
+                "o1",
+                &[
+                    ("Remuneration to Partners", 60_000_00),
+                    ("Partner A", -60_000_00),
+                ],
+            )]
+        };
+        let r = go(o1(), &config);
+        let (ha, hb) = (hash8("partner_a"), hash8("partner_b"));
+        let f = found(&r, &format!("s40b_not_computed/{ha}"));
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {ha}): its interest credited cannot be read \
+exactly; the CA computes it"
+            )
+        );
+        assert_eq!(
+            f[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "o1",
+                "Journal o1 on 2026-03-31"
+            )]
+        );
+        // Not called partner A's remuneration voucher.
+        let b = found(&r, "remuneration_book_profit_required");
+        assert!(!b[0]
+            .limits
+            .iter()
+            .any(|x| x.contains("remuneration voucher(s) are not of the plain shape")));
+        // B's capital is not touched: with the switch on, B alone is computed.
+        let r = go_with(o1(), &config, &["TDS Payable"], true).unwrap();
+        assert_eq!(found(&r, &format!("s40b_not_computed/{ha}")).len(), 1);
+        assert!(found(&r, &format!("s40b_not_computed/{hb}")).is_empty());
+    }
+
+    #[test]
+    fn a_zero_capital_line_does_not_hide_a_bank_payment() {
+        for cap in ["Partner A", "Partner B"] {
+            let iz = voucher(
+                "iz",
+                &[
+                    ("Interest to Partners", 70_000_00),
+                    ("Cash", -70_000_00),
+                    (cap, 0),
+                ],
+            );
+            let r = go(vec![iz], &format!("{TWO}{DEED}"));
+            let h = hash8("partner_a");
+            let off = found(&r, &format!("off_capital/{h}"));
+            assert_eq!(off.len(), 1, "{cap}");
+            assert_eq!(
+                off[0].evidence,
+                [EvidenceRef::with_label(
+                    "voucher",
+                    "iz",
+                    "Journal iz on 2026-03-31"
+                )],
+                "{cap}"
+            );
+            let f = found(&r, &format!("s40b_not_computed/{h}"));
+            assert!(f[0].evidence.iter().any(|e| e.id == "iz"), "{cap}");
+        }
+    }
+
+    #[test]
+    fn another_partners_own_tds_on_a_shared_ledger_leaves_this_one_no() {
+        let a2 = voucher(
+            "a2",
+            &[
+                ("Interest to Partners", 12_000_00),
+                ("Partner A", -10_800_00),
+                ("TDS Payable", -1_200_00),
+            ],
+        );
+        let b1 = voucher(
+            "b1",
+            &[
+                ("Interest to Partners", 30_000_00),
+                ("Partner B", -30_000_00),
+            ],
+        );
+        let r = go(vec![a2, b1], &format!("{TWO}{DEED}"));
+        let hb = hash8("partner_b");
+        assert_eq!(
+            fig(&r, &format!("s194t_tds_ledger_seen_{hb}")).value,
+            Value::Text("no".to_string())
+        );
+        let t = found(&r, &format!("s194t/{hb}"));
+        assert!(
+            !t[0].limits.iter().any(|x| x.contains("a2")),
+            "{:?}",
+            t[0].limits
+        );
+    }
+
+    #[test]
+    fn remuneration_net_of_an_unread_ledger_is_said_on_the_remuneration_finding() {
+        let config = format!("{ONE}remuneration_ledger = \"Remuneration to Partners\"\n{DEED}");
+        let r1 = voucher(
+            "r1",
+            &[
+                ("Remuneration to Partners", 20_000_00),
+                ("Partner A", -18_000_00),
+                ("TDS on Partners 194T", -2_000_00),
+            ],
+        );
+        let r = go(vec![r1], &config);
+        let h = hash8("partner_a");
+        let b = found(&r, "remuneration_book_profit_required");
+        assert_eq!(
+            b[0].limits[2..],
+            [format!(
+                "Partner (tag {h}): 1 remuneration voucher(s) also credit a ledger this test does \
+not read (Journal r1 on 2026-03-31): remuneration_credited_{h} may be net of it. If that ledger is \
+TDS on this partner's remuneration alone, classify it as TDS payable in the client's statutory dues."
+            )]
+        );
+        assert_eq!(
+            b[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "r1",
+                "Journal r1 on 2026-03-31"
+            )]
+        );
+    }
+
+    #[test]
+    fn remuneration_left_inside_an_unsplit_voucher_is_said() {
+        let config = format!("{ONE}remuneration_ledger = \"Remuneration to Partners\"\n{DEED}");
+        let m1 = voucher(
+            "m1",
+            &[
+                ("Interest to Partners", 4_000_00),
+                ("Remuneration to Partners", 20_000_00),
+                ("Partner A", -24_000_00),
+                ("Partner A", 1_000_00),
+                ("Cash", -1_000_00),
+            ],
+        );
+        let r = go(vec![m1], &config);
+        let h = hash8("partner_a");
+        let rem = fig(&r, &format!("remuneration_credited_{h}"));
+        assert_eq!(rem.value, Value::Int(0));
+        assert!(rem.definition.ends_with(
+            " A voucher carrying both the interest and the remuneration ledger that is not split \
+is counted as interest, not here."
+        ));
+        let b = found(&r, "remuneration_book_profit_required");
+        assert_eq!(
+            b[0].limits[2..],
+            [format!(
+                "Partner (tag {h}): 1 voucher(s) carrying both the interest and the remuneration \
+ledger are not split (Journal m1 on 2026-03-31): their credit is counted as interest, so \
+remuneration_credited_{h} leaves out the remuneration in them."
+            )]
+        );
+    }
+
+    // ---- the owner's 4a: a deed that authorises no interest on capital ----
+
+    #[test]
+    fn a_no_interest_deed_states_the_disallowance_and_asks_nothing_without_an_interest_ledger() {
+        let books = vec![
+            voucher_on(
+                "k1",
+                "20250601",
+                &[("Cash", 50_000_00), ("Partner A", -50_000_00)],
+            ),
+            voucher(
+                "r1",
+                &[
+                    ("Remuneration to Partners", 1_20_000_00),
+                    ("Partner A", -1_20_000_00),
+                ],
+            ),
+        ];
+        let r = go(
+            books,
+            &format!("{NOINT}[deed]\nno_interest_authorised = true\n"),
+        );
+        let h = hash8("partner_a");
+        let f = found(&r, &format!("s40b_not_computed/{h}"));
+        assert_eq!(f.len(), 1);
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {h}): the deed authorises no interest on \
+capital, so any interest is disallowed in full"
+            )
+        );
+        assert_eq!(
+            f[0].limits,
+            [
+                LEAD,
+                "The deed authorises no interest on capital (as recorded in the configuration), so \
+s.40(b) allows none: interest paid or credited to this partner, through any ledger (its \
+remuneration ledger included), is disallowed in full. This test does not search the books for such \
+interest, and states no disallowed amount.",
+                CLOSING,
+            ]
+        );
+        assert!(f[0].ask_client.is_empty());
+        assert_eq!(f[0].evidence, [EvidenceRef::new("ledger", "Partner A")]);
+        assert_eq!(fig(&r, "interest_rate_bp_used").value, Value::Int(0));
+        assert_eq!(
+            fig(&r, "interest_rate_bp_used").definition,
+            "Rate used for s.40(b) allowable interest: 0, as the deed authorises no interest on \
+capital (recorded in the configuration)."
+        );
+        assert!(found(&r, "deed_rate_missing").is_empty());
+        assert!(found(&r, "deed_missing").is_empty());
+        assert!(!has_fig(&r, &format!("s40b_excess_{h}")));
+        assert!(!has_fig(&r, "s40b_excess_total"));
+        let t = found(&r, &format!("s194t/{h}"));
+        assert!(t[0].limits.contains(
+            &"No interest ledger is configured for this partner, so interest credited to its \
+capital is not in this base, which may therefore be understated."
+                .to_string()
+        ));
+    }
+
+    #[test]
+    fn a_no_interest_deed_with_an_interest_ledger_asks_for_the_interest_not_the_rate() {
+        let i1 = voucher(
+            "i1",
+            &[
+                ("Interest to Partners", 60_000_00),
+                ("Partner A", -60_000_00),
+            ],
+        );
+        let r = go(
+            vec![i1],
+            &format!("{ONE}[deed]\nno_interest_authorised = true\n"),
+        );
+        let h = hash8("partner_a");
+        let f = found(&r, &format!("s40b_not_computed/{h}"));
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {h}): this test computes the excess for no \
+partner; the CA computes it"
+            )
+        );
+        assert_eq!(
+            f[0].limits[1],
+            "The deed authorises no interest on capital (as recorded in the configuration), so \
+s.40(b) allows none: interest paid or credited to this partner, through any ledger (its \
+remuneration ledger included), is disallowed in full. This test does not search the books for such \
+interest, beyond reading its configured interest ledger as a working figure (marked not usable), \
+and states no disallowed amount."
+        );
+        assert_eq!(
+            f[0].ask_client,
+            ["The s.40(b) computation for this partner: the interest credited (the deed authorises \
+none, so all of it is disallowed)."]
+        );
+        assert_eq!(
+            fig(&r, &format!("interest_credited_{h}")).value,
+            Value::Int(60_000_00)
+        );
+        assert_eq!(
+            fig(&r, &format!("allowable_interest_{h}")).value,
+            Value::Int(0)
+        );
+    }
+
+    #[test]
+    fn a_no_interest_flag_set_false_is_the_same_as_not_recorded() {
+        let r = go(
+            Vec::new(),
+            &format!("{NOINT}[deed]\nno_interest_authorised = false\n"),
+        );
+        assert_eq!(found(&r, "deed_rate_missing").len(), 1);
+        assert_eq!(fig(&r, "interest_rate_bp_used").value, Value::Int(1200));
+        let f = found(&r, "s40b_not_computed/");
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {}): its interest credited cannot be read \
+exactly; the CA computes it",
+                hash8("partner_a")
+            )
+        );
+        assert_eq!(
+            f[0].limits[1],
+            "No interest ledger is configured for this partner, so interest credited to its capital \
+cannot be told from capital introduced: the capital walk reads every credit to it as capital, \
+except remuneration on a configured remuneration ledger, and no interest credited is counted. If \
+the deed authorises no interest on capital, the configuration can record that ([partners.deed] \
+no_interest_authorised)."
+        );
+        assert_eq!(
+            f[0].ask_client,
+            [ASK_RATE, "The ledger that carries this partner's interest."]
+        );
+    }
+
+    // ---- production wiring: the TDS ledgers reach the module (P2-4) ----
+
+    #[test]
+    fn the_statutory_dues_tds_ledgers_reach_the_module_through_the_engagement() {
+        let engagement = |extra: &str| {
+            crate::Engagement::from_toml(
+                &format!(
+                    "[client]\nlabel = \"Test\"\nassessment_year = \"2026-27\"\n\
+entity_type = \"firm\"\n\
+[period]\nstart = \"2025-04-01\"\nend = \"2026-03-31\"\n\
+[snapshot]\nformat = \"tally-read-v1\"\npath = \"unused\"\n\
+[roles]\ncash_groups = []\nbank_groups = []\n\
+[partners.partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+[partners.deed]\ninterest_rate_bp = 1000\n{extra}"
+                ),
+                std::path::Path::new("."),
+            )
+            .unwrap()
+        };
+        let book = book_of(vec![voucher(
+            "i1",
+            &[
+                ("Interest to Partners", 90_000_00),
+                ("Partner A", -81_000_00),
+                ("TDS Payable", -9_000_00),
+            ],
+        )]);
+        let rules = Rules::vendored().unwrap();
+        let h = hash8("partner_a");
+        let value = |dump: &serde_json::Value, name: &str| {
+            let id = format!("{TEST_ID}.{name}");
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == id)
+                .unwrap_or_else(|| panic!("no figure {id}"))["value"]
+                .clone()
+        };
+        let classified =
+            engagement("[statutory_dues.nature_by_ledger]\n\"TDS Payable\" = \"tds_payable\"\n");
+        let dump = crate::partners_40b_194t_on(&classified, &book, &rules).unwrap();
+        // Read gross of the TDS on the ledger [statutory_dues] classifies, and seen.
+        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 90_000_00);
+        assert_eq!(value(&dump, &format!("s194t_tds_ledger_seen_{h}")), "yes");
+        // The control: unclassified, the same voucher is read net and the TDS is not judged.
+        let dump = crate::partners_40b_194t_on(&engagement(""), &book, &rules).unwrap();
+        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 81_000_00);
+        assert_eq!(
+            value(&dump, &format!("s194t_tds_ledger_seen_{h}")),
+            "not judged"
+        );
     }
 }

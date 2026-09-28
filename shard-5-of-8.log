@@ -1,0 +1,148 @@
+F08 killed (full) by 2: src/lib.rs::binding::tests::a_guid_binds_across_python_only_whitespace_and_non_ascii_case, src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+F01 killed (full) by 1: tests/parity.rs::a_repeated_id_or_an_unknown_key_is_reported
+F07 killed (full) by 1: src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+F02 killed (full) by 1: tests/parity.rs::a_repeated_id_or_an_unknown_key_is_reported
+A27 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::an_unknown_creditor_group_refuses_naming_its_location, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A29 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S22 killed (full) by 5: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity, src/lib.rs::binding::tests::tds_payees_inputs_come_from_the_bound_tables, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A28 killed (full) by 1: src/lib.rs::binding::tests::a_legacy_trade_creditor_source_is_read_bound_and_replaced
+A33 killed (full) by 1: src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+S23 killed (full) by 2: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+S26 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+C1-34 killed (full) by 2: src/lib.rs::binding::tests::each_tds_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+C1-38 killed (full) by 1: src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+C1-37 killed (full) by 1: src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+E1B-O24 killed (full) by 1: src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+C2-33 killed (full) by 2: src/lib.rs::binding::tests::each_tds_26as_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_26as_ledgers_and_alias_values_are_bound
+E1B-O25 killed (full) by 1: src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+LB-01 killed (full) by 2: src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used, src/lib.rs::binding::tests::an_unknown_interest_or_shared_ledger_refuses_naming_its_location
+LB-02 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_loans_location_refuses, src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used, src/lib.rs::binding::tests::an_unknown_interest_or_shared_ledger_refuses_naming_its_location
+LB-03 killed (full) by 1: src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used
+LB-04 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+LB-05 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+D1-01 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+D1-02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-06 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+SB-09 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+D2-04 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_partner_ledger_location_refuses, src/lib.rs::binding::tests::an_unknown_partner_remuneration_ledger_refuses_naming_its_location, src/lib.rs::binding::tests::partner_capital_and_remuneration_ledgers_follow_a_rename_by_identity
+D2-03 killed (full) by 4: src/lib.rs::binding::tests::a_malformed_partner_ledger_location_refuses, src/lib.rs::binding::tests::an_identity_used_only_by_a_partner_capital_ledger_is_not_unused, src/lib.rs::binding::tests::an_unknown_partner_capital_ledger_refuses_naming_its_location, src/lib.rs::binding::tests::partner_capital_and_remuneration_ledgers_follow_a_rename_by_identity
+E2B2-01 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+D2-05 killed (full) by 1: src/lib.rs::binding::tests::an_empty_partner_interest_ledger_binds_but_is_not_financial_statements_interest
+E2B2-03 killed (full) by 1: src/lib.rs::high_value_register::tests::a_contra_voucher_is_never_a_row
+E2B2-02 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-05 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-06 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-07 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-08 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-09 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-12 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-15 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-19 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-17 killed (full) by 2: tests/edge_books.rs::a_journal_on_one_ledger_is_refused_not_panicked, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-20 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-21 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-23 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-24 killed (full) by 1: src/lib.rs::high_value_register::tests::the_recipient_type_follows_pack_py
+E2B2-25 killed (full) by 1: src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+E2B2-26 killed (full) by 1: src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+E2B2-29 killed (full) by 2: src/lib.rs::binding::tests::a_bare_ledger_name_that_matches_nothing_refuses_with_named_code, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-30 killed (full) by 1: src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+E2B2-31 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-33 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-32 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-34 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-35 killed (full) by 2: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-36 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-37 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-39 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-38 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-40 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-41 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-42 killed (full) by 3: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2B2-44 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+E2B2-43 killed (full) by 1: src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+F644-01 killed (full) by 7: src/lib.rs::findings::tests::a_repeated_figure_id_is_refused_with_its_typed_error, src/lib.rs::loans_interest::tests::two_vouchers_sharing_a_row_figure_id_are_refused, src/lib.rs::tds_payees::tests::two_payees_sharing_a_figure_id_are_refused, tests/edge_books.rs::a_journal_on_one_ledger_is_refused_not_panicked, tests/edge_books.rs::a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked, tests/edge_books.rs::a_repeated_books_guid_is_refused_not_panicked, tests/edge_books.rs::a_repeated_tis_category_is_refused
+F644-02 killed (full) by 1: src/lib.rs::findings::tests::a_repeated_figure_id_is_refused_with_its_typed_error
+
+89 of 89 killed
+
+warning: 55 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  F01 (full): tests/parity.rs::a_repeated_id_or_an_unknown_key_is_reported
+  F02 (full): tests/parity.rs::a_repeated_id_or_an_unknown_key_is_reported
+  F07 (full): src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+  A28 (full): src/lib.rs::binding::tests::a_legacy_trade_creditor_source_is_read_bound_and_replaced
+  A33 (full): src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+  S26 (full): src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+  C1-37 (full): src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+  C1-38 (full): src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+  E1B-O24 (full): src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+  E1B-O25 (full): src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+  LB-03 (full): src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used
+  LB-04 (full): src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+  LB-05 (full): src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+  D1-02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-06 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D2-05 (full): src/lib.rs::binding::tests::an_empty_partner_interest_ledger_binds_but_is_not_financial_statements_interest
+  E2B2-03 (full): src/lib.rs::high_value_register::tests::a_contra_voucher_is_never_a_row
+  E2B2-04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-24 (full): src/lib.rs::high_value_register::tests::the_recipient_type_follows_pack_py
+  E2B2-25 (full): src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+  E2B2-26 (full): src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+  E2B2-30 (full): src/lib.rs::high_value_register::tests::config_values_are_typed_or_refused
+  E2B2-32 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-33 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-34 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-36 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-37 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-38 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-39 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-43 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  E2B2-44 (full): src/lib.rs::high_value_register::tests::a_row_shows_the_money_line_summed_per_voucher_when_any_voucher_differs
+  F644-02 (full): src/lib.rs::findings::tests::a_repeated_figure_id_is_refused_with_its_typed_error

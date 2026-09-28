@@ -21,8 +21,14 @@ permissions:
 concurrency:
   # Not cancel-in-progress: the report job writes to an issue in two steps, and a
   # cancelled half-run would leave it half-updated.
+  # One group for every ref: runs go one at a time, so a run's eight shards never
+  # compete with another run's for runners that pull requests' CI also needs.
+  # queue: max keeps up to 100 waiting runs, roughly first in, first out; the
+  # default keeps only the newest, so a second branch's dispatch silently
+  # cancelled the first's.
   group: tax-audit-mutations-nightly
   cancel-in-progress: false
+  queue: max
 
 jobs:
   shard:

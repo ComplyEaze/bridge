@@ -56,7 +56,9 @@ recipient constants or "unknown"; absent meaning derived from `entity_type` as p
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
-`is_integrated` (true, false, or absent/null for unknown).
+`is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` and
+`period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
+a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
 """
 from __future__ import annotations
 
@@ -77,7 +79,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-                                 high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, stale_balances_41_1,
+                                 high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules
@@ -254,6 +256,10 @@ def main() -> int:
         "loans_interest": loans_interest_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
             eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"))),
+        "party_monthly": lambda: (party_monthly, party_monthly.run(
+            eng, rules, cash, bank,
+            top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
+                        absent=party_monthly.PARTY_TOP_N, nullable=False))),
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),

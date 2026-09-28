@@ -89,13 +89,10 @@ where
                     .unwrap_or_else(|| json!({}));
                 if catalog::registered_tool_definitions(true, true).as_array().is_some_and(|tools| tools.iter().any(|tool| tool["name"] == name)) {
                     let response = if name == "post_import" {
-                        await_post(
-                            server.call_tool_response(name, arguments.clone()),
-                            PostRequest {
-                                id: id.as_ref().expect("tool requests have IDs"),
-                                args: &arguments,
-                            },
+                        run_post(
                             &server,
+                            id.as_ref().expect("tool requests have IDs"),
+                            &arguments,
                             &mut reader, &mut framer, &mut pending,
                             stdout,
                         ).await?
@@ -398,12 +395,12 @@ fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {
 
 // Independently bounds caller-controlled memory; response caps cannot bound stdin.
 const MAX_REQUEST_BYTES: usize = 5_000_000;
-type Frame = Result<String, (i32, &'static str)>;
+pub(in crate::agent) type Frame = Result<String, (i32, &'static str)>;
 
 // State survives a cancelled read future when a write finishes between frame
 // fragments. Dropping a local Vec here would corrupt the next MCP request.
 #[derive(Default)]
-struct Framer {
+pub(in crate::agent) struct Framer {
     bytes: Vec<u8>,
     oversized: bool,
 }
@@ -447,12 +444,74 @@ impl Framer {
 struct PostRequest<'a> {
     id: &'a Value,
     args: &'a Value,
+    /// Withdraws the post before its next queued Tally operation (#554).
+    cancellation: &'a tokio_util::sync::CancellationToken,
+}
+
+/// Withdraw a post that has written no intent (#725). Its approval is revoked,
+/// which closes an open dialog and leaves nothing an intent could be written
+/// under, and it stops before its next queued Tally operation. The operation in
+/// flight, and one already admitted to the queue, run in full rather than being
+/// abandoned: dropping one would leave Tally serving a request nobody reads
+/// (protocol reference §11b.2). It is awaited with no cap. Each request is
+/// bounded by the transport's deadline (20 seconds by default, configurable up
+/// to 120), and an operation waits at most the queue deadline (30 seconds by
+/// default) to start. The longest is the queue's lease operation, about 32
+/// requests for a Journal and 38 for a bank voucher, so at the defaults a
+/// cancelled post can hold this server for about 11 to 13 minutes at worst
+/// (#778 would stop it between requests). Input is read meanwhile.
+fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
+    request.cancellation.cancel();
+    if let Some(batch_id) = request.args.get("batch_id").and_then(Value::as_str) {
+        server.post_approvals.revoke(batch_id, "request_cancelled");
+    }
+}
+
+/// Run one `post_import` call to its end while servicing input: the one path
+/// every agent post takes. It runs under its own withdrawal token (#725): a
+/// cancellation before its intent stops it before its next Tally operation,
+/// never in one.
+pub(in crate::agent) async fn run_post<R, W>(
+    server: &Server,
+    id: &Value,
+    args: &Value,
+    reader: &mut R,
+    framer: &mut Framer,
+    pending: &mut std::collections::VecDeque<Frame>,
+    stdout: &mut W,
+) -> Result<Option<ToolResponse>, String>
+where
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    // Boxed: the post's state machine is large (#725 added the dialog wait),
+    // and held inline it overflowed a Windows debug test thread's stack. The
+    // MCP loop runs on the main thread, whose stack is 1 MB on Windows.
+    await_post(
+        Box::pin(crate::tally::runtime::TOOL_CANCELLATION.scope(
+            cancellation.clone(),
+            server.call_tool_response("post_import", args.clone()),
+        )),
+        PostRequest {
+            id,
+            args,
+            cancellation: &cancellation,
+        },
+        server,
+        reader,
+        framer,
+        pending,
+        stdout,
+    )
+    .await
 }
 
 // Keep receiving cancellation and disconnect while a native approval or write
 // is pending. A durable dispatch intent makes cancellation observational: the
 // original future must finish its response journal and readback before we drop
-// it. Before an intent, cancellation remains prompt and does not start a post.
+// it. Before an intent, cancellation withdraws the post: nothing further is
+// sent, no intent can be written, and the operation in flight is finished.
 async fn await_post<R, W, F>(
     future: F,
     request: PostRequest<'_>,
@@ -478,6 +537,13 @@ where
             frame = framer.read(reader, MAX_REQUEST_BYTES) => {
                 let frame = match frame {
                     Ok(Some(frame)) => frame,
+                    // Already withdrawn: the input ending changes nothing. The
+                    // operation in flight is finished and the call answers as
+                    // cancelled.
+                    Ok(None) if phase == PostPhase::Withdrawing => {
+                        let _finished = future.as_mut().await;
+                        return Ok(None);
+                    }
                     Ok(None) => return finish_interrupted_post(
                         future.as_mut(),
                         request,
@@ -491,11 +557,14 @@ where
                 match service_frame_in_flight(server, stdout, pending, request.id, frame, true).await {
                     Ok(InFlightFrame::Serviced) => {}
                     Ok(InFlightFrame::CancelsInFlight) => {
-                        if phase == PostPhase::Draining {
+                        if matches!(phase, PostPhase::Draining | PostPhase::Withdrawing) {
                             continue;
                         }
                         match post_dispatch_state(server, request.args) {
-                            PostDispatchState::NotDispatched => return Ok(None),
+                            PostDispatchState::NotDispatched => {
+                                withdraw_post(server, &request);
+                                phase = PostPhase::Withdrawing;
+                            }
                             PostDispatchState::MayHaveDispatched if phase == PostPhase::Running => {
                                 phase = PostPhase::Draining;
                             }
@@ -513,12 +582,18 @@ where
             // for the builder's Tally reads to finish.
             _ = classifier_retry.tick(), if phase == PostPhase::Classifying => {
                 match post_dispatch_state(server, request.args) {
-                    PostDispatchState::NotDispatched => return Ok(None),
+                    PostDispatchState::NotDispatched => {
+                        withdraw_post(server, &request);
+                        phase = PostPhase::Withdrawing;
+                    }
                     PostDispatchState::MayHaveDispatched => phase = PostPhase::Draining,
                     PostDispatchState::AdmissionBusy => {}
                 }
             }
-            response = &mut future, if phase != PostPhase::Classifying => return Ok(Some(response)),
+            // A withdrawn post's own answer is replaced by the cancellation's.
+            response = &mut future, if phase != PostPhase::Classifying => {
+                return Ok((phase != PostPhase::Withdrawing).then_some(response))
+            }
         }
     }
 }
@@ -694,6 +769,8 @@ enum PostPhase {
     Running,
     Classifying,
     Draining,
+    /// Cancelled before its intent: finishing the operation in flight.
+    Withdrawing,
 }
 
 fn post_dispatch_state(server: &Server, args: &Value) -> PostDispatchState {
@@ -740,6 +817,10 @@ where
         // remains usable; no replacement post is created.
         return Ok(Some(future.as_mut().await));
     }
+    // No intent: withdraw it, and finish the operation in flight rather than
+    // abandon it. It starts no further operation and can write no intent (#725).
+    withdraw_post(server, &request);
+    let _withdrawn = future.as_mut().await;
     match interruption {
         Some(error) => Err(error),
         None => Ok(None),
@@ -787,6 +868,8 @@ async fn cancel_queued_request<W: AsyncWrite + Unpin>(
         .unwrap_or_else(|| json!({}));
     let name = request["params"]["name"].as_str().unwrap_or("unknown");
     if is_tool && name == "post_import" {
+        // Cancelled before it started, it holds nothing: what an earlier call
+        // left for this batch belongs to that call, and is left alone (#725).
         let response = server.finish_tool_response(
             name,
             &args,

@@ -3448,3 +3448,26 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
         }
     }
 }
+
+/// Page 1 is served through the same step as every later page: from a saved
+/// proof holding plain names, the first page carries them only under none.
+#[test]
+fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
+    let mut proof = divergent_verification();
+    proof["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+    let saved = super::super::redact_value(proof, super::super::Redaction::None);
+    let bytes = serde_json::to_vec_pretty(&saved).unwrap();
+    let (_, page) = served_verification_page(&bytes, 0).unwrap();
+    let served = |redaction| {
+        super::super::redact_tool_response("verify_import", json!({ "result": page }), redaction)
+            .to_string()
+    };
+    let (plain, masked) = (
+        served(super::super::Redaction::None),
+        served(super::super::Redaction::MaskParties),
+    );
+    for name in ["Private Synthetic Party", "Private Changed Ledger"] {
+        assert!(plain.contains(name), "{name}: {plain}");
+        assert!(!masked.contains(name), "{name} unmasked: {masked}");
+    }
+}

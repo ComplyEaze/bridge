@@ -973,25 +973,22 @@ impl Server {
         // Page 1 is built from the bytes read back, not from memory, so the
         // page and the hash it names are the same file even if another
         // verification replaced it in between.
-        let mut proof: Value = serde_json::from_slice(&persisted).map_err(|_| {
-            ToolFailure::from("verification_proof_unreadable".to_string())
-                .with_prior_evidence(evidence.clone())
-        })?;
-        mark_verification_names(&mut proof);
+        let (proof, page) = served_verification_page(&persisted, 0)
+            .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if proof["batch_id"] != batch_id {
             return Err(
                 ToolFailure::from("verification_proof_batch_mismatch".to_string())
                     .with_prior_evidence(evidence),
             );
         }
-        let page = verification_response_page(&proof, &sha256_hex(&persisted), 0);
         self.admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
         Ok(outcome)
     }
 
-    /// A later page of a verification, from its persisted proof only.
+    /// A later page of a verification, from its persisted proof only (see
+    /// [`served_verification_page`]).
     fn verify_import_page(
         &self,
         args: &Value,
@@ -1006,9 +1003,7 @@ impl Server {
         if sha256 != proof_sha256 {
             return Err("verification_proof_changed".to_string().into());
         }
-        let mut proof: Value = serde_json::from_slice(&persisted)
-            .map_err(|_| "verification_proof_unreadable".to_string())?;
-        mark_verification_names(&mut proof);
+        let (proof, page) = served_verification_page(&persisted, offset)?;
         if proof["batch_id"] != batch_id
             || !proof["company"]["guid"]
                 .as_str()
@@ -1016,7 +1011,6 @@ impl Server {
         {
             return Err("verification_proof_batch_mismatch".to_string().into());
         }
-        let page = verification_response_page(&proof, &sha256, offset);
         self.admit_verification_page(&page)?;
         Ok(ToolOutcome {
             payload: json!({"company": proof["company"], "result": page}),
@@ -3252,6 +3246,18 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
+
+/// A verification page as it is served, from the saved proof's bytes: the
+/// proof, with every ledger name marked so the response's redaction applies,
+/// and the page from `offset`. Page 1 and every later page are served
+/// through this, so they cannot differ in what they mark.
+fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, Value), String> {
+    let mut proof: Value = serde_json::from_slice(persisted)
+        .map_err(|_| "verification_proof_unreadable".to_string())?;
+    mark_verification_names(&mut proof);
+    let page = verification_response_page(&proof, &sha256_hex(persisted), offset);
+    Ok((proof, page))
+}
 
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]

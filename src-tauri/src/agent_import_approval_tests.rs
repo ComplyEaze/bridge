@@ -13,6 +13,10 @@ use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
 use tokio::io::{AsyncWriteExt, BufReader};
 
+/// Bounds a wait on an event, only so that a hang fails instead of stalling
+/// the run: nothing here is paced by it.
+const HANG_GUARD: Duration = Duration::from_secs(120);
+
 fn result(response: &Value) -> &Value {
     &response["structuredContent"]["result"]
 }
@@ -488,16 +492,14 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
         SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
     );
     let cancel = async {
-        while !scripted.is_waiting() {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+        scripted.opened().await;
         withdrawn.cancel();
     };
-    // Bounded: a call that ends before its dialog opens leaves `cancel` waiting.
-    let (response, ()) =
-        tokio::time::timeout(Duration::from_secs(5), async { tokio::join!(post, cancel) })
-            .await
-            .expect("the withdrawn call stops");
+    // A call that ends before its dialog opens leaves `cancel` waiting; the
+    // bound only stops a hang, since every wait here is on an event.
+    let (response, ()) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(post, cancel) })
+        .await
+        .expect("the withdrawn call stops");
     let observed = sent(simulator);
     assert_eq!(
         result(&response)["error"]["code"],
@@ -535,24 +537,24 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
             withdrawn.clone(),
             SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
         ));
-        tokio::time::timeout(Duration::from_secs(5), async {
+        // Every wait is on an event, so a slow runner only slows the test;
+        // the bound stops a hang.
+        tokio::time::timeout(HANG_GUARD, async {
             // Drive the call until its dialog is open.
-            while !scripted.is_waiting() {
-                tokio::select! {
-                    biased;
-                    response = &mut post => panic!("the call ended early: {response}"),
-                    () = tokio::time::sleep(Duration::from_millis(1)) => {}
-                }
+            tokio::select! {
+                biased;
+                response = &mut post => panic!("the call ended early: {response}"),
+                () = scripted.opened() => {}
             }
-            // Answer, and let the dialog's task finish, without polling the call.
+            // Answer, and let the dialog's task take it, without polling the
+            // call. On this current-thread runtime the task drops its end of
+            // the answer and runs to its end in one poll, so once `closed`
+            // resolves its answer is ready for the call's next poll.
             scripted.answer(true);
-            while scripted.is_waiting() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+            scripted.closed().await;
         })
         .await
         .expect("the dialog opened and its task took the answer");
-        tokio::time::sleep(Duration::from_millis(10)).await;
         withdrawn.cancel();
         let response = post.await;
         let _ = sent(simulator);

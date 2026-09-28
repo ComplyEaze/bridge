@@ -1494,7 +1494,7 @@ fn admit_build_binding(
 }
 
 /// How many changed ledgers a refusal names; the rest are counted.
-const REFUSAL_LEDGERS_NAMED: usize = 8;
+pub(super) const REFUSAL_LEDGERS_NAMED: usize = 8;
 
 /// List the ledgers whose GUID changed since the build, each marked as a party
 /// name so the response's redaction applies, and, where no attempt is

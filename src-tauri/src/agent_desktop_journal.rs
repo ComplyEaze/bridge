@@ -182,7 +182,7 @@ impl DesktopJournalService {
 /// shows the message alone: the masters list of a changed-masters post, or
 /// the changed ledgers of a refused build. The MCP message names none.
 fn named_ledgers(result: &Value) -> Option<String> {
-    const SHOWN: usize = 8;
+    const SHOWN: usize = super::post::REFUSAL_LEDGERS_NAMED;
     let (listed, total) = match result["error"]["code"].as_str()? {
         "posted_under_changed_masters" => (&result["masters_after_post"]["ledgers"], None),
         "import_masters_changed_since_build" => (

@@ -3361,6 +3361,13 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
             .await;
         let _ = sent(simulator);
         let result = &response["structuredContent"]["result"];
+        // The failure path: no dispatch verdict, and the failure's own error.
+        assert!(result.get("dispatch").is_none(), "{response}");
+        assert_ne!(
+            result["error"]["code"], "posted_under_changed_masters",
+            "{response}"
+        );
+        assert!(result["error"]["code"].is_string(), "{response}");
         assert_eq!(
             result["masters_after_post"]["state"], "posted_under_changed_masters",
             "{response}"

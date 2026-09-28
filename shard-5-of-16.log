@@ -1,0 +1,84 @@
+E4-02 killed (full) by 4: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-01 killed (full) by 5: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-03 killed (full) by 3: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-07 killed (full) by 4: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-06 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-08 killed (full) by 6: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-05 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-09 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-11 killed (full) by 4: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-10 killed (full) by 4: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-14 killed (full) by 6: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-15 killed (full) by 3: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-16 killed (full) by 2: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-18 killed (full) by 2: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties, tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-21 killed (full) by 1: tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+E4-19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-22 killed (full) by 1: tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+E4-24 killed (full) by 1: tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+E4-23 killed (full) by 1: tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+E4-25 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-26 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-27 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-28 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-29 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-30 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-32 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-31 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-33 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-35 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-34 killed (full) by 1: src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+E4-37 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-36 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-38 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-39 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-40 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-41 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-43 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-42 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-44 killed (full) by 3: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-45 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-46 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-47 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-48 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-50 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-51 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-52 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+E4-49 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E4-54 killed (full) by 3: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-53 killed (full) by 3: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E4-55 killed (full) by 1: tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own
+
+54 of 54 killed
+
+warning: 26 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  E4-04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-21 (full): tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+  E4-22 (full): tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+  E4-23 (full): tests/edge_books.rs::pwm_1_fires_on_a_total_or_movement_that_does_not_tie
+  E4-24 (full): tests/edge_books.rs::pwm_2_fires_on_a_party_row_or_an_others_label_that_is_wrong
+  E4-26 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-27 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-28 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-29 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-30 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-31 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-32 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-33 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-34 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-35 (full): src/lib.rs::party_monthly::tests::a_whole_run_pins_the_period_ranking_cut_and_trial_balance_ties
+  E4-46 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-47 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-48 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-49 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-50 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-51 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E4-55 (full): tests/edge_books.rs::pwm_2_checks_the_not_attributed_row_on_its_own

@@ -217,6 +217,14 @@ fn assert_journaled_clean_create(directory: &std::path::Path) {
 }
 
 fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
+    server_redacting(address, directory, crate::agent::Redaction::None)
+}
+
+fn server_redacting(
+    address: std::net::SocketAddr,
+    directory: &std::path::Path,
+    redaction: crate::agent::Redaction,
+) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: TallyEndpointConfig {
             host: address.ip().to_string(),
@@ -225,7 +233,7 @@ fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Serv
         data_dir: directory.to_path_buf(),
         max_rows: 10,
         max_bytes: 200_000,
-        redaction: crate::agent::Redaction::None,
+        redaction,
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: false,
@@ -2539,6 +2547,14 @@ async fn refused_by_build_binding(
     identities: Option<Vec<BoundLedger>>,
     desktop: bool,
 ) -> (Value, usize, usize, bool) {
+    refused_by_build_binding_under(identities, desktop, crate::agent::Redaction::None).await
+}
+
+async fn refused_by_build_binding_under(
+    identities: Option<Vec<BoundLedger>>,
+    desktop: bool,
+    redaction: crate::agent::Redaction,
+) -> (Value, usize, usize, bool) {
     let mut plans = before_approval();
     let expected = if identities.is_some() {
         // The Currency read and mode probe after the catalogue are never sent.
@@ -2550,7 +2566,7 @@ async fn refused_by_build_binding(
     };
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
+    let server = server_redacting(simulator.address(), directory.path(), redaction);
     let (mut line, args) = saved_batch(&server);
     line.ledger_identities = identities;
     server.append_import_ledger(&line).unwrap();
@@ -2608,10 +2624,15 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
                 "{result}"
             );
         }
-        assert!(result["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("(Cash)"));
+        // The desktop names the ledger; the MCP message leaves it to the list.
+        assert_eq!(
+            result["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Cash"),
+            desktop,
+            "{result}"
+        );
         assert_eq!(observed, expected, "{result}");
         assert!(!intent);
     }
@@ -3271,4 +3292,40 @@ async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
     let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
     assert_eq!(ledgers.len(), 1, "{response}");
     assert_ne!(ledgers[0], "Cash", "{response}");
+}
+
+/// Under mask_parties, a post refused because a ledger changed since the build
+/// lists the ledger masked, and its message names none.
+#[tokio::test]
+async fn a_changed_ledger_refusal_names_no_ledger_under_mask_parties() {
+    let identities = vec![
+        BoundLedger {
+            name: "Cash".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        },
+        BoundLedger {
+            name: "WR2 Sales".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
+        },
+    ];
+    let (result, _, _, _) = refused_by_build_binding_under(
+        Some(identities),
+        false,
+        crate::agent::Redaction::MaskParties,
+    )
+    .await;
+    assert_eq!(
+        result["error"]["code"], "import_masters_changed_since_build",
+        "{result}"
+    );
+    let listed = result["error"]["ledgers_changed"].as_array().unwrap();
+    assert_eq!(listed.len(), 1, "{result}");
+    assert_ne!(listed[0], "Cash", "{result}");
+    assert!(
+        !result["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Cash"),
+        "{result}"
+    );
 }

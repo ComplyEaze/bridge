@@ -1277,8 +1277,9 @@ impl Server {
                 line.vouchers.len(),
             );
             payload["result"]["verification_status"] = json!(status.as_str());
-            self.persist_import_verification(&payload["result"], &line, status, generation)?;
+            // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
+            self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),

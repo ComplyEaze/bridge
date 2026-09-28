@@ -3327,7 +3327,7 @@ fn marked_paths(value: &Value, path: &str, found: &mut std::collections::BTreeSe
 }
 
 /// The one list of name fields covers every name the verifier marks: a result
-/// saved with its marks removed (as proofs were) and marked again has the
+/// saved with its marks removed (the older plain format) and marked again has the
 /// verifier's marks back, and the masters list's too, and no others.
 #[test]
 fn the_name_field_list_covers_every_name_a_verification_marks() {
@@ -3391,9 +3391,9 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
         .value;
     assert_ne!(first["isError"], true, "{first}");
 
-    // A divergent row from the verifier and a changed-masters doubt, saved as
-    // proofs were saved before names kept their marks (plain names, and the
-    // message that named the ledgers) and as they are saved now.
+    // A divergent row from the verifier and a changed-masters doubt, saved in
+    // the older plain format (plain names, and a message listing the ledgers)
+    // and in the current, marked one.
     let divergent = divergent_verification();
     let proof_path = masked
         .imports_dir()
@@ -3443,7 +3443,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
         for name in names {
             assert!(
                 !later.to_string().contains(name),
-                "{name} unmasked (old format {old_format}): {later}"
+                "{name} under mask_parties (old format {old_format}): {later}"
             );
         }
     }
@@ -3468,6 +3468,9 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
     );
     for name in ["Private Synthetic Party", "Private Changed Ledger"] {
         assert!(plain.contains(name), "{name}: {plain}");
-        assert!(!masked.contains(name), "{name} unmasked: {masked}");
+        assert!(
+            !masked.contains(name),
+            "{name} under mask_parties: {masked}"
+        );
     }
 }

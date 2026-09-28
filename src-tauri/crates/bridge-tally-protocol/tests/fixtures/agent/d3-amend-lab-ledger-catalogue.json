@@ -1,0 +1,15 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver synthetic-company StandardLedgerCatalogV1 read, the post path's own request for the D3 batch's company",
+  "observed_date": "2026-09-27",
+  "source_response_bytes": 18288,
+  "source_response_sha256": "067573492022e04d93b01837fc91e5cb95b6234fe281dcfd5d1342874817578d",
+  "source_request_bytes": 1974,
+  "source_request_sha256": "589566214e5ab516d415e7a9ea3e143ed63452a8a732de0d50d6cb857c0aef2c",
+  "fixture_bytes": 18288,
+  "fixture_sha256": "067573492022e04d93b01837fc91e5cb95b6234fe281dcfd5d1342874817578d",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 14,
+  "transformation": [],
+  "provenance_limit": "Byte-exact live response, sent once (not a paired read) from an authorized synthetic lab company; the same company as the d3-batch captures, whose bound ledgers Cash and Test Expense B it holds with the same GUIDs. Tests derive a changed-GUID variant with replaced_once; that variant is not a capture.",
+  "sensitivity_review": "Synthetic lab identifiers only; no credentials, customer data, or operational paths."
+}

@@ -171,14 +171,33 @@ fn a_voucher_type_list_with_a_repeated_status_is_malformed() {
     );
 }
 
+/// A missing, self-closing or empty STATUS is no answer: its own class, apart
+/// from Tally's failure answer and from broken XML (bridge#717).
 #[test]
-fn a_voucher_type_list_without_a_status_did_not_succeed() {
-    let silent = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", "", 1);
-    assert_ne!(silent, VOUCHER_TYPES);
-    assert_eq!(
-        voucher_type_refusal(&silent, COMPANY_GUID),
-        NativeCollectionError::NotSuccess
-    );
+fn a_voucher_type_list_without_a_status_answer_is_status_absent() {
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, VOUCHER_TYPES);
+        assert_eq!(
+            voucher_type_refusal(&silent, COMPANY_GUID),
+            NativeCollectionError::StatusAbsent,
+            "{absent:?}"
+        );
+    }
+}
+
+#[test]
+fn a_voucher_list_without_a_status_answer_is_status_absent() {
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = VOUCHERS.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, VOUCHERS);
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&silent, COMPANY_GUID)
+                .expect_err("a voucher list without a STATUS answer is refused"),
+            NativeCollectionError::StatusAbsent,
+            "{absent:?}"
+        );
+    }
 }
 
 #[test]
@@ -248,6 +267,7 @@ fn native_collection_causes_are_distinct_and_name_no_row() {
     let codes = [
         NativeCollectionError::MalformedResponse,
         NativeCollectionError::NotSuccess,
+        NativeCollectionError::StatusAbsent,
         NativeCollectionError::RowUnusable,
         NativeCollectionError::CompanyIdentityMismatch,
         NativeCollectionError::BoundsViolation,
@@ -261,4 +281,16 @@ fn native_collection_causes_are_distinct_and_name_no_row() {
             && code
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte == b'_')));
+}
+
+/// A self-closing STATUS after a real one is a second STATUS, the response's
+/// shape, not an absent answer (bridge#717).
+#[test]
+fn a_self_closing_status_after_a_real_one_is_malformed() {
+    let doubled = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", "<STATUS>1</STATUS><STATUS/>", 1);
+    assert_ne!(doubled, VOUCHER_TYPES);
+    assert_eq!(
+        voucher_type_refusal(&doubled, COMPANY_GUID),
+        NativeCollectionError::MalformedResponse
+    );
 }

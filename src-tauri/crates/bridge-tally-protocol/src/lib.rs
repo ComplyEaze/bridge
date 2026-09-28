@@ -909,8 +909,14 @@ pub enum NativeCollectionError {
     /// The XML did not parse, or its envelope, nesting or `COLLECTION` was
     /// not the documented shape: Tally or the transport, not one master.
     MalformedResponse,
-    /// `STATUS` was absent or not `1`.
+    /// `STATUS` was present with a value other than `1`: Tally's own failure
+    /// answer (bridge#717).
     NotSuccess,
+    /// `STATUS` was missing, self-closing or empty. Tally answered, but not
+    /// with an export: the one such answer captured is a bare `RESPONSE` for a
+    /// request it could not serve (protocol reference §12a.1). Neither broken
+    /// XML nor a failure report about this export (bridge#717).
+    StatusAbsent,
     /// One row was refused: empty, missing an identity or a required field,
     /// repeating a field, or carrying content the row grammar does not admit.
     RowUnusable,
@@ -925,6 +931,7 @@ impl std::fmt::Display for NativeCollectionError {
         formatter.write_str(match self {
             Self::MalformedResponse => "native collection response was malformed",
             Self::NotSuccess => "native collection did not report success",
+            Self::StatusAbsent => "native collection carried no STATUS answer",
             Self::RowUnusable => "native collection held a row it could not use",
             Self::CompanyIdentityMismatch => {
                 "native collection did not bind to the requested company"
@@ -944,6 +951,7 @@ impl NativeCollectionError {
         match self {
             Self::MalformedResponse => "native_collection_malformed_response",
             Self::NotSuccess => "native_collection_not_success",
+            Self::StatusAbsent => "native_collection_status_absent",
             Self::RowUnusable => "native_collection_row_unusable",
             Self::CompanyIdentityMismatch => "native_collection_identity_mismatch",
             Self::BoundsViolation => "native_collection_bounds_exceeded",
@@ -1103,6 +1111,15 @@ pub fn parse_native_voucher_source_records_with_evidence(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
+                if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    // A self-closing STATUS is no answer (bridge#717), unless
+                    // one was already read: then it is a second STATUS.
+                    return Err(if status_seen {
+                        NativeCollectionError::MalformedResponse
+                    } else {
+                        NativeCollectionError::StatusAbsent
+                    });
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
@@ -1216,6 +1233,15 @@ fn parse_native_collection_with_identity_evidence<T>(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
+                if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    // A self-closing STATUS is no answer (bridge#717), unless
+                    // one was already read: then it is a second STATUS.
+                    return Err(if status_seen {
+                        NativeCollectionError::MalformedResponse
+                    } else {
+                        NativeCollectionError::StatusAbsent
+                    });
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
@@ -1255,7 +1281,8 @@ struct NativeCollectionState<T> {
 }
 
 /// The collection's one `STATUS`, which must read `1`. A second `STATUS` or
-/// one whose text cannot be read is the response's shape, not Tally's answer.
+/// one whose text cannot be read is the response's shape, not Tally's answer;
+/// an empty one is no answer (bridge#717).
 fn native_collection_status(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
@@ -1264,8 +1291,9 @@ fn native_collection_status(
     if status_seen {
         return Err(NativeCollectionError::MalformedResponse);
     }
-    let status = read_required_text(reader, element.name())
-        .map_err(|_| NativeCollectionError::MalformedResponse)?;
+    let status = read_optional_text(reader, element.name())
+        .map_err(|_| NativeCollectionError::MalformedResponse)?
+        .ok_or(NativeCollectionError::StatusAbsent)?;
     if status != "1" {
         return Err(NativeCollectionError::NotSuccess);
     }
@@ -1280,7 +1308,7 @@ fn native_collection_export<T>(
         return Err(NativeCollectionError::MalformedResponse);
     }
     if !state.status_seen {
-        return Err(NativeCollectionError::NotSuccess);
+        return Err(NativeCollectionError::StatusAbsent);
     }
     if !state.collection_seen {
         return Err(NativeCollectionError::MalformedResponse);

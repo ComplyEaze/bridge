@@ -74,6 +74,27 @@ fn a_base_is_only_taken_from_a_book_with_one_currency_master() {
     assert_eq!(BaseCurrencyName::of_single_master(&several), None);
 }
 
+/// The ledger collection's STATUS must read `1`; a missing, self-closing or
+/// empty one is no answer, apart from Tally's failure answer (bridge#717).
+#[test]
+fn a_ledger_collection_status_is_one_failure_or_absent() {
+    let book = single_currency_book();
+    let failed = book.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1);
+    assert_eq!(
+        parse_native_ledger_snapshot(&failed).unwrap_err(),
+        NativeOutstandingsError::TallyReportedFailure
+    );
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = book.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, book);
+        assert_eq!(
+            parse_native_ledger_snapshot(&silent).unwrap_err(),
+            NativeOutstandingsError::StatusAbsent,
+            "{absent:?}"
+        );
+    }
+}
+
 #[test]
 fn a_single_currency_book_parses_every_ledger_currency_as_its_one_master() {
     let rows = parse_native_ledger_snapshot(&single_currency_book()).unwrap();

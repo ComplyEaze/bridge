@@ -477,3 +477,26 @@ fn the_currency_request_does_not_fetch_originalname_yet() {
     assert!(request.contains("<FETCH>NAME, MAILINGNAME, DECIMALPLACES</FETCH>"));
     assert!(!request.contains("ORIGINALNAME"));
 }
+
+/// The currency collection's STATUS must read `1`. Another value is Tally's
+/// failure answer; a missing, self-closing or empty STATUS is no answer at all
+/// (bridge#717).
+#[test]
+fn a_currency_collection_status_is_one_failure_or_absent() {
+    let xml = decode_utf16le(MODERN_LIVE);
+    let failed = xml.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1);
+    assert_ne!(failed, xml);
+    assert_eq!(
+        parse_currency_masters(&failed).unwrap_err(),
+        NativeOutstandingsError::TallyReportedFailure
+    );
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = xml.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, xml);
+        assert_eq!(
+            parse_currency_masters(&silent).unwrap_err(),
+            NativeOutstandingsError::StatusAbsent,
+            "{absent:?}"
+        );
+    }
+}

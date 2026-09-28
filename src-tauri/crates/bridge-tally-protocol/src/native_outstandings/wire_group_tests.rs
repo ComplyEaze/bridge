@@ -25,6 +25,27 @@ fn reads_group_rows_only_from_the_native_collection() {
     assert_ne!(evidence[0].raw_source_sha256, evidence[1].raw_source_sha256);
 }
 
+/// The group collection's STATUS must read `1`. Another value is Tally's
+/// failure answer; a missing, self-closing or empty STATUS is no answer at all
+/// (bridge#717).
+#[test]
+fn a_group_collection_status_is_one_failure_or_absent() {
+    let failed = LIVE_SHAPE.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1);
+    assert_eq!(
+        parse_native_group_snapshot(&failed, COMPANY_GUID),
+        Err(NativeOutstandingsError::TallyReportedFailure)
+    );
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = LIVE_SHAPE.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, LIVE_SHAPE);
+        assert_eq!(
+            parse_native_group_snapshot(&silent, COMPANY_GUID),
+            Err(NativeOutstandingsError::StatusAbsent),
+            "{absent:?}"
+        );
+    }
+}
+
 #[test]
 fn missing_group_parent_fails_closed() {
     let xml = LIVE_SHAPE.replace("<PARENT>Current Assets</PARENT>", "");

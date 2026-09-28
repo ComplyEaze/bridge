@@ -167,6 +167,16 @@ fn the_company_currency_name_fails_closed() {
         ),
         Err(NativeOutstandingsError::TallyReportedFailure)
     );
+    // A missing, self-closing or empty STATUS is no answer (bridge#717).
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = xml.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, xml);
+        assert_eq!(
+            parse_company_currency_name(&silent, FOREX_GUID),
+            Err(NativeOutstandingsError::StatusAbsent),
+            "{absent:?}"
+        );
+    }
 }
 
 /// bridge#551, from captures only: FOREX's currency read with `ORIGINALNAME`

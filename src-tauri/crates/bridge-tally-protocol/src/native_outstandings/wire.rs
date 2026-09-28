@@ -599,6 +599,10 @@ fn parse_native_ledger_snapshot_rows(
                 }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717).
+                    if text.is_empty() {
+                        return Err(NativeOutstandingsError::StatusAbsent);
+                    }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -648,8 +652,9 @@ fn parse_native_ledger_snapshot_rows(
             "ledger_envelope_unterminated",
         ));
     }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(
@@ -727,6 +732,10 @@ pub fn parse_native_group_snapshot_with_evidence(
                 }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717).
+                    if text.is_empty() {
+                        return Err(NativeOutstandingsError::StatusAbsent);
+                    }
                     if text != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -797,8 +806,9 @@ pub fn parse_native_group_snapshot_with_evidence(
             "group_envelope_unterminated",
         ));
     }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(
@@ -1320,6 +1330,10 @@ fn walk_collection_rows(
                 }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717).
+                    if text.is_empty() {
+                        return Err(NativeOutstandingsError::StatusAbsent);
+                    }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -1362,8 +1376,9 @@ fn walk_collection_rows(
     if !path.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(codes.unterminated));
     }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(

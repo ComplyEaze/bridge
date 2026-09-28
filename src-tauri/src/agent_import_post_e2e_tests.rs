@@ -1478,6 +1478,14 @@ async fn a_group_collection_that_reports_failure_is_refused_with_its_cause() {
     refused_on_the_group_read(failed, "group_status_not_success").await;
 }
 
+/// bridge#717: a group collection with no STATUS answer names its own cause,
+/// not Tally's failure answer.
+#[tokio::test]
+async fn a_group_collection_without_a_status_answer_is_refused_as_status_absent() {
+    let silent = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS/>");
+    refused_on_the_group_read(silent, "group_status_absent").await;
+}
+
 /// bridge#717: the group collection the queue re-reads after approval is
 /// refused as `group_export_invalid` with the same data-free `cause` the read
 /// before approval carries, not as a causeless queue failure. Nothing is sent
@@ -1532,6 +1540,12 @@ async fn a_queued_group_collection_of_another_company_is_refused_with_its_cause(
 async fn a_queued_group_collection_that_reports_failure_is_refused_with_its_cause() {
     let failed = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
     refused_on_the_queued_group_read(failed, "group_status_not_success").await;
+}
+
+#[tokio::test]
+async fn a_queued_group_collection_without_a_status_answer_is_refused_as_status_absent() {
+    let silent = replaced_once(&groups(), "<STATUS>1</STATUS>", "");
+    refused_on_the_queued_group_read(silent, "group_status_absent").await;
 }
 
 /// Already changed since the build: refused before approval is asked, and no

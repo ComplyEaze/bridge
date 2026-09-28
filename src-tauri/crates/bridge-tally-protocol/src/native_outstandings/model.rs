@@ -19,12 +19,16 @@ pub enum NativeOutstandingsError {
     /// identifies which structural rule was violated.
     InvalidResponse(&'static str),
     ArithmeticOverflow,
-    /// The response carried a `<STATUS>` element. Both native response
-    /// shapes used here (the flat Bills Receivable/Payable report and the
-    /// Ledger collection) only ever carry `STATUS` on failure — the flat
-    /// report's verification is INVERTED (no `STATUS` at all is success),
-    /// and the ledger collection's `STATUS` must read `1`.
+    /// Tally answered with failure. Two rules apply here (bridge#717): the
+    /// flat Bills Receivable/Payable report's verification is INVERTED (any
+    /// `STATUS` is failure, and none at all is success), while the collection
+    /// exports (ledger, group, currency and company) must carry `STATUS`
+    /// reading `1`, so for them this is a `STATUS` with another value.
     TallyReportedFailure,
+    /// A collection export (ledger, group, currency or company) carried no
+    /// `STATUS` answer: missing, self-closing or empty. Not used by the inverted
+    /// report, where absence is success (bridge#717).
+    StatusAbsent,
     /// The ledgers' own currencies could not be classified against the base
     /// currency (bridge#551): see [`super::LedgerCurrencyRefusal`].
     LedgerCurrency(super::LedgerCurrencyRefusal),
@@ -48,6 +52,9 @@ impl fmt::Display for NativeOutstandingsError {
                 .write_str("native outstandings arithmetic exceeded the exact-decimal bound"),
             Self::TallyReportedFailure => {
                 formatter.write_str("Tally reported failure for the native outstandings request")
+            }
+            Self::StatusAbsent => {
+                formatter.write_str("the native collection carried no STATUS answer")
             }
             Self::LedgerCurrency(refusal) => formatter.write_str(refusal.code()),
         }

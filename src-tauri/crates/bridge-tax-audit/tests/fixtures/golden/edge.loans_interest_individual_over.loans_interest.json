@@ -3,8 +3,8 @@
   "test_id": "loans_interest",
   "test_version": "1",
   "rules_version": "2026-09-17.1",
-  "population_note_sha256_16": "633355ba4551c544",
-  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name.",
+  "population_note_sha256_16": "933d0802253430c9",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name -- except one that both credits and debits the loan ledger, which is listed as the books hold it, not divided into entries.",
   "figures": [
     {
       "id": "loans_interest.clause31_repaid_reportable_total",
@@ -150,8 +150,8 @@
       "id": "loans_interest.s194a_tds_coverage_83f666a6",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "7d4120a29b8cf269",
-      "definition_text": "Whether the TDS on loan ledger (tag 83f666a6) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "516f800a36a3be98",
+      "definition_text": "Whether the TDS on loan ledger (tag 83f666a6) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
@@ -174,8 +174,8 @@
       "id": "loans_interest.s194a_tds_over_threshold_lender_count",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "9c8fff5fb794835b",
-      "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold and for which the assessee is a deductor.",
+      "definition_sha256_16": "460e4c4fc8e61e8a",
+      "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold, where the assessee is a deductor or its deductor status is not known, and the TDS seen does not cover the s.194A rate on it (each listed in clause 21(b)); a loan whose s.194A verdict is not computed is not counted.",
       "evidence": []
     },
     {
@@ -192,6 +192,14 @@
       "unit": "paise",
       "definition_sha256_16": "9354e2c9c34a03f6",
       "definition_text": "TDS deducted on loan ledger (tag 83f666a6): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.tds_payable_ledgers",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "82b3f68f0d51c1bc",
+      "definition_text": "The ledgers the client's statutory dues classify as TDS payable, less every loan's interest ledger and every shared one, one per line: the TDS lines this test reads. Its own consistency checks read them back.",
       "evidence": []
     }
   ],

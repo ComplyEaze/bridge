@@ -3,8 +3,8 @@
   "test_id": "loans_interest",
   "test_version": "1",
   "rules_version": "2026-09-17.1",
-  "population_note_sha256_16": "633355ba4551c544",
-  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name.",
+  "population_note_sha256_16": "933d0802253430c9",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A loan ledger's interest journals are vouchers whose only other ledger lines are its configured interest ledger or ledgers (the client's list of loans) and any ledger the client configures as TDS payable; every other voucher touching the loan ledger is a taken (credit) or repaid (debit) transaction, never classified by ledger name -- except one that both credits and debits the loan ledger, which is listed as the books hold it, not divided into entries.",
   "figures": [
     {
       "id": "loans_interest.clause31_expense_entry_count_b9a9795c",
@@ -18,8 +18,8 @@
       "id": "loans_interest.clause31_not_computed_row_count",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "e857c21ca770b41e",
-      "definition_text": "Taken/repaid entries listed as not computed because the two walks of the principal balance disagree on their reportability: in no reportable total and not in the flag count.",
+      "definition_sha256_16": "205bd6d2d7ead77a",
+      "definition_text": "Taken/repaid entries listed as not computed -- because the two walks of the principal balance disagree on their reportability, or because a voucher listed as both crediting and debiting their loan comes on or before their date and their own amount is less than the limit: in no reportable total and not in the flag count.",
       "evidence": []
     },
     {
@@ -1324,80 +1324,80 @@
       "id": "loans_interest.s194a_tds_coverage_109bf849",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "438602775c2e1af1",
-      "definition_text": "Whether the TDS on loan ledger (tag 109bf849) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "b9c04d94a3dc2aa8",
+      "definition_text": "Whether the TDS on loan ledger (tag 109bf849) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_34ba9c75",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "b1a9e37baeae881c",
-      "definition_text": "Whether the TDS on loan ledger (tag 34ba9c75) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "1a77d97f30182278",
+      "definition_text": "Whether the TDS on loan ledger (tag 34ba9c75) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_744255e8",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "67ec8cae56879337",
-      "definition_text": "Whether the TDS on loan ledger (tag 744255e8) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "1553a96a60193ae9",
+      "definition_text": "Whether the TDS on loan ledger (tag 744255e8) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_79cc132f",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "7649b5d3b5810044",
-      "definition_text": "Whether the TDS on loan ledger (tag 79cc132f) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "a53cbe74769c67c7",
+      "definition_text": "Whether the TDS on loan ledger (tag 79cc132f) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_80d21ff6",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "75264d8832b5ffe6",
-      "definition_text": "Whether the TDS on loan ledger (tag 80d21ff6) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "add3f9b0146924be",
+      "definition_text": "Whether the TDS on loan ledger (tag 80d21ff6) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_9de4ab16",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "9ad6cbb5f236c217",
-      "definition_text": "Whether the TDS on loan ledger (tag 9de4ab16) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "a58f6836ca99519d",
+      "definition_text": "Whether the TDS on loan ledger (tag 9de4ab16) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_b9a9795c",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "e87e502b39e2173c",
-      "definition_text": "Whether the TDS on loan ledger (tag b9a9795c) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "67df4465829046e6",
+      "definition_text": "Whether the TDS on loan ledger (tag b9a9795c) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_e27bcd60",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "13f0c7cf603de922",
-      "definition_text": "Whether the TDS on loan ledger (tag e27bcd60) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "2c634671ec6aa9fa",
+      "definition_text": "Whether the TDS on loan ledger (tag e27bcd60) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_e5881f26",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "9a562173d64e2a0f",
-      "definition_text": "Whether the TDS on loan ledger (tag e5881f26) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "9cab1da797bd08d3",
+      "definition_text": "Whether the TDS on loan ledger (tag e5881f26) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
       "id": "loans_interest.s194a_tds_coverage_ea76d48a",
       "value": "none",
       "unit": "text",
-      "definition_sha256_16": "5559e47d4de42ec1",
-      "definition_text": "Whether the TDS on loan ledger (tag ea76d48a) covers the s.194A rate on its interest: covered, partly covered, none, or not judged where the rules carry no s.194A rate. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "11d3307c589661e0",
+      "definition_text": "Whether the TDS on loan ledger (tag ea76d48a) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
@@ -1564,8 +1564,8 @@
       "id": "loans_interest.s194a_tds_over_threshold_lender_count",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "9c8fff5fb794835b",
-      "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold and for which the assessee is a deductor.",
+      "definition_sha256_16": "460e4c4fc8e61e8a",
+      "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold, where the assessee is a deductor or its deductor status is not known, and the TDS seen does not cover the s.194A rate on it (each listed in clause 21(b)); a loan whose s.194A verdict is not computed is not counted.",
       "evidence": []
     },
     {
@@ -1580,8 +1580,8 @@
       "id": "loans_interest.s269ss_269t_possible_not_computed_count",
       "value": 2,
       "unit": "count",
-      "definition_sha256_16": "bc6728d900b09b86",
-      "definition_text": "Taken/repaid rows whose verdict (reportability, or the s.269SS/269T flag) is not computed because the two walks of the balance disagree, and that the second walk would flag: listed as questions or noted on the row, never in the flag count.",
+      "definition_sha256_16": "60374b1ff54d4000",
+      "definition_text": "Entries and vouchers whose s.269SS/269T flag is not computed and may apply: rows the two walks of the balance disagree on, which the second would flag; entries in cash, journal or other mode dated on or after a voucher listed as both crediting and debiting their loan; and such vouchers whose other lines include a ledger that is not a bank account. Listed as questions or noted on the row, never in the flag count.",
       "evidence": []
     },
     {
@@ -1662,6 +1662,14 @@
       "unit": "paise",
       "definition_sha256_16": "017b87ea9170bdec",
       "definition_text": "TDS deducted on loan ledger (tag ea76d48a): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
+      "evidence": []
+    },
+    {
+      "id": "loans_interest.tds_payable_ledgers",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "82b3f68f0d51c1bc",
+      "definition_text": "The ledgers the client's statutory dues classify as TDS payable, less every loan's interest ledger and every shared one, one per line: the TDS lines this test reads. Its own consistency checks read them back.",
       "evidence": []
     }
   ],

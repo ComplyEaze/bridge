@@ -3256,3 +3256,113 @@ fn a_twin_needing_both_folds_is_still_found() {
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
     }
 }
+
+/// Verification pages apply the configured redaction to ledger names. A saved
+/// proof holding a divergent row (made by the verifier and saved as the tool
+/// saves it) is served under mask_parties with no ledger name, and under none
+/// with the names, so the check is not vacuous.
+#[tokio::test]
+async fn verification_pages_mask_ledger_names_under_mask_parties() {
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server_with = |redaction| {
+        Server::new(super::super::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().to_path_buf(),
+            max_rows: 10,
+            max_bytes: 200_000,
+            redaction,
+            import_enabled: true,
+            writes_enabled: false,
+            batch_post_enabled: false,
+        })
+    };
+    let masked = server_with(super::super::Redaction::MaskParties);
+    let built = masked
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let first = masked
+        .call_tool_response("verify_import", args.clone())
+        .await
+        .value;
+    assert_ne!(first["isError"], true, "{first}");
+
+    // A divergent row from the verifier, saved as the tool saves a proof.
+    let input = payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "synthetic-redaction-batch".into(),
+        company_guid: GUID.into(),
+        company: None,
+        txn_ids: vec!["txn-001".into()],
+        date_from: "20260901".into(),
+        date_to: "20260901".into(),
+        sha256: "synthetic-hash".into(),
+        built_at: now(),
+        status: "built".into(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".into(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let voucher = ReadVoucher {
+        remote_id: None,
+        guid: Some("synthetic-guid-1".into()),
+        master_id: None,
+        alter_id: Some(11),
+        date: Some("20260901".into()),
+        voucher_type: Some("Payment".into()),
+        narration: Some("[BRIDGE:txn-001]".into()),
+        voucher_number: None,
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: vec![ReadEntry {
+            ledger: "Private Synthetic Party".into(),
+            amount: "-12.50".into(),
+            is_deemed_positive: "Yes".into(),
+        }],
+    };
+    let divergent = verify_observed_batch(&line, &[voucher]).expect("divergent verification");
+    assert_eq!(divergent["vouchers"][0]["status"], "posted_divergent");
+    let proof_path = masked
+        .imports_dir()
+        .unwrap()
+        .join(format!("{batch_id}.proof.json"));
+    let mut proof: Value = serde_json::from_slice(&fs::read(&proof_path).unwrap()).unwrap();
+    proof["vouchers"] =
+        super::super::redact_value(divergent["vouchers"].clone(), super::super::Redaction::None);
+    let bytes = serde_json::to_vec_pretty(&proof).unwrap();
+    fs::write(&proof_path, &bytes).unwrap();
+    let mut saved = args.clone();
+    saved["proof_sha256"] = json!(crate::agent::sha256_hex(&bytes));
+    saved["offset"] = json!(0);
+
+    let name = "Private Synthetic Party";
+    let plain = server_with(super::super::Redaction::None)
+        .call_tool_response("verify_import", saved.clone())
+        .await
+        .value;
+    assert_ne!(plain["isError"], true, "{plain}");
+    assert!(plain.to_string().contains(name), "{plain}");
+    let later = masked
+        .call_tool_response("verify_import", saved)
+        .await
+        .value;
+    assert_ne!(later["isError"], true, "{later}");
+    assert!(!later.to_string().contains(name), "{later}");
+}

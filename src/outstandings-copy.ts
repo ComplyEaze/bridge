@@ -52,8 +52,8 @@ export function outstandingsPartialReason(
   if (value === "ledger_currency_unobserved") {
     return "Tally did not report the currency of every ledger in this multi-currency company";
   }
-  if (value === "foreign_currency_ledgers_excluded") {
-    return "Tally keeps some of this company's ledgers in a currency other than its base currency";
+  if (value === "currency_ledgers_excluded") {
+    return "Tally keeps some of this company's ledgers in another currency, or shows values in another currency on some of its base-currency ledgers";
   }
   if (value === "tally_segment_latency_trending_restart_recommended") {
     return "comparable segments kept slowing toward the safety deadline; Tally may need a restart before another sync";
@@ -107,6 +107,17 @@ function excludedLedgersSentence(excluded: ReadonlyArray<ExcludedCurrencyLedger>
   return `Tally keeps ${count} in a currency other than this company's base currency: ${named}${more}`;
 }
 
+// bridge#642: base-currency ledgers with a value Tally shows in another
+// currency, named because their balances were never read.
+function mixedLedgersSentence(mixed: ReadonlyArray<string>) {
+  const named = mixed.slice(0, EXCLUDED_LEDGERS_NAMED).join(", ");
+  const more = mixed.length > EXCLUDED_LEDGERS_NAMED
+    ? ` and ${mixed.length - EXCLUDED_LEDGERS_NAMED} more`
+    : "";
+  const count = mixed.length === 1 ? "1 base-currency ledger" : `${mixed.length} base-currency ledgers`;
+  return `Tally shows values in another currency on ${count}: ${named}${more}`;
+}
+
 export type OutstandingsPartialState = {
   title: string;
   message: string;
@@ -120,11 +131,16 @@ export function outstandingsPartialState(
   tallyAsOf?: string,
   foreignCurrencyLedgerName?: string,
   excludedLedgers?: ReadonlyArray<ExcludedCurrencyLedger>,
+  mixedLedgers?: ReadonlyArray<string>,
 ): OutstandingsPartialState {
-  if (reasonCode === "foreign_currency_ledgers_excluded") {
+  if (reasonCode === "currency_ledgers_excluded") {
+    const named = [
+      excludedLedgers?.length ? excludedLedgersSentence(excludedLedgers) : null,
+      mixedLedgers?.length ? mixedLedgersSentence(mixedLedgers) : null,
+    ].filter((sentence): sentence is string => sentence !== null);
     return {
       title: "Outstandings totals withheld on the desktop",
-      message: `${excludedLedgers?.length ? excludedLedgersSentence(excludedLedgers) : outstandingsPartialReason(reasonCode)}. Bridge left those ledgers out of the figures and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the base-currency ledgers only, labelled as such.`,
+      message: `${named.length ? named.join(". ") : outstandingsPartialReason(reasonCode)}. Bridge left those ledgers out of the figures, with their bills, and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the plain base-currency ledgers only, labelled as such.`,
       retryable: false,
       tallyReadAttempted: true,
     };

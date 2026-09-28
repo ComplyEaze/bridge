@@ -258,9 +258,47 @@ fn creditor_ageing_params(c: &Value) -> creditor_ageing_43bh::Params {
     }
 }
 
+/// A table of the spec's keys that are present, as TOML (a challan's `date` string as a TOML date).
+fn toml_table(s: &Value, keys: &[&str]) -> toml::Table {
+    keys.iter()
+        .filter(|k| !s[**k].is_null())
+        .map(|k| {
+            let mut v = toml_of(&s[*k]);
+            if *k == "challans" {
+                for c in v.as_array_mut().into_iter().flatten() {
+                    if let Some(d) = c.get("date").and_then(toml::Value::as_str) {
+                        let date: toml::value::Datetime = d.parse().expect("an ISO date");
+                        c.as_table_mut()
+                            .unwrap()
+                            .insert("date".to_string(), toml::Value::Datetime(date));
+                    }
+                }
+            }
+            ((*k).to_string(), v)
+        })
+        .collect()
+}
+
 /// The `[tds]`/`[tds_payees]` values `parity/edge_golden.py` passes `tds_payees`: a
 /// `s194j_category_by_ledger` value that is not a string is kept as `None`, as `TdsConfig` keeps it.
+/// The lists are read by the crate's own readers from the spec's keys, as the edge runner reads
+/// them through the reference's.
 fn tds_config(s: &Value) -> TdsConfig {
+    let tds = toml_table(
+        s,
+        &[
+            "nature_by_ledger",
+            "previous_year_turnover_status",
+            "goods_carriage_ledgers",
+            "form_26a",
+            "challans",
+        ],
+    );
+    let tds_payees = toml_table(
+        s,
+        &["reversals", "gst_separate_by_agreement", "foreseeability"],
+    );
+    let lists = tds_payees::read_config_lists(&tds, Some(&tds_payees)).unwrap();
     let map = |key: &str| -> BTreeMap<String, String> {
         s[key]
             .as_object()
@@ -283,6 +321,38 @@ fn tds_config(s: &Value) -> TdsConfig {
                     .collect()
             })
             .unwrap_or_default(),
+        reversals: lists.reversals,
+        gst_separate: lists.gst_separate,
+        foreseeability_names: lists.foreseeability_names,
+        challans: lists.challans,
+        form_26a: lists.form_26a,
+        turnover_is_placeholder: lists.turnover_is_placeholder,
+        goods_carriage_ledgers: strs(&s["goods_carriage_ledgers"]).into_iter().collect(),
+    }
+}
+
+/// What the edge runner passes `tds_payees` from the other tables: the spec's `tds_payable_ledgers`,
+/// `gst_ledgers`, `partners` keys, `client_state` and `deductor_activity`.
+fn tds_inputs(s: &Value) -> tds_payees::Inputs {
+    let mut client = toml::Table::new();
+    if let Some(state) = s.get("client_state") {
+        client.insert("state".to_string(), toml_of(state));
+    }
+    let mut cfg = toml::Table::new();
+    if let Some(activity) = s.get("deductor_activity") {
+        let mut deductor = toml::Table::new();
+        deductor.insert("activity".to_string(), toml_of(activity));
+        cfg.insert("deductor".to_string(), toml::Value::Table(deductor));
+    }
+    tds_payees::Inputs {
+        tds_ledgers: strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+        gst_ledgers: strs(&s["gst_ledgers"]).into_iter().collect(),
+        other_names: s["partners"]
+            .as_object()
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default(),
+        client_state: tds_payees::read_client_state(&client).unwrap(),
+        deductor_activity: tds_payees::read_deductor_activity(&cfg).unwrap(),
     }
 }
 
@@ -519,7 +589,9 @@ fn check(name: &str) {
             }
             "tds_payees" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
-                let r = tds_payees::run(&book, &rules, entity_type, &tds_config(&s)).unwrap();
+                let r =
+                    tds_payees::run(&book, &rules, entity_type, &tds_config(&s), &tds_inputs(&s))
+                        .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
                 let rust = canonical_test_result(&book, &r, None).unwrap();
                 let golden = common::golden_named(&format!("edge.{name}.{test}"));

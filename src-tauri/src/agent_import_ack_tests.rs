@@ -1421,6 +1421,129 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     }
 }
 
+/// Add a synthetic, unmarked voucher to one captured response: a copy of
+/// D3-005 under a new GUID, MASTERID and AlterID, with Bridge's marker removed
+/// from its narration. It is not live evidence. Its IDs are arbitrary, chosen
+/// only to be unused in the capture: AlterID 1419 with MASTERID 1998 is not a
+/// pair Tally would produce for a voucher entered again by hand. The outcome
+/// does not depend on them, since D3-005 itself matches by its marker.
+fn with_d3_005_copy(bytes: &[u8]) -> Vec<u8> {
+    let text = captured(bytes);
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000552</GUID>";
+    assert_eq!(text.matches(guid).count(), 1);
+    let start = text[..text.find(guid).unwrap()].rfind("<VOUCHER ").unwrap();
+    let end = start + text[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    let original = &text[start..end];
+    let mut copy = original
+        .replace("-00000552", "-000009f5")
+        .replace(
+            "<MASTERID TYPE=\"Number\"> 1362</MASTERID>",
+            "<MASTERID TYPE=\"Number\"> 1998</MASTERID>",
+        )
+        .replace(
+            "<ALTERID TYPE=\"Number\"> 1424</ALTERID>",
+            "<ALTERID TYPE=\"Number\"> 1419</ALTERID>",
+        );
+    if let Some(marker) = copy.find(" [BRIDGE:") {
+        let close = marker + copy[marker..].find(']').unwrap() + 1;
+        copy.replace_range(marker..close, "");
+    }
+    for field in ["-000009f5", "1998</MASTERID>", "1419</ALTERID>"] {
+        assert!(copy.contains(field), "{field}: {copy}");
+    }
+    assert!(!copy.contains("[BRIDGE:"), "{copy}");
+    format!("{}\n    {copy}{}", &text[..end], &text[end..])
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+/// A batch the accountant imported by hand (the D3 journal with its dispatch
+/// records left out), read back with all 50 vouchers matching and a synthetic
+/// unmarked copy of D3-005 beside them. The JSON says verification_incomplete
+/// for the duplicate. The Markdown proof must say so too, and must not read as
+/// a clean post (bridge#804).
+#[tokio::test]
+async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown() {
+    let census = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
+    ));
+    let readback = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
+        ),
+        &census,
+        &readback,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    // Keep only the built batch and its first verification: no dispatch.
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    let lines = fs::read_to_string(&journal).unwrap();
+    let kept = lines
+        .lines()
+        .filter(|line| !line.contains("\"record_type\":\"dispatch_"))
+        .take(2)
+        .collect::<Vec<_>>();
+    assert_eq!(kept.len(), 2);
+    assert!(
+        !kept.iter().any(|line| line.contains("dispatch")),
+        "{kept:?}"
+    );
+    fs::write(&journal, format!("{}\n", kept.join("\n"))).unwrap();
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_verified"], 50, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    let duplicates = result["duplicates"].as_array().unwrap();
+    assert_eq!(duplicates.len(), 1, "{verified}");
+    assert_eq!(
+        duplicates[0]["kind"], "accounting_fingerprint",
+        "{verified}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{verified}"
+    );
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{D3_BATCH}.proof.md")),
+    )
+    .unwrap();
+    assert!(
+        markdown.contains("this report does not confirm posting"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Verification status: `verification_incomplete`"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Duplicates in this batch: 1"),
+        "{markdown}"
+    );
+    let fingerprint = duplicates[0]["fingerprint_sha256"].as_str().unwrap();
+    assert!(
+        markdown.contains(&format!("| accounting_fingerprint | `{fingerprint}` | 2 |")),
+        "{markdown}"
+    );
+}
+
 /// The same capture with D3-004 read as cancelled too, derived in memory: its
 /// `ISCANCELLED` and ledger entries as the captured D3-003 cancel reads them,
 /// every other field as captured for D3-004. That is a state Tally would not
@@ -1530,4 +1653,251 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
             Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
         }
     }
+}
+
+/// A paired read of `catalogue`, bracketed the way the D3 capture brackets its
+/// reads, with its company extent. The one capture (fixture
+/// `d3-amend-lab-ledger-catalogue`, read once) answers both reads of the pair.
+fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
+    let extent = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+    ));
+    vec![
+        xml(extent.clone()),
+        xml(catalogue.clone()),
+        status(),
+        xml(catalogue),
+        status(),
+        xml(extent),
+    ]
+}
+
+/// The post path's catalogue request for the D3 company: the one the capture
+/// answered (its sidecar's `source_request_sha256`).
+const D3_CATALOGUE_REQUEST: &str =
+    "589566214e5ab516d415e7a9ea3e143ed63452a8a732de0d50d6cb857c0aef2c";
+
+/// How many of `observed` are that catalogue request.
+fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    observed
+        .iter()
+        .filter(|request| request.request_body_sha256 == D3_CATALOGUE_REQUEST)
+        .count()
+}
+
+fn d3_catalogue() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml"
+    ))
+}
+
+/// The same catalogue with Cash on another GUID, as a ledger renamed and
+/// replaced would read.
+fn d3_catalogue_with_cash_replaced() -> String {
+    replaced_once(
+        &d3_catalogue(),
+        ">17a10910-773c-42c6-bd66-7bba9a392536-0000001f</GUID>",
+        ">17a10910-773c-42c6-bd66-7bba9a392536-000000ff</GUID>",
+    )
+}
+
+/// The D3 batch with its step doubt observed and its masters check left
+/// pending, as a post that ended before the check finished leaves it.
+fn d3_step_doubt_beside_a_pending_check(server: &Server) {
+    let imports = server.imports_dir().unwrap();
+    let step = json!({"state":"unmatched","target_voucher_step":{
+        "before":1419,"after":1470,"step":51,"reported_created":50,"matches_created":false}});
+    fs::write(
+        imports.join(format!("{D3_BATCH}.batch_step_doubt.json")),
+        serde_json::to_vec(&step).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        imports.join(format!("{D3_BATCH}.masters_check.json")),
+        serde_json::to_vec(&json!({"state":"check_pending","batch_step":step})).unwrap(),
+    )
+    .unwrap();
+}
+
+/// An unnamed review chooses the step doubt, the only one observed, while
+/// the masters check is pending. Its own read finishes that check as a doubt
+/// (#756). The review is refused as ambiguous after that read, with no dialog
+/// and no record, rather than admitting a step review the person did not
+/// name while a masters doubt now stands.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
+    // The read did finish the check as a doubt: that is what refused it.
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+}
+
+/// The control: the same read finishes the check as unchanged, the step doubt
+/// is still the only one, and the unnamed review goes ahead to its dialog.
+#[tokio::test]
+async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue()));
+    plans.extend(d3_batch_readback());
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .exists());
+    // The first read finished the check, unchanged: the second read sends no
+    // catalogue request.
+    assert_eq!(masters_check_of(&server, D3_BATCH)["state"], "unchanged");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+}
+
+/// The catalogue read refused, as Tally answers when the company cannot be
+/// selected (the live answer `moved_masters_that_cannot_be_re_read_are_not_verified`
+/// scripts, for this company): the masters check cannot finish and stays
+/// pending.
+fn d3_catalogue_refused() -> Vec<ScenarioPlan> {
+    // Both reads of the pair are sent even when the first is refused.
+    d3_catalogue_read(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA>\
+         <LINEERROR>Could not set 'SVCurrentCompany' to 'BRIDGE AMEND LAB'</LINEERROR>\
+         </DATA></BODY></ENVELOPE>"
+            .to_string(),
+    )
+}
+
+/// The first read cannot finish the pending masters check (its catalogue read
+/// is refused), so the step doubt is still the only one and the dialog is
+/// shown. The read after the dialog finishes the check as a doubt (#756): the
+/// unnamed review is refused then, and nothing is recorded.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_refused());
+    plans.extend(d3_batch_readback());
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
+    assert_eq!(
+        approval.review_counts(),
+        [50],
+        "the dialog was shown: {response}"
+    );
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    // Both reads ran in full, the refused catalogue pair included.
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 4, "{response}");
+}
+
+/// A review NAMING the step doubt goes ahead when its first read finishes the
+/// masters check as a second doubt (#756): the person named what they review,
+/// and the record covers only that doubt. The masters doubt stands for its own
+/// review.
+#[tokio::test]
+async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    plans.extend(d3_batch_readback());
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"batch_step"}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    let record: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{D3_BATCH}.batch_step_ack.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(record["doubt"], "batch_step", "{record}");
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_ack.json"))
+        .exists());
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
 }

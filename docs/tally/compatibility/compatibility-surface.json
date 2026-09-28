@@ -3,19 +3,19 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "999dd98fb3af9a8c015a91b0aca6e7d8c0f967d09f9f1e89d717d54479459568"
+      "sha256": "c91aab31bed4235e96f08fb36eac3e437e110b9d13f416ec342b548cf4274888"
     },
     {
       "path": ".github/workflows/dependency-security-scheduled.yml",
-      "sha256": "8ad69bb034bf740c7dfcdf6d35ebab0a25d9b70ba74a517967807aaa4e36ba17"
+      "sha256": "3e9aeddfe1762a7e7503e4a38575836a62c04a524f916b065626dade3e4a2c92"
     },
     {
       "path": ".github/workflows/dependency-security.yml",
-      "sha256": "011268f61eb283b15903023f2254e20074891d019ca863e407aec9b6203a0673"
+      "sha256": "ca6b86a444bfaf761292bc6b9d7232b60df0cde51db3a1a4d8cf12f5249b3d84"
     },
     {
       "path": "docs/adr/0004-tally-write-safety.md",
-      "sha256": "fb1cc0fbdb112ebd6bfdfe5daad05d86863f50dc8687cd2411dbbb952b044d9a"
+      "sha256": "1e9803c8964b72e47eaa9e441a0e35ba1a8da728361d22f607193b14ca3dfe34"
     },
     {
       "path": "docs/adr/0005-tally-snapshot-recovery.md",
@@ -443,7 +443,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "c18390b411e81c1785f989316fd07378bda4995b31c73606c405da655e3f685e"
+      "sha256": "4ad900654d74576c1e1774642cdd502b52b3f4a37f6c48f6a3fff90c4415f528"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -471,11 +471,11 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "1852fbede8d11d332d7c33cfcb088fbab7e92bc6e14ad1237d8047a30032731b"
+      "sha256": "39ffe11f1d055fc29f369aa37c0e99793b4660e76fdf7bb4a1c28690d997bef0"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
-      "sha256": "30b8da8cba0ac43d1d3d69c2aedff73043f1bc40b9eb54d80228518da08fad9f"
+      "sha256": "6e0e0b29f3666077d6d74f020da08932c140f399d40a60383048f2c7cae3bb0d"
     },
     {
       "path": "src-tauri/src/agent_import_amend.rs",
@@ -511,7 +511,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs",
-      "sha256": "2233c0c45ead47d84b6e0404904b3232d9bd86c3ff865cf4ccb6291b78083c1c"
+      "sha256": "f6903435f32f4195afc6de395a157002ee16422ca60c42678f3739f86ee7df77"
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",

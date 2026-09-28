@@ -15,6 +15,7 @@ mod common;
 
 use bridge_bank_statement::bank::Bank;
 use bridge_bank_statement::bbox::read_pages;
+use bridge_bank_statement::cash::CashAnswers;
 use bridge_bank_statement::geometry::{lines, Page};
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::money::{reconcile, verify_against_statement, Controls};
@@ -191,6 +192,7 @@ fn pdfium_reproduces_poppler_rows_on_the_synthetic_hdfc_statement() {
             account_number: "00000000004321",
             date_from: None,
             date_to: None,
+            cash_answers: CashAnswers::none(),
         },
     )
     .unwrap();

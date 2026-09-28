@@ -1,0 +1,1657 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "tds_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "99f767f57c072436",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A voucher whose mapped expense lines span more than one TDS nature (rare) attributes its full credit-line total to each nature present, not divided or netted.",
+  "figures": [
+    {
+      "id": "tds_payees.194C_credited_total",
+      "value": 50930050,
+      "unit": "paise",
+      "definition_sha256_16": "c6d791e6cb91b60a",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194C-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_over_limit_payee_count",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "018269baec844b51",
+      "definition_text": "Payee entities credited on a voucher with a 194C-mapped expense ledger line whose 194C test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_payee_entities_count",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "1d35d018403be5a0",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194C-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_03f9660f_001",
+      "value": 5030000,
+      "unit": "paise",
+      "definition_sha256_16": "54775eecb1f4c462",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 03f9660f) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_6ad86d52_001",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "42a8cb3ed35a408a",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 6ad86d52) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_98c6cabe_001",
+      "value": 11800000,
+      "unit": "paise",
+      "definition_sha256_16": "da75e7e07b110cf0",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 98c6cabe) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_c884e1c4_001",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "343d7fe9a9927891",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag c884e1c4) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_f81067e8_001",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "9ec67617418d33ce",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag f81067e8) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_03f9660f",
+      "value": 5030000,
+      "unit": "paise",
+      "definition_sha256_16": "f7b6490a6c45b0aa",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 03f9660f) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_6ad86d52",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "d4ea48d069f13648",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 6ad86d52) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_98c6cabe",
+      "value": 11800000,
+      "unit": "paise",
+      "definition_sha256_16": "ebf4c6707f850371",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 98c6cabe) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_c884e1c4",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "b61cb657bdcb0592",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag c884e1c4) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_f81067e8",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "2c478bb0618d73c5",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag f81067e8) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_deducted_194C_512242c1_001",
+      "value": 10100000,
+      "unit": "paise",
+      "definition_sha256_16": "058c6b1c0fcbd010",
+      "definition_text": "One payment to this payee entity (tag 512242c1) under 194C whose own voucher deducts its TDS, as credited to the payee: listed on this question rather than in clause 21(b)(ii)(A) in this draft. It is in (ii)(B) only if that tax was not deposited by the s.139(1) due date, which the CA determines. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_deducted_194C_512242c1_002",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "058c6b1c0fcbd010",
+      "definition_text": "One payment to this payee entity (tag 512242c1) under 194C whose own voucher deducts its TDS, as credited to the payee: listed on this question rather than in clause 21(b)(ii)(A) in this draft. It is in (ii)(B) only if that tax was not deposited by the s.139(1) due date, which the CA determines. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_deducted_tds_194C_512242c1_001",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "f7e38402583a1232",
+      "definition_text": "The TDS on that payment's own voucher (tag 512242c1).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_deducted_tds_194C_512242c1_002",
+      "value": 40000,
+      "unit": "paise",
+      "definition_sha256_16": "f7e38402583a1232",
+      "definition_text": "The TDS on that payment's own voucher (tag 512242c1).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_deducted_total_194C_512242c1",
+      "value": 14100000,
+      "unit": "paise",
+      "definition_sha256_16": "5ebd7cd81f4af40e",
+      "definition_text": "The payments to this payee entity (tag 512242c1) listed on this question as deducted on their own vouchers (not in clause 21(b)(ii)(A) or (ii)(B) in this draft), summed.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_03f9660f",
+      "value": 5030000,
+      "unit": "paise",
+      "definition_sha256_16": "8d1016390b4ef6be",
+      "definition_text": "Total credited to one payee entity (tag 03f9660f) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_512242c1",
+      "value": 14100000,
+      "unit": "paise",
+      "definition_sha256_16": "c667067dfb2e57d2",
+      "definition_text": "Total credited to one payee entity (tag 512242c1) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_6ad86d52",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "62c90fbb24756693",
+      "definition_text": "Total credited to one payee entity (tag 6ad86d52) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_98c6cabe",
+      "value": 11800000,
+      "unit": "paise",
+      "definition_sha256_16": "bd52fcdf013b5857",
+      "definition_text": "Total credited to one payee entity (tag 98c6cabe) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_c884e1c4",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "92aa49d5ccd9961d",
+      "definition_text": "Total credited to one payee entity (tag c884e1c4) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_f81067e8",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "178e7a601d82ab85",
+      "definition_text": "Total credited to one payee entity (tag f81067e8) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_03f9660f",
+      "value": 5030000,
+      "unit": "paise",
+      "definition_sha256_16": "d02a9d413fbfb787",
+      "definition_text": "Largest total credited to this payee entity (tag 03f9660f) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_512242c1",
+      "value": 10100000,
+      "unit": "paise",
+      "definition_sha256_16": "176ac9ee93f7246f",
+      "definition_text": "Largest total credited to this payee entity (tag 512242c1) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_6ad86d52",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "18acbd1fcd314158",
+      "definition_text": "Largest total credited to this payee entity (tag 6ad86d52) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_98c6cabe",
+      "value": 11800000,
+      "unit": "paise",
+      "definition_sha256_16": "5c2742ca28ef6568",
+      "definition_text": "Largest total credited to this payee entity (tag 98c6cabe) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_c884e1c4",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "39badac5d8b844c3",
+      "definition_text": "Largest total credited to this payee entity (tag c884e1c4) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_f81067e8",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "b4c6af624fa7a436",
+      "definition_text": "Largest total credited to this payee entity (tag f81067e8) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_short_194C_512242c1_001",
+      "value": 10100000,
+      "unit": "paise",
+      "definition_sha256_16": "1fd0c77452c340fa",
+      "definition_text": "One payment to this payee entity (tag 512242c1) under 194C whose own TDS is less than the section's rate; its full amount. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_194C_512242c1_002",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "1fd0c77452c340fa",
+      "definition_text": "One payment to this payee entity (tag 512242c1) under 194C whose own TDS is less than the section's rate; its full amount. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_194C_6ad86d52_001",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "de4f8fa3a70e0a94",
+      "definition_text": "One payment to this payee entity (tag 6ad86d52) under 194C whose own TDS is less than the section's rate; its full amount. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_194C_c884e1c4_001",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "97705ecc6ab4ca56",
+      "definition_text": "One payment to this payee entity (tag c884e1c4) under 194C whose own TDS is less than the section's rate; its full amount. The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_base_194C_512242c1_001",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "6d42d5dd063c4505",
+      "definition_text": "The base that payment's TDS is tested against (tag 512242c1): the payee's net credit on the bill plus the bill's own TDS, its value before TDS (a bill tested carries only the section's expense, the payee and its TDS).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_base_194C_512242c1_002",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "6d42d5dd063c4505",
+      "definition_text": "The base that payment's TDS is tested against (tag 512242c1): the payee's net credit on the bill plus the bill's own TDS, its value before TDS (a bill tested carries only the section's expense, the payee and its TDS).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_base_194C_6ad86d52_001",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "2d519e5af23a69a4",
+      "definition_text": "The base that payment's TDS is tested against (tag 6ad86d52): the payee's net credit on the bill plus the bill's own TDS, its value before TDS (a bill tested carries only the section's expense, the payee and its TDS).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_base_194C_c884e1c4_001",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "b2f0ebe6a0ebb223",
+      "definition_text": "The base that payment's TDS is tested against (tag c884e1c4): the payee's net credit on the bill plus the bill's own TDS, its value before TDS (a bill tested carries only the section's expense, the payee and its TDS).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_tds_194C_512242c1_001",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "f7e38402583a1232",
+      "definition_text": "The TDS on that payment's own voucher (tag 512242c1).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_tds_194C_512242c1_002",
+      "value": 40000,
+      "unit": "paise",
+      "definition_sha256_16": "f7e38402583a1232",
+      "definition_text": "The TDS on that payment's own voucher (tag 512242c1).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_tds_194C_6ad86d52_001",
+      "value": 49900,
+      "unit": "paise",
+      "definition_sha256_16": "277722e37bb39453",
+      "definition_text": "The TDS on that payment's own voucher (tag 6ad86d52).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_tds_194C_c884e1c4_001",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "260a0b86f07102bf",
+      "definition_text": "The TDS on that payment's own voucher (tag c884e1c4).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_short_total_194C_512242c1",
+      "value": 14100000,
+      "unit": "paise",
+      "definition_sha256_16": "770e92cf18e956ea",
+      "definition_text": "The payments to this payee entity (tag 512242c1) whose own TDS is less than the section's rate, summed.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_short_total_194C_6ad86d52",
+      "value": 5000050,
+      "unit": "paise",
+      "definition_sha256_16": "8681a5b1c06081f3",
+      "definition_text": "The payments to this payee entity (tag 6ad86d52) whose own TDS is less than the section's rate, summed.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_short_total_194C_c884e1c4",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "04ef574a026f7765",
+      "definition_text": "The payments to this payee entity (tag c884e1c4) whose own TDS is less than the section's rate, summed.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_bills_not_rate_tested_194C_03f9660f",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "efbb8a2ca8e2a309",
+      "definition_text": "Bills to this payee entity (tag 03f9660f) under 194C that carry TDS but whose rate is not tested, because each carries lines other than the section's expense, the payee and its TDS (GST, another tax, another party or ledger), or more than one section.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_bills_not_rate_tested_194C_98c6cabe",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "5d323299d302cf90",
+      "definition_text": "Bills to this payee entity (tag 98c6cabe) under 194C that carry TDS but whose rate is not tested, because each carries lines other than the section's expense, the payee and its TDS (GST, another tax, another party or ledger), or more than one section.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_bills_not_rate_tested_194C_f81067e8",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "1151b42be3179765",
+      "definition_text": "Bills to this payee entity (tag f81067e8) under 194C that carry TDS but whose rate is not tested, because no payee is named on them.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_194C_03f9660f",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b2eb1c43add154df",
+      "definition_text": "TDS on the vouchers touching this payee entity (tag 03f9660f): the lines on ledgers in the client's statutory dues classified as TDS payable, net, on every voucher that carries one and names the payee or credits it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "p07",
+          "label": "Journal p07 on 2025-10-06"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_194C_512242c1",
+      "value": 140000,
+      "unit": "paise",
+      "definition_sha256_16": "dee6e6d807e98e7f",
+      "definition_text": "TDS on the vouchers touching this payee entity (tag 512242c1): the lines on ledgers in the client's statutory dues classified as TDS payable, net, on every voucher that carries one and names the payee or credits it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_194C_6ad86d52",
+      "value": 49900,
+      "unit": "paise",
+      "definition_sha256_16": "b9990c01cf527f05",
+      "definition_text": "TDS on the vouchers touching this payee entity (tag 6ad86d52): the lines on ledgers in the client's statutory dues classified as TDS payable, net, on every voucher that carries one and names the payee or credits it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_194C_98c6cabe",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "e40e3ab3186e096a",
+      "definition_text": "TDS on the vouchers touching this payee entity (tag 98c6cabe): the lines on ledgers in the client's statutory dues classified as TDS payable, net, on every voucher that carries one and names the payee or credits it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_194C_c884e1c4",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a6df3cda0cd16e64",
+      "definition_text": "TDS on the vouchers touching this payee entity (tag c884e1c4): the lines on ledgers in the client's statutory dues classified as TDS payable, net, on every voucher that carries one and names the payee or credits it.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "p05",
+          "label": "Journal p05 on 2025-08-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_03f9660f",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f59b17f0e29b2f78",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag 03f9660f).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_512242c1",
+      "value": 140000,
+      "unit": "paise",
+      "definition_sha256_16": "b24e869c4dc589a5",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag 512242c1).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_6ad86d52",
+      "value": 49900,
+      "unit": "paise",
+      "definition_sha256_16": "9635649f62c0f8cd",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag 6ad86d52).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_98c6cabe",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "550e9568b713372d",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag 98c6cabe).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_c884e1c4",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "eb57acb0944689e3",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag c884e1c4).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_tds_seen_net_194C_f81067e8",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "1269d3cca929e527",
+      "definition_text": "TDS, net, on the vouchers touching this payee entity (tag f81067e8).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "529536a7929105ee",
+      "definition_text": "Sum of the 194C-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1449014338a93dea",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194I-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "a0a0363fab5a0fc8",
+      "definition_text": "Payee entities credited on a voucher with a 194I-mapped expense ledger line whose 194I test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d5a067612ec55500",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194I-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ef3b05505b746211",
+      "definition_text": "Sum of the 194I-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fed1b85f21d59a4c",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category '28va' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "10bcd4c7824eda31",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category '28va' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "cf415d8a939d5bf1",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category '28va'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "11231d6b39640206",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category '28va': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3fb472ec6edb6290",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'professional' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f621859ba5881f66",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'professional' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "9a7be0dcae8b0313",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'professional'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "417e36d6d1a9608e",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'professional': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9ce366dcbb65d921",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'royalty' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d588011f3d543cc9",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'royalty' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "bba06ca233dc2bd4",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'royalty'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "41af0047ed526f35",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'royalty': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3aee06fb97efcbf1",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'technical' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0e964d495149d930",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'technical' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c033ab36a29e99d5",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'technical'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "440ac151fb3deb7a",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'technical': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8d5e379ba7d60b0c",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'unmapped' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "822394377ce7ff3a",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'unmapped' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "ccaf861927fa70cb",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'unmapped'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "361e189a0ba5f4e3",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'unmapped': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.deductor_status",
+      "value": "deductor",
+      "unit": "text",
+      "definition_sha256_16": "f4ae0f27f28231f1",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194H/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.tds_ledger_under_duties_taxes_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "642a041f3bc1b5f5",
+      "definition_text": "Ledgers under 'Duties & Taxes' whose name contains 'tds' (case-insensitive) -- a books figure only; existence or absence of such a ledger is not itself a conclusion about TDS compliance.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "TDS Payable 194C",
+          "label": "TDS Payable 194C"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "tds_payees/194C_03f9660f",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_03f9660f"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_03f9660f"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_03f9660f"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_03f9660f_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "3f77bceed9037c16",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "TDS of ₹500 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net). 1 of those bills also debit the payee (the TDS, or an advance): their amounts may overstate by the TDS.",
+        "TDS lines are seen on 2 voucher(s) touching this payee (net ₹0): which payments they cover, and whether the tax was deposited by the s.139(1) due date, is the CA's to determine (see the question on this payee's TDS).",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: TDS is seen on vouchers touching this payee, so which payments it covers is not concluded (see the question on this payee's TDS).",
+        "1 bill(s) carrying TDS are not tested against the section's rate: each carries lines other than the section's expense, the payee and its TDS (GST, another tax, another party or ledger), or more than one section."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_512242c1",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_512242c1"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_512242c1"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "3e2eb5648babd576",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "TDS of ₹1,400 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net). 1 of those bills also debit the payee (the TDS, or an advance): their amounts may overstate by the TDS.",
+        "TDS lines are seen on 2 voucher(s) touching this payee (net ₹1,400): which payments they cover, and whether the tax was deposited by the s.139(1) due date, is the CA's to determine (see the question on this payee's TDS).",
+        "2 payment(s) are listed on this payee's TDS question as deducted on their own vouchers, not in clause 21(b)(ii)(A) in this draft: tax was deducted on them. Whether it was deposited by the s.139(1) due date is asked there."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_6ad86d52",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_6ad86d52"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_6ad86d52"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_6ad86d52"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_6ad86d52_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "a8d059e835a3da64",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "TDS of ₹499 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net).",
+        "TDS lines are seen on 1 voucher(s) touching this payee (net ₹499): which payments they cover, and whether the tax was deposited by the s.139(1) due date, is the CA's to determine (see the question on this payee's TDS).",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: TDS is seen on vouchers touching this payee, so which payments it covers is not concluded (see the question on this payee's TDS)."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_98c6cabe",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_98c6cabe"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_98c6cabe"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_98c6cabe"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_98c6cabe_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "185ab4910d2e0789",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "TDS of ₹1,000 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net).",
+        "TDS lines are seen on 1 voucher(s) touching this payee (net ₹1,000): which payments they cover, and whether the tax was deposited by the s.139(1) due date, is the CA's to determine (see the question on this payee's TDS).",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: TDS is seen on vouchers touching this payee, so which payments it covers is not concluded (see the question on this payee's TDS).",
+        "1 bill(s) carrying TDS are not tested against the section's rate: each carries lines other than the section's expense, the payee and its TDS (GST, another tax, another party or ledger), or more than one section.",
+        "GST of ₹18,000 on this payee's vouchers is counted in its credits: no agreement stating GST separately is recorded for it (or the voucher credits another payee too). If the agreement states it separately, record that and GST is left out."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_c884e1c4",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_c884e1c4"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_c884e1c4"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_c884e1c4"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_c884e1c4_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "2dfa64420172b2c0",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "TDS of ₹1,000 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net).",
+        "TDS lines are seen on 2 voucher(s) touching this payee (net ₹0): which payments they cover, and whether the tax was deposited by the s.139(1) due date, is the CA's to determine (see the question on this payee's TDS).",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: TDS is seen on vouchers touching this payee, so which payments it covers is not concluded (see the question on this payee's TDS)."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_f81067e8",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_f81067e8"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_f81067e8"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_f81067e8"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_f81067e8_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-09-10"
+        }
+      ],
+      "title_sha256_16": "0eb25ef0a73229b9",
+      "title_text": "Cash/bank paid under a 194C-mapped expense, payee not identified, over the limit",
+      "limits_sha256_16": "5e4aaa8d97c3d970",
+      "limits_text": [
+        "The credit line is a cash or bank ledger, not a named payee; the actual payee must be identified from narration, vouchers or the bank statement before any TDS conclusion can be drawn for this amount.",
+        "s.40(a)(ia) disallowance and its Form 26A relief cannot be assessed until the payee is known.",
+        "TDS of ₹500 deducted on this payee's own bills is added back: the credits are counted gross of it (a bill booked net of TDS credits the payee the net).",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited: TDS is seen on vouchers touching this payee, so which payments it covers is not concluded (see the question on this payee's TDS).",
+        "1 bill(s) carrying TDS are not tested against the section's rate: no payee is named on them."
+      ],
+      "ask_client_sha256_16": "f040bdbbf725b2a9",
+      "ask_client_text": [
+        "Identify the payee(s) behind this cash/bank credit from narration, vouchers or the bank statement, then re-test."
+      ]
+    },
+    {
+      "id": "tds_payees/s194c6/194C_512242c1",
+      "clauses": [
+        "3CD-21(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ],
+      "title_sha256_16": "a2e5f76b9ecf60d4",
+      "title_text": "Payments on ledgers marked as goods carriage: they stay listed unless the s.194C(6) conditions are evidenced",
+      "limits_sha256_16": "4ce6534aed1ff43c",
+      "limits_text": [
+        "2 of this payee's vouchers (tag 512242c1) are on ledgers the client marks as goods carriage (tags ca81c651). Its payments stay where this draft lists them: in clause 21(b), or on the question on this payee's TDS.",
+        "They leave the list only if the CA holds evidence that s.194C(6) applied: the payee was in the business of plying, hiring or leasing goods carriages, owned ten or fewer goods carriages at any time during the previous year, and furnished a declaration to that effect along with its PAN (s.194C(6) as it stands from 1-6-2015; CBDT Circular 19/2015, para 43). The books show none of this."
+      ],
+      "ask_client_sha256_16": "c4e7f72d400d526f",
+      "ask_client_text": [
+        "For this payee: its s.194C(6) declaration with PAN, if any, and the number of goods carriages it owned in the year."
+      ]
+    },
+    {
+      "id": "tds_payees/short_deduction/194C_512242c1",
+      "clauses": [
+        "3CD-34(a)",
+        "3CD-21(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "short_base:001",
+          "figure_id": "tds_payees.194C_row_short_base_194C_512242c1_001"
+        },
+        {
+          "name": "short_base:002",
+          "figure_id": "tds_payees.194C_row_short_base_194C_512242c1_002"
+        },
+        {
+          "name": "short_deducted_payments_total",
+          "figure_id": "tds_payees.194C_row_short_total_194C_512242c1"
+        },
+        {
+          "name": "short_payment:001",
+          "figure_id": "tds_payees.194C_row_short_194C_512242c1_001"
+        },
+        {
+          "name": "short_payment:002",
+          "figure_id": "tds_payees.194C_row_short_194C_512242c1_002"
+        },
+        {
+          "name": "short_tds:001",
+          "figure_id": "tds_payees.194C_row_short_tds_194C_512242c1_001"
+        },
+        {
+          "name": "short_tds:002",
+          "figure_id": "tds_payees.194C_row_short_tds_194C_512242c1_002"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ],
+      "title_sha256_16": "d909048e375e30b5",
+      "title_text": "TDS deducted at less than the 194C rate on payments to this payee",
+      "limits_sha256_16": "ccebfdc91800f8ef",
+      "limits_text": [
+        "2 payment(s) carry TDS at the section's lower rate (1%) but less than its higher (2%): short unless the payee is an individual or HUF.",
+        "Each bill tested carries only the section's expense, the payee and its TDS; its rate is tested on the bill's value before TDS (the payee's net credit plus its own TDS).",
+        "TDS elsewhere on this payee's vouchers may cover them: see the question on this payee's TDS.",
+        "2 of these payment(s) are not listed in clause 21(b)(ii)(A) in this draft (they are in (ii)(B), or on the question on this payee's TDS): tax was deducted on them; whether to list them in (ii)(A) is the CA's decision.",
+        "Whether s.40(a)(ia) reaches a short deduction is not settled, and listing on that ground is the CA's decision. For no disallowance: PCIT v Media Worldwide Ltd, Bombay HC, ITA 19/2020, 24 April 2026 (order read), which agrees with four High Courts known only as quoted there: CIT v S.K. Tekriwal (2014) 361 ITR 432 (Calcutta); Future First Info Services (2023) 290 Taxman 490 (Delhi); Kishore Rao & Others (HUF) (2016) 387 ITR 196 (Karnataka); Samsung Heavy Industries (2025) (Uttarakhand). For disallowance: CIT v PVS Memorial Hospital, Kerala HC, ITA 16/2014, 20 July 2015 (order read): a deduction under the wrong provision does not save the payer from s.40(a)(ia). The Supreme Court appeal against PVS Memorial (CA 10915-10916/2018) was pending at last report (as quoted in Media Worldwide); its current status was not checked."
+      ],
+      "ask_client_sha256_16": "8dca1e794c85ce84",
+      "ask_client_text": [
+        "Confirm the payee's type (or, for rent, what is let) and so the rate that applies; decide whether to list these payments in clause 21(b)."
+      ]
+    },
+    {
+      "id": "tds_payees/short_deduction/194C_6ad86d52",
+      "clauses": [
+        "3CD-34(a)",
+        "3CD-21(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "short_base:001",
+          "figure_id": "tds_payees.194C_row_short_base_194C_6ad86d52_001"
+        },
+        {
+          "name": "short_deducted_payments_total",
+          "figure_id": "tds_payees.194C_row_short_total_194C_6ad86d52"
+        },
+        {
+          "name": "short_payment:001",
+          "figure_id": "tds_payees.194C_row_short_194C_6ad86d52_001"
+        },
+        {
+          "name": "short_tds:001",
+          "figure_id": "tds_payees.194C_row_short_tds_194C_6ad86d52_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ],
+      "title_sha256_16": "d909048e375e30b5",
+      "title_text": "TDS deducted at less than the 194C rate on payments to this payee",
+      "limits_sha256_16": "887a3b2755d17f9e",
+      "limits_text": [
+        "1 payment(s) carry TDS on their own vouchers less than the section's lower rate (1%).",
+        "Each bill tested carries only the section's expense, the payee and its TDS; its rate is tested on the bill's value before TDS (the payee's net credit plus its own TDS).",
+        "TDS elsewhere on this payee's vouchers may cover them: see the question on this payee's TDS.",
+        "1 of these payment(s) are listed in clause 21(b)(ii)(A) in this draft; whether to keep them there is the CA's decision.",
+        "Whether s.40(a)(ia) reaches a short deduction is not settled, and listing on that ground is the CA's decision. For no disallowance: PCIT v Media Worldwide Ltd, Bombay HC, ITA 19/2020, 24 April 2026 (order read), which agrees with four High Courts known only as quoted there: CIT v S.K. Tekriwal (2014) 361 ITR 432 (Calcutta); Future First Info Services (2023) 290 Taxman 490 (Delhi); Kishore Rao & Others (HUF) (2016) 387 ITR 196 (Karnataka); Samsung Heavy Industries (2025) (Uttarakhand). For disallowance: CIT v PVS Memorial Hospital, Kerala HC, ITA 16/2014, 20 July 2015 (order read): a deduction under the wrong provision does not save the payer from s.40(a)(ia). The Supreme Court appeal against PVS Memorial (CA 10915-10916/2018) was pending at last report (as quoted in Media Worldwide); its current status was not checked."
+      ],
+      "ask_client_sha256_16": "8dca1e794c85ce84",
+      "ask_client_text": [
+        "Confirm the payee's type (or, for rent, what is let) and so the rate that applies; decide whether to list these payments in clause 21(b)."
+      ]
+    },
+    {
+      "id": "tds_payees/short_deduction/194C_c884e1c4",
+      "clauses": [
+        "3CD-34(a)",
+        "3CD-21(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "short_base:001",
+          "figure_id": "tds_payees.194C_row_short_base_194C_c884e1c4_001"
+        },
+        {
+          "name": "short_deducted_payments_total",
+          "figure_id": "tds_payees.194C_row_short_total_194C_c884e1c4"
+        },
+        {
+          "name": "short_payment:001",
+          "figure_id": "tds_payees.194C_row_short_194C_c884e1c4_001"
+        },
+        {
+          "name": "short_tds:001",
+          "figure_id": "tds_payees.194C_row_short_tds_194C_c884e1c4_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        }
+      ],
+      "title_sha256_16": "d909048e375e30b5",
+      "title_text": "TDS deducted at less than the 194C rate on payments to this payee",
+      "limits_sha256_16": "a9e4e56fb2d5c1ed",
+      "limits_text": [
+        "1 payment(s) carry TDS at the section's lower rate (1%) but less than its higher (2%): short unless the payee is an individual or HUF.",
+        "Each bill tested carries only the section's expense, the payee and its TDS; its rate is tested on the bill's value before TDS (the payee's net credit plus its own TDS).",
+        "TDS elsewhere on this payee's vouchers may cover them: see the question on this payee's TDS.",
+        "1 of these payment(s) are listed in clause 21(b)(ii)(A) in this draft; whether to keep them there is the CA's decision.",
+        "Whether s.40(a)(ia) reaches a short deduction is not settled, and listing on that ground is the CA's decision. For no disallowance: PCIT v Media Worldwide Ltd, Bombay HC, ITA 19/2020, 24 April 2026 (order read), which agrees with four High Courts known only as quoted there: CIT v S.K. Tekriwal (2014) 361 ITR 432 (Calcutta); Future First Info Services (2023) 290 Taxman 490 (Delhi); Kishore Rao & Others (HUF) (2016) 387 ITR 196 (Karnataka); Samsung Heavy Industries (2025) (Uttarakhand). For disallowance: CIT v PVS Memorial Hospital, Kerala HC, ITA 16/2014, 20 July 2015 (order read): a deduction under the wrong provision does not save the payer from s.40(a)(ia). The Supreme Court appeal against PVS Memorial (CA 10915-10916/2018) was pending at last report (as quoted in Media Worldwide); its current status was not checked."
+      ],
+      "ask_client_sha256_16": "8dca1e794c85ce84",
+      "ask_client_text": [
+        "Confirm the payee's type (or, for rent, what is let) and so the rate that applies; decide whether to list these payments in clause 21(b)."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_03f9660f",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_03f9660f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p03",
+          "label": "Journal p03 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "p07",
+          "label": "Journal p07 on 2025-10-06"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "1677eb88942e7a05",
+      "limits_text": [
+        "TDS of ₹0 (net) is seen on 2 voucher(s) touching this payee: Journal p03 on 2025-05-20, Journal p07 on 2025-10-06. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b)."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_512242c1",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "deducted_payment:001",
+          "figure_id": "tds_payees.194C_row_21b_deducted_194C_512242c1_001"
+        },
+        {
+          "name": "deducted_payment:002",
+          "figure_id": "tds_payees.194C_row_21b_deducted_194C_512242c1_002"
+        },
+        {
+          "name": "deducted_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_deducted_total_194C_512242c1"
+        },
+        {
+          "name": "deducted_tds:001",
+          "figure_id": "tds_payees.194C_row_21b_deducted_tds_194C_512242c1_001"
+        },
+        {
+          "name": "deducted_tds:002",
+          "figure_id": "tds_payees.194C_row_21b_deducted_tds_194C_512242c1_002"
+        },
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_512242c1"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Journal p01 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Journal p02 on 2025-06-12"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "1c4b7361d2ed879c",
+      "limits_text": [
+        "TDS of ₹1,400 (net) is seen on 2 voucher(s) touching this payee: Journal p01 on 2025-05-12, Journal p02 on 2025-06-12. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b), except the 2 payment(s) listed on this question as deducted on their own vouchers: not in clause 21(b)(ii)(A) or (ii)(B) in this draft, they are listed here for whether the tax was deposited by the due date. A reversal of a deduction booked without this payee's ledger (against the expense, say) is not seen here: the CA confirms that each deduction listed on this question stands."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_6ad86d52",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_6ad86d52"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p08",
+          "label": "Journal p08 on 2025-11-14"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "9e57fa126257a069",
+      "limits_text": [
+        "TDS of ₹499 (net) is seen on 1 voucher(s) touching this payee: Journal p08 on 2025-11-14. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b)."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_98c6cabe",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_98c6cabe"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p09",
+          "label": "Journal p09 on 2025-12-08"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "de277b24a7747ef6",
+      "limits_text": [
+        "TDS of ₹1,000 (net) is seen on 1 voucher(s) touching this payee: Journal p09 on 2025-12-08. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b)."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_c884e1c4",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_c884e1c4"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p04",
+          "label": "Journal p04 on 2025-07-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "p05",
+          "label": "Journal p05 on 2025-08-05"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "3847d760be293394",
+      "limits_text": [
+        "TDS of ₹0 (net) is seen on 2 voucher(s) touching this payee: Journal p04 on 2025-07-05, Journal p05 on 2025-08-05. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b). A voucher touching this payee debits a ledger classified as TDS payable (a reversal or correction of a deduction, or another entry): what it undoes is not judged, so no payment is listed on this question as deducted on its own voucher; each stays in clause 21(b)(ii)(A) or (ii)(B)."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    },
+    {
+      "id": "tds_payees/tds_seen/194C_f81067e8",
+      "clauses": [
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "tds_seen",
+          "figure_id": "tds_payees.194C_row_tds_seen_net_194C_f81067e8"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p06",
+          "label": "Payment p06 on 2025-09-10"
+        }
+      ],
+      "title_sha256_16": "df193749adfcfda2",
+      "title_text": "TDS is seen on vouchers touching a payee over the 194C limit: which payments it covers, and its deposit, are the CA's to determine",
+      "limits_sha256_16": "bb91f6b4bccefe62",
+      "limits_text": [
+        "TDS of ₹500 (net) is seen on 1 voucher(s) touching this payee: Payment p06 on 2025-09-10. The CA determines which payments it covers and whether it was deposited by the s.139(1) due date; until then every payment that attracts TDS is listed in clause 21(b)."
+      ],
+      "ask_client_sha256_16": "85402617bd2e7e7d",
+      "ask_client_text": [
+        "For each payment to this payee, the TDS deducted on it and the challan that deposited it."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

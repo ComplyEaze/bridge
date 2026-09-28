@@ -37,7 +37,7 @@ is cash_44ab's two figures and finding limits, presumptive history is the option
 reads {"gstr1": {"turnover_paise", "coverage"} | null, "gstr3b": ..., "ais": ...};
 `--emit-turnover-inputs FILE` takes GSTR-1 from the reference's own full pack for an engagement
 that is one of the engine's own client configs (named by its file stem, as the pack names it),
-with the configured gstr1_coverage and no GSTR-3B/AIS, exactly as that pack passes them, and
+with the coverage label its optional [documents].gstr1 carries (none without one) and no GSTR-3B/AIS, exactly as that pack passes them, and
 writes that JSON. With neither, no comparison source is supplied. `creditor_ageing_43bh` reads
 `[roles].trade_creditors_source` (and `creditor_groups` for a `groups` source) and the optional
 `[creditor_ageing_43bh]` table, and passes no next-year payment data, as the reference's pack runs
@@ -128,7 +128,7 @@ def _financial_statements(c):
 
 def _applicability_44ab(c):
     from tae.audit_tests import applicability_44ab, cash_44ab, financial_statements
-    from tae.config import gstr1_coverage, partner_interest_ledgers, presumptive_history_config
+    from tae.config import partner_interest_ledgers, presumptive_history_config
     a = c.args
     if a.turnover_inputs and a.emit_turnover_inputs:
         c.ap.error("--turnover-inputs and --emit-turnover-inputs are exclusive")
@@ -138,11 +138,15 @@ def _applicability_44ab(c):
     elif a.emit_turnover_inputs:
         from tae import pack
         from tae.audit_tests import gst_outward_gstr1
+        from tae.config import gstr1_document
         _cfg, _eng, results, _inv = pack._compute(c.path.stem)
-        fig = results[gst_outward_gstr1.TEST_ID].figures[
-            f"{gst_outward_gstr1.TEST_ID}.annual_gstr1_taxable_total_paise"]
-        comparisons = {"gstr1": None if fig.value is None else
-                       {"turnover_paise": fig.value, "coverage": gstr1_coverage(c.cfg)},
+        # GSTR-1 is optional in the reference (gstr1_document; its coverage label comes with the document): with
+        # none, gst_outward_gstr1 does not run and there is no comparison source.
+        doc = gstr1_document(c.cfg, c.path.parent)
+        res = results.get(gst_outward_gstr1.TEST_ID)
+        fig = None if res is None else res.figures[f"{gst_outward_gstr1.TEST_ID}.annual_gstr1_taxable_total_paise"]
+        comparisons = {"gstr1": None if doc is None or fig is None or fig.value is None else
+                       {"turnover_paise": fig.value, "coverage": doc[1]},
                        "gstr3b": None, "ais": None}
         Path(a.emit_turnover_inputs).write_text(json.dumps(comparisons, indent=2) + "\n", encoding="utf-8")
     fs = financial_statements.run(c.eng, c.rules, partner_interest_ledgers(c.cfg), None)
@@ -203,21 +207,25 @@ def _book_keeping_quality(c):
 
 def _tds_payees(c):
     from tae.audit_tests import tds_payees
-    from tae.config import tds_config
-    # As tae/pack.py calls it: the four values tds_config reads from [tds] and [tds_payees].
-    nature_by_ledger, payee_aliases, turnover, s194j_category_by_ledger = tds_config(c.cfg)
-    return tds_payees, tds_payees.run(c.eng, c.rules, nature_by_ledger, payee_aliases, turnover,
-                                      s194j_category_by_ledger)
+    from tae.config import partners_config, tax_ledgers_by_head
+    from tae.pack import _tds_payees as pack_tds_payees
+    # The reference pack's own call, so no argument can drift from it. Its pack requires [roles].tax_ledgers for the
+    # whole run; tds_payees.run() itself defaults the GST ledgers to none, which a config without the table gets here.
+    tax_ledgers = tax_ledgers_by_head(c.cfg) if "tax_ledgers" in c.cfg.get("roles", {}) else {}
+    return tds_payees, pack_tds_payees(c.eng, c.rules, c.cfg, tax_ledgers, partners_config(c.cfg)[0])
 
 
 def _loans_interest(c):
     from tae.audit_tests import loans_interest
-    from tae.config import loan_ledgers_config
+    from tae.config import deductor_activity, loan_ledgers_config, tds_payable_ledgers, turnover_is_placeholder
     # As tae/pack.py calls it: the loan table, [tds].previous_year_turnover_paise (tds_config's
-    # optional key) and the declared-shared interest ledgers.
+    # optional key), the declared-shared interest ledgers, and through the reference's own readers the
+    # TDS-payable ledgers, [deductor].activity and whether the turnover is a placeholder.
     return loans_interest, loans_interest.run(
         c.eng, c.rules, loan_ledgers_config(c.cfg), c.cfg.get("tds", {}).get("previous_year_turnover_paise"),
-        c.cash, c.bank, frozenset(c.cfg.get("loans", {}).get("shared_interest_ledgers", [])))
+        c.cash, c.bank, frozenset(c.cfg.get("loans", {}).get("shared_interest_ledgers", [])),
+        tds_payable_ledgers=tds_payable_ledgers(c.cfg), deductor_activity=deductor_activity(c.cfg),
+        turnover_is_placeholder=turnover_is_placeholder(c.cfg))
 
 
 def _partners_40b_194t(c):

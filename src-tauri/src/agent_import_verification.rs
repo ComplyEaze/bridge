@@ -399,6 +399,25 @@ pub(super) fn verification_response_page(
     page
 }
 
+/// A verdict of `verify_import`: the only statuses a proof may carry. The
+/// ledger line keeps its status as a string, which also holds non-verdicts
+/// such as `built`; taking this type at the persist boundary keeps those out
+/// of a proof (bridge#814).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum VerificationStatus {
+    PostedVerified,
+    VerificationIncomplete,
+}
+
+impl VerificationStatus {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::PostedVerified => "posted_verified",
+            Self::VerificationIncomplete => "verification_incomplete",
+        }
+    }
+}
+
 /// The verdict `verify_import` records and the proof renders. A dispatch that
 /// needs reconciliation is never verified, whatever the readback shows; with no
 /// dispatch record, the readback alone decides (bridge#804).
@@ -406,21 +425,26 @@ pub(super) fn final_verification_status(
     dispatch: Option<&Value>,
     result: &Value,
     expected_voucher_count: usize,
-) -> &'static str {
+) -> VerificationStatus {
     if dispatch.is_some_and(|dispatch| dispatch["state"] == "reconciliation_required") {
-        "verification_incomplete"
+        VerificationStatus::VerificationIncomplete
     } else {
-        verification_status(result, expected_voucher_count)
+        readback_verdict(result, expected_voucher_count)
     }
 }
 
+/// The readback's verdict, as the string tool results and the ledger carry.
 pub(super) fn verification_status(result: &Value, expected_voucher_count: usize) -> &'static str {
+    readback_verdict(result, expected_voucher_count).as_str()
+}
+
+fn readback_verdict(result: &Value, expected_voucher_count: usize) -> VerificationStatus {
     if result["counts"]["posted_verified"].as_u64() == Some(expected_voucher_count as u64)
         && result["duplicates"].as_array().is_some_and(Vec::is_empty)
     {
-        "posted_verified"
+        VerificationStatus::PostedVerified
     } else {
-        "verification_incomplete"
+        VerificationStatus::VerificationIncomplete
     }
 }
 
@@ -661,11 +685,19 @@ pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> 
 }
 
 /// `text` as a code span inside a Markdown table cell. A REMOTEID comes from
-/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped and
-/// control characters become spaces, so the row keeps its cells; the span's
-/// fence is one backtick longer than any run inside; and a text that starts
-/// and ends with a space is padded, since a code span drops one from each end.
+/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped, so
+/// the row keeps its cells, and the rest is [`markdown_code`]'s.
 fn markdown_table_code(text: &str) -> String {
+    markdown_code(&text.replace('|', "\\|"))
+}
+
+/// `text` as a Markdown code span. Text from Tally, such as a company name
+/// (bridge#807), may hold a backtick or a line break: control characters
+/// become spaces, so the line stays whole; the span's fence is one backtick
+/// longer than any run inside; and a text that starts and ends with a space is
+/// padded, since a code span drops one from each end. An empty text is padded
+/// too: a bare pair of backticks is no span.
+fn markdown_code(text: &str) -> String {
     let text = text
         .chars()
         .map(|character| {
@@ -675,15 +707,17 @@ fn markdown_table_code(text: &str) -> String {
                 character
             }
         })
-        .collect::<String>()
-        .replace('|', "\\|");
+        .collect::<String>();
     let longest_run = text
         .split(|character| character != '`')
         .map(str::len)
         .max()
         .unwrap_or(0);
-    let padded =
-        longest_run > 0 || (text.starts_with(' ') && text.ends_with(' ') && text.trim() != "");
+    let padded = text.is_empty()
+        || longest_run > 0
+        || (text.starts_with(' ')
+            && text.ends_with(' ')
+            && !text.chars().all(|character| character == ' '));
     let fence = "`".repeat(longest_run + 1);
     if padded {
         format!("{fence} {text} {fence}")
@@ -733,7 +767,7 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: `{}`\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", proof["company"]["name"].as_str().unwrap_or("unknown"), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",

@@ -352,9 +352,61 @@ captures are not committed.
 In these runs the mark moved by exactly the number of vouchers created or altered, including a
 partial commit, and each screen edit moved it by one. This does not establish:
 
-- the step through Bridge's own post path, which a batch post must measure before it gates on it;
+- the step through Bridge's own post path, which a batch post must measure before it gates on it
+  (since measured, below);
 - that nothing else can move the mark within the same interval;
 - a multi-user book with edits made while an import runs.
+
+**The multi-voucher step through Bridge's own post path — VERIFIED, 2026-09-26.** One run of each,
+on a licensed TallyPrime 7.1 Silver lab, on a quiet synthetic company with automatic Journal
+numbering. Each was one native `post_import` of one saved batch, after one approval, through a debug
+build of the batch-posting branch. The 200-voucher run raised only the batch-size cap for the
+measurement. The captures are not committed.
+
+| Batch | Counters (one POST) | `ALTVCHID` | Readback |
+| --- | --- | --- | --- |
+| 50 Journals | CREATED 50, all else 0 | +50, equal to CREATED | 50 verified; AlterIDs contiguous |
+| 200 Journals | CREATED 200, all else 0 | +200, equal to CREATED | 200 verified; AlterIDs contiguous |
+
+A second read a minute later gave the same verdict. A multi-user book, other voucher types and other
+licence tiers are not measured.
+
+**What screen actions move the marks — measured 2026-09-26.** One run of each, on a licensed
+TallyPrime 7.1 Silver lab, on synthetic companies. Each person's action on screen was followed by
+Bridge's own reads, and nothing else was changed in between.
+
+| Action on screen | `ALTVCHID` | `ALTMSTID` | Confidence |
+| --- | --- | --- | --- |
+| Open a posted voucher in alteration, save with no change | +1; the voucher's AlterID moves | 0 | VERIFIED |
+| Change a bill allocation's reference | +1; AlterID moves | 0 | PARTIAL |
+| Add a cost-centre allocation | +1; AlterID moves | 0 | PARTIAL |
+| Set a bank-reconciliation date | +1; AlterID moves | 0 | PARTIAL |
+| Cancel a voucher (Alt+X) | +1; AlterID moves | 0 | VERIFIED |
+| Mark a voucher optional (Ctrl+L) | +2 (its own AlterID +1; the other step unexplained) | 0 | PARTIAL |
+| Delete a voucher (Alt+D) | +2 | 0 | VERIFIED |
+| Enable cost centres, create one, make a ledger applicable | 0 | +3 | PARTIAL |
+| Regroup a ledger; change its opening balance; create a ledger; delete it | 0 | +1 each | VERIFIED |
+| Rename the base currency, then restore it (a company with no vouchers) | absent throughout | +2, then +1 | PARTIAL |
+
+Further observations from the same runs:
+
+- **Invisible fields.** Bridge's import-verification read returns a bill allocation's amount only,
+  not its name or type; a cost-centre allocation as an empty `CATEGORYALLOCATIONS.LIST`; and no bank
+  allocation. An edit to only those fields shows up as the AlterID moving, not as a field change.
+- **Tally allocates bills itself.** A native import to a bill-wise party ledger read back with a bill
+  allocation of the full amount already on that line.
+- **Cancelled and optional vouchers read differently.** A cancelled voucher keeps its number but
+  loses its ledger entries in the readback. Bridge labelled it `posted_divergent` at the time
+  (bridge#758); since bridge#771 it reads as `posted_not_effective` (`voucher_cancelled`). An
+  optional voucher's number changed when it was marked optional, and again, with no AlterID
+  change, when a later voucher of the same type was posted. Its number is not a stable identity.
+- **A voucher held open in alteration** blocked none of Bridge's reads, builds or posts, and Tally
+  raised no dialog.
+- **Emptied is not never-used.** A company that has never held a voucher omits `ALTVCHID`. After
+  vouchers are entered and all deleted, it keeps it (+1 per create, +2 per delete).
+- **Currency rename.** A Company Alteration rename of the base currency (symbol and formal name)
+  changed the currency master's `ORIGINALNAME` and the company's `CURRENCYNAME` with it, both ways.
+  A non-INR company given a ₹ symbol was not measured.
 
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
@@ -377,8 +429,8 @@ promoted.
   already precedes it, or from the run's own probe. The run carries on and records
   `report_tie_out_unavailable` and `education_report_family_unsupported`. A later window's
   successful report clears the second code, as it does the other tie-out codes.
-- **Selected-ledger and selected-voucher qualifiers.** Read the mode from their opening identity
-  bracket.
+- **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
+  path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
   Education, the ledger step is recorded as failed with `education_report_family_unsupported`, and
   the voucher steps as not attempted.
@@ -927,6 +979,11 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 - **Amounts are plain signed decimals.** There is no digit grouping, symbol or `Dr`/`Cr` suffix, and a debit is negative, as in the trial balance. Examples: `-4250.00`; `222962422.38` and `-222962422.38` on the larger book.
 - **An empty window gives empty amount elements**, not `0.00`: a month with no activity returned all five Balance Sheet amounts empty. An empty amount is not zero (§7).
 - **The figures tie to the native trial balance (§5.6)** for the small book's full year. Current liabilities equalled the sundry creditors' TB closing. The P&L line equalled the P&L ledger's TB closing (`0.00`) plus the year's result. `Purchase Accounts` equalled the purchase ledger's TB closing.
+- **A part-year window (PARTIAL: one book, one month).** On the 29,900-voucher book, for 2025-05-01 to 2025-05-31, the statements were read beside the native TB and group tree in the same two minutes. Every line tied.
+  - The book's one P&L ledger (sales) had a TB covering the window only. Its `TBALOPENING` was `0.00`, and its `TBALCLOSING` equalled the month's movement, `113726661.73`. That is the P&L's `Sales Accounts` line.
+  - The `Profit & Loss A/c` ledger's `TBALOPENING` was `109235760.65`. That is the negation of the current-asset ledgers' combined opening. No ledger other than those current-asset ledgers and the `Profit & Loss A/c` ledger opened non-zero. So the year's earlier result is carried in that ledger rather than in the sales ledger's opening (inferred from the balancing, not from a voucher read).
+  - The Balance Sheet's `Profit & Loss A/c` line, `222962422.38`, equalled that ledger's TB closing plus the sales ledger's TB closing.
+  - The one-month TB (123 ledgers) was 150 KB, the group tree 54 KB and the one-month P&L 368 B.
 - **Cost:** 0.14–0.72 s and 0.7–1.8 KB per request on the small book; **0.23 s and 1.8 KB for a one-month Balance Sheet on the 29,900-voucher book**. No full year was requested on the larger book.
 
 `<ID>Stock Summary</ID>` returned an empty `<ENVELOPE/>` on a company not known to hold inventory. An empty envelope cannot tell "no items" from "not rendered", so it is not read as zero. **Not measured:**
@@ -976,4 +1033,5 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-26 | §9.14: "an upsert omitting `REFERENCE` kept the stored value" moves from PARTIAL to VERIFIED for a gateway-written `REFERENCE` on licensed 7.1 Silver, on a second independent run through Bridge's own amendment file (bridge#239). A `REFERENCE` typed in Tally's screens remains unmeasured. |
 | 2026-09-26 | §6.3: a custom-report FIELD without `<TYPE>Amount</TYPE>` returned money as a display string (sign dropped, digits grouped); with it, signed. One variable, licensed 7.1 Silver, PARTIAL |
 | 2026-09-26 | §9.4e: fold-equal ledgers (a trailing CR LF, and case) coexist, and an import binds the exact name in both creation orders; the fold-only case is open. Licensed 7.1 Silver, PARTIAL |
+| 2026-09-26 | §11c.5: the multi-voucher step through Bridge's own post path (50 and 200, one run each) is VERIFIED; and what screen actions move `ALTVCHID` and `ALTMSTID`, with the fields the import-verification read cannot see. |
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |

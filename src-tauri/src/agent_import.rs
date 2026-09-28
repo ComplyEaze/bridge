@@ -64,6 +64,7 @@ use verification::{
     final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
     render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
+    VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
@@ -1278,10 +1279,8 @@ impl Server {
                 &result,
                 line.vouchers.len(),
             );
-            payload["result"]["verification_status"] = json!(status);
-            let mut update = line.clone();
-            update.status = status.to_string();
-            self.persist_import_verification(&payload["result"], &update, generation)?;
+            payload["result"]["verification_status"] = json!(status.as_str());
+            self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1293,12 +1292,18 @@ impl Server {
         result.map_err(|failure| failure.with_prior_evidence(accumulated))
     }
 
+    /// Publishes the proof files and the ledger line recording `status`, the
+    /// verdict, for the batch `line` (bridge#814).
     fn persist_import_verification(
         &self,
         proof: &Value,
-        update: &ImportLedgerLine,
+        line: &ImportLedgerLine,
+        status: VerificationStatus,
         expected_generation: ledger::VerificationGeneration,
     ) -> Result<(), String> {
+        let mut update = line.clone();
+        update.status = status.as_str().into();
+        let update = &update;
         let _admission_lock = self.lock_import_admission()?;
         let current = self.import_snapshot_while_admitted(Some(&update.batch_id))?;
         if current.map(|snapshot| snapshot.generation) != Some(expected_generation) {

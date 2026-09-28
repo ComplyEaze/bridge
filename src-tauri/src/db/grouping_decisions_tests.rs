@@ -93,6 +93,8 @@ fn book(to: &str, rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook 
             group("Loans (Liability)", "Loans (Liability)"),
             group("Current Liabilities", "Current Liabilities"),
         ],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
     .unwrap()
 }

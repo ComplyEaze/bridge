@@ -235,9 +235,7 @@ dependencies beyond Node and `git ls-files`.
 | `gh api` pagination | `check-gh-api-pagination.mjs` | BLOCKING (wired in `workflow-consistency`) | clean (one listing call, paginated) |
 | File size report | `report-file-sizes.mjs` | REPORTING (never fails) | 559 files, 213,322 lines |
 
-Three of the "BLOCKING, passes clean today" gates (§5, §6, §7) have not yet
-been exercised by a real PR that trips them — "passes clean" here means "the
-current tree has nothing to flag," not "has been proven to correctly flag a
-real violation in production." Each has a contract-test suite
-(`scripts/*.test.mjs`) that does exercise the failure path on synthetic input;
-that is the evidence available before the first real trip.
+Each remaining gate has a contract-test suite (`scripts/*.test.mjs`) that
+exercises its failure path on synthetic input. The pagination gate (§7) has
+also tripped on a real call: the install-page release listing, fixed when the
+gate was wired.

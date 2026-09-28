@@ -61,9 +61,10 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    parse_import_voucher_rows, parse_import_vouchers, render_proof_markdown,
-    verification_response_page, verification_status, verification_window_identities, verify_batch,
-    voucher_diffs, voucher_is_accounting_effective,
+    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
+    render_proof_markdown, verification_response_page, verification_status,
+    verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
+    VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
@@ -590,7 +591,9 @@ impl Server {
     pub(super) async fn build_import_xml(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         // A proposals file supplies `vouchers`; everything after this line
         // admits them exactly as it admits inline vouchers.
-        let args = &super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
+        let resolved =
+            super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
+        let args = &resolved.args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
         let (debit, credit) = totals(&payload.vouchers)?;
@@ -666,7 +669,7 @@ impl Server {
             // collection, so a Journal-only batch keeps the request sequence its
             // own qualification was measured on.
             let mut group_evidence = None;
-            if renders_bank_shape(&payload.vouchers) {
+            if renders_bank_shape(&payload.vouchers) || !resolved.cash_ledgers.is_empty() {
                 let (groups, evidence) = self.read_group_collection(&identity, &company.name).await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence.clone());
                 let observed = ObservedMasters::new(ledger_masters.parents(), groups);
@@ -680,6 +683,27 @@ impl Server {
                             "refused_ledgers_omitted":refusals.omitted,
                             "group_evidence_sha256":evidence.response_sha256,
                             "next_step":"No file was written. Each refused leg says which ledger and why: cash_bank must reach Bank Accounts or Cash-in-Hand, not_cash_bank must reach a group holding no money, and an unresolvable group is refused either way. Fix the payload or the ledger's group, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
+                        }}),
+                        evidence: accumulated.clone(),
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
+                }
+                // A ledger a person named as cash in hand must be one: a bank
+                // ledger there would move the cash bank to bank, which the
+                // other statement's line then posts a second time.
+                if let Some((reason, refused, omitted)) = answered_ledger_refusals(
+                    &resolved.cash_ledgers,
+                    &observed,
+                    self.settings.max_bytes,
+                ) {
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                            "state":"refused", "reason":reason,
+                            "refused_ledgers":refused,
+                            "refused_ledgers_omitted":omitted,
+                            "group_evidence_sha256":evidence.response_sha256,
+                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c; only a dont_know answer may post a cash line there, where it is tagged and counted. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
                         }}),
                         evidence: accumulated.clone(),
                         company_guid: Some(payload.company_guid),
@@ -901,6 +925,9 @@ impl Server {
                     "batch_id": batch_id, "path": path, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
+                    // How many lines a bank import sent to suspense, by tag,
+                    // so none sits there uncounted.
+                    "suspense_lines": tagged_suspense_vouchers(&line.vouchers),
                     "live_evidence": live_evidence(&line.vouchers),
                     "verification_preflight": verification_preflight,
                     "identity_scheme": line.identity_scheme,
@@ -1247,17 +1274,13 @@ impl Server {
                     );
                 }
             }
-            let status = if dispatched
-                && payload["result"]["dispatch"]["state"] == "reconciliation_required"
-            {
-                "verification_incomplete"
-            } else {
-                verification_status(&result, line.vouchers.len())
-            };
-            payload["result"]["verification_status"] = json!(status);
-            let mut update = line.clone();
-            update.status = status.to_string();
-            self.persist_import_verification(&payload["result"], &update, generation)?;
+            let status = final_verification_status(
+                dispatched.then(|| &payload["result"]["dispatch"]),
+                &result,
+                line.vouchers.len(),
+            );
+            payload["result"]["verification_status"] = json!(status.as_str());
+            self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1269,19 +1292,28 @@ impl Server {
         result.map_err(|failure| failure.with_prior_evidence(accumulated))
     }
 
+    /// Publishes the proof files and the ledger line recording `status`, the
+    /// verdict, for the batch `line` (bridge#814).
     fn persist_import_verification(
         &self,
         proof: &Value,
-        update: &ImportLedgerLine,
+        line: &ImportLedgerLine,
+        status: VerificationStatus,
         expected_generation: ledger::VerificationGeneration,
     ) -> Result<(), String> {
+        let mut update = line.clone();
+        update.status = status.as_str().into();
+        let update = &update;
         let _admission_lock = self.lock_import_admission()?;
         let current = self.import_snapshot_while_admitted(Some(&update.batch_id))?;
         if current.map(|snapshot| snapshot.generation) != Some(expected_generation) {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // The files record the verdict the ledger records, whatever the caller's
+        // copy says, so the proof and the ledger status cannot disagree.
+        local_proof["verification_status"] = json!(update.status);
         let json = serde_json::to_vec_pretty(&local_proof)
             .map_err(|_| "proof_serialization_failed".to_string())?;
         let markdown = render_proof_markdown(&local_proof);
@@ -2527,6 +2559,77 @@ fn requested_master_report(
             }),
         })
         .collect()
+}
+
+/// The ledgers named in bank cash answers that the book's groups refuse: a
+/// cash-in-hand answer's ledger outside Cash-in-Hand
+/// (`cash_ledger_not_cash_in_hand`), else another answer's ledger under
+/// Suspense A/c (`cash_answer_ledger_in_suspense`). One row per ledger with the
+/// reserved group it reaches, bounded like the cash/bank refusal.
+fn answered_ledger_refusals(
+    required: &[super::bank_statement::AnsweredCashLedger],
+    observed: &ObservedMasters,
+    max_bytes: usize,
+) -> Option<(&'static str, Vec<Value>, usize)> {
+    let mut not_cash = BTreeMap::<&str, Value>::new();
+    let mut in_suspense = BTreeMap::<&str, Value>::new();
+    for need in required {
+        let state = observed.classify(&need.ledger);
+        let (refused, requires) = if need.cash_in_hand && !state.is_cash_in_hand() {
+            (&mut not_cash, "cash_in_hand")
+        } else if !need.cash_in_hand && state.is_suspense() {
+            (&mut in_suspense, "not_suspense")
+        } else {
+            continue;
+        };
+        refused.entry(need.ledger.as_str()).or_insert_with(|| {
+            json!({
+                "ledger": party_name(need.ledger.as_str()),
+                "requires": requires,
+                "state": state.state(),
+                "reserved_group": state.reserved_group(),
+                "first_bridge_txn_id": need.bridge_txn_id,
+            })
+        });
+    }
+    let (reason, refused) = if !not_cash.is_empty() {
+        ("cash_ledger_not_cash_in_hand", not_cash)
+    } else if !in_suspense.is_empty() {
+        ("cash_answer_ledger_in_suspense", in_suspense)
+    } else {
+        return None;
+    };
+    let mut budget = refusal_diagnostic_budget(max_bytes);
+    let (rows, omitted) =
+        super::bank_statement::bounded(refused.into_values().collect(), &mut budget);
+    Some((reason, rows, omitted))
+}
+
+/// How many vouchers Bridge's bank import sent to suspense, by the tag it
+/// writes at the end of their narration
+/// ([`bridge_bank_statement::proposals::suspense_tag`]), for a build's result.
+/// Counts only: a line's date and amounts stay local, as in the parse result.
+fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
+    use bridge_bank_statement::proposals::SuspenseTag;
+    let (mut purpose_not_confirmed, mut unidentified) = (0_usize, 0_usize);
+    for voucher in vouchers {
+        let tag = voucher.narration.as_deref().and_then(|narration| {
+            bridge_bank_statement::proposals::suspense_tag(
+                narration,
+                voucher.entries.iter().map(|entry| entry.ledger.as_str()),
+            )
+        });
+        match tag {
+            Some(SuspenseTag::PurposeNotConfirmed) => purpose_not_confirmed += 1,
+            Some(SuspenseTag::Unidentified) => unidentified += 1,
+            None => {}
+        }
+    }
+    json!({
+        "count": purpose_not_confirmed + unidentified,
+        "purpose_not_confirmed": purpose_not_confirmed,
+        "unidentified": unidentified,
+    })
 }
 
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {

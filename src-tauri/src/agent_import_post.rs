@@ -62,6 +62,33 @@ enum ApprovalState {
     Approved,
 }
 
+/// How a post call enters (#725 slice 2.0).
+pub(in crate::agent) enum Entry {
+    /// A call from the agent or the desktop: it may ask, join or redeem.
+    Fresh,
+    /// A call re-entered from the top to redeem the approval its own Join
+    /// just found, keeping that call's clock and evidence. It may only
+    /// redeem: it never asks, so it can never show a second dialog.
+    RedeemOnly {
+        call_started: std::time::Instant,
+        evidence: Evidence,
+    },
+}
+
+/// What a post's checked body came to: an answer, or an approval its Join
+/// found that the same call redeems by entering again from the top, so every
+/// check before the wait is made again after it.
+enum Step {
+    Done(ToolOutcome),
+    Redeem,
+}
+
+/// A post future, boxed: the re-entry recurses, and a post's state machine
+/// held inline has overflowed a Windows debug thread's stack before.
+type PostFuture<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<ToolOutcome, ToolFailure>> + Send + 'a>,
+>;
+
 /// What waiting on a dialog came to.
 enum Waited {
     Answered((Result<ApprovedImport, String>, Answered)),
@@ -289,6 +316,7 @@ impl Server {
                     .approval_remaining(batch_id)
                     .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
+                "next_step": "Call post_import again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s.",
             }),
         };
         ToolOutcome {
@@ -319,7 +347,45 @@ impl Server {
         expected_sha256: Option<&str>,
         scope: PostScope,
     ) -> Result<ToolOutcome, ToolFailure> {
-        let call_started = std::time::Instant::now();
+        self.post_import_entry(args, expected_sha256, scope, Entry::Fresh)
+            .await
+    }
+
+    /// The same post entered again to redeem the approval its Join found.
+    fn post_import_redeeming<'a>(
+        &'a self,
+        args: &'a Value,
+        expected_sha256: Option<&'a str>,
+        scope: PostScope,
+        call_started: std::time::Instant,
+        evidence: Evidence,
+    ) -> PostFuture<'a> {
+        Box::pin(self.post_import_entry(
+            args,
+            expected_sha256,
+            scope,
+            Entry::RedeemOnly {
+                call_started,
+                evidence,
+            },
+        ))
+    }
+
+    pub(in crate::agent) async fn post_import_entry(
+        &self,
+        args: &Value,
+        expected_sha256: Option<&str>,
+        scope: PostScope,
+        entry: Entry,
+    ) -> Result<ToolOutcome, ToolFailure> {
+        let (call_started, carried) = match entry {
+            Entry::Fresh => (std::time::Instant::now(), None),
+            Entry::RedeemOnly {
+                call_started,
+                evidence,
+            } => (call_started, Some(evidence)),
+        };
+        let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let snapshot = self
@@ -332,8 +398,10 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
-        let mut accumulated =
-            evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty());
+        // A re-entered call keeps what its first pass read (#725 slice 2.0).
+        let mut accumulated = carried.unwrap_or_else(|| {
+            evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty())
+        });
         let mut received_response = None;
         // Where the voucher went, once a POST has been sent (#574).
         let mut post_location: Option<Value> = None;
@@ -343,7 +411,7 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
-        let operation: Result<ToolOutcome, ToolFailure> = async {
+        let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
                 &self.settings.endpoint,
@@ -355,7 +423,7 @@ impl Server {
                 // posted, and must not keep other batches waiting (#725).
                 self.post_approvals
                     .revoke(batch_id, "batch_already_dispatched");
-                return self.verify_import(args).await;
+                return self.verify_import(args).await.map(Step::Done);
             }
             // The record's own hash only proves the record agrees with itself.
             // The file Bridge built must hold exactly the XML this record
@@ -375,22 +443,30 @@ impl Server {
             // The desktop waits for its dialog in one call, as before.
             let redeeming = match scope {
                 PostScope::JournalOnly => false,
+                // Re-entered to redeem what its Join found: only that
+                // approval lets it go on, and it never asks (#725 slice 2.0).
+                PostScope::Vouchers if redeem_only => {
+                    self.post_approvals.begin_redeem(batch_id)?;
+                    true
+                }
                 PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
                     Begin::Ask => false,
                     Begin::Redeem => true,
                     Begin::Busy(code) => return Err(code.to_string().into()),
                     Begin::Refused(code) => return Err(code.into()),
                     Begin::Waiting => {
-                        return Ok(self.approval_outcome(
+                        return Ok(Step::Done(self.approval_outcome(
                             batch_id,
                             guid,
                             ApprovalState::Pending(None),
                             accumulated.clone(),
-                        ))
+                        )))
                     }
                     Begin::Join(dialog) => {
-                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
-                        {
+                        let wait = self
+                            .post_approvals
+                            .join_wait(call_started.elapsed(), line.vouchers.len());
+                        let waited = match wait_for_answer(dialog, wait).await {
                             Waited::Cancelled => {
                                 return Err("request_cancelled".to_string().into())
                             }
@@ -398,18 +474,31 @@ impl Server {
                             Waited::Answered(answer) => Ok(answer),
                         };
                         return match self.post_approvals.settle_join(batch_id, waited) {
-                            Joined::StillOpen { remaining } => Ok(self.approval_outcome(
-                                batch_id,
-                                guid,
-                                ApprovalState::Pending(Some(remaining)),
-                                accumulated.clone(),
-                            )),
-                            Joined::Approved => Ok(self.approval_outcome(
+                            Joined::StillOpen { remaining } => {
+                                Ok(Step::Done(self.approval_outcome(
+                                    batch_id,
+                                    guid,
+                                    ApprovalState::Pending(Some(remaining)),
+                                    accumulated.clone(),
+                                )))
+                            }
+                            // Posted by this call when the redeem fits in it,
+                            // entering again from the top so every check made
+                            // before the wait is made again after it.
+                            Joined::Approved
+                                if self.post_approvals.redeem_fits_in_call(
+                                    call_started.elapsed(),
+                                    line.vouchers.len(),
+                                ) =>
+                            {
+                                Ok(Step::Redeem)
+                            }
+                            Joined::Approved => Ok(Step::Done(self.approval_outcome(
                                 batch_id,
                                 guid,
                                 ApprovalState::Approved,
                                 accumulated.clone(),
-                            )),
+                            ))),
                             Joined::Refused(code) => Err(code.into()),
                         };
                     }
@@ -593,12 +682,12 @@ impl Server {
                                 let remaining = dialog.remaining();
                                 self.post_approvals
                                     .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(self.approval_outcome(
+                                return Ok(Step::Done(self.approval_outcome(
                                     batch_id,
                                     guid,
                                     ApprovalState::Pending(Some(remaining)),
                                     accumulated.clone(),
-                                ));
+                                )));
                             }
                             Waited::Answered((answer, answered)) => {
                                 self.post_approvals.hold_approved(
@@ -615,12 +704,12 @@ impl Server {
                                     .post_approvals
                                     .fits_in_call(call_started.elapsed(), line.vouchers.len())
                                 {
-                                    return Ok(self.approval_outcome(
+                                    return Ok(Step::Done(self.approval_outcome(
                                         batch_id,
                                         guid,
                                         ApprovalState::Approved,
                                         accumulated.clone(),
-                                    ));
+                                    )));
                                 }
                             }
                         }
@@ -958,9 +1047,21 @@ impl Server {
             if let Some(located) = post_location.clone() {
                 proof.payload["result"]["post_location"] = located;
             }
-            Ok(proof)
+            Ok(Step::Done(proof))
         }
         .await;
+        // A Join that found an approval it can redeem in this call enters again
+        // from the top, redeem-only (#725 slice 2.0). The approval stays held
+        // for that pass: nothing below revokes it.
+        let operation = match operation {
+            Ok(Step::Redeem) => {
+                return self
+                    .post_import_redeeming(args, expected_sha256, scope, call_started, accumulated)
+                    .await
+            }
+            Ok(Step::Done(outcome)) => Ok(outcome),
+            Err(failure) => Err(failure),
+        };
         // A refused redemption withdraws the approval it was to use (#725): a
         // later call asks the person again. One taken by this call has already
         // lapsed; another call's, or a dialog, is left as it is.

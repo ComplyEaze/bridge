@@ -1,0 +1,135 @@
+M04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M32 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_trial_balance.rs::a_changed_value_is_reported, tests/parity_trial_balance.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M24 killed (full) by 2: src/lib.rs::support::tests::exceptions_keep_their_character_and_everything_else_maps_as_rust_does, tests/edge_books.rs::every_edge_book_matches_the_reference
+B01 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_trial_balance.rs::a_changed_value_is_reported, tests/parity_trial_balance.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+B03 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_trial_balance.rs::a_changed_value_is_reported, tests/parity_trial_balance.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+B02 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_trial_balance.rs::a_changed_value_is_reported, tests/parity_trial_balance.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X12 survived (full)
+X10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X13 killed (full) by 9: src/lib.rs::applicability_44ab::tests::a_partial_comparison_source_is_never_differenced, src/lib.rs::support::tests::exceptions_keep_their_character_and_everything_else_maps_as_rust_does, tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part, tests/parity_applicability_44ab.rs::a_changed_call_is_reported, tests/parity_applicability_44ab.rs::a_changed_due_date_is_reported, tests/parity_applicability_44ab.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X19 killed (full) by 3: src/lib.rs::cash_payments_40a3::tests::a_voucher_without_a_number_is_labelled_by_the_last_12_characters_of_its_guid, src/lib.rs::depreciation::tests::a_voucher_without_a_number_is_labelled_by_the_last_12_characters_of_its_guid, tests/edge_books.rs::every_edge_book_matches_the_reference
+X21 killed (full) by 14: tests/parity_40a3.rs::a_changed_value_is_reported, tests/parity_40a3.rs::a_flipped_confidence_is_reported, tests/parity_40a3.rs::a_flipped_goods_carriage_exemption_is_reported, tests/parity_40a3.rs::a_flipped_loan_coverage_clause_is_reported, tests/parity_40a3.rs::a_reordered_but_equal_dump_passes, tests/parity_40a3.rs::an_invariant_not_evaluated_is_reported_even_without_violations, tests/parity_40a3.rs::synthetic_read_matches_the_python_golden, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/parity_financial_statements.rs::a_changed_value_is_reported, tests/parity_financial_statements.rs::closing_stock_from_the_stale_field_is_reported, tests/parity_financial_statements.rs::synthetic_read_matches_the_python_golden_with_report_totals, tests/parity_financial_statements.rs::synthetic_read_matches_the_python_golden_without_report_totals, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X15 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_trial_balance.rs::a_changed_value_is_reported, tests/parity_trial_balance.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+U01 killed (full) by 2: src/lib.rs::support::tests::exceptions_keep_their_character_and_everything_else_maps_as_rust_does, tests/edge_books.rs::every_edge_book_matches_the_reference
+F05 killed (full) by 6: src/lib.rs::binding::tests::a_guid_binds_across_python_only_whitespace_and_non_ascii_case, src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace, src/lib.rs::ledger_ids::tests::guid_tag_strips_and_lowercases_as_python_does, src/lib.rs::support::text_probe_tests::strip_and_split_match_python, src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does, src/lib.rs::tds_payees::tests::the_config_readers_refuse_what_the_reference_refuses
+X24 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+T01 killed (full) by 2: src/lib.rs::support::tests::exceptions_keep_their_character_and_everything_else_maps_as_rust_does, src/lib.rs::support::text_probe_tests::lower_matches_python_including_final_sigma
+T02 killed (full) by 1: src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+T03 killed (full) by 2: src/lib.rs::support::text_probe_tests::a_lower_case_literal_folds_like_its_capital, src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+T04 killed (full) by 1: src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+T05 killed (full) by 10: src/lib.rs::depreciation::tests::the_gst_tcs_name_check_ignores_case_and_needs_a_word, src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does, tests/parity_depreciation.rs::a_changed_value_at_the_180_day_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_at_the_cash_limit_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_is_reported, tests/parity_depreciation.rs::a_flipped_confidence_is_reported, tests/parity_depreciation.rs::a_reordered_but_equal_dump_passes, tests/parity_depreciation.rs::synthetic_read_matches_the_python_golden, tests/parity_depreciation.rs::the_old_book_vs_act_title_is_reported, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+T06 killed (full) by 1: src/lib.rs::support::text_probe_tests::a_lower_case_literal_folds_like_its_capital
+S02 killed (full) by 2: src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month, tests/edge_books.rs::every_edge_book_matches_the_reference
+S01 killed (full) by 2: src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month, tests/edge_books.rs::every_edge_book_matches_the_reference
+S03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S04 killed (full) by 1: src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month
+S07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S06 killed (full) by 3: src/lib.rs::statutory_dues_43b::tests::a_period_starting_mid_month_takes_the_opening_lot_from_the_day_before, src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month, tests/edge_books.rs::every_edge_book_matches_the_reference
+S05 killed (full) by 2: src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month, tests/edge_books.rs::every_edge_book_matches_the_reference
+S08 survived (full)
+S11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S09 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S14 killed (full) by 1: tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S17 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S18 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S25 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+S21 killed (full) by 2: src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month, tests/edge_books.rs::every_edge_book_matches_the_reference
+S20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R10 killed (full) by 1: src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+R12 killed (full) by 1: src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+R11 killed (full) by 1: src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+R14 killed (full) by 1: src/lib.rs::statutory_dues_43b::tests::a_period_starting_mid_month_takes_the_opening_lot_from_the_day_before
+R13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R16 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+R17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A36 killed (full) by 4: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int, src/lib.rs::py_int_tests::py_int_takes_what_pythons_int_takes, tests/edge_books.rs::every_edge_book_matches_the_reference
+R21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+Q01 killed (full) by 3: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does, tests/edge_books.rs::every_edge_book_matches_the_reference
+Q03 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q02 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q04 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q06 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q05 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q07 killed (full) by 1: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python
+Q08 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q10 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+Q09 killed (full) by 2: src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python, src/lib.rs::support::text_probe_tests::repr_takes_each_branch_as_python_does
+SB-01 killed (full) by 9: src/lib.rs::support::tests::rupees_groups_as_the_reference_does, tests/parity_40a3.rs::a_changed_value_is_reported, tests/parity_40a3.rs::a_flipped_confidence_is_reported, tests/parity_40a3.rs::a_flipped_goods_carriage_exemption_is_reported, tests/parity_40a3.rs::a_flipped_loan_coverage_clause_is_reported, tests/parity_40a3.rs::a_reordered_but_equal_dump_passes, tests/parity_40a3.rs::an_invariant_not_evaluated_is_reported_even_without_violations, tests/parity_40a3.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+SB-02 killed (full) by 9: src/lib.rs::support::tests::rupees_groups_as_the_reference_does, tests/parity_depreciation.rs::a_changed_value_at_the_180_day_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_at_the_cash_limit_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_is_reported, tests/parity_depreciation.rs::a_flipped_confidence_is_reported, tests/parity_depreciation.rs::a_reordered_but_equal_dump_passes, tests/parity_depreciation.rs::synthetic_read_matches_the_python_golden, tests/parity_depreciation.rs::the_old_book_vs_act_title_is_reported, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+SB-03 killed (full) by 1: src/lib.rs::support::tests::rupees_groups_as_the_reference_does
+PI-01 killed (full) by 3: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it, src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int
+PI-02 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it
+PI-03 killed (full) by 3: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it, src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int
+PI-04 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it
+PI-07 killed (full) by 1: src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it
+PI-05 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it
+PI-06 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int
+E2A-15 killed (full) by 3: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2A-21 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-20 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+PI-09 killed (full) by 3: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2A-22 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-33 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-35 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-34 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+
+88 of 88 killed
+
+warning: 43 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  M01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X24 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  T02 (full): src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+  T04 (full): src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+  T06 (full): src/lib.rs::support::text_probe_tests::a_lower_case_literal_folds_like_its_capital
+  S03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S04 (full): src/lib.rs::statutory_dues_43b::tests::the_opening_lot_is_due_the_month_after_the_last_pre_period_month
+  S07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S14 (full): tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+  S15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  S25 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R10 (full): src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+  R11 (full): src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+  R12 (full): src/lib.rs::statutory_dues_43b::tests::s43b_1_reports_mismatches_and_missing_evidence_as_the_reference_does
+  R13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R14 (full): src/lib.rs::statutory_dues_43b::tests::a_period_starting_mid_month_takes_the_opening_lot_from_the_day_before
+  R15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  Q07 (full): src/lib.rs::support::text_probe_tests::repr_and_isprintable_match_python
+  SB-03 (full): src/lib.rs::support::tests::rupees_groups_as_the_reference_does
+  PI-07 (full): src/lib.rs::py_int_tests::a_string_reads_as_pythons_int_reads_it
+  E2A-20 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-21 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-22 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-33 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-34 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-35 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse

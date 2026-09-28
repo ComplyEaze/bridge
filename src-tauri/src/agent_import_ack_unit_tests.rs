@@ -784,3 +784,31 @@ fn a_debit_total_is_the_negated_sum_not_each_lines_magnitude() {
         "{preview}"
     );
 }
+
+/// After an unnamed review's read (#756): a second observed doubt refuses as
+/// `select_doubt` would; one or none leaves the choice as it was.
+#[test]
+fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
+    use MastersRecord::{DoubtRecordUnavailable, NoDoubt, Pending};
+    let doubt = || MastersRecord::Doubt {
+        raw: b"{}".to_vec(),
+    };
+    let cases: [([MastersRecord; 2], Result<(), &str>); 6] = [
+        ([doubt(), doubt()], Err("ack_doubt_ambiguous")),
+        (
+            [doubt(), DoubtRecordUnavailable],
+            Err("ack_doubt_ambiguous"),
+        ),
+        (
+            [DoubtRecordUnavailable, DoubtRecordUnavailable],
+            Err("ack_doubt_record_unavailable"),
+        ),
+        ([NoDoubt, doubt()], Ok(())),
+        ([Pending, doubt()], Ok(())),
+        ([NoDoubt, NoDoubt], Ok(())),
+    ];
+    for ([masters, step], expected) in cases {
+        let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
+        assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
+    }
+}

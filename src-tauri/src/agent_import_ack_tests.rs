@@ -1951,11 +1951,11 @@ async fn a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finis
         review_beside_a_pending_check(&crate::agent::sha256_hex(earlier.as_bytes())).await;
     assert_eq!(code, "ack_recorded_review_stale");
     let (code, again) = review_beside_a_pending_check(&crate::agent::sha256_hex(&finished)).await;
-    assert_eq!(code, "ack_already_recorded");
     assert_eq!(
         again, finished,
         "the read finishes the same doubt each time"
     );
+    assert_eq!(code, "ack_already_recorded");
 }
 
 /// One named masters review of the D3 batch, whose masters check is pending
@@ -2028,4 +2028,28 @@ async fn a_recorded_step_review_beside_a_pending_step_answers_before_any_request
         "{response}"
     );
     assert!(sent(simulator).is_empty());
+}
+
+/// A record this build cannot read names no doubt, so no read could change
+/// its answer: beside a pending masters check it answers before any request.
+#[tokio::test]
+async fn an_unreadable_record_beside_a_pending_check_answers_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
+        clean(),
+        Some(br#"{"state":"check_pending"}"#),
+        None,
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_already_recorded",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(sent(simulator).is_empty(), "no request");
 }

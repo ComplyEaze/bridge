@@ -20,7 +20,8 @@ builds the same book in Rust and compares whole dumps. Python 3.13 is pinned bec
 tables (15.1.0) are the ones the crate's case mapping reproduces (`src/support.rs`).
 
 Spec keys: `period` ([start, end], ISO; default the AY 2026-27 previous year), `groups` ({name:
-parent or null}), `ledgers` ([{name, chain, guid}]), `tb` ([{ledger, opening, debit, credit,
+parent or null}), `ledgers` ([{name, chain, guid, chain_complete?}], `chain_complete` a boolean, absent
+meaning true), `tb` ([{ledger, opening, debit, credit,
 closing}]), `vouchers` ([{guid, date, base_type, vtype?, number?, reference?, status?, narration?,
 masterid?, inventory?, lines: [[ledger, paise], ...]}]; `number` defaults to the GUID, so pass `""`
 to test a voucher with no number; `reference` is text, absent meaning ""; `masterid` is text, absent
@@ -46,8 +47,9 @@ config, each through the reference's own `tae.config` reader (so each is refused
 `form26as`, `ais`, `tis` (invented document rows in the shape `parity/python_golden.py
 --emit-traces-documents` writes; default []) and `tds_ledgers`, `tcs_ledgers`,
 `advance_tax_ledgers`, `deductor_aliases` (default empty); and for `loans_interest`: `entity_type` and
-`previous_year_turnover_paise` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
-interest_ledger?}}, default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
+`previous_year_turnover_paise`, `previous_year_turnover_status`, `deductor_activity` and
+`tds_payable_ledgers` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
+interest_ledger?}}, the interest ledger one name or a list; default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
 default false: true sets the module's NET_REVERSALS switch, reaching the dormant reversal rule in `run` and
 in the module invariant alike); and for `partners_40b_194t`: `entity_type` as for `tds_payees`, `partners`
 ({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}) and `deed` (a table such as
@@ -98,9 +100,6 @@ def main() -> int:
     status = {s: getattr(VoucherStatus, s.upper()) for s in STATUS}
     start, end = spec.get("period", ["2025-04-01", "2026-03-31"])
     groups = {n: Group(name=n, parent=p) for n, p in spec["groups"].items()}
-    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
-                                 chain=tuple(l["chain"]), chain_complete=True, guid=l.get("guid", ""))
-               for l in spec["ledgers"]}
     # Typed strictly, the same way tests/edge_books.rs reads them, so that a mistyped key fails on
     # both sides instead of building two different books.
     def typed(d, key, ok, what, absent=None, nullable=True):
@@ -109,6 +108,13 @@ def main() -> int:
         if not ok(d[key]):
             raise SystemExit(f"{spec_path.name}: {key} must be {what}, got {d[key]!r}")
         return d[key]
+
+    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
+                                 chain=tuple(l["chain"]),
+                                 chain_complete=typed(l, "chain_complete", lambda x: isinstance(x, bool),
+                                                      "true or false", absent=True, nullable=False),
+                                 guid=l.get("guid", ""))
+               for l in spec["ledgers"]}
 
     def integer(x):
         return isinstance(x, int) and not isinstance(x, bool)
@@ -162,10 +168,17 @@ def main() -> int:
         # canonical dump below calls check_invariants in this same process, before anything resets it.
         loans_interest.NET_REVERSALS = typed(spec, "net_reversals", lambda x: isinstance(x, bool), "true or false",
                                              absent=False, nullable=False)
+        # As tae/pack.py passes them: the deductor activity and the turnover's status through the
+        # reference's own readers, from a config built out of the spec's keys.
+        from tae import config as tc
+        cfg = {"tds": {k: spec[k] for k in ("previous_year_turnover_status",) if k in spec},
+               "deductor": {"activity": spec["deductor_activity"]} if "deductor_activity" in spec else {}}
         return loans_interest, loans_interest.run(
             eng, rules, {k: dict(v) for k, v in spec.get("loans", {}).items()},
             spec.get("previous_year_turnover_paise"), cash, bank,
-            frozenset(spec.get("shared_interest_ledgers", [])))
+            frozenset(spec.get("shared_interest_ledgers", [])),
+            tds_payable_ledgers=frozenset(spec.get("tds_payable_ledgers", [])),
+            deductor_activity=tc.deductor_activity(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg))
 
     # One runner per test an edge book may name: the module and its result, run as the reference's
     # pack runs it.

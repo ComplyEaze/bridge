@@ -27,7 +27,7 @@ pub const TEST_ID: &str = "cash_book_integrity";
 pub const VERSION: &str = "1";
 
 /// Tally's reserved group names, not client data.
-const EXPENSE_GROUPS: [&str; 2] = ["Direct Expenses", "Indirect Expenses"];
+pub(crate) const EXPENSE_GROUPS: [&str; 2] = ["Direct Expenses", "Indirect Expenses"];
 
 fn overflow() -> AuditError {
     support::overflow(TEST_ID)

@@ -556,6 +556,7 @@ from a Voucher collection readback, not from the counters alone.
   - The upsert reported `CREATED=1`, with a **new GUID**, a **new MASTERID** (7 before, 855 after) and the number 815.
   - A resend therefore undoes a delete, and neither the GUID nor the MASTERID survives it. Anything keyed on either (a baseline, a binding) must treat the re-created voucher as new. The REMOTEID is the only link, and after a delete that link re-creates the voucher rather than restoring it.
   - **Current behaviour:** Bridge's native post sends a fresh random REMOTEID for every post and records it with the dispatch intent (#582), so it never resends one.
+  - **The recorded list is in batch voucher order. VERIFIED on one run (licensed TallyPrime 7.1 Gold, 2026-09-28).** For 9 of 9 batches whose import request was captured, `dispatch_intent.native_remote_ids` equalled the captured `REMOTEID` attributes, in order. So the recorded list can address each voucher of a batch, for example for the upsert in the Gold block below.
   - **Design consequence, not current behaviour:** a batch-posting design must refuse to resend a REMOTEID Bridge has already sent, because a resend after a delete re-creates the voucher under a new GUID.
 - **Manual numbering with duplicates prevented refuses, and two of the three refusals are silent. PARTIAL — observed once each (G).** The same Journal type was switched to Manual with Prevent Duplicates, then restored.
   - An upsert (same `REMOTEID`) with no `VOUCHERNUMBER` reported `ERRORS=1` with `LINEERROR` "Voucher Number cannot be left BLANK!", and no create or alter counter moved.
@@ -570,3 +571,21 @@ from a Voucher collection readback, not from the counters alone.
 own screens, and repeatability beyond one run (except the `REFERENCE` merge above, repeated
 once on 2026-09-26). A masters delete in the same session drew no
 response, and its cause is **UNVERIFIED**; nothing is recorded about it here.
+
+**Payment, Receipt and Contra on Gold: an upsert alters in place. VERIFIED on one run (licensed
+TallyPrime 7.1 Gold, one book, 2026-09-28).**
+- **What was sent.** The request shape was §9.13's, with the same `REMOTEID` a voucher was created
+  with, `ACTION="Create"`, and only the `NARRATION` changed. It was byte-identical to Bridge's own
+  native request apart from `NARRATION`: a renderer reproduced 258 of 258 captured native vouchers
+  exactly.
+- **Pilot.** One Payment returned `ALTERED=1`, `CREATED=0`. A vouchers read of that day showed the
+  same GUID, the same `VOUCHERNUMBER`, the same amounts and an unchanged day total. Only `NARRATION`
+  and `ALTERID` had changed.
+- **Then 307 more** Payment, Receipt and Contra vouchers, in 13 requests, each returned `ALTERED` equal to
+  its voucher count and `CREATED=0`.
+- **Read-back.** A full vouchers read of the window (1,958 vouchers, paged) found each of the 308
+  target vouchers once. Their type, amounts, cancelled and optional flags were unchanged, and none
+  still carried the narration tag the upsert removed.
+- **What it extends.** It extends the Journal-on-Silver upsert above to Payment, Receipt and Contra
+  on Gold, for a narration change only. A changed amount, ledger or date was not sent, and
+  neither was a repeat run on a second book.

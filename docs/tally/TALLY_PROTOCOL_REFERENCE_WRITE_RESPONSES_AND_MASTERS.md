@@ -325,6 +325,22 @@ The required implementation workflow is maintained in
 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a. This section records the gateway observation;
 it does not grant dispatch authority from a pre-read.
 
+**A rename by `Alter` changes only the name. VERIFIED on one run (licensed TallyPrime 7.1 Gold, one
+book, 2026-09-28).**
+- **Request.** `REPORTNAME` `All Masters`. A `LEDGER` (or `GROUP`) with `NAME="<old name>"` and
+  `ACTION="Alter"`, carrying only
+  `<LANGUAGENAME.LIST><NAME.LIST TYPE="String"><NAME><new name></NAME></NAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST>`.
+- **Pilot ledger.** An Object export (`TYPE=Object`, `SUBTYPE=Ledger`, `FETCH *`) was taken before and
+  after the rename. The textual diff held only the name, `ALTERID` and the company's ledger counter.
+  Opening balance, parent, GUID and `MASTERID` were unchanged. `ledger_movement` showed the ledger's
+  vouchers still attached.
+- **Then 122 more ledgers** returned `ALTERED` equal to each request's count. Two groups were each
+  piloted with the same Object diff.
+- **Re-read.** A compliance `ledger_masters` read of all 699 ledgers found the count unchanged and
+  every renamed ledger under its new name. Parent, opening balance and GSTIN fields had 0 changes.
+- **Scope.** A gateway rename keeps the GUID, as §12a.9 observed for a rename in Tally's screens.
+  Aliases and a rename that collides with an existing name were not measured.
+
 ### 9.4a A partial ledger `Alter` preserves the omitted Party GSTIN
 
 **VERIFIED (2026-08-28; one licensed TallyPrime Silver synthetic lab company).** A ledger was
@@ -706,7 +722,7 @@ habits, not against real operator input.
 
 **VERIFIED 2026-09-26, licensed TallyPrime 7.1 Silver** (`education_mode=false`). One synthetic company, one run of each step. **Confidence: PARTIAL.**
 
-§9.4b and §9.4d measure a folded spelling against **one** live ledger. This measures an import naming one of **two** ledgers whose names fold equal. The twins differed by a trailing CR LF (written as `&#13;&#10;`, §9.4d), and in one case also by ASCII case.
+§9.4b and §9.4d measure a folded spelling against **one** live ledger. This measures an import naming one of **two** ledgers whose names fold equal. The twins differed by a trailing CR LF (written as `&#13;&#10;`; see the encoding paragraph below), and in one case also by ASCII case.
 
 **Tally lets such twins coexist.** A gateway ledger `Create` for the second of each pair returned `CREATED 1`, `ALTERED 0`, three times:
 - plain after the CR LF name;
@@ -732,6 +748,16 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 - Gold and Education.
 
 Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
+
+**Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
+Gold, one book, 2026-09-28).**
+- **Vouchers.** A ledger whose stored name ends in CR LF was named with the CR LF written as
+  `&#13;&#10;` inside `LEDGERNAME` and `PARTYLEDGERNAME`. 6 vouchers returned `CREATED`, and
+  `ledger_movement` on that ledger then showed exactly those 6.
+- **Masters.** The same encoding worked in the `NAME` attribute of a ledger `Alter` (§9.4).
+- **Bridge.** Bridge's import file writes CR and LF this way (`xml_escape`, bridge#626).
+- **Not sent.** A raw CR LF was not sent. XML 1.0 normalises a raw CR LF in content to LF, so a
+  raw line break would name a ledger the book does not hold; that is **UNVERIFIED** against Tally.
 
 
 #

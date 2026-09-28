@@ -1,0 +1,96 @@
+{
+ "comment": "loans_interest #779 Phase A: a voucher on the loan alone whose two lines do not balance, listed with its imbalance and no forced set-off, then a bank repayment below the limit that depends on it (Uneven Loan). The one unbalanced voucher in these books, on purpose.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_unbalanced-000"
+  },
+  {
+   "name": "Uneven Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_unbalanced-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Uneven Loan",
+   "opening": -5000000,
+   "debit": 800000,
+   "credit": 500000,
+   "closing": -4700000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "w01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Uneven Loan",
+     -500000
+    ],
+    [
+     "Uneven Loan",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "w02",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Uneven Loan",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Uneven Loan": {
+   "lender": "Invented Uneven Lender",
+   "lender_type": "person"
+  }
+ }
+}

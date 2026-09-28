@@ -1,0 +1,73 @@
+{
+ "comment": "tds_payees: an individual recorded as carrying on a profession, with no previous-year receipts supplied, is 'unknown', and the question names the profession.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Labour",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_deductor_activity_unknown-000"
+  },
+  {
+   "name": "Builder B41",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_deductor_activity_unknown-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Builder B41",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Contract Labour",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "k01",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     100000
+    ],
+    [
+     "Builder B41",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "individual",
+ "deductor_activity": "profession",
+ "nature_by_ledger": {
+  "Contract Labour": "194C"
+ }
+}

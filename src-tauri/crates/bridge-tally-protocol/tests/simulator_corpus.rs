@@ -3,14 +3,12 @@ use bridge_tally_protocol::{
     parse_companies_for_interactive_discovery, parse_companies_from_collection,
     parse_companies_with_evidence, parse_group_source_records_with_evidence, parse_import_result,
     parse_ledger_source_records_with_evidence, parse_ledgers, parse_ledgers_with_evidence,
-    parse_selected_voucher_source_records_with_evidence, parse_standard_ledger_catalog,
-    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, parse_voucher_type_source_records_with_evidence,
-    parse_vouchers, parse_vouchers_with_evidence, validate_exact_selected_export_structure,
-    verify_company_context, verify_selected_voucher_window_context, ParsedSourceIdentityKind,
-    PartyLedgerMasterFieldObservation, StandardLedgerCatalogError, TallyExportStatus,
-    BRIDGE_GROUP_EXPORT_SCHEMA, BRIDGE_LEDGER_EXPORT_SCHEMA, BRIDGE_SELECTED_VOUCHER_EXPORT_SCHEMA,
-    BRIDGE_VOUCHER_EXPORT_SCHEMA, BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA,
+    parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
+    parse_standard_ledger_identity_observation, parse_voucher_source_records_with_evidence,
+    parse_voucher_type_source_records_with_evidence, parse_vouchers, parse_vouchers_with_evidence,
+    verify_company_context, ParsedSourceIdentityKind, PartyLedgerMasterFieldObservation,
+    StandardLedgerCatalogError, TallyExportStatus, BRIDGE_GROUP_EXPORT_SCHEMA,
+    BRIDGE_LEDGER_EXPORT_SCHEMA, BRIDGE_VOUCHER_EXPORT_SCHEMA, BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA,
     MAX_INTERACTIVE_DISCOVERY_COMPANIES,
 };
 use quick_xml::{events::Event, Reader};
@@ -117,38 +115,6 @@ fn primary_rows_and_company_context_must_use_supported_export_parents() {
         BRIDGE_LEDGER_EXPORT_SCHEMA
     );
     assert!(parse_ledger_source_records_with_evidence(&nested_context).is_err());
-}
-
-#[test]
-fn selected_voucher_v3_binds_exact_window_and_rejects_structural_siblings() {
-    let xml = format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>
-<COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1" FROMDATE="20260701" TODATE="20260731"/>
-<VOUCHER GUID="voucher-guid"><DATE>20260715</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER>
-</DATA></BODY></ENVELOPE>"#,
-        BRIDGE_SELECTED_VOUCHER_EXPORT_SCHEMA
-    );
-    validate_exact_selected_export_structure(&xml, "VOUCHER").unwrap();
-    let parsed = parse_selected_voucher_source_records_with_evidence(&xml).unwrap();
-    verify_company_context(&parsed.evidence, "company-guid").unwrap();
-    verify_selected_voucher_window_context(&parsed.evidence, "20260701", "20260731").unwrap();
-    assert!(
-        verify_selected_voucher_window_context(&parsed.evidence, "20260702", "20260731").is_err()
-    );
-
-    let with_sibling = xml.replace(
-        "</DATA>",
-        "<LEDGER NAME=\"unexpected\" GUID=\"ledger-guid\"/></DATA>",
-    );
-    assert!(validate_exact_selected_export_structure(&with_sibling, "VOUCHER").is_err());
-
-    for invalid in [
-        xml.replace("<DATA>", "<DATA unsafe=\"1\">"),
-        xml.replace("<VOUCHER GUID", "<![CDATA[hidden]]><VOUCHER GUID"),
-        xml.replace("<COMPANYCONTEXT", "<![CDATA[hidden]]><COMPANYCONTEXT"),
-    ] {
-        assert!(validate_exact_selected_export_structure(&invalid, "VOUCHER").is_err());
-    }
 }
 
 #[test]

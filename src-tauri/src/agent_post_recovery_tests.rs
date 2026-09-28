@@ -7,6 +7,37 @@ use std::{
 };
 use tokio::io::AsyncWrite;
 
+/// What a withdrawn post answers once it stops. Its answer is replaced by the
+/// cancellation's, so what it holds is never read.
+fn stand_in_response() -> ToolResponse {
+    ToolResponse {
+        value: json!({}),
+        egress: EgressContext {
+            evidence: None,
+            tool: "post_import".into(),
+            args_sha256: sha256_hex(b"post"),
+            company_guid: None,
+        },
+        recovery_batch_id: None,
+    }
+}
+
+/// A post that stops when withdrawn, as a real one does before its next queued
+/// Tally operation (#725). A withdrawn post is awaited until it stops, so a
+/// stand-in that never stopped would hold the call forever.
+async fn stand_in(withdrawal: tokio_util::sync::CancellationToken) -> ToolResponse {
+    withdrawal.cancelled().await;
+    stand_in_response()
+}
+
+/// Awaits a call whose post is withdrawn. A withdrawal that no longer stops the
+/// post fails the test here instead of hanging the suite.
+async fn stops<F: std::future::Future>(call: F) -> F::Output {
+    tokio::time::timeout(std::time::Duration::from_secs(5), call)
+        .await
+        .expect("a withdrawn post stops once its token is cancelled")
+}
+
 const BATCH: &str = "bridge-00000000-0000-4000-8000-000000000001";
 const COMPANY: &str = "00000000-0000-4000-8000-000000000002";
 
@@ -153,11 +184,13 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let response = {
+        let cancellation = tokio_util::sync::CancellationToken::new();
         let result = await_post(
             future,
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -206,7 +239,7 @@ async fn cancellation_after_durable_intent_finishes_the_original_response_once()
 }
 
 #[tokio::test]
-async fn cancellation_before_durable_intent_drops_the_controlled_future() {
+async fn cancellation_before_durable_intent_withdraws_the_controlled_future() {
     let directory = tempfile::tempdir().unwrap();
     let server = local_batch(directory.path());
     let (mut client, source) = tokio::io::duplex(1024);
@@ -214,18 +247,20 @@ async fn cancellation_before_durable_intent_drops_the_controlled_future() {
         .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n")
         .await
         .unwrap();
-    let result = await_post(
-        std::future::pending::<ToolResponse>(),
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let result = stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &args(),
+            cancellation: &cancellation,
         },
         &server,
         &mut BufReader::new(source),
         &mut Framer::default(),
         &mut std::collections::VecDeque::new(),
         &mut Vec::new(),
-    )
+    ))
     .await
     .unwrap();
     assert!(result.is_none());
@@ -243,6 +278,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let response = {
         let result = await_post(
             async move {
@@ -252,6 +288,7 @@ async fn eof_after_durable_intent_drains_the_original_future() {
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -284,6 +321,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
     let mut framer = Framer::default();
     let mut pending = std::collections::VecDeque::new();
     let mut output = FailingWriter;
+    let cancellation = tokio_util::sync::CancellationToken::new();
     let response = {
         let result = await_post(
             async move {
@@ -293,6 +331,7 @@ async fn output_error_after_durable_intent_drains_the_original_future() {
             PostRequest {
                 id: &id,
                 args: &request_args,
+                cancellation: &cancellation,
             },
             &server,
             &mut reader,
@@ -351,18 +390,20 @@ async fn buffered_post_cancellation_removes_call_before_it_can_start() {
     let input = format!("{queued}\n{}\n{}\n", cancel(8), cancel(7));
     let mut pending = std::collections::VecDeque::new();
     let mut output = Vec::new();
-    assert!(await_post(
-        std::future::pending(),
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    assert!(stops(await_post(
+        stand_in(cancellation.clone()),
         PostRequest {
             id: &json!(7),
             args: &args(),
+            cancellation: &cancellation,
         },
         &server,
         &mut BufReader::new(input.as_bytes()),
         &mut Framer::default(),
         &mut pending,
         &mut output
-    )
+    ))
     .await
     .unwrap()
     .is_none());

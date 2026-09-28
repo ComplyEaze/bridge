@@ -508,7 +508,7 @@ fn display_name(path: &Path) -> String {
         .to_string()
 }
 
-pub async fn sync_documents(
+pub(crate) async fn sync_documents(
     request: SyncDocumentsRequest,
 ) -> anyhow::Result<SyncDocumentsResponse> {
     let credentials = credentials_for_session(

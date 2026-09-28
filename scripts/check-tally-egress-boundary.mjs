@@ -44,10 +44,11 @@
 //    webview window. A lint fires however the client or socket was obtained,
 //    which a text scan cannot see. A reviewed call site carries
 //    `#[expect(clippy::disallowed_methods, reason = "...")]`; this gate allows
-//    that exemption only in a pinned set of files (each with its exact count)
-//    and in test-only code, and refuses anything that would turn the lints off:
-//    a lint-group allow, a lint table or CI flag, another clippy.toml, or an
-//    edit to clippy.toml itself without updating its pinned digest.
+//    that exemption only in a pinned set of files (each with its exact count,
+//    in that one form) and in test-only code. It refuses the ways it knows to
+//    turn the lints off: a lint-group or renamed-lint allow, a lint table, an
+//    `-A`/`--cap-lints` flag or CLIPPY_CONF_DIR in a workflow or Cargo config,
+//    another clippy.toml, or an edit to clippy.toml without updating its digest.
 //
 // 3. A deny-list of network-capable crates and Tauri plugins, read from both
 //    Cargo.lock files and the JS manifests.
@@ -59,9 +60,16 @@
 //    still wired up -- that is a runtime property with its own tests in
 //    bridge-tally-transport, not this gate.
 //  - The lints name specific methods. An egress path through a method they do
-//    not name (a crate on neither list, FFI, a native library) is outside them;
-//    the deny-list and the cargo-tree half narrow that, and the webview CSP
-//    (`ipc:` only) covers the JS side.
+//    not name (a crate on neither list, an FFI function not listed, a native
+//    library) is outside them; the deny-list and the cargo-tree half narrow
+//    that. The webview CSP (`ipc:` only) governs the page's own requests; the
+//    Rust calls that navigate the webview or run script in it are linted.
+//  - On Windows, opening a UNC or WebDAV path through std::fs reaches the
+//    network; no method list can tell such a path from a local one.
+//  - A lint fires only in code a CI clippy step compiles: a cfg branch or
+//    feature CI never builds (another OS, lab-writes) is not linted.
+//  - Dropping `-D warnings` from a CI clippy step, or narrowing what it
+//    covers, is not detected here.
 //  - tools/ is outside the lints: its binaries do not ship. The cargo-tree half
 //    and the deny-list still cover it.
 //  - The lints run in CI's clippy steps; this gate cannot see a build that
@@ -70,6 +78,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -100,7 +109,7 @@ const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 // extension binary. So this reqwest edge is compiled into the artifact a user
 // installs, not just into the desktop app. The honest claim is "present and
 // unreachable from the agent surface", not "absent" -- and "unreachable" is
-// what source check 2 below exists to keep true.
+// what the lint check below exists to keep true.
 //
 // The standard this gate is modelled on is the Tally transport's own loopback
 // guard, which is stronger than a file allow-list: `endpoint_url` special-cases
@@ -182,16 +191,21 @@ function directDependents(manifestPath, packageName) {
 // reqwest only through the transport; hyper is reqwest's own transport, and
 // a first-party crate using it directly would build an HTTP client that
 // bypasses reqwest and bridge-tally-transport's loopback check entirely.
+// Network crates already in the lockfiles under reqwest and tokio. The deny-list below cannot
+// refuse them, since they are legitimately present, so no first-party crate may depend on one
+// directly: each is a way to open a connection that names no linted method.
+const LOWER_LEVEL_NETWORK = { h2: [], "hyper-util": [], socket2: [], mio: [], "tower-service": [] };
+
 const workspaces = [
   {
     label: "src-tauri",
     manifestPath: "src-tauri/Cargo.toml",
-    expected: { reqwest: [APP_CRATE, TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
+    expected: { reqwest: [APP_CRATE, TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
   },
   {
     label: "tools",
     manifestPath: "tools/Cargo.toml",
-    expected: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
+    expected: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
   },
 ];
 
@@ -248,10 +262,16 @@ const EGRESS_EXEMPTIONS = new Map([
   ["src-tauri/crates/tally-protocol-simulator/src/server.rs", 3],
 ]);
 
-const EXEMPTION = /clippy::disallowed_(?:methods|types)/g;
-// Lint groups that would silence the egress lints wholesale.
-// An attribute only (`cfg_attr` included), not a method call such as `.expect("warnings")`.
-const LINT_ESCAPE = /#!?\[[^\]]*\b(?:allow|expect)\s*\([^)\]]*\b(?:warnings|clippy::all|clippy::style)\b/;
+// Any mention of the egress lints, however spaced or line-broken, the lints' old singular names
+// included (they still work through `renamed_and_removed_lints`).
+const MENTION = /clippy\s*::\s*(?:r#)?disallowed_(?:method|type)s?\b/g;
+// The one form a reviewed production site may use: an outer `#[expect(..., reason = ...)]`, which
+// covers the statement or item it sits on and fails when that site stops needing it.
+const REVIEWED = /#\[\s*expect\s*\(\s*clippy\s*::\s*disallowed_(?:methods|types)\s*,\s*reason\s*=/g;
+// Lint groups that would silence the egress lints wholesale: an attribute only (`cfg_attr`
+// included), not a method call such as `.expect("warnings")`.
+const LINT_ESCAPE =
+  /#!?\[[^\]]*\b(?:allow|expect)\s*\([^)\]]*\b(?:warnings|clippy\s*::\s*(?:all|style)|renamed_and_removed_lints)\b/;
 
 function trackedFiles() {
   const result = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8", windowsHide: true });
@@ -262,35 +282,37 @@ function trackedFiles() {
 }
 
 // A file is test-only when Cargo builds it only for tests (under a crate's tests/ directory), or
-// when the module line that declares it carries exactly `#[cfg(test)]`, or `#[cfg(all(test, ...))]`
-// with `test` as its first condition.
+// when its one declaration is a module line carrying exactly `#[cfg(test)]`, or
+// `#[cfg(all(test, ...))]` with `test` as its first condition. A second declaration, or an
+// `include!` of the file anywhere, makes it production.
 function isTestOnly(path, rustSources) {
   if (/^src-tauri\/(?:crates\/[^/]+\/)?tests\//.test(path)) return true;
-  let directory = path.slice(0, path.lastIndexOf("/"));
-  const file = path.slice(directory.length + 1);
-  let stem = file.replace(/\.rs$/, "");
-  if (file === "mod.rs") {
-    // `mod name;` declares name/mod.rs from the directory above it.
-    stem = directory.slice(directory.lastIndexOf("/") + 1);
-    directory = directory.slice(0, directory.lastIndexOf("/"));
+  // Where a plain `mod name;` for this file would be written: name/mod.rs belongs to the directory above.
+  let moduleDirectory = posix.dirname(path);
+  let moduleName = posix.basename(path, ".rs");
+  if (moduleName === "mod") {
+    moduleName = posix.basename(moduleDirectory);
+    moduleDirectory = posix.dirname(moduleDirectory);
   }
   const declarations = [];
   for (const [candidate, lines] of rustSources) {
-    const candidateDirectory = candidate.slice(0, candidate.lastIndexOf("/"));
-    const candidateStem = candidate.slice(candidateDirectory.length + 1).replace(/\.rs$/, "");
-    lines.forEach((line, index) => {
-      const mod = line.match(/^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
-      if (!mod) return;
-      const attributes = [];
-      for (let back = index - 1; back >= 0 && /^\s*#\[/.test(lines[back]); back -= 1) attributes.push(lines[back].trim());
+    const text = lines.join("\n");
+    const candidateDirectory = posix.dirname(candidate);
+    const candidateStem = posix.basename(candidate, ".rs");
+    const modules = /((?:^[ \t]*#\[[^\n]*\][ \t]*\n)*)^[ \t]*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/gm;
+    for (const [, attributeLines, name] of text.matchAll(modules)) {
+      const attributes = attributeLines.split("\n").map((line) => line.trim()).filter(Boolean);
       const pathAttribute = attributes.map((attribute) => attribute.match(/^#\[path\s*=\s*"([^"]+)"\]$/)?.[1]).find(Boolean);
       const declares = pathAttribute
-        ? candidateDirectory === directory && pathAttribute === file
-        : mod[1] === stem &&
-          ((["mod", "lib", "main"].includes(candidateStem) && candidateDirectory === directory) ||
-            `${candidateDirectory}/${candidateStem}` === directory);
+        ? posix.normalize(`${candidateDirectory}/${pathAttribute}`) === path
+        : name === moduleName &&
+          ((["mod", "lib", "main"].includes(candidateStem) && candidateDirectory === moduleDirectory) ||
+            `${candidateDirectory}/${candidateStem}` === moduleDirectory);
       if (declares) declarations.push(attributes);
-    });
+    }
+    for (const [, included] of text.matchAll(/\binclude(?:_str|_bytes)?!\s*\(\s*"([^"]+)"/g)) {
+      if (posix.normalize(`${candidateDirectory}/${included}`) === path) declarations.push([]);
+    }
   }
   return (
     declarations.length === 1 &&
@@ -309,11 +331,17 @@ for (const [path, lines] of rustSources) {
   if (LINT_ESCAPE.test(text)) {
     egressViolations.push(`${path} silences a whole lint group (warnings, clippy::all or clippy::style), which includes the egress lints`);
   }
-  const count = text.match(EXEMPTION)?.length ?? 0;
+  const count = text.match(MENTION)?.length ?? 0;
   if (EGRESS_EXEMPTIONS.has(path)) {
-    if (count !== EGRESS_EXEMPTIONS.get(path)) {
+    const reviewed = text.match(REVIEWED)?.length ?? 0;
+    if (count !== reviewed) {
       egressViolations.push(
-        `${path} has ${count} egress-lint exemption(s), not the ${EGRESS_EXEMPTIONS.get(path)} reviewed; ` +
+        `${path} mentions the egress lints ${count - reviewed} time(s) outside an outer #[expect(..., reason = ...)]; ` +
+          "a reviewed file exempts one statement or item at a time, and only that way",
+      );
+    } else if (reviewed !== EGRESS_EXEMPTIONS.get(path)) {
+      egressViolations.push(
+        `${path} has ${reviewed} egress-lint exemption(s), not the ${EGRESS_EXEMPTIONS.get(path)} reviewed; ` +
           "review each call site, then update EGRESS_EXEMPTIONS in scripts/check-tally-egress-boundary.mjs",
       );
     }
@@ -332,7 +360,7 @@ for (const path of EGRESS_EXEMPTIONS.keys()) {
 // The lint configuration itself. Clippy reads the nearest clippy.toml, so a second one under
 // src-tauri would replace these lists for its crate; a lint table, a CI flag or CLIPPY_CONF_DIR could
 // switch them off.
-const CLIPPY_CONFIG_DIGEST = "7ee30761eee7198056a21f1558e3fd825e6fd882f527477e52844a2673e2deeb";
+const CLIPPY_CONFIG_DIGEST = "68ae937585ee4db8039f4c4186e2ee811596aca0ccdf4dd0e96f755dc33bccae";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
@@ -345,8 +373,10 @@ for (const path of tracked) {
     /^\.github\//.test(path) || /(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(path) || /^src-tauri\/(?:.*\/)?Cargo\.toml$/.test(path);
   if (!buildInput) continue;
   const text = readFileSync(`${root}${path}`, "utf8");
-  if (/disallowed[_-](?:methods|types)|CLIPPY_CONF_DIR/.test(text) || (path.endsWith("Cargo.toml") && /^\s*(?:all|style|warnings)\s*=/m.test(text))) {
-    egressViolations.push(`${path} configures the egress lints or their groups; only src-tauri/clippy.toml may`);
+  const buildEscape =
+    /disallowed[_-](?:methods?|types?)|CLIPPY_CONF_DIR|renamed_and_removed_lints|--cap-lints|-A\s*(?:warnings|clippy\s*::\s*(?:all|style))\b/;
+  if (buildEscape.test(text) || (path.endsWith("Cargo.toml") && /^\s*(?:all|style|warnings)\s*=/m.test(text))) {
+    egressViolations.push(`${path} configures the egress lints or a group containing them; only src-tauri/clippy.toml may`);
   }
 }
 

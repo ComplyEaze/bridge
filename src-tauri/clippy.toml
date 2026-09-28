@@ -35,6 +35,31 @@ disallowed-methods = [
   { path = "tokio::net::lookup_host", reason = "DNS lookup can carry data in the name" },
   { path = "std::process::Command::new", reason = "a spawned process (an opened URL included) is egress" },
   { path = "tokio::process::Command::new", reason = "a spawned process (an opened URL included) is egress" },
+  # The webview can reach the network by navigating or running script; its windows come from
+  # tauri.conf.json. `builder` returns a WebviewWindowBuilder without naming the type.
+  { path = "tauri::webview::WebviewWindow::navigate", reason = "webview navigation is egress" },
+  { path = "tauri::webview::WebviewWindow::eval", reason = "script in the webview can reach the network" },
+  { path = "tauri::webview::WebviewWindow::builder", reason = "windows come from tauri.conf.json, whose URLs are pinned" },
+  { path = "tauri::webview::WebviewWindowBuilder::new", reason = "windows come from tauri.conf.json, whose URLs are pinned" },
+  { path = "tauri::webview::Webview::navigate", reason = "webview navigation is egress" },
+  { path = "tauri::webview::Webview::eval", reason = "script in the webview can reach the network" },
+  # Process and socket calls through the FFI crates this workspace already depends on. The
+  # Windows paths resolve only where windows-sys is built.
+  { path = "libc::execve", reason = "a spawned process is egress" },
+  { path = "libc::execv", reason = "a spawned process is egress" },
+  { path = "libc::execvp", reason = "a spawned process is egress" },
+  { path = "libc::system", reason = "a spawned process is egress" },
+  { path = "libc::posix_spawn", reason = "a spawned process is egress" },
+  { path = "libc::posix_spawnp", reason = "a spawned process is egress" },
+  { path = "libc::socket", reason = "raw socket egress" },
+  { path = "libc::connect", reason = "raw socket egress" },
+  { path = "libc::getaddrinfo", reason = "DNS lookup can carry data in the name" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteW", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteA", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteExW", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::System::Threading::CreateProcessW", reason = "a spawned process is egress" },
+  { path = "windows_sys::Win32::System::Threading::CreateProcessA", reason = "a spawned process is egress" },
+  { path = "windows_sys::Win32::System::Threading::WinExec", reason = "a spawned process is egress" },
 ]
 disallowed-types = [
   { path = "tauri::webview::WebviewWindowBuilder", reason = "windows come from tauri.conf.json, whose URLs are pinned" },

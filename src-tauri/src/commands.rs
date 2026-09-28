@@ -2582,7 +2582,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     let mut command = {
         #[expect(
             clippy::disallowed_methods,
-            reason = "reveals a file this process just wrote in the OS file manager; the path is re-checked as an existing file first"
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
         )]
         let mut command = std::process::Command::new("open");
         command.arg("-R").arg(&target);
@@ -2592,7 +2592,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     let mut command = {
         #[expect(
             clippy::disallowed_methods,
-            reason = "reveals a file this process just wrote in the OS file manager; the path is re-checked as an existing file first"
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
         )]
         let mut command = std::process::Command::new("explorer");
         // `explorer` wants the selector and path as one argument.
@@ -2604,7 +2604,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
         let parent = target.parent().unwrap_or(&target);
         #[expect(
             clippy::disallowed_methods,
-            reason = "reveals a file this process just wrote in the OS file manager; the path is re-checked as an existing file first"
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
         )]
         let mut command = std::process::Command::new("xdg-open");
         command.arg(parent);

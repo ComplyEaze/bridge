@@ -55,6 +55,17 @@ const TODAY = {
   ],
   "tools.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.4"],
 };
+// The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
+for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"], ["tools", "reqwest v0.13.4"]]) {
+  TODAY[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
+  TODAY[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
+  TODAY[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
+  TODAY[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
+  TODAY[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
+}
+const EVERY_CALL = ["src-tauri", "tools"].flatMap((workspace) =>
+  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service"].map((name) => `${workspace}.${name}`),
+);
 
 let bin;
 before(() => {
@@ -83,11 +94,11 @@ function assertRefused(result, message) {
   assert.ok(!result.stdout.includes("is sealed"), result.stdout);
 }
 
-test("control: the trees cargo prints today pass, and all four are read", { skip }, () => {
+test("control: the trees cargo prints today pass, and every one is read", { skip }, () => {
   const result = runGate(TODAY);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
-  assert.deepEqual(result.calls, ["src-tauri.reqwest", "src-tauri.hyper", "tools.reqwest", "tools.hyper"]);
+  assert.deepEqual(result.calls, EVERY_CALL);
 });
 
 test("an empty tree from a cargo that exits 0 fails closed", { skip }, () => {
@@ -102,7 +113,8 @@ test("an empty hyper tree fails closed although its pinned set is empty", { skip
   const { "tools.hyper": _omitted, ...rest } = TODAY;
   const result = runGate(rest);
   assertRefused(result, 'dependency tree for hyper (tools/Cargo.toml) did not start with hyper; got "" (0 line(s))');
-  assert.deepEqual(result.calls, ["src-tauri.reqwest", "src-tauri.hyper", "tools.reqwest", "tools.hyper"]);
+  // It stops at the tree it could not read.
+  assert.deepEqual(result.calls, EVERY_CALL.slice(0, EVERY_CALL.indexOf("tools.hyper") + 1));
 });
 
 test("a tree with only its root line reports every pinned crate as lost", { skip }, () => {
@@ -122,6 +134,12 @@ test("a new first-party dependent is refused", { skip }, () => {
   const extra = `bridge-tally-protocol v0.1.0 (${root}/src-tauri/crates/bridge-tally-protocol)`;
   const result = runGate({ ...TODAY, "tools.hyper": [...TODAY["tools.hyper"], extra] });
   assertRefused(result, "tools: crate(s) gained a direct hyper dependency outside the pinned set (none): bridge-tally-protocol");
+});
+
+test("a first-party crate depending on a lower-level network crate is refused", { skip }, () => {
+  const extra = `bridge v0.2.0 (${root}/src-tauri)`;
+  const result = runGate({ ...TODAY, "src-tauri.socket2": [...TODAY["src-tauri.socket2"], extra] });
+  assertRefused(result, "src-tauri: crate(s) gained a direct socket2 dependency outside the pinned set (none): bridge");
 });
 
 test("an unparseable line fails instead of being skipped", { skip }, () => {

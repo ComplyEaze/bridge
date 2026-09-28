@@ -599,11 +599,11 @@
     },
     {
       "path": "src-tauri/src/axal.rs",
-      "sha256": "04737f3317862e635da71cc99ce862d83f2883203d1343a15a38f4378ac45a71"
+      "sha256": "4295055536d595aa5f63c5f65593ab5a67ae6c57a7185b25f2e79b02f707a94b"
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "9f44128e722b023d24cb68ae753f1629a0b9f77115ccfa1f8d9924d839b50068"
+      "sha256": "cb0a7b5204e035fa4b1f0ffc2301536914ad6bb2ea426cff875b48494cefd0fb"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -735,7 +735,7 @@
     },
     {
       "path": "src-tauri/src/documents.rs",
-      "sha256": "d5f9c6cc6ce8a675758b901168f07c223d105cf1aa108b43e5563ce175309554"
+      "sha256": "8f9f83807b42acd4470cc2af32aa7445e950899b73d86434e75e15b2ef9911f9"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs",

@@ -95,7 +95,7 @@ struct ApiErrorResponse {
     code: Option<String>,
 }
 
-pub async fn establish_credential_session(
+pub(crate) async fn establish_credential_session(
     credentials: AxalCredentials,
 ) -> anyhow::Result<AxalSessionResponse> {
     let credentials = Arc::new(credentials);
@@ -133,7 +133,7 @@ pub async fn establish_credential_session(
     })
 }
 
-pub async fn validate_api_key(credentials: &AxalCredentials) -> anyhow::Result<ValidationResponse> {
+async fn validate_api_key(credentials: &AxalCredentials) -> anyhow::Result<ValidationResponse> {
     validate_credentials(credentials)?;
     let client = api_client()?;
     #[expect(
@@ -153,7 +153,7 @@ pub async fn validate_api_key(credentials: &AxalCredentials) -> anyhow::Result<V
     parse_response::<ValidationResponse>(response).await
 }
 
-pub async fn check_connection_status(
+pub(crate) async fn check_connection_status(
     credential_session_id: &str,
 ) -> anyhow::Result<ConnectionStatusResponse> {
     let credentials = credentials_for_session(credential_session_id, None)?;

@@ -650,8 +650,9 @@ pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal>
 /// One line of the list an operator writes the mapping from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CounterpartyGroup {
-    /// The spelling with the fewest words, then the most value: a cell wrap can
-    /// only insert a space the bank did not print, never remove one.
+    /// The spelling with the fewest words, then the first by name: a cell wrap
+    /// can only insert a space the bank did not print, never remove one. No
+    /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
     /// The ledger its non-bank leg posts to; empty when skipped.
@@ -720,9 +721,8 @@ pub fn group_counterparties(
     Ok(buckets
         .into_iter()
         .map(|mut bucket| {
-            bucket
-                .spellings
-                .sort_by(|left, right| right.1.cmp_magnitude(&left.1));
+            // By name, so the spellings' order says nothing of their amounts.
+            bucket.spellings.sort_by(|left, right| left.0.cmp(&right.0));
             let shown = bucket
                 .spellings
                 .iter()
@@ -732,7 +732,6 @@ pub fn group_counterparties(
                         .split_whitespace()
                         .count()
                         .cmp(&right.0.split_whitespace().count())
-                        .then(right.1.cmp_magnitude(&left.1))
                         .then(left_index.cmp(right_index))
                 })
                 .map(|(_, spelling)| spelling.0.clone())

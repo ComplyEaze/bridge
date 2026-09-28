@@ -1422,6 +1422,24 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         .map(|(path, text)| (path.to_string(), text.to_string())),
         "{summary}"
     );
+    // Ordered by suspense, rows, name and disposition, never by amount: the
+    // answered 512.00 line and the open 64.00 line share a spelling, and the
+    // open one (NeedsAnswer) comes first by disposition.
+    let order: Vec<(Value, Value)> = summary["counterparties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|group| (group["party"].clone(), group["disposition"].clone()))
+        .collect();
+    let party = |name: &str| serde_json::to_value(party_name(name)).unwrap();
+    assert_eq!(
+        order,
+        [
+            (party("SYNTHETIC PAYER"), json!("Receipt")),
+            (party("ATM CASH WITHDRAWAL"), json!("NeedsAnswer")),
+            (party("ATM CASH WITHDRAWAL"), json!("Payment")),
+        ]
+    );
     // A counterparty gives its rows, and no total.
     for group in summary["counterparties"].as_array().unwrap() {
         assert!(group.get("total").is_none(), "{group}");

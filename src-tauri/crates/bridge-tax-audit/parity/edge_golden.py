@@ -36,7 +36,13 @@ to drop, e.g. ["ledger_scrutiny"]; the Rust side must map each one, see `tests/e
 `statutory_dues` ({nature_by_ledger?, salary_expense_ledgers?}), `tests`; per voucher `party`
 (PARTYLEDGERNAME, default ""); for `tds_payees`: `entity_type` (default "individual"),
 `nature_by_ledger`, `payee_aliases`, `s194j_category_by_ledger` (each default {}) and
-`previous_year_turnover_paise` (default absent); and for `tds_tcs_26as`/`twentysixas_receipts`:
+`previous_year_turnover_paise` (default absent), and the inputs the reference's pack reads from the client
+config, each through the reference's own `tae.config` reader (so each is refused as a client config would be):
+`reversals`, `gst_separate_by_agreement`, `foreseeability` (the `[tds_payees]` keys), `challans` (as
+`[[tds.challans]]`, each `date` an ISO date string), `form_26a`, `previous_year_turnover_status` and
+`goods_carriage_ledgers` (the `[tds]` keys), `deductor_activity` (`[deductor].activity`), `client_state`
+(`[client].state`), `tds_payable_ledgers` (the ledgers `[statutory_dues]` classifies as TDS payable),
+`gst_ledgers` (the `[roles].tax_ledgers` ledgers) and the keys of `partners`; and for `tds_tcs_26as`/`twentysixas_receipts`:
 `form26as`, `ais`, `tis` (invented document rows in the shape `parity/python_golden.py
 --emit-traces-documents` writes; default []) and `tds_ledgers`, `tcs_ledgers`,
 `advance_tax_ledgers`, `deductor_aliases` (default empty); and for `loans_interest`: `entity_type` and
@@ -239,6 +245,30 @@ def main() -> int:
         integrated = typed(spec, "is_integrated", lambda x: isinstance(x, bool), "true, false or null")
         return module, stock.run(eng, {"version": rules.version}, items, opening, closing, integrated)
 
+    def tds_payees_run():
+        # As tae/pack.py's _tds_payees: every client-config input through the reference's own reader, from a
+        # config built out of the spec's keys.
+        from tae import config as tc
+        tds_tbl = {k: spec[k] for k in ("nature_by_ledger", "previous_year_turnover_status", "goods_carriage_ledgers",
+                                        "form_26a") if k in spec}
+        if "challans" in spec:
+            tds_tbl["challans"] = [{**c, "date": date.fromisoformat(c["date"])} if isinstance(c.get("date"), str) else c
+                                   for c in spec["challans"]]
+        cfg = {"tds": tds_tbl,
+               "tds_payees": {k: spec[k] for k in ("reversals", "gst_separate_by_agreement", "foreseeability")
+                              if k in spec},
+               "client": {"state": spec["client_state"]} if "client_state" in spec else {},
+               "deductor": {"activity": spec["deductor_activity"]} if "deductor_activity" in spec else {}}
+        return tds_payees, tds_payees.run(
+            eng, rules, dict(spec.get("nature_by_ledger", {})), dict(spec.get("payee_aliases", {})),
+            spec.get("previous_year_turnover_paise"), dict(spec.get("s194j_category_by_ledger", {})),
+            reversals=tc.tds_payees_reversals(cfg), gst_separate=tc.tds_payees_gst_separate(cfg),
+            gst_ledgers=frozenset(spec.get("gst_ledgers", [])), tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])),
+            foreseeability_names=frozenset(tc.tds_payees_foreseeability(cfg)),
+            other_names=frozenset(spec.get("partners", {})), challans=tc.tds_challans(cfg), form_26a=tc.tds_form_26a(cfg),
+            client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
+            deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
+
     runners = {
         "bank_reconciliation": bank_reconciliation_run,
         "book_keeping_quality": lambda: (book_keeping_quality, book_keeping_quality.run(
@@ -264,9 +294,7 @@ def main() -> int:
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),
         "stock": stock_run,
-        "tds_payees": lambda: (tds_payees, tds_payees.run(
-            eng, rules, dict(spec.get("nature_by_ledger", {})), dict(spec.get("payee_aliases", {})),
-            spec.get("previous_year_turnover_paise"), dict(spec.get("s194j_category_by_ledger", {})))),
+        "tds_payees": tds_payees_run,
         "tds_tcs_26as": lambda: (tds_tcs_26as, tds_tcs_26as.run(
             eng, rules, form26as=form26as, ais_rows=ais, tis_rows=tis,
             tds_ledgers=set(spec.get("tds_ledgers", [])), tcs_ledgers=set(spec.get("tcs_ledgers", [])),

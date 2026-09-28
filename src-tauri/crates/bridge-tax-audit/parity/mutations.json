@@ -1492,24 +1492,24 @@
   "by": "author (Lane C)",
   "what": "goods bucket only for the first nature",
   "file": "src/tds_payees.rs",
-  "from": "for (key, amounts) in &expense_lines {",
-  "to": "for (key, amounts) in expense_lines.iter().take(1) {"
+  "from": "            for (key, amounts) in &expense_lines {\n                rows.entry((key.clone(), WITHIN_GOODS_INVOICE",
+  "to": "            for (key, amounts) in expense_lines.iter().take(1) {\n                rows.entry((key.clone(), WITHIN_GOODS_INVOICE"
  },
  {
   "id": "C1-06",
   "by": "author (Lane C)",
   "what": "a debit line is a payee",
   "file": "src/tds_payees.rs",
-  "from": "                l.amount_paise < 0\n",
-  "to": "                l.amount_paise != 0\n"
+  "from": "                l.amount_paise < 0\n                    && !expense_ledgers_here",
+  "to": "                l.amount_paise != 0\n                    && !expense_ledgers_here"
  },
  {
   "id": "C1-07",
   "by": "author (Lane C)",
   "what": "a mapped expense ledger's credit is a payee",
   "file": "src/tds_payees.rs",
-  "from": "                    && !expense_ledgers_here.contains(l.ledger.as_str())\n",
-  "to": ""
+  "from": "                    && !expense_ledgers_here.contains(l.ledger.as_str())\n                    && !under_any(book, &l.ledger, &[DUTIES_TAXES_GROUP])\n",
+  "to": "                    && !under_any(book, &l.ledger, &[DUTIES_TAXES_GROUP])\n"
  },
  {
   "id": "C1-08",
@@ -1532,24 +1532,24 @@
   "by": "author (Lane C)",
   "what": "a cash credit is a named payee",
   "file": "src/tds_payees.rs",
-  "from": "&[CASH_GROUP, BANK_GROUPS[0], BANK_GROUPS[1]],",
-  "to": "&[BANK_GROUPS[0], BANK_GROUPS[1]],"
+  "from": "const CASH_BANK: [&str; 3] = [CASH_GROUP, BANK_GROUPS[0], BANK_GROUPS[1]];",
+  "to": "const CASH_BANK: [&str; 2] = [BANK_GROUPS[0], BANK_GROUPS[1]];"
  },
  {
   "id": "C1-11",
   "by": "author (Lane C)",
   "what": "an overdraft credit is a named payee",
   "file": "src/tds_payees.rs",
-  "from": "&[CASH_GROUP, BANK_GROUPS[0], BANK_GROUPS[1]],",
-  "to": "&[CASH_GROUP, BANK_GROUPS[0]],"
+  "from": "const CASH_BANK: [&str; 3] = [CASH_GROUP, BANK_GROUPS[0], BANK_GROUPS[1]];",
+  "to": "const CASH_BANK: [&str; 2] = [CASH_GROUP, BANK_GROUPS[0]];"
  },
  {
   "id": "C1-12",
   "by": "author (Lane C)",
   "what": "payee_aliases ignored",
   "file": "src/tds_payees.rs",
-  "from": "                        .get(&l.ledger)\n",
-  "to": "                        .get(\"\")\n"
+  "from": "    cfg.payee_aliases.get(ledger).map_or(ledger, String::as_str)",
+  "to": "    cfg.payee_aliases.get(\"\").map_or(ledger, String::as_str)"
  },
  {
   "id": "C1-13",
@@ -1572,8 +1572,8 @@
   "by": "author (Lane C)",
   "what": "months keyed by year",
   "file": "src/tds_payees.rs",
-  "from": "format!(\"{}-{}\", &s[0..4], &s[4..6])",
-  "to": "format!(\"{}-01\", &s[0..4])"
+  "from": "    let s = v.date.as_str();\n    format!(\"{}-{}\", &s[0..4], &s[4..6])",
+  "to": "    let s = v.date.as_str();\n    format!(\"{}-01\", &s[0..4])"
  },
  {
   "id": "C1-16",
@@ -1652,16 +1652,16 @@
   "by": "author (Lane C)",
   "what": "entity type matched ignoring case",
   "file": "src/tds_payees.rs",
-  "from": "if entity_type == \"individual\" || entity_type == \"huf\" {",
-  "to": "if entity_type.eq_ignore_ascii_case(\"individual\") || entity_type == \"huf\" {"
+  "from": "    if entity_type != \"individual\" && entity_type != \"huf\" {",
+  "to": "    if !entity_type.eq_ignore_ascii_case(\"individual\") && entity_type != \"huf\" {"
  },
  {
   "id": "C1-26",
   "by": "author (Lane C)",
   "what": "a HUF is always a deductor",
   "file": "src/tds_payees.rs",
-  "from": "if entity_type == \"individual\" || entity_type == \"huf\" {",
-  "to": "if entity_type == \"individual\" {"
+  "from": "    if entity_type != \"individual\" && entity_type != \"huf\" {",
+  "to": "    if entity_type != \"individual\" {"
  },
  {
   "id": "C1-27",
@@ -5270,5 +5270,453 @@
   "file": "src/party_monthly.rs",
   "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
   "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
+ },
+ {
+  "id": "TR-01",
+  "by": "author",
+  "what": "tds_payees re-pin: a bill's own TDS added back though it credits another party too",
+  "file": "src/tds_payees.rs",
+  "from": "        if tds > 0 && alone {",
+  "to": "        if tds > 0 {"
+ },
+ {
+  "id": "TR-02",
+  "by": "author",
+  "what": "tds_payees re-pin: a bill also debiting the payee not counted",
+  "file": "src/tds_payees.rs",
+  "from": "            if debited != 0 {",
+  "to": "            if debited == 0 {"
+ },
+ {
+  "id": "TR-03",
+  "by": "author",
+  "what": "tds_payees re-pin: possibly netted read on a bill crediting another party",
+  "file": "src/tds_payees.rs",
+  "from": "        } else if alone {\n",
+  "to": "        } else if !alone {\n"
+ },
+ {
+  "id": "TR-04",
+  "by": "author",
+  "what": "tds_payees re-pin: GST left out without the agreement",
+  "file": "src/tds_payees.rs",
+  "from": "        if gst != 0 && separate && alone {",
+  "to": "        if gst != 0 && alone {"
+ },
+ {
+  "id": "TR-05",
+  "by": "author",
+  "what": "tds_payees re-pin: a credit-note reversal read as unclassified",
+  "file": "src/tds_payees.rs",
+  "from": "            Some(Reversal::CreditNote) => out.credit_notes.push(v),",
+  "to": "            Some(Reversal::CreditNote) => out.unclassified.push(v),"
+ },
+ {
+  "id": "TR-06",
+  "by": "author",
+  "what": "tds_payees re-pin: a bill-specific reversal applied on a row not holding its bill",
+  "file": "src/tds_payees.rs",
+  "from": "            Some(Reversal::BillSpecific(bill)) if row.by_voucher.contains_key(bill.as_str()) => {",
+  "to": "            Some(Reversal::BillSpecific(bill)) => {"
+ },
+ {
+  "id": "TR-07",
+  "by": "author",
+  "what": "tds_payees re-pin: a section that reverses and books read as a pure reversal",
+  "file": "src/tds_payees.rs",
+  "from": "            if amounts.iter().all(|a| *a < 0) {",
+  "to": "            if amounts.iter().any(|a| *a < 0) {"
+ },
+ {
+  "id": "TR-08",
+  "by": "author",
+  "what": "tds_payees re-pin: a pure reversal's bank credit read as an unnamed payee",
+  "file": "src/tds_payees.rs",
+  "from": "                    if pure_reversal.contains(key) {",
+  "to": "                    if pure_reversal.contains(key) && false {"
+ },
+ {
+  "id": "TR-09",
+  "by": "author",
+  "what": "tds_payees re-pin: both activities: at the profession limit not a deductor dropped",
+  "file": "src/tds_payees.rs",
+  "from": "        Some(DeductorActivity::Both) => {\n            if turnover <= profession {",
+  "to": "        Some(DeductorActivity::Both) => {\n            if turnover < profession {"
+ },
+ {
+  "id": "TR-10",
+  "by": "author",
+  "what": "tds_payees re-pin: no activity: at the business limit read as a deductor",
+  "file": "src/tds_payees.rs",
+  "from": "            if turnover > business {",
+  "to": "            if turnover >= business {"
+ },
+ {
+  "id": "TR-11",
+  "by": "author",
+  "what": "tds_payees re-pin: a placeholder turnover masks every status",
+  "file": "src/tds_payees.rs",
+  "from": "    Ok(if placeholder && status == \"not_deductor\" {",
+  "to": "    Ok(if placeholder {"
+ },
+ {
+  "id": "TR-12",
+  "by": "author",
+  "what": "tds_payees re-pin: business and profession limits swapped",
+  "file": "src/tds_payees.rs",
+  "from": "            let limit = if a == DeductorActivity::Business {",
+  "to": "            let limit = if a == DeductorActivity::Profession {"
+ },
+ {
+  "id": "TR-13",
+  "by": "author",
+  "what": "tds_payees re-pin: a 194H mapping runs without [s194h]",
+  "file": "src/tds_payees.rs",
+  "from": "    if s194h_mapped && rules.s194h_aggregate_paise.is_none() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "TR-14",
+  "by": "author",
+  "what": "tds_payees re-pin: a goods-carriage ledger off 194C accepted",
+  "file": "src/tds_payees.rs",
+  "from": "    if !bad.is_empty() {",
+  "to": "    if false {"
+ },
+ {
+  "id": "TR-15",
+  "by": "author",
+  "what": "tds_payees re-pin: a reversal naming a bill no payee holds accepted",
+  "file": "src/tds_payees.rs",
+  "from": "        if !credited.contains(bill.as_str()) {",
+  "to": "        if false {"
+ },
+ {
+  "id": "TR-16",
+  "by": "author",
+  "what": "tds_payees re-pin: TDS on vouchers touching a payee not collected",
+  "file": "src/tds_payees.rs",
+  "from": "    if !inputs.tds_ledgers.is_empty() {\n        for &v in &pop {",
+  "to": "    if false {\n        for &v in &pop {"
+ },
+ {
+  "id": "TR-17",
+  "by": "author",
+  "what": "tds_payees re-pin: a challan after the due date counted as deposited",
+  "file": "src/tds_payees.rs",
+  "from": "                if c.date <= due {",
+  "to": "                if true {"
+ },
+ {
+  "id": "TR-18",
+  "by": "author",
+  "what": "tds_payees re-pin: a foreseeability entry naming a partner reported",
+  "file": "src/tds_payees.rs",
+  "from": "            .filter(|n| !entities.contains(n.as_str()) && !inputs.other_names.contains(*n))",
+  "to": "            .filter(|n| !entities.contains(n.as_str()))"
+ },
+ {
+  "id": "TR-19",
+  "by": "author",
+  "what": "tds_payees re-pin: s.194H tested against the s.194J limit",
+  "file": "src/tds_payees.rs",
+  "from": "                    s.credited > s194h_limit",
+  "to": "                    s.credited > s194j_limit"
+ },
+ {
+  "id": "TR-20",
+  "by": "author",
+  "what": "tds_payees re-pin: no possibly-over on a s.194-I month",
+  "file": "src/tds_payees.rs",
+  "from": "        if nature == \"194I\" {\n            for (e, s) in &payee_entities {",
+  "to": "        if nature == \"194X\" {\n            for (e, s) in &payee_entities {"
+ },
+ {
+  "id": "TR-21",
+  "by": "author",
+  "what": "tds_payees re-pin: no possibly-over on an aggregate",
+  "file": "src/tds_payees.rs",
+  "from": "        if let (Some(agg), false) = (agg_limit, is_unmapped_194j) {",
+  "to": "        if let (Some(agg), true) = (agg_limit, is_unmapped_194j) {"
+ },
+ {
+  "id": "TR-22",
+  "by": "author",
+  "what": "tds_payees re-pin: shared TDS read only for payees without it",
+  "file": "src/tds_payees.rs",
+  "from": "                if over.contains_key(e) || adj.shared_tds == 0 {",
+  "to": "                if over.contains_key(e) || adj.shared_tds != 0 {"
+ },
+ {
+  "id": "TR-23",
+  "by": "author",
+  "what": "tds_payees re-pin: shared TDS never crosses the single sum",
+  "file": "src/tds_payees.rs",
+  "from": "                    if !crosses && nature == \"194C\" {",
+  "to": "                    if !crosses && nature == \"194X\" {"
+ },
+ {
+  "id": "TR-24",
+  "by": "author",
+  "what": "tds_payees re-pin: a possibly-over amount counted as a computed default",
+  "file": "src/tds_payees.rs",
+  "from": "                \"possibly_over_credited\"",
+  "to": "                \"credited\""
+ },
+ {
+  "id": "TR-25",
+  "by": "author",
+  "what": "tds_payees re-pin: a reversal not applied leaves the finding needing a document",
+  "file": "src/tds_payees.rs",
+  "from": "                if is_unmapped_194j || possibly_over.contains(entity) || !rv.not_applied.is_empty()",
+  "to": "                if is_unmapped_194j || possibly_over.contains(entity)"
+ },
+ {
+  "id": "TR-26",
+  "by": "author",
+  "what": "tds_payees re-pin: the TDS-seen limit given where the rates are not held",
+  "file": "src/tds_payees.rs",
+  "from": "            if !is_unmapped_194j && entity != PAYEE_NOT_NAMED && pair.is_some() {",
+  "to": "            if !is_unmapped_194j && entity != PAYEE_NOT_NAMED && pair.is_none() {"
+ },
+ {
+  "id": "TR-27",
+  "by": "author",
+  "what": "tds_payees re-pin: a TDS-seen figure without classified TDS ledgers",
+  "file": "src/tds_payees.rs",
+  "from": "    if tds_ledgers.is_empty() {\n        return Ok(\n",
+  "to": "    if !tds_ledgers.is_empty() {\n        return Ok(\n"
+ },
+ {
+  "id": "TR-28",
+  "by": "author",
+  "what": "tds_payees re-pin: a non-deductor lists its payments",
+  "file": "src/tds_payees.rs",
+  "from": "    if ctx.deductor == \"not_deductor\" {",
+  "to": "    if ctx.deductor == \"unknown\" {"
+ },
+ {
+  "id": "TR-29",
+  "by": "author",
+  "what": "tds_payees re-pin: with TDS seen only the taxable credits listed",
+  "file": "src/tds_payees.rs",
+  "from": "    let taxable = if x.list_all || !seen.is_empty() {",
+  "to": "    let taxable = if x.list_all {"
+ },
+ {
+  "id": "TR-30",
+  "by": "author",
+  "what": "tds_payees re-pin: a deposited month read as not deposited",
+  "file": "src/tds_payees.rs",
+  "from": "                    == 0\n",
+  "to": "                    != 0\n"
+ },
+ {
+  "id": "TR-31",
+  "by": "author",
+  "what": "tds_payees re-pin: a short deduction read as mid",
+  "file": "src/tds_payees.rs",
+  "from": "                short.push(*g);",
+  "to": "                mid.push(*g);"
+ },
+ {
+  "id": "TR-32",
+  "by": "author",
+  "what": "tds_payees re-pin: the state read unstripped",
+  "file": "src/tds_payees.rs",
+  "from": "        let state = py_strip(state);",
+  "to": "        let state = state;"
+ },
+ {
+  "id": "TR-33",
+  "by": "author",
+  "what": "tds_payees re-pin: the due-date status read backwards",
+  "file": "src/tds_payees.rs",
+  "from": "                if rules.due_dates_status == \"verified\" {",
+  "to": "                if rules.due_dates_status != \"verified\" {"
+ },
+ {
+  "id": "TR-34",
+  "by": "author",
+  "what": "tds_payees re-pin: a placeholder status read as confirmed",
+  "file": "src/tds_payees.rs",
+  "from": "            Some(\"placeholder\") => true,",
+  "to": "            Some(\"placeholder\") => false,"
+ },
+ {
+  "id": "TR-35",
+  "by": "author",
+  "what": "tds_payees re-pin: a month 00 accepted",
+  "file": "src/tds_payees.rs",
+  "from": "                            && (1..=12).contains(&m[5..].parse::<u32>().unwrap_or(0))",
+  "to": "                            && (0..=12).contains(&m[5..].parse::<u32>().unwrap_or(0))"
+ },
+ {
+  "id": "TR-36",
+  "by": "author",
+  "what": "tds_payees re-pin: a payee listed twice for Form 26A accepted",
+  "file": "src/tds_payees.rs",
+  "from": "            if form_26a.insert(payee.to_string(), held).is_some() {",
+  "to": "            if form_26a.insert(payee.to_string(), held).is_some() && false {"
+ },
+ {
+  "id": "TR-37",
+  "by": "author",
+  "what": "tds_payees re-pin: a credit at the single-sum limit read as over it",
+  "file": "src/tds_tranches.rs",
+  "from": "        let single = single_limit.is_some_and(|limit| *paise > limit);",
+  "to": "        let single = single_limit.is_some_and(|limit| *paise >= limit);"
+ },
+ {
+  "id": "TR-38",
+  "by": "author",
+  "what": "tds_payees re-pin: an aggregate at its limit read as crossed",
+  "file": "src/tds_tranches.rs",
+  "from": "        if !crossed && aggregate_limit.is_some_and(|limit| running > limit) {",
+  "to": "        if !crossed && aggregate_limit.is_some_and(|limit| running >= limit) {"
+ },
+ {
+  "id": "TR-39",
+  "by": "author",
+  "what": "tds_payees re-pin: earlier credits not dated by the crossing",
+  "file": "src/tds_tranches.rs",
+  "from": "                if e.3.is_none() {",
+  "to": "                if false {"
+ },
+ {
+  "id": "TR-40",
+  "by": "author",
+  "what": "tds_payees re-pin: a bill's own TDS not added back to the payee's credit",
+  "file": "src/tds_payees.rs",
+  "from": "            credit = add(credit, tds)?;",
+  "to": "            credit = add(credit, 0)?;"
+ },
+ {
+  "id": "TR-41",
+  "by": "author",
+  "what": "tds_payees P2-2: a payee debit other than the bill's own TDS read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "        Ok((debit == 0 || debit == tds)",
+  "to": "        Ok((debit == 0 || debit != 0)"
+ },
+ {
+  "id": "TR-42",
+  "by": "author",
+  "what": "tds_payees P2-2: a line on another ledger read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "            && v.lines.iter().filter(|l| l.amount_paise != 0).all(|l| {",
+  "to": "            && v.lines.iter().filter(|l| l.amount_paise != 0).any(|l| {"
+ },
+ {
+  "id": "TR-43",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill's base read without its own TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            let base = tds.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;",
+  "to": "            let base = 0_i64.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;"
+ },
+ {
+  "id": "TR-44",
+  "by": "author",
+  "what": "tds_payees P2-2: the base fact given the TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            bases.insert(*g, base);",
+  "to": "            bases.insert(*g, tds);"
+ },
+ {
+  "id": "TR-45",
+  "by": "author",
+  "what": "tds_payees P2-2: a TDS credit read as a reversal",
+  "file": "src/tds_payees.rs",
+  "from": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise > 0)",
+  "to": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise < 0)"
+ },
+ {
+  "id": "TR-46",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill leaves (A)",
+  "file": "src/tds_payees.rs",
+  "from": "const SHORT_LEAVES_A: bool = false;",
+  "to": "const SHORT_LEAVES_A: bool = true;"
+ },
+ {
+  "id": "TR-47",
+  "by": "author",
+  "what": "tds_payees P2-2: a reversal does not keep deducted bills in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "    let deducted: Vec<&str> = if reversal {",
+  "to": "    let deducted: Vec<&str> = if false {"
+ },
+ {
+  "id": "TR-48",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill also listed in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g) && !off_a.contains(g))",
+  "to": "        .filter(|g| !b_rows.contains(g))"
+ },
+ {
+  "id": "TR-49",
+  "by": "author",
+  "what": "tds_payees P2-2: the reversal guard said without a candidate",
+  "file": "src/tds_payees.rs",
+  "from": "    let mut guard = if reversal && !candidates.is_empty() {",
+  "to": "    let mut guard = if reversal {"
+ },
+ {
+  "id": "TR-50",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill without TDS counted as untested",
+  "file": "src/tds_payees.rs",
+  "from": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? > 0 {",
+  "to": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? >= 0 {"
+ },
+ {
+  "id": "TR-51",
+  "by": "author",
+  "what": "tds_payees P2-2: the unnamed payee's reason swapped",
+  "file": "src/tds_payees.rs",
+  "from": "            let why = if e == PAYEE_NOT_NAMED {",
+  "to": "            let why = if e != PAYEE_NOT_NAMED {"
+ },
+ {
+  "id": "TR-52",
+  "by": "author",
+  "what": "tds_payees P2-2: s.194C(6) not raised by a deposit-question listing",
+  "file": "src/tds_payees.rs",
+  "from": "                                .any(|(k, _)| k.starts_with(\"deducted_payment:\"))",
+  "to": "                                .any(|(k, _)| k.starts_with(\"deducted_payment_:\"))"
+ },
+ {
+  "id": "TR-53",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill counted in (A) when it is not",
+  "file": "src/tds_payees.rs",
+  "from": "    let in_a = rows.iter().filter(|g| listed_a.contains(g)).count();",
+  "to": "    let in_a = rows.iter().filter(|g| !listed_a.contains(g)).count();"
+ },
+ {
+  "id": "TR-54",
+  "by": "author",
+  "what": "tds_payees P2-2: the rate's rounding to the nearest paisa dropped (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 0).div_euclid(10_000) - 100"
+ },
+ {
+  "id": "TR-55",
+  "by": "author",
+  "what": "tds_payees P2-2: the rupee tolerance on the rate reversed (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) + 100"
+ },
+ {
+  "id": "TR-56",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill in (ii)(B) also listed on the TDS question (review)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
+  "to": "        .collect();\n    let listed"
  }
 ]

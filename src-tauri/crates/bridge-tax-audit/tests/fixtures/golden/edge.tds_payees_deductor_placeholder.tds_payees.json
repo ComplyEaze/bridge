@@ -8,7 +8,7 @@
   "figures": [
     {
       "id": "tds_payees.194C_credited_total",
-      "value": 100,
+      "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "c6d791e6cb91b60a",
       "definition_text": "Sum credited to every payee entity credited on a voucher with a 194C-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
@@ -16,7 +16,7 @@
     },
     {
       "id": "tds_payees.194C_over_limit_payee_count",
-      "value": 0,
+      "value": 1,
       "unit": "count",
       "definition_sha256_16": "018269baec844b51",
       "definition_text": "Payee entities credited on a voucher with a 194C-mapped expense ledger line whose 194C test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
@@ -28,6 +28,50 @@
       "unit": "count",
       "definition_sha256_16": "1d35d018403be5a0",
       "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194C-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_0a943a1b_001",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "f0cf7bdcbfa7a56c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 0a943a1b) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "h01",
+          "label": "Journal h01 on 2025-05-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_0a943a1b",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "2bcaef795013c264",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 0a943a1b) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_0a943a1b",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "a2909501c4e37739",
+      "definition_text": "Total credited to one payee entity (tag 0a943a1b) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "h01",
+          "label": "Journal h01 on 2025-05-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_0a943a1b",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "046a1a135dd7b0c1",
+      "definition_text": "Largest total credited to this payee entity (tag 0a943a1b) within one voucher, under 194C.",
       "evidence": []
     },
     {
@@ -249,6 +293,54 @@
   ],
   "findings": [
     {
+      "id": "tds_payees/194C_0a943a1b",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_0a943a1b"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_0a943a1b"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_0a943a1b"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_0a943a1b_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "h01",
+          "label": "Journal h01 on 2025-05-05"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "8a97d6d69e69a105",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
       "id": "tds_payees/deductor_status",
       "clauses": [
         "3CD-21(b)",
@@ -264,9 +356,9 @@
       "evidence": [],
       "title_sha256_16": "06119560fefe9404",
       "title_text": "Deductor status depends on previous-year turnover",
-      "limits_sha256_16": "fe8897e0c776deb3",
+      "limits_sha256_16": "3daba6820d35a7be",
       "limits_text": [
-        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
+        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this. The previous-year turnover on file is a placeholder, so it is not relied on."
       ],
       "ask_client_sha256_16": "6a59a8224649a5d2",
       "ask_client_text": [

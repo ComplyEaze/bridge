@@ -123,10 +123,25 @@ async fn a_click_between_calls_is_posted_by_the_next_call() {
     );
 }
 
-/// A click that lands while a later call waits on the dialog is posted by that
-/// same call (#725 slice 2.0), not reported as `approved` for yet another call.
+/// Answered only once a second call has taken the held dialog to wait on it,
+/// so the click lands inside that call's wait and never before it.
+async fn click_while_joined(server: &Server, batch_id: &str, scripted: &ScriptedApproval) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !server.post_approvals.joined_for_test(batch_id) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the second call joined the held dialog");
+    scripted.answer(true);
+}
+
+/// A click that lands while a later call waits on the dialog is reported by
+/// that call, not posted: posting after a wait could run past the host's
+/// timeout on a large book (#852). The report says to call again now, and
+/// that call checks the book afresh and posts (#725 slice 2.0).
 #[tokio::test]
-async fn a_click_during_a_joining_call_is_posted_by_that_call() {
+async fn a_click_during_a_joining_call_is_reported_and_posted_by_the_next() {
     let (plans, post_at) = pending_then_posted_plans();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -135,19 +150,27 @@ async fn a_click_during_a_joining_call_is_posted_by_that_call() {
     let scripted = ScriptedApproval::held();
     first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
 
-    // Answered only once the second call has taken the held dialog to wait
-    // on it, so the click lands inside that call's wait and never before it.
-    let click = async {
-        tokio::time::timeout(Duration::from_secs(5), async {
-            while !server.post_approvals.joined_for_test(&line.batch_id) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
-        })
-        .await
-        .expect("the second call joined the held dialog");
-        scripted.answer(true);
-    };
-    let (posted, ()) = tokio::join!(server.call_tool("post_import", args), click);
+    let (approved, ()) = tokio::join!(
+        server.call_tool("post_import", args.clone()),
+        click_while_joined(&server, &line.batch_id, &scripted)
+    );
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
+    assert_eq!(
+        result(&approved)["approval"]["retry_after_s"],
+        0,
+        "{approved}"
+    );
+    assert!(
+        result(&approved)["approval"]["next_step"].is_string(),
+        "{approved}"
+    );
+    assert_eq!(intents(directory.path()), 0);
+
+    let posted = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
     assert_posted_once(
         &posted,
@@ -1496,7 +1519,7 @@ fn an_approval_is_posted_in_its_call_only_while_the_measured_post_fits() {
     assert!(!dispatch_fits_in_call(Duration::MAX, 1));
 }
 
-/// A joining call that finds an approval posts it only while the measured
+/// A joining call that finds a click already made posts it only while the measured
 /// redeem, which re-runs every check before posting, still fits under the
 /// ceiling (#725 slice 2.0): at the boundary it does, a millisecond later it
 /// does not, and a batch larger than the one redeem measured live never does.
@@ -1722,12 +1745,12 @@ async fn a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval() {
 }
 
 /// A batch dispatched by another route while a joining call waits is not
-/// posted when the person then approves: the re-entered pass reloads the batch
-/// after the wait, finds it dispatched, withdraws the approval and only
-/// reconciles (#725 slice 2.0). A pass that skipped the reload would be
-/// refused under the lock instead, lapsing the approval for another reason.
+/// posted when the person then approves: that call only reports the approval,
+/// and the next reloads the batch, finds it dispatched, withdraws the approval
+/// and only reconciles (#725 slice 2.0). The note's reason tells the two
+/// apart: a post refused under the lock would lapse it as refused.
 #[tokio::test]
-async fn a_batch_dispatched_during_the_join_is_reconciled_not_posted() {
+async fn a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -1751,8 +1774,16 @@ async fn a_batch_dispatched_during_the_join_is_reconciled_not_posted() {
         }
         scripted.answer(true);
     };
-    let (reconciled, ()) =
-        tokio::join!(server.call_tool("post_import", args), elsewhere_then_click);
+    let (approved, ()) = tokio::join!(
+        server.call_tool("post_import", args.clone()),
+        elsewhere_then_click
+    );
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
+    let reconciled = server.call_tool("post_import", args).await;
     let _ = sent(simulator);
     assert_eq!(
         intents(directory.path()),

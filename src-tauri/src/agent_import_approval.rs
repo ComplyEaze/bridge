@@ -267,9 +267,9 @@ impl PostApprovals {
         self
     }
 
-    /// Whether a joining call that finds an approval `elapsed` into it can
-    /// redeem it in that call (#725 slice 2.0): check the book afresh, post and
-    /// read back, all under the ceiling.
+    /// Whether a joining call that finds a click already made `elapsed` into
+    /// it can redeem it in that call (#725 slice 2.0): check the book afresh,
+    /// post and read back, all under the ceiling.
     pub(super) fn redeem_fits_in_call(&self, elapsed: Duration, vouchers: usize) -> bool {
         fits_within(
             self.measured_redeem,
@@ -277,18 +277,6 @@ impl PostApprovals {
             elapsed,
             vouchers,
         )
-    }
-
-    /// How long a joining call `elapsed` into it waits on the dialog. A batch
-    /// it could redeem keeps room to do so: a click inside the wait is posted
-    /// by that call. Any other waits as the asking call does.
-    pub(super) fn join_wait(&self, elapsed: Duration, vouchers: usize) -> Duration {
-        let budget = if vouchers <= MEASURED_REDEEM_VOUCHERS {
-            CALL_BUDGET.min(CALL_CEILING.saturating_sub(self.measured_redeem))
-        } else {
-            CALL_BUDGET
-        };
-        budget.saturating_sub(elapsed).max(MIN_DIALOG_WAIT)
     }
 
     #[cfg(test)]

@@ -463,10 +463,13 @@ impl Server {
                         )))
                     }
                     Begin::Join(dialog) => {
-                        let wait = self
-                            .post_approvals
-                            .join_wait(call_started.elapsed(), line.vouchers.len());
-                        let waited = match wait_for_answer(dialog, wait).await {
+                        // Only a click that landed while no call waited is
+                        // posted by the call that finds it (#725 slice 2.0):
+                        // posting after this call's own wait could run past
+                        // the host's timeout on a large book (#852).
+                        let answered_at_join = dialog.answered().is_some();
+                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
+                        {
                             Waited::Cancelled => {
                                 return Err("request_cancelled".to_string().into())
                             }
@@ -482,14 +485,15 @@ impl Server {
                                     accumulated.clone(),
                                 )))
                             }
-                            // Posted by this call when the redeem fits in it,
-                            // entering again from the top so every check made
-                            // before the wait is made again after it.
+                            // Posted by this call when it found the click
+                            // already made and the redeem fits in it, entering
+                            // again from the top so every check is made anew.
                             Joined::Approved
-                                if self.post_approvals.redeem_fits_in_call(
-                                    call_started.elapsed(),
-                                    line.vouchers.len(),
-                                ) =>
+                                if answered_at_join
+                                    && self.post_approvals.redeem_fits_in_call(
+                                        call_started.elapsed(),
+                                        line.vouchers.len(),
+                                    ) =>
                             {
                                 Ok(Step::Redeem)
                             }

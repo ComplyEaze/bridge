@@ -326,3 +326,34 @@ fn a_self_closing_status_after_a_real_one_is_malformed() {
         NativeCollectionError::MalformedResponse
     );
 }
+
+/// A second STATUS, empty, self-closing or full and in either order, is the
+/// response's shape in both lists, never an answer (bridge#717). An empty or
+/// self-closing STATUS is recorded, so a real one after it is still second.
+#[test]
+fn a_second_status_in_either_order_is_malformed_in_both_lists() {
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS></STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS/><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let voucher_types = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_ne!(voucher_types, VOUCHER_TYPES);
+        assert_eq!(
+            voucher_type_refusal(&voucher_types, COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "voucher types {repeated:?}"
+        );
+        let vouchers = VOUCHERS.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_ne!(vouchers, VOUCHERS);
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&vouchers, COMPANY_GUID)
+                .expect_err("a voucher list with a second STATUS is refused"),
+            NativeCollectionError::MalformedResponse,
+            "vouchers {repeated:?}"
+        );
+    }
+}

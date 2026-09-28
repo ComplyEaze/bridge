@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,16 +114,19 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
 
-// A step that must run is pinned whole (the step, not the rest of its job): a pinned command line
-// alone still passes with a step-level `if`, a `continue-on-error`, an `|| true`, or the command
-// kept only in a comment. Change a step and its copy here together, deliberately.
+// A step that must run is pinned whole: a pinned command line alone still passes with a step-level
+// `if`, a `continue-on-error`, an `|| true`, or the command kept only in a comment. Everything that
+// runs in its job before it can also change what it sees, so each job is pinned too, by SHA-256
+// over its exact committed UTF-8 text from its key through that step (line endings included, so
+// even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
+// and deliberately; the failure prints the new digest for a reviewed change.
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
-for (const [source, job, expected] of [
+for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ]],
+  ], "85fdd243e10222a6e10dabffa5e5ef0a765a3d8ca00469bdfc382c91dd9928d4"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -133,30 +137,61 @@ for (const [source, job, expected] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ]],
-  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"]],
+  ], "1b60d4c3772bff9479bb4bf7925e91e039db62f2e76b1d4de78a0fa2a39e816a"],
+  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "02ffb0e75b37aad5c1238ce91ce19f82aa713deb1941978cb3687ad2757c8122"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ]],
+  ], "b0f27a021c9d0fe13a3021a2177a3e649b5afa33e7e90e6738e4f7fd9b72fee4"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);
   }
+  const actual = sha256(jobThrough(source, job, expected[0]));
+  if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
+}
+// native, bundle-smoke and package run this composite action before their scans.
+const windowsSetup = createHash("sha256");
+for (const path of trackedFiles().filter((file) => file.startsWith(".github/actions/setup-windows-native/"))) {
+  windowsSetup.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
+}
+const windowsSetupDigest = windowsSetup.digest("hex");
+if (windowsSetupDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
+  failures.push(`.github/actions/setup-windows-native changed; its digest is now ${windowsSetupDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+  // A step without its own `shell:` runs under the workflow's or job's defaults.
+  if (/^\s*defaults\s*:/m.test(source)) failures.push(`${name} must not set defaults: they change how unpinned-shell steps run`);
+}
+if (/^    if\s*:/m.test(jobBlock(releaseWorkflow, "package"))) {
+  failures.push("release-mcpb-preview.yml's package job must run whenever a release is admitted");
 }
 
-// Every MCPB is staged by package-mcpb.mjs, so its one seam scan must run unconditionally, right
-// after the binary is found, with the scanner imported from its own module: no second call, no
-// alias, nothing between them.
+// Every MCPB is staged by package-mcpb.mjs, so its one seam scan must run unconditionally, with
+// the scanner imported from its own module: main() is pinned from its first line through the
+// scan, so nothing can return, branch or run first; no second call, no alias.
 const packageMcpb = readFileSync(resolve(repositoryRoot, "scripts/package-mcpb.mjs"), "utf8");
 const packageSeamScan = [
+  "async function main() {",
+  "  const { binaryPath, pdfiumDirectory } = packageMcpbArguments(process.argv.slice(2));",
+  "  const host = mcpbHostTarget();",
+  "  const sourceBinary = binaryPath ?? releaseMcpbBinaryPath(root, host.binary);",
+  "  if (!binaryPath) {",
+  "    const manifest = resolve(root, \"src-tauri\", \"Cargo.toml\");",
+  "    const build = spawnSync(\"cargo\", [\"build\", \"--locked\", \"--release\", \"--manifest-path\", manifest, \"--bin\", \"bridge_mcp\"], {",
+  "      cwd: root,",
+  "      stdio: \"inherit\",",
+  "    });",
+  "    if (build.status !== 0) process.exit(build.status ?? 1);",
+  "  }",
+  "  try {",
+  "    await access(sourceBinary);",
+  "  } catch {",
   "    throw new Error(`MCPB binary is missing: ${sourceBinary}`);",
   "  }",
   "  // Every MCPB, from CI, a release or a local build, is staged here: refuse a",
@@ -389,6 +424,23 @@ function jobIds(source) {
   return ids;
 }
 
+function sha256(text) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+// A job's exact text, from its key through the step that starts with `head`, split and rejoined on
+// "\n" alone so any "\r" stays in the hashed text. Empty when either line is missing.
+function jobThrough(source, job, head) {
+  const lines = source.split("\n");
+  const start = lines.findIndex((line) => line.replace(/\r$/, "") === `  ${job}:`);
+  const step = lines.findIndex((line, index) => index > start && line.replace(/\r$/, "") === head);
+  if (start === -1 || step === -1) return "";
+  let end = step + 1;
+  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
+  while (end > step + 1 && lines[end - 1].replace(/\r$/, "") === "") end -= 1;
+  return lines.slice(start, end).join("\n");
+}
+
 function stepBlock(job, head) {
   const lines = job.split("\n");
   const starts = lines.flatMap((line, index) => (line === head ? [index] : []));
@@ -442,6 +494,17 @@ function workspaceMetadata(manifestPath) {
 function staleToolPaths() {
   const toolsMetadata = workspaceMetadata(resolve(repositoryRoot, "tools", "Cargo.toml"));
   const legacyPaths = toolsMetadata.packages.map((candidate) => `src-tauri/crates/${candidate.name}`);
+  const stale = [];
+  for (const file of trackedFiles()) {
+    const contents = readFileSync(resolve(repositoryRoot, file), "utf8");
+    for (const path of legacyPaths) {
+      if (contents.includes(path)) stale.push({ file, path });
+    }
+  }
+  return stale;
+}
+
+function trackedFiles() {
   const tracked = spawnSync("git", ["-C", repositoryRoot, "ls-files", "-z"], {
     encoding: "utf8",
     windowsHide: true,
@@ -450,15 +513,7 @@ function staleToolPaths() {
     const detail = tracked.error?.message ?? tracked.stderr.trim() ?? "unknown error";
     throw new Error(`git ls-files failed: ${detail}`);
   }
-
-  const stale = [];
-  for (const file of tracked.stdout.split("\0").filter(Boolean)) {
-    const contents = readFileSync(resolve(repositoryRoot, file), "utf8");
-    for (const path of legacyPaths) {
-      if (contents.includes(path)) stale.push({ file, path });
-    }
-  }
-  return stale;
+  return tracked.stdout.split("\0").filter(Boolean);
 }
 
 function relativePath(path) {

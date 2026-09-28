@@ -12,7 +12,8 @@
 //!    closing balance, and the printed debit and credit totals agree, for a
 //!    layout that prints them.
 //! 5. [`proposals::build`] — Payment / Receipt / Contra proposals in
-//!    `build_import_xml`'s input shape, with a suspense fallback.
+//!    `build_import_xml`'s input shape, with a suspense fallback, and a
+//!    person's answer for each cash line ([`cash`]).
 //!
 //! What is deliberately **not** here: REMOTEIDs, XML, output files, and any
 //! matching of names against Tally masters. Bridge's writer owns identity and
@@ -20,6 +21,7 @@
 
 pub mod bank;
 pub mod bbox;
+pub mod cash;
 pub mod date;
 pub mod geometry;
 pub mod mapping;

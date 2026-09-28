@@ -87,7 +87,9 @@ function selectedCompanyIdentity(company: OutstandingsCompany) {
   };
 }
 
-/** Builds the exact Tauri argument for one company's requested as-of date. */
+/** Builds the exact Tauri argument for one company's requested as-of date.
+ * It carries no currency assertion: the backend reads Tally's own currency
+ * masters and decides (bridge#551). */
 export function singleCompanyOutstandingsInvokeArgument(
   config: OutstandingsConfig,
   company: OutstandingsCompany,
@@ -100,7 +102,6 @@ export function singleCompanyOutstandingsInvokeArgument(
     request: {
       config,
       selected_company: selectedCompanyIdentity(company),
-      currency_assertion: "INR" as const,
       as_of_yyyymmdd: asOfYyyymmddValue,
       ageing_anchor: ageingAnchor,
     },
@@ -120,7 +121,6 @@ export function allCompaniesOutstandingsInvokeArgument(
     request: {
       config,
       companies: companies.map((company) => ({ selected_company: selectedCompanyIdentity(company) })),
-      currency_assertion: "INR" as const,
       as_of_yyyymmdd: asOfYyyymmddValue,
       ageing_anchor: ageingAnchor,
     },

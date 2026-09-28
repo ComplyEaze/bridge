@@ -5,6 +5,7 @@
 //! to be, is `validate_masters`' job; nothing here matches against Tally.
 
 use crate::bank::PARSER_SENTINELS;
+use crate::cash::CashMovement;
 use crate::refusal::Refusal;
 use crate::text::{mapping_key, squash, strip};
 use std::collections::BTreeMap;
@@ -93,6 +94,17 @@ impl Mapping {
                 ));
             }
             let key = mapping_key(&party);
+            // A cash line's entry depends on what happened to that cash, which
+            // differs line by line: never one rule for every such line.
+            if CashMovement::of_party(&party).is_some() {
+                return Err(Refusal::new(
+                    "cash_party_in_mapping",
+                    format!(
+                        "{}: cash withdrawals and deposits are answered line by line in cash_answers, not mapped: the same statement text covers business cash, the owner's drawings, a customer paying in and cash paid straight to someone",
+                        row.origin
+                    ),
+                ));
+            }
             if PARSER_SENTINELS.contains(&key.as_str()) {
                 return Err(Refusal::new(
                     "mapping_claims_a_sentinel",

@@ -34,6 +34,7 @@ fn captured_read(name: &str) -> TrialBalanceRead {
             response_sha256: "b".repeat(64),
             bytes: 42,
         },
+        ledger_scope: Default::default(),
     }
 }
 
@@ -80,6 +81,34 @@ fn overbudget_source_is_not_issued_a_handle() {
     read.evidence.bytes = MAX_SOURCE_BYTES + 1;
     assert_eq!(
         TrialBalanceExportStore::default().insert(read).unwrap_err(),
+        TrialBalanceExportStoreError::ResourceLimit
+    );
+}
+
+/// A several-currency read's excluded ledger names become workbook cells, so
+/// they are held to the same cell budget as a row's name (bridge#709). A
+/// name within budget is issued a handle; one byte over is not.
+#[test]
+fn an_excluded_ledger_name_is_held_to_the_cell_budget() {
+    let partial = |name: String| {
+        let mut read = captured_read("several currencies");
+        read.ledger_scope =
+            crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+                base_name: "I\u{20b9}".into(),
+                decimal_places: 2,
+                foreign: Vec::new(),
+                mixed: vec![name],
+            };
+        read
+    };
+    let store = TrialBalanceExportStore::default();
+    assert!(store
+        .insert(partial("x".repeat(MAX_CELL_TEXT_BYTES)))
+        .is_ok());
+    assert_eq!(
+        store
+            .insert(partial("x".repeat(MAX_CELL_TEXT_BYTES + 1)))
+            .unwrap_err(),
         TrialBalanceExportStoreError::ResourceLimit
     );
 }

@@ -1,0 +1,996 @@
+{
+ "comment": "loans_interest questions at the reference's current head, an individual whose previous-year turnover is a placeholder below both limits, activity not recorded (not a deductor, but unknown as a placeholder): an expense credited to a loan and its reversal, asked about as the lender's charge (Charge Loan, with its interest over the threshold); an entry against only another loan's interest ledger (Misposted Loan); a bank debit and its return by identical narration, one by a number in the credit's reference, and a repeated narration (Pair Loan); a repayment past the balance, then a cash loan tested on its own amount, then one the two walks disagree on, listed as not computed (Walk Loan); a repayment reportable under both walks and flagged only under the second (Flag Loan); a Government loan taken, reported, and repaid, not (Govt Loan); one lender on two ledgers whose names match only case-folded (Strasse A, B); two ledgers with no lender (Nameless A, B); and the notices: a loan left out of the list, instalments to a creditor in three months, and no notice for suspense in two months, a duties ledger, a bank OD or a ledger whose group chain is incomplete, though it reaches Loans (Liability).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_questions-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_questions-001"
+  },
+  {
+   "name": "Charge Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-002"
+  },
+  {
+   "name": "Misposted Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-003"
+  },
+  {
+   "name": "Pair Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-004"
+  },
+  {
+   "name": "Walk Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-005"
+  },
+  {
+   "name": "Flag Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-006"
+  },
+  {
+   "name": "Govt Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-007"
+  },
+  {
+   "name": "Strasse A",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-008"
+  },
+  {
+   "name": "Strasse B",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-009"
+  },
+  {
+   "name": "Nameless A",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-010"
+  },
+  {
+   "name": "Nameless B",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-011"
+  },
+  {
+   "name": "Interest Charge",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_questions-012"
+  },
+  {
+   "name": "Interest Flag",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_questions-013"
+  },
+  {
+   "name": "Loan Processing Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_questions-014"
+  },
+  {
+   "name": "Unlisted Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-015"
+  },
+  {
+   "name": "NBFC Creditor",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_questions-016"
+  },
+  {
+   "name": "Suspense Ledger",
+   "chain": [
+    "Suspense A/c"
+   ],
+   "guid": "edge-loans_interest_questions-017"
+  },
+  {
+   "name": "OD Account",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-018"
+  },
+  {
+   "name": "GST Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_questions-019"
+  },
+  {
+   "name": "Broken Ledger",
+   "chain": [
+    "Missing Group",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_questions-020",
+   "chain_complete": false
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 15130000,
+   "credit": 5540000,
+   "closing": 9590000
+  },
+  {
+   "ledger": "Broken Ledger",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000,
+   "closing": -10000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 100000,
+   "closing": 2300000
+  },
+  {
+   "ledger": "Charge Loan",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 4450000,
+   "closing": -4400000
+  },
+  {
+   "ledger": "Flag Loan",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 3000000,
+   "closing": -1700000
+  },
+  {
+   "ledger": "GST Payable",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 0,
+   "closing": 60000
+  },
+  {
+   "ledger": "Govt Loan",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 2500000,
+   "closing": 0
+  },
+  {
+   "ledger": "Interest Charge",
+   "opening": 0,
+   "debit": 1240000,
+   "credit": 0,
+   "closing": 1240000
+  },
+  {
+   "ledger": "Interest Flag",
+   "opening": 0,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -400000
+  },
+  {
+   "ledger": "Loan Processing Charges",
+   "opening": 0,
+   "debit": 250000,
+   "credit": 50000,
+   "closing": 200000
+  },
+  {
+   "ledger": "Misposted Loan",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2240000,
+   "closing": -2240000
+  },
+  {
+   "ledger": "NBFC Creditor",
+   "opening": 0,
+   "debit": 180000,
+   "credit": 0,
+   "closing": 180000
+  },
+  {
+   "ledger": "Nameless A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Nameless B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "OD Account",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Pair Loan",
+   "opening": 0,
+   "debit": 240000,
+   "credit": 2620000,
+   "closing": -2380000
+  },
+  {
+   "ledger": "Strasse A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Strasse B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Suspense Ledger",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 0,
+   "closing": 60000
+  },
+  {
+   "ledger": "Unlisted Loan",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 1000000,
+   "closing": -800000
+  },
+  {
+   "ledger": "Walk Loan",
+   "opening": -1000000,
+   "debit": 1500000,
+   "credit": 2400000,
+   "closing": -1900000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "k01",
+   "date": "2025-04-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Charge Loan",
+     -3000000
+    ],
+    [
+     "Bank A",
+     3000000
+    ]
+   ],
+   "narration": "Loan disbursal"
+  },
+  {
+   "guid": "k02",
+   "date": "2025-05-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Loan Processing Charges",
+     250000
+    ],
+    [
+     "Charge Loan",
+     -250000
+    ]
+   ]
+  },
+  {
+   "guid": "k03",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Charge Loan",
+     50000
+    ],
+    [
+     "Loan Processing Charges",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "k04",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Charge",
+     1200000
+    ],
+    [
+     "Charge Loan",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "z01",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Misposted Loan",
+     -2200000
+    ],
+    [
+     "Bank A",
+     2200000
+    ]
+   ]
+  },
+  {
+   "guid": "z02",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Charge",
+     40000
+    ],
+    [
+     "Misposted Loan",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "q01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Pair Loan",
+     -2500000
+    ],
+    [
+     "Bank A",
+     2500000
+    ]
+   ],
+   "narration": "Loan disbursal"
+  },
+  {
+   "guid": "q02",
+   "date": "2025-08-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pair Loan",
+     60000
+    ],
+    [
+     "Bank A",
+     -60000
+    ]
+   ],
+   "narration": "ACH DR 123456789 EMI"
+  },
+  {
+   "guid": "q03",
+   "date": "2025-08-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Pair Loan",
+     -60000
+    ],
+    [
+     "Bank A",
+     60000
+    ]
+   ],
+   "narration": "ACH DR 123456789 EMI"
+  },
+  {
+   "guid": "q04",
+   "date": "2025-09-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pair Loan",
+     60000
+    ],
+    [
+     "Bank A",
+     -60000
+    ]
+   ],
+   "narration": "ACH DR 987654321 EMI SEP"
+  },
+  {
+   "guid": "q05",
+   "date": "2025-09-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Pair Loan",
+     -60000
+    ],
+    [
+     "Bank A",
+     60000
+    ]
+   ],
+   "narration": "ACH RTN INSUFFICIENT FUNDS",
+   "reference": "987654321"
+  },
+  {
+   "guid": "q06",
+   "date": "2025-10-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pair Loan",
+     60000
+    ],
+    [
+     "Bank A",
+     -60000
+    ]
+   ],
+   "narration": "NACH 555666777 EMI"
+  },
+  {
+   "guid": "q07",
+   "date": "2025-11-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Pair Loan",
+     60000
+    ],
+    [
+     "Bank A",
+     -60000
+    ]
+   ],
+   "narration": "NACH  555666777 EMI"
+  },
+  {
+   "guid": "w01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Walk Loan",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "w02",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Walk Loan",
+     -2100000
+    ],
+    [
+     "Cash",
+     2100000
+    ]
+   ],
+   "narration": "Cash received"
+  },
+  {
+   "guid": "w03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Walk Loan",
+     -300000
+    ],
+    [
+     "Cash",
+     300000
+    ]
+   ],
+   "narration": "Cash received"
+  },
+  {
+   "guid": "f01",
+   "date": "2025-04-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Flag Loan",
+     -500000
+    ],
+    [
+     "Bank A",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "f02",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Flag Loan",
+     800000
+    ],
+    [
+     "Bank A",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "f03",
+   "date": "2025-04-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Flag Loan",
+     -2500000
+    ],
+    [
+     "Bank A",
+     2500000
+    ]
+   ]
+  },
+  {
+   "guid": "f04",
+   "date": "2025-04-04",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Flag Loan",
+     400000
+    ],
+    [
+     "Interest Flag",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "f05",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Flag Loan",
+     100000
+    ],
+    [
+     "Cash",
+     -100000
+    ]
+   ],
+   "narration": "Cash paid"
+  },
+  {
+   "guid": "g01",
+   "date": "2025-05-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Govt Loan",
+     -2500000
+    ],
+    [
+     "Bank A",
+     2500000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2026-02-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Govt Loan",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "s01",
+   "date": "2025-10-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Strasse A",
+     -100000
+    ],
+    [
+     "Bank A",
+     100000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-10-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Strasse B",
+     -100000
+    ],
+    [
+     "Bank A",
+     100000
+    ]
+   ]
+  },
+  {
+   "guid": "x01",
+   "date": "2025-10-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Nameless A",
+     -100000
+    ],
+    [
+     "Bank A",
+     100000
+    ]
+   ]
+  },
+  {
+   "guid": "u01",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Unlisted Loan",
+     -1000000
+    ],
+    [
+     "Bank A",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "u02",
+   "date": "2025-12-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Unlisted Loan",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "n01",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "NBFC Creditor",
+     45000
+    ],
+    [
+     "Bank A",
+     -45000
+    ]
+   ],
+   "narration": "NACH/DR/INVENTED NBFC"
+  },
+  {
+   "guid": "n02",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "NBFC Creditor",
+     45000
+    ],
+    [
+     "Bank A",
+     -45000
+    ]
+   ],
+   "narration": "nach/dr/invented nbfc"
+  },
+  {
+   "guid": "n03",
+   "date": "2025-07-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "NBFC Creditor",
+     45000
+    ],
+    [
+     "Bank A",
+     -45000
+    ]
+   ],
+   "narration": "EMI 07 INVENTED NBFC"
+  },
+  {
+   "guid": "n04",
+   "date": "2025-08-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "NBFC Creditor",
+     45000
+    ],
+    [
+     "Bank A",
+     -45000
+    ]
+   ],
+   "narration": "ACHDR INVENTED NBFC"
+  },
+  {
+   "guid": "s11",
+   "date": "2025-05-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Suspense Ledger",
+     30000
+    ],
+    [
+     "Bank A",
+     -30000
+    ]
+   ],
+   "narration": "EMI MAY"
+  },
+  {
+   "guid": "s12",
+   "date": "2025-06-20",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Suspense Ledger",
+     30000
+    ],
+    [
+     "Bank A",
+     -30000
+    ]
+   ],
+   "narration": "EMI JUN"
+  },
+  {
+   "guid": "d01",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "GST Payable",
+     20000
+    ],
+    [
+     "Bank A",
+     -20000
+    ]
+   ],
+   "narration": "NACH GST"
+  },
+  {
+   "guid": "d02",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "GST Payable",
+     20000
+    ],
+    [
+     "Bank A",
+     -20000
+    ]
+   ],
+   "narration": "NACH GST"
+  },
+  {
+   "guid": "d03",
+   "date": "2025-07-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "GST Payable",
+     20000
+    ],
+    [
+     "Bank A",
+     -20000
+    ]
+   ],
+   "narration": "NACH GST"
+  },
+  {
+   "guid": "o01",
+   "date": "2025-09-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "OD Account",
+     -500000
+    ],
+    [
+     "Bank A",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "b01",
+   "date": "2025-09-16",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Broken Ledger",
+     -10000
+    ],
+    [
+     "Bank A",
+     10000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "individual",
+ "previous_year_turnover_paise": 400000000,
+ "previous_year_turnover_status": "placeholder",
+ "loans": {
+  "Charge Loan": {
+   "lender": "Invented Charge Finance",
+   "lender_type": "nbfc",
+   "interest_ledger": "Interest Charge"
+  },
+  "Misposted Loan": {
+   "lender": "Invented Person",
+   "lender_type": "person"
+  },
+  "Pair Loan": {
+   "lender": "Invented Pair Finance",
+   "lender_type": "nbfc"
+  },
+  "Walk Loan": {
+   "lender": "Invented Walker",
+   "lender_type": "person"
+  },
+  "Flag Loan": {
+   "lender": "Invented Flagger",
+   "lender_type": "person",
+   "interest_ledger": "Interest Flag"
+  },
+  "Govt Loan": {
+   "lender": "Invented Government Department",
+   "lender_type": "government"
+  },
+  "Strasse A": {
+   "lender": "Invented Straße Finance",
+   "lender_type": "person"
+  },
+  "Strasse B": {
+   "lender": "  INVENTED STRASSE FINANCE ",
+   "lender_type": "person"
+  },
+  "Nameless A": {
+   "lender": "",
+   "lender_type": "person"
+  },
+  "Nameless B": {
+   "lender": " ",
+   "lender_type": "person"
+  }
+ }
+}

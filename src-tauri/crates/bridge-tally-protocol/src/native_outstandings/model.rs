@@ -132,6 +132,11 @@ pub struct NativeOutstandingsResult {
     /// with their bills (bridge#551). Empty when nothing was excluded, which
     /// is the only case in which the figures describe the whole book.
     pub foreign_currency_ledgers_excluded: Vec<super::ForeignCurrencyLedger>,
+    /// Base-currency ledgers with a value Tally wrote as a currency composite,
+    /// left out of every figure above with their bills (bridge#642). Their
+    /// bills are plain rupee amounts, but the ledger's balance was not read,
+    /// so nothing could reconcile them.
+    pub mixed_currency_ledgers_excluded: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,7 +193,7 @@ pub(crate) struct CurrencyMaster {
     /// `CURRENCYNAME` carries when this master is its base (`₹` for a master
     /// named `I₹`). It identifies the base and never decides INR. `Some("")`
     /// when the element is present but empty, which is not the same as absent.
-    /// Only the MCP outstandings read fetches it, and only on a book with several
+    /// Only the outstandings reads fetch it, and only on a book with several
     /// masters (bridge#551).
     pub original_name: Option<String>,
     pub mailing_name: String,

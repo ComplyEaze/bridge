@@ -6,6 +6,7 @@
 use super::*;
 use crate::agent::agent_import::approval::{
     ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
+    MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, Framer};
 use crate::agent::ToolResponse;
@@ -29,22 +30,26 @@ fn intents(directory: &std::path::Path) -> usize {
 const CANCEL_7: &[u8] =
     b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":7}}\n";
 
-/// A dialog nobody has answered by the end of the call leaves the call
-/// `pending`, having sent nothing past its checks. Once the person approves,
-/// the next call returns `approved` without reading Tally, and the one after
-/// checks the book afresh and posts exactly once.
-#[tokio::test]
-async fn a_dialog_answered_after_its_call_returned_is_posted_by_a_later_call() {
+/// The two calls after a pending one, in both orders of click and call: `plans`
+/// serves the first call's checks, then the posting call's fresh checks and
+/// its dispatch up to the POST, whose index is returned.
+fn pending_then_posted_plans() -> (Vec<ScenarioPlan>, usize) {
     let mut plans = before_approval();
     plans.extend(before_approval());
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
-    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
-    let (line, args) = saved_batch(&server);
-    let scripted = ScriptedApproval::held();
+    (plans, post_at)
+}
 
+/// The first call of a held dialog, left `pending` with nothing sent past its
+/// checks and the dialog held for the next call.
+async fn first_call_pending(
+    server: &Server,
+    directory: &std::path::Path,
+    line: &ImportLedgerLine,
+    args: &Value,
+    scripted: &ScriptedApproval,
+) {
     let pending = SCRIPTED_APPROVAL
         .scope(
             scripted.clone(),
@@ -62,33 +67,82 @@ async fn a_dialog_answered_after_its_call_returned_is_posted_by_a_later_call() {
         "{pending}"
     );
     assert_eq!(result(&pending)["attempt_recorded"], false, "{pending}");
-    assert_eq!(intents(directory.path()), 0);
+    assert_eq!(intents(directory), 0);
     assert!(
         server.post_approvals.holds(&line.batch_id),
         "the open dialog is held for the next call"
     );
+}
 
-    scripted.answer(true);
-    let approved = server.call_tool("post_import", args.clone()).await;
+/// What a posting call must leave: one intent for this batch, its clean
+/// create, one dialog asked once, and the POST on the wire. The simulator's
+/// script ends at the POST, so the readback after it is not served.
+fn assert_posted_once(
+    posted: &Value,
+    directory: &std::path::Path,
+    line: &ImportLedgerLine,
+    scripted: &ScriptedApproval,
+    observed: &[tally_protocol_simulator::ObservedRequest],
+    post_at: usize,
+) {
+    assert_eq!(result(posted)["attempt_recorded"], true, "{posted}");
     assert_eq!(
-        result(&approved)["approval"]["state"],
-        "approved",
-        "{approved}"
-    );
-    assert_eq!(intents(directory.path()), 0);
-
-    let posted = server.call_tool("post_import", args).await;
-    let observed = sent(simulator);
-    // The simulator's script ends at the POST, so the readback after it is
-    // not served; what is asserted is the one intent and its clean create.
-    assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
-    assert_eq!(
-        dispatch_intent(directory.path())["batch_id"],
+        dispatch_intent(directory)["batch_id"],
         line.batch_id.as_str()
     );
-    assert_journaled_clean_create(directory.path());
+    assert_journaled_clean_create(directory);
     assert_eq!(scripted.counts(), [1], "one dialog, asked once");
     assert!(observed.len() > post_at, "the POST was sent: {posted}");
+}
+
+/// A click that lands while no call waits is posted by the very next call
+/// (#725 slice 2.0): that call checks the book afresh and posts exactly once.
+/// Before, it only reported `approved`, and an agent that stopped there left
+/// the batch unposted (L1-a, 28 Sep 2026: two calls after the click).
+#[tokio::test]
+async fn a_click_between_calls_is_posted_by_the_next_call() {
+    let (plans, post_at) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let posted = server.call_tool("post_import", args).await;
+    let observed = sent(simulator);
+    assert_posted_once(&posted, directory.path(), &line, &scripted, &observed, post_at);
+}
+
+/// A click that lands while a later call waits on the dialog is posted by that
+/// same call (#725 slice 2.0), not reported as `approved` for yet another call.
+#[tokio::test]
+async fn a_click_during_a_joining_call_is_posted_by_that_call() {
+    let (plans, post_at) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+
+    // Answered only once the second call has taken the held dialog to wait
+    // on it, so the click lands inside that call's wait and never before it.
+    let click = async {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !server.post_approvals.joined_for_test(&line.batch_id) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the second call joined the held dialog");
+        scripted.answer(true);
+    };
+    let (posted, ()) = tokio::join!(server.call_tool("post_import", args), click);
+    let observed = sent(simulator);
+    assert_posted_once(&posted, directory.path(), &line, &scripted, &observed, post_at);
 }
 
 /// Answered in its call, but too late for the measured post to fit: the call
@@ -805,17 +859,20 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     }
 }
 
-/// An approval collected by a joined call late in its window reports what is
-/// left of it, counted from the click, not the whole window.
+/// An approval collected by a joined call too late for its post to fit reports
+/// what is left of it, counted from the click, not the whole window, and tells
+/// the agent to call again at once.
 #[tokio::test]
 async fn an_approval_reports_the_time_left_since_its_click() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let mut server = server_at(simulator.address(), directory.path());
-    server.post_approvals = std::sync::Arc::new(PostApprovals::with_ttl(
-        directory.path(),
-        Duration::from_secs(3),
-    ));
+    // A redeem measured at the whole ceiling never fits in the joining call,
+    // so that call reports the approval instead of posting it.
+    server.post_approvals = std::sync::Arc::new(
+        PostApprovals::with_ttl(directory.path(), Duration::from_secs(3))
+            .with_measured_redeem(CALL_CEILING),
+    );
     let (line, args) = saved_batch(&server);
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
@@ -843,6 +900,14 @@ async fn an_approval_reports_the_time_left_since_its_click() {
         .as_u64()
         .unwrap();
     assert!(left <= 1, "counted from the click: {approved}");
+    assert_eq!(result(&approved)["approval"]["retry_after_s"], 0, "{approved}");
+    assert!(
+        result(&approved)["approval"]["next_step"]
+            .as_str()
+            .is_some_and(|step| step.contains("post_import") && step.contains("now")),
+        "an approved batch says to call again now: {approved}"
+    );
+    assert_eq!(intents(directory.path()), 0);
 }
 
 /// A batch posted by any other route releases whatever was held for it, so it
@@ -969,7 +1034,8 @@ async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
 }
 
 /// A refusal in the call redeeming an approval withdraws it: the next call
-/// asks the person again rather than posting on the old click.
+/// asks the person again rather than posting on the old click. Since slice
+/// 2.0 the redeeming call is the first one after the click.
 #[tokio::test]
 async fn a_refused_redemption_withdraws_its_approval() {
     let mut plans = before_approval();
@@ -991,12 +1057,7 @@ async fn a_refused_redemption_withdraws_its_approval() {
         "{pending}"
     );
     scripted.answer(true);
-    let approved = server.call_tool("post_import", args.clone()).await;
-    assert_eq!(
-        result(&approved)["approval"]["state"],
-        "approved",
-        "{approved}"
-    );
+    until_answered(&server, &line.batch_id).await;
     let refused = server.call_tool("post_import", args).await;
     let observed = sent(simulator);
     assert_eq!(
@@ -1415,6 +1476,29 @@ fn an_approval_is_posted_in_its_call_only_while_the_measured_post_fits() {
     assert!(dispatch_fits_in_call(Duration::ZERO, 200));
     assert!(!dispatch_fits_in_call(Duration::ZERO, 201));
     assert!(!dispatch_fits_in_call(Duration::MAX, 1));
+}
+
+/// A joining call that finds an approval posts it only while the measured
+/// redeem, which re-runs every check before posting, still fits under the
+/// ceiling (#725 slice 2.0): at the boundary it does, a millisecond later it
+/// does not, and a batch larger than the one redeem measured live never does.
+#[test]
+fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits() {
+    let directory = tempfile::tempdir().unwrap();
+    let approvals = PostApprovals::new(directory.path());
+    let redeem_fits_in_call = |elapsed, vouchers| approvals.redeem_fits_in_call(elapsed, vouchers);
+    let boundary = CALL_CEILING - MEASURED_REDEEM;
+    assert_eq!(MEASURED_REDEEM, Duration::from_millis(18_090));
+    assert_eq!(MEASURED_REDEEM_VOUCHERS, 50);
+    assert_eq!(boundary, Duration::from_millis(26_910));
+    assert!(redeem_fits_in_call(Duration::ZERO, 1));
+    assert!(redeem_fits_in_call(boundary, 50));
+    assert!(!redeem_fits_in_call(
+        boundary + Duration::from_millis(1),
+        50
+    ));
+    assert!(!redeem_fits_in_call(Duration::ZERO, 51));
+    assert!(!redeem_fits_in_call(Duration::MAX, 1));
 }
 
 /// The agent's dialog says when its post happens, in both preview shapes and

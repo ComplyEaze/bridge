@@ -710,6 +710,26 @@ fn forex_ledgers() -> String {
     ))
 }
 
+/// A labelled edit of the captured FOREX ledgers: the dollar ledger
+/// "FX USD Debtor 02" relabelled to the base currency, keeping its composite
+/// closing balance, as a rupee party carrying a dollar bill shows it.
+fn forex_ledgers_with_a_mixed_rupee_ledger() -> String {
+    let captured = forex_ledgers();
+    let row = captured
+        .find("<LEDGER NAME=\"FX USD Debtor 02\"")
+        .expect("captured dollar ledger");
+    let dollar = "<CURRENCYNAME TYPE=\"String\">$</CURRENCYNAME>";
+    let at = row + captured[row..].find(dollar).expect("its currency");
+    assert!(!captured[row..at].contains("</LEDGER>"));
+    let mixed = format!(
+        "{}<CURRENCYNAME TYPE=\"String\">I\u{20b9}</CURRENCYNAME>{}",
+        &captured[..at],
+        &captured[at + dollar.len()..]
+    );
+    assert!(mixed.contains("-$ 2000.00 @ I\u{20b9} 86/$  = -I\u{20b9} 172000.00"));
+    mixed
+}
+
 /// FOREX's native outstandings read with its ledger snapshot replaced, for
 /// labelled edits of the captured ledgers.
 fn forex_native_plans_with_ledgers(ledgers: String) -> Vec<ScenarioPlan> {
@@ -834,19 +854,7 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
 /// becomes the base's, and its composite balance is kept.
 #[tokio::test]
 async fn a_rupee_ledger_with_a_composite_balance_refuses_the_several_currency_read_naming_it() {
-    let captured = forex_ledgers();
-    let row = captured
-        .find("<LEDGER NAME=\"FX USD Debtor 02\"")
-        .expect("captured dollar ledger");
-    let dollar = "<CURRENCYNAME TYPE=\"String\">$</CURRENCYNAME>";
-    let at = row + captured[row..].find(dollar).expect("its currency");
-    assert!(!captured[row..at].contains("</LEDGER>"));
-    let mixed = format!(
-        "{}<CURRENCYNAME TYPE=\"String\">I\u{20b9}</CURRENCYNAME>{}",
-        &captured[..at],
-        &captured[at + dollar.len()..]
-    );
-    assert!(mixed.contains("-$ 2000.00 @ I\u{20b9} 86/$  = -I\u{20b9} 172000.00"));
+    let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
     let mut plans = forex_classified_currency_plans();
     plans.extend(forex_native_plans_with_ledgers(mixed));
     let simulator = SequenceSimulator::spawn(plans).unwrap();
@@ -1120,6 +1128,81 @@ async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledg
             (Err(_), _) => panic!("{expected:?}: the read failed"),
         }
         assert_eq!(requests_sent(simulator), requests, "{expected:?}");
+    }
+}
+
+/// bridge#551: the desktop command and the all-companies sweep read a
+/// several-currency book through the same classified read as MCP. A ledger
+/// kept in the base currency whose closing balance Tally writes as a currency
+/// composite refuses the whole read on both, in-band and naming that ledger:
+/// no figures, no working paper and no statement source. The labelled edit of
+/// the captured FOREX ledgers is the one the MCP test uses.
+#[tokio::test]
+async fn a_rupee_ledger_with_a_composite_balance_refuses_the_desktop_read_and_the_sweep() {
+    let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
+    let names_it = |result: &OutstandingsLoadResult| {
+        matches!(
+            result,
+            OutstandingsLoadResult::Partial { reason, .. }
+                if reason.reason_code == "company_foreign_currency_ledger_balance"
+                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
+        )
+    };
+
+    let mut plans = vec![xml(companies())];
+    plans.extend(forex_classified_currency_plans());
+    plans.extend(forex_native_plans_with_ledgers(mixed.clone()));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let rows = parse_companies_from_collection(&companies()).unwrap();
+    let row = rows
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(FOREX_GUID))
+        .unwrap();
+    let request: crate::commands::OutstandingsRequest = serde_json::from_value(serde_json::json!({
+        "config": {"host": simulator.address().ip().to_string(), "port": simulator.address().port()},
+        "selected_company": {
+            "display_name": row.name,
+            "company_guid": row.guid,
+            "company_number": row.company_number,
+            "books_from_yyyymmdd": row.books_from,
+        },
+        "as_of_yyyymmdd": "20250930",
+    }))
+    .unwrap();
+    let response = crate::commands::read_screen_outstandings(
+        request,
+        &TallyRuntime::default(),
+        &crate::reports::outstandings_working_paper_store::WorkingPaperExportStore::default(),
+        &crate::reports::outstandings_working_paper_store::PartyStatementSourceStore::default(),
+    )
+    .await
+    .unwrap();
+    simulator.cancel();
+    assert!(names_it(&response.result), "{:?}", response.result);
+    assert!(response.working_paper_export_id.is_none());
+    assert!(response.party_statement_source_id.is_none());
+
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans_with_ledgers(mixed));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = crate::commands::sweep_company_outstandings(
+        &TallyRuntime::default(),
+        &TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        &identity_for_guid(&companies(), FOREX_GUID),
+        &TallyDate::parse("20250930").unwrap(),
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .await;
+    simulator.cancel();
+    match result {
+        Ok(result) => assert!(names_it(&result), "{result:?}"),
+        Err(crate::commands::CompanySweepFailure::ReasonCode(code)) => {
+            panic!("the sweep refused with {code}, without naming the ledger")
+        }
+        Err(_) => panic!("the sweep read failed"),
     }
 }
 

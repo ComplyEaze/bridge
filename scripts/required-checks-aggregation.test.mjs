@@ -37,16 +37,20 @@ function requiredChecksCommand() {
   return command;
 }
 
-const baseNeeds = {
-  changes: { result: "success" },
-  frontend: { result: "success" },
-  "rust-format": { result: "success" },
-  "workflow-consistency": { result: "success" },
-  "tally-portable": { result: "success" },
-  native: { result: "skipped" },
-  "bundle-smoke": { result: "skipped" },
-  "compiler-cache-retention": { result: "skipped" },
-};
+// Built from required-checks' own needs, which check-ci-workflow-consistency.mjs pins to every
+// other job, so a new job is covered here without a hand-kept list.
+function requiredChecksNeeds() {
+  const lines = readFileSync(workflowPath, "utf8").split("\n");
+  const job = lines.indexOf("  required-checks:");
+  const needs = job === -1 ? undefined : lines.slice(job + 1).find((line) => line.startsWith("    needs: ["));
+  assert.ok(needs?.endsWith("]"), "required-checks needs are missing");
+  return needs.slice("    needs: [".length, -1).split(", ");
+}
+
+const conditionalJobs = new Set(["native", "bundle-smoke", "seam-control", "compiler-cache-retention", "tax-audit-mutations"]);
+const baseNeeds = Object.fromEntries(
+  requiredChecksNeeds().map((job) => [job, { result: conditionalJobs.has(job) ? "skipped" : "success" }]),
+);
 
 function runRequiredChecks(needs) {
   return spawnSync("bash", ["-c", requiredChecksCommand()], {
@@ -81,7 +85,7 @@ test("required checks reject a missing workflow consistency result", () => {
   assert.match(result.stdout, /Required jobs did not pass: .*workflow-consistency/);
 });
 
-for (const [job, resultName] of [["frontend", "failure"], ["rust-format", "cancelled"], ["compiler-cache-retention", "cancelled"]]) {
+for (const [job, resultName] of Object.keys(baseNeeds).flatMap((job) => [[job, "failure"], [job, "cancelled"]])) {
   test(`required checks retain normal ${resultName} propagation for ${job}`, () => {
     const result = runRequiredChecks({
       ...baseNeeds,

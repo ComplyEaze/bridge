@@ -38,11 +38,6 @@ if (preflightOffset !== -1 && regressionOffset !== -1 && preflightOffset > regre
   failures.push("workflow-consistency must require pinned Rust before running reseal regressions");
 }
 
-const requiredChecks = jobBlock(workflow, "required-checks");
-if (!/^    needs: \[[^\n]*\bworkflow-consistency\b[^\n]*\]$/m.test(requiredChecks)) {
-  failures.push("required-checks must propagate workflow-consistency failures");
-}
-
 // bridge#583: the release positive control is what makes a clean seam scan of the shipped
 // executables mean anything. It runs in its own job, so that job must stay required, keep
 // bundle-smoke's scope and platforms, and keep its whole shape: a single pinned line would still
@@ -108,9 +103,6 @@ const seamControl = jobBlock(workflow, "seam-control");
 const bundleSmoke = jobBlock(workflow, "bundle-smoke");
 const bundleScope = bundleSmoke.match(/^    if: .*$/m)?.[0];
 const bundleOs = bundleSmoke.match(/^        os: .*$/m)?.[0];
-if (!/^    needs: \[[^\n]*\bseam-control\b[^\n]*\]$/m.test(requiredChecks)) {
-  failures.push("required-checks must propagate seam-control failures");
-}
 if (seamControl.trimEnd() !== expectedSeamControl) {
   failures.push("seam-control changed shape; review it against bridge#583 and update expectedSeamControl");
 }
@@ -120,6 +112,176 @@ if (!bundleScope || seamControl.match(/^    if: .*$/m)?.[0] !== bundleScope) {
 if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
+
+// A step that must run is pinned whole, as seam-control is: a pinned command line alone still
+// passes with a step-level `if`, a `continue-on-error`, an `|| true`, or the command kept only in
+// a comment. Change a step and its copy here together, deliberately.
+const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
+for (const [source, job, expected] of [
+  [workflow, "native", [
+    "      - name: Prove the approval-seam scan sees a test build",
+    "        shell: bash",
+    "        run: node scripts/check-no-test-seam.mjs --test-harness",
+  ]],
+  [workflow, "bundle-smoke", [
+    "      - name: Prove shipped executables lack the test-only approval seam",
+    "        shell: bash",
+    "        run: |",
+    "          set -euo pipefail",
+    "          ext=\"${{ runner.os == 'Windows' && '.exe' || '' }}\"",
+    "          node scripts/check-no-test-seam.mjs \"src-tauri/target/release/bridge$ext\" \"src-tauri/target/release/bridge_mcp$ext\"",
+    "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
+    "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
+    "          fi",
+  ]],
+  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"]],
+  [releaseWorkflow, "package", [
+    "      - name: Prove the release binary lacks the test-only approval seam",
+    "        shell: bash",
+    "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
+  ]],
+]) {
+  if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
+    failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);
+  }
+}
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
+  failures.push("native must run on every pull request that changes native code");
+}
+for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
+  if (source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
+}
+
+// Every MCPB is staged by package-mcpb.mjs, so its one seam scan must run unconditionally, right
+// after the binary is found: no second call, no alias, nothing between them.
+const packageMcpb = readFileSync(resolve(repositoryRoot, "scripts/package-mcpb.mjs"), "utf8");
+const packageSeamScan = [
+  "    throw new Error(`MCPB binary is missing: ${sourceBinary}`);",
+  "  }",
+  "  // Every MCPB, from CI, a release or a local build, is staged here: refuse a",
+  "  // binary compiled with the test-only approval seam (bridge#583).",
+  "  assertNoTestSeam([sourceBinary]);",
+].join("\n");
+if (packageMcpb.split("assertNoTestSeam").length !== 3 || packageMcpb.split(packageSeamScan).length !== 2) {
+  failures.push("package-mcpb must call assertNoTestSeam exactly once, unconditionally, before staging");
+}
+
+// The scope job decides whether native, bundle-smoke and seam-control run on a pull request, and
+// required-checks turns every job into the one status branch protection reads. Its needs are every
+// other job, so a new job cannot be left out, and a skipped aggregator cannot pass as green.
+const expectedChanges = [
+  "  changes:",
+  "    name: Determine bundle scope",
+  "    runs-on: ubuntu-latest",
+  "    timeout-minutes: 5",
+  "    permissions:",
+  "      contents: read",
+  "    outputs:",
+  "      bundle: ${{ steps.scope.outputs.bundle }}",
+  "      native: ${{ steps.scope.outputs.native }}",
+  "      tax_audit: ${{ steps.scope.outputs.tax_audit }}",
+  "    steps:",
+  "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7",
+  "        with:",
+  "          persist-credentials: false",
+  "          fetch-depth: 0",
+  "      - id: scope",
+  "        shell: bash",
+  "        env:",
+  "          EVENT_NAME: ${{ github.event_name }}",
+  "          BEFORE_SHA: ${{ github.event.before }}",
+  "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+  "        run: |",
+  "          set -euo pipefail",
+  "",
+  "          if [[ \"$EVENT_NAME\" == \"workflow_dispatch\" ]]; then",
+  "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
+  "            exit 0",
+  "          fi",
+  "",
+  "          if [[ \"$EVENT_NAME\" == \"pull_request\" ]]; then",
+  "            base=\"$PR_BASE_SHA\"",
+  "          else",
+  "            base=\"$BEFORE_SHA\"",
+  "          fi",
+  "",
+  "          # A new branch has no useful predecessor. Keep the conservative path.",
+  "          if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]]; then",
+  "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
+  "            exit 0",
+  "          fi",
+  "",
+  "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
+  "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
+  "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs)'; then",
+  "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
+  "          else",
+  "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
+  "          fi",
+  "",
+  "          # The mutation records check runs when the crate it guards changes, or this workflow does.",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|src-tauri/crates/bridge-tax-audit/)'; then",
+  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
+  "          else",
+  "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
+  "          fi",
+  "",
+  "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)'; then",
+  "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
+  "          else",
+  "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
+  "          fi",
+].join("\n");
+if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
+  failures.push("changes changed shape; review its scope rules and update expectedChanges");
+}
+const expectedRequiredChecks = [
+  "  required-checks:",
+  "    name: Required checks",
+  "    # Always runs so it can report a single, stable required status for branch",
+  "    # protection. Workflow consistency is unconditional and must succeed. Other",
+  "    # upstream jobs may be legitimately skipped (e.g. native/bundle on docs-only",
+  "    # PRs), but any failure or cancellation fails this job. Point branch",
+  "    # protection at this context instead of the individual matrix jobs so",
+  "    # docs-only PRs are not blocked by skipped native/bundle checks.",
+  "    # tax-audit-mutations is required too, on pull requests that touch the",
+  "    # crate: it runs the mutation runner's tests and `--verify` (no build), so a",
+  "    # bridge-tax-audit change merges only with its selected mutations proven on",
+  "    # the merged tree. Skipped on other pull requests, which is a pass here.",
+  "    if: ${{ always() }}",
+  `    needs: [${jobIds(workflow).filter((id) => id !== "required-checks").join(", ")}]`,
+  "    runs-on: ubuntu-latest",
+  "    timeout-minutes: 5",
+  "    permissions:",
+  "      contents: read",
+  "    steps:",
+  "      - name: Verify no required job failed",
+  "        shell: bash",
+  "        env:",
+  "          NEEDS_JSON: ${{ toJSON(needs) }}",
+  "        run: |",
+  "          set -euo pipefail",
+  "          printf '%s\\n' \"$NEEDS_JSON\"",
+  "          failed=\"$(",
+  "            printf '%s' \"$NEEDS_JSON\" \\",
+  "              | python3 -c \"import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))\"",
+  "          )\"",
+  "          if [[ -n \"$failed\" ]]; then",
+  "            echo \"Required jobs did not pass: $failed\"",
+  "            exit 1",
+  "          fi",
+  "          echo \"All required jobs succeeded or were legitimately skipped.\"",
+].join("\n");
+if (jobBlock(workflow, "required-checks").trimEnd() !== expectedRequiredChecks) {
+  failures.push("required-checks changed shape, or does not need every other job; update expectedRequiredChecks");
+}
+
 if (/^env:/m.test(workflow)) {
   failures.push("a workflow-level env reaches seam-control's release build; set env per job instead");
 }
@@ -202,6 +364,32 @@ function jobBlock(source, jobName) {
   let end = start + 1;
   while (end < lines.length && !/^  [A-Za-z0-9_-]+:\s*$/.test(lines[end])) end += 1;
   return lines.slice(start, end).join("\n");
+}
+
+// Parses every job id, and refuses a line at job-key indentation it cannot read, so a job
+// cannot hide from required-checks' needs behind a comment or a quoted key.
+function jobIds(source) {
+  const lines = source.split(/\r?\n/);
+  const start = lines.indexOf("jobs:");
+  if (start === -1) failures.push("CI workflow has no block-style jobs: map");
+  const ids = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^\S/.test(line)) break;
+    if (!/^  [^\s#]/.test(line)) continue;
+    const id = line.match(/^  ([A-Za-z0-9_-]+):$/)?.[1];
+    if (id) ids.push(id);
+    else failures.push(`CI workflow has a job key this gate cannot read: ${line}`);
+  }
+  return ids;
+}
+
+function stepBlock(job, head) {
+  const lines = job.split("\n");
+  const starts = lines.flatMap((line, index) => (line === head ? [index] : []));
+  if (starts.length !== 1) return undefined;
+  let end = starts[0] + 1;
+  while (end < lines.length && !/^ {0,6}\S/.test(lines[end])) end += 1;
+  return lines.slice(starts[0], end).join("\n").trimEnd();
 }
 
 function escapeRegex(value) {

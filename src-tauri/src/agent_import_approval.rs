@@ -49,8 +49,11 @@ pub(super) const MEASURED_POST_VOUCHERS: usize = 200;
 
 /// What a redeem took from the start of its call to its result: the call that
 /// finds an approval, checks the book afresh, posts and reads back. Measured
-/// live once, 50 Journals (L1-a, 28 Sep 2026, bridge#725): 18.09 s. It is not
-/// measured above 50, so a larger batch is never posted by a joining call.
+/// live once, 50 Journals on a small synthetic book (L1-a, 28 Sep 2026,
+/// bridge#725): 18.09 s. A joining call redeems only a click it finds already
+/// made, so it starts the redeem within moments of its own start: this check
+/// then limits the batch to the size measured, and bounds nothing on a large
+/// book, where a redeem costs what a fresh redeeming call does (#852).
 pub(super) const MEASURED_REDEEM: Duration = Duration::from_millis(18_090);
 pub(super) const MEASURED_REDEEM_VOUCHERS: usize = 50;
 
@@ -268,8 +271,9 @@ impl PostApprovals {
     }
 
     /// Whether a joining call that finds a click already made `elapsed` into
-    /// it can redeem it in that call (#725 slice 2.0): check the book afresh,
-    /// post and read back, all under the ceiling.
+    /// it may redeem it in that call (#725 slice 2.0): a batch no larger than
+    /// the redeem measured live, whose measured cost fits under the ceiling
+    /// from here. A measurement, not a bound on what the redeem then takes.
     pub(super) fn redeem_fits_in_call(&self, elapsed: Duration, vouchers: usize) -> bool {
         fits_within(
             self.measured_redeem,

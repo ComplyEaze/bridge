@@ -67,12 +67,9 @@ pub(in crate::agent) enum Entry {
     /// A call from the agent or the desktop: it may ask, join or redeem.
     Fresh,
     /// The second pass of a call, from the top, to redeem the approval its
-    /// own Join just found, keeping that call's clock and evidence. It may
-    /// only redeem: it never asks, so it can never show a second dialog.
-    RedeemOnly {
-        call_started: std::time::Instant,
-        evidence: Evidence,
-    },
+    /// own Join just found, keeping that call's evidence. It may only
+    /// redeem: it never asks, so it can never show a second dialog.
+    RedeemOnly { evidence: Evidence },
 }
 
 /// What a post's checked body came to: an answer, or an approval its Join
@@ -88,10 +85,7 @@ enum Step {
 /// pass (#725 slice 2.0). The passes run one after the other, never nested.
 pub(in crate::agent) enum Pass {
     Done(ToolOutcome),
-    Redeem {
-        call_started: std::time::Instant,
-        evidence: Evidence,
-    },
+    Redeem { evidence: Evidence },
 }
 
 /// What waiting on a dialog came to.
@@ -358,25 +352,19 @@ impl Server {
         {
             Pass::Done(outcome) => Ok(outcome),
             // At most one more pass: a redeem-only pass never joins, so it
-            // never asks for another.
-            Pass::Redeem {
-                call_started,
-                evidence,
-            } => match self
-                .post_import_entry(
-                    args,
-                    expected_sha256,
-                    scope,
-                    Entry::RedeemOnly {
-                        call_started,
-                        evidence,
-                    },
-                )
-                .await?
-            {
-                Pass::Done(outcome) => Ok(outcome),
-                Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
-            },
+            // never hands on another redeem.
+            Pass::Redeem { evidence } => {
+                #[cfg(test)]
+                let _ = BETWEEN_PASSES.try_with(|between| between());
+                match self
+                    .post_import_entry(args, expected_sha256, scope, Entry::RedeemOnly { evidence })
+                    .await?
+                {
+                    Pass::Done(outcome) => Ok(outcome),
+                    // Unreachable: only a Join hands on a redeem.
+                    Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
+                }
+            }
         }
     }
 
@@ -389,12 +377,10 @@ impl Server {
         scope: PostScope,
         entry: Entry,
     ) -> Result<Pass, ToolFailure> {
-        let (call_started, carried) = match entry {
-            Entry::Fresh => (std::time::Instant::now(), None),
-            Entry::RedeemOnly {
-                call_started,
-                evidence,
-            } => (call_started, Some(evidence)),
+        let call_started = std::time::Instant::now();
+        let carried = match entry {
+            Entry::Fresh => None,
+            Entry::RedeemOnly { evidence } => Some(evidence),
         };
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
@@ -1074,7 +1060,6 @@ impl Server {
         let operation = match operation {
             Ok(Step::Redeem) => {
                 return Ok(Pass::Redeem {
-                    call_started,
                     evidence: accumulated,
                 })
             }
@@ -1678,6 +1663,9 @@ tokio::task_local! {
     pub(super) static SCRIPTED_REMOTE_ID: Uuid;
     /// Test-only: the REMOTEIDs a batch post mints, one per voucher.
     pub(super) static SCRIPTED_REMOTE_IDS: Vec<Uuid>;
+    /// Test-only: run between a call's two passes (#725 slice 2.0), as a
+    /// cancel, an expiry or another route's post landing there would.
+    pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
 }
 
 /// A fresh random REMOTEID for one native post.

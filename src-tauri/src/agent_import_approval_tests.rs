@@ -1801,3 +1801,116 @@ async fn a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted() 
     );
     assert_eq!(scripted.counts(), [1]);
 }
+
+/// What happens between a call's two passes, run by the test seam there.
+type Between = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+/// A click made while no call waited, then a call run with `between` between
+/// its passes. The simulator serves enough for a second pass that asked the
+/// person again to go on and post, so such a pass would be seen.
+async fn two_pass_call_with(
+    between: impl FnOnce(&Server, &ImportLedgerLine) -> Between,
+) -> (
+    Value,
+    ImportLedgerLine,
+    tempfile::TempDir,
+    Server,
+    ScriptedApproval,
+) {
+    let (plans, _) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let hook = between(&server, &line);
+    let answer = BETWEEN_PASSES
+        .scope(
+            hook,
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let _ = sent(simulator);
+    (answer, line, directory, server, scripted)
+}
+
+/// An approval lost between the passes (here withdrawn, as an expiry landing
+/// there would lapse it) is refused by the second pass, which never asks the
+/// person again (#725 slice 2.0): one dialog in all, and no intent.
+#[tokio::test]
+async fn an_approval_lost_between_the_passes_is_refused_and_asks_nobody_again() {
+    let (answer, line, directory, server, scripted) = two_pass_call_with(|server, line| {
+        let approvals = std::sync::Arc::clone(&server.post_approvals);
+        let batch_id = line.batch_id.clone();
+        std::sync::Arc::new(move || approvals.revoke(&batch_id, "approval_expired"))
+    })
+    .await;
+    assert_eq!(
+        result(&answer)["error"]["code"],
+        "import_approval_revoked",
+        "{answer}"
+    );
+    assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+}
+
+/// A post of the batch by another route landing between the passes (another
+/// process's intent in the shared journal) is reconciled by the second pass,
+/// never posted again (#725 slice 2.0).
+#[tokio::test]
+async fn a_post_elsewhere_between_the_passes_is_reconciled_not_posted() {
+    let (answer, line, directory, server, scripted) = two_pass_call_with(|server, line| {
+        let other = server_at("127.0.0.1:9".parse().unwrap(), &server.settings.data_dir);
+        let line = line.clone();
+        std::sync::Arc::new(move || {
+            let _lock = other.lock_import_admission().unwrap();
+            other
+                .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&line))
+                .unwrap();
+        })
+    })
+    .await;
+    assert_eq!(
+        intents(directory.path()),
+        1,
+        "only the other route's intent: {answer}"
+    );
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "batch_already_dispatched",
+        "{answer}"
+    );
+    assert_eq!(scripted.counts(), [1]);
+}
+
+/// A cancellation landing between the passes, as `withdraw_post` makes one
+/// (the call's token cancelled, then its approval revoked), posts nothing and
+/// asks nobody again (#725 slice 2.0).
+#[tokio::test]
+async fn a_cancel_between_the_passes_posts_nothing() {
+    let token = tokio_util::sync::CancellationToken::new();
+    let cancel = token.clone();
+    let (answer, line, directory, server, scripted) = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(
+            token,
+            two_pass_call_with(move |server, line| {
+                let approvals = std::sync::Arc::clone(&server.post_approvals);
+                let batch_id = line.batch_id.clone();
+                std::sync::Arc::new(move || {
+                    cancel.cancel();
+                    approvals.revoke(&batch_id, "request_cancelled");
+                })
+            }),
+        )
+        .await;
+    assert_eq!(intents(directory.path()), 0, "{answer}");
+    assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "request_cancelled"
+    );
+}

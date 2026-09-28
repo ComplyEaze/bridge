@@ -1330,13 +1330,13 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             "9495.00",
         ),
         // A second unmapped payer, first by name but later in the statement
-        // and larger, so only the name puts it first.
+        // and smaller, so neither appearance nor amount puts it first.
         (
             "06Aug2026",
             "BY TRANSFER-UPI/CR/698765432109/AARDVARK BUYER/XYZ",
             "",
-            "90.00",
-            "9585.00",
+            "9.00",
+            "9504.00",
         ),
         // The first payer again, spelled otherwise, and the second payer
         // again, so both groups have two rows and one has two spellings.
@@ -1345,14 +1345,14 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             "BY TRANSFER-UPI/CR/611111111111/Synthetic Payer/XYZ",
             "",
             "10.00",
-            "9595.00",
+            "9514.00",
         ),
         (
             "08Aug2026",
             "BY TRANSFER-UPI/CR/622222222222/AARDVARK BUYER/XYZ",
             "",
-            "20.00",
-            "9615.00",
+            "2.00",
+            "9516.00",
         ),
     ]
     .map(|(date, narration, dr, cr, bal)| sbi(date, narration, dr, cr, bal));
@@ -1362,9 +1362,9 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
-        "closing_balance": "9,615.00",
+        "closing_balance": "9,516.00",
         "total_debits": "576.00",
-        "total_credits": "191.00",
+        "total_credits": "92.00",
         "bank_ledger": "Synthetic Bank Ledger",
         "suspense_ledger": "Suspense"
     });
@@ -1387,7 +1387,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         ParsedStatement {
             account_number: "00000000001234".into(),
             statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9615.00").unwrap(),
+            closing: bridge_tally_core::ExactDecimal::parse("9516.00").unwrap(),
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
@@ -1556,8 +1556,8 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             ("/cash_questions/0/amount", "64.00"),
             ("/cash_questions/0/bridge_txn_id", open_id.as_str()),
             ("/cash_questions/0/date", "2026-08-05"),
-            ("/reconciled/closing_balance", "9615.00"),
-            ("/reconciled/total_credits", "191.00"),
+            ("/reconciled/closing_balance", "9516.00"),
+            ("/reconciled/total_credits", "92.00"),
             ("/reconciled/total_debits", "576.00"),
             ("/sha256", "0"),
         ]
@@ -1586,6 +1586,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     );
     // The payer printed two ways is one group of two rows, shown by the first
     // spelling by name, with the other listed.
+    assert_eq!(summary["counterparties"][0]["rows"], 2, "{summary}");
     let payer = &summary["counterparties"][1];
     assert_eq!(payer["rows"], 2, "{payer}");
     assert_eq!(payer["also_printed_as"], json!([party("Synthetic Payer")]));

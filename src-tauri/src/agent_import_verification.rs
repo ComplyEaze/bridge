@@ -715,7 +715,9 @@ fn markdown_code(text: &str) -> String {
         .unwrap_or(0);
     let padded = text.is_empty()
         || longest_run > 0
-        || (text.starts_with(' ') && text.ends_with(' ') && text.trim() != "");
+        || (text.starts_with(' ')
+            && text.ends_with(' ')
+            && !text.chars().all(|character| character == ' '));
     let fence = "`".repeat(longest_run + 1);
     if padded {
         format!("{fence} {text} {fence}")

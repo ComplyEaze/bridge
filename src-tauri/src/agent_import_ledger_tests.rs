@@ -279,6 +279,12 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
         }
         // Retrying requires a fresh snapshot. An unrelated batch publication
         // between its admission and publication must not invalidate that token.
+        // The retry records the other verdict, so the ledger shows it wrote.
+        let retry_status = if newer_status == VerificationStatus::PostedVerified {
+            VerificationStatus::VerificationIncomplete
+        } else {
+            VerificationStatus::PostedVerified
+        };
         let retry = older
             .latest_import_snapshot(&original.batch_id)
             .unwrap()
@@ -300,7 +306,7 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             )
             .unwrap();
         older
-            .persist_import_verification(&stale_proof, &retry.batch, newer_status, retry.generation)
+            .persist_import_verification(&stale_proof, &retry.batch, retry_status, retry.generation)
             .unwrap();
         // The file is the retry's proof, carrying the status the ledger records.
         let recorded = older
@@ -309,7 +315,7 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .unwrap()
             .batch
             .status;
-        assert_eq!(recorded, newer_status.as_str());
+        assert_eq!(recorded, retry_status.as_str());
         let mut expected = stale_proof.clone();
         expected["verification_status"] = json!(recorded);
         assert_eq!(

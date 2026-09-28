@@ -1159,7 +1159,7 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
             config,
             &identity,
             as_of,
-            OutstandingsCurrencyAssertion::Inr,
+            Some(OutstandingsCurrencyAssertion::Inr),
             OutstandingsAgeingAnchor::DueDate,
         )
         .await

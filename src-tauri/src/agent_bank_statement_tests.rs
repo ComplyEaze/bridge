@@ -443,6 +443,34 @@ async fn mask_parties_masks_every_name_in_the_summary() {
     ] {
         assert!(!text.contains(name), "{name} was not masked: {text}");
     }
+    // The evidence describes the result as it is returned.
+    let content = &response["structuredContent"];
+    assert_eq!(
+        content["evidence"]["response_sha256"],
+        sha256_json(&content["result"])
+    );
+    assert_eq!(
+        content["evidence"]["bytes"],
+        serde_json::to_vec(&content["result"]).unwrap().len()
+    );
+}
+
+/// The evidence of a parse result is its hash and size as the caller receives
+/// it: with mask_parties, the masked names.
+#[test]
+fn the_evidence_describes_the_result_as_returned() {
+    let result = json!({"party": party_name("SYNTHETIC PAYER"), "rows": 3});
+    let masked = json!({"party": "SY…ER", "rows": 3});
+    let plain = json!({"party": "SYNTHETIC PAYER", "rows": 3});
+    let size = |value: &Value| serde_json::to_vec(value).unwrap().len();
+    assert_eq!(
+        returned_evidence(&result, Redaction::MaskParties),
+        (sha256_json(&masked), size(&masked))
+    );
+    assert_eq!(
+        returned_evidence(&result, Redaction::None),
+        (sha256_json(&plain), size(&plain))
+    );
 }
 
 #[tokio::test]

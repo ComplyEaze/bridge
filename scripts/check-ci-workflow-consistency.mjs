@@ -151,14 +151,25 @@ for (const [source, job, expected, digest] of [
   const actual = sha256(jobThrough(source, job, expected[0]));
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
 }
-// native, bundle-smoke and package run this composite action before their scans.
-const windowsSetup = createHash("sha256");
-for (const path of trackedFiles().filter((file) => file.startsWith(".github/actions/setup-windows-native/"))) {
-  windowsSetup.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
+// Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job,
+// and native, bundle-smoke and package run a local composite action before their scans; a local
+// action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
+for (const [name, source, digest] of [
+  ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],
+  ["release-mcpb-preview.yml", releaseWorkflow, "cf1da8bf810c3134d781b2b95e08803b9c1e58b48d20992931ec17660bd73c42"],
+]) {
+  const lines = source.split("\n");
+  const jobs = lines.findIndex((line) => line.replace(/\r$/, "") === "jobs:");
+  const actual = sha256(jobs === -1 ? source : lines.slice(0, jobs + 1).join("\n"));
+  if (actual !== digest) failures.push(`${name}'s workflow header changed; its digest is now ${actual}`);
 }
-const windowsSetupDigest = windowsSetup.digest("hex");
-if (windowsSetupDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
-  failures.push(`.github/actions/setup-windows-native changed; its digest is now ${windowsSetupDigest}`);
+const localActions = createHash("sha256");
+for (const path of trackedFiles().filter((file) => file.startsWith(".github/actions/"))) {
+  localActions.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
+}
+const localActionsDigest = localActions.digest("hex");
+if (localActionsDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
+  failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");

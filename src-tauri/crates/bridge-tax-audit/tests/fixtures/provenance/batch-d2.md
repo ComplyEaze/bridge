@@ -44,7 +44,7 @@ branch the real book does not reach. This bends the two-book bar; the owner may 
 
 ## Re-pin at the s.194T TDS rule (Lane E3, 2026-09-28, later)
 
-At `38846495ef3ded7d6504ef8cf75ee18e5b562675` (brain main) a zero line never touches a ledger; a TDS voucher on a ledger shared by partners is listed for
+At `38846495ef3ded7d6504ef8cf75ee18e5b562675` (the reference's main) a zero line never touches a ledger; a TDS voucher on a ledger shared by partners is listed for
 each sharing partner unless its TDS side, net-signed apart from the TDS, is partners' capitals alone (a TDS netting to
 nil falls back to touching a partner's capital), and the unattributed vouchers join the s.194T evidence; a partner
 under a no-interest deed is never computed, whatever the switch. The goldens of `partners_deed_no_interest`,
@@ -54,7 +54,7 @@ in each; in `partners_tds_mixed` also two partners' s.194T limits and evidence);
 
 ## Re-pin at list-only and the no-interest deed (Lane E3, 2026-09-28)
 
-At `01b6f5d8dfd526474d32335778f6cada5dc23c85` (brain main) the reference computes the s.40(b) excess for no partner and asks for each
+At `01b6f5d8dfd526474d32335778f6cada5dc23c85` (the reference's main) the reference computes the s.40(b) excess for no partner and asks for each
 (`S40B_EXCESS_COMPUTED = False`), withholds the firm total, reads only plain forward interest vouchers, names a
 credit to a ledger it does not read, refuses a partner configuration with an empty or repeated capital list, a
 capital ledger shared by two partners, a ledger missing from the books or one ledger in two roles, and reads the

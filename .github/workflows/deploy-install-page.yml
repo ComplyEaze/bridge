@@ -33,9 +33,10 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh api "repos/${REPOSITORY}/releases?per_page=100" \
-            --jq '[.[] | select(.draft == false) | {tag_name, draft, prerelease, published_at, assets: [.assets[] | {name, browser_download_url}]}]' \
-            > site/releases.json
+          # --paginate reads every page; --jq then prints one release per line, and jq -s collects them.
+          gh api --paginate "repos/${REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false) | {tag_name, draft, prerelease, published_at, assets: [.assets[] | {name, browser_download_url}]}' \
+            | jq -s . > site/releases.json
           # Counted with the page's own predicate, so the deploy and the page agree on what installs.
           count="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; import { isInstallablePreview } from "./site/release-catalog.mjs"; console.log(JSON.parse(readFileSync("site/releases.json", "utf8")).filter(isInstallablePreview).length);')"
           if [ "${count}" -lt 1 ]; then

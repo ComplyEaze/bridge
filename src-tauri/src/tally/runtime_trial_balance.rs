@@ -1,8 +1,12 @@
 //! One native report operation shared by desktop and MCP callers.
 use super::*;
+use bridge_tally_protocol::native_statement_reports::{
+    parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
+};
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, render_native_trial_balance_request, NativeTrialBalance,
 };
+use bridge_tally_protocol::TallyNamedMaster;
 
 /// A completed observation, not a reusable admission for a later write.
 #[derive(Debug, Clone, Serialize)]
@@ -16,6 +20,74 @@ pub struct TrialBalanceRead {
     pub totals: crate::reports::trial_balance::TrialBalanceTotals,
     pub read_at: String,
     pub evidence: RuntimeReadEvidence,
+}
+
+/// A Profit and Loss or Balance Sheet read: the Trial Balance it derives from,
+/// the group tree that classifies it, and Tally's own Balance Sheet (the gate)
+/// and, for a P&L, Tally's own Profit and Loss, all read inside one identity and
+/// book-extent bracket (#692).
+#[derive(Debug, Clone, Serialize)]
+pub struct StatementsRead {
+    pub trial_balance: TrialBalanceRead,
+    pub derived: crate::reports::statements::DerivedStatements,
+}
+
+/// Sealed so that nothing outside it can build a [`SingleInrAdmission`] or a
+/// [`SingleCurrencyTrialBalance`]: the rest of this module can obtain the first
+/// only from `admit_single_inr`, and the second only from `admitted` with it.
+mod single_inr {
+    use super::{CompanyCurrencyRead, NativeTrialBalance};
+
+    /// Proof that a currency read found exactly one Currency master, and that it
+    /// is INR: `admit_single_inr` is the only way to obtain one, and it succeeds
+    /// only where `admit_inr` does. A several-currency book's admission is a
+    /// different type and cannot stand in for it (#692; #715 admits its partial
+    /// read by another path).
+    #[derive(Debug)]
+    pub(crate) struct SingleInrAdmission {
+        _sealed: (),
+    }
+
+    impl CompanyCurrencyRead {
+        pub(crate) fn admit_single_inr(self) -> Result<SingleInrAdmission, &'static str> {
+            self.admit_inr().map(|_| SingleInrAdmission { _sealed: () })
+        }
+    }
+
+    /// A Trial Balance whose company passed the single-INR admission: every
+    /// ledger of a book with one currency master. It is built only from a
+    /// [`SingleInrAdmission`] taken in the same bracket, so a read of a
+    /// several-currency book can never become one. The statement derivation
+    /// accepts nothing else (#692).
+    #[derive(Debug, Clone)]
+    pub(crate) struct SingleCurrencyTrialBalance(NativeTrialBalance);
+
+    impl SingleCurrencyTrialBalance {
+        pub(super) fn admitted(
+            report: NativeTrialBalance,
+            _admission: &SingleInrAdmission,
+        ) -> Self {
+            Self(report)
+        }
+
+        pub(crate) fn report(&self) -> &NativeTrialBalance {
+            &self.0
+        }
+
+        #[cfg(test)]
+        pub(crate) fn admitted_for_tests(report: NativeTrialBalance) -> Self {
+            Self(report)
+        }
+    }
+}
+pub(crate) use single_inr::SingleCurrencyTrialBalance;
+
+/// What a statement read adds to a Trial Balance read.
+struct StatementSources {
+    trial_balance: SingleCurrencyTrialBalance,
+    groups: Vec<TallyNamedMaster>,
+    balance_sheet: NativeStatement,
+    profit_and_loss: Option<NativeStatement>,
 }
 
 /// An ordered caller-selected range. Profile-specific boundary admission stays
@@ -85,6 +157,48 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         period: TrialBalancePeriod,
     ) -> anyhow::Result<(TrialBalanceRead, CompanyBookExtent)> {
+        self.fetch_trial_balance_sources(config, identity, period, None)
+            .await
+            .map(|(read, _, extent)| (read, extent))
+    }
+
+    /// Tally's `kind` statement derived from the Trial Balance and group tree.
+    /// Tally's own Balance Sheet for the same window gates every result, and for
+    /// a P&L Tally's own Profit and Loss gates gross and net as well.
+    pub(crate) async fn fetch_statements(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        period: TrialBalancePeriod,
+        kind: NativeStatementKind,
+    ) -> anyhow::Result<StatementsRead> {
+        let (trial_balance, sources, _) = self
+            .fetch_trial_balance_sources(config, identity, period, Some(kind))
+            .await?;
+        let sources = sources.ok_or_else(|| anyhow::anyhow!("statement_sources_not_read"))?;
+        let derived = crate::reports::statements::derive_statements(
+            &sources.trial_balance,
+            &sources.groups,
+            &sources.balance_sheet,
+            sources.profit_and_loss.as_ref(),
+        )?;
+        Ok(StatementsRead {
+            trial_balance,
+            derived,
+        })
+    }
+
+    async fn fetch_trial_balance_sources(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        period: TrialBalancePeriod,
+        statement: Option<NativeStatementKind>,
+    ) -> anyhow::Result<(
+        TrialBalanceRead,
+        Option<StatementSources>,
+        CompanyBookExtent,
+    )> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
@@ -126,12 +240,12 @@ impl TallyRuntime {
                         let currency = parse_company_currency(&currency_xml)?;
                         // Reuse the observed single-INR admission used by existing
                         // monetary reports. Multiple masters cannot establish base currency.
-                        CompanyCurrencyRead {
+                        let admission = CompanyCurrencyRead {
                             currency: currency.clone(),
                             extent: extent.clone(),
                             evidence: evidence.clone(),
                         }
-                        .admit_inr()
+                        .admit_single_inr()
                         .map_err(TrialBalanceReadError::Currency)?;
 
                         let request =
@@ -145,6 +259,69 @@ impl TallyRuntime {
                             .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                         let report = parse_native_trial_balance(&xml, identity.company_guid())?;
                         let totals = crate::reports::trial_balance::observed_totals(&report)?;
+                        let sources = match statement {
+                            None => None,
+                            Some(kind) => {
+                                let request =
+                                    render_native_group_snapshot_request(identity.display_name());
+                                let (xml, bytes, hash) = client
+                                    .fetch_native_report_paired(request.clone())
+                                    .await?
+                                    .require_stable(PairedReadValidationError::NativeLedgerGroup)?;
+                                evidence = evidence
+                                    .clone()
+                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                                let groups =
+                                    parse_native_group_snapshot(&xml, identity.company_guid())?;
+                                // Tally's own Balance Sheet gates both tools; its own
+                                // Profit and Loss is read only for a P&L's report.
+                                let request = render_native_statement_request(
+                                    NativeStatementKind::BalanceSheet,
+                                    identity.display_name(),
+                                    &period,
+                                );
+                                let (xml, bytes, hash) = client
+                                    .fetch_native_report_paired(request.clone())
+                                    .await?
+                                    .require_stable(PairedReadValidationError::NativeStatement)?;
+                                evidence = evidence
+                                    .clone()
+                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                                let balance_sheet = parse_native_statement(
+                                    NativeStatementKind::BalanceSheet,
+                                    &xml,
+                                )?;
+                                let profit_and_loss = if kind == NativeStatementKind::ProfitAndLoss
+                                {
+                                    let request = render_native_statement_request(
+                                        kind,
+                                        identity.display_name(),
+                                        &period,
+                                    );
+                                    let (xml, bytes, hash) = client
+                                        .fetch_native_report_paired(request.clone())
+                                        .await?
+                                        .require_stable(
+                                            PairedReadValidationError::NativeStatement,
+                                        )?;
+                                    evidence = evidence.clone().combine(
+                                        RuntimeReadEvidence::paired(&request, hash, bytes),
+                                    );
+                                    Some(parse_native_statement(kind, &xml)?)
+                                } else {
+                                    None
+                                };
+                                Some(StatementSources {
+                                    trial_balance: SingleCurrencyTrialBalance::admitted(
+                                        report.clone(),
+                                        &admission,
+                                    ),
+                                    groups,
+                                    balance_sheet,
+                                    profit_and_loss,
+                                })
+                            }
+                        };
                         let closing_extent = client.fetch_company_book_extent(&identity).await?;
                         if closing_extent != extent {
                             return Err(PairedReadValidationError::NativeLedgerExtent.into());
@@ -165,6 +342,7 @@ impl TallyRuntime {
                                 read_at: chrono::Utc::now().to_rfc3339(),
                                 evidence: evidence.clone(),
                             },
+                            sources,
                             extent,
                         ))
                     }

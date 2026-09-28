@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
@@ -86,7 +90,53 @@ function assertInstallPageWorkflow(page) {
   assertUnconditional(upload, "Pages upload step");
   assertUnconditional(publish, "Pages deployment step");
   assert.equal(upload.with.path, "site");
+  const snapshot = deploy.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
+  assert.ok(snapshot, "the install page must ship a release snapshot for when the GitHub API refuses it");
+  assertUnconditional(snapshot, "release snapshot step");
+  assert.ok(deploy.steps.indexOf(snapshot) < deploy.steps.indexOf(upload), "the snapshot must be written before the site is uploaded");
+  assert.match(snapshot.run, /set -euo pipefail/);
 }
+
+// Runs the snapshot step's own shell with `gh` replaced by a function that applies the step's
+// real --jq filter to fixture JSON, so the draft filter and the empty guard are exercised, not matched.
+function runSnapshotStep(run, releases) {
+  const dir = mkdtempSync(join(tmpdir(), "bridge-snapshot-"));
+  mkdirSync(join(dir, "site"));
+  copyFileSync(new URL("../site/release-catalog.mjs", import.meta.url), join(dir, "site", "release-catalog.mjs"));
+  writeFileSync(join(dir, "fixture.json"), JSON.stringify(releases));
+  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; jq "$4" fixture.json; }\n${run}`;
+  const result = spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8", env: { ...process.env, REPOSITORY: "example/bridge" } });
+  const written = existsSync(join(dir, "site", "releases.json")) ? readFileSync(join(dir, "site", "releases.json"), "utf8") : undefined;
+  rmSync(dir, { recursive: true, force: true });
+  return { status: result.status, stderr: result.stderr, written };
+}
+
+test("the install page snapshot step drops drafts and refuses a list with no mcp-preview release", async (t) => {
+  if (spawnSync("jq", ["--version"]).status !== 0) {
+    t.skip("jq is not installed on this host; the deploy runner has it");
+    return;
+  }
+  const page = await workflow("../.github/workflows/deploy-install-page.yml");
+  const { run } = page.jobs.deploy.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
+  const files = (tag) => ["windows-x64", "macos-arm64"].flatMap((platform) => [`bridge-tally-${tag}-${platform}.mcpb`, `bridge-tally-${tag}-${platform}.mcpb.sha256`]);
+  const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, size: 1 })) });
+
+  const ok = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("mcp-preview-0.3.0", false), release("v0.1.0", false)]);
+  assert.equal(ok.status, 0, ok.stderr);
+  const snapshot = JSON.parse(ok.written);
+  assert.deepEqual(snapshot.map((entry) => entry.tag_name), ["mcp-preview-0.3.0", "v0.1.0"]);
+  assert.deepEqual(Object.keys(snapshot[0]).sort(), ["assets", "draft", "prerelease", "published_at", "tag_name"]);
+  assert.deepEqual(Object.keys(snapshot[0].assets[0]).sort(), ["browser_download_url", "name"]);
+
+  const onlyDraftPreview = runSnapshotStep(run, [release("mcp-preview-0.4.0", true), release("v0.1.0", false)]);
+  assert.equal(onlyDraftPreview.status, 1);
+  assert.match(onlyDraftPreview.stderr, /refusing to deploy/);
+  assert.equal(runSnapshotStep(run, []).status, 1);
+  // A preview missing one checksum would deploy a page with no download, so it is refused too.
+  const incomplete = runSnapshotStep(run, [release("mcp-preview-0.3.0", false, files("mcp-preview-0.3.0").slice(0, 3))]);
+  assert.equal(incomplete.status, 1);
+  assert.match(incomplete.stderr, /no installable mcp-preview release/);
+});
 
 test("publication workflows enforce their parsed trigger, dependency, branch, and platform controls", async () => {
   assertReleaseWorkflow(await workflow("../.github/workflows/release-mcpb-preview.yml"));

@@ -49,14 +49,18 @@ pub mod ledger_ids;
 pub mod ledger_scrutiny;
 pub mod loans_interest;
 pub mod partners_40b_194t;
+pub mod party_monthly;
 pub mod read;
 pub mod registry;
 pub mod rules;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
+pub mod stock;
+pub mod stock_read;
 mod support;
 pub mod tds_payees;
 pub mod tds_tcs_26as;
+pub mod tds_tranches;
 mod text_tables;
 pub mod trial_balance;
 pub mod twentysixas_receipts;
@@ -130,6 +134,14 @@ pub struct Engagement {
     /// `[client].entity_type` ("individual", "firm", ...); `applicability_44ab` reads it (the
     /// s.44ADA profession flag) and refuses without it. Optional for every other test.
     pub entity_type: Option<String>,
+    /// `[client].state`, the state's name; `None` when absent. `tds_payees` adds the Kerala High
+    /// Court note to a short deduction by it. A value that is not a name refuses reading the
+    /// engagement, as the reference's pack refuses.
+    pub client_state: Option<String>,
+    /// `[deductor].activity`; `None` when absent. It decides an individual/HUF's TDS deductor
+    /// limit in `tds_payees`. Any other value refuses reading the engagement, as the reference's
+    /// pack refuses.
+    pub deductor_activity: Option<tds_payees::DeductorActivity>,
     /// `applicability_44ab`-only: the optional `[presumptive_history]` table, verbatim (client
     /// confirmation of s.44AD history, never inferred from the books); `None` when absent.
     pub presumptive_history: Option<toml::Table>,
@@ -436,6 +448,24 @@ pub struct TdsConfig {
     /// `[tds_payees].s194j_category_by_ledger`, optional, empty when absent. A value that is not a
     /// string is kept as `None`: the reference finds it in no category, so the ledger is unmapped.
     pub s194j_category_by_ledger: BTreeMap<String, Option<String>>,
+    /// `[tds_payees.reversals]`: reversal voucher GUID -> the CA's classification. Empty when
+    /// absent.
+    pub reversals: BTreeMap<String, tds_payees::Reversal>,
+    /// `[tds_payees].gst_separate_by_agreement`: payees (ledger or alias) whose agreement states
+    /// GST separately. Empty when absent.
+    pub gst_separate: BTreeSet<String>,
+    /// `[tds_payees.foreseeability]`'s names (its values are checked; only the names reach
+    /// `tds_payees`, which reports a name matching no payee).
+    pub foreseeability_names: BTreeSet<String>,
+    /// `[[tds.challans]]`: `None` when absent (deposit not verified); an empty list means
+    /// "recorded: none deposited".
+    pub challans: Option<Vec<tds_payees::Challan>>,
+    /// `[[tds.form_26a]]`: payee -> whether its Form 26A is held. Empty when absent.
+    pub form_26a: BTreeMap<String, bool>,
+    /// `[tds].previous_year_turnover_status` is "placeholder".
+    pub turnover_is_placeholder: bool,
+    /// `[tds].goods_carriage_ledgers`, bound by [`Engagement::bind`]; empty before binding.
+    pub goods_carriage_ledgers: BTreeSet<String>,
 }
 
 /// `[snapshot]` keys of the reference engine's legacy raw-export layout. A config naming a read
@@ -759,11 +789,19 @@ not YYYY-MM-DD"
                         .map(|(k, v)| (k.clone(), v.as_str().map(str::to_string)))
                         .collect(),
                 };
+                let lists = tds_payees::read_config_lists(tds, tds_payees)?;
                 Ok(TdsConfig {
                     nature_by_ledger: string_map("nature_by_ledger")?,
                     payee_aliases: string_map("payee_aliases")?,
                     previous_year_turnover_paise,
                     s194j_category_by_ledger,
+                    reversals: lists.reversals,
+                    gst_separate: lists.gst_separate,
+                    foreseeability_names: lists.foreseeability_names,
+                    challans: lists.challans,
+                    form_26a: lists.form_26a,
+                    turnover_is_placeholder: lists.turnover_is_placeholder,
+                    goods_carriage_ledgers: BTreeSet::new(),
                 })
             })
             .transpose()?;
@@ -831,6 +869,8 @@ not YYYY-MM-DD"
             tds_tcs_26as_missing,
             tds,
             book_keeping_quality: BookKeepingQualityConfig::default(),
+            client_state: tds_payees::read_client_state(client)?,
+            deductor_activity: tds_payees::read_deductor_activity(&cfg)?,
             entity_type: client
                 .get("entity_type")
                 .map(|v| {
@@ -1060,8 +1100,10 @@ fn bound_loans(bound: &Engagement) -> Result<BTreeMap<String, loans_interest::Lo
 }
 
 /// Run `loans_interest` on a book and return its canonical parity dump, with the module's own
-/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, as
-/// the reference's pack reads it; absent without a `[tds]` table.
+/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, and
+/// whether it is a placeholder `[tds].previous_year_turnover_status`, as the reference's pack reads
+/// them (absent without a `[tds]` table); the TDS-payable ledgers and `[deductor].activity` are read
+/// as for `tds_payees`.
 pub fn loans_interest_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1089,10 +1131,18 @@ pub fn loans_interest_on(
         rules,
         &entity_type,
         &loans,
-        turnover,
-        &cash,
-        &bank,
-        &shared,
+        &loans_interest::Inputs {
+            previous_year_turnover_paise: turnover,
+            cash: &cash,
+            bank: &bank,
+            shared_interest_ledgers: &shared,
+            tds_payable_ledgers: &tds_payable_ledgers(&bound)?,
+            deductor_activity: bound.deductor_activity,
+            turnover_is_placeholder: bound
+                .tds
+                .as_ref()
+                .is_some_and(|t| t.turnover_is_placeholder),
+        },
     )?;
     let module_check = loans_interest::check_invariants(book, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
@@ -1188,6 +1238,45 @@ pub fn trial_balance_on(
     let (_engagement, _report) = engagement.bind(book)?;
     let result = trial_balance::run(book, rules)?;
     let module_check = trial_balance::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `party_monthly` on a book and return its canonical parity dump, with the module's own
+/// PWM-1/PWM-2 check. Cash and bank are the engagement's cash and bank groups, as the reference's
+/// pack passes them; the period is the engagement's, and the top-parties cut is the module's own.
+pub fn party_monthly_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let result = party_monthly::run(
+        book,
+        rules,
+        &bound.period,
+        &cash,
+        &bank,
+        party_monthly::PARTY_TOP_N,
+    )?;
+    let module_check = party_monthly::check_invariants(book, &bound.period, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `stock` on a book and return its canonical parity dump, with the module's own STK-1 check.
+/// The item masters, both Stock Summaries and the ISINTEGRATED flag come from the read's stock
+/// parts and `[stock]` ([`stock_read::stock_inputs`]), parsed here, so a missing or malformed
+/// stock part refuses this test alone.
+pub fn stock_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (_engagement, _report) = engagement.bind(book)?;
+    let inputs = stock_read::stock_inputs(engagement.raw_cfg.get("stock"), book.stock.as_ref())?;
+    let result = stock::run(book, rules, &inputs)?;
+    let module_check = stock::check_invariants(book, &result, &inputs)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1521,8 +1610,55 @@ pub fn tds_payees_on(
         .tds
         .as_ref()
         .ok_or_else(|| AuditError::Config("tds_payees needs a [tds] table".to_string()))?;
-    let result = tds_payees::run(book, rules, &entity_type, tds)?;
+    let inputs = tds_payees_inputs(&bound)?;
+    let result = tds_payees::run(book, rules, &entity_type, tds, &inputs)?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
+/// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
+/// `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
+pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>> {
+    if bound.statutory_dues.not_a_table {
+        return Err(AuditError::Config(
+            "[statutory_dues] is not a table".to_string(),
+        ));
+    }
+    Ok(bound
+        .statutory_dues
+        .nature_by_ledger
+        .iter()
+        .filter(|(_, nature)| nature.as_str() == Some("tds_payable"))
+        .map(|(ledger, _)| ledger.clone())
+        .collect())
+}
+
+/// What the reference's `pack._tds_payees` passes `tds_payees.run()` from tables other than
+/// `[tds]`/`[tds_payees]`, from a bound engagement: the ledgers `[statutory_dues]` classifies as
+/// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
+/// own default: the reference's pack requires the table for its whole run), the `[partners]`
+/// keys, `[client].state` and `[deductor].activity`.
+pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
+    let tds_ledgers = tds_payable_ledgers(bound)?;
+    let gst_ledgers = match &bound.book_keeping_quality.tax_ledgers {
+        None => BTreeSet::new(),
+        Some(TaxLedgers::NotATable) => {
+            return Err(AuditError::Config(
+                "[roles].tax_ledgers is not a table".to_string(),
+            ))
+        }
+        Some(TaxLedgers::Heads(heads)) => heads
+            .iter()
+            .flat_map(|(_, ledgers)| ledgers.iter().cloned())
+            .collect(),
+    };
+    Ok(tds_payees::Inputs {
+        tds_ledgers,
+        gst_ledgers,
+        other_names: bound.partners.partners.keys().cloned().collect(),
+        client_state: bound.client_state.clone(),
+        deductor_activity: bound.deductor_activity,
+    })
 }
 
 /// Run `partners_40b_194t` on an already-built book: its canonical parity dump (the reference

@@ -304,6 +304,7 @@ fn ageing_ledgers_with_currency(customer_a: &str) -> String {
 
 async fn operator_outstandings(
     plans: Vec<ScenarioPlan>,
+    guid: &str,
 ) -> (anyhow::Result<OutstandingsLoadResult>, usize) {
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let result = TallyRuntime::default()
@@ -312,9 +313,8 @@ async fn operator_outstandings(
                 host: simulator.address().ip().to_string(),
                 port: simulator.address().port(),
             },
-            &identity_for_guid(&companies(), "eebb9a9f-1679-4468-9e8f-814c729674cb"),
+            &identity_for_guid(&companies(), guid),
             TallyDate::parse("20260801").unwrap(),
-            OutstandingsCurrencyAssertion::Inr,
             OutstandingsAgeingAnchor::DueDate,
         )
         .await;
@@ -336,64 +336,114 @@ fn requests_sent(simulator: SequenceSimulator) -> usize {
         .count()
 }
 
-/// bridge#604: the desktop read of an operator's INR assertion reads the
-/// currency masters itself, and refuses a book with several (which can hold a
-/// foreign-currency ledger whose bills Tally returns as plain amounts) or with
-/// none (several not ruled out) before any bill is read. Spare native
-/// responses are queued so that a read past the refusal would be served and
-/// counted.
+const AGEING_GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
+
+/// Labelled edits of the captured Company collection: its FOREX row's
+/// `CURRENCYNAME` replaced by `value`.
+fn forex_company_naming(value: &str) -> String {
+    let company = forex_company_currency();
+    let rupee = "<CURRENCYNAME TYPE=\"String\">\u{20b9}</CURRENCYNAME>";
+    assert!(company.find(rupee).unwrap() < company.find("BRIDGE SHAPE LAB").unwrap());
+    company.replacen(
+        rupee,
+        &format!("<CURRENCYNAME TYPE=\"String\">{value}</CURRENCYNAME>"),
+        1,
+    )
+}
+
+/// FOREX's classified currency read with its company naming `value`, then
+/// FOREX's native read, queued so that a read past a refusal would be served
+/// and counted.
+fn forex_plans_naming(value: &str) -> Vec<ScenarioPlan> {
+    let mut plans = classified_currency_plans(
+        forex_originalname_currency(),
+        forex_company_naming(value),
+        forex_company_naming(value),
+    );
+    plans.extend(forex_native_plans());
+    plans
+}
+
+/// bridge#551, on the desktop read: a book whose currency read admits no INR
+/// base refuses before any bill. Several masters, from labelled edits of the
+/// FOREX captures: the company names its `$` master (not INR) or no master
+/// (undetermined). And a read with no master at all.
 #[tokio::test]
-async fn operator_outstandings_refuse_several_or_no_currency_masters_before_any_bill() {
+async fn operator_outstandings_refuse_a_book_without_an_inr_base_before_any_bill() {
     let captured = currency_source();
     let start = captured.find("<CURRENCY ").unwrap();
     let end = start + captured[start..].find("</CURRENCY>").unwrap() + "</CURRENCY>".len();
     let mut none = captured.clone();
     none.replace_range(start..end, "");
-    for (fault, currency, reason) in [
-        // A live capture of a book with `I₹` and `$` masters.
+    for (fault, plans, guid, reason, requests) in [
         (
-            "multiple",
-            multi_currency_source(),
-            "company_base_currency_undetermined",
+            "dollar base",
+            forex_plans_naming("$"),
+            FOREX_GUID,
+            "company_base_currency_not_inr",
+            22,
         ),
-        ("empty", none, "company_currency_probe_failed"),
+        (
+            "no base",
+            forex_plans_naming("\u{20ac}"),
+            FOREX_GUID,
+            "company_base_currency_undetermined",
+            22,
+        ),
+        (
+            "empty",
+            currency_then_native_plans(none),
+            AGEING_GUID,
+            "company_currency_probe_failed",
+            14,
+        ),
     ] {
-        let (result, requests) = operator_outstandings(currency_then_native_plans(currency)).await;
+        let (result, sent) = operator_outstandings(plans, guid).await;
         let result = result.unwrap();
         assert!(
             matches!(&result, OutstandingsLoadResult::Partial { reason: got, .. } if *got == reason.into()),
             "{fault}: {result:?}"
         );
-        // The currency read's 14 requests, and not one more.
-        assert_eq!(requests, 14, "{fault}");
+        // The currency read's requests (the plain read, and with several
+        // masters the ORIGINALNAME re-read and the Company read), no more.
+        assert_eq!(sent, requests, "{fault}");
     }
 }
 
-/// bridge#604: with one Currency master the operator's assertion stands, as
-/// before: a master Tally names INR, and one it does not (the case the
-/// screen's confirmation exists for), both read through to a complete report.
+/// bridge#551 (601c): with one Currency master there is no operator
+/// override. A master Tally names INR reads through to a complete report; one
+/// it does not (the case bridge#604's confirmation used to admit) is refused
+/// as not INR, before any bill.
 #[tokio::test]
-async fn operator_outstandings_with_one_currency_master_read_through() {
+async fn one_currency_master_reads_only_when_tally_names_it_inr() {
     let captured = currency_source();
     let foreign = captured.replace(
         "<MAILINGNAME TYPE=\"String\">INR</MAILINGNAME>",
         "<MAILINGNAME TYPE=\"String\">USD</MAILINGNAME>",
     );
     assert_ne!(foreign, captured);
-    for currency in [captured, foreign] {
-        let (result, requests) = operator_outstandings(currency_then_native_plans(currency)).await;
-        assert!(matches!(
-            result.unwrap(),
-            OutstandingsLoadResult::Complete {
-                currency_assertion: OutstandingsCurrencyAssertion::Inr,
-                ..
-            }
-        ),);
-        assert_eq!(requests, 44);
-    }
+    let (result, requests) =
+        operator_outstandings(currency_then_native_plans(captured), AGEING_GUID).await;
+    assert!(matches!(
+        result.unwrap(),
+        OutstandingsLoadResult::Complete {
+            currency_assertion: OutstandingsCurrencyAssertion::Inr,
+            ..
+        }
+    ));
+    assert_eq!(requests, 44);
+    let (result, requests) =
+        operator_outstandings(currency_then_native_plans(foreign), AGEING_GUID).await;
+    let result = result.unwrap();
+    assert!(
+        matches!(&result, OutstandingsLoadResult::Partial { reason, .. }
+            if *reason == "company_base_currency_not_inr".into()),
+        "{result:?}"
+    );
+    assert_eq!(requests, 14);
 }
 
-/// bridge#604: the operator's assertion is bound to the extent the currency
+/// bridge#604: the desktop read's witness is bound to the extent the currency
 /// read observed, as the agent read's witness is. A book that changed between
 /// the two reads is the retryable partial a change during the read gives,
 /// before any bill is read.
@@ -412,7 +462,7 @@ async fn operator_outstandings_refuse_a_book_changed_since_the_currency_read() {
     pair(&mut plans, xml(decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
     ))));
-    let (result, requests) = operator_outstandings(plans).await;
+    let (result, requests) = operator_outstandings(plans, AGEING_GUID).await;
     let result = result.unwrap();
     assert!(
         matches!(&result, OutstandingsLoadResult::Partial { reason, .. }
@@ -422,18 +472,21 @@ async fn operator_outstandings_refuse_a_book_changed_since_the_currency_read() {
     assert_eq!(requests, 21);
 }
 
-/// bridge#604, through the desktop command's own body: an operator's INR
-/// assertion for a book with several Currency masters comes back as a partial
-/// result, with no working paper, and no bill is read.
+/// bridge#551, through the desktop command's own body on FOREX's captures:
+/// a book with an INR base and a `$` master reads through, with its dollar
+/// ledgers left out, as the base-currency-ledgers-only partial. No working
+/// paper, statement source or unavailable-reason is issued for it.
 #[tokio::test]
-async fn the_desktop_command_refuses_several_currency_masters_before_any_bill() {
+async fn the_desktop_command_reads_forex_as_base_currency_ledgers_only() {
     let mut plans = vec![xml(companies())];
-    plans.extend(currency_then_native_plans(multi_currency_source()));
+    plans.extend(forex_classified_currency_plans());
+    plans.extend(forex_native_plans());
+    let plan_count = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let rows = parse_companies_from_collection(&companies()).unwrap();
     let row = rows
         .iter()
-        .find(|row| row.guid.as_deref() == Some("eebb9a9f-1679-4468-9e8f-814c729674cb"))
+        .find(|row| row.guid.as_deref() == Some(FOREX_GUID))
         .unwrap();
     let request: crate::commands::OutstandingsRequest = serde_json::from_value(serde_json::json!({
         "config": {"host": simulator.address().ip().to_string(), "port": simulator.address().port()},
@@ -444,7 +497,7 @@ async fn the_desktop_command_refuses_several_currency_masters_before_any_bill() 
             "books_from_yyyymmdd": row.books_from,
         },
         "currency_assertion": "INR",
-        "as_of_yyyymmdd": "20260801",
+        "as_of_yyyymmdd": "20250930",
     }))
     .unwrap();
     let response = crate::commands::read_screen_outstandings(
@@ -455,17 +508,15 @@ async fn the_desktop_command_refuses_several_currency_masters_before_any_bill() 
     )
     .await
     .unwrap();
-    assert!(
-        matches!(&response.result, OutstandingsLoadResult::Partial { reason, .. }
-            if *reason == "company_base_currency_undetermined".into()),
-        "{:?}",
-        response.result
-    );
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. } = &response.result
+    else {
+        panic!("{:?}", response.result);
+    };
+    assert_eq!(exclusions.foreign().len(), 3);
     assert!(response.working_paper_export_id.is_none());
     assert!(response.party_statement_source_id.is_none());
-    simulator.cancel();
-    // The company list, then the currency read's 14 requests, and no more.
-    assert_eq!(requests_sent(simulator), 15);
+    assert_eq!(response.working_paper_unavailable_reason_code, None);
+    assert_eq!(requests_sent(simulator), plan_count);
 }
 
 /// bridge#551: on a book with one Currency master, every ledger's own
@@ -474,10 +525,13 @@ async fn the_desktop_command_refuses_several_currency_masters_before_any_bill() 
 /// through.
 #[tokio::test]
 async fn a_ledger_in_another_currency_on_a_one_master_book_refuses_the_read() {
-    let (result, requests) = operator_outstandings(currency_then_native_plans_with_ledgers(
-        currency_source(),
-        ageing_ledgers_with_currency("$"),
-    ))
+    let (result, requests) = operator_outstandings(
+        currency_then_native_plans_with_ledgers(
+            currency_source(),
+            ageing_ledgers_with_currency("$"),
+        ),
+        AGEING_GUID,
+    )
     .await;
     match result.unwrap() {
         OutstandingsLoadResult::Partial { reason, .. } => {
@@ -492,10 +546,13 @@ async fn a_ledger_in_another_currency_on_a_one_master_book_refuses_the_read() {
     // The snapshot is the last native read, so the read runs to its end.
     assert_eq!(requests, 44);
 
-    let (result, requests) = operator_outstandings(currency_then_native_plans_with_ledgers(
-        currency_source(),
-        ageing_ledgers_with_currency("I\u{20b9}"),
-    ))
+    let (result, requests) = operator_outstandings(
+        currency_then_native_plans_with_ledgers(
+            currency_source(),
+            ageing_ledgers_with_currency("I\u{20b9}"),
+        ),
+        AGEING_GUID,
+    )
     .await;
     assert!(
         matches!(result.unwrap(), OutstandingsLoadResult::Complete { .. }),
@@ -504,38 +561,413 @@ async fn a_ledger_in_another_currency_on_a_one_master_book_refuses_the_read() {
     assert_eq!(requests, 44);
 }
 
-/// bridge#551: only a base among several masters can find a ledger in another
-/// currency, and none is admitted before bridge#601. Where one is found, every
-/// figure is withheld, naming the ledger, rather than reported for the whole
-/// book or for part of it.
-#[test]
-fn a_foreign_ledger_withholds_every_figure() {
-    let foreign =
-        |ledger: &str| bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger {
-            ledger: ledger.to_string(),
-            currency: "$".to_string(),
-        };
-    let snapshot = |foreign| ClassifiedLedgerSnapshot {
-        base: Vec::new(),
-        foreign,
-        unobserved: 0,
+const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+
+fn fixture(bytes: &[u8]) -> ScenarioPlan {
+    xml(decode(bytes))
+}
+
+fn forex_originalname_currency() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+    ))
+}
+
+fn forex_company_currency() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+    ))
+}
+
+/// The classified currency read of a two-master book: the plain Currency
+/// collection, the same with `ORIGINALNAME`, then the Company collection as a
+/// pair (`company` twice, then `company_again` on the second send), inside the
+/// identity and extent bracket.
+fn classified_currency_plans(
+    with_original_names: String,
+    company: String,
+    company_again: String,
+) -> Vec<ScenarioPlan> {
+    let identity = xml(companies());
+    let extent = xml(extents());
+    let mut plans = vec![identity.clone()];
+    pair(&mut plans, extent.clone());
+    pair(&mut plans, xml(multi_currency_source()));
+    pair(&mut plans, xml(with_original_names));
+    plans.extend([xml(company), status(), xml(company_again), status()]);
+    pair(&mut plans, extent);
+    plans.push(identity);
+    plans
+}
+
+/// FOREX's classified currency read, from captures (the plain two-master read
+/// of 2026-08-23, the `ORIGINALNAME` read and the edited Company collection of
+/// 2026-09-23).
+fn forex_classified_currency_plans() -> Vec<ScenarioPlan> {
+    classified_currency_plans(
+        forex_originalname_currency(),
+        forex_company_currency(),
+        forex_company_currency(),
+    )
+}
+
+fn request_sha256(request: &str) -> String {
+    sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        request,
+    ))
+}
+
+async fn forex_classified_read(
+    plans: Vec<ScenarioPlan>,
+) -> anyhow::Result<ClassifiedCompanyCurrencyRead> {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let read = TallyRuntime::default()
+        .detect_classified_base_currency_with_extent(
+            TallyConfig {
+                host: simulator.address().ip().to_string(),
+                port: simulator.address().port(),
+            },
+            &identity_for_guid(&companies(), FOREX_GUID),
+        )
+        .await;
+    simulator.cancel();
+    read
+}
+
+/// bridge#551, labelled edits of the FOREX captures: the company's
+/// `CURRENCYNAME` naming the `$` master identifies a base that is not INR,
+/// and one naming no master identifies none, although the book holds an INR
+/// master either way. A Company collection that changes between the pair's
+/// two sends, or an `ORIGINALNAME` re-read whose masters differ from the plain
+/// read's, refuses as drift.
+#[tokio::test]
+async fn a_book_whose_company_names_no_inr_base_is_refused() {
+    let company = forex_company_currency();
+    let forex_row = company.find("BRIDGE CORPUS FOREX").unwrap();
+    let rupee = "<CURRENCYNAME TYPE=\"String\">\u{20b9}</CURRENCYNAME>";
+    assert!(company.find(rupee).unwrap() > forex_row);
+    let first = company.find(rupee).unwrap();
+    assert!(company.find("BRIDGE CORPUS FOREX").unwrap() < first);
+    assert!(first < company.find("BRIDGE SHAPE LAB").unwrap());
+    let naming = |value: &str| {
+        company.replacen(
+            rupee,
+            &format!("<CURRENCYNAME TYPE=\"String\">{value}</CURRENCYNAME>"),
+            1,
+        )
     };
-    assert_eq!(
-        foreign_ledger_withholds_figures(&snapshot(Vec::new())),
-        None
+    for (value, code) in [
+        ("$", "company_base_currency_not_inr"),
+        ("\u{20ac}", "company_base_currency_undetermined"),
+    ] {
+        let read = forex_classified_read(classified_currency_plans(
+            forex_originalname_currency(),
+            naming(value),
+            naming(value),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(read.admit_inr_classified().err(), Some(code), "{value}");
+    }
+
+    let drift = |plans| async {
+        forex_classified_read(plans)
+            .await
+            .unwrap_err()
+            .chain()
+            .find_map(|cause| {
+                cause
+                    .downcast_ref::<PairedReadValidationError>()
+                    .map(PairedReadValidationError::safe_code)
+            })
+    };
+    assert!(matches!(
+        drift(classified_currency_plans(
+            forex_originalname_currency(),
+            company.clone(),
+            naming("$"),
+        ))
+        .await,
+        Some("company_currency_name_changed")
+    ));
+    let changed = forex_originalname_currency().replace(
+        "<MAILINGNAME TYPE=\"String\">USD</MAILINGNAME>",
+        "<MAILINGNAME TYPE=\"String\">US Dollar</MAILINGNAME>",
     );
-    match foreign_ledger_withholds_figures(&snapshot(vec![
-        foreign("FX Debtor A"),
-        foreign("FX Debtor B"),
-    ])) {
-        Some(OutstandingsLoadResult::Partial { reason, .. }) => {
-            assert_eq!(reason.reason_code, "foreign_currency_ledger_present");
+    assert_ne!(changed, forex_originalname_currency());
+    assert!(matches!(
+        drift(classified_currency_plans(changed, company.clone(), company)).await,
+        Some("currency_master_changed")
+    ));
+}
+
+/// FOREX's native outstandings read in the order the read sends it: its
+/// bills, groups and ledgers captured 2026-09-22/23, with the shared company
+/// and extent fixtures from earlier sessions.
+fn forex_native_plans() -> Vec<ScenarioPlan> {
+    forex_native_plans_with_ledgers(forex_ledgers())
+}
+
+fn forex_ledgers() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+    ))
+}
+
+/// A labelled edit of the captured FOREX ledgers: the dollar ledger
+/// "FX USD Debtor 02" relabelled to the base currency, keeping its composite
+/// closing balance, as a rupee party carrying a dollar bill shows it.
+fn forex_ledgers_with_a_mixed_rupee_ledger() -> String {
+    let captured = forex_ledgers();
+    let row = captured
+        .find("<LEDGER NAME=\"FX USD Debtor 02\"")
+        .expect("captured dollar ledger");
+    let dollar = "<CURRENCYNAME TYPE=\"String\">$</CURRENCYNAME>";
+    let at = row + captured[row..].find(dollar).expect("its currency");
+    assert!(!captured[row..at].contains("</LEDGER>"));
+    let mixed = format!(
+        "{}<CURRENCYNAME TYPE=\"String\">I\u{20b9}</CURRENCYNAME>{}",
+        &captured[..at],
+        &captured[at + dollar.len()..]
+    );
+    assert!(mixed.contains("-$ 2000.00 @ I\u{20b9} 86/$  = -I\u{20b9} 172000.00"));
+    mixed
+}
+
+/// The mixed-party result on FOREX with "FX USD Debtor 02" relabelled to the
+/// base: that ledger is set aside as mixed, the other two dollar ledgers as
+/// foreign, and the figures are the 14 rupee bills only (34,500), with no row
+/// for any set-aside ledger.
+fn assert_mixed_ledger_set_aside(result: &OutstandingsLoadResult) {
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
+        exclusions,
+        base_currency_ledgers,
+        ..
+    } = result
+    else {
+        panic!("{result:?}");
+    };
+    assert_eq!(exclusions.mixed(), ["FX USD Debtor 02".to_string()]);
+    let foreign = exclusions
+        .foreign()
+        .iter()
+        .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        foreign,
+        [("BRIDGE FX DEBTOR A", "$"), ("FX USD Debtor 01", "$")]
+    );
+    assert_eq!(
+        base_currency_ledgers.report.receivable_total.as_str(),
+        "34500"
+    );
+    let set_aside = ["BRIDGE FX DEBTOR A", "FX USD Debtor 01", "FX USD Debtor 02"];
+    for row in &base_currency_ledgers.statement_open_bills {
+        assert!(!set_aside.contains(&row.party.as_str()), "{row:?}");
+    }
+    for party in &base_currency_ledgers.statement_unallocated_by_party {
+        assert!(!set_aside.contains(&party.party.as_str()), "{party:?}");
+    }
+}
+
+/// FOREX's native outstandings read with its ledger snapshot replaced, for
+/// labelled edits of the captured ledgers.
+fn forex_native_plans_with_ledgers(ledgers: String) -> Vec<ScenarioPlan> {
+    let extent = xml(extents());
+    let mut plans = vec![status(), xml(companies()), xml(companies())];
+    pair(&mut plans, extent.clone());
+    for plan in [
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        )),
+        xml(ledgers),
+    ] {
+        pair(&mut plans, plan);
+    }
+    pair(&mut plans, extent);
+    plans.extend([xml(companies()), status(), xml(companies())]);
+    plans
+}
+
+/// bridge#551, end to end from captures: FOREX has an `I₹` and a `$` master.
+/// The classified read identifies the rupee master as the base through the
+/// company's `CURRENCYNAME`, and admits it as INR. The outstandings read
+/// then leaves the three `$` ledgers and their four bills out of every
+/// figure, and says so: a partial result whose figures describe the rupee
+/// ledgers only (TALLY_PROTOCOL_REFERENCE §8.2d, §9.10a.2).
+#[tokio::test]
+async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans());
+    let plan_count = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let identity = identity_for_guid(&companies(), FOREX_GUID);
+    let runtime = TallyRuntime::default();
+    let witness = runtime
+        .detect_classified_base_currency_with_extent(config.clone(), &identity)
+        .await
+        .unwrap()
+        .admit_inr_classified()
+        .unwrap();
+    let (result, _) = runtime
+        .fetch_agent_outstandings_with_evidence(
+            config,
+            &identity,
+            TallyDate::parse("20250930").unwrap(),
+            witness,
+            OutstandingsAgeingAnchor::DueDate,
+        )
+        .await
+        .unwrap();
+    let requests = simulator.finish().unwrap();
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
+        exclusions,
+        base_currency_ledgers,
+        ..
+    } = result
+    else {
+        panic!("{result:?}");
+    };
+    // Captured before any foreign-currency entry touched a rupee ledger: the
+    // derived reasons name the foreign list only (bridge#642).
+    assert_eq!(
+        exclusions.partial_reasons(),
+        ["foreign_currency_ledgers_excluded"]
+    );
+    assert!(exclusions.mixed().is_empty());
+    let excluded = exclusions
+        .foreign()
+        .iter()
+        .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
+        .collect::<Vec<_>>();
+    let dollars = ["BRIDGE FX DEBTOR A", "FX USD Debtor 01", "FX USD Debtor 02"];
+    assert_eq!(excluded, dollars.map(|ledger| (ledger, "$")));
+    // The 14 rupee bills only, 34,500; the four dollar bills (350,100 read as
+    // rupees) are in no figure and no statement row.
+    assert_eq!(
+        base_currency_ledgers.report.receivable_total.as_str(),
+        "34500"
+    );
+    assert_eq!(base_currency_ledgers.statement_open_bills.len(), 14);
+    for row in &base_currency_ledgers.statement_open_bills {
+        assert!(!dollars.contains(&row.party.as_str()), "{row:?}");
+    }
+    for party in &base_currency_ledgers.statement_unallocated_by_party {
+        assert!(!dollars.contains(&party.party.as_str()), "{party:?}");
+    }
+    // Every scripted response was served, and each read sent its own request:
+    // the plain currency read, the ORIGINALNAME re-read, the Company read.
+    assert_eq!(requests.len(), plan_count);
+    for (indexes, request) in [
+        (
+            [5, 7],
+            render_company_currency_request("BRIDGE CORPUS FOREX"),
+        ),
+        (
+            [9, 11],
+            render_company_currency_request_with_originalname("BRIDGE CORPUS FOREX"),
+        ),
+        (
+            [13, 15],
+            render_company_base_currency_request("BRIDGE CORPUS FOREX"),
+        ),
+    ] {
+        for index in indexes {
             assert_eq!(
-                reason.foreign_currency_ledger_name.as_deref(),
-                Some("FX Debtor A")
+                requests[index].request_body_sha256,
+                request_sha256(&request)
             );
         }
-        other => panic!("{other:?}"),
+    }
+}
+
+/// bridge#551: on a book with several masters, a ledger kept in the base
+/// currency whose closing balance Tally writes as a currency composite (a
+/// foreign-currency bill entered on a rupee party) is set aside by name with
+/// all of its bills, next to the foreign-currency ledgers; the figures cover
+/// the plain rupee ledgers only (#642's mixed-party design). A labelled edit of
+/// the captured FOREX ledgers: one `$` ledger's CURRENCYNAME becomes the
+/// base's, and its composite balance is kept.
+#[tokio::test]
+async fn a_rupee_ledger_with_a_composite_balance_is_set_aside_by_the_several_currency_read() {
+    let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans_with_ledgers(mixed));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let identity = identity_for_guid(&companies(), FOREX_GUID);
+    let runtime = TallyRuntime::default();
+    let witness = runtime
+        .detect_classified_base_currency_with_extent(config.clone(), &identity)
+        .await
+        .unwrap()
+        .admit_inr_classified()
+        .unwrap();
+    let (result, _) = runtime
+        .fetch_agent_outstandings_with_evidence(
+            config,
+            &identity,
+            TallyDate::parse("20250930").unwrap(),
+            witness,
+            OutstandingsAgeingAnchor::DueDate,
+        )
+        .await
+        .unwrap();
+    simulator.cancel();
+    assert_mixed_ledger_set_aside(&result);
+}
+
+/// bridge#551: on a book with one master the classified read sends exactly
+/// the plain currency read, no `ORIGINALNAME` re-read and no Company read,
+/// and admits as `admit_inr` does: the captured `INR` master, and not the
+/// same master with its mailing name changed.
+#[tokio::test]
+async fn a_one_master_classified_read_sends_only_the_plain_currency_read() {
+    let captured = currency_source();
+    let rupees = captured.replace(
+        "<MAILINGNAME TYPE=\"String\">INR</MAILINGNAME>",
+        "<MAILINGNAME TYPE=\"String\">Rupees</MAILINGNAME>",
+    );
+    assert_ne!(rupees, captured);
+    for (currency, admitted) in [(captured, true), (rupees, false)] {
+        let plans = currency_plans(currency);
+        let plan_count = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let read = TallyRuntime::default()
+            .detect_classified_base_currency_with_extent(
+                TallyConfig {
+                    host: simulator.address().ip().to_string(),
+                    port: simulator.address().port(),
+                },
+                &identity_for_guid(&companies(), "eebb9a9f-1679-4468-9e8f-814c729674cb"),
+            )
+            .await
+            .unwrap();
+        let requests = simulator.finish().unwrap();
+        assert_eq!(requests.len(), plan_count);
+        let plain = request_sha256(&render_company_currency_request("Bridge Ageing Lab"));
+        assert_eq!(requests[5].request_body_sha256, plain);
+        assert_eq!(requests[7].request_body_sha256, plain);
+        match read.admit_inr_classified() {
+            Ok(_) => assert!(admitted),
+            Err(code) => {
+                assert!(!admitted, "{code}");
+                assert_eq!(code, "company_base_currency_not_inr");
+            }
+        }
     }
 }
 
@@ -592,7 +1024,6 @@ async fn the_sweep_compares_each_ledgers_currency_with_its_own_read() {
             },
             &identity_for_guid(&companies(), "eebb9a9f-1679-4468-9e8f-814c729674cb"),
             &TallyDate::parse("20260801").unwrap(),
-            OutstandingsCurrencyAssertion::Inr,
             OutstandingsAgeingAnchor::DueDate,
         )
         .await;
@@ -652,45 +1083,152 @@ fn a_currency_refusal_is_a_partial_naming_its_ledger() {
     }
 }
 
-/// The sweep admits only a book with one Currency master that Tally names INR,
-/// and refuses any other after its currency read, before any bill: a book
-/// with several masters (captured), and one master named something else.
+/// bridge#551: the sweep admits a book whose base is INR, the only master or
+/// the one the company names, and refuses any other after its currency read,
+/// before any bill: several masters whose company names the `$` master, or no
+/// master (labelled edits of the FOREX captures), and one master named USD.
+/// FOREX itself reads through as the base-currency-ledgers-only partial.
 #[tokio::test]
-async fn the_sweep_refuses_a_book_that_is_not_single_currency_inr_before_any_bill() {
+async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledgers_only() {
     let foreign = currency_source().replace(
         "<MAILINGNAME TYPE=\"String\">INR</MAILINGNAME>",
         "<MAILINGNAME TYPE=\"String\">USD</MAILINGNAME>",
     );
     assert_ne!(foreign, currency_source());
-    for (currency, expected) in [
+    let captured = currency_source();
+    let start = captured.find("<CURRENCY ").unwrap();
+    let end = start + captured[start..].find("</CURRENCY>").unwrap() + "</CURRENCY>".len();
+    let mut no_master = captured.clone();
+    no_master.replace_range(start..end, "");
+    let mut forex = forex_classified_currency_plans();
+    forex.extend(forex_native_plans());
+    let forex_count = forex.len();
+    for (plans, guid, expected, requests) in [
         (
-            multi_currency_source(),
-            "company_base_currency_undetermined",
+            forex_plans_naming("$"),
+            FOREX_GUID,
+            Some("company_base_currency_not_inr"),
+            22,
         ),
-        (foreign, "company_base_currency_not_inr"),
+        (
+            forex_plans_naming("\u{20ac}"),
+            FOREX_GUID,
+            Some("company_base_currency_undetermined"),
+            22,
+        ),
+        (
+            currency_then_native_plans(foreign),
+            AGEING_GUID,
+            Some("company_base_currency_not_inr"),
+            14,
+        ),
+        (
+            currency_then_native_plans(no_master.clone()),
+            AGEING_GUID,
+            Some("company_currency_probe_failed"),
+            14,
+        ),
+        (forex, FOREX_GUID, None, forex_count),
     ] {
-        let simulator = SequenceSimulator::spawn(currency_then_native_plans(currency)).unwrap();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
         let result = crate::commands::sweep_company_outstandings(
             &TallyRuntime::default(),
             &TallyConfig {
                 host: simulator.address().ip().to_string(),
                 port: simulator.address().port(),
             },
-            &identity_for_guid(&companies(), "eebb9a9f-1679-4468-9e8f-814c729674cb"),
-            &TallyDate::parse("20260801").unwrap(),
-            OutstandingsCurrencyAssertion::Inr,
+            &identity_for_guid(&companies(), guid),
+            &TallyDate::parse(if expected.is_none() {
+                "20250930"
+            } else {
+                "20260801"
+            })
+            .unwrap(),
             OutstandingsAgeingAnchor::DueDate,
         )
         .await;
         simulator.cancel();
-        match result {
-            Err(crate::commands::CompanySweepFailure::ReasonCode(code)) => {
+        match (result, expected) {
+            (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), Some(expected)) => {
                 assert_eq!(code, expected);
             }
-            _ => panic!("{expected}: not refused"),
+            (Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }), None) => {
+                assert_eq!(exclusions.foreign().len(), 3)
+            }
+            (Ok(other), _) => panic!("{expected:?}: {other:?}"),
+            (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), _) => {
+                panic!("{expected:?}: refused with {code}")
+            }
+            (Err(_), _) => panic!("{expected:?}: the read failed"),
         }
-        // The currency read's 14 requests, and not one more.
-        assert_eq!(requests_sent(simulator), 14, "{expected}");
+        assert_eq!(requests_sent(simulator), requests, "{expected:?}");
+    }
+}
+
+/// bridge#551: the desktop command and the all-companies sweep read a
+/// several-currency book through the same classified read as MCP. A ledger
+/// kept in the base currency whose closing balance Tally writes as a currency
+/// composite is set aside by name with its bills on both, as MCP does. No
+/// working paper or statement source is issued for the partial. The labelled
+/// edit of the captured FOREX ledgers is the one the MCP test uses.
+#[tokio::test]
+async fn a_rupee_ledger_with_a_composite_balance_is_set_aside_by_the_desktop_read_and_the_sweep() {
+    let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
+
+    let mut plans = vec![xml(companies())];
+    plans.extend(forex_classified_currency_plans());
+    plans.extend(forex_native_plans_with_ledgers(mixed.clone()));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let rows = parse_companies_from_collection(&companies()).unwrap();
+    let row = rows
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(FOREX_GUID))
+        .unwrap();
+    let request: crate::commands::OutstandingsRequest = serde_json::from_value(serde_json::json!({
+        "config": {"host": simulator.address().ip().to_string(), "port": simulator.address().port()},
+        "selected_company": {
+            "display_name": row.name,
+            "company_guid": row.guid,
+            "company_number": row.company_number,
+            "books_from_yyyymmdd": row.books_from,
+        },
+        "as_of_yyyymmdd": "20250930",
+    }))
+    .unwrap();
+    let response = crate::commands::read_screen_outstandings(
+        request,
+        &TallyRuntime::default(),
+        &crate::reports::outstandings_working_paper_store::WorkingPaperExportStore::default(),
+        &crate::reports::outstandings_working_paper_store::PartyStatementSourceStore::default(),
+    )
+    .await
+    .unwrap();
+    simulator.cancel();
+    assert_mixed_ledger_set_aside(&response.result);
+    assert!(response.working_paper_export_id.is_none());
+    assert!(response.party_statement_source_id.is_none());
+
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans_with_ledgers(mixed));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = crate::commands::sweep_company_outstandings(
+        &TallyRuntime::default(),
+        &TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        &identity_for_guid(&companies(), FOREX_GUID),
+        &TallyDate::parse("20250930").unwrap(),
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .await;
+    simulator.cancel();
+    match result {
+        Ok(result) => assert_mixed_ledger_set_aside(&result),
+        Err(crate::commands::CompanySweepFailure::ReasonCode(code)) => {
+            panic!("the sweep refused with {code}")
+        }
+        Err(_) => panic!("the sweep read failed"),
     }
 }
 
@@ -825,4 +1363,191 @@ async fn a_two_master_read_with_originalname_stays_undetermined() {
         read.admit_inr().err(),
         Some("company_base_currency_undetermined")
     );
+}
+
+const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// A captured company list and book extents with only synthetic companies
+/// loaded (2026-09-24), which carry SHAPE LAB.
+fn synthetic_companies() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_list_synthetic_live.utf16le.xml"
+    ))
+}
+
+/// SHAPE LAB's classified currency read and native read, from captures: two
+/// masters (`I₹`, `UUSD`), the company naming `₹`, and 44 ledgers all in
+/// `I₹`.
+fn shape_plans(leading_company_list: bool) -> Vec<ScenarioPlan> {
+    let companies = xml(synthetic_companies());
+    let extent = fixture(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_extents_synthetic_live.utf16le.xml"
+    ));
+    let mut plans = Vec::new();
+    if leading_company_list {
+        plans.push(companies.clone());
+    }
+    plans.push(companies.clone());
+    pair(&mut plans, extent.clone());
+    for plan in [
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/currency_shape_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_shape_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+        )),
+    ] {
+        pair(&mut plans, plan);
+    }
+    pair(&mut plans, extent.clone());
+    plans.push(companies.clone());
+    plans.extend([status(), companies.clone(), companies.clone()]);
+    pair(&mut plans, extent.clone());
+    for plan in [
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_shape_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/groups_shape_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/bills_payable_shape_live.utf16le.xml"
+        )),
+        fixture(include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_shape_live.utf16le.xml"
+        )),
+    ] {
+        pair(&mut plans, plan);
+    }
+    pair(&mut plans, extent);
+    plans.extend([companies.clone(), status(), companies]);
+    plans
+}
+
+/// bridge#551, from captures: SHAPE LAB defines a second master (`UUSD`) but
+/// keeps every ledger in its INR base, so nothing is left out and the sweep
+/// and the desktop read it as a complete report, with the desktop issuing
+/// its working paper and statement source.
+#[tokio::test]
+async fn several_masters_with_every_ledger_in_the_base_read_as_complete() {
+    let plans = shape_plans(false);
+    let plan_count = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = crate::commands::sweep_company_outstandings(
+        &TallyRuntime::default(),
+        &TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        &identity_for_guid(&synthetic_companies(), SHAPE_GUID),
+        &TallyDate::parse("20260923").unwrap(),
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .await;
+    simulator.cancel();
+    assert!(
+        matches!(result, Ok(OutstandingsLoadResult::Complete { .. })),
+        "sweep: {:?}",
+        result.map(|_| ()).map_err(|_| "refused")
+    );
+    assert_eq!(requests_sent(simulator), plan_count, "sweep");
+
+    let plans = shape_plans(true);
+    let plan_count = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let rows = parse_companies_from_collection(&synthetic_companies()).unwrap();
+    let row = rows
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(SHAPE_GUID))
+        .unwrap();
+    let request: crate::commands::OutstandingsRequest = serde_json::from_value(serde_json::json!({
+        "config": {"host": simulator.address().ip().to_string(), "port": simulator.address().port()},
+        "selected_company": {
+            "display_name": row.name,
+            "company_guid": row.guid,
+            "company_number": row.company_number,
+            "books_from_yyyymmdd": row.books_from,
+        },
+        "currency_assertion": "INR",
+        "as_of_yyyymmdd": "20260923",
+    }))
+    .unwrap();
+    let response = crate::commands::read_screen_outstandings(
+        request,
+        &TallyRuntime::default(),
+        &crate::reports::outstandings_working_paper_store::WorkingPaperExportStore::default(),
+        &crate::reports::outstandings_working_paper_store::PartyStatementSourceStore::default(),
+    )
+    .await
+    .unwrap();
+    let OutstandingsLoadResult::Complete { report, .. } = &response.result else {
+        panic!("desktop: {:?}", response.result);
+    };
+    assert_eq!(report.receivable_total.as_str(), "5000");
+    assert!(response.working_paper_export_id.is_some());
+    assert!(response.party_statement_source_id.is_some());
+    assert_eq!(requests_sent(simulator), plan_count, "desktop");
+}
+
+/// bridge#551, through the desktop command's own body: with no operator
+/// assertion in the request, a book with one master Tally does not name INR
+/// (say its unused INR master was deleted) is refused before any bill, and an
+/// INR one reads through.
+#[tokio::test]
+async fn the_desktop_command_admits_one_master_only_by_its_mailing_name() {
+    let dollar = currency_source().replace(
+        "<MAILINGNAME TYPE=\"String\">INR</MAILINGNAME>",
+        "<MAILINGNAME TYPE=\"String\">USD</MAILINGNAME>",
+    );
+    assert_ne!(dollar, currency_source());
+    for (currency, admitted) in [(dollar, false), (currency_source(), true)] {
+        let mut plans = vec![xml(companies())];
+        plans.extend(currency_then_native_plans(currency));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let rows = parse_companies_from_collection(&companies()).unwrap();
+        let row = rows
+            .iter()
+            .find(|row| row.guid.as_deref() == Some(AGEING_GUID))
+            .unwrap();
+        let request: crate::commands::OutstandingsRequest =
+            serde_json::from_value(serde_json::json!({
+                "config": {"host": simulator.address().ip().to_string(), "port": simulator.address().port()},
+                "selected_company": {
+                    "display_name": row.name,
+                    "company_guid": row.guid,
+                    "company_number": row.company_number,
+                    "books_from_yyyymmdd": row.books_from,
+                },
+                "as_of_yyyymmdd": "20260801",
+            }))
+            .unwrap();
+        let response = crate::commands::read_screen_outstandings(
+            request,
+            &TallyRuntime::default(),
+            &crate::reports::outstandings_working_paper_store::WorkingPaperExportStore::default(),
+            &crate::reports::outstandings_working_paper_store::PartyStatementSourceStore::default(),
+        )
+        .await
+        .unwrap();
+        simulator.cancel();
+        if admitted {
+            assert!(
+                matches!(response.result, OutstandingsLoadResult::Complete { .. }),
+                "INR by its mailing name: {:?}",
+                response.result
+            );
+        } else {
+            assert!(
+                matches!(&response.result, OutstandingsLoadResult::Partial { reason, .. }
+                    if *reason == "company_base_currency_not_inr".into()),
+                "{:?}",
+                response.result
+            );
+            // The company list, then the currency read's 14 requests, no more.
+            assert_eq!(requests_sent(simulator), 15);
+        }
+    }
 }

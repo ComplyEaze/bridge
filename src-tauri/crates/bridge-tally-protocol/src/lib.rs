@@ -31,6 +31,7 @@ pub mod audit_company_part;
 pub mod bills_native_outstandings_probe;
 #[cfg(feature = "bills-payments-observation-parser")]
 pub mod bills_payments_observation;
+pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_registration;
 mod import_outcome;
@@ -42,6 +43,7 @@ pub mod jsonex;
 pub mod jsonex_request;
 mod native_ledger_collection;
 pub mod native_outstandings;
+pub mod native_statement_reports;
 pub mod native_trial_balance;
 /// The legacy voucher-scan outstandings path: date/AlterID-partitioned
 /// wildcard voucher fetch, segment/witness completeness proofs, and bill
@@ -70,7 +72,9 @@ pub use import_outcome::{
 };
 pub use native_ledger_collection::{
     parse_native_ledger_source_records_with_evidence,
-    parse_native_party_ledger_master_records_with_evidence, GstDutyHead, GstDutyHeadObservation,
+    parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_native_party_ledger_master_records_with_evidence,
+    parse_native_party_ledger_master_structure, GstDutyHead, GstDutyHeadObservation,
     NativeLedgerAmountError, PartyLedgerMasterFields, PartyLedgerMasterRecord,
 };
 pub use standard_ledger_catalog::{

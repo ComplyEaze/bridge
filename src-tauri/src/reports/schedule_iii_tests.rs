@@ -71,6 +71,8 @@ fn maps_only_immutable_group_evidence_and_lists_everything_else() {
                 reserved_name: Some("".to_string()),
             },
         ],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
     let view = view_with(&workbook(source), &[]).unwrap();
     assert_eq!(view.lines.len(), 1);
@@ -105,6 +107,8 @@ fn contra_signed_sundry_debtor_is_excluded_not_netted_against_its_group_subtotal
             parent: PartyLedgerMasterFieldObservation::Returned(RESERVED_ROOT.to_string()),
             reserved_name: Some("Sundry Debtors".to_string()),
         }],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -142,6 +146,8 @@ fn contra_signed_sundry_creditor_is_excluded_not_netted_against_its_group_subtot
             parent: PartyLedgerMasterFieldObservation::Returned(RESERVED_ROOT.to_string()),
             reserved_name: Some("Sundry Creditors".to_string()),
         }],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -186,6 +192,8 @@ fn cash_in_hand_and_bank_accounts_keep_separate_group_subtotals_and_totals() {
                 reserved_name: Some("Cash-in-Hand".to_string()),
             },
         ],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -237,6 +245,8 @@ fn contra_signed_bank_account_is_excluded_not_netted_against_its_group_subtotal(
                 reserved_name: Some("Cash-in-Hand".to_string()),
             },
         ],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();
@@ -269,6 +279,8 @@ fn empty_closing_balance_is_excluded_not_manufactured_as_zero() {
         balance_response_bytes: 1,
         group_response_bytes: 1,
         groups: vec![],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
 
     let view = view_with(&workbook(source), &[]).unwrap();

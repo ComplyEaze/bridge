@@ -382,6 +382,25 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
         select_doubt(None, &masters_unavailable),
         Err("ack_doubt_ambiguous")
     );
+    // The mirror: a masters doubt with its file, beside a step doubt without.
+    let step_unavailable_beside = [
+        (DoubtKind::Masters, doubt()),
+        (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
+    ];
+    assert_eq!(
+        select_doubt(None, &step_unavailable_beside),
+        Err("ack_doubt_ambiguous")
+    );
+    // Both held only by the check record: no name could be reviewed, so the
+    // choice itself refuses as unavailable, not as ambiguous.
+    let both_unavailable = [
+        (DoubtKind::Masters, MastersRecord::DoubtRecordUnavailable),
+        (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
+    ];
+    assert_eq!(
+        select_doubt(None, &both_unavailable),
+        Err("ack_doubt_record_unavailable")
+    );
     let step_unavailable = [
         (DoubtKind::Masters, NoDoubt),
         (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
@@ -454,6 +473,19 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
     assert_eq!(
         refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
         Some("ack_no_observed_doubt")
+    );
+    // A check the review's own read finished as a masters doubt whose file
+    // could not be written: refused after that read, and never read as no
+    // doubt (#770). The caller refuses such a doubt before the read only when
+    // it was already there; this is the one left to `admit_review`.
+    fs::write(
+        masters_check_path(imports.path(), BATCH),
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
+        Some("ack_doubt_record_unavailable")
     );
 }
 
@@ -751,4 +783,32 @@ fn a_debit_total_is_the_negated_sum_not_each_lines_magnitude() {
         preview.contains("Dr 3  Cr 0  2 entries  \"Odd\""),
         "{preview}"
     );
+}
+
+/// After an unnamed review's read (#756): a second observed doubt refuses as
+/// `select_doubt` would; one or none leaves the choice as it was.
+#[test]
+fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
+    use MastersRecord::{DoubtRecordUnavailable, NoDoubt, Pending};
+    let doubt = || MastersRecord::Doubt {
+        raw: b"{}".to_vec(),
+    };
+    let cases: [([MastersRecord; 2], Result<(), &str>); 6] = [
+        ([doubt(), doubt()], Err("ack_doubt_ambiguous")),
+        (
+            [doubt(), DoubtRecordUnavailable],
+            Err("ack_doubt_ambiguous"),
+        ),
+        (
+            [DoubtRecordUnavailable, DoubtRecordUnavailable],
+            Err("ack_doubt_record_unavailable"),
+        ),
+        ([NoDoubt, doubt()], Ok(())),
+        ([Pending, doubt()], Ok(())),
+        ([NoDoubt, NoDoubt], Ok(())),
+    ];
+    for ([masters, step], expected) in cases {
+        let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
+        assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
+    }
 }

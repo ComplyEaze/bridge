@@ -13,24 +13,23 @@ pub mod serial_queue;
 pub mod tdl_engine;
 pub mod validators;
 pub mod xml_parser;
-// Crate-internal only: `tally::connector` and `tally::connection` are the sole consumers.
+// Crate-internal only: `tally::connector` is the sole consumer.
 mod canonical_window;
 
 pub use bridge_tally_core as core;
 pub use connection::{
-    ConnectionStatus, SelectedReadObservation, SelectedReadScopeEvidence, TallyClient, TallyConfig,
-    TallyProbeResult, TallyProduct, SELECTED_LEDGER_QUERY_PROFILE_ID,
-    SELECTED_VOUCHER_QUERY_PROFILE_ID,
+    ConnectionStatus, SelectedReadScopeEvidence, TallyClient, TallyConfig, TallyProbeResult,
+    TallyProduct,
 };
 pub(crate) use connector::core_snapshot_start_authorized_codes;
 pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CachedProbeReservation, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
-    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason,
-    OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport,
-    UnallocatedParty,
+    CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
+    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
+    OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
+    TallyTelemetryPreviewExport, UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
 

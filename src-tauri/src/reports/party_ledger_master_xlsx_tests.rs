@@ -45,6 +45,8 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         balance_response_bytes: 200,
         group_response_bytes: 300,
         groups: vec![],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     }
 }
 
@@ -110,6 +112,8 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         balance_response_bytes: 200,
         group_response_bytes: 300,
         groups: vec![],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -173,6 +177,8 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
             parent: PartyLedgerMasterFieldObservation::Returned("Primary".to_string()),
             reserved_name: Some("Sundry Debtors".to_string()),
         }],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
     .unwrap();
 
@@ -234,6 +240,8 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         balance_response_bytes: 200,
         group_response_bytes: 300,
         groups: vec![],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -295,6 +303,8 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         balance_response_bytes: 200,
         group_response_bytes: 300,
         groups: vec![],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();

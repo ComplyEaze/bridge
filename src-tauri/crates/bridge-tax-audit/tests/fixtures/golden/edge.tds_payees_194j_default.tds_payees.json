@@ -127,6 +127,28 @@
       "evidence": []
     },
     {
+      "id": "tds_payees.194J_professional_row_21b_a_194J_professional_1198f0bd_001",
+      "value": 5000001,
+      "unit": "paise",
+      "definition_sha256_16": "1935868e3bf0f83d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1198f0bd) under 194J, category 'professional', attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "d01",
+          "label": "Journal d01 on 2025-04-02"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194J_professional_row_21b_a_total_194J_professional_1198f0bd",
+      "value": 5000001,
+      "unit": "paise",
+      "definition_sha256_16": "c27648030401adf3",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 1198f0bd) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
       "id": "tds_payees.194J_professional_row_credited_194J_professional_1198f0bd",
       "value": 5000001,
       "unit": "paise",
@@ -256,8 +278,8 @@
       "id": "tds_payees.deductor_status",
       "value": "unknown",
       "unit": "text",
-      "definition_sha256_16": "2536d022c30ff81e",
-      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
+      "definition_sha256_16": "f4ae0f27f28231f1",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194H/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
       "evidence": []
     },
     {
@@ -284,8 +306,16 @@
           "figure_id": "tds_payees.194J_professional_row_credited_194J_professional_1198f0bd"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194J_professional_row_21b_a_total_194J_professional_1198f0bd"
+        },
+        {
           "name": "max_single",
           "figure_id": "tds_payees.194J_professional_row_max_single_194J_professional_1198f0bd"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194J_professional_row_21b_a_194J_professional_1198f0bd_001"
         }
       ],
       "evidence": [
@@ -297,11 +327,13 @@
       ],
       "title_sha256_16": "fc093d978d13219e",
       "title_text": "Payee over the 194J, category 'professional' limit",
-      "limits_sha256_16": "1550b126d23547f0",
+      "limits_sha256_16": "2884a0a32139c474",
       "limits_text": [
-        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (own-account transporter, PAN furnished, ten or fewer goods carriages) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
         "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
-        "The s.194J aggregate limit used here (5000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule."
+        "The s.194J aggregate limit used here (5000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "b53cfcd0738b684c",
       "ask_client_text": [
@@ -325,13 +357,13 @@
       "evidence": [],
       "title_sha256_16": "06119560fefe9404",
       "title_text": "Deductor status depends on previous-year turnover",
-      "limits_sha256_16": "e5850cc8f1e435fb",
+      "limits_sha256_16": "fe8897e0c776deb3",
       "limits_text": [
-        "An individual/HUF is a s.194A/194C/194-I/194J deductor only if the immediately preceding year's business turnover exceeded ₹1 crore; the current year's books alone cannot establish this."
+        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
       ],
-      "ask_client_sha256_16": "0f4f5d87be308771",
+      "ask_client_sha256_16": "6a59a8224649a5d2",
       "ask_client_text": [
-        "Confirm previous-year business turnover."
+        "Confirm previous-year turnover or gross receipts, and whether from a business or a profession."
       ]
     }
   ],

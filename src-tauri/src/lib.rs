@@ -7,6 +7,7 @@ pub mod commands;
 pub mod db;
 pub mod documents;
 pub(crate) mod endpoint_coordination;
+pub mod export_registry;
 pub mod gst;
 pub(crate) mod local_files;
 // Crate-internal only: the previously separate `bridge-tally-observability` crate had exactly
@@ -104,6 +105,7 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
         .manage(sync::coordinator::SnapshotCoordinator::default())
         .setup(|app| {
             let app_data_directory = app.path().app_data_dir()?;
+            export_registry::init(&app_data_directory);
             app.manage(LazyTallyMirror::new(app_data_directory));
             #[cfg(target_os = "macos")]
             install_macos_cocoa_termination_guard(app.handle())?;

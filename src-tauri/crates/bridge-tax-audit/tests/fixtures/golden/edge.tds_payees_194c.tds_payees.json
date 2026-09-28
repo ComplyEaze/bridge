@@ -31,6 +31,114 @@
       "evidence": []
     },
     {
+      "id": "tds_payees.194C_row_21b_a_194C_0f33b915_001",
+      "value": 3000001,
+      "unit": "paise",
+      "definition_sha256_16": "26913183d3519ad1",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 0f33b915) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c02",
+          "label": "Journal c02 on 2025-04-03"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_f6048743_001",
+      "value": 3100000,
+      "unit": "paise",
+      "definition_sha256_16": "9da2f89ab981a5c4",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag f6048743) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c20",
+          "label": "Journal c20 on 2025-06-02"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_fb4e043c_001",
+      "value": 2900000,
+      "unit": "paise",
+      "definition_sha256_16": "d9a57a53ca82c7e6",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag fb4e043c) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c03",
+          "label": "Journal c03 on 2025-04-04"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_fb4e043c_002",
+      "value": 2900000,
+      "unit": "paise",
+      "definition_sha256_16": "d9a57a53ca82c7e6",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag fb4e043c) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c04",
+          "label": "Journal c04 on 2025-04-05"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_fb4e043c_003",
+      "value": 2900000,
+      "unit": "paise",
+      "definition_sha256_16": "d9a57a53ca82c7e6",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag fb4e043c) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c05",
+          "label": "Journal c05 on 2025-04-06"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_fb4e043c_004",
+      "value": 1300001,
+      "unit": "paise",
+      "definition_sha256_16": "d9a57a53ca82c7e6",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag fb4e043c) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "c06",
+          "label": "Journal c06 on 2025-04-07"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_0f33b915",
+      "value": 3000001,
+      "unit": "paise",
+      "definition_sha256_16": "519827476c8ee2ff",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 0f33b915) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_f6048743",
+      "value": 3100000,
+      "unit": "paise",
+      "definition_sha256_16": "b024bafcbb8764a2",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag f6048743) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_fb4e043c",
+      "value": 10000001,
+      "unit": "paise",
+      "definition_sha256_16": "6d36490a5a2e4d92",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag fb4e043c) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
       "id": "tds_payees.194C_row_credited_194C_0f33b915",
       "value": 3000001,
       "unit": "paise",
@@ -315,8 +423,8 @@
       "id": "tds_payees.deductor_status",
       "value": "unknown",
       "unit": "text",
-      "definition_sha256_16": "2536d022c30ff81e",
-      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
+      "definition_sha256_16": "f4ae0f27f28231f1",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194H/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
       "evidence": []
     },
     {
@@ -349,8 +457,16 @@
           "figure_id": "tds_payees.194C_row_credited_194C_0f33b915"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_0f33b915"
+        },
+        {
           "name": "max_single",
           "figure_id": "tds_payees.194C_row_max_single_194C_0f33b915"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_0f33b915_001"
         }
       ],
       "evidence": [
@@ -362,10 +478,12 @@
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",
       "title_text": "Payee over the 194C limit",
-      "limits_sha256_16": "2483d80b2ca773c5",
+      "limits_sha256_16": "8a97d6d69e69a105",
       "limits_text": [
-        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (own-account transporter, PAN furnished, ten or fewer goods carriages) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
-        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way."
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "b53cfcd0738b684c",
       "ask_client_text": [
@@ -387,8 +505,16 @@
           "figure_id": "tds_payees.194C_row_credited_194C_f6048743"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_f6048743"
+        },
+        {
           "name": "max_single",
           "figure_id": "tds_payees.194C_row_max_single_194C_f6048743"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_f6048743_001"
         }
       ],
       "evidence": [
@@ -400,10 +526,12 @@
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",
       "title_text": "Payee over the 194C limit",
-      "limits_sha256_16": "2483d80b2ca773c5",
+      "limits_sha256_16": "8a97d6d69e69a105",
       "limits_text": [
-        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (own-account transporter, PAN furnished, ten or fewer goods carriages) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
-        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way."
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "b53cfcd0738b684c",
       "ask_client_text": [
@@ -425,8 +553,28 @@
           "figure_id": "tds_payees.194C_row_credited_194C_fb4e043c"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_fb4e043c"
+        },
+        {
           "name": "max_single",
           "figure_id": "tds_payees.194C_row_max_single_194C_fb4e043c"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_fb4e043c_001"
+        },
+        {
+          "name": "payment_a:002",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_fb4e043c_002"
+        },
+        {
+          "name": "payment_a:003",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_fb4e043c_003"
+        },
+        {
+          "name": "payment_a:004",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_fb4e043c_004"
         }
       ],
       "evidence": [
@@ -453,10 +601,12 @@
       ],
       "title_sha256_16": "8eaee7b8a29c82d3",
       "title_text": "Payee over the 194C limit",
-      "limits_sha256_16": "2483d80b2ca773c5",
+      "limits_sha256_16": "4eb9451da9a1a80f",
       "limits_text": [
-        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (own-account transporter, PAN furnished, ten or fewer goods carriages) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
-        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way."
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "4 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "b53cfcd0738b684c",
       "ask_client_text": [
@@ -480,13 +630,13 @@
       "evidence": [],
       "title_sha256_16": "06119560fefe9404",
       "title_text": "Deductor status depends on previous-year turnover",
-      "limits_sha256_16": "e5850cc8f1e435fb",
+      "limits_sha256_16": "fe8897e0c776deb3",
       "limits_text": [
-        "An individual/HUF is a s.194A/194C/194-I/194J deductor only if the immediately preceding year's business turnover exceeded ₹1 crore; the current year's books alone cannot establish this."
+        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
       ],
-      "ask_client_sha256_16": "0f4f5d87be308771",
+      "ask_client_sha256_16": "6a59a8224649a5d2",
       "ask_client_text": [
-        "Confirm previous-year business turnover."
+        "Confirm previous-year turnover or gross receipts, and whether from a business or a profession."
       ]
     }
   ],

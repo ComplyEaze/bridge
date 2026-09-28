@@ -8,7 +8,7 @@
   "figures": [
     {
       "id": "tds_payees.194C_credited_total",
-      "value": 100,
+      "value": 100000,
       "unit": "paise",
       "definition_sha256_16": "c6d791e6cb91b60a",
       "definition_text": "Sum credited to every payee entity credited on a voucher with a 194C-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
@@ -264,9 +264,9 @@
       "evidence": [],
       "title_sha256_16": "06119560fefe9404",
       "title_text": "Deductor status depends on previous-year turnover",
-      "limits_sha256_16": "fe8897e0c776deb3",
+      "limits_sha256_16": "189cd8e51ba31b36",
       "limits_text": [
-        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
+        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); the client is recorded as carrying on a profession; the current year's books alone cannot establish this."
       ],
       "ask_client_sha256_16": "6a59a8224649a5d2",
       "ask_client_text": [

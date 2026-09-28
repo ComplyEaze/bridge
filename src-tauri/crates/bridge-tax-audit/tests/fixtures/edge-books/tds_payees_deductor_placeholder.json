@@ -1,0 +1,74 @@
+{
+ "comment": "tds_payees: an HUF whose previous-year turnover (at or under the profession limit, no activity recorded) is a placeholder is 'unknown', never 'not a deductor', and asked; its payee over the limit is listed, and with no ledger classified as TDS payable, whether TDS was deducted is not judged.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Labour",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_deductor_placeholder-000"
+  },
+  {
+   "name": "Builder B31",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_deductor_placeholder-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Builder B31",
+   "opening": 0,
+   "debit": 0,
+   "credit": 12000000,
+   "closing": -12000000
+  },
+  {
+   "ledger": "Contract Labour",
+   "opening": 0,
+   "debit": 12000000,
+   "credit": 0,
+   "closing": 12000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h01",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     12000000
+    ],
+    [
+     "Builder B31",
+     -12000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "huf",
+ "previous_year_turnover_paise": 400000000,
+ "previous_year_turnover_status": "placeholder",
+ "nature_by_ledger": {
+  "Contract Labour": "194C"
+ }
+}

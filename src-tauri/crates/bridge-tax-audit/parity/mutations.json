@@ -5254,5 +5254,29 @@
   "file": "src/tds_payees.rs",
   "from": "    let in_a = rows.iter().filter(|g| listed_a.contains(g)).count();",
   "to": "    let in_a = rows.iter().filter(|g| !listed_a.contains(g)).count();"
+ },
+ {
+  "id": "TR-54",
+  "by": "author",
+  "what": "tds_payees P2-2: the rate's rounding to the nearest paisa dropped (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 0).div_euclid(10_000) - 100"
+ },
+ {
+  "id": "TR-55",
+  "by": "author",
+  "what": "tds_payees P2-2: the rupee tolerance on the rate reversed (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) + 100"
+ },
+ {
+  "id": "TR-56",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill in (ii)(B) also listed on the TDS question (review)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
+  "to": "        .collect();\n    let listed"
  }
 ]

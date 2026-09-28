@@ -479,7 +479,9 @@ async fn a_click_after_revocation_approves_nothing() {
 /// A call withdrawn while it waits on the dialog stops waiting at once,
 /// answers `request_cancelled` rather than `pending`, and closes the dialog it
 /// had started.
-#[tokio::test]
+// current_thread, which `closed()` relies on: the dialog's task finishes in
+// the poll that closes it, before this task runs again.
+#[tokio::test(flavor = "current_thread")]
 async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -519,7 +521,9 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
 /// call itself, so the answer and the cancellation are both ready when it is
 /// next polled; repeated, since the pick between two ready arms is what is
 /// under test.
-#[tokio::test]
+// current_thread, which `closed()` relies on: the dialog's task finishes in
+// the poll that closes it, before this task runs again.
+#[tokio::test(flavor = "current_thread")]
 async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
     for _ in 0..16 {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();

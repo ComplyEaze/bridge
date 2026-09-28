@@ -656,7 +656,26 @@ live-Tally compatibility claim:
 
 For Tally reads, request commitments hash the transmitted request body (UTF-16LE
 for XML; empty for the status GET), and response commitments hash encoded response
-bodies. Multiple sources combine their commitments in read order. `evidence.bytes`
+bodies. Multiple sources combine their commitments in read order.
+
+A `request_sha256` or `response_sha256` is therefore the hash of one request or
+response only where exactly one source was read. Wherever evidence covers more
+than one source, which includes the top-level `evidence` of most tools and named
+sub-evidence such as `verify_import`'s `mode_opening`, the field is a combined
+commitment: `sha256("<left>:<right>")` over the two lowercase hex digests, folded
+left to right in the order the tool's code combines them. No request on the wire
+has that hash. To check one against captured wire bytes, hash each captured body
+and fold the digests in that same order; probes and paired reads interleave, so
+the order is the code's, not the wire's. Not every request has its own digest in
+the result: on a lab capture of one `verify_import`, the company-mark and census
+requests were folded into commitments without being reported separately (#726).
+The runtime's own combination passes a side through unchanged when the other
+side's two digests are both empty, so runtime evidence that one source alone fed
+carries that request's own hash; the tool-level combination always hashes both
+sides. The result does not say which case produced a given value, so a digest
+that matches no captured request should be treated as a combination, and one
+that matches a captured request as that request.
+`evidence.bytes`
 counts committed response bodies, including both accepted bodies of a paired read;
 it excludes auxiliary health and identity guards and is not total network traffic.
 Status commits its status and company-discovery responses. Scoped agent reads use

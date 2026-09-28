@@ -1344,6 +1344,67 @@ fn a_captured_composite_voucher_is_withheld_with_its_identity_and_no_amount() {
     assert!(!view.to_string().contains(" @ "), "{view}");
 }
 
+/// The second capture of the same day (#674): the first capture's Sales
+/// voucher and a Receipt against its bill, the receipt's party entry, bill
+/// allocation and cash entry each a composite
+/// (fixtures/agent/vouchers-forex-bill-allocation-20260915.PROVENANCE.md).
+fn captured_forex_bill_allocation_vouchers() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-bill-allocation-20260915.utf16le.xml"
+    );
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_captured_receipt_against_a_foreign_bill_is_withheld_beside_the_sale() {
+    let rows = parse_agent_rows_withholding(
+        &captured_forex_bill_allocation_vouchers(),
+        FOREX_COMPANY_GUID,
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    let views: Vec<Value> = rows.iter().map(withheld_view).collect();
+    for (view, (voucher_type, alter_id)) in views.iter().zip([("Sales", 18), ("Receipt", 19)]) {
+        assert_eq!(view[WITHHELD_MARKER], WITHHELD_FOREIGN_CURRENCY);
+        assert_eq!(view["date"], "20260915");
+        assert_eq!(view["voucher_type"], voucher_type);
+        assert_eq!(view["voucher_number"], "1");
+        assert_eq!(view["alter_id"], alter_id);
+        assert!(view["guid"]
+            .as_str()
+            .unwrap()
+            .starts_with(FOREX_COMPANY_GUID));
+        let entries = view["amounts"].as_array().unwrap();
+        assert_eq!(entries.len(), 2);
+        for entry in entries {
+            assert_eq!(
+                entry.as_object().unwrap().keys().collect::<Vec<_>>(),
+                vec!["ledger"]
+            );
+        }
+        assert!(!view.to_string().contains(" @ "), "{view}");
+    }
+    // The sale's withheld view is the first capture's, unchanged.
+    let first =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert_eq!(views[0], withheld_view(&first[0]));
+    // The receipt's entries name the party and the cash ledger.
+    let receipt_ledgers: Vec<&str> = views[1]["amounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["ledger"].as_str().unwrap())
+        .collect();
+    assert_eq!(receipt_ledgers, vec!["FX Party 01", "Cash"]);
+}
+
 #[test]
 fn every_amount_consuming_parse_still_refuses_the_composite_window() {
     let captured = captured_forex_composite_vouchers();

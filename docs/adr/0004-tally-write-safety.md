@@ -553,11 +553,16 @@ is accepted, and loud.
   any voucher makes it stale, naming the voucher. It is refused unless all N read back. It
   changes no verdict. A `batch_step` review attests only the batch's own vouchers, not that
   nothing else in the company changed. A doubt the check record holds without its own file
-  has no bytes to bind, so it is refused (`ack_doubt_record_unavailable`, #722), unless a review
-  of that kind was already recorded, which answers first (`ack_already_recorded`). Beside
-  another observed doubt it needs a name, unless both are held only by the check record, which
-  is refused with no name needed; a check still pending or unreadable is not observed when the
-  choice is made, which is before the read that can finish it.
+  has no bytes to bind, so it is refused (`ack_doubt_record_unavailable`, #722), named or
+  chosen, before any recorded review of that kind is consulted: such a review is stale, so the
+  refusal names the missing file rather than the stale record (#770). A pending check that the
+  review's own read finishes as a doubt whose file cannot be written is refused the same way,
+  after that read. Beside another observed doubt it needs a name, unless both are held only by
+  the check record, which is refused with no name needed; a check still pending or unreadable
+  is not observed when the choice is made, which is before the read that can finish it. If a read
+  finishes it as a second doubt (the review's first read, its read after the dialog, or another
+  call's read while the dialog is open), an unnamed review is refused as ambiguous after its
+  next read, before any record (#756); a named one goes on, since the person named what they review.
 - The N-voucher step is PARTIAL on raw-gateway lab scripts (protocol reference §11c.5).
   Through Bridge's own post path it is UNVERIFIED until the lab proof (slice D3).
 - The desktop stays single-voucher `JournalOnly`.

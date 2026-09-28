@@ -121,6 +121,7 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
 // even a whitespace or CRLF change trips it). Change a step and its copy, or a job and its digest, together
 // and deliberately; the failure prints the new digest for a reviewed change.
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
+jobIds(releaseWorkflow);
 for (const [source, job, expected, digest] of [
   [workflow, "native", [
     "      - name: Prove the approval-seam scan sees a test build",
@@ -419,14 +420,19 @@ function jobBlock(source, jobName) {
 }
 
 // Parses every job id, and refuses a line at job-key indentation it cannot read, so a job
-// cannot hide from required-checks' needs behind a comment or a quoted key.
+// cannot hide from required-checks' needs behind a comment or a quoted key, and refuses any
+// top-level key after the jobs map.
 function jobIds(source) {
   const lines = source.split(/\r?\n/);
   const start = lines.indexOf("jobs:");
   if (start === -1) failures.push("CI workflow has no block-style jobs: map");
   const ids = [];
   for (const line of lines.slice(start + 1)) {
-    if (/^\S/.test(line)) break;
+    // A workflow-level key after the jobs map would sit outside the pinned header.
+    if (/^[^\s#]/.test(line)) {
+      failures.push(`CI workflow has a top-level key after jobs: ${line}`);
+      break;
+    }
     if (!/^  [^\s#]/.test(line)) continue;
     const id = line.match(/^  ([A-Za-z0-9_-]+):$/)?.[1];
     if (id) ids.push(id);

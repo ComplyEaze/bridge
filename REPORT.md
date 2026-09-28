@@ -402,3 +402,15 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
 - **656 in the list, 656 run, 651 killed.** The 5 that survive are the accepted survivors. F644-01, F644-02 and C2-26 are killed. `--verify --changed-since origin/master` → 494 selected, 494 proven, on crate tree 417ae43f. Master has not touched the crate.
 - Read-only Sonnet pre-push check: none. **Pushed 2e474bd4.** #826's body now names the candidate SHA and the numbers, and a comment gives them.
 - Next: #826 waits on CI, review and the merge (Lane D). Then #662: only the CI wiring of `check-unbounded-reads.mjs` is left, an owner option (a) or (b). Then #658 and #667.
+
+## 2026-09-28 17:15 UTC — #826 (#644): two master merges, and records for the merged tree (6df2162b)
+
+- Master re-pinned two modules this PR touches, so the branch merged master twice. Each time the conflicting files took master's side and the change was re-applied on top:
+  - **f9ab0d91** brings #812 (tds_payees): `?` after its 24 calls, the inline check deleted, and its test retyped.
+  - **b6a70e15** brings #821 (loans_interest), which came with its own checked `fig` wrapper. The wrapper is deleted, its 53 callers call `r.fig(...)?`, its test is retyped, and LR-56 and LR-60 are retargeted.
+  - The list is now 779. 367 tests pass; fmt and clippy are clean. A Sonnet pre-push check found no P1 or P2 on each merge.
+- The records for f9ab0d91 (712 run, 707 killed) were made and then went stale when #821 landed.
+- **Records for b6a70e15:** 779 run, 775 killed, and the survivors are X11, A04, A19 and S08. X12 is still listed as accepted, but master's own #821 test kills it (master's records show the same). `--verify` gives 618 of 618.
+  - The run was sixteen shards. Container restarts roughly every hour killed runs; each shard was pushed to `cloud/lane-e-644-shards-3` as it finished, and a committed `resume.sh` restarts only the missing ones.
+- A Sonnet pre-push check found nothing. **Pushed 6df2162b.** #826's body and a comment give the numbers.
+- Next: #826 waits on CI, review and the merge (Lane D). Then #662's remainder (CI wiring for `check-unbounded-reads.mjs`), #658 and #667.

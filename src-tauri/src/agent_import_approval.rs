@@ -47,15 +47,37 @@ pub(super) const CALL_CEILING: Duration = Duration::from_secs(45);
 pub(super) const MEASURED_POST: Duration = Duration::from_millis(20_950);
 pub(super) const MEASURED_POST_VOUCHERS: usize = 200;
 
+/// What a redeem took from the start of its call to its result: the call that
+/// finds an approval, checks the book afresh, posts and reads back. Measured
+/// live once, 50 Journals on a small synthetic book (L1-a, 28 Sep 2026,
+/// bridge#725): 18.09 s. A joining call redeems only a click it finds already
+/// made, so it starts the redeem within moments of its own start: this check
+/// then limits the batch to the size measured, and bounds nothing on a large
+/// book, where a redeem costs what a fresh redeeming call does (#852).
+pub(super) const MEASURED_REDEEM: Duration = Duration::from_millis(18_090);
+pub(super) const MEASURED_REDEEM_VOUCHERS: usize = 50;
+
+/// Whether work that costs `measured`, measured live at up to
+/// `measured_vouchers`, fits under the ceiling when it starts `elapsed` into
+/// its call.
+fn fits_within(
+    measured: Duration,
+    measured_vouchers: usize,
+    elapsed: Duration,
+    vouchers: usize,
+) -> bool {
+    vouchers <= measured_vouchers
+        && elapsed
+            .checked_add(measured)
+            .is_some_and(|total| total <= CALL_CEILING)
+}
+
 /// Whether an approval answered `elapsed` into its call may be posted in that
 /// same call, as before #725: only when a post that costs `measured` still fits
 /// under the ceiling. Otherwise the next call redeems it, after checking the
 /// book again.
 fn fits_with(measured: Duration, elapsed: Duration, vouchers: usize) -> bool {
-    vouchers <= MEASURED_POST_VOUCHERS
-        && elapsed
-            .checked_add(measured)
-            .is_some_and(|total| total <= CALL_CEILING)
+    fits_within(measured, MEASURED_POST_VOUCHERS, elapsed, vouchers)
 }
 
 /// How long an answered approval may wait to be taken for posting, from the
@@ -225,6 +247,7 @@ pub(in crate::agent) struct PostApprovals {
     refusals: Mutex<std::collections::VecDeque<KeptRefusal>>,
     ttl: Duration,
     measured_post: Duration,
+    measured_redeem: Duration,
 }
 
 impl PostApprovals {
@@ -235,7 +258,29 @@ impl PostApprovals {
             refusals: Mutex::new(std::collections::VecDeque::new()),
             ttl: APPROVAL_TTL,
             measured_post: MEASURED_POST,
+            measured_redeem: MEASURED_REDEEM,
         }
+    }
+
+    /// This holder with its redeems measured at `measured`: a test drives the
+    /// joined-too-late branch through a real call with it.
+    #[cfg(test)]
+    pub(in crate::agent) fn with_measured_redeem(mut self, measured: Duration) -> Self {
+        self.measured_redeem = measured;
+        self
+    }
+
+    /// Whether a joining call that finds a click already made `elapsed` into
+    /// it may redeem it in that call (#725 slice 2.0): a batch no larger than
+    /// the redeem measured live, whose measured cost fits under the ceiling
+    /// from here. A measurement, not a bound on what the redeem then takes.
+    pub(super) fn redeem_fits_in_call(&self, elapsed: Duration, vouchers: usize) -> bool {
+        fits_within(
+            self.measured_redeem,
+            MEASURED_REDEEM_VOUCHERS,
+            elapsed,
+            vouchers,
+        )
     }
 
     #[cfg(test)]
@@ -364,6 +409,40 @@ impl PostApprovals {
             Some((held_batch, Held::Pending { dialog: Some(dialog), .. }))
                 if held_batch == batch_id && dialog.answered().is_some()
         )
+    }
+
+    /// Whether a call is waiting on `batch_id`'s held dialog: it has taken the
+    /// dialog out of the slot to wait on it.
+    #[cfg(test)]
+    pub(in crate::agent) fn joined_for_test(&self, batch_id: &str) -> bool {
+        matches!(
+            self.slot().as_ref(),
+            Some((held_batch, Held::Pending { dialog: None, .. })) if held_batch == batch_id
+        )
+    }
+
+    /// What a call re-entered to redeem a joined approval finds (#725 slice
+    /// 2.0). Only this batch's approval, still in its time, lets it go on:
+    /// anything else is refused, and nothing is asked, so such a call can
+    /// never show a second dialog.
+    pub(super) fn begin_redeem(&self, batch_id: &str) -> Result<(), String> {
+        let mut slot = self.slot();
+        let expired = matches!(
+            slot.as_ref(),
+            Some((held_batch, Held::Approved { answered, .. }))
+                if held_batch == batch_id && self.expired(answered)
+        );
+        self.settle(&mut slot);
+        if expired {
+            return Err("import_approval_expired".into());
+        }
+        match slot.as_ref() {
+            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id => Ok(()),
+            Some((held_batch, Held::Redeeming { .. })) if held_batch == batch_id => {
+                Err("import_approval_in_use".into())
+            }
+            _ => Err("import_approval_revoked".into()),
+        }
     }
 
     pub(super) fn begin(&self, batch_id: &str) -> Begin {

@@ -158,60 +158,40 @@ after `Enforce fixture byte integrity`:
         run: node scripts/check-fixture-provenance.mjs
 ```
 
-## 4. Unbounded reads — BLOCKING
+## 4. Unbounded reads — BLOCKING (wired)
 
 `scripts/check-unbounded-reads.mjs` requires every `Read::read_to_end`/
 `read_to_string` call site (outside tests) to be capped with `.take(N)`, the
 pattern already used in `src-tauri/src/dsc.rs`, `agent_desktop_journal.rs`,
-`source_draft/files.rs`, and `tools/bridge-tally-qualification`. Passes clean
-today: 15 call sites scanned, 10 bounded, 3 reviewed exceptions (zip entries
-read from a bundled XLSX/PDF template, not untrusted input — named in the
-script's `ALLOWED_UNBOUNDED`), 0 unbounded.
+`source_draft/files.rs`, and `tools/bridge-tally-qualification`. When wired it
+passed clean: 11 call sites scanned, 11 bounded, 0 unbounded, 3 reviewed
+exceptions (zip entries read from a bundled XLSX/PDF template, not untrusted
+input — named in the script's `ALLOWED_UNBOUNDED`).
 
 ```yaml
       - name: Enforce read bound coverage
         run: node scripts/check-unbounded-reads.mjs
 ```
 
-Place in the `tally-portable` job, alongside
-`check-tally-live-read-boundary.mjs`. No Rust toolchain needed (pure Node +
-`git ls-files`), so it can equally go in `workflow-consistency`.
+It runs in the `workflow-consistency` job (pure Node and `git ls-files`, no Rust
+toolchain).
 
-## 5. PII regex regression coverage — BLOCKING
+## 5. PII regex regression coverage — removed
 
-`scripts/check-pii-regex-regression-coverage.mjs` enforces: a diff editing a
-PII-matching regex inside a file named like a scanner/sanitizer
-(`sanit*`/`redact*`/`scrub*`/`*pii*`) must touch that file's `*.test.<ext>`
-sibling in the same diff. Diff-based (compares against
-`origin/${{ github.base_ref }}` / `origin/master`), so it needs
-`fetch-depth: 0`, same as `check-protocol-section-numbers.mjs`. Passes clean
-today (no PII regex edits in this branch's diff — the gate has not yet been
-exercised against a real regex-editing PR; noted as a real limit on how much
-confidence "passes clean" should carry here).
+Proposed as a diff gate but never wired, then deleted. It selected files by name
+(`sanit*`/`redact*`/`scrub*`/`*pii*`) and regexes by constructor call, which
+matched one file in the repository, `scripts/sanitise-bbox-capture.py`, whose
+own test already runs in CI. It found no qualifying edit in 100 master commits,
+and it could not see a Rust redaction site by construction.
 
-```yaml
-      - run: node scripts/check-pii-regex-regression-coverage.mjs
-```
+## 6. Parser accept/reject test symmetry — removed
 
-Place in `workflow-consistency` (already checks out with `fetch-depth: 0`),
-immediately after `check-protocol-section-numbers.mjs`.
+Proposed as a diff gate but never wired, then deleted. It classified tests by
+name tokens: about 85% of this repository's Rust test names matched neither
+list, and `refuse`, the house verb for a reject-path test, was not a reject
+token, so wiring it would have failed pull requests that follow the house style.
 
-## 6. Parser accept/reject test symmetry — BLOCKING
-
-`scripts/check-parser-test-symmetry.mjs` enforces: a parser module (any `.rs`
-file defining a `fn` whose name contains `parse`) gaining a new
-accept-path-named test in a diff must gain a new reject-path-named test in the
-same diff. Diff-based, same `fetch-depth: 0` requirement as above. Passes
-clean today (no parser files touched in this branch's diff — same caveat as
-§5: not yet exercised against a real parser-test-adding PR).
-
-```yaml
-      - run: node scripts/check-parser-test-symmetry.mjs
-```
-
-Place in `workflow-consistency`, same job as §5.
-
-## 7. `gh api` pagination — BLOCKING
+## 7. `gh api` pagination — BLOCKING (wired)
 
 `scripts/check-gh-api-pagination.mjs` scans workflow YAML, `scripts/**`, and
 `docs/**` for `gh api` REST calls that look like a collection listing
@@ -220,17 +200,12 @@ Place in `workflow-consistency`, same job as §5.
 without `hasNextPage` appearing anywhere in the same file. Passes clean today:
 2 `gh api` invocations found repository-wide (one real, in
 `release-mcpb-preview.yml`; one a test assertion string matching it), both
-`--method POST` mutations, neither a list call — this repository does not yet
-have a `gh api` listing call to positively exercise the rule against, which is
-exactly the situation that prompted this gate: the
-hazard is invisible until someone adds one.
+`--method POST` mutations, neither a list call. By the time it was wired, the
+install-page deploy had added a release listing without `--paginate`; that call
+now reads every page.
 
-```yaml
-      - run: node scripts/check-gh-api-pagination.mjs
-```
-
-Place in `workflow-consistency`. No `fetch-depth: 0` requirement (scans the
-working tree, not a diff).
+It runs in the `workflow-consistency` job. No `fetch-depth: 0` requirement
+(scans the working tree, not a diff).
 
 ## 8. File size report — REPORTING (never blocking, by design)
 
@@ -256,10 +231,8 @@ dependencies beyond Node and `git ls-files`.
 | clippy default groups | existing `-D warnings` steps, `-A clippy::pedantic` appended | BLOCKING (already is, unchanged) | 0 warnings (unchanged by this PR) |
 | clippy pedantic | `lint-pedantic-advisory` job (new) | REPORTING | 1,199 warnings (1,150 + 49) |
 | Fixture provenance | `check-fixture-provenance.mjs` | BLOCKING (wired in `tally-portable`) | 0 undocumented (51/125 backfilled) |
-| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING | 0 unbounded (3 reviewed exceptions) |
-| PII regex regression coverage | `check-pii-regex-regression-coverage.mjs` | BLOCKING | clean (0 regex edits in this diff) |
-| Parser accept/reject symmetry | `check-parser-test-symmetry.mjs` | BLOCKING | clean (0 parser files in this diff) |
-| `gh api` pagination | `check-gh-api-pagination.mjs` | BLOCKING | clean (2 invocations, both excluded mutations) |
+| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING (wired in `workflow-consistency`) | 0 unbounded (3 reviewed exceptions) |
+| `gh api` pagination | `check-gh-api-pagination.mjs` | BLOCKING (wired in `workflow-consistency`) | clean (one listing call, paginated) |
 | File size report | `report-file-sizes.mjs` | REPORTING (never fails) | 559 files, 213,322 lines |
 
 Three of the "BLOCKING, passes clean today" gates (§5, §6, §7) have not yet

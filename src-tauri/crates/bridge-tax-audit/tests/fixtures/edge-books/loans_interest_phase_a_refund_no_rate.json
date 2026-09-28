@@ -1,0 +1,312 @@
+{
+ "comment": "loans_interest #779 Phase A review round, a firm, the rules without [tds_rates] (no s.194A rate): a loan of 6,000 by bank that the two walks disagree on (not reportable netting against a repayment past the balance, reportable read as a fresh loan), listed as not computed, and a later voucher both crediting and debiting the same loan, listed, which that record says it was not compared with (Refund Loan); interest over the threshold with or without the interest on a two-sided voucher, no TDS anywhere: coverage not judged, and the s.194A finding stays and names the listed interest (Unjudged Loan); TDS on a two-sided voucher over the threshold: coverage not computed, not 'not judged', and the s.194A verdict is not computed (No Rate Seen Loan), where LOAN-1 names the TDS (the reference's pinned OQ-2).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-002"
+  },
+  {
+   "name": "Refund Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-003"
+  },
+  {
+   "name": "Unjudged Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-004"
+  },
+  {
+   "name": "No Rate Seen Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-005"
+  },
+  {
+   "name": "Interest Unjudged",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-006"
+  },
+  {
+   "name": "Interest No Rate Seen",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_refund_no_rate-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 2000000,
+   "closing": 400000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 70000,
+   "closing": -70000
+  },
+  {
+   "ledger": "Interest No Rate Seen",
+   "opening": 0,
+   "debit": 10000000,
+   "credit": 0,
+   "closing": 10000000
+  },
+  {
+   "ledger": "Interest Unjudged",
+   "opening": 0,
+   "debit": 5100000,
+   "credit": 0,
+   "closing": 5100000
+  },
+  {
+   "ledger": "No Rate Seen Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 10020000,
+   "closing": -19920000
+  },
+  {
+   "ledger": "Refund Loan",
+   "opening": -1000000,
+   "debit": 1700000,
+   "credit": 2600000,
+   "closing": -1900000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000,
+   "closing": -10000
+  },
+  {
+   "ledger": "Unjudged Loan",
+   "opening": -10000000,
+   "debit": 500000,
+   "credit": 5100000,
+   "closing": -14600000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Refund Loan",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     1500000
+    ],
+    [
+     "Refund Loan",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     600000
+    ],
+    [
+     "Refund Loan",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Refund Loan",
+     -500000
+    ],
+    [
+     "Refund Loan",
+     200000
+    ],
+    [
+     "Bank A",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Unjudged",
+     5000000
+    ],
+    [
+     "Unjudged Loan",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Unjudged Loan",
+     500000
+    ],
+    [
+     "Unjudged Loan",
+     -100000
+    ],
+    [
+     "Interest Unjudged",
+     100000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "n01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest No Rate Seen",
+     10000000
+    ],
+    [
+     "No Rate Seen Loan",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "No Rate Seen Loan",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -10000
+    ],
+    [
+     "No Rate Seen Loan",
+     -20000
+    ],
+    [
+     "Cash",
+     -70000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Refund Loan": {
+   "lender": "Invented Refund Lender",
+   "lender_type": "person"
+  },
+  "Unjudged Loan": {
+   "lender": "Invented Unjudged Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Unjudged"
+  },
+  "No Rate Seen Loan": {
+   "lender": "Invented No Rate Seen Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest No Rate Seen"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ],
+ "rules_without": [
+  "tds_rates"
+ ]
+}

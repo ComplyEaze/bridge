@@ -95,9 +95,13 @@ impl Server {
                             .map(|ledger| party_name(ledger.clone()))
                             .collect::<Vec<_>>(),
                     });
-                    frame["scope_limitation"] = json!(
-                        "Totals cover this book's plain base-currency ledgers only. Ledgers kept in another currency, and base-currency ledgers with a balance Tally shows in another currency, are left out and named, so debit and credit totals are expected to differ."
-                    );
+                    frame["scope_limitation"] =
+                        json!(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION);
+                    frame["scope_label"] =
+                        json!(crate::tally::runtime::base_currency_ledgers_only_label(
+                            foreign.len(),
+                            mixed.len(),
+                        ));
                 }
                 self.hold_listing(ListingSnapshot::new(
                     &identity,
@@ -155,6 +159,12 @@ impl Server {
             limitations.as_array_mut(),
         ) {
             list.push(json!(limitation));
+        }
+        // A partial read says so first, with its counts (bridge#709).
+        if let (Some(label), Some(list)) =
+            (frame["scope_label"].as_str(), limitations.as_array_mut())
+        {
+            list.insert(0, json!(label));
         }
         result["limitations"] = limitations;
         Ok(ToolOutcome {

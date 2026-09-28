@@ -294,10 +294,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
         .expect("northwind group");
     assert_eq!(northwind["ledger"], "Northwind Traders");
     assert_eq!(northwind["disposition"], "Receipt");
-    assert_eq!(northwind["total"], "10000.00");
-    // A known gap, pinned so it cannot pass unseen: a party of one row shows
-    // that row's amount as its total.
+    // Its rows, and no amount.
     assert_eq!(northwind["rows"], 1);
+    assert!(northwind.get("total").is_none(), "{northwind}");
 
     // row-level content stays in the file: no reference, narration, label or
     // transaction date reaches the response
@@ -576,8 +575,10 @@ async fn a_union_bank_statement_parses_without_printed_totals() {
         result["suspense_by_reason"]["cash_purpose_not_confirmed"], 1,
         "{response}"
     );
-    assert_eq!(result["reconciled"]["total_debits"], "13250.50");
-    assert_eq!(result["reconciled"]["total_credits"], "3750.50");
+    // Union Bank prints no totals and none were supplied, so none is echoed.
+    assert_eq!(result["reconciled"]["total_debits"], Value::Null);
+    assert_eq!(result["reconciled"]["total_credits"], Value::Null);
+    assert_eq!(result["reconciled"]["closing_balance"], "500.00");
     assert_eq!(result["reconciled"]["totals_match_statement"], false);
 
     // a closing balance the rows do not reach is still refused
@@ -1128,8 +1129,6 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
         [
             "account_last4",
             "bank",
-            "bank_ledger_in",
-            "bank_ledger_out",
             "cash_questions",
             "cash_questions_omitted",
             "cash_questions_open",
@@ -1285,12 +1284,13 @@ fn slashed_date(iso: &str) -> String {
     format!("{}/{}/{}", &iso[8..10], &iso[5..7], &iso[0..4])
 }
 
-/// A known gap, pinned so it cannot pass unseen: a counterparty of one row
-/// reports that row's amount as its total, for a party paid once and for one
-/// answered cash line alike, and so does a bank ledger total over one row. This predates the cash questions; whether to
-/// withhold such a total is a separate decision.
+/// The parse result carries no amount of its own: a counterparty gives its
+/// rows only, and reconciled echoes only what the caller supplied. An open
+/// cash line's amount is the one exception (owner ruling b1). Checked by
+/// structure: every string in the result that reads as an amount sits at one
+/// of those places.
 #[test]
-fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
+fn the_parse_result_carries_no_amount_but_the_callers_own() {
     use bridge_bank_statement::parse::Row;
     use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
     let sbi = |date: &str, narration: &str, dr: &str, cr: &str, bal: &str| {
@@ -1305,30 +1305,40 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
             ("bal", bal),
         ])
     };
+    // An answered cash line and a once-paid party (each a group of one row),
+    // and an open cash line.
     let rows = [
-        sbi(
+        (
             "01Aug2026",
             "ATM WDL ATM CASH 4417 SYNTHETIC QUAYSIDE",
             "512.00",
             "",
             "9488.00",
         ),
-        sbi(
+        (
             "03Aug2026",
             "BY TRANSFER-UPI/CR/612345678901/SYNTHETIC PAYER/XYZ",
             "",
             "71.00",
             "9559.00",
         ),
-    ];
+        (
+            "05Aug2026",
+            "ATM WDL ATM CASH 6639 SYNTHETIC LOCKSIDE",
+            "64.00",
+            "",
+            "9495.00",
+        ),
+    ]
+    .map(|(date, narration, dr, cr, bal)| sbi(date, narration, dr, cr, bal));
     let mut args = json!({
         "statement_path": never_opened("statement.pdf"),
         "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
-        "closing_balance": "9,559.00",
-        "total_debits": "512.00",
+        "closing_balance": "9,495.00",
+        "total_debits": "576.00",
         "total_credits": "71.00",
         "bank_ledger": "Synthetic Bank Ledger",
         "suspense_ledger": "Suspense"
@@ -1352,38 +1362,69 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
         ParsedStatement {
             account_number: "00000000001234".into(),
             statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9559.00").unwrap(),
+            closing: bridge_tally_core::ExactDecimal::parse("9495.00").unwrap(),
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
             build,
         }
     };
-    let open = parsed_with(&OwnedRequest::from_args(&args).unwrap());
+    let unanswered = parsed_with(&OwnedRequest::from_args(&args).unwrap());
     args["cash_answers"] = json!([{
-        "bridge_txn_id": open.build.records[0].bridge_txn_id,
+        "bridge_txn_id": unanswered.build.records[0].bridge_txn_id,
         "answer": "owner_use",
         "ledger": "Drawings"
     }]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let parsed = parsed_with(&request);
     let summary = summary(&request, &parsed, "statement-x", "0", 200_000);
-    assert_eq!(summary["cash_questions"], json!([]));
-    let total_of = |party: &str| {
-        let group = summary["counterparties"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|group| group["party"] == serde_json::to_value(party_name(party)).unwrap())
-            .unwrap_or_else(|| panic!("{party}: {summary}"));
-        assert_eq!(group["rows"], 1, "{party}");
-        group["total"].clone()
-    };
-    assert_eq!(total_of("ATM CASH WITHDRAWAL"), "512.00");
-    assert_eq!(total_of("SYNTHETIC PAYER"), "71.00");
-    // The bank ledger's totals are built from the same single rows.
-    assert_eq!(summary["bank_ledger_out"], "512.00");
-    assert_eq!(summary["bank_ledger_in"], "71.00");
-    assert_eq!(summary["reconciled"]["total_debits"], "512.00");
-    assert_eq!(summary["reconciled"]["total_credits"], "71.00");
+    assert_eq!(summary["cash_questions"].as_array().unwrap().len(), 1);
+
+    // Every string that reads as an amount (a date reads as one too), with
+    // where it sits.
+    fn amounts(value: &Value, path: &str, found: &mut Vec<(String, String)>) {
+        match value {
+            Value::String(text)
+                if text.chars().any(|c| c.is_ascii_digit())
+                    && text
+                        .chars()
+                        .all(|c| c.is_ascii_digit() || ".,-".contains(c)) =>
+            {
+                found.push((path.to_string(), text.clone()));
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    amounts(item, &format!("{path}/{index}"), found);
+                }
+            }
+            Value::Object(fields) => {
+                for (key, field) in fields {
+                    amounts(field, &format!("{path}/{key}"), found);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    amounts(&summary, "", &mut found);
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            ("/account_last4", "1234"),
+            ("/cash_questions/0/amount", "64.00"),
+            ("/cash_questions/0/date", "2026-08-05"),
+            ("/reconciled/closing_balance", "9495.00"),
+            ("/reconciled/total_credits", "71.00"),
+            ("/reconciled/total_debits", "576.00"),
+            ("/sha256", "0"),
+        ]
+        .map(|(path, text)| (path.to_string(), text.to_string())),
+        "{summary}"
+    );
+    // A counterparty gives its rows, and no total.
+    for group in summary["counterparties"].as_array().unwrap() {
+        assert!(group.get("total").is_none(), "{group}");
+        assert!(group["rows"].as_u64().unwrap() >= 1, "{group}");
+    }
 }

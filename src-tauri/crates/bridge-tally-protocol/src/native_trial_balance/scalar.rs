@@ -7,15 +7,24 @@ use quick_xml::{
     Reader,
 };
 
-pub(super) fn parse_amount(
+/// An amount element's text, once its `TYPE` is `Amount`. The text is parsed
+/// only for a row that is read ([`parse_amount_text`]); a row set aside keeps
+/// its values unparsed.
+pub(super) fn amount_text(
     element: &BytesStart<'_>,
     value: String,
-) -> Result<NativeTrialBalanceAmount, NativeTrialBalanceError> {
+) -> Result<String, NativeTrialBalanceError> {
     if required_attribute(element, b"TYPE", "trial_balance_amount_type_missing")? != "Amount" {
         return Err(NativeTrialBalanceError::InvalidResponse(
             "trial_balance_amount_type_invalid",
         ));
     }
+    Ok(value)
+}
+
+pub(super) fn parse_amount_text(
+    value: String,
+) -> Result<NativeTrialBalanceAmount, NativeTrialBalanceError> {
     if value.is_empty() {
         Ok(NativeTrialBalanceAmount::PresentEmpty)
     } else {

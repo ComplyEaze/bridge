@@ -14,6 +14,7 @@
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
 use crate::bank::{Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION};
+use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
 use crate::mapping::{Mapping, Treatment};
 use crate::money::money;
@@ -23,12 +24,55 @@ use crate::text::{ledger_key, mapping_key, squash, strip};
 use bridge_tally_primitives::ExactDecimal;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Bridge's per-name and per-text limits (`agent_import.rs`), checked here so a
 /// statement that cannot be built is refused while its row number is known.
 pub const MAX_LEDGER_CHARS: usize = 1024;
 pub const MAX_NARRATION_CHARS: usize = 2000;
+
+/// The narration tag of a line posted to suspense because no mapping names
+/// its party, or the parser could not identify one.
+pub const UNIDENTIFIED: &str = "UNIDENTIFIED - reallocate from";
+
+/// Every tag a line Bridge posts to suspense carries, one of each kind, so
+/// one read can find them all.
+pub const SUSPENSE_TAGS: [&str; 2] = [PURPOSE_NOT_CONFIRMED, UNIDENTIFIED];
+
+/// Whether a narration ends in a suspense tag as `build` writes it: the
+/// last segment, and for [`UNIDENTIFIED`] followed by one of the voucher's own
+/// `ledgers`. A tag's text anywhere else (an account label, a party name)
+/// never counts.
+pub fn suspense_tagged<'a>(narration: &str, ledgers: impl IntoIterator<Item = &'a str>) -> bool {
+    suspense_tag(narration, ledgers).is_some()
+}
+
+/// One of [`SUSPENSE_TAGS`], as [`suspense_tag`] finds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuspenseTag {
+    /// [`PURPOSE_NOT_CONFIRMED`]: a person answered dont_know.
+    PurposeNotConfirmed,
+    /// [`UNIDENTIFIED`]: a party the mapping does not name, or the parser
+    /// could not identify.
+    Unidentified,
+}
+
+/// Which suspense tag a narration ends in, as [`suspense_tagged`] finds it.
+pub fn suspense_tag<'a>(
+    narration: &str,
+    ledgers: impl IntoIterator<Item = &'a str>,
+) -> Option<SuspenseTag> {
+    if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
+        Some(SuspenseTag::PurposeNotConfirmed)
+    } else if ledgers
+        .into_iter()
+        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
+    {
+        Some(SuspenseTag::Unidentified)
+    } else {
+        None
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Side {
@@ -77,6 +121,9 @@ pub enum Disposition {
     Voucher(VoucherType),
     /// Carried by the other account's Contra; no voucher is proposed.
     Skipped,
+    /// A cash withdrawal or deposit nobody has answered yet. No voucher is
+    /// proposed, and `build_import_xml` refuses the proposals until it is.
+    NeedsAnswer,
 }
 
 /// What became of one statement row. Kept for every row inside the date window,
@@ -90,9 +137,14 @@ pub struct StatementRecord {
     pub party: String,
     /// The ledger the voucher posts the non-bank leg to (empty when skipped).
     pub ledger: String,
-    /// The row reached the suspense ledger, by the deliberately loose fold.
+    /// The row reached the suspense ledger: answered "don't know", or, by
+    /// the deliberately loose fold, mapped or defaulted there.
     pub suspense: bool,
     pub bridge_txn_id: String,
+    /// Set when the statement text is a captured cash withdrawal or deposit.
+    pub cash_movement: Option<CashMovement>,
+    /// The person's answer for a cash line, when given.
+    pub cash_answer: Option<CashAnswer>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,6 +165,8 @@ pub struct BuildOptions<'a> {
     pub account_number: &'a str,
     pub date_from: Option<Date>,
     pub date_to: Option<Date>,
+    /// A person's answer per cash line, keyed by `bridge_txn_id`.
+    pub cash_answers: &'a CashAnswers,
 }
 
 fn two_places(text: &str) -> String {
@@ -176,6 +230,87 @@ fn require_ledger(name: &str, what: &str, row: Option<usize>) -> Result<(), Refu
     Ok(())
 }
 
+fn require_unique(
+    seen: &mut BTreeMap<String, usize>,
+    txn_id: &str,
+    number: usize,
+) -> Result<(), Refusal> {
+    match seen.insert(txn_id.to_string(), number) {
+        Some(first) => Err(Refusal::at_row(
+            "duplicate_statement_row",
+            number,
+            format!(
+                "rows {first} and {number} carry the same date, amounts, balance and narration. Check whether the statement really prints the row twice."
+            ),
+        )),
+        None => Ok(()),
+    }
+}
+
+fn require_answers(
+    movement: CashMovement,
+    answer: CashAnswer,
+    number: usize,
+) -> Result<(), Refusal> {
+    if answer.answers(movement) {
+        return Ok(());
+    }
+    Err(Refusal::at_row(
+        "cash_answer_wrong_direction",
+        number,
+        format!(
+            "row {number} is a cash {}, and {} is not one of its answers",
+            if movement.outward() {
+                "withdrawal"
+            } else {
+                "deposit"
+            },
+            answer.as_str()
+        ),
+    ))
+}
+
+/// The one entry an answer maps to: the non-bank leg's ledger and the type.
+/// Only "don't know" reaches the suspense ledger.
+fn cash_entry(
+    movement: CashMovement,
+    answer: CashAnswer,
+    named: &str,
+    suspense_ledger: &str,
+    number: usize,
+) -> Result<(String, VoucherType), Refusal> {
+    require_answers(movement, answer, number)?;
+    if answer != CashAnswer::DontKnow && ledger_key(named) == ledger_key(suspense_ledger) {
+        return Err(Refusal::at_row(
+            "cash_answer_names_suspense",
+            number,
+            format!(
+                "row {number}: only a dont_know answer posts to the suspense ledger, where it is tagged for the CA; name the ledger this answer means"
+            ),
+        ));
+    }
+    let voucher_type = match answer {
+        CashAnswer::BusinessCash => VoucherType::Contra,
+        CashAnswer::OwnerUse => VoucherType::Payment,
+        CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => VoucherType::Receipt,
+        CashAnswer::DontKnow if movement.outward() => VoucherType::Payment,
+        CashAnswer::DontKnow => VoucherType::Receipt,
+        CashAnswer::PaidToSomeone | CashAnswer::OwnCashBox | CashAnswer::UnbookedCashSales => {
+            return Err(Refusal::at_row(
+                "cash_answer_not_built",
+                number,
+                format!("row {number}: {}", answer.not_built().unwrap_or_default()),
+            ))
+        }
+    };
+    let ledger = if answer == CashAnswer::DontKnow {
+        suspense_ledger.to_string()
+    } else {
+        named.to_string()
+    };
+    Ok((ledger, voucher_type))
+}
+
 /// Proposals and a record per statement row, in printed order (`build`).
 pub fn build(
     rows: &[Row],
@@ -188,6 +323,8 @@ pub fn build(
     let mut proposals = Vec::new();
     let mut records = Vec::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
+    let mut statement_ids = BTreeSet::new();
+    let mut window_ids = BTreeSet::new();
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -201,11 +338,14 @@ pub fn build(
                 ),
             ));
         };
+        let txn_id = transaction_id(options.account_number, date, row);
+        statement_ids.insert(txn_id.clone());
         if options.date_from.is_some_and(|from| date < from)
             || options.date_to.is_some_and(|to| date > to)
         {
             continue;
         }
+        window_ids.insert(txn_id.clone());
         let debit = money(row.get(DEBIT), DEBIT, number)?;
         let credit = money(row.get(CREDIT), CREDIT, number)?;
         let (amount, outward) = match (debit, credit) {
@@ -236,53 +376,105 @@ pub fn build(
         }
         let amount_text = format_amount(&amount);
         let party = bank.party(row);
-        // A sentinel party ("not identified") always reaches suspense. The
-        // reference also re-checked that here, as a second lock behind the
-        // loader; in Rust a `Mapping` can only be built by `from_rows`, which
-        // refuses a sentinel key, so that lock could never fire and is omitted
-        // rather than kept as protection nothing exercises.
-        let (mapped_ledger, treatment) = mapping
-            .get(&party)
-            .cloned()
-            .unwrap_or((String::new(), Treatment::Auto));
-        let ledger = if mapped_ledger.is_empty() {
-            options.suspense_ledger.to_string()
-        } else {
-            mapped_ledger
+        let cash_movement = CashMovement::of_party(&party);
+        let answered = options.cash_answers.get(&txn_id);
+        let (ledger, voucher_type, cash_answer) = match cash_movement {
+            Some(movement) => {
+                if movement.outward() != outward {
+                    return Err(Refusal::at_row(
+                        "cash_movement_direction_mismatch",
+                        number,
+                        format!(
+                            "row {number}'s text names a cash {} but its amount moves the other way",
+                            if movement.outward() { "withdrawal" } else { "deposit" }
+                        ),
+                    ));
+                }
+                let Some((answer, named)) = answered else {
+                    require_unique(&mut seen, &txn_id, number)?;
+                    records.push(StatementRecord {
+                        row: number,
+                        date: date.iso(),
+                        disposition: Disposition::NeedsAnswer,
+                        amount: amount_text,
+                        party,
+                        ledger: String::new(),
+                        suspense: false,
+                        bridge_txn_id: txn_id,
+                        cash_movement,
+                        cash_answer: None,
+                    });
+                    continue;
+                };
+                let (ledger, voucher_type) =
+                    cash_entry(movement, *answer, named, options.suspense_ledger, number)?;
+                (ledger, voucher_type, Some(*answer))
+            }
+            None => {
+                if answered.is_some() {
+                    return Err(Refusal::at_row(
+                        "cash_answer_not_a_cash_line",
+                        number,
+                        format!(
+                            "row {number} is answered in cash_answers, but it is not a cash withdrawal or deposit; map its party instead"
+                        ),
+                    ));
+                }
+                // A sentinel party ("not identified") always reaches suspense. The
+                // reference also re-checked that here, as a second lock behind the
+                // loader; in Rust a `Mapping` can only be built by `from_rows`, which
+                // refuses a sentinel key, so that lock could never fire and is omitted
+                // rather than kept as protection nothing exercises.
+                let (mapped_ledger, treatment) = mapping
+                    .get(&party)
+                    .cloned()
+                    .unwrap_or((String::new(), Treatment::Auto));
+                let ledger = if mapped_ledger.is_empty() {
+                    options.suspense_ledger.to_string()
+                } else {
+                    mapped_ledger
+                };
+                if treatment == Treatment::Skip {
+                    records.push(StatementRecord {
+                        row: number,
+                        date: date.iso(),
+                        disposition: Disposition::Skipped,
+                        amount: amount_text,
+                        party,
+                        ledger: String::new(),
+                        suspense: false,
+                        bridge_txn_id: txn_id,
+                        cash_movement: None,
+                        cash_answer: None,
+                    });
+                    continue;
+                }
+                let voucher_type = match (treatment, outward) {
+                    (Treatment::Contra, _) => VoucherType::Contra,
+                    (_, true) => VoucherType::Payment,
+                    (_, false) => VoucherType::Receipt,
+                };
+                (ledger, voucher_type, None)
+            }
         };
-        let txn_id = transaction_id(options.account_number, date, row);
-        if treatment == Treatment::Skip {
-            records.push(StatementRecord {
-                row: number,
-                date: date.iso(),
-                disposition: Disposition::Skipped,
-                amount: amount_text,
-                party,
-                ledger: String::new(),
-                suspense: false,
-                bridge_txn_id: txn_id,
-            });
-            continue;
-        }
         require_ledger(&ledger, "mapped ledger", Some(number))?;
-        let voucher_type = match (treatment, outward) {
-            (Treatment::Contra, _) => VoucherType::Contra,
-            (_, true) => VoucherType::Payment,
-            (_, false) => VoucherType::Receipt,
-        };
         let (mode, reference) = bank.reference(row);
+        let dont_know = cash_answer == Some(CashAnswer::DontKnow);
         // Deliberately the LOOSE fold: over-flagging costs a look. The message
         // names the ledger actually written, never the word "Suspense".
-        let unidentified = ledger_key(&ledger) == ledger_key(options.suspense_ledger);
-        let shown = if unidentified { &party } else { &ledger };
+        let unidentified = !dont_know && ledger_key(&ledger) == ledger_key(options.suspense_ledger);
+        let suspense = dont_know || unidentified;
+        let shown = if suspense { &party } else { &ledger };
         let mut narration = squash(&format!(
             "{mode} {reference} {} {shown} | {} | {}",
             if outward { "to" } else { "from" },
             options.account_label,
             date.narration()
         ));
-        if unidentified {
-            narration.push_str(&format!(" | UNIDENTIFIED - reallocate from {ledger}"));
+        if dont_know {
+            narration.push_str(&format!(" | {PURPOSE_NOT_CONFIRMED}"));
+        } else if unidentified {
+            narration.push_str(&format!(" | {UNIDENTIFIED} {ledger}"));
         }
         if !admissible_text(&narration, MAX_NARRATION_CHARS) {
             return Err(Refusal::at_row(
@@ -293,15 +485,7 @@ pub fn build(
                 ),
             ));
         }
-        if let Some(first) = seen.insert(txn_id.clone(), number) {
-            return Err(Refusal::at_row(
-                "duplicate_statement_row",
-                number,
-                format!(
-                    "rows {first} and {number} carry the same date, amounts, balance and narration. Check whether the statement really prints the row twice."
-                ),
-            ));
-        }
+        require_unique(&mut seen, &txn_id, number)?;
         let (debit_ledger, credit_ledger) = if outward {
             (ledger.clone(), options.bank_ledger.to_string())
         } else {
@@ -341,9 +525,35 @@ pub fn build(
             amount: amount_text,
             party,
             ledger,
-            suspense: unidentified,
+            suspense,
             bridge_txn_id: txn_id,
+            cash_movement,
+            cash_answer,
         });
+    }
+    if let Some(stale) = options
+        .cash_answers
+        .ids()
+        .find(|id| !statement_ids.contains(*id))
+    {
+        return Err(Refusal::new(
+            "cash_answer_not_in_statement",
+            format!("cash_answers names {stale}, which no row of this statement carries"),
+        ));
+    }
+    // An answer for a row the date window leaves out would post nothing and
+    // say nothing: refused, so the person knows it was not used.
+    if let Some(outside) = options
+        .cash_answers
+        .ids()
+        .find(|id| !window_ids.contains(*id))
+    {
+        return Err(Refusal::new(
+            "cash_answer_outside_window",
+            format!(
+                "cash_answers names {outside}, a row outside the from/to window; nothing would post for it, so answer only rows inside the window"
+            ),
+        ));
     }
     if records.is_empty() {
         return Err(Refusal::new(
@@ -414,7 +624,12 @@ pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal>
     let posted = build
         .records
         .iter()
-        .filter(|record| record.disposition != Disposition::Skipped)
+        .filter(|record| {
+            !matches!(
+                record.disposition,
+                Disposition::Skipped | Disposition::NeedsAnswer
+            )
+        })
         .count();
     if posted != build.proposals.len() {
         return Err(Refusal::new(
@@ -471,6 +686,7 @@ pub fn group_counterparties(
         let disposition = match record.disposition {
             Disposition::Voucher(kind) => kind.as_str().to_string(),
             Disposition::Skipped => "Skipped".to_string(),
+            Disposition::NeedsAnswer => "NeedsAnswer".to_string(),
         };
         let key = (mapping_key(&record.party), disposition, record.suspense);
         let amount = ExactDecimal::parse(record.amount.as_str()).map_err(overflow)?;

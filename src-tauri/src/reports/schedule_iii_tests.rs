@@ -331,6 +331,8 @@ fn book(rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook {
                 reserved_name: Some(String::new()),
             },
         ],
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     })
 }
 

@@ -603,7 +603,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "c3aeb0393a79248dda574a2860af8f73a571b5987fb5fabd317c719e2174f3a9"
+      "sha256": "746565e3f9095e1e7591be73b8654d48feff0ebf714bf17f16ed3350b5d5c72b"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -799,15 +799,15 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_tests.rs",
-      "sha256": "9b71538e941df23aba78892761a9399f376ca4fd01de9b5c0a058865e293e12b"
+      "sha256": "112eea2b3bdaf7f7ae110ba0abdc4f25520ae9708923535259170da5cb74112d"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx.rs",
-      "sha256": "358d4684f7b0dca9c0537fb7668e36e10b5326a73b933714702d155907a6fed1"
+      "sha256": "81b730650f271e457dc5d08366383e2d1a321b63d4e98f9a8358ef6d552637dd"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx_tests.rs",
-      "sha256": "e640284d8995c04276d073f8ffacde480c2c4a085c7e8e0c21bcabfe7a0cd509"
+      "sha256": "d2bafc23ba6f8334eca103f0dcc54433aabda45fa1fa80114d3297321a7b1440"
     },
     {
       "path": "src-tauri/src/reports/party_statement.rs",
@@ -835,11 +835,11 @@
     },
     {
       "path": "src-tauri/src/reports/schedule_iii.rs",
-      "sha256": "b26b87f4fc05425c24eff2a59dc0076cca064b483bfc34a5fc362909dfb4b7c4"
+      "sha256": "59acf498ef7ab2bb8a8e38b9cb528c4a069efc01b1c06c1b575bf1e15f5979ed"
     },
     {
       "path": "src-tauri/src/reports/schedule_iii_tests.rs",
-      "sha256": "930b4c0c792ccb2d45c5ba2e48c821ae30ef15f1d677b38df11c31b6cf1ade7e"
+      "sha256": "086ce1baef8ac314338d13e3432934ceb35984b6bd930a82aa0c72c45f03bc76"
     },
     {
       "path": "src-tauri/src/reports/statements.rs",

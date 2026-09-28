@@ -3,7 +3,7 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "22d2a90103f9bcf7ebdaca559585380f94b85bb7eeee4d3294fdb508ef58e462"
+      "sha256": "999dd98fb3af9a8c015a91b0aca6e7d8c0f967d09f9f1e89d717d54479459568"
     },
     {
       "path": ".github/workflows/dependency-security-scheduled.yml",
@@ -471,7 +471,7 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "1852fbede8d11d332d7c33cfcb088fbab7e92bc6e14ad1237d8047a30032731b"
+      "sha256": "39ffe11f1d055fc29f369aa37c0e99793b4660e76fdf7bb4a1c28690d997bef0"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
@@ -511,7 +511,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs",
-      "sha256": "2233c0c45ead47d84b6e0404904b3232d9bd86c3ff865cf4ccb6291b78083c1c"
+      "sha256": "f6903435f32f4195afc6de395a157002ee16422ca60c42678f3739f86ee7df77"
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",

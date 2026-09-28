@@ -81,19 +81,7 @@ test("required checks reject a missing workflow consistency result", () => {
   assert.match(result.stdout, /Required jobs did not pass: .*workflow-consistency/);
 });
 
-test("required checks accept a superseded compiler-cache-retention prune", () => {
-  const result = runRequiredChecks({ ...baseNeeds, "compiler-cache-retention": { result: "cancelled" } });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /All required jobs succeeded or were legitimately skipped/);
-});
-
-test("required checks reject a failed compiler-cache-retention prune", () => {
-  const result = runRequiredChecks({ ...baseNeeds, "compiler-cache-retention": { result: "failure" } });
-  assert.equal(result.status, 1, result.stderr);
-  assert.match(result.stdout, /Required jobs did not pass: .*compiler-cache-retention/);
-});
-
-for (const [job, resultName] of [["frontend", "failure"], ["rust-format", "cancelled"]]) {
+for (const [job, resultName] of [["frontend", "failure"], ["rust-format", "cancelled"], ["compiler-cache-retention", "cancelled"]]) {
   test(`required checks retain normal ${resultName} propagation for ${job}`, () => {
     const result = runRequiredChecks({
       ...baseNeeds,

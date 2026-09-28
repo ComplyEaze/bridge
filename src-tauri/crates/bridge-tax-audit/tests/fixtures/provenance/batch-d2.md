@@ -31,7 +31,7 @@ branch the real book does not reach. This bends the two-book bar; the owner may 
   an integer, and rules without `[entity]`: each is refused (the reference raises), and unit tests cover
   them, as no golden can.
 
-- `edge-books/partners_tds_mixed.json` (a firm, three partners, two sharing an interest ledger; added at the re-pin
+- `edge-books/partners_tds_mixed.json` (a firm, four partners, two sharing an interest ledger; added at the re-pin
   below): TDS on a partner's interest added back; an interest-and-remuneration voucher split exactly and one
   that also credits the bank, not split; an interest voucher that also debits the capital; vouchers on the
   shared interest ledger touching no capital, one carrying TDS attributed to no one; interest over the

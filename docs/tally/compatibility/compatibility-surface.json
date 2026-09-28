@@ -199,7 +199,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/proposals.rs",
-      "sha256": "71a7c63feb55df4efd90878ae533c59dce88c7761c9ff39d66de59f385994246"
+      "sha256": "c93f992dd231e3dbe0514c18d042bbddfe74f3de6ffd502c8a5f40443f750d1d"
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/text.rs",
@@ -443,7 +443,7 @@
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
-      "sha256": "b11ea32e9e0426e93f4dc99a79e367f701a7f65d06828a8d173adf10b7a0edb9"
+      "sha256": "610c27a8aefa373d0114d3d6d3874adbb86da3a6fc580c0e9322df02e7e00220"
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",

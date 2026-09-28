@@ -3428,7 +3428,7 @@
   "by": "author",
   "what": "a balanced voucher on the loan alone is listed",
   "file": "src/loans_interest.rs",
-  "from": "        return v.lines.iter().map(|l| i128::from(l.amount_paise)).sum::<i128>() != 0;",
+  "from": "        return v\n            .lines\n            .iter()\n            .map(|l| i128::from(l.amount_paise))\n            .sum::<i128>()\n            != 0;",
   "to": "        return true;"
  },
  {
@@ -3572,8 +3572,8 @@
   "by": "author",
   "what": "a bank-only side of a listed voucher is a possible s.269SS/269T",
   "file": "src/loans_interest.rs",
-  "from": "                            .any(|(role, sd)| sd == side && *role != \"bank\")",
-  "to": "                            .any(|(_, sd)| sd == side)"
+  "from": "                        roles.keys().any(|(role, sd)| sd == side && *role != \"bank\")",
+  "to": "                        roles.keys().any(|(_, sd)| sd == side)"
  },
  {
   "id": "LR-59",

@@ -418,7 +418,12 @@ fn two_sided(v: &Voucher, loan_ledger: &str, ledgers: &LoanLedgers) -> bool {
         .map(|l| l.ledger.as_str())
         .collect();
     if others.is_empty() {
-        return v.lines.iter().map(|l| i128::from(l.amount_paise)).sum::<i128>() != 0;
+        return v
+            .lines
+            .iter()
+            .map(|l| i128::from(l.amount_paise))
+            .sum::<i128>()
+            != 0;
     }
     others.iter().any(|o| ledgers.other_loans.contains(o))
         || !others
@@ -2288,9 +2293,7 @@ were not compared for reversal pairs or repeated narrations with this loan's oth
                 [("s.269SS", "debits"), ("s.269T", "credits")]
                     .into_iter()
                     .filter(|(_, side)| {
-                        roles
-                            .keys()
-                            .any(|(role, sd)| sd == side && *role != "bank")
+                        roles.keys().any(|(role, sd)| sd == side && *role != "bank")
                     })
                     .map(|(tag, _)| tag)
                     .collect()
@@ -3823,7 +3826,12 @@ debits it {debit}p, but its listed record shows {shown_credit}p and {}p.",
                 .filter(|l| l.ledger != **loan && l.amount_paise != 0)
                 .map(|l| l.ledger.as_str())
                 .collect();
-            let unbalanced = v.lines.iter().map(|l| i128::from(l.amount_paise)).sum::<i128>() != 0;
+            let unbalanced = v
+                .lines
+                .iter()
+                .map(|l| i128::from(l.amount_paise))
+                .sum::<i128>()
+                != 0;
             if (others.is_empty() && unbalanced)
                 || others
                     .iter()

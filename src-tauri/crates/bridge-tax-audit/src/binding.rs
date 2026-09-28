@@ -2488,7 +2488,8 @@ deductor_aliases = 5\n"
         // Rs 60 lakh: over the profession limit, under the business limit.
         let status = |activity: &str, turnover_status: &str| {
             let dump = run(&format!(
-                "\n[tds]\nprevious_year_turnover_paise = 600000000\n{turnover_status}\
+                "\n[tds]\nnature_by_ledger = {{}}\npayee_aliases = {{}}\n\
+                 previous_year_turnover_paise = 600000000\n{turnover_status}\
                  \n[deductor]\nactivity = \"{activity}\"\n"
             ));
             value(&dump, "loans_interest.deductor_status").unwrap()

@@ -250,16 +250,16 @@
       "id": "partners_40b_194t.s194t_tds_ledger_seen_177f4125",
       "value": "yes",
       "unit": "text",
-      "definition_sha256_16": "69bbd291c5cb58f0",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 177f4125)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "6618cf41c02f1745",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 177f4125)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_9c4b9496",
       "value": "yes",
       "unit": "text",
-      "definition_sha256_16": "1cbe97fa872d168c",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 9c4b9496)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "b42cd6040f6486b4",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 9c4b9496)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {

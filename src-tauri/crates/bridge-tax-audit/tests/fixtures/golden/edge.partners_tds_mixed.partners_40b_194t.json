@@ -493,32 +493,32 @@
       "id": "partners_40b_194t.s194t_tds_ledger_seen_379fc0d5",
       "value": "yes",
       "unit": "text",
-      "definition_sha256_16": "e2672c0ac8590547",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 379fc0d5)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "ed2f544f5b0c8de8",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 379fc0d5)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_793d6d7c",
       "value": "yes",
       "unit": "text",
-      "definition_sha256_16": "9aa00c063f8e42fe",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 793d6d7c)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "02c626983a1466cc",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag 793d6d7c)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_b1fa6f10",
       "value": "not judged",
       "unit": "text",
-      "definition_sha256_16": "c94d0344fab86c20",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag b1fa6f10)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "a8639aadbbc9c5fa",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag b1fa6f10)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_e9efe2ae",
       "value": "no",
       "unit": "text",
-      "definition_sha256_16": "4528cb3dbfa6d187",
-      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag e9efe2ae)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher that touches no partner's capital).",
+      "definition_sha256_16": "b85212a12c9317e6",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag e9efe2ae)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
@@ -681,16 +681,21 @@
           "kind": "voucher",
           "id": "a3",
           "label": "Journal a3 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "b4",
+          "label": "Journal b4 on 2025-12-01"
         }
       ],
       "title_sha256_16": "1bf0ea7c56ab393c",
       "title_text": "Payments/credits to a partner over the s.194T threshold, with TDS seen on its vouchers: which credits it covers, and its deposit, are the CA's to determine",
-      "limits_sha256_16": "c8411e1d9aacedf1",
+      "limits_sha256_16": "86ca8b01b18a871d",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
         "2 voucher(s) touching this partner are not read exactly (Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): this base may be wrong in either direction.",
         "TDS of ₹4,700 (net) is seen on 2 voucher(s) touching this partner: Journal a2 on 2026-03-31, Journal a3 on 2026-03-31.",
-        "TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared by partners that touch no partner's capital: Journal b4 on 2025-12-01. Which partner's TDS they are is not judged."
+        "TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared by partners whose TDS is not booked against partners' capitals alone: Journal b4 on 2025-12-01. Which partner's TDS they are is not judged."
       ],
       "ask_client_sha256_16": "bc25a006eb146deb",
       "ask_client_text": [
@@ -780,18 +785,23 @@
           "kind": "voucher",
           "id": "b2",
           "label": "Journal b2 on 2025-10-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "b4",
+          "label": "Journal b4 on 2025-12-01"
         }
       ],
       "title_sha256_16": "1ad7ff747629b977",
       "title_text": "Payments/credits to a partner over the s.194T threshold: whether TDS was deducted is not judged",
-      "limits_sha256_16": "04607be547ac1771",
+      "limits_sha256_16": "e303446fbe2937ab",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
         "1 interest or remuneration voucher(s) also credit a ledger this test does not read (Journal b2 on 2025-10-01): the partner may be credited net of it, so this base may be understated.",
         "1 interest or remuneration voucher(s) also debit this partner's capital (Journal b2 on 2025-10-01): if a debit is a withdrawal rather than TDS booked through the capital, this base is read net of it and may be understated (see the finding that s.40(b) is not computed).",
         "1 voucher(s) carry both interest and remuneration and are not split (Journal b1 on 2026-03-31): see the s.40(b) not-computed finding. Their credit to this partner is counted here whole. 1 of them also debit this partner's capital: the credit is read net of that debit, so this base may be wrong in either direction.",
         "4 voucher(s) touching this partner are not read exactly (Journal b1 on 2026-03-31, Journal b2 on 2025-10-01, Journal b3 on 2025-11-01, Journal b4 on 2025-12-01): this base may be wrong in either direction.",
-        "TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared by partners that touch no partner's capital: Journal b4 on 2025-12-01. Which partner's TDS they are is not judged."
+        "TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared by partners whose TDS is not booked against partners' capitals alone: Journal b4 on 2025-12-01. Which partner's TDS they are is not judged."
       ],
       "ask_client_sha256_16": "bc25a006eb146deb",
       "ask_client_text": [

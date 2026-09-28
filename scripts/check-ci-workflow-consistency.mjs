@@ -113,9 +113,9 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
 
-// A step that must run is pinned whole, as seam-control is: a pinned command line alone still
-// passes with a step-level `if`, a `continue-on-error`, an `|| true`, or the command kept only in
-// a comment. Change a step and its copy here together, deliberately.
+// A step that must run is pinned whole (the step, not the rest of its job): a pinned command line
+// alone still passes with a step-level `if`, a `continue-on-error`, an `|| true`, or the command
+// kept only in a comment. Change a step and its copy here together, deliberately.
 const releaseWorkflow = readFileSync(resolve(repositoryRoot, ".github/workflows/release-mcpb-preview.yml"), "utf8");
 for (const [source, job, expected] of [
   [workflow, "native", [
@@ -153,7 +153,8 @@ for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml",
 }
 
 // Every MCPB is staged by package-mcpb.mjs, so its one seam scan must run unconditionally, right
-// after the binary is found: no second call, no alias, nothing between them.
+// after the binary is found, with the scanner imported from its own module: no second call, no
+// alias, nothing between them.
 const packageMcpb = readFileSync(resolve(repositoryRoot, "scripts/package-mcpb.mjs"), "utf8");
 const packageSeamScan = [
   "    throw new Error(`MCPB binary is missing: ${sourceBinary}`);",
@@ -162,7 +163,12 @@ const packageSeamScan = [
   "  // binary compiled with the test-only approval seam (bridge#583).",
   "  assertNoTestSeam([sourceBinary]);",
 ].join("\n");
-if (packageMcpb.split("assertNoTestSeam").length !== 3 || packageMcpb.split(packageSeamScan).length !== 2) {
+const packageSeamImport = 'import { assertNoTestSeam } from "./check-no-test-seam.mjs";\n';
+if (
+  packageMcpb.split("assertNoTestSeam").length !== 3 ||
+  packageMcpb.split(packageSeamImport).length !== 2 ||
+  packageMcpb.split(packageSeamScan).length !== 2
+) {
   failures.push("package-mcpb must call assertNoTestSeam exactly once, unconditionally, before staging");
 }
 

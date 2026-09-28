@@ -38,7 +38,8 @@ function requiredChecksCommand() {
 }
 
 // Built from required-checks' own needs, which check-ci-workflow-consistency.mjs pins to every
-// other job, so a new job is covered here without a hand-kept list.
+// other job, so a new job's failure and cancellation are covered without editing this file. A job
+// that may legitimately be skipped must still be added to conditionalJobs by hand.
 function requiredChecksNeeds() {
   const lines = readFileSync(workflowPath, "utf8").split("\n");
   const job = lines.indexOf("  required-checks:");

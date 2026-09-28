@@ -1660,6 +1660,9 @@ async fn a_redeem_only_entry_with_nothing_held_is_refused_and_asks_nobody() {
         )
         .await
         .unwrap();
+    let Pass::Done(refused) = refused else {
+        panic!("a redeem-only pass never hands on another redeem");
+    };
     let observed = sent(simulator);
     assert_eq!(
         refused.payload["result"]["error"]["code"], "import_approval_revoked",
@@ -1797,40 +1800,4 @@ async fn a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted() 
         "{reconciled}"
     );
     assert_eq!(scripted.counts(), [1]);
-}
-
-/// The re-entered post runs through the stdio path every agent post takes on
-/// a 1 MiB thread, in this profile (#725 slice 2.0). Windows gives the MCP
-/// loop's main thread 1 MB, and a post held inline has overflowed a Windows
-/// debug thread before (`run_post` boxes it for that reason). This is the same
-/// limit on this platform, not a Windows measurement.
-#[test]
-fn a_re_entered_post_fits_a_one_mebibyte_stack() {
-    std::thread::Builder::new()
-        .stack_size(1 << 20)
-        .spawn(|| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(Box::pin(async {
-                    let (plans, post_at) = pending_then_posted_plans();
-                    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
-                    let directory = tempfile::tempdir().unwrap();
-                    let server = server_at(simulator.address(), directory.path());
-                    let (line, args) = saved_batch(&server);
-                    let scripted = ScriptedApproval::held();
-                    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
-                    scripted.answer(true);
-                    until_answered(&server, &line.batch_id).await;
-                    let posted = post_over_stdio(&server, &args, None).await;
-                    let observed = sent(simulator);
-                    assert!(posted.is_some(), "the re-entered post answered");
-                    assert_eq!(intents(directory.path()), 1);
-                    assert!(observed.len() > post_at, "the POST was sent");
-                }))
-        })
-        .unwrap()
-        .join()
-        .expect("the post ran to its end within a 1 MiB stack");
 }

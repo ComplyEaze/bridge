@@ -66,9 +66,9 @@ enum ApprovalState {
 pub(in crate::agent) enum Entry {
     /// A call from the agent or the desktop: it may ask, join or redeem.
     Fresh,
-    /// A call re-entered from the top to redeem the approval its own Join
-    /// just found, keeping that call's clock and evidence. It may only
-    /// redeem: it never asks, so it can never show a second dialog.
+    /// The second pass of a call, from the top, to redeem the approval its
+    /// own Join just found, keeping that call's clock and evidence. It may
+    /// only redeem: it never asks, so it can never show a second dialog.
     RedeemOnly {
         call_started: std::time::Instant,
         evidence: Evidence,
@@ -83,11 +83,16 @@ enum Step {
     Redeem,
 }
 
-/// A post future, boxed: the re-entry recurses, and a post's state machine
-/// held inline has overflowed a Windows debug thread's stack before.
-type PostFuture<'a> = std::pin::Pin<
-    Box<dyn std::future::Future<Output = Result<ToolOutcome, ToolFailure>> + Send + 'a>,
->;
+/// What one pass of a post call came to: its answer, or a click its Join
+/// found already made, which the same call redeems in a second, redeem-only
+/// pass (#725 slice 2.0). The passes run one after the other, never nested.
+pub(in crate::agent) enum Pass {
+    Done(ToolOutcome),
+    Redeem {
+        call_started: std::time::Instant,
+        evidence: Evidence,
+    },
+}
 
 /// What waiting on a dialog came to.
 enum Waited {
@@ -347,37 +352,43 @@ impl Server {
         expected_sha256: Option<&str>,
         scope: PostScope,
     ) -> Result<ToolOutcome, ToolFailure> {
-        self.post_import_entry(args, expected_sha256, scope, Entry::Fresh)
-            .await
-    }
-
-    /// The same post entered again to redeem the approval its Join found.
-    fn post_import_redeeming<'a>(
-        &'a self,
-        args: &'a Value,
-        expected_sha256: Option<&'a str>,
-        scope: PostScope,
-        call_started: std::time::Instant,
-        evidence: Evidence,
-    ) -> PostFuture<'a> {
-        Box::pin(self.post_import_entry(
-            args,
-            expected_sha256,
-            scope,
-            Entry::RedeemOnly {
+        match self
+            .post_import_entry(args, expected_sha256, scope, Entry::Fresh)
+            .await?
+        {
+            Pass::Done(outcome) => Ok(outcome),
+            // At most one more pass: a redeem-only pass never joins, so it
+            // never asks for another.
+            Pass::Redeem {
                 call_started,
                 evidence,
+            } => match self
+                .post_import_entry(
+                    args,
+                    expected_sha256,
+                    scope,
+                    Entry::RedeemOnly {
+                        call_started,
+                        evidence,
+                    },
+                )
+                .await?
+            {
+                Pass::Done(outcome) => Ok(outcome),
+                Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
             },
-        ))
+        }
     }
 
+    /// One pass of a post call: the whole post, or up to a Join that found a
+    /// click already made, which the caller then redeems in a second pass.
     pub(in crate::agent) async fn post_import_entry(
         &self,
         args: &Value,
         expected_sha256: Option<&str>,
         scope: PostScope,
         entry: Entry,
-    ) -> Result<ToolOutcome, ToolFailure> {
+    ) -> Result<Pass, ToolFailure> {
         let (call_started, carried) = match entry {
             Entry::Fresh => (std::time::Instant::now(), None),
             Entry::RedeemOnly {
@@ -1054,14 +1065,15 @@ impl Server {
             Ok(Step::Done(proof))
         }
         .await;
-        // A Join that found an approval it can redeem in this call enters again
-        // from the top, redeem-only (#725 slice 2.0). The approval stays held
-        // for that pass: nothing below revokes it.
+        // A Join that found a click it can redeem in this call hands it to a
+        // second, redeem-only pass from the top (#725 slice 2.0). The approval
+        // stays held for that pass: nothing below revokes it.
         let operation = match operation {
             Ok(Step::Redeem) => {
-                return self
-                    .post_import_redeeming(args, expected_sha256, scope, call_started, accumulated)
-                    .await
+                return Ok(Pass::Redeem {
+                    call_started,
+                    evidence: accumulated,
+                })
             }
             Ok(Step::Done(outcome)) => Ok(outcome),
             Err(failure) => Err(failure),
@@ -1076,7 +1088,7 @@ impl Server {
         // Even failure after a lost response carries the saved identity. The next
         // call must reconcile that batch, never create a replacement business event.
         match operation {
-            Ok(result) => Ok(result),
+            Ok(result) => Ok(Pass::Done(result)),
             Err(failure) => {
                 let snapshot = self.latest_import_snapshot(batch_id).ok().flatten();
                 let attempted = self.post_failure_attempt_observation(
@@ -1116,7 +1128,7 @@ impl Server {
                 } else {
                     explain_unbound_batch(&mut outcome.payload);
                 }
-                Ok(outcome)
+                Ok(Pass::Done(outcome))
             }
         }
     }

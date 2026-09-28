@@ -312,7 +312,7 @@ fn exact_readback_requires_a_clean_persisted_response_to_reconcile() {
         // verify_import records this status before the proof is rendered.
         let status =
             final_verification_status(Some(&payload["result"]["dispatch"]), &payload["result"], 1);
-        payload["result"]["verification_status"] = json!(status);
+        payload["result"]["verification_status"] = json!(status.as_str());
         let markdown = render_proof_markdown(&payload["result"]);
         assert!(markdown.contains(&format!("Dispatch verdict: `{expected_state}`")));
         assert!(markdown.contains(&format!("Response state: `{response_state}`")));

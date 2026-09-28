@@ -152,8 +152,9 @@ for (const [source, job, expected, digest] of [
   const actual = sha256(jobThrough(source, job, expected[0]));
   if (actual !== digest) failures.push(`${job} changed before "${expected[0].trim()}"; its digest is now ${actual}`);
 }
-// Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job,
-// and native, bundle-smoke and package run a local composite action before their scans; a local
+// Each workflow's header (triggers, permissions, concurrency, env, defaults) applies to every job;
+// jobIds refuses a workflow-level key after the jobs map, so the header is all of them.
+// And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
   ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],

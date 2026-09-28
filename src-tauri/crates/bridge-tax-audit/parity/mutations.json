@@ -6284,7 +6284,7 @@
   "by": "author",
   "what": "partners re-pin: off-capital vouchers on the partner's ledgers not named",
   "file": "src/partners_40b_194t.rs",
-  "from": "            if !touches_capital {",
+  "from": "            if !(touches_capital && partners_alone) {",
   "to": "            if false {"
  },
  {
@@ -6500,8 +6500,8 @@
   "by": "author",
   "what": "partners: a zero line on any partner's capital hides an off-capital voucher",
   "file": "src/partners_40b_194t.rs",
-  "from": "(capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))\n                    && l.amount_paise != 0",
-  "to": "(capital.contains(l.ledger.as_str()) || all_capitals.contains(&l.ledger))\n                    && l.amount_paise != 1"
+  "from": "                .any(|l| any_capital(l.ledger.as_str()) && l.amount_paise != 0);",
+  "to": "                .any(|l| any_capital(l.ledger.as_str()) && l.amount_paise != 1);"
  },
  {
   "id": "PR-33",

@@ -2449,10 +2449,10 @@ async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_fi
     }
 }
 
-/// A build from a proposals file returns no value of any statement row: its
-/// suspense lines, under either tag, are counted, not listed. What remains
-/// row-derived is batch-level: the verification window's first and last dates
-/// and the batch's totals.
+/// A build from a proposals file counts its suspense lines by tag and lists
+/// none: no suspense line's id, date or amount is returned. The verification
+/// window's bounds are the batch's first and last voucher dates, and the
+/// totals sum the batch; both are asserted, then set aside.
 #[tokio::test]
 async fn a_proposals_build_returns_no_row_value_of_its_suspense_lines() {
     let tags = bridge_bank_statement::proposals::SUSPENSE_TAGS;
@@ -2476,7 +2476,7 @@ async fn a_proposals_build_returns_no_row_value_of_its_suspense_lines() {
         result["suspense_lines"],
         json!({"count": 2, "purpose_not_confirmed": 1, "unidentified": 1})
     );
-    // The batch-level fields, named: the window spans the batch's dates, and
+    // The window runs from the batch's first voucher date to its last, and
     // the totals sum every voucher.
     assert_eq!(result["verification_preflight"]["from"], "20260901");
     assert_eq!(result["verification_preflight"]["to"], "20260902");

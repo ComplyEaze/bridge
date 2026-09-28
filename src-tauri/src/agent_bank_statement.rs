@@ -9,9 +9,10 @@
 //! spelling as printed, its row count and total, its disposition and whether
 //! it reached suspense, and the ledger names to check with `validate_masters`.
 //! Every name in that summary is marked as a party name, so the
-//! `mask_parties` redaction preset masks it. The one row-level exception is an
-//! open cash line, which `cash_questions` identifies by its id, date and
-//! amount so a person can answer it (owner ruling b1).
+//! `mask_parties` redaction preset masks it. Beyond a total built from one row,
+//! which is that row's amount, the only row-level values returned are an open
+//! cash line's: `cash_questions` identifies it by its id, date and amount so a
+//! person can answer it (owner ruling b1).
 //!
 //! **The password never enters the conversation.** It is read from a local
 //! owner-only file named by `password_file`, held in a zeroizing buffer, handed
@@ -582,7 +583,7 @@ fn suspense_by_reason(records: &[StatementRecord]) -> Value {
 /// checks against the book's groups. A cash-in-hand answer's ledger must reach
 /// Cash-in-Hand: a bank ledger there would move the cash bank to bank. No
 /// answer but dont_know may name a ledger under the Suspense group: only a
-/// dont_know line posted there is tagged "purpose not confirmed" and listed.
+/// dont_know line posted there is tagged "purpose not confirmed" and counted.
 pub(super) struct AnsweredCashLedger {
     pub(super) bridge_txn_id: String,
     pub(super) ledger: String,

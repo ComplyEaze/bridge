@@ -47,19 +47,28 @@ pub fn suspense_tagged<'a>(narration: &str, ledgers: impl IntoIterator<Item = &'
     suspense_tag(narration, ledgers).is_some()
 }
 
-/// Which of [`SUSPENSE_TAGS`] a narration ends in, as [`suspense_tagged`]
-/// finds it.
+/// One of [`SUSPENSE_TAGS`], as [`suspense_tag`] finds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuspenseTag {
+    /// [`PURPOSE_NOT_CONFIRMED`]: a person answered dont_know.
+    PurposeNotConfirmed,
+    /// [`UNIDENTIFIED`]: a party the mapping does not name, or the parser
+    /// could not identify.
+    Unidentified,
+}
+
+/// Which suspense tag a narration ends in, as [`suspense_tagged`] finds it.
 pub fn suspense_tag<'a>(
     narration: &str,
     ledgers: impl IntoIterator<Item = &'a str>,
-) -> Option<&'static str> {
+) -> Option<SuspenseTag> {
     if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
-        Some(PURPOSE_NOT_CONFIRMED)
+        Some(SuspenseTag::PurposeNotConfirmed)
     } else if ledgers
         .into_iter()
         .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
     {
-        Some(UNIDENTIFIED)
+        Some(SuspenseTag::Unidentified)
     } else {
         None
     }

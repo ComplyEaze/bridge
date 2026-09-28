@@ -702,7 +702,7 @@ impl Server {
                             "refused_ledgers":refused,
                             "refused_ledgers_omitted":omitted,
                             "group_evidence_sha256":evidence.response_sha256,
-                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c; only a dont_know answer may post a cash line there, where it is tagged and listed. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
+                            "next_step":"No file was written. Each ledger was named in answering a bank cash line. requires cash_in_hand: the answer named the cash-in-hand ledger, but this one's group reaches the reserved group shown. requires not_suspense: the answer was not dont_know, but the ledger sits under Suspense A/c; only a dont_know answer may post a cash line there, where it is tagged and counted. Re-run parse_bank_statement with the right ledger, then build again. Raise BRIDGE_AGENT_MAX_BYTES if refused_ledgers_omitted is above zero."
                         }}),
                         evidence: accumulated.clone(),
                         company_guid: Some(payload.company_guid),
@@ -2605,6 +2605,7 @@ fn answered_ledger_refusals(
 /// ([`bridge_bank_statement::proposals::suspense_tag`]), for a build's result.
 /// Counts only: a line's date and amounts stay local, as in the parse result.
 fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
+    use bridge_bank_statement::proposals::SuspenseTag;
     let (mut purpose_not_confirmed, mut unidentified) = (0_usize, 0_usize);
     for voucher in vouchers {
         let tag = voucher.narration.as_deref().and_then(|narration| {
@@ -2614,8 +2615,8 @@ fn tagged_suspense_vouchers(vouchers: &[ImportVoucher]) -> Value {
             )
         });
         match tag {
-            Some(bridge_bank_statement::cash::PURPOSE_NOT_CONFIRMED) => purpose_not_confirmed += 1,
-            Some(_) => unidentified += 1,
+            Some(SuspenseTag::PurposeNotConfirmed) => purpose_not_confirmed += 1,
+            Some(SuspenseTag::Unidentified) => unidentified += 1,
             None => {}
         }
     }

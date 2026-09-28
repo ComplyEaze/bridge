@@ -8,8 +8,8 @@
 //! defaulted: it stays open, and `build_import_xml` refuses the proposals.
 //!
 //! An explicit "don't know" posts the line to the suspense ledger with
-//! [`PURPOSE_NOT_CONFIRMED`] in its narration, counted by that tag in the
-//! parse and build results, so the CA can find it in the books and move it.
+//! [`PURPOSE_NOT_CONFIRMED`] in its narration, and counted in the parse and
+//! build results, so the CA can find it in the books by that tag and move it.
 //! That is the owner's
 //! decision of 27-Sep-2026: every bank line reaches the books, and a line whose
 //! purpose nobody knows is visible rather than held back.

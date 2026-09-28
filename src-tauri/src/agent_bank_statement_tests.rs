@@ -1243,14 +1243,24 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
 
     // Under mask_parties the open lines' party name is masked like every
     // other party name.
+    let plain = super::super::redact_tool_response(
+        "parse_bank_statement",
+        json!({ "result": summary_before.clone() }),
+        Redaction::None,
+    );
     let masked = super::super::redact_tool_response(
         "parse_bank_statement",
         json!({ "result": summary_before }),
         Redaction::MaskParties,
-    )
-    .to_string();
-    assert!(!masked.contains("ATM CASH WITHDRAWAL"), "{masked}");
-    assert!(!masked.contains("SYNTHETIC PAYER"), "{masked}");
+    );
+    for name in ["ATM CASH WITHDRAWAL", "SYNTHETIC PAYER"] {
+        assert!(plain.to_string().contains(name), "{name}: {plain}");
+        assert!(!masked.to_string().contains(name), "{name}: {masked}");
+    }
+    let printed = |value: &Value| value["result"]["cash_questions"][0]["printed_as"].clone();
+    assert_eq!(printed(&plain), "ATM CASH WITHDRAWAL");
+    assert!(printed(&masked).is_string(), "{masked}");
+    assert_ne!(printed(&masked), printed(&plain));
 }
 
 /// 2026-08-01 as a statement narration prints it: 01-Aug-2026.

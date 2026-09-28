@@ -1,0 +1,60 @@
+A27 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::an_unknown_creditor_group_refuses_naming_its_location, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A28 killed (full) by 1: src/lib.rs::binding::tests::a_legacy_trade_creditor_source_is_read_bound_and_replaced
+F07 killed (full) by 1: src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+F08 killed (full) by 2: src/lib.rs::binding::tests::a_guid_binds_across_python_only_whitespace_and_non_ascii_case, src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+A29 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+S22 killed (full) by 6: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity, src/lib.rs::binding::tests::loans_interest_on_passes_the_tds_ledgers_activity_and_placeholder, src/lib.rs::binding::tests::tds_payees_inputs_come_from_the_bound_tables, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A33 killed (full) by 1: src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+S23 killed (full) by 2: src/lib.rs::binding::tests::a_malformed_name_location_refuses_binding, src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+C1-34 killed (full) by 2: src/lib.rs::binding::tests::each_tds_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+S26 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+C1-38 killed (full) by 1: src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+C1-37 killed (full) by 1: src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+E1B-O25 killed (full) by 1: src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+LB-01 killed (full) by 2: src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used, src/lib.rs::binding::tests::an_unknown_interest_or_shared_ledger_refuses_naming_its_location
+E1B-O24 killed (full) by 1: src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+C2-33 killed (full) by 2: src/lib.rs::binding::tests::each_tds_26as_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_26as_ledgers_and_alias_values_are_bound
+LB-02 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_loans_location_refuses, src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used, src/lib.rs::binding::tests::an_unknown_interest_or_shared_ledger_refuses_naming_its_location
+LB-03 killed (full) by 2: src/lib.rs::binding::tests::a_loans_interest_ledger_list_binds_each_name_in_its_shape, src/lib.rs::binding::tests::a_renamed_interest_ledger_is_bound_and_its_label_is_used
+LB-04 killed (full) by 2: src/lib.rs::binding::tests::a_loans_interest_ledger_list_binds_each_name_in_its_shape, src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+LB-05 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+LB-06 killed (full) by 1: src/lib.rs::binding::tests::a_loans_interest_ledger_list_binds_each_name_in_its_shape
+D2-03 killed (full) by 4: src/lib.rs::binding::tests::a_malformed_partner_ledger_location_refuses, src/lib.rs::binding::tests::an_identity_used_only_by_a_partner_capital_ledger_is_not_unused, src/lib.rs::binding::tests::an_unknown_partner_capital_ledger_refuses_naming_its_location, src/lib.rs::binding::tests::partner_capital_and_remuneration_ledgers_follow_a_rename_by_identity
+D2-04 killed (full) by 3: src/lib.rs::binding::tests::a_malformed_partner_ledger_location_refuses, src/lib.rs::binding::tests::an_unknown_partner_remuneration_ledger_refuses_naming_its_location, src/lib.rs::binding::tests::partner_capital_and_remuneration_ledgers_follow_a_rename_by_identity
+D2-05 killed (full) by 1: src/lib.rs::binding::tests::an_empty_partner_interest_ledger_binds_but_is_not_financial_statements_interest
+E2B2-29 killed (full) by 2: src/lib.rs::binding::tests::a_bare_ledger_name_that_matches_nothing_refuses_with_named_code, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E3A-25 killed (full) by 4: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::stock_counts_the_population_seeds_nil_and_goods_only_at_close, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E3A-26 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+E3A-27 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+E3A-28 killed (full) by 2: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E3A-29 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+E3A-30 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E3A-36 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+E3A-33 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+TR-37 killed (full) by 1: src/lib.rs::tds_tranches::tests::credits_become_deductible_as_the_reference_reads_the_limits
+E3A-41 killed (full) by 1: src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+TR-38 killed (full) by 1: src/lib.rs::tds_tranches::tests::credits_become_deductible_as_the_reference_reads_the_limits
+TR-39 killed (full) by 2: src/lib.rs::tds_tranches::tests::credits_become_deductible_as_the_reference_reads_the_limits, tests/edge_books.rs::every_edge_book_matches_the_reference
+
+37 of 37 killed
+
+warning: 19 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  F07 (full): src/lib.rs::binding::tests::a_guid_binds_whatever_its_case_and_python_whitespace
+  A28 (full): src/lib.rs::binding::tests::a_legacy_trade_creditor_source_is_read_bound_and_replaced
+  A33 (full): src/lib.rs::binding::tests::creditor_ageing_and_statutory_dues_names_are_bound_by_identity
+  S26 (full): src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+  C1-37 (full): src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+  C1-38 (full): src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity
+  E1B-O24 (full): src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+  E1B-O25 (full): src/lib.rs::binding::tests::bkq_locations_bind_by_identity
+  LB-05 (full): src/lib.rs::binding::tests::a_malformed_loans_location_refuses
+  LB-06 (full): src/lib.rs::binding::tests::a_loans_interest_ledger_list_binds_each_name_in_its_shape
+  D2-05 (full): src/lib.rs::binding::tests::an_empty_partner_interest_ledger_binds_but_is_not_financial_statements_interest
+  E3A-26 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  E3A-27 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  E3A-29 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  E3A-33 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  E3A-36 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  E3A-41 (full): src/lib.rs::stock_read::tests::the_reader_reads_what_the_reference_reads_and_refuses_by_code
+  TR-37 (full): src/lib.rs::tds_tranches::tests::credits_become_deductible_as_the_reference_reads_the_limits
+  TR-38 (full): src/lib.rs::tds_tranches::tests::credits_become_deductible_as_the_reference_reads_the_limits

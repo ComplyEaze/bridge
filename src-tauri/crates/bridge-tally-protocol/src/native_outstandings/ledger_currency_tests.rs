@@ -299,10 +299,12 @@ fn the_classified_snapshot_excludes_foreign_ledgers_before_parsing_their_balance
     assert_eq!(snapshot.unobserved, 0);
 }
 
-/// A composite balance on a ledger classified as the base is still refused:
-/// only a foreign ledger's balance is excused from the parse.
+/// A composite balance on a ledger classified as the base is never parsed:
+/// the ledger is named as mixed and leaves the base rows (bridge#642). Before
+/// #642 it refused the whole read. DERIVED: the one `$` ledger with a
+/// composite opening, relabelled as a rupee ledger.
 #[test]
-fn a_composite_balance_on_a_base_ledger_still_refuses() {
+fn a_composite_balance_on_a_base_ledger_is_named_as_mixed_and_not_parsed() {
     let book = forex_book();
     // Relabel the one `$` ledger with a composite opening as a rupee ledger.
     let start = book.find("<LEDGER NAME=\"BRIDGE FX DEBTOR A\"").unwrap();
@@ -313,15 +315,41 @@ fn a_composite_balance_on_a_base_ledger_still_refuses() {
         at..at + tag.len(),
         "<CURRENCYNAME TYPE=\"String\">I\u{20b9}</CURRENCYNAME>",
     );
-    assert_eq!(
-        crate::native_outstandings::parse_native_ledger_snapshot_classified(
-            &relabelled,
-            &forex_base()
+    let classified = crate::native_outstandings::parse_native_ledger_snapshot_classified(
+        &relabelled,
+        &forex_base(),
+    )
+    .unwrap();
+    assert_eq!(classified.mixed, ["BRIDGE FX DEBTOR A"]);
+    assert!(classified
+        .base
+        .iter()
+        .all(|row| row.name != "BRIDGE FX DEBTOR A"));
+    assert!(classified
+        .foreign
+        .iter()
+        .all(|ledger| ledger.ledger != "BRIDGE FX DEBTOR A"));
+    // Either composite alone is enough: the opening with a plain closing, and
+    // the closing with a plain opening (both DERIVED the same way).
+    for (composite, plain) in [
+        (
+            "-$ 1100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 94600.00",
+            "-94600.00",
         ),
-        Err(NativeOutstandingsError::ForeignCurrencyLedgerBalance {
-            ledger_name: "BRIDGE FX DEBTOR A".to_string()
-        })
-    );
+        (
+            "-$ 500.00 @ I\u{20b9} 84/$  = -I\u{20b9} 42000.00",
+            "-42000.00",
+        ),
+    ] {
+        assert_eq!(relabelled.matches(composite).count(), 1, "{composite}");
+        let one_composite = relabelled.replacen(composite, plain, 1);
+        let classified = crate::native_outstandings::parse_native_ledger_snapshot_classified(
+            &one_composite,
+            &forex_base(),
+        )
+        .unwrap();
+        assert_eq!(classified.mixed, ["BRIDGE FX DEBTOR A"], "{composite}");
+    }
 }
 
 #[test]
@@ -389,6 +417,8 @@ fn the_four_dollar_bills_are_left_out_of_every_figure() {
     let bills = bills();
     assert_eq!(bills.len(), 18);
     let snapshot = forex_snapshot();
+    // Captured before any foreign-currency entry touched a rupee ledger.
+    assert!(snapshot.mixed.is_empty());
     let result = compute_native_outstandings_with_exclusions(
         "BRIDGE CORPUS FOREX",
         &bills,
@@ -398,6 +428,7 @@ fn the_four_dollar_bills_are_left_out_of_every_figure() {
             groups: NativeGroupSnapshot::LegacyFixtureWithoutGroups,
         },
         &snapshot.foreign,
+        &snapshot.mixed,
         AgeingAnchor::DueDate,
         &TallyDate::parse("20250930").unwrap(),
         0,
@@ -479,6 +510,7 @@ fn with_exclusions_a_bill_of_an_unknown_party_refuses() {
                 groups: NativeGroupSnapshot::LegacyFixtureWithoutGroups,
             },
             &snapshot.foreign,
+            &snapshot.mixed,
             AgeingAnchor::DueDate,
             &TallyDate::parse("20250930").unwrap(),
             0,
@@ -524,8 +556,8 @@ fn the_company_checked_classified_snapshot_admits_only_its_own_company() {
 /// The compliance snapshot of the book after a dollar invoice to a rupee party
 /// (captured 25 Sep, coherent with the compliance master): the dollar ledgers
 /// and the rupee ledgers with a composite balance are named, and only the
-/// plain rupee rows are parsed. The outstandings parse of the same bytes still
-/// refuses, on the first composite base balance.
+/// plain rupee rows are parsed. The outstandings parse of the same bytes
+/// classifies them identically: one classifier serves both (bridge#642).
 #[test]
 fn the_compliance_snapshot_sets_mixed_rupee_ledgers_aside_by_name() {
     let snapshot = decode(include_bytes!(
@@ -559,12 +591,142 @@ fn the_compliance_snapshot_sets_mixed_rupee_ledgers_aside_by_name() {
             .collect::<Vec<_>>(),
         ["BRIDGE INR DEBTOR A", "Cash", "FX Party 02", "FX Party 03"]
     );
-    assert!(matches!(
+    let outstandings =
         crate::native_outstandings::parse_native_ledger_snapshot_classified_for_company(
             &snapshot,
             company,
             &forex_base(),
-        ),
-        Err(NativeOutstandingsError::ForeignCurrencyLedgerBalance { .. })
-    ));
+        )
+        .unwrap();
+    assert_eq!(outstandings.foreign, classified.foreign);
+    assert_eq!(outstandings.mixed, classified.mixed);
+    assert_eq!(outstandings.base, classified.base);
+}
+
+/// bridge#642, on the book after a dollar invoice to the rupee party
+/// `FX Party 01` (one moment: FOREX_601D_CAPTURE_PROVENANCE, PARTIAL). That
+/// party's balance is a composite, so it is named as mixed, never parsed.
+/// Its five bills are plain rupee amounts (20,100), and they leave every figure
+/// with it: the receivable is the plain rupee parties' 23,000 only, and no
+/// residual is computed for a party whose balance was not read.
+#[test]
+fn a_mixed_partys_bills_leave_every_figure_with_it() {
+    let snapshot = parse_native_ledger_snapshot_classified(
+        &decode(include_bytes!(
+            "../../tests/fixtures/balance_snapshot_forex_live.utf16le.xml"
+        )),
+        &forex_base(),
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot.mixed,
+        ["FX Party 01", "FX Sales", "Profit & Loss A/c"]
+    );
+    let as_of = TallyDate::parse("20260915").unwrap();
+    let receivable = parse_native_bill_rows(
+        &decode(include_bytes!(
+            "../../tests/fixtures/bills_receivable_forex_post_c1_live.utf16le.xml"
+        )),
+        &TallyDate::parse("20250401").unwrap(),
+        &as_of,
+    )
+    .unwrap();
+    assert_eq!(receivable.len(), 19);
+    let payable = parse_native_bill_rows(
+        &decode(include_bytes!(
+            "../../tests/fixtures/bills_payable_forex_post_c1_live.utf16le.xml"
+        )),
+        &TallyDate::parse("20250401").unwrap(),
+        &as_of,
+    )
+    .unwrap();
+    assert!(payable.is_empty());
+    let result = compute_native_outstandings_with_exclusions(
+        "BRIDGE CORPUS FOREX",
+        &receivable,
+        &payable,
+        NativeMasterSnapshot {
+            ledgers: &snapshot.base,
+            groups: NativeGroupSnapshot::LegacyFixtureWithoutGroups,
+        },
+        &snapshot.foreign,
+        &snapshot.mixed,
+        AgeingAnchor::DueDate,
+        &as_of,
+        0,
+    )
+    .unwrap();
+    // BRIDGE INR DEBTOR A 3,000 + FX Party 02 9,500 + FX Party 03 10,500.
+    assert_eq!(result.report.receivable_total, amount("23000"));
+    assert_eq!(
+        result.mixed_currency_ledgers_excluded,
+        ["FX Party 01", "FX Sales", "Profit & Loss A/c"]
+    );
+    assert_eq!(result.foreign_currency_ledgers_excluded, snapshot.foreign);
+    assert!(result
+        .residuals
+        .iter()
+        .all(|residual| residual.party != "FX Party 01"));
+}
+
+/// bridge#642 and #683, on the book after a $40 receipt at 88 against the
+/// dollar bill of the rupee party `FX Party 01` (sold at 86). Captured, one
+/// moment: FOREX_601D_CAPTURE_PROVENANCE, PARTIAL. Tally computed a forex
+/// gain into that party's closing and bill with no voucher, revalued other
+/// dollar bills no voucher touched, and made `Cash` a composite. Every
+/// ledger with a composite value is named as mixed, never parsed or compared.
+/// Its bills leave every figure: the plain rupee parties' receivable is still
+/// 23,000, as before the receipt.
+#[test]
+fn a_mixed_party_revalued_with_no_voucher_is_listed_not_compared() {
+    let snapshot = parse_native_ledger_snapshot_classified(
+        &decode(include_bytes!(
+            "../../tests/fixtures/balance_snapshot_forex_post_receipt_live.utf16le.xml"
+        )),
+        &forex_base(),
+    )
+    .unwrap();
+    assert_eq!(
+        snapshot.mixed,
+        ["Cash", "FX Party 01", "FX Sales", "Profit & Loss A/c"]
+    );
+    assert_eq!(
+        snapshot
+            .base
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["BRIDGE INR DEBTOR A", "FX Party 02", "FX Party 03"]
+    );
+    let as_of = TallyDate::parse("20260915").unwrap();
+    let receivable = parse_native_bill_rows(
+        &decode(include_bytes!(
+            "../../tests/fixtures/bills_receivable_forex_post_receipt_live.utf16le.xml"
+        )),
+        &TallyDate::parse("20250401").unwrap(),
+        &as_of,
+    )
+    .unwrap();
+    assert_eq!(receivable.len(), 19);
+    let result = compute_native_outstandings_with_exclusions(
+        "BRIDGE CORPUS FOREX",
+        &receivable,
+        &[],
+        NativeMasterSnapshot {
+            ledgers: &snapshot.base,
+            groups: NativeGroupSnapshot::LegacyFixtureWithoutGroups,
+        },
+        &snapshot.foreign,
+        &snapshot.mixed,
+        AgeingAnchor::DueDate,
+        &as_of,
+        0,
+    )
+    .unwrap();
+    assert_eq!(result.report.receivable_total, amount("23000"));
+    assert_eq!(result.mixed_currency_ledgers_excluded, snapshot.mixed);
+    assert!(result
+        .residuals
+        .iter()
+        .all(|residual| !snapshot.mixed.contains(&residual.party)));
 }

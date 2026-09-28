@@ -3245,9 +3245,10 @@ mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
 
-/// Under mask_parties, a post whose ledger no longer resolves to the master
-/// approved reports it without naming the ledger: the masters list is masked
-/// and the message names none.
+/// A post whose ledger no longer resolves to the master approved names the
+/// ledger only in the masters list, where the configured redaction applies:
+/// under none it is there, and under mask_parties it is nowhere in the
+/// response; the message names none.
 #[tokio::test]
 async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
     let replaced = replaced_once(
@@ -3255,47 +3256,45 @@ async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
         ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
         ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
     );
-    let mut plans = before_approval();
-    plans.extend(after_approval(xml(created_one())));
-    plans.push(xml(masters_moved_to(8)));
-    plans.extend(paired(replaced));
-    plans.extend(reconcile_readback());
-    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(crate::agent::Settings {
-        endpoint: TallyEndpointConfig {
-            host: simulator.address().ip().to_string(),
-            port: simulator.address().port(),
-        },
-        data_dir: directory.path().to_path_buf(),
-        max_rows: 10,
-        max_bytes: 200_000,
-        redaction: crate::agent::Redaction::MaskParties,
-        import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
-    });
-    let args = saved_captured_batch(&server);
-    let response = SCRIPTED_APPROVAL
-        .scope(
-            ScriptedApproval::approving(),
-            server.call_tool("post_import", args),
-        )
-        .await;
-    let _ = sent(simulator);
-    let result = &response["structuredContent"]["result"];
-    assert_eq!(
-        result["error"]["code"], "posted_under_changed_masters",
-        "{response}"
-    );
-    assert_eq!(result["error"]["message"], super::CHANGED_MASTERS_MESSAGE);
-    let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
-    assert_eq!(ledgers.len(), 1, "{response}");
-    assert_ne!(ledgers[0], "Cash", "{response}");
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.push(xml(masters_moved_to(8)));
+        plans.extend(paired(replaced.clone()));
+        plans.extend(reconcile_readback());
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_redacting(simulator.address(), directory.path(), redaction);
+        let args = saved_captured_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["error"]["code"], "posted_under_changed_masters",
+            "{response}"
+        );
+        assert_eq!(result["error"]["message"], super::CHANGED_MASTERS_MESSAGE);
+        // The whole response: the ledger is there under none, and nowhere
+        // under mask_parties.
+        assert_eq!(
+            response.to_string().contains("Cash"),
+            redaction == crate::agent::Redaction::None,
+            "{response}"
+        );
+    }
 }
 
-/// Under mask_parties, a post refused because a ledger changed since the build
-/// lists the ledger masked, and its message names none.
+/// A post refused because a ledger changed since the build names the ledger
+/// only in its list, where the configured redaction applies: under none it is
+/// there, and under mask_parties it is nowhere in the result.
 #[tokio::test]
 async fn a_changed_ledger_refusal_names_no_ledger_under_mask_parties() {
     let identities = vec![
@@ -3308,26 +3307,24 @@ async fn a_changed_ledger_refusal_names_no_ledger_under_mask_parties() {
             guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
         },
     ];
-    let (result, _, _, _) = refused_by_build_binding_under(
-        Some(identities),
-        false,
+    for redaction in [
+        crate::agent::Redaction::None,
         crate::agent::Redaction::MaskParties,
-    )
-    .await;
-    assert_eq!(
-        result["error"]["code"], "import_masters_changed_since_build",
-        "{result}"
-    );
-    let listed = result["error"]["ledgers_changed"].as_array().unwrap();
-    assert_eq!(listed.len(), 1, "{result}");
-    assert_ne!(listed[0], "Cash", "{result}");
-    assert!(
-        !result["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("Cash"),
-        "{result}"
-    );
+    ] {
+        let (result, _, _, _) =
+            refused_by_build_binding_under(Some(identities.clone()), false, redaction).await;
+        assert_eq!(
+            result["error"]["code"], "import_masters_changed_since_build",
+            "{result}"
+        );
+        // The whole result: the ledger is listed under none, and appears
+        // nowhere under mask_parties.
+        assert_eq!(
+            result.to_string().contains("Cash"),
+            redaction == crate::agent::Redaction::None,
+            "{result}"
+        );
+    }
 }
 
 /// A post whose readback fails after its masters check found a changed ledger

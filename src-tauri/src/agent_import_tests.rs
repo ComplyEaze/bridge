@@ -3432,6 +3432,22 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             plain["structuredContent"]["result"]["error"]["message"],
             super::post::CHANGED_MASTERS_MESSAGE
         );
+        // drop_narration drops narrations only: the names stay, and a
+        // verification page carries no narration to drop.
+        let narrations = server_with(super::super::Redaction::DropNarration)
+            .call_tool_response("verify_import", saved.clone())
+            .await
+            .value;
+        for name in names {
+            assert!(
+                narrations.to_string().contains(name),
+                "{name}: {narrations}"
+            );
+        }
+        assert!(
+            !narrations.to_string().contains("\"narration\""),
+            "{narrations}"
+        );
         let later = server_with(super::super::Redaction::MaskParties)
             .call_tool_response("verify_import", saved)
             .await

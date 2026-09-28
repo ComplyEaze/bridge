@@ -508,14 +508,11 @@ async fn the_desktop_command_reads_forex_as_base_currency_ledgers_only() {
     )
     .await
     .unwrap();
-    let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-        foreign_currency_ledgers_excluded,
-        ..
-    } = &response.result
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. } = &response.result
     else {
         panic!("{:?}", response.result);
     };
-    assert_eq!(foreign_currency_ledgers_excluded.len(), 3);
+    assert_eq!(exclusions.foreign().len(), 3);
     assert!(response.working_paper_export_id.is_none());
     assert!(response.party_statement_source_id.is_none());
     assert_eq!(response.working_paper_unavailable_reason_code, None);
@@ -737,6 +734,42 @@ fn forex_ledgers_with_a_mixed_rupee_ledger() -> String {
     mixed
 }
 
+/// The mixed-party result on FOREX with "FX USD Debtor 02" relabelled to the
+/// base: that ledger is set aside as mixed, the other two dollar ledgers as
+/// foreign, and the figures are the 14 rupee bills only (34,500), with no row
+/// for any set-aside ledger.
+fn assert_mixed_ledger_set_aside(result: &OutstandingsLoadResult) {
+    let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
+        exclusions,
+        base_currency_ledgers,
+        ..
+    } = result
+    else {
+        panic!("{result:?}");
+    };
+    assert_eq!(exclusions.mixed(), ["FX USD Debtor 02".to_string()]);
+    let foreign = exclusions
+        .foreign()
+        .iter()
+        .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        foreign,
+        [("BRIDGE FX DEBTOR A", "$"), ("FX USD Debtor 01", "$")]
+    );
+    assert_eq!(
+        base_currency_ledgers.report.receivable_total.as_str(),
+        "34500"
+    );
+    let set_aside = ["BRIDGE FX DEBTOR A", "FX USD Debtor 01", "FX USD Debtor 02"];
+    for row in &base_currency_ledgers.statement_open_bills {
+        assert!(!set_aside.contains(&row.party.as_str()), "{row:?}");
+    }
+    for party in &base_currency_ledgers.statement_unallocated_by_party {
+        assert!(!set_aside.contains(&party.party.as_str()), "{party:?}");
+    }
+}
+
 /// FOREX's native outstandings read with its ledger snapshot replaced, for
 /// labelled edits of the captured ledgers.
 fn forex_native_plans_with_ledgers(ledgers: String) -> Vec<ScenarioPlan> {
@@ -798,16 +831,22 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
         .unwrap();
     let requests = simulator.finish().unwrap();
     let OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-        reason,
-        foreign_currency_ledgers_excluded,
+        exclusions,
         base_currency_ledgers,
         ..
     } = result
     else {
         panic!("{result:?}");
     };
-    assert_eq!(reason.reason_code, "foreign_currency_ledgers_excluded");
-    let excluded = foreign_currency_ledgers_excluded
+    // Captured before any foreign-currency entry touched a rupee ledger: the
+    // derived reasons name the foreign list only (bridge#642).
+    assert_eq!(
+        exclusions.partial_reasons(),
+        ["foreign_currency_ledgers_excluded"]
+    );
+    assert!(exclusions.mixed().is_empty());
+    let excluded = exclusions
+        .foreign()
         .iter()
         .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
         .collect::<Vec<_>>();
@@ -854,13 +893,13 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
 
 /// bridge#551: on a book with several masters, a ledger kept in the base
 /// currency whose closing balance Tally writes as a currency composite (a
-/// foreign-currency bill entered on a rupee party) is not read. The whole read
-/// is the in-band partial naming that ledger, with no figures (the
-/// mixed-party design, #642's stacked follow-up, sets it aside instead). A
-/// labelled edit of the captured FOREX ledgers: one `$` ledger's CURRENCYNAME
-/// becomes the base's, and its composite balance is kept.
+/// foreign-currency bill entered on a rupee party) is set aside by name with
+/// all of its bills, next to the foreign-currency ledgers; the figures cover
+/// the plain rupee ledgers only (#642's mixed-party design). A labelled edit of
+/// the captured FOREX ledgers: one `$` ledger's CURRENCYNAME becomes the
+/// base's, and its composite balance is kept.
 #[tokio::test]
-async fn a_rupee_ledger_with_a_composite_balance_refuses_the_several_currency_read_naming_it() {
+async fn a_rupee_ledger_with_a_composite_balance_is_set_aside_by_the_several_currency_read() {
     let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
     let mut plans = forex_classified_currency_plans();
     plans.extend(forex_native_plans_with_ledgers(mixed));
@@ -888,15 +927,7 @@ async fn a_rupee_ledger_with_a_composite_balance_refuses_the_several_currency_re
         .await
         .unwrap();
     simulator.cancel();
-    assert!(
-        matches!(
-            &result,
-            OutstandingsLoadResult::Partial { reason, .. }
-                if reason.reason_code == "company_foreign_currency_ledger_balance"
-                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
-        ),
-        "{result:?}"
-    );
+    assert_mixed_ledger_set_aside(&result);
 }
 
 /// bridge#551: on a book with one master the classified read sends exactly
@@ -1121,13 +1152,9 @@ async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledg
             (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), Some(expected)) => {
                 assert_eq!(code, expected);
             }
-            (
-                Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-                    foreign_currency_ledgers_excluded,
-                    ..
-                }),
-                None,
-            ) => assert_eq!(foreign_currency_ledgers_excluded.len(), 3),
+            (Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }), None) => {
+                assert_eq!(exclusions.foreign().len(), 3)
+            }
             (Ok(other), _) => panic!("{expected:?}: {other:?}"),
             (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), _) => {
                 panic!("{expected:?}: refused with {code}")
@@ -1141,20 +1168,12 @@ async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledg
 /// bridge#551: the desktop command and the all-companies sweep read a
 /// several-currency book through the same classified read as MCP. A ledger
 /// kept in the base currency whose closing balance Tally writes as a currency
-/// composite refuses the whole read on both, in-band and naming that ledger:
-/// no figures, no working paper and no statement source. The labelled edit of
-/// the captured FOREX ledgers is the one the MCP test uses.
+/// composite is set aside by name with its bills on both, as MCP does. No
+/// working paper or statement source is issued for the partial. The labelled
+/// edit of the captured FOREX ledgers is the one the MCP test uses.
 #[tokio::test]
-async fn a_rupee_ledger_with_a_composite_balance_refuses_the_desktop_read_and_the_sweep() {
+async fn a_rupee_ledger_with_a_composite_balance_is_set_aside_by_the_desktop_read_and_the_sweep() {
     let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
-    let names_it = |result: &OutstandingsLoadResult| {
-        matches!(
-            result,
-            OutstandingsLoadResult::Partial { reason, .. }
-                if reason.reason_code == "company_foreign_currency_ledger_balance"
-                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
-        )
-    };
 
     let mut plans = vec![xml(companies())];
     plans.extend(forex_classified_currency_plans());
@@ -1185,7 +1204,7 @@ async fn a_rupee_ledger_with_a_composite_balance_refuses_the_desktop_read_and_th
     .await
     .unwrap();
     simulator.cancel();
-    assert!(names_it(&response.result), "{:?}", response.result);
+    assert_mixed_ledger_set_aside(&response.result);
     assert!(response.working_paper_export_id.is_none());
     assert!(response.party_statement_source_id.is_none());
 
@@ -1205,9 +1224,9 @@ async fn a_rupee_ledger_with_a_composite_balance_refuses_the_desktop_read_and_th
     .await;
     simulator.cancel();
     match result {
-        Ok(result) => assert!(names_it(&result), "{result:?}"),
+        Ok(result) => assert_mixed_ledger_set_aside(&result),
         Err(crate::commands::CompanySweepFailure::ReasonCode(code)) => {
-            panic!("the sweep refused with {code}, without naming the ledger")
+            panic!("the sweep refused with {code}")
         }
         Err(_) => panic!("the sweep read failed"),
     }

@@ -1508,3 +1508,23 @@ fn build_and_post_agree_on_what_fits_the_dialog() {
     }
     assert!(admit_saved_voucher(&seven, &endpoint, PostScope::Vouchers, 1).is_ok());
 }
+
+/// An approval answered for a call already withdrawn is not kept for the next
+/// call: the refusal under the lock, on its own, apart from the biased wait.
+#[tokio::test]
+async fn an_approval_is_not_held_for_a_withdrawn_call() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let (request, answered, native) = granted(&line, 1).await;
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    withdrawn.cancel();
+    let held = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(withdrawn, async {
+            approvals.hold_approved(&line.batch_id, binding, request, native, answered)
+        })
+        .await;
+    assert_eq!(held.err().as_deref(), Some("request_cancelled"));
+    assert!(!approvals.holds(&line.batch_id));
+}

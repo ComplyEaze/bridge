@@ -24,6 +24,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      # The install page reads this snapshot when the unauthenticated GitHub API refuses it
+      # (60 requests an hour per address). A failed or empty read stops the deploy rather than
+      # publishing a list that says no release exists.
+      - name: Snapshot releases for the install page
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPOSITORY}/releases?per_page=100" \
+            --jq '[.[] | select(.draft == false) | {tag_name, draft, prerelease, published_at, assets: [.assets[] | {name, browser_download_url}]}]' \
+            > site/releases.json
+          # Counted with the page's own predicate, so the deploy and the page agree on what installs.
+          count="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; import { isInstallablePreview } from "./site/release-catalog.mjs"; console.log(JSON.parse(readFileSync("site/releases.json", "utf8")).filter(isInstallablePreview).length);')"
+          if [ "${count}" -lt 1 ]; then
+            echo "release snapshot has no installable mcp-preview release; refusing to deploy" >&2
+            exit 1
+          fi
+          echo "release snapshot: ${count} installable mcp-preview releases"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

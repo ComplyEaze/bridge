@@ -325,7 +325,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // `vouchers` read withholds a voucher or refuses its window; a defect there
 // sets aside an amount that should have refused, or refuses a window that
 // should have been read.
-pub const MAX_SURFACE_FILES: usize = 285;
+// `src-tauri/src/agent_import_approval.rs` (bridge#725) holds the approval a
+// post redeems across calls: what it is bound to, how long it lasts, that it is
+// spent once before the intent, and when it is revoked; a defect there could
+// post a batch on an approval for something else, or on one withdrawn.
+pub const MAX_SURFACE_FILES: usize = 286;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

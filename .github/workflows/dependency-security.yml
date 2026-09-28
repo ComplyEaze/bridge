@@ -15,8 +15,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: dependency-security-${{ github.ref }}
-  cancel-in-progress: true
+  # As in ci.yml: only a pull request's newer push cancels its older run.
+  group: dependency-security-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -36,7 +37,7 @@ jobs:
           node-version-file: .node-version
       - name: Audit production frontend dependencies
         run: corepack pnpm run security:audit:frontend
-      - uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+      - uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: cargo-audit@0.22.2
           fallback: none

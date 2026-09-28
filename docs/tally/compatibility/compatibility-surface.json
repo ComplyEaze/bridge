@@ -731,7 +731,7 @@
     },
     {
       "path": "src-tauri/src/documents.rs",
-      "sha256": "25ded17715da5d55c87de73b23cd95d366ba2073d8c387322589fae8343db045"
+      "sha256": "ba965c6de1d3df4d4863312c4e45a0c3f49e52c57853227feba8a15993c72fcd"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs",
@@ -755,11 +755,11 @@
     },
     {
       "path": "src-tauri/src/reports/bulk_party_statement.rs",
-      "sha256": "6edb721467e05bef506f6e5307f2127f6fdf7a2be298ec3be6f4adefe765c1a3"
+      "sha256": "21960f25d023e9dfa349b9f77633699e269d22ef98b0db06a16da39a01a52ade"
     },
     {
       "path": "src-tauri/src/reports/bulk_party_statement_tests.rs",
-      "sha256": "97cb9e3332d2cf30ba943b59a34df1d0c373704dea8e417c36c398de344bf6cb"
+      "sha256": "5283f31e1ede40bacc5ba5c396817c3cf7e1c471b129ff829963495c876ad136"
     },
     {
       "path": "src-tauri/src/reports/mod.rs",

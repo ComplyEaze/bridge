@@ -392,3 +392,122 @@ async fn an_export_does_not_take_a_user_files_name_in_another_folder() {
         .collect::<Vec<_>>();
     assert_eq!(reasons, [super::BRIDGE_EXPORT_SKIPPED]);
 }
+
+fn scan_everything(selection_id: String) -> ScanDocumentsRequest {
+    ScanDocumentsRequest {
+        selection_ids: vec![selection_id],
+        use_hash: true,
+        max_file_size: None,
+        excluded_extensions: None,
+        exclude_hidden_files: false,
+        exclude_zero_byte_files: false,
+    }
+}
+
+/// bridge#833: a statement the writer had not finished, a hidden staging file
+/// or the empty file reserving its name, is never listed, even with the
+/// hidden-file and zero-byte settings off: the scan skips both kinds always.
+#[tokio::test]
+async fn a_partial_or_reserved_statement_is_never_listed() {
+    let selected = tempfile::tempdir().expect("selected directory");
+    std::fs::write(
+        selected
+            .path()
+            .join(crate::reports::bulk_party_statement::staging_name(
+                "statement-party-20260928.xlsx",
+            )),
+        b"half a statement",
+    )
+    .unwrap();
+    std::fs::write(selected.path().join("statement-party-20260928.xlsx"), b"").unwrap();
+    std::fs::write(selected.path().join("invoice.pdf"), b"the user's own file").unwrap();
+    let selections =
+        authorize_selected_paths(vec![selected.path().to_path_buf()]).expect("authorize directory");
+    let response =
+        super::scan_documents_with(scan_everything(selections[0].selection_id.clone()), || {
+            Ok(std::collections::HashSet::new())
+        })
+        .await
+        .expect("scan directory");
+    let scanned = response
+        .files
+        .iter()
+        .map(|file| file.relative_path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(scanned, ["invoice.pdf"]);
+}
+
+/// bridge#833: a registry that cannot be read stops the scan, rather than
+/// letting an export through unchecked.
+#[tokio::test]
+async fn an_unreadable_export_registry_stops_the_scan() {
+    let selected = tempfile::tempdir().expect("selected directory");
+    std::fs::write(selected.path().join("invoice.pdf"), b"the user's own file").unwrap();
+    let selections =
+        authorize_selected_paths(vec![selected.path().to_path_buf()]).expect("authorize directory");
+    let error =
+        super::scan_documents_with(scan_everything(selections[0].selection_id.clone()), || {
+            Err("export_registry_unreadable".to_string())
+        })
+        .await
+        .err()
+        .expect("the scan refuses");
+    assert!(
+        error.to_string().contains("export_registry_unreadable"),
+        "{error}"
+    );
+    // The same when only the read after the walk fails.
+    let selections =
+        authorize_selected_paths(vec![selected.path().to_path_buf()]).expect("authorize directory");
+    let reads = std::cell::Cell::new(0);
+    let error =
+        super::scan_documents_with(scan_everything(selections[0].selection_id.clone()), || {
+            reads.set(reads.get() + 1);
+            if reads.get() == 1 {
+                Ok(std::collections::HashSet::new())
+            } else {
+                Err("export_registry_unreadable".to_string())
+            }
+        })
+        .await
+        .err()
+        .expect("the scan refuses after its walk");
+    assert_eq!(reads.get(), 2);
+    assert!(
+        error.to_string().contains("export_registry_unreadable"),
+        "{error}"
+    );
+}
+
+/// bridge#833: an export recorded while the scan walks the folder (Bridge
+/// records it before writing it) is caught by the registry's second read.
+#[tokio::test]
+async fn an_export_recorded_during_the_walk_is_still_skipped() {
+    let export = b"a statement written during the scan".to_vec();
+    let selected = tempfile::tempdir().expect("selected directory");
+    std::fs::write(selected.path().join("statement-late.xlsx"), &export).unwrap();
+    let selections =
+        authorize_selected_paths(vec![selected.path().to_path_buf()]).expect("authorize directory");
+    let reads = std::cell::Cell::new(0);
+    let response =
+        super::scan_documents_with(scan_everything(selections[0].selection_id.clone()), || {
+            reads.set(reads.get() + 1);
+            Ok(if reads.get() == 1 {
+                std::collections::HashSet::new()
+            } else {
+                std::collections::HashSet::from([crate::export_registry::content_sha256(&export)])
+            })
+        })
+        .await
+        .expect("scan directory");
+    assert_eq!(reads.get(), 2);
+    assert!(response.files.is_empty(), "{}", response.files.len());
+    assert_eq!(
+        response
+            .skipped
+            .iter()
+            .map(|file| (file.path.as_str(), file.reason.as_str()))
+            .collect::<Vec<_>>(),
+        [("statement-late.xlsx", super::BRIDGE_EXPORT_SKIPPED)]
+    );
+}

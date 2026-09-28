@@ -88,7 +88,9 @@ statement batch it writes (the statements and their manifest), and the document
 feature lists any file with a recorded hash as skipped and does not upload it,
 even if it was renamed or moved. A copy that has changed in any way, even by
 being opened and saved again in Excel, has another hash and is treated as your
-own file. Bridge remembers about the last 20,000 files it exported. Not yet
+own file. Bridge remembers about the last 20,000 files it exported. If two
+copies of Bridge are open and both export when that record is full, one
+export can go unrecorded; keep one copy open while exporting. Not yet
 recognised: exports Bridge wrote before this version, and the working paper,
 single statement, outstandings CSV, trial balance and ledger master saved to
 your Downloads folder (bridge#833). Move those out of a synced folder yourself.

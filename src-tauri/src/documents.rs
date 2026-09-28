@@ -179,6 +179,16 @@ struct PresignedPart {
 pub async fn scan_documents(
     request: ScanDocumentsRequest,
 ) -> anyhow::Result<ScanDocumentsResponse> {
+    scan_documents_with(request, crate::export_registry::recorded).await
+}
+
+/// The scan, with the export registry's read passed in so that tests can
+/// give it an unreadable registry or one that changes during the walk
+/// (bridge#833).
+async fn scan_documents_with(
+    request: ScanDocumentsRequest,
+    recorded: impl Fn() -> Result<HashSet<String>, String>,
+) -> anyhow::Result<ScanDocumentsResponse> {
     if request.selection_ids.is_empty() {
         anyhow::bail!("Select at least one file or folder with the native picker");
     }
@@ -192,7 +202,7 @@ pub async fn scan_documents(
     // uploaded (bridge#833). Checked during the walk, so an export takes no
     // place under the file cap or a relative path, and again after it. A
     // record that cannot be read stops the scan rather than let one through.
-    let exports = recorded_exports()?;
+    let exports = recorded_exports(&recorded)?;
     let max_file_size = request
         .max_file_size
         .unwrap_or(DEFAULT_MAX_FILE_SIZE)
@@ -371,7 +381,7 @@ pub async fn scan_documents(
     }
     // Read again: an export Bridge wrote while this scan ran was recorded
     // before it was written, so it is caught here.
-    let exports = recorded_exports()?;
+    let exports = recorded_exports(&recorded)?;
     files.retain(|file| {
         let export = exports.contains(&file.integrity_hash);
         if export {
@@ -719,8 +729,10 @@ fn resolve_scanned_files(
 }
 
 /// The content hashes of Bridge's own exports, or the scan's error.
-fn recorded_exports() -> anyhow::Result<HashSet<String>> {
-    crate::export_registry::recorded().map_err(|code| {
+fn recorded_exports(
+    recorded: &impl Fn() -> Result<HashSet<String>, String>,
+) -> anyhow::Result<HashSet<String>> {
+    recorded().map_err(|code| {
         anyhow::anyhow!(
             "Bridge could not read its record of the files it exported ({code}), so this scan lists nothing to upload. Select the folder again; if this repeats, contact support."
         )

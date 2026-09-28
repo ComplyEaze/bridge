@@ -1421,6 +1421,129 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     }
 }
 
+/// Add a synthetic, unmarked voucher to one captured response: a copy of
+/// D3-005 under a new GUID, MASTERID and AlterID, with Bridge's marker removed
+/// from its narration. It is not live evidence. Its IDs are arbitrary, chosen
+/// only to be unused in the capture: AlterID 1419 with MASTERID 1998 is not a
+/// pair Tally would produce for a voucher entered again by hand. The outcome
+/// does not depend on them, since D3-005 itself matches by its marker.
+fn with_d3_005_copy(bytes: &[u8]) -> Vec<u8> {
+    let text = captured(bytes);
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000552</GUID>";
+    assert_eq!(text.matches(guid).count(), 1);
+    let start = text[..text.find(guid).unwrap()].rfind("<VOUCHER ").unwrap();
+    let end = start + text[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    let original = &text[start..end];
+    let mut copy = original
+        .replace("-00000552", "-000009f5")
+        .replace(
+            "<MASTERID TYPE=\"Number\"> 1362</MASTERID>",
+            "<MASTERID TYPE=\"Number\"> 1998</MASTERID>",
+        )
+        .replace(
+            "<ALTERID TYPE=\"Number\"> 1424</ALTERID>",
+            "<ALTERID TYPE=\"Number\"> 1419</ALTERID>",
+        );
+    if let Some(marker) = copy.find(" [BRIDGE:") {
+        let close = marker + copy[marker..].find(']').unwrap() + 1;
+        copy.replace_range(marker..close, "");
+    }
+    for field in ["-000009f5", "1998</MASTERID>", "1419</ALTERID>"] {
+        assert!(copy.contains(field), "{field}: {copy}");
+    }
+    assert!(!copy.contains("[BRIDGE:"), "{copy}");
+    format!("{}\n    {copy}{}", &text[..end], &text[end..])
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+/// A batch the accountant imported by hand (the D3 journal with its dispatch
+/// records left out), read back with all 50 vouchers matching and a synthetic
+/// unmarked copy of D3-005 beside them. The JSON says verification_incomplete
+/// for the duplicate. The Markdown proof must say so too, and must not read as
+/// a clean post (bridge#804).
+#[tokio::test]
+async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown() {
+    let census = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
+    ));
+    let readback = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
+        ),
+        &census,
+        &readback,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    // Keep only the built batch and its first verification: no dispatch.
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    let lines = fs::read_to_string(&journal).unwrap();
+    let kept = lines
+        .lines()
+        .filter(|line| !line.contains("\"record_type\":\"dispatch_"))
+        .take(2)
+        .collect::<Vec<_>>();
+    assert_eq!(kept.len(), 2);
+    assert!(
+        !kept.iter().any(|line| line.contains("dispatch")),
+        "{kept:?}"
+    );
+    fs::write(&journal, format!("{}\n", kept.join("\n"))).unwrap();
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_verified"], 50, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    let duplicates = result["duplicates"].as_array().unwrap();
+    assert_eq!(duplicates.len(), 1, "{verified}");
+    assert_eq!(
+        duplicates[0]["kind"], "accounting_fingerprint",
+        "{verified}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{verified}"
+    );
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{D3_BATCH}.proof.md")),
+    )
+    .unwrap();
+    assert!(
+        markdown.contains("this report does not confirm posting"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Verification status: `verification_incomplete`"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Duplicates in this batch: 1"),
+        "{markdown}"
+    );
+    let fingerprint = duplicates[0]["fingerprint_sha256"].as_str().unwrap();
+    assert!(
+        markdown.contains(&format!("| accounting_fingerprint | `{fingerprint}` | 2 |")),
+        "{markdown}"
+    );
+}
+
 /// The same capture with D3-004 read as cancelled too, derived in memory: its
 /// `ISCANCELLED` and ledger entries as the captured D3-003 cancel reads them,
 /// every other field as captured for D3-004. That is a state Tally would not

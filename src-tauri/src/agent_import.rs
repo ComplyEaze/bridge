@@ -61,9 +61,9 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    parse_import_voucher_rows, parse_import_vouchers, render_proof_markdown,
-    verification_response_page, verification_status, verification_window_identities, verify_batch,
-    voucher_diffs, voucher_is_accounting_effective,
+    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
+    render_proof_markdown, verification_response_page, verification_status,
+    verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
 };
 #[cfg(test)]
 use verification::{
@@ -1247,13 +1247,11 @@ impl Server {
                     );
                 }
             }
-            let status = if dispatched
-                && payload["result"]["dispatch"]["state"] == "reconciliation_required"
-            {
-                "verification_incomplete"
-            } else {
-                verification_status(&result, line.vouchers.len())
-            };
+            let status = final_verification_status(
+                dispatched.then(|| &payload["result"]["dispatch"]),
+                &result,
+                line.vouchers.len(),
+            );
             payload["result"]["verification_status"] = json!(status);
             let mut update = line.clone();
             update.status = status.to_string();
@@ -1281,7 +1279,10 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // The files record the verdict the ledger records, whatever the caller's
+        // copy says, so the proof and the ledger status cannot disagree.
+        local_proof["verification_status"] = json!(update.status);
         let json = serde_json::to_vec_pretty(&local_proof)
             .map_err(|_| "proof_serialization_failed".to_string())?;
         let markdown = render_proof_markdown(&local_proof);

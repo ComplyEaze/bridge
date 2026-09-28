@@ -1,6 +1,6 @@
-# tds_payees re-pin fixture provenance: six invented edge books
+# tds_payees re-pin fixture provenance: seven invented edge books
 
-Lane E2, 2026-09-27. Every book here is invented: no fixture is a Tally read of any real assessee.
+Lane E2, 2026-09-27; `tds_payees_p22` and the P2-2 regeneration, Lane E3, 2026-09-28. Every book here is invented: no fixture is a Tally read of any real assessee.
 
 ## What these fixtures establish, and what they do not
 
@@ -25,6 +25,13 @@ Each book names, in its own `comment`, what it reaches at the reference's curren
   classified, so deduction is not judged.
 - `tds_payees_deductor_activity_unknown`: an individual recorded as a profession with no receipts supplied:
   "unknown", and the question names the profession.
+- `tds_payees_p22`: a bill booked gross with its TDS debited back to the payee, rate-tested on its value
+  before TDS and, deducted on its own voucher, listed on the payee's TDS question instead of in clause
+  21(b)(ii)(A), that listing alone raising the s.194C(6) question; a payee debit other than the bill's own TDS
+  (untested, counted), then a TDS reversal against it that adds no guard (it has no bill to leave (ii)(A)); a
+  later voucher debiting the TDS ledger against a payee, which keeps its deducted bill in (ii)(A) (the reversal
+  guard); a cash-paid bill carrying TDS with no payee named (untested, counted); and a bill short of the lower
+  rate only through the rate's rounding to the nearest paisa (Rs 50,000.50 before TDS, Rs 499 deducted).
 
 Regression fixtures only: the evidence for real books is local parity on the real reads, never committed.
 The refusals the reference raises (a reversal naming a bill credited to no payee, a 194H mapping with no
@@ -33,8 +40,11 @@ The refusals the reference raises (a reversal naming a bill credited to no payee
 
 ## How they were produced
 
-The books are written as data by a small generator, and every voucher balances. The goldens come from the
-reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e715788db0ca46`, under Python 3.13:
+The books are written as data by a small generator, and every voucher balances. The goldens came from the
+reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e715788db0ca46`, under Python 3.13;
+after its P2-1/P2-2 change, `tds_payees_p22`'s golden and the regenerated `tds_payees_21b`, `tds_payees_gross_gst`
+and `tds_payees_reversals_194h` goldens come from commit `b0a4f91aa84dd5cc52a1fa5ae05ba0cc92d31459`, at which every
+other golden in this batch regenerates byte-identical:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
@@ -45,14 +55,16 @@ reference engine (a private repository), commit `e2456bcf4f163cf770945e8620e7157
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `tds_payees_gross_gst.json` | 9,916 | `96cf35c296e957ff156311232053278606e4b0bec9e379c6f8ccba1bb3e81af1` | `edge-books/tds_payees_gross_gst.json` |
-| `edge.tds_payees_gross_gst.tds_payees.json` | 65,520 | `5a510f6ddda837b38fb3c3b467305835f83b7b9464f945dbdc61b9f2b12c3c36` | `golden/edge.tds_payees_gross_gst.tds_payees.json` |
+| `edge.tds_payees_gross_gst.tds_payees.json` | 71,259 | `6ae9b73cc0568d3592a630ac3934e7795a8bbbe66992dd792a5a4c86cdad3e99` | `golden/edge.tds_payees_gross_gst.tds_payees.json` |
 | `tds_payees_21b.json` | 6,112 | `cbc3543088630157f0a340ddf2e8517c426a81b6f2d543d9b96c3e2f91b1f8a8` | `edge-books/tds_payees_21b.json` |
-| `edge.tds_payees_21b.tds_payees.json` | 53,797 | `beaee53c2477b35215ec641548cde3aaf4c1bed45da9f822417390991d94f2b9` | `golden/edge.tds_payees_21b.tds_payees.json` |
+| `edge.tds_payees_21b.tds_payees.json` | 56,866 | `0d4c778a3f17a58ef8c1fa335a1cf1d104e25efb5a3f234e45413feb66be4e3b` | `golden/edge.tds_payees_21b.tds_payees.json` |
 | `tds_payees_reversals_194h.json` | 6,561 | `1a51ff96db3f173046fb5a7a62cc8c7632c6e7db339f32e3596b94bf045d00ce` | `edge-books/tds_payees_reversals_194h.json` |
-| `edge.tds_payees_reversals_194h.tds_payees.json` | 29,467 | `f2c4730a19b112d8229a67809e91e33d3347bce7dfe282f8938c9116672b445b` | `golden/edge.tds_payees_reversals_194h.tds_payees.json` |
+| `edge.tds_payees_reversals_194h.tds_payees.json` | 30,556 | `e7e48301544abc65e1c1d63c12388c6f12fce7b19263405527d90af9e6423f12` | `golden/edge.tds_payees_reversals_194h.tds_payees.json` |
 | `tds_payees_deductor_both.json` | 1,520 | `87efe808595b27026aa8fb065bfda92f633f12bfead20549af917674bd625a0a` | `edge-books/tds_payees_deductor_both.json` |
 | `edge.tds_payees_deductor_both.tds_payees.json` | 17,901 | `0e43833800a4f1114fe3580d4f63b9333c038666b4186e88e3fbe0114b7693e0` | `golden/edge.tds_payees_deductor_both.tds_payees.json` |
 | `tds_payees_deductor_placeholder.json` | 1,632 | `6e6263056f92300780d561ccc58393faec1830d8d3d50d29dabbfc67394e240c` | `edge-books/tds_payees_deductor_placeholder.json` |
 | `edge.tds_payees_deductor_placeholder.tds_payees.json` | 20,327 | `140b4e54cdfd3f13a0bc12156d50560bfd2ab83a4b5c40a849383b68d9071bc5` | `golden/edge.tds_payees_deductor_placeholder.tds_payees.json` |
 | `tds_payees_deductor_activity_unknown.json` | 1,445 | `b7ea95f59f19a30fd4d2feaa5dd9800fed586d40db89dc38d8df744286afadb8` | `edge-books/tds_payees_deductor_activity_unknown.json` |
 | `edge.tds_payees_deductor_activity_unknown.tds_payees.json` | 16,206 | `cf39e0c5f26bf10ceb30be03456bd2367a5438a455a682a19152720b4fbc7693` | `golden/edge.tds_payees_deductor_activity_unknown.tds_payees.json` |
+| `tds_payees_p22.json` | 5,626 | `3b79889e9f42977993a16002da85b24577907a4b94dad85f58e3c12dedd56bfd` | `edge-books/tds_payees_p22.json` |
+| `edge.tds_payees_p22.tds_payees.json` | 68,302 | `e7fdbed5b845978012beb7be24a809909fe2ed3ae697634950d1e81d9a8b9e67` | `golden/edge.tds_payees_p22.tds_payees.json` |

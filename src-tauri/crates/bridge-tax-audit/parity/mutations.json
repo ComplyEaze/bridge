@@ -4832,6 +4832,446 @@
   "to": "is_integrated: parts.is_integrated.or(Some(false)),"
  },
  {
+  "id": "E4-01",
+  "by": "author",
+  "what": "a period ending 31 March is not April-to-March",
+  "file": "src/party_monthly.rs",
+  "from": "(sm, sd, em, ed) == (4, 1, 3, 31)",
+  "to": "(sm, sd, em, ed) == (4, 1, 3, 30)"
+ },
+ {
+  "id": "E4-02",
+  "by": "author",
+  "what": "months are off by one",
+  "file": "src/party_monthly.rs",
+  "from": "MONTHS[(m + 8) % 12]",
+  "to": "MONTHS[(m + 9) % 12]"
+ },
+ {
+  "id": "E4-03",
+  "by": "author",
+  "what": "a sub-group party is not a party",
+  "file": "src/party_monthly.rs",
+  "from": ".filter(|l| PARTY_GROUPS.iter().any(|g| l.under(g)))",
+  "to": ".filter(|l| PARTY_GROUPS.iter().any(|g| l.parent == *g))"
+ },
+ {
+  "id": "E4-04",
+  "by": "author",
+  "what": "a missing group's block is run",
+  "file": "src/party_monthly.rs",
+  "from": "if !book.groups.contains_key(group) {\n            r.findings.push(Finding {",
+  "to": "if false && !book.groups.contains_key(group) {\n            r.findings.push(Finding {"
+ },
+ {
+  "id": "E4-05",
+  "by": "author",
+  "what": "several parties go to the first party",
+  "file": "src/party_monthly.rs",
+  "from": "let key = if named.len() == 1 {",
+  "to": "let key = if !named.is_empty() {"
+ },
+ {
+  "id": "E4-06",
+  "by": "author",
+  "what": "expenses get a cash-or-bank row",
+  "file": "src/party_monthly.rs",
+  "from": "(block == \"sales\" || block == \"purchases\")",
+  "to": "(block == \"sales\" || block != \"sales\")"
+ },
+ {
+  "id": "E4-07",
+  "by": "author",
+  "what": "vouchers outside the period count in the year",
+  "file": "src/party_monthly.rs",
+  "from": "            if in_period(&v.date) {",
+  "to": "            if true {"
+ },
+ {
+  "id": "E4-08",
+  "by": "author",
+  "what": "notes are every voucher but credit and debit notes",
+  "file": "src/party_monthly.rs",
+  "from": "if NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns",
+  "to": "if !NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns"
+ },
+ {
+  "id": "E4-09",
+  "by": "author",
+  "what": "every voucher counts as the same one",
+  "file": "src/party_monthly.rs",
+  "from": "row.vouchers.insert(idx);",
+  "to": "row.vouchers.insert(idx.min(0));"
+ },
+ {
+  "id": "E4-10",
+  "by": "author",
+  "what": "parties are shown smallest first",
+  "file": "src/party_monthly.rs",
+  "from": "(Reverse(a.0), a.1).cmp(&(Reverse(b.0), b.1))",
+  "to": "(a.0, a.1).cmp(&(b.0, b.1))"
+ },
+ {
+  "id": "E4-11",
+  "by": "author",
+  "what": "the Others label's singular is wrong",
+  "file": "src/party_monthly.rs",
+  "from": "let label = format!(\"Others ({n} {})\", if n == 1 { \"party\" } else { \"parties\" });",
+  "to": "let label = format!(\"Others ({n} {})\", if n == 2 { \"party\" } else { \"parties\" });"
+ },
+ {
+  "id": "E4-12",
+  "by": "author",
+  "what": "a nil month cell publishes a figure",
+  "file": "src/party_monthly.rs",
+  "from": "if let Some(a) = row.cols.get(c).filter(|a| **a != 0) {",
+  "to": "if let Some(a) = row.cols.get(c).filter(|_| true) {"
+ },
+ {
+  "id": "E4-13",
+  "by": "author",
+  "what": "a nil total row publishes no year",
+  "file": "src/party_monthly.rs",
+  "from": "if row.year != 0 || *is_total {",
+  "to": "if row.year != 0 {"
+ },
+ {
+  "id": "E4-14",
+  "by": "author",
+  "what": "the Trial Balance movement is not business-signed",
+  "file": "src/party_monthly.rs",
+  "from": "let tb_movement = tb_movement.checked_mul(sign)",
+  "to": "let tb_movement = tb_movement.checked_mul(1)"
+ },
+ {
+  "id": "E4-15",
+  "by": "author",
+  "what": "only nil openings are reported",
+  "file": "src/party_monthly.rs",
+  "from": "if t.opening_paise != 0 {",
+  "to": "if t.opening_paise == 0 {"
+ },
+ {
+  "id": "E4-16",
+  "by": "author",
+  "what": "a difference within a rupee is a finding",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(diff)? > TIE_TOLERANCE_PAISE {",
+  "to": "if abs(diff)? > 0 {"
+ },
+ {
+  "id": "E4-17",
+  "by": "author",
+  "what": "no combined set of excluded vouchers is tried",
+  "file": "src/party_monthly.rs",
+  "from": "if candidates.len() > 1 {",
+  "to": "if candidates.len() > 2 {"
+ },
+ {
+  "id": "E4-18",
+  "by": "author",
+  "what": "no set of excluded vouchers ever matches",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
+  "to": "if abs(s)? < 0 {"
+ },
+ {
+  "id": "E4-19",
+  "by": "author",
+  "what": "the first of several matching sets is named",
+  "file": "src/party_monthly.rs",
+  "from": "            } else if matches.len() > 1 {",
+  "to": "            } else if false && matches.len() > 1 {"
+ },
+ {
+  "id": "E4-20",
+  "by": "author",
+  "what": "a repeated figure id is not refused",
+  "file": "src/party_monthly.rs",
+  "from": "if r.figures.iter().any(|f| f.id == id) {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-21",
+  "by": "author",
+  "what": "PWM-1 ignores the Trial Balance movement",
+  "file": "src/party_monthly.rs",
+  "from": "if int(published_mv) != movement {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-22",
+  "by": "author",
+  "what": "PWM-1 ignores rows that do not sum to the total",
+  "file": "src/party_monthly.rs",
+  "from": "if others != cell(&rows[&total], col) {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-23",
+  "by": "author",
+  "what": "PWM-2 ignores months that do not sum to the year",
+  "file": "src/party_monthly.rs",
+  "from": "if months != cell(row, \"year\") {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-24",
+  "by": "author",
+  "what": "PWM-2 ignores a wrong Others label",
+  "file": "src/party_monthly.rs",
+  "from": "if label != want {",
+  "to": "if false {"
+ },
+ {
+  "id": "E4-25",
+  "by": "author",
+  "what": "PWM-2 reads no named party's row",
+  "file": "src/party_monthly.rs",
+  "from": "if e.kind == \"ledger\" {",
+  "to": "if e.kind == \"ledger_\" {"
+ },
+ {
+  "id": "E4-26",
+  "by": "reviewer-opus",
+  "what": "a voucher on the period's first day is outside it",
+  "file": "src/party_monthly.rs",
+  "from": "let in_period = |d: &TallyDate| start <= d && d <= end;",
+  "to": "let in_period = |d: &TallyDate| start < d && d <= end;"
+ },
+ {
+  "id": "E4-27",
+  "by": "reviewer-opus",
+  "what": "a TB difference of exactly Re 1 is a finding",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(diff)? > TIE_TOLERANCE_PAISE {",
+  "to": "if abs(diff)? >= TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-28",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers matching to exactly Re 1 do not match",
+  "file": "src/party_monthly.rs",
+  "from": "if abs(s)? <= TIE_TOLERANCE_PAISE {",
+  "to": "if abs(s)? < TIE_TOLERANCE_PAISE {"
+ },
+ {
+  "id": "E4-29",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers of any date are matched",
+  "file": "src/party_monthly.rs",
+  "from": "                    if in_period(&x.date) {",
+  "to": "                    if true {"
+ },
+ {
+  "id": "E4-30",
+  "by": "reviewer-opus",
+  "what": "named parties tied on amount go in descending name order",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.sort_by(|a, b| (Reverse(a.0), a.1).cmp(&(Reverse(b.0), b.1)));",
+  "to": "named_rows.sort_by(|a, b| (Reverse(a.0), Reverse(a.1)).cmp(&(Reverse(b.0), Reverse(b.1))));"
+ },
+ {
+  "id": "E4-31",
+  "by": "reviewer-opus",
+  "what": "named parties ranked by signed year, not absolute",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.push((abs(row.year)?, name));",
+  "to": "named_rows.push((row.year, name));"
+ },
+ {
+  "id": "E4-32",
+  "by": "reviewer-opus",
+  "what": "the ranking counts amounts dated outside the period",
+  "file": "src/party_monthly.rs",
+  "from": "named_rows.push((abs(row.year)?, name));",
+  "to": "named_rows.push((abs(add(row.year, row.cols.get(\"outside\").copied().unwrap_or(0))?)?, name));"
+ },
+ {
+  "id": "E4-33",
+  "by": "reviewer-opus",
+  "what": "a note dated outside the period counts in returns",
+  "file": "src/party_monthly.rs",
+  "from": "                let cell = row.cols.entry(\"outside\").or_insert(0);\n                *cell = add(*cell, amount)?;",
+  "to": "                let cell = row.cols.entry(\"outside\").or_insert(0);\n                *cell = add(*cell, amount)?;\n                if NOTE_TYPES.contains(&v.base_type.as_str()) {\n                    row.returns = add(row.returns, amount)?;\n                }"
+ },
+ {
+  "id": "E4-34",
+  "by": "reviewer-opus",
+  "what": "the opening balance is published without the block's sign",
+  "file": "src/party_monthly.rs",
+  "from": "Value::Int(sum.checked_mul(sign).ok_or_else(overflow)?)",
+  "to": "Value::Int(sum)"
+ },
+ {
+  "id": "E4-35",
+  "by": "reviewer-opus",
+  "what": "excluded vouchers dated before the period are matched",
+  "file": "src/party_monthly.rs",
+  "from": "                    if in_period(&x.date) {",
+  "to": "                    if x.date <= *end {"
+ },
+ {
+  "id": "E4-36",
+  "by": "author",
+  "what": "an invoice-class voucher's party is read by side, as any other's",
+  "file": "src/party_monthly.rs",
+  "from": "    if INVOICE_TYPES.contains(&v.base_type.as_str()) {",
+  "to": "    if false && INVOICE_TYPES.contains(&v.base_type.as_str()) {"
+ },
+ {
+  "id": "E4-37",
+  "by": "author",
+  "what": "a debit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Notes\"];"
+ },
+ {
+  "id": "E4-38",
+  "by": "author",
+  "what": "a credit note is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Notes\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-39",
+  "by": "author",
+  "what": "a sales voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sale\", \"Purchase\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-40",
+  "by": "author",
+  "what": "a purchase voucher is not invoice-class",
+  "file": "src/party_monthly.rs",
+  "from": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchase\", \"Credit Note\", \"Debit Note\"];",
+  "to": "const INVOICE_TYPES: [&str; 4] = [\"Sales\", \"Purchases\", \"Credit Note\", \"Debit Note\"];"
+ },
+ {
+  "id": "E4-41",
+  "by": "author",
+  "what": "a party on the same side as the block's lines is counted",
+  "file": "src/party_monthly.rs",
+  "from": "(party_net > 0) != (block_net > 0)",
+  "to": "(party_net > 0) == (block_net > 0)"
+ },
+ {
+  "id": "E4-42",
+  "by": "author",
+  "what": "a party netting to nil on the voucher is counted",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if block_net != 0 &&"
+ },
+ {
+  "id": "E4-43",
+  "by": "author",
+  "what": "a party is counted when the block's lines net to nil",
+  "file": "src/party_monthly.rs",
+  "from": "if party_net != 0 && block_net != 0 &&",
+  "to": "if party_net != 0 &&"
+ },
+ {
+  "id": "E4-44",
+  "by": "author",
+  "what": "a voucher with an uncounted party ledger goes to cash or bank, or no party",
+  "file": "src/party_monthly.rs",
+  "from": "            } else if !on_voucher.is_empty() {",
+  "to": "            } else if false && !on_voucher.is_empty() {"
+ },
+ {
+  "id": "E4-45",
+  "by": "author",
+  "what": "amounts not attributed raise no finding",
+  "file": "src/party_monthly.rs",
+  "from": "        if let Some(na) = rows.get(&Key::NotAttributed) {",
+  "to": "        if let Some(na) = rows.get(&Key::NotAttributed).filter(|_| false) {"
+ },
+ {
+  "id": "E4-46",
+  "by": "author",
+  "what": "the all-together set's statuses are joined with 'and' throughout",
+  "file": "src/party_monthly.rs",
+  "from": "Some((last, head)) => format!(\"{} and {last}\", head.join(\", \")),",
+  "to": "Some((last, head)) => format!(\"{} and {last}\", head.join(\" and \")),"
+ },
+ {
+  "id": "E4-47",
+  "by": "author",
+  "what": "a single match with two statuses tried says it is the only set tried",
+  "file": "src/party_monthly.rs",
+  "from": "            let others_tried = if present.len() > 1 {",
+  "to": "            let others_tried = if present.len() > 2 {"
+ },
+ {
+  "id": "E4-48",
+  "by": "author",
+  "what": "several statuses tried and none matching are listed without 'nor'",
+  "file": "src/party_monthly.rs",
+  "from": "several.join(\", nor the \")",
+  "to": "several.join(\", \")"
+ },
+ {
+  "id": "E4-49",
+  "by": "author",
+  "what": "the several matching sets' evidence repeats a voucher in two sets",
+  "file": "src/party_monthly.rs",
+  "from": "                    if !evidence.contains(&e) {",
+  "to": "                    if true {"
+ },
+ {
+  "id": "E4-50",
+  "by": "author",
+  "what": "the all-together single match is not said to be together",
+  "file": "src/party_monthly.rs",
+  "from": ".map_or_else(|| (all_word(), \" together\"), |w| (w.to_string(), \"\"));",
+  "to": ".map_or_else(|| (all_word(), \"\"), |w| (w.to_string(), \"\"));"
+ },
+ {
+  "id": "E4-51",
+  "by": "author",
+  "what": "each matching set's amount is misstated in the finding's text",
+  "file": "src/party_monthly.rs",
+  "from": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum))));",
+  "to": "named.push(format!(\"{label} ({})\", rupees(i128::from(sum) + 100)));"
+ },
+ {
+  "id": "E4-52",
+  "by": "author",
+  "what": "PWM-2 counts a party netting to nil on a non-invoice voucher",
+  "file": "src/party_monthly.rs",
+  "from": "invoice || net.signum() * raw.signum() < 0",
+  "to": "invoice || net.signum() * raw.signum() <= 0"
+ },
+ {
+  "id": "E4-53",
+  "by": "author",
+  "what": "PWM-2 folds the not-attributed vouchers into the rows with no party",
+  "file": "src/party_monthly.rs",
+  "from": "                (0, false) => Kind::NotAttributed,",
+  "to": "                (0, false) => Kind::Unnamed,"
+ },
+ {
+  "id": "E4-54",
+  "by": "author",
+  "what": "PWM-2 does not find the published not-attributed row",
+  "file": "src/party_monthly.rs",
+  "from": "} else if e.id.ends_with(\":not_attributed\") {",
+  "to": "} else if e.id.ends_with(\":not_attributed_\") {"
+ },
+ {
+  "id": "E4-55",
+  "by": "author",
+  "what": "PWM-2 discards its not-attributed comparison",
+  "file": "src/party_monthly.rs",
+  "from": "        out.extend(compare(\n            &format!(\"the {block} not-attributed row\"),",
+  "to": "        drop(compare(\n            &format!(\"the {block} not-attributed row\"),"
+ },
+ {
   "id": "TR-01",
   "by": "author",
   "what": "tds_payees re-pin: a bill's own TDS added back though it credits another party too",
@@ -5076,8 +5516,8 @@
   "by": "author",
   "what": "tds_payees re-pin: a short deduction read as mid",
   "file": "src/tds_payees.rs",
-  "from": "                    short.push(*g);",
-  "to": "                    mid.push(*g);"
+  "from": "                short.push(*g);",
+  "to": "                mid.push(*g);"
  },
  {
   "id": "TR-32",
@@ -5150,6 +5590,134 @@
   "file": "src/tds_payees.rs",
   "from": "            credit = add(credit, tds)?;",
   "to": "            credit = add(credit, 0)?;"
+ },
+ {
+  "id": "TR-41",
+  "by": "author",
+  "what": "tds_payees P2-2: a payee debit other than the bill's own TDS read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "        Ok((debit == 0 || debit == tds)",
+  "to": "        Ok((debit == 0 || debit != 0)"
+ },
+ {
+  "id": "TR-42",
+  "by": "author",
+  "what": "tds_payees P2-2: a line on another ledger read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "            && v.lines.iter().filter(|l| l.amount_paise != 0).all(|l| {",
+  "to": "            && v.lines.iter().filter(|l| l.amount_paise != 0).any(|l| {"
+ },
+ {
+  "id": "TR-43",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill's base read without its own TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            let base = tds.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;",
+  "to": "            let base = 0_i64.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;"
+ },
+ {
+  "id": "TR-44",
+  "by": "author",
+  "what": "tds_payees P2-2: the base fact given the TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            bases.insert(*g, base);",
+  "to": "            bases.insert(*g, tds);"
+ },
+ {
+  "id": "TR-45",
+  "by": "author",
+  "what": "tds_payees P2-2: a TDS credit read as a reversal",
+  "file": "src/tds_payees.rs",
+  "from": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise > 0)",
+  "to": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise < 0)"
+ },
+ {
+  "id": "TR-46",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill leaves (A)",
+  "file": "src/tds_payees.rs",
+  "from": "const SHORT_LEAVES_A: bool = false;",
+  "to": "const SHORT_LEAVES_A: bool = true;"
+ },
+ {
+  "id": "TR-47",
+  "by": "author",
+  "what": "tds_payees P2-2: a reversal does not keep deducted bills in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "    let deducted: Vec<&str> = if reversal {",
+  "to": "    let deducted: Vec<&str> = if false {"
+ },
+ {
+  "id": "TR-48",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill also listed in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g) && !off_a.contains(g))",
+  "to": "        .filter(|g| !b_rows.contains(g))"
+ },
+ {
+  "id": "TR-49",
+  "by": "author",
+  "what": "tds_payees P2-2: the reversal guard said without a candidate",
+  "file": "src/tds_payees.rs",
+  "from": "    let mut guard = if reversal && !candidates.is_empty() {",
+  "to": "    let mut guard = if reversal {"
+ },
+ {
+  "id": "TR-50",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill without TDS counted as untested",
+  "file": "src/tds_payees.rs",
+  "from": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? > 0 {",
+  "to": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? >= 0 {"
+ },
+ {
+  "id": "TR-51",
+  "by": "author",
+  "what": "tds_payees P2-2: the unnamed payee's reason swapped",
+  "file": "src/tds_payees.rs",
+  "from": "            let why = if e == PAYEE_NOT_NAMED {",
+  "to": "            let why = if e != PAYEE_NOT_NAMED {"
+ },
+ {
+  "id": "TR-52",
+  "by": "author",
+  "what": "tds_payees P2-2: s.194C(6) not raised by a deposit-question listing",
+  "file": "src/tds_payees.rs",
+  "from": "                                .any(|(k, _)| k.starts_with(\"deducted_payment:\"))",
+  "to": "                                .any(|(k, _)| k.starts_with(\"deducted_payment_:\"))"
+ },
+ {
+  "id": "TR-53",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill counted in (A) when it is not",
+  "file": "src/tds_payees.rs",
+  "from": "    let in_a = rows.iter().filter(|g| listed_a.contains(g)).count();",
+  "to": "    let in_a = rows.iter().filter(|g| !listed_a.contains(g)).count();"
+ },
+ {
+  "id": "TR-54",
+  "by": "author",
+  "what": "tds_payees P2-2: the rate's rounding to the nearest paisa dropped (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 0).div_euclid(10_000) - 100"
+ },
+ {
+  "id": "TR-55",
+  "by": "author",
+  "what": "tds_payees P2-2: the rupee tolerance on the rate reversed (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) + 100"
+ },
+ {
+  "id": "TR-56",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill in (ii)(B) also listed on the TDS question (review)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
+  "to": "        .collect();\n    let listed"
  },
  {
   "id": "PR-01",

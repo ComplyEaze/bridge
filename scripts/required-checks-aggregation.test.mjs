@@ -81,7 +81,7 @@ test("required checks reject a missing workflow consistency result", () => {
   assert.match(result.stdout, /Required jobs did not pass: .*workflow-consistency/);
 });
 
-for (const [job, resultName] of [["frontend", "failure"], ["rust-format", "cancelled"]]) {
+for (const [job, resultName] of [["frontend", "failure"], ["rust-format", "cancelled"], ["compiler-cache-retention", "cancelled"]]) {
   test(`required checks retain normal ${resultName} propagation for ${job}`, () => {
     const result = runRequiredChecks({
       ...baseNeeds,

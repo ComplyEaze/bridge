@@ -447,7 +447,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "ef2d2dbfe4c2fdbaf757d655436d8b7ca2324bb9aca80ba5bd13fd8edf47b281"
+      "sha256": "ff0c8a73fb4e0e767ad121eac59a365be2618ba66ac74cbe05946d30636fc4e5"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -467,7 +467,7 @@
     },
     {
       "path": "src-tauri/src/agent_desktop_journal.rs",
-      "sha256": "6faaad31d3a57e6a6ca72683d14868e04c594f46e787d1636dba537e3ff9d735"
+      "sha256": "5f3bd45bf666aefbc3994bc6a1741b7725e284b9a2c37057b0baed67e011e601"
     },
     {
       "path": "src-tauri/src/agent_egress.rs",
@@ -475,7 +475,7 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "615077cf60d3ade8950b99211f592bd63a7a8de16b2013360779ca2d9db74295"
+      "sha256": "6c72dc0cbab6b30f5eae79724bf0d42e1c5af01d584339d3e436e628d04b6d38"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
@@ -487,7 +487,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_approval.rs",
-      "sha256": "ed05a319a14922e1e1df9adf8be05927719f02a9406f932c3c182cb80a7129af"
+      "sha256": "ed0eb28de020e72ce51ad8ab743dc08382bd37975f3f9f5128d6b0262708e76a"
     },
     {
       "path": "src-tauri/src/agent_import_cash_bank.rs",
@@ -507,7 +507,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "30a908f6a7c213079f03d1a7f1bd1cbec9f083becca5106d3e10a0924794e117"
+      "sha256": "7016989313894cfda3d24de69cd70d93017f85b8616a76e3968311bcd2651899"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",
@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs",
-      "sha256": "0863ef23bf8b714dd95d2d3765d031456be188512c1aaaec7cc7ffa2b4d328a6"
+      "sha256": "302592accf0e357ae6b7b5d71804b7afb378899d9652beb7f6f677c298835003"
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",

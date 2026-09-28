@@ -1916,10 +1916,10 @@ async fn a_cancel_between_the_passes_posts_nothing() {
     );
 }
 
-/// A redeem-only pass of the desktop's Journal post, which only an agent's
-/// Join could hand on, is refused before anything could ask the person: the
-/// desktop asks through its own dialog, so no redeem-only pass of any scope
-/// shows a second one (#725 slice 2.0).
+/// A redeem-only pass of the desktop's Journal post, a pair the flow never
+/// builds but the types allow, is refused before anything could ask the
+/// person: the desktop asks through its own dialog, so no redeem-only pass of
+/// any scope shows a second one (#725 slice 2.0).
 #[tokio::test]
 async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();

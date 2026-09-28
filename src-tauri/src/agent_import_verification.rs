@@ -661,11 +661,18 @@ pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> 
 }
 
 /// `text` as a code span inside a Markdown table cell. A REMOTEID comes from
-/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped and
-/// control characters become spaces, so the row keeps its cells; the span's
-/// fence is one backtick longer than any run inside; and a text that starts
-/// and ends with a space is padded, since a code span drops one from each end.
+/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped, so
+/// the row keeps its cells, and the rest is [`markdown_code`]'s.
 fn markdown_table_code(text: &str) -> String {
+    markdown_code(&text.replace('|', "\\|"))
+}
+
+/// `text` as a Markdown code span. Text from Tally, such as a company name
+/// (bridge#807), may hold a backtick or a line break: control characters
+/// become spaces, so the line stays whole; the span's fence is one backtick
+/// longer than any run inside; and a text that starts and ends with a space is
+/// padded, since a code span drops one from each end.
+fn markdown_code(text: &str) -> String {
     let text = text
         .chars()
         .map(|character| {
@@ -675,8 +682,7 @@ fn markdown_table_code(text: &str) -> String {
                 character
             }
         })
-        .collect::<String>()
-        .replace('|', "\\|");
+        .collect::<String>();
     let longest_run = text
         .split(|character| character != '`')
         .map(str::len)
@@ -733,7 +739,7 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: `{}`\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", proof["company"]["name"].as_str().unwrap_or("unknown"), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",

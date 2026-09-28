@@ -943,6 +943,23 @@ fn the_markdown_proof_follows_the_verification_status() {
     );
 }
 
+/// The company name comes from Tally and is printed as a code span outside any
+/// table: a backtick run gets a longer fence, a pipe is left as it is, and a
+/// line break becomes a space, so the line stays whole (bridge#807).
+#[test]
+fn the_markdown_proof_fences_the_company_name() {
+    for (company, line) in [
+        (json!({"name":"Plain Co"}), "\n- Company: `Plain Co`\n"),
+        (json!({"name":"A`B``C | D"}), "\n- Company: ``` A`B``C | D ```\n"),
+        (json!({"name":"Two\nLines"}), "\n- Company: `Two Lines`\n"),
+        (json!({}), "\n- Company: `unknown`\n"),
+    ] {
+        let markdown =
+            render_proof_markdown(&json!({"batch_id":"batch-md","company":company.clone()}));
+        assert!(markdown.contains(line), "{company}: {markdown}");
+    }
+}
+
 /// Why leaving cancelled rows out of the fingerprint check (bridge#767) changes
 /// no verdict. A cancelled pair could only reach `duplicates` through a batch
 /// row with no entries, and a batch row is the one holder of its marker. So a

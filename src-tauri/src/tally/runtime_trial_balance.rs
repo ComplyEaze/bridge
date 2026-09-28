@@ -22,15 +22,17 @@ pub struct TrialBalanceRead {
     pub totals: crate::reports::trial_balance::TrialBalanceTotals,
     pub read_at: String,
     pub evidence: RuntimeReadEvidence,
-    /// Which ledgers `report` and `totals` cover. Only the MCP read asks for a
-    /// several-currency book's base-currency ledgers; the desktop screen, which
-    /// cannot show what was left out, refuses such a book instead (bridge#551).
-    #[serde(skip)]
+    /// Which ledgers `report` and `totals` cover. Only a caller that asks for
+    /// [`TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly`] can receive a
+    /// partial one: the MCP read and, since bridge#709, the desktop screen and
+    /// its workbook, which show the ledgers left out.
     pub ledger_scope: TrialBalanceLedgerScope,
 }
 
 /// Whether a caller can present a Trial Balance that covers only part of the
-/// book. A caller that cannot show the ledgers left out must never receive one.
+/// book. A caller that cannot show the ledgers left out must never receive
+/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance`]
+/// keeps the single-INR refusal for every other reader (bridge#709).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TrialBalanceCurrencyScope {
     /// One Currency master only; several refuse (`company_base_currency_undetermined`).
@@ -40,8 +42,44 @@ pub(crate) enum TrialBalanceCurrencyScope {
     BaseCurrencyLedgersOnly,
 }
 
+impl TrialBalanceRead {
+    /// The currency this read's amounts are in, as a label and its display
+    /// precision: for a several-currency book the base Tally identified, never
+    /// `currency`, which there describes the first master read (bridge#709).
+    pub(crate) fn amount_currency(&self) -> (&str, u8) {
+        match &self.ledger_scope {
+            TrialBalanceLedgerScope::AllLedgers => (
+                self.currency.mailing_name.as_str(),
+                self.currency.decimal_places,
+            ),
+            TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+                base_name,
+                decimal_places,
+                ..
+            } => (base_name.as_str(), *decimal_places),
+        }
+    }
+}
+
+/// What every presentation of a several-currency book's Trial Balance says
+/// about its totals: the MCP read, the desktop screen and its workbook.
+pub(crate) const BASE_CURRENCY_LEDGERS_ONLY_LIMITATION: &str = "Totals cover this book's plain base-currency ledgers only. Ledgers kept in another currency, and base-currency ledgers with a balance Tally shows in another currency, are left out and named, so debit and credit totals are expected to differ.";
+
+/// The first line every surface shows for a several-currency book's partial
+/// read, in its own output rather than only in a field (bridge#709): what it
+/// covers, and how many ledgers it left out and listed.
+pub(crate) fn base_currency_ledgers_only_label(foreign: usize, mixed: usize) -> String {
+    let ledgers = |count: usize| if count == 1 { "ledger" } else { "ledgers" };
+    format!(
+        "Base-currency ledgers only: {foreign} {} kept in another currency and {mixed} base-currency {} with a value Tally shows in another currency are excluded and listed.",
+        ledgers(foreign),
+        ledgers(mixed),
+    )
+}
+
 /// The ledgers a Trial Balance read covers.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TrialBalanceLedgerScope {
     /// Every ledger of a book with one Currency master.
     #[default]

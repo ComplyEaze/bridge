@@ -970,3 +970,197 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
         );
     }
 }
+
+/// The one row-level exception (owner ruling b1): an open, recognised cash
+/// line's bridge_txn_id, date and amount, and its party as printed (masked
+/// under redaction), leave so a person can answer it. Nothing else of any row
+/// does, and an answered cash line takes no exception.
+#[test]
+fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let sbi = |date: &str, narration: &str, dr: &str, cr: &str, bal: &str| {
+        Row::from_pairs([
+            ("date", date),
+            ("narr", narration),
+            ("narr_spaced", narration),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", dr),
+            ("cr", cr),
+            ("bal", bal),
+        ])
+    };
+    // Every row's amount and balance differs from every total the summary
+    // reports, so a row value cannot hide behind an aggregate.
+    let rows = [
+        sbi(
+            "01Aug2026",
+            "ATM WDL ATM CASH 4417 SYNTHETIC QUAYSIDE",
+            "512.00",
+            "",
+            "9488.00",
+        ),
+        sbi(
+            "03Aug2026",
+            "BY TRANSFER-UPI/CR/612345678901/SYNTHETIC PAYER/XYZ",
+            "",
+            "71.00",
+            "9559.00",
+        ),
+        sbi(
+            "05Aug2026",
+            "BY TRANSFER-UPI/CR/698765432109/SYNTHETIC PAYER/XYZ",
+            "",
+            "29.00",
+            "9588.00",
+        ),
+        sbi(
+            "07Aug2026",
+            "ATM WDL ATM CASH 5528 SYNTHETIC HARBOURSIDE",
+            "288.00",
+            "",
+            "9300.00",
+        ),
+    ];
+    let mut args = json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "10,000.00",
+        "closing_balance": "9,300.00",
+        "total_debits": "800.00",
+        "total_credits": "100.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let parsed_with = |request: &OwnedRequest| {
+        let build = build(
+            &rows,
+            Bank::Sbi,
+            &Mapping::default(),
+            &BuildOptions {
+                bank_ledger: "Synthetic Bank Ledger",
+                suspense_ledger: "Suspense",
+                account_label: "Synthetic SB xx1234",
+                account_number: "00000000001234",
+                date_from: None,
+                date_to: None,
+                cash_answers: &request.cash_answers,
+            },
+        )
+        .unwrap();
+        ParsedStatement {
+            account_number: "00000000001234".into(),
+            statement_rows: rows.len(),
+            closing: bridge_tally_core::ExactDecimal::parse("9300.00").unwrap(),
+            totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+            check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+            counterparties: group_counterparties(&build.records).unwrap(),
+            build,
+        }
+    };
+    // Answer the second cash line; the first stays open.
+    let unanswered = parsed_with(&OwnedRequest::from_args(&args).unwrap());
+    let answered_id = unanswered.build.records[3].bridge_txn_id.clone();
+    args["cash_answers"] = json!([{"bridge_txn_id": answered_id, "answer": "dont_know"}]);
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let parsed = parsed_with(&request);
+    let records = &parsed.build.records;
+    assert_eq!(records.len(), 4);
+    assert_eq!(records[0].disposition, Disposition::NeedsAnswer);
+    assert!(records[3].cash_answer.is_some());
+    let mut summary = summary(
+        &request,
+        &parsed,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        200_000,
+    );
+
+    let summary_before = summary.clone();
+    // The open line's entry carries exactly the exempt fields, with the
+    // line's own values, and the fixed question and answers.
+    let questions = summary["cash_questions"].as_array_mut().unwrap();
+    assert_eq!(questions.len(), 1, "only the open line is asked");
+    let entry = questions[0].as_object_mut().unwrap();
+    let mut keys: Vec<&str> = entry.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        [
+            "amount",
+            "answers",
+            "bridge_txn_id",
+            "date",
+            "movement",
+            "printed_as",
+            "question"
+        ]
+    );
+    assert_eq!(entry["bridge_txn_id"], records[0].bridge_txn_id.as_str());
+    assert_eq!(entry["date"], records[0].date.as_str());
+    assert_eq!(entry["amount"], records[0].amount.as_str());
+    assert_eq!(
+        entry["printed_as"],
+        serde_json::to_value(party_name(records[0].party.clone())).unwrap()
+    );
+    for exempt in ["bridge_txn_id", "date", "amount", "printed_as"] {
+        entry.remove(exempt);
+    }
+    // The open line's id, date and amount were present before the removal,
+    // and are scanned for below: the scan fires on a leaked row value.
+    let whole = summary_before.to_string();
+    for token in [
+        &records[0].bridge_txn_id,
+        &records[0].date,
+        &records[0].amount,
+    ] {
+        assert!(whole.contains(token.as_str()), "{token}");
+    }
+
+    // With those four removed, no value of any row is left: no row's id,
+    // date, amount or row number, no printed balance, reference or other
+    // statement text, and nothing of the answered cash line.
+    let text = summary.to_string();
+    let mut private: Vec<String> = records
+        .iter()
+        .flat_map(|record| {
+            [
+                record.bridge_txn_id.clone(),
+                record.date.clone(),
+                record.amount.clone(),
+            ]
+        })
+        .collect();
+    private.extend(
+        [
+            "\"row\"",
+            "st-2026",
+            "Aug2026",
+            "9488",
+            "9559",
+            "9588",
+            "612345678901",
+            "698765432109",
+            "4417",
+            "5528",
+            "QUAYSIDE",
+            "HARBOURSIDE",
+            "ATM WDL",
+            "/XYZ",
+            "UPI/CR",
+            "narration",
+            "Bridge: purpose not confirmed",
+        ]
+        .map(String::from),
+    );
+    for token in &private {
+        assert!(
+            !text.contains(token.as_str()),
+            "{token} left the machine: {text}"
+        );
+    }
+}

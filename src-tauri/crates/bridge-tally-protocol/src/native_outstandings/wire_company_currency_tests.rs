@@ -196,6 +196,22 @@ fn the_company_currency_name_fails_closed() {
             "{empty:?}"
         );
     }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = xml.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_company_currency_name(&doubled, FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_status_repeated"
+            )),
+            "{repeated:?}"
+        );
+    }
 }
 
 /// bridge#551, from captures only: FOREX's currency read with `ORIGINALNAME`

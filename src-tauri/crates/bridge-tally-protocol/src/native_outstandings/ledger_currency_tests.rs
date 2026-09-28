@@ -108,6 +108,20 @@ fn a_ledger_collection_status_is_one_failure_or_absent() {
             "{empty:?}"
         );
     }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = book.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_native_ledger_snapshot(&doubled).unwrap_err(),
+            NativeOutstandingsError::InvalidResponse("ledger_status_repeated"),
+            "{repeated:?}"
+        );
+    }
 }
 
 #[test]

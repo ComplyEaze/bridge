@@ -63,6 +63,22 @@ fn a_group_collection_status_is_one_failure_or_absent() {
             "{empty:?}"
         );
     }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = LIVE_SHAPE.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_native_group_snapshot(&doubled, COMPANY_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "group_status_repeated"
+            )),
+            "{repeated:?}"
+        );
+    }
 }
 
 #[test]

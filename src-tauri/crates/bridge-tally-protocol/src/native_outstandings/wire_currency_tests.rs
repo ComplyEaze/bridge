@@ -514,4 +514,18 @@ fn a_currency_collection_status_is_one_failure_or_absent() {
             "{empty:?}"
         );
     }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = xml.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_currency_masters(&doubled).unwrap_err(),
+            NativeOutstandingsError::InvalidResponse("currency_status_repeated"),
+            "{repeated:?}"
+        );
+    }
 }

@@ -1901,3 +1901,155 @@ async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
     assert_eq!(observed.len(), scripted, "{response}");
     assert_eq!(catalogue_requests(&observed), 2, "{response}");
 }
+
+/// A review on file answers "already recorded" only for the doubt it covers
+/// (#808). Beside a different doubt it is refused as stale, before any
+/// request and with no dialog; beside its own doubt, or when the record names
+/// no doubt this build can read, it is refused as already recorded.
+#[tokio::test]
+async fn a_recorded_review_answers_only_for_the_doubt_it_covers() {
+    let other =
+        r#"{"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Bank"]}"#;
+    for (record, code) in [
+        (
+            json!({"doubt_sha256": crate::agent::sha256_hex(other.as_bytes())}),
+            "ack_recorded_review_stale",
+        ),
+        (
+            json!({"doubt_sha256": crate::agent::sha256_hex(DOUBT.as_bytes())}),
+            "ack_already_recorded",
+        ),
+        (json!({}), "ack_already_recorded"),
+    ] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let (server, args) = doubted(&simulator, directory.path());
+        let bytes = serde_json::to_vec(&record).unwrap();
+        fs::write(ack_path(&server), &bytes).unwrap();
+        let approval = ScriptedApproval::approving();
+        let response = acknowledge(&server, args, approval.clone()).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{record}: {response}"
+        );
+        assert!(approval.reviews().is_empty(), "{record}: no dialog");
+        assert_eq!(fs::read(ack_path(&server)).unwrap(), bytes, "{record}");
+        assert!(sent(simulator).is_empty(), "{record}: no request");
+    }
+}
+
+/// The #808 path: a masters review was recorded for an earlier doubt, and
+/// the check was later set pending again (a losing second post's mark). The
+/// review's own read finishes the check as a new doubt, and the call is
+/// refused as stale before the dialog, never as that new doubt's review. The
+/// control: a record of that same doubt answers as already recorded.
+#[tokio::test]
+async fn a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes() {
+    let earlier =
+        r#"{"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Bank"]}"#;
+    let (code, finished) =
+        review_beside_a_pending_check(&crate::agent::sha256_hex(earlier.as_bytes())).await;
+    assert_eq!(code, "ack_recorded_review_stale");
+    let (code, again) = review_beside_a_pending_check(&crate::agent::sha256_hex(&finished)).await;
+    assert_eq!(
+        again, finished,
+        "the read finishes the same doubt each time"
+    );
+    assert_eq!(code, "ack_already_recorded");
+}
+
+/// One named masters review of the D3 batch, whose masters check is pending
+/// and whose review record covers `doubt_sha256`, while its read finishes the
+/// check as a doubt. Returns the refusal code and the doubt the read wrote,
+/// after checking that no dialog was shown, the record is unchanged, and
+/// every scripted request was sent.
+async fn review_beside_a_pending_check(doubt_sha256: &str) -> (String, Vec<u8>) {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let imports = server.imports_dir().unwrap();
+    let record_path = imports.join(format!("{D3_BATCH}.masters_ack.json"));
+    let record = serde_json::to_vec(&json!({ "doubt_sha256": doubt_sha256 })).unwrap();
+    fs::write(&record_path, &record).unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"masters"}),
+        approval.clone(),
+    )
+    .await;
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    assert_eq!(fs::read(&record_path).unwrap(), record);
+    // The read did finish the check as a doubt: that is what was compared.
+    let finished = fs::read(imports.join(format!("{D3_BATCH}.masters_doubt.json"))).unwrap();
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    let code = response["structuredContent"]["result"]["error"]["code"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    (code, finished)
+}
+
+/// A batch's step verdict left pending is recorded only by a post, so no read
+/// can finish it: a review already on file for it still answers first, before
+/// any request, as it did before #808.
+#[tokio::test]
+async fn a_recorded_step_review_beside_a_pending_step_answers_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let line = dispatched_batch(&server);
+    server
+        .record_post_checks_pending(&line.batch_id, true)
+        .unwrap();
+    let record = serde_json::to_vec(&json!({"doubt_sha256": "0".repeat(64)})).unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.batch_step_ack.json", line.batch_id)),
+        record,
+    )
+    .unwrap();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"batch_step"}),
+        ScriptedApproval::approving(),
+    )
+    .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_already_recorded",
+        "{response}"
+    );
+    assert!(sent(simulator).is_empty());
+}
+
+/// A record this build cannot read names no doubt, so no read could change
+/// its answer: beside a pending masters check it answers before any request.
+#[tokio::test]
+async fn an_unreadable_record_beside_a_pending_check_answers_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
+        clean(),
+        Some(br#"{"state":"check_pending"}"#),
+        None,
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_already_recorded",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(sent(simulator).is_empty(), "no request");
+}

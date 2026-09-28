@@ -1,7 +1,7 @@
 import React from "react";
 import { Building2, ChevronRight, Download, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { isNonRetryableOutstandingsBoundary, outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialState, workingPaperUnavailableState, type OutstandingsAgeingAnchor } from "./outstandings-copy";
+import { isNonRetryableOutstandingsBoundary, outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialState, workingPaperUnavailableState, type ExcludedCurrencyLedger, type OutstandingsAgeingAnchor } from "./outstandings-copy";
 import { csvNumericCell, csvRow, csvTextCell, type CsvCell } from "./outstandings-csv";
 import { canStartOutstandingsRead, outstandingsCurrencySymbol } from "./outstandings-currency";
 import { groupOpenBillsByParty, type OpenBill, type PartyBillsState } from "./outstandings-bills";
@@ -136,6 +136,10 @@ type LoadResult =
       requested_as_of_yyyymmdd?: string;
       tally_as_of_yyyymmdd?: string;
       foreign_currency_ledger_name?: string;
+      // bridge#551, #642: both present with reason currency_ledgers_excluded.
+      // The base-currency figures that come with them are not shown here.
+      foreign_currency_ledgers_excluded?: Array<ExcludedCurrencyLedger>;
+      base_currency_ledgers_mixed_excluded?: Array<string>;
       synced_at_unix_ms: number;
     };
 
@@ -232,7 +236,10 @@ export function OutstandingsScreen({
   const [loadedResult, setLoadedResult] = React.useState<AsOfBoundValue<LoadResult> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [inrAssertedCompanyIdentity, setInrAssertedCompanyIdentity] = React.useState<string | null>(null);
+  // The company whose currency read found at least one master. The backend
+  // then decides from Tally's own currency masters (bridge#551); the screen
+  // asserts nothing.
+  const [probedCompanyIdentity, setProbedCompanyIdentity] = React.useState<string | null>(null);
   const [ageingAnchor, setAgeingAnchor] = React.useState<OutstandingsAgeingAnchor>("due_date");
   const [view, setView] = React.useState<"ageing" | "unallocated">("ageing");
   const [expandedParty, setExpandedParty] = React.useState<string | null>(null);
@@ -266,7 +273,7 @@ export function OutstandingsScreen({
     setLoadedResult(null);
     setError(null);
     setLoading(false);
-    setInrAssertedCompanyIdentity(null);
+    setProbedCompanyIdentity(null);
     setExpandedParty(null);
   }, [config.host, config.port, company?.guid, company?.name, company?.company_number, company?.books_from_yyyymmdd]);
 
@@ -293,7 +300,7 @@ export function OutstandingsScreen({
   }, [ageingAnchor]);
 
   const currentCompanyIdentity = company ? companyIdentityFor(company) : null;
-  const currencyReadPermitted = canStartOutstandingsRead(currentCompanyIdentity, inrAssertedCompanyIdentity);
+  const currencyReadPermitted = canStartOutstandingsRead(currentCompanyIdentity, probedCompanyIdentity);
   const readPermitted = !liveReadSuppressed && currencyReadPermitted && requestedAsOf !== null;
   const partialState = result?.state === "partial"
     ? outstandingsPartialState(
@@ -301,6 +308,8 @@ export function OutstandingsScreen({
       result.requested_as_of_yyyymmdd,
       result.tally_as_of_yyyymmdd,
       result.foreign_currency_ledger_name,
+      result.foreign_currency_ledgers_excluded,
+      result.base_currency_ledgers_mixed_excluded,
     )
     : null;
   const outstandingsUnavailable = result?.state === "partial" && isNonRetryableOutstandingsBoundary(result.reason_code);
@@ -387,11 +396,12 @@ export function OutstandingsScreen({
   // assert it. The INR requirement stays -- putting a rupee symbol in front of
   // a foreign balance misstates money -- but it is a fact Tally holds, and
   // asking for it on every company was a step the product can answer itself.
-  // Where Tally names one currency but not INR, the operator may still
-  // confirm it below; a book with several currencies, or none read, is not
-  // read at all (bridge#604).
+  // Any book with a master goes to the backend, which reads the company's
+  // base itself and refuses unless Tally names it INR, leaving foreign-
+  // currency ledgers out (bridge#551). There is no operator override. A book
+  // with none read is not read at all.
   React.useEffect(() => {
-    if (liveReadSuppressed || !company || inrAssertedCompanyIdentity === companyIdentityFor(company)) return;
+    if (liveReadSuppressed || !company || probedCompanyIdentity === companyIdentityFor(company)) return;
     let cancelled = false;
     setCurrencyCheck({ state: "checking" });
     onTallyReadActivityChange(1);
@@ -409,7 +419,7 @@ export function OutstandingsScreen({
     )
       .then((currency) => {
         if (cancelled) return;
-        if (currency.is_inr) setInrAssertedCompanyIdentity(companyIdentityFor(company));
+        if (currency.currency_count > 0) setProbedCompanyIdentity(companyIdentityFor(company));
         setCurrencyCheck(currencyCheckOf(currency));
       })
       .catch(() => {
@@ -421,7 +431,7 @@ export function OutstandingsScreen({
     return () => {
       cancelled = true;
     };
-  }, [config.host, config.port, company?.guid, company?.name, company?.company_number, company?.books_from_yyyymmdd, inrAssertedCompanyIdentity, liveReadSuppressed, onTallyReadActivityChange]);
+  }, [config.host, config.port, company?.guid, company?.name, company?.company_number, company?.books_from_yyyymmdd, probedCompanyIdentity, liveReadSuppressed, onTallyReadActivityChange]);
 
   // Grouped from the COMPLETE source Bridge received -- the display cap is
   // applied per party inside groupOpenBillsByParty, never to the flattened
@@ -467,9 +477,7 @@ export function OutstandingsScreen({
   }
 
   if (!currencyReadPermitted) {
-    // "inr" lands here only for the render before the confirmed identity
-    // catches up with the selected company.
-    if (currencyCheck.state === "checking" || currencyCheck.state === "idle" || currencyCheck.state === "inr") {
+    if (currencyCheck.state === "checking" || currencyCheck.state === "idle" || currencyCheck.state === "ready") {
       return (
         <section className="panel wide outstandings-empty">
           <h2>Opening {company.name}</h2>
@@ -477,31 +485,10 @@ export function OutstandingsScreen({
         </section>
       );
     }
-    // bridge#604: only a book with one Currency master may be confirmed by
-    // hand, and the backend re-reads the masters and refuses the rest. With
-    // several, the Bills reports return a foreign-currency party's bills as
-    // plain amounts that would be shown as rupees.
-    if (currencyCheck.state === "several") {
-      return (
-        <section className="panel wide outstandings-empty">
-          <h2>Multi-currency books are not supported yet</h2>
-          <p>Tally reports more than one currency in this company. Bridge cannot yet tell which of its outstanding amounts are in a foreign currency, so it does not read outstandings for this company.</p>
-        </section>
-      );
-    }
-    if (currencyCheck.state !== "single") {
-      return (
-        <section className="panel wide outstandings-empty">
-          <h2>Bridge could not read this company&rsquo;s currency</h2>
-          <p>Without it Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
-        </section>
-      );
-    }
     return (
       <section className="panel wide outstandings-empty">
-        <h2>Confirm the base currency</h2>
-        <p>Tally reports this company&rsquo;s currency as {currencyCheck.mailingName ? `${currencyCheck.mailingName} (${currencyCheck.name})` : currencyCheck.name}. Confirm only if this company&rsquo;s books are in Indian rupees.</p>
-        <button type="button" onClick={() => setInrAssertedCompanyIdentity(companyIdentityFor(company))}>This company uses INR</button>
+        <h2>Bridge could not read this company&rsquo;s currency</h2>
+        <p>Without it Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
       </section>
     );
   }
@@ -1333,15 +1320,12 @@ function exposureComposition(report: Report, unallocatedTotal: string | undefine
 
 /// What Tally's own currency read settled for the selected company.
 type CurrencyCheck =
-  | { state: "idle" | "checking" | "inr" | "several" | "unread" }
-  | { state: "single"; name: string; mailingName: string };
+  | { state: "idle" | "checking" | "ready" | "unread" };
 
-function currencyCheckOf(currency: { is_inr: boolean; symbol: string; mailing_name: string; currency_count: number }): CurrencyCheck {
-  if (currency.is_inr) return { state: "inr" };
-  if (currency.currency_count === 1) {
-    return { state: "single", name: currency.symbol, mailingName: currency.mailing_name };
-  }
-  return { state: currency.currency_count > 1 ? "several" : "unread" };
+function currencyCheckOf(currency: { currency_count: number }): CurrencyCheck {
+  // Any master read: the backend decides from Tally's own masters, with no
+  // assertion from the screen (bridge#551). None: nothing to decide from.
+  return { state: currency.currency_count > 0 ? "ready" : "unread" };
 }
 
 function formatMoney(value: string, currencyAssertion: "INR") {

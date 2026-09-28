@@ -613,9 +613,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "company_several_currency_masters" => Some(
             "This company keeps more than one Currency master. The opening balances these \
              reads return (and ledger_movement's movements) name no currency, so Bridge \
-             refused before reading any ledger. Neither ledger_masters nor ledger_movement \
-             supports a book with several Currency masters yet (#551, #716). Retrying \
-             refuses again.",
+             refused before reading any ledger. ledger_masters with fields=compliance reads \
+             such a book through the base currency Tally identifies: it returns the plain \
+             base-currency ledgers and names the ones it leaves out (#551). The basic read \
+             and ledger_movement do not support it yet (#716). Retrying this read refuses \
+             again.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \

@@ -721,6 +721,39 @@ fn caps_exceeded(preview: &str) -> Vec<&'static str> {
     exceeded
 }
 
+/// A review record already on file, by the doubt it covers (#808). A record
+/// this build cannot read names no doubt.
+enum RecordedReview {
+    Covers(String),
+    Unreadable,
+}
+
+fn recorded_review(path: &Path) -> Option<RecordedReview> {
+    match read_masters_record_raw(path) {
+        Ok(None) => None,
+        Ok(Some((_, record))) => Some(
+            record["doubt_sha256"]
+                .as_str()
+                .map_or(RecordedReview::Unreadable, |sha256| {
+                    RecordedReview::Covers(sha256.to_string())
+                }),
+        ),
+        Err(()) => Some(RecordedReview::Unreadable),
+    }
+}
+
+impl RecordedReview {
+    /// Why a review of `doubt_raw` is refused while this record is on file.
+    /// Records are never overwritten, so a record covering another doubt is
+    /// refused as stale, never as this doubt's review.
+    fn answer(&self, doubt_raw: &[u8]) -> &'static str {
+        match self {
+            Self::Covers(sha256) if *sha256 != sha256_hex(doubt_raw) => "ack_recorded_review_stale",
+            _ => "ack_already_recorded",
+        }
+    }
+}
+
 /// Place `bytes` at `path` only if nothing is there: staged, synced, then
 /// hard-linked, which fails when the name exists. Taking the approval by value
 /// means no record can be written without one.
@@ -957,13 +990,23 @@ impl Server {
         if state == Some(&MastersRecord::DoubtRecordUnavailable) {
             return Err("ack_doubt_record_unavailable".to_string().into());
         }
-        // A record already answers it. The path is built from the journal's
-        // batch id, never the argument.
+        // A record already answers it only if it covers this doubt (#808).
+        // The path is built from the journal's batch id, never the argument.
         let ack_path = kind.ack_path(&imports, &line.batch_id);
-        if ack_path.exists() {
-            return Err("ack_already_recorded".to_string().into());
-        }
         let batch = line.vouchers.len() > 1;
+        match (recorded_review(&ack_path), state) {
+            (Some(recorded), Some(MastersRecord::Doubt { raw })) => {
+                return Err(recorded.answer(raw).to_string().into())
+            }
+            // A pending masters check can finish as a doubt in the read below,
+            // and the record is compared with that doubt after it. A batch's
+            // pending step verdict only a post records, so no read finishes it;
+            // a record beside it, or beside anything else, answers as before.
+            (Some(RecordedReview::Covers(_)), Some(MastersRecord::Pending))
+                if !(batch && kind == DoubtKind::BatchStep) => {}
+            (None, _) => {}
+            (Some(_), _) => return Err("ack_already_recorded".to_string().into()),
+        }
         // For a batch, what no read can change is refused before any read: no
         // doubt of the named kind, or a step verdict left pending, which only
         // a post records. For one voucher, no doubt and a pending check are
@@ -990,6 +1033,11 @@ impl Server {
                 .map_err(|code| with_doubt_cause(fail(code.to_string()), code))?;
         }
         let shown = admit_review(&imports, &line, &first.payload, &rows, kind).map_err(fail)?;
+        // Read again, not reused: a review recorded by another call during
+        // the read answers here, before the dialog.
+        if let Some(recorded) = recorded_review(&ack_path) {
+            return Err(fail(recorded.answer(&shown.doubt_raw).to_string()));
+        }
         let doubt: Value = serde_json::from_slice(&shown.doubt_raw).unwrap_or_default();
         let company_name = line
             .company

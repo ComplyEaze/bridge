@@ -380,7 +380,7 @@ fn sbi_party(row: &Row) -> String {
     let narration = row.get("narr_spaced");
     let reference = row.get("ref_spaced");
     if narration.contains("ATM WDL") {
-        return "ATM CASH WITHDRAWAL".to_string();
+        return crate::cash::CASH_WITHDRAWAL.to_string();
     }
     for pattern in [&*TRANSFER_TO, &*CT_TRANSFER_FROM] {
         if let Some(found) = pattern.captures(reference) {
@@ -681,7 +681,7 @@ fn ubi_party(row: &Row) -> String {
         return UNRESOLVED.to_string();
     }
     if narration == "BY CASH" {
-        return "CASH DEPOSIT".to_string();
+        return crate::cash::CASH_DEPOSIT.to_string();
     }
     if CARD_FEE.is_match(narration) {
         return "CARD ANNUAL FEE".to_string();

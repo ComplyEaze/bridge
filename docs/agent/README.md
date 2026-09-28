@@ -166,7 +166,9 @@ for the selected company's Trial Balance from 1 April to 31 March. The runtime
 requires freshly observed Licensed TallyPrime for this four-column report.
 Education mode is refused before report dispatch until this complete request
 has mode-specific live qualification. Dates before book start are refused.
-The monetary scope also requires one observed INR currency master.
+The monetary scope also requires an INR base currency. On a book with several
+Currency masters, the report covers the plain base-currency ledgers only and
+names the ledgers it leaves out; its totals are not expected to balance.
 
 Each opening, debit, credit and closing value is either
 `{"state":"present","value":"-7000.00"}` or `{"state":"present_empty"}`.

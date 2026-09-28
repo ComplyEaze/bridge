@@ -1,0 +1,597 @@
+{
+ "comment": "loans_interest #779 Phase A, s.194A, a firm: a two-sided voucher carrying interest that takes the interest over the threshold (Threshold Loan) or back under it (Reverse Loan): whether it crosses is not computed; over the threshold either way with no TDS anywhere, the s.194A finding stays and names the listed interest (Default Loan); TDS on a two-sided voucher over the threshold, coverage not computed and the TDS may be on it (Seen Loan), and under it, no s.194A record (Under Loan); a deduction with the credit and a duplicate deducted and reversed, covered by amount, not by date (Dated Loan); the Threshold shape on a lender exempt from s.194A (Insurer Loan). Seen and Under Loan carry TDS on a listed voucher, where LOAN-1 names the TDS (the reference's pinned OQ-2).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-002"
+  },
+  {
+   "name": "Threshold Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-003"
+  },
+  {
+   "name": "Reverse Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-004"
+  },
+  {
+   "name": "Default Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-005"
+  },
+  {
+   "name": "Seen Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-006"
+  },
+  {
+   "name": "Under Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-007"
+  },
+  {
+   "name": "Dated Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-008"
+  },
+  {
+   "name": "Insurer Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-009"
+  },
+  {
+   "name": "Interest Threshold",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-010"
+  },
+  {
+   "name": "Interest Reverse",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-011"
+  },
+  {
+   "name": "Interest Default",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-012"
+  },
+  {
+   "name": "Interest Seen",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-013"
+  },
+  {
+   "name": "Interest Under",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-014"
+  },
+  {
+   "name": "Interest Dated",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-015"
+  },
+  {
+   "name": "Interest Insurer",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_s194a-016"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9010000,
+   "closing": -9010000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 140000,
+   "closing": -90000
+  },
+  {
+   "ledger": "Dated Loan",
+   "opening": -10000000,
+   "debit": 1000000,
+   "credit": 10000000,
+   "closing": -19000000
+  },
+  {
+   "ledger": "Default Loan",
+   "opening": -10000000,
+   "debit": 50000,
+   "credit": 10050000,
+   "closing": -20000000
+  },
+  {
+   "ledger": "Insurer Loan",
+   "opening": -10000000,
+   "debit": 3000000,
+   "credit": 1300000,
+   "closing": -8300000
+  },
+  {
+   "ledger": "Interest Dated",
+   "opening": 0,
+   "debit": 10000000,
+   "credit": 0,
+   "closing": 10000000
+  },
+  {
+   "ledger": "Interest Default",
+   "opening": 0,
+   "debit": 10010000,
+   "credit": 0,
+   "closing": 10010000
+  },
+  {
+   "ledger": "Interest Insurer",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Interest Reverse",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 300000,
+   "closing": 900000
+  },
+  {
+   "ledger": "Interest Seen",
+   "opening": 0,
+   "debit": 10000000,
+   "credit": 0,
+   "closing": 10000000
+  },
+  {
+   "ledger": "Interest Threshold",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Interest Under",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Reverse Loan",
+   "opening": -10000000,
+   "debit": 300000,
+   "credit": 1250000,
+   "closing": -10950000
+  },
+  {
+   "ledger": "Seen Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 10020000,
+   "closing": -19920000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 2020000,
+   "closing": -1020000
+  },
+  {
+   "ledger": "Threshold Loan",
+   "opening": -10000000,
+   "debit": 6000000,
+   "credit": 1300000,
+   "closing": -5300000
+  },
+  {
+   "ledger": "Under Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 120000,
+   "closing": -10020000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Threshold",
+     800000
+    ],
+    [
+     "Threshold Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "h02",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Threshold",
+     500000
+    ],
+    [
+     "Threshold Loan",
+     -500000
+    ],
+    [
+     "Threshold Loan",
+     6000000
+    ],
+    [
+     "Bank A",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "v01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Reverse",
+     1200000
+    ],
+    [
+     "Reverse Loan",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "v02",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Reverse Loan",
+     300000
+    ],
+    [
+     "Interest Reverse",
+     -300000
+    ],
+    [
+     "Reverse Loan",
+     -50000
+    ],
+    [
+     "Cash",
+     50000
+    ]
+   ]
+  },
+  {
+   "guid": "f01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Default",
+     10000000
+    ],
+    [
+     "Default Loan",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "f02",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Default Loan",
+     50000
+    ],
+    [
+     "Default Loan",
+     -50000
+    ],
+    [
+     "Interest Default",
+     10000
+    ],
+    [
+     "Bank A",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "s01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Seen",
+     10000000
+    ],
+    [
+     "Seen Loan",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Seen Loan",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -10000
+    ],
+    [
+     "Seen Loan",
+     -20000
+    ],
+    [
+     "Cash",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "u01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Under",
+     100000
+    ],
+    [
+     "Under Loan",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "u02",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Under Loan",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -10000
+    ],
+    [
+     "Under Loan",
+     -20000
+    ],
+    [
+     "Cash",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "t01",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Dated",
+     10000000
+    ],
+    [
+     "Dated Loan",
+     -9000000
+    ],
+    [
+     "TDS Payable",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "t02",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Dated Loan",
+     1000000
+    ],
+    [
+     "TDS Payable",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "t03",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "TDS Payable",
+     1000000
+    ],
+    [
+     "Dated Loan",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "i01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Insurer",
+     800000
+    ],
+    [
+     "Insurer Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "i02",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Insurer",
+     500000
+    ],
+    [
+     "Insurer Loan",
+     -500000
+    ],
+    [
+     "Insurer Loan",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Threshold Loan": {
+   "lender": "Invented Threshold Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Threshold"
+  },
+  "Reverse Loan": {
+   "lender": "Invented Reverse Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Reverse"
+  },
+  "Default Loan": {
+   "lender": "Invented Default Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Default"
+  },
+  "Seen Loan": {
+   "lender": "Invented Seen Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Seen"
+  },
+  "Under Loan": {
+   "lender": "Invented Under Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Under"
+  },
+  "Dated Loan": {
+   "lender": "Invented Dated Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Dated"
+  },
+  "Insurer Loan": {
+   "lender": "Invented Life Insurer",
+   "lender_type": "lic",
+   "interest_ledger": "Interest Insurer"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

@@ -3416,6 +3416,206 @@
   "to": "                    .and_then(|x| x.checked_add(0))"
  },
  {
+  "id": "LR-39",
+  "by": "author",
+  "what": "a voucher with lines on one side of the loan only is read as two-sided",
+  "file": "src/loans_interest.rs",
+  "from": "    if !(on_loan().any(|l| l.amount_paise > 0) && on_loan().any(|l| l.amount_paise < 0)) {",
+  "to": "    if !(on_loan().any(|l| l.amount_paise > 0) || on_loan().any(|l| l.amount_paise < 0)) {"
+ },
+ {
+  "id": "LR-40",
+  "by": "author",
+  "what": "a balanced voucher on the loan alone is listed",
+  "file": "src/loans_interest.rs",
+  "from": "        return v.lines.iter().map(|l| i128::from(l.amount_paise)).sum::<i128>() != 0;",
+  "to": "        return true;"
+ },
+ {
+  "id": "LR-41",
+  "by": "author",
+  "what": "a TDS line no longer keeps a two-sided interest entry's interest reading",
+  "file": "src/loans_interest.rs",
+  "from": "            .all(|o| ledgers.interest.contains(*o) || ledgers.tds.contains(*o))",
+  "to": "            .all(|o| ledgers.interest.contains(*o))"
+ },
+ {
+  "id": "LR-42",
+  "by": "author",
+  "what": "a listed voucher is also netted into a taken or repaid row",
+  "file": "src/loans_interest.rs",
+  "from": "            continue; // listed by run(), never netted (#779 Phase A)",
+  "to": "            // listed by run(), and netted too"
+ },
+ {
+  "id": "LR-43",
+  "by": "author",
+  "what": "a listed voucher's credit side is left out of the loan's taken total",
+  "file": "src/loans_interest.rs",
+  "from": "        let taken_total: i128 = rows.taken.iter().map(|x| x.amount).sum::<i128>() + listed_credits;",
+  "to": "        let taken_total: i128 = rows.taken.iter().map(|x| x.amount).sum::<i128>();"
+ },
+ {
+  "id": "LR-44",
+  "by": "author",
+  "what": "a listed voucher carrying TDS but no interest does not reach s.194A",
+  "file": "src/loans_interest.rs",
+  "from": "                    l.amount_paise != 0 && (ils.contains(&l.ledger) || tds_here.contains(&l.ledger))",
+  "to": "                    l.amount_paise != 0 && ils.contains(&l.ledger)"
+ },
+ {
+  "id": "LR-45",
+  "by": "author",
+  "what": "the threshold is open whenever the interest crosses it with the listed interest",
+  "file": "src/loans_interest.rs",
+  "from": "        let threshold_open = !listed_194a.is_empty() && over_without != over_with;",
+  "to": "        let threshold_open = !listed_194a.is_empty() && over_with;"
+ },
+ {
+  "id": "LR-46",
+  "by": "author",
+  "what": "coverage is open with no TDS seen on the loan (a certain default lost)",
+  "file": "src/loans_interest.rs",
+  "from": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;",
+  "to": "        let coverage_open = !listed_194a.is_empty();"
+ },
+ {
+  "id": "LR-47",
+  "by": "author",
+  "what": "open coverage under the threshold makes the s.194A verdict open",
+  "file": "src/loans_interest.rs",
+  "from": "        let s194a_open = threshold_open || (coverage_open && over_without);",
+  "to": "        let s194a_open = threshold_open || coverage_open;"
+ },
+ {
+  "id": "LR-48",
+  "by": "author",
+  "what": "covered by amount, not by date where nothing is expected",
+  "file": "src/loans_interest.rs",
+  "from": "                } else if tds_on_loan >= expected - tolerance && expected - tolerance > 0 {",
+  "to": "                } else if tds_on_loan >= expected - tolerance {"
+ },
+ {
+  "id": "LR-49",
+  "by": "author",
+  "what": "the by-date shortfall is written as partly covered",
+  "file": "src/loans_interest.rs",
+  "from": "            let by_date = coverage == \"covered by amount, not by date\";",
+  "to": "            let by_date = false;"
+ },
+ {
+  "id": "LR-50",
+  "by": "author",
+  "what": "an open s.194A verdict still raises the ordinary s.194A finding",
+  "file": "src/loans_interest.rs",
+  "from": "        let over_194a = !s194a_open",
+  "to": "        let over_194a = true"
+ },
+ {
+  "id": "LR-51",
+  "by": "author",
+  "what": "a lender exempt from s.194A gets the not-computed s.194A record",
+  "file": "src/loans_interest.rs",
+  "from": "        if s194a_open && !ex.s194a.contains(lender_type) && matches!(status, \"deductor\" | \"unknown\")",
+  "to": "        if s194a_open && matches!(status, \"deductor\" | \"unknown\")"
+ },
+ {
+  "id": "LR-52",
+  "by": "author",
+  "what": "the open threshold's direction is read from the interest without the listed interest",
+  "file": "src/loans_interest.rs",
+  "from": "                                if over_with {",
+  "to": "                                if over_without {"
+ },
+ {
+  "id": "LR-53",
+  "by": "author",
+  "what": "an entry on the first listed voucher's own date does not depend on it",
+  "file": "src/loans_interest.rs",
+  "from": "    let after_listed = c.first_listed.is_some_and(|d| v.date >= *d);",
+  "to": "    let after_listed = c.first_listed.is_some_and(|d| v.date > *d);"
+ },
+ {
+  "id": "LR-54",
+  "by": "author",
+  "what": "an entry exactly at the limit after a listed voucher depends on it",
+  "file": "src/loans_interest.rs",
+  "from": "    if after_listed && amt < limit {",
+  "to": "    if after_listed && amt <= limit {"
+ },
+ {
+  "id": "LR-55",
+  "by": "author",
+  "what": "an entry names listed vouchers dated after it",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|x| x.date <= v.date)",
+  "to": "        .filter(|_| true)"
+ },
+ {
+  "id": "LR-56",
+  "by": "author",
+  "what": "a row after a listed voucher keeps its balance figure",
+  "file": "src/loans_interest.rs",
+  "from": "    if !after_listed {\n        fig(",
+  "to": "    if true {\n        fig("
+ },
+ {
+  "id": "LR-57",
+  "by": "author",
+  "what": "a loan taken after a listed voucher keeps the below-zero note",
+  "file": "src/loans_interest.rs",
+  "from": "    if taken && prior < 0 && !after_listed {",
+  "to": "    if taken && prior < 0 {"
+ },
+ {
+  "id": "LR-58",
+  "by": "author",
+  "what": "a bank-only side of a listed voucher is a possible s.269SS/269T",
+  "file": "src/loans_interest.rs",
+  "from": "                            .any(|(role, sd)| sd == side && *role != \"bank\")",
+  "to": "                            .any(|(_, sd)| sd == side)"
+ },
+ {
+  "id": "LR-59",
+  "by": "author",
+  "what": "the first-date note is on every listed voucher",
+  "file": "src/loans_interest.rs",
+  "from": "                Some(&v.date) == first_listed,",
+  "to": "                true,"
+ },
+ {
+  "id": "LR-60",
+  "by": "author",
+  "what": "a forced set-off is stated on a voucher that does not balance",
+  "file": "src/loans_interest.rs",
+  "from": "    if set_off != 0 && balanced {\n        let id = fig(",
+  "to": "    if set_off != 0 {\n        let id = fig("
+ },
+ {
+  "id": "LR-61",
+  "by": "author",
+  "what": "LOAN-4 reads no TDS ledger, naming an interest entry net of TDS",
+  "file": "src/loans_interest.rs",
+  "from": "                    .all(|o| ils.contains(*o) || tds_read.contains(*o))",
+  "to": "                    .all(|o| ils.contains(*o))"
+ },
+ {
+  "id": "LR-62",
+  "by": "author",
+  "what": "LOAN-2 (E) does not accept a listed voucher against another loan's interest ledger",
+  "file": "src/loans_interest.rs",
+  "from": "        cited.extend(listed_sides(h, \"credit\").into_keys());",
+  "to": "        cited.extend(Vec::<String>::new());"
+ },
+ {
+  "id": "LR-63",
+  "by": "author",
+  "what": "LOAN-2 (A) reads a listed voucher's interest as misbucketed",
+  "file": "src/loans_interest.rs",
+  "from": "                let why = if listed_here.contains_key(&v.guid) {",
+  "to": "                let why = if false {"
+ },
+ {
   "id": "Y01",
   "by": "author",
   "what": "the no-party bucket cited as a ledger (EVID-1)",

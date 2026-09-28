@@ -36,11 +36,20 @@
 //! the switch, reached by the tests through [`run_with`] instead of rebinding a module global.
 //!
 //! `[partners.deed] no_interest_authorised = true` records a deed that authorises no interest on
-//! capital: the rate used is 0 and no deed-rate question is raised; the partner stays not
-//! computed, and its finding says any interest paid or credited to it, through any ledger, is
-//! disallowed in full, that this test does not look for it, and states no amount. It is refused
-//! beside any `interest_rate_bp` (0 included) and in any form but a boolean; `false` is the same as
+//! capital: the rate used is 0 and no deed-rate question is raised; the partner is never computed,
+//! whatever the switch, and its finding says any interest paid or credited to it, through any
+//! ledger, is disallowed in full, that this test does not look for it, and states no amount. For a
+//! partner with no interest ledger and no voucher this test cannot read exactly, it asks the client
+//! nothing about interest for s.40(b); its s.194T question, which applies whether or not interest
+//! is allowed, still asks for the interest and remuneration credited. The flag is refused beside
+//! any `interest_rate_bp` (0 included) and in any form but a boolean; `false` is the same as
 //! absent.
+//!
+//! The s.194T TDS seen is a non-zero line on a TDS-payable ledger, on a voucher with a non-zero line
+//! on the partner's capital or on its own interest or remuneration ledger not shared by partners.
+//! TDS on a voucher on a shared ledger is listed for every sharing partner, attributed to no one,
+//! unless its TDS side (net-signed, apart from the TDS) is partners' capitals alone; a net-nil TDS
+//! is theirs when it touches a partner's capital.
 //!
 //! The configuration is refused, never read, where it could mislead (the reference's
 //! `check_partners_config`, run after the applicability gate and before any voucher is read): a
@@ -937,7 +946,9 @@ is listed in clause 21(c)."
         // With no interest ledger its interest cannot be told from capital.
         let no_interest_ledger = p.interest_ledger.is_none();
         let read_fails = !unknown.is_empty() || no_interest_ledger;
-        let not_computed = read_fails || !excess_computed;
+        // Under the no-interest deed a partner is never computed, whatever the switch: interest
+        // through any ledger is disallowed, and the configured interest ledger is only one of them.
+        let not_computed = read_fails || no_interest || !excess_computed;
         let unusable = if not_computed {
             " Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding \
 that says so)."
@@ -1210,22 +1221,23 @@ is not divided between them, so the interest counted is net of an unknown part o
 Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
                     .to_string(),
             );
-            let title = if no_interest && no_interest_ledger && unknown.is_empty() {
-                format!(
+            let title =
+                if no_interest && unknown.is_empty() && (no_interest_ledger || excess_computed) {
+                    format!(
                     "s.40(b) not computed for partner (tag {h}): the deed authorises no interest \
 on capital, so any interest is disallowed in full"
                 )
-            } else if read_fails {
-                format!(
+                } else if read_fails {
+                    format!(
                     "s.40(b) not computed for partner (tag {h}): its interest credited cannot be \
 read exactly; the CA computes it"
                 )
-            } else {
-                format!(
+                } else {
+                    format!(
                     "s.40(b) not computed for partner (tag {h}): this test computes the excess for \
 no partner; the CA computes it"
                 )
-            };
+                };
             let mut evidence = voucher_refs(&unknown);
             evidence.extend(unread_ledgers.iter().map(|x| EvidenceRef::new("ledger", x)));
             if no_interest_ledger {
@@ -1236,9 +1248,10 @@ no partner; the CA computes it"
                 );
             }
             let mut ask_client = Vec::new();
-            // Asked for the computation unless it is computed, or the deed authorises no interest
-            // and no interest ledger is configured (nothing to ask).
-            if !(excess_computed || (no_interest && no_interest_ledger)) {
+            // Asked for the computation unless the switch computes it (never under the no-interest
+            // deed), or the deed authorises no interest and no interest ledger is configured
+            // (nothing to ask).
+            if !((excess_computed && !no_interest) || (no_interest && no_interest_ledger)) {
                 ask_client.push(if no_interest {
                     "The s.40(b) computation for this partner: the interest credited (the deed \
 authorises none, so all of it is disallowed)."
@@ -1357,7 +1370,8 @@ split is counted as interest, not here."
         );
         remuneration_facts.push((key.clone(), f_rem));
         let mixed_here = &w.mixed_unsplit_vouchers;
-        if !mixed_here.is_empty() && p.remuneration_ledger.is_some() {
+        // A voucher is mixed only when it carries a remuneration ledger, so one is configured.
+        if !mixed_here.is_empty() {
             // The remuneration inside an unsplit voucher is counted as interest.
             remuneration_evidence.extend(mixed_here.clone());
             remuneration_notes.push(format!(
@@ -1476,24 +1490,58 @@ remuneration, commission, bonus and interest to a partner).{}",
                 .iter()
                 .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise != 0)
         };
+        // The TDS's own side, apart from the TDS, is partners' capitals alone -- the walk's own test
+        // for adding it back gross: it is theirs. Anything else on that side (a bank, a payable)
+        // and it is not judged whose. A net-nil TDS (deducted and reversed, or moved between TDS
+        // ledgers) has no side, so it is theirs when it touches a partner's capital.
+        let partners_tds = |v: &Voucher| {
+            let tds: i128 = -v
+                .lines
+                .iter()
+                .filter(|l| tds_ledgers.contains(&l.ledger))
+                .map(|l| i128::from(l.amount_paise))
+                .sum::<i128>();
+            if tds == 0 {
+                return v
+                    .lines
+                    .iter()
+                    .any(|l| all_capitals.contains(&l.ledger) && l.amount_paise != 0);
+            }
+            let side: BTreeSet<&str> = v
+                .lines
+                .iter()
+                .filter(|l| {
+                    i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)
+                })
+                .map(|l| l.ledger.as_str())
+                .collect();
+            !side.is_empty() && side.iter().all(|l| all_capitals.contains(*l))
+        };
         let mut seen: BTreeMap<String, &Voucher> = BTreeMap::new();
         let mut unattributed: BTreeMap<String, &Voucher> = BTreeMap::new();
         if !tds_ledgers.is_empty() {
+            // Only a non-zero line touches a ledger, as the walk reads it: a zero capital line
+            // never makes a shared ledger's TDS that partner's.
             for &v in &pop {
-                if v.lines.iter().any(|l| own.contains(l.ledger.as_str())) && has_tds(v) {
+                if v.lines
+                    .iter()
+                    .any(|l| own.contains(l.ledger.as_str()) && l.amount_paise != 0)
+                    && has_tds(v)
+                {
                     seen.insert(v.guid.clone(), v);
                 }
             }
-            // On a shared ledger, TDS on a voucher that touches a partner's capital is that
-            // partner's, never "whose is not judged" for another.
+            // On a shared ledger, TDS booked against partners' capitals alone is theirs, never
+            // "whose is not judged" for another.
             for &v in &pop {
                 if !seen.contains_key(&v.guid)
                     && has_tds(v)
                     && v.lines.iter().any(|l| {
                         ledgers.contains(l.ledger.as_str())
                             && shared_ledgers.contains(l.ledger.as_str())
+                            && l.amount_paise != 0
                     })
-                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger))
+                    && !partners_tds(v)
                 {
                     unattributed.insert(v.guid.clone(), v);
                 }
@@ -1521,7 +1569,7 @@ remuneration, commission, bonus and interest to a partner).{}",
                 "Whether a line on a ledger the client's statutory dues classify as TDS payable \
 appears on a voucher touching partner (tag {h})'s capital, interest or remuneration ledgers (\"not \
 judged\" when none is classified, or when the only such lines are on a ledger shared by partners, \
-on a voucher that touches no partner's capital)."
+on a voucher whose TDS is not booked against partners' capitals alone)."
             ),
             Vec::new(),
         );
@@ -1650,8 +1698,8 @@ credits it covers, and its deposit, are the CA's to determine"
                 let l = by_date(&unattributed);
                 limits.push(format!(
                     "TDS lines are seen on {} voucher(s) on an interest or remuneration ledger \
-shared by partners that touch no partner's capital: {}. Which partner's TDS they are is not \
-judged.",
+shared by partners whose TDS is not booked against partners' capitals alone: {}. Which partner's \
+TDS they are is not judged.",
                     l.len(),
                     first12(&l)
                 ));
@@ -1677,6 +1725,7 @@ returned the income, tax paid)."
             );
             let mut evidence = touched.clone();
             evidence.extend(seen.clone());
+            evidence.extend(unattributed.clone());
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/s194t/{h}"),
                 clauses: vec![
@@ -2749,6 +2798,244 @@ exactly; the CA computes it"
         );
     }
 
+    // ---- TDS on a ledger shared by partners (queue items 3 and 7, 28-Sep) ----
+
+    /// The selftest's `PartnersBOffCapital.SHARED`: both partners on one interest and one
+    /// remuneration ledger.
+    const SHARED: &str = "[partner_a]\ncapital_ledgers = [\"Partner A\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Remuneration to Partners\"\n\
+[partner_b]\ncapital_ledgers = [\"Partner B\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Remuneration to Partners\"\n";
+    const PARTNER_C: &str = "[partner_c]\ncapital_ledgers = [\"Partner C\"]\n\
+interest_ledger = \"Interest to Partners\"\n\
+remuneration_ledger = \"Remuneration to Partners\"\n";
+
+    /// [`go`] on a book that also holds a Bank ledger and the `extra` ones.
+    fn go_shared(vouchers: Vec<Voucher>, config: &str, extra: &[&str]) -> TestResult {
+        let mut book = book_of(vouchers);
+        for n in ["Bank"].iter().chain(extra) {
+            book.ledgers.insert((*n).to_string(), ledger(n));
+        }
+        let tds = BTreeSet::from(["TDS Payable".to_string()]);
+        run_with(
+            &book,
+            &Rules::vendored().unwrap(),
+            &year(),
+            "firm",
+            &cfg(config),
+            &tds,
+            S40B_EXCESS_COMPUTED,
+        )
+        .unwrap()
+    }
+
+    fn tds_seen(r: &TestResult, key: &str) -> String {
+        match &fig(r, &format!("s194t_tds_ledger_seen_{}", hash8(key))).value {
+            Value::Text(t) => t.clone(),
+            other => panic!("not text: {other:?}"),
+        }
+    }
+
+    const NOT_JUDGED_TAIL: &str = "Which partner's TDS they are is not judged.";
+
+    #[test]
+    fn a_zero_capital_line_does_not_decide_whose_shared_tds_it_is() {
+        // Only a non-zero line touches a ledger: TDS on a bank payment on a shared ledger is
+        // listed for both partners, and a zero line on either capital changes nothing.
+        let sb = |zero_on: Option<&str>| {
+            let mut lines = vec![
+                ("Interest to Partners", 6_000_000),
+                ("Bank", -5_400_000),
+                ("TDS Payable", -600_000),
+            ];
+            lines.extend(zero_on.map(|c| (c, 0)));
+            voucher("sz", &lines)
+        };
+        let said = |r: &TestResult, key: &str| {
+            let t = found(r, &format!("s194t/{}", hash8(key)));
+            assert_eq!(t.len(), 1, "{key}");
+            (tds_seen(r, key), t[0].title.clone(), t[0].limits.clone())
+        };
+        let plain = go_shared(vec![sb(None)], &format!("{SHARED}{DEED}"), &[]);
+        for key in ["partner_a", "partner_b"] {
+            let (seen, _, limits) = said(&plain, key);
+            assert_eq!(seen, "not judged", "{key}");
+            assert!(
+                limits.iter().any(|x| x.ends_with(NOT_JUDGED_TAIL)),
+                "{limits:?}"
+            );
+        }
+        for cap in ["Partner A", "Partner B"] {
+            let r = go_shared(vec![sb(Some(cap))], &format!("{SHARED}{DEED}"), &[]);
+            for key in ["partner_a", "partner_b"] {
+                assert_eq!(said(&r, key), said(&plain, key), "{cap} {key}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_zero_line_on_a_shared_ledger_does_not_make_someone_elses_tds_a_partners() {
+        // TDS deducted from a supplier, on a voucher whose only line on the shared interest ledger
+        // is zero, is no partner's: each says "no", as without that line.
+        for zero in [false, true] {
+            let mut lines = vec![
+                ("Rent", 1_000_000),
+                ("Supplier", -900_000),
+                ("TDS Payable", -100_000),
+            ];
+            if zero {
+                lines.push(("Interest to Partners", 0));
+            }
+            let r = go_shared(
+                vec![voucher("sp", &lines)],
+                &format!("{SHARED}{DEED}"),
+                &["Rent", "Supplier"],
+            );
+            for key in ["partner_a", "partner_b"] {
+                assert_eq!(tds_seen(&r, key), "no", "{zero} {key}");
+            }
+        }
+    }
+
+    #[test]
+    fn shared_tds_on_a_voucher_crediting_one_partner_and_a_bank_is_listed_for_the_other() {
+        // Queue item 7: the TDS's side carries A's capital and a bank, so it is not exactly A's;
+        // B, who shares the ledger, lists it and is "not judged".
+        let s1 = voucher(
+            "s1",
+            &[
+                ("Interest to Partners", 12_000_000),
+                ("Partner A", -5_400_000),
+                ("Bank", -5_400_000),
+                ("TDS Payable", -1_200_000),
+            ],
+        );
+        let r = go_shared(vec![s1], &format!("{SHARED}{DEED}"), &[]);
+        let hb = hash8("partner_b");
+        assert_eq!(tds_seen(&r, "partner_b"), "not judged");
+        let t = found(&r, &format!("s194t/{hb}"));
+        assert!(
+            t[0].limits.contains(
+                &"TDS lines are seen on 1 voucher(s) on an interest or remuneration ledger shared \
+by partners whose TDS is not booked against partners' capitals alone: Journal s1 on 2026-03-31. \
+Which partner's TDS they are is not judged."
+                    .to_string()
+            ),
+            "{:?}",
+            t[0].limits
+        );
+        assert!(t[0].evidence.iter().any(|e| e.id == "s1"));
+        assert_eq!(tds_seen(&r, "partner_a"), "yes");
+        // The definition states the rule.
+        assert!(fig(&r, &format!("s194t_tds_ledger_seen_{hb}"))
+            .definition
+            .ends_with(
+                "(\"not judged\" when none is classified, or when the only such lines are on a \
+ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone)."
+            ));
+    }
+
+    #[test]
+    fn shared_tds_exactly_one_partners_stays_that_partners() {
+        let a1 = voucher(
+            "a1",
+            &[
+                ("Interest to Partners", 6_000_000),
+                ("Partner A", -5_400_000),
+                ("TDS Payable", -600_000),
+            ],
+        );
+        let r = go_shared(vec![a1], &format!("{SHARED}{DEED}"), &[]);
+        assert_eq!(tds_seen(&r, "partner_b"), "no");
+        assert_eq!(tds_seen(&r, "partner_a"), "yes");
+    }
+
+    #[test]
+    fn tds_credited_against_nothing_else_is_no_partners() {
+        let t0 = voucher(
+            "t0",
+            &[("Interest to Partners", 600_000), ("TDS Payable", -600_000)],
+        );
+        let r = go_shared(vec![t0], &format!("{SHARED}{DEED}"), &[]);
+        for key in ["partner_a", "partner_b"] {
+            assert_eq!(tds_seen(&r, key), "not judged", "{key}");
+        }
+    }
+
+    #[test]
+    fn a_net_nil_tds_on_one_partners_voucher_is_not_listed_for_the_other() {
+        // No TDS side: it stays with the partner whose capital it touches.
+        let z1 = voucher(
+            "z1",
+            &[
+                ("Interest to Partners", 6_000_000),
+                ("Partner A", -6_000_000),
+                ("TDS Payable", 600_000),
+                ("TDS Payable", -600_000),
+            ],
+        );
+        let r = go_shared(vec![z1], &format!("{SHARED}{DEED}"), &[]);
+        assert_eq!(tds_seen(&r, "partner_b"), "no");
+    }
+
+    #[test]
+    fn a_net_nil_tds_on_a_bank_payment_is_listed_for_both() {
+        // A zero line on a capital does not count as touching it.
+        let zb = voucher(
+            "zb",
+            &[
+                ("Interest to Partners", 6_000_000),
+                ("Bank", -6_000_000),
+                ("TDS Payable", 600_000),
+                ("TDS Payable", -600_000),
+                ("Partner A", 0),
+            ],
+        );
+        let r = go_shared(vec![zb], &format!("{SHARED}{DEED}"), &[]);
+        for key in ["partner_a", "partner_b"] {
+            assert_eq!(tds_seen(&r, key), "not judged", "{key}");
+        }
+    }
+
+    #[test]
+    fn a_reversal_of_one_partners_voucher_is_not_listed_for_the_other() {
+        // Signed: the TDS debited, its side is A's capital debited, not the interest ledger.
+        let rv = voucher(
+            "rv",
+            &[
+                ("Interest to Partners", -6_000_000),
+                ("Partner A", 5_400_000),
+                ("TDS Payable", 600_000),
+            ],
+        );
+        let r = go_shared(vec![rv], &format!("{SHARED}{DEED}"), &[]);
+        assert_eq!(tds_seen(&r, "partner_b"), "no");
+    }
+
+    #[test]
+    fn a_joint_journal_is_not_listed_for_a_partner_it_does_not_credit() {
+        let j1 = voucher(
+            "j1",
+            &[
+                ("Interest to Partners", 10_000_000),
+                ("Partner A", -4_500_000),
+                ("Partner B", -4_500_000),
+                ("TDS Payable", -1_000_000),
+            ],
+        );
+        let r = go_shared(
+            vec![j1],
+            &format!("{SHARED}{PARTNER_C}{DEED}"),
+            &["Partner C"],
+        );
+        assert_eq!(tds_seen(&r, "partner_c"), "no");
+        for key in ["partner_a", "partner_b"] {
+            assert_eq!(tds_seen(&r, key), "yes", "{key}");
+        }
+    }
+
     #[test]
     fn remuneration_net_of_an_unread_ledger_is_said_on_the_remuneration_finding() {
         let config = format!("{ONE}remuneration_ledger = \"Remuneration to Partners\"\n{DEED}");
@@ -2949,6 +3236,109 @@ no_interest_authorised)."
         assert_eq!(
             f[0].ask_client,
             [ASK_RATE, "The ledger that carries this partner's interest."]
+        );
+    }
+
+    #[test]
+    fn a_no_interest_deed_partner_is_not_computed_with_the_switch_on_either() {
+        // Queue item 2 (28-Sep): under the flag a partner is never computed, whatever the switch.
+        // With the switch on, a plain interest voucher gave a computed excess (rate 0) whose limit
+        // said interest "was authorised for the whole year" and asked for the deed's rate.
+        let i1 = voucher(
+            "i1",
+            &[
+                ("Interest to Partners", 6_000_000),
+                ("Partner A", -6_000_000),
+            ],
+        );
+        let r = go_with(
+            vec![i1],
+            &format!("{ONE}[deed]\nno_interest_authorised = true\n"),
+            &["TDS Payable"],
+            true,
+        )
+        .unwrap();
+        let h = hash8("partner_a");
+        assert!(found(&r, "s40b_excess/").is_empty());
+        assert!(!has_fig(&r, &format!("s40b_excess_{h}")));
+        assert!(!has_fig(&r, "s40b_excess_total"));
+        assert_eq!(
+            fig(&r, "s40b_excess_total_not_computed").value,
+            Value::Text("not computed: s.40(b) is not computed for 1 partner(s)".to_string())
+        );
+        let f = found(&r, &format!("s40b_not_computed/{h}"));
+        assert_eq!(f.len(), 1);
+        assert_eq!(
+            f[0].title,
+            format!(
+                "s.40(b) not computed for partner (tag {h}): the deed authorises no interest on \
+capital, so any interest is disallowed in full"
+            )
+        );
+        assert_eq!(
+            f[0].limits,
+            [
+                "The deed authorises no interest on capital (as recorded in the configuration), so \
+s.40(b) allows none: interest paid or credited to this partner, through any ledger (its \
+remuneration ledger included), is disallowed in full. This test does not search the books for such \
+interest, beyond reading its configured interest ledger as a working figure (marked not usable), \
+and states no disallowed amount.",
+                CLOSING,
+            ]
+        );
+        assert_eq!(
+            f[0].ask_client,
+            ["The s.40(b) computation for this partner: the interest credited (the deed authorises \
+none, so all of it is disallowed)."]
+        );
+        for g in &r.findings {
+            assert!(
+                !g.limits
+                    .iter()
+                    .any(|x| x.contains("authorised for the whole year")),
+                "{}",
+                g.id
+            );
+            assert!(
+                !g.ask_client
+                    .join(" ")
+                    .contains("the deed's authorised interest rate"),
+                "{}",
+                g.id
+            );
+        }
+    }
+
+    #[test]
+    fn with_the_switch_on_a_rate_deed_partner_read_inexactly_is_not_asked_for_the_computation() {
+        // The other half of the question's condition: with the switch on, a partner whose deed
+        // authorises a rate and whose interest cannot be read is asked about the vouchers named,
+        // not for the s.40(b) computation.
+        let x1 = voucher(
+            "x1",
+            &[
+                ("Interest to Partners", 1_000_000),
+                ("Partner A", -800_000),
+                ("Cash", -200_000),
+            ],
+        );
+        let r = go_with(
+            vec![x1],
+            &format!("{ONE}[deed]\ninterest_rate_bp = 1200\n"),
+            &["TDS Payable"],
+            true,
+        )
+        .unwrap();
+        let f = found(&r, "s40b_not_computed/");
+        assert_eq!(f.len(), 1);
+        assert!(f[0].evidence.iter().any(|e| e.id == "x1"));
+        assert_eq!(
+            f[0].ask_client,
+            [
+                ASK_VOUCHERS,
+                "If 'Cash' carries TDS on this partner's interest, classify it as TDS payable in \
+your statutory dues; otherwise, what it is.",
+            ]
         );
     }
 

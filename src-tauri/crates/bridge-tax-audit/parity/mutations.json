@@ -3356,7 +3356,7 @@
   "by": "author (Lane B)",
   "what": "partners: a TDS ledger anywhere counts as seen",
   "file": "src/partners_40b_194t.rs",
-  "from": "                if v.lines.iter().any(|l| own.contains(l.ledger.as_str())) && has_tds(v) {",
+  "from": "                if v.lines\n                    .iter()\n                    .any(|l| own.contains(l.ledger.as_str()) && l.amount_paise != 0)\n                    && has_tds(v)\n                {",
   "to": "                if has_tds(v) {"
  },
  {
@@ -5796,8 +5796,8 @@
   "by": "author",
   "what": "partners re-pin: an unknown interest still gets an excess",
   "file": "src/partners_40b_194t.rs",
-  "from": "let not_computed = read_fails || !excess_computed;",
-  "to": "let not_computed = !excess_computed;"
+  "from": "let not_computed = read_fails || no_interest || !excess_computed;",
+  "to": "let not_computed = no_interest || !excess_computed;"
  },
  {
   "id": "PR-12",
@@ -6028,16 +6028,16 @@
   "by": "author",
   "what": "partners 4a: the no-interest title never used",
   "file": "src/partners_40b_194t.rs",
-  "from": "let title = if no_interest && no_interest_ledger && unknown.is_empty() {",
-  "to": "let title = if false {"
+  "from": "if no_interest && unknown.is_empty() && (no_interest_ledger || excess_computed) {",
+  "to": "if false {"
  },
  {
   "id": "PR-41",
   "by": "author",
   "what": "partners 4a: a partner with no interest ledger asked for the computation anyway",
   "file": "src/partners_40b_194t.rs",
-  "from": "            if !(excess_computed || (no_interest && no_interest_ledger)) {",
-  "to": "            if !excess_computed {"
+  "from": "            if !((excess_computed && !no_interest) || (no_interest && no_interest_ledger)) {",
+  "to": "            if !(excess_computed && !no_interest) {"
  },
  {
   "id": "PR-42",
@@ -6068,15 +6068,15 @@
   "by": "author",
   "what": "partners: another partner's own TDS on a shared ledger made unattributed",
   "file": "src/partners_40b_194t.rs",
-  "from": "                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger))",
-  "to": "                    && !v.lines.iter().any(|l| all_capitals.contains(&l.ledger) && false)"
+  "from": "                    && !partners_tds(v)",
+  "to": "                    && !false"
  },
  {
   "id": "PR-46",
   "by": "author",
   "what": "partners: remuneration inside an unsplit voucher not said",
   "file": "src/partners_40b_194t.rs",
-  "from": "        if !mixed_here.is_empty() && p.remuneration_ledger.is_some() {",
+  "from": "        if !mixed_here.is_empty() {",
   "to": "        if false {"
  },
  {
@@ -6110,5 +6110,101 @@
   "file": "src/partners_40b_194t.rs",
   "from": "    if !applicable {\n        return Ok(r);\n    }\n\n    // The configuration is refused, never read, where it could mislead: before any voucher.\n    let (partners, deed) = partners_config(cfg)?;\n    check_partners_config(&partners, book, tds_ledgers)?;\n",
   "to": "    let (partners, deed) = partners_config(cfg)?;\n    check_partners_config(&partners, book, tds_ledgers)?;\n    if !applicable {\n        return Ok(r);\n    }\n\n"
+ },
+ {
+  "id": "PR-51",
+  "by": "author",
+  "what": "partners 4a: a no-interest partner computed with the switch on",
+  "file": "src/partners_40b_194t.rs",
+  "from": "let not_computed = read_fails || no_interest || !excess_computed;",
+  "to": "let not_computed = read_fails || !excess_computed;"
+ },
+ {
+  "id": "PR-52",
+  "by": "author",
+  "what": "partners 4a: with the switch on, the no-interest title only without an interest ledger",
+  "file": "src/partners_40b_194t.rs",
+  "from": "if no_interest && unknown.is_empty() && (no_interest_ledger || excess_computed) {",
+  "to": "if no_interest && unknown.is_empty() && no_interest_ledger {"
+ },
+ {
+  "id": "PR-53",
+  "by": "author",
+  "what": "partners 4a: with the switch on, a no-interest partner not asked for the computation",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if !((excess_computed && !no_interest) || (no_interest && no_interest_ledger)) {",
+  "to": "            if !(excess_computed || (no_interest && no_interest_ledger)) {"
+ },
+ {
+  "id": "PR-54",
+  "by": "author",
+  "what": "partners: with the switch on, a partner read inexactly asked for the computation",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if !((excess_computed && !no_interest) || (no_interest && no_interest_ledger)) {",
+  "to": "            if !(no_interest && no_interest_ledger) {"
+ },
+ {
+  "id": "PR-55",
+  "by": "author",
+  "what": "partners: a zero line on the partner's own ledger makes TDS seen",
+  "file": "src/partners_40b_194t.rs",
+  "from": ".any(|l| own.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": ".any(|l| own.contains(l.ledger.as_str()))"
+ },
+ {
+  "id": "PR-56",
+  "by": "author",
+  "what": "partners: a zero line on a shared ledger makes TDS unattributed",
+  "file": "src/partners_40b_194t.rs",
+  "from": "                            && shared_ledgers.contains(l.ledger.as_str())\n                            && l.amount_paise != 0\n",
+  "to": "                            && shared_ledgers.contains(l.ledger.as_str())\n"
+ },
+ {
+  "id": "PR-57",
+  "by": "author",
+  "what": "partners: the TDS side read unsigned",
+  "file": "src/partners_40b_194t.rs",
+  "from": "i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)",
+  "to": "l.amount_paise != 0 && !tds_ledgers.contains(&l.ledger)"
+ },
+ {
+  "id": "PR-58",
+  "by": "author",
+  "what": "partners: a TDS side with a bank on it read as partners' alone",
+  "file": "src/partners_40b_194t.rs",
+  "from": "!side.is_empty() && side.iter().all(|l| all_capitals.contains(*l))",
+  "to": "side.iter().any(|l| all_capitals.contains(*l))"
+ },
+ {
+  "id": "PR-59",
+  "by": "author",
+  "what": "partners: an empty TDS side read as partners'",
+  "file": "src/partners_40b_194t.rs",
+  "from": "!side.is_empty() && side.iter().all(|l| all_capitals.contains(*l))",
+  "to": "side.iter().all(|l| all_capitals.contains(*l))"
+ },
+ {
+  "id": "PR-60",
+  "by": "author",
+  "what": "partners: a net-nil TDS made a partner's by a zero capital line",
+  "file": "src/partners_40b_194t.rs",
+  "from": ".any(|l| all_capitals.contains(&l.ledger) && l.amount_paise != 0);",
+  "to": ".any(|l| all_capitals.contains(&l.ledger));"
+ },
+ {
+  "id": "PR-61",
+  "by": "author",
+  "what": "partners: a net-nil TDS on one partner's voucher listed for the others",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            if tds == 0 {\n                return v\n",
+  "to": "            if tds == 0 {\n                return false && v\n"
+ },
+ {
+  "id": "PR-62",
+  "by": "author",
+  "what": "partners: unattributed TDS vouchers not cited on the s.194T finding",
+  "file": "src/partners_40b_194t.rs",
+  "from": "            evidence.extend(unattributed.clone());",
+  "to": "            let _ = &unattributed;"
  }
 ]

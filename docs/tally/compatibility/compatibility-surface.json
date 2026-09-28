@@ -447,7 +447,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "8dd2a3213599a2a86da8155cdaac8399d6a6f4dd89e7995aad3798fe7eb97e85"
+      "sha256": "9e3b4f601bab2a577e16be7508c7e279f0bf3c29250a7ac0480f19f5b4b5cf64"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -475,7 +475,7 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "1139b37aaf2b9e717f685fa55e6e9d21756547d8c679e58827c558f87bbf8c8b"
+      "sha256": "6c72dc0cbab6b30f5eae79724bf0d42e1c5af01d584339d3e436e628d04b6d38"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",

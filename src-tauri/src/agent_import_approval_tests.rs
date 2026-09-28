@@ -1651,7 +1651,6 @@ async fn a_redeem_only_entry_with_nothing_held_is_refused_and_asks_nobody() {
                 None,
                 PostScope::Vouchers,
                 Entry::RedeemOnly {
-                    call_started: std::time::Instant::now(),
                     evidence: evidence_from_runtime_read(
                         crate::tally::runtime::RuntimeReadEvidence::empty(),
                     ),
@@ -1806,8 +1805,10 @@ async fn a_batch_dispatched_while_its_approval_waits_is_reconciled_not_posted() 
 type Between = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 /// A click made while no call waited, then a call run with `between` between
-/// its passes. The simulator serves enough for a second pass that asked the
-/// person again to go on and post, so such a pass would be seen.
+/// its passes. The simulator serves further reads, so a second pass that
+/// tried to ask the person again reaches Tally and is seen, by its dialog or
+/// by the refusal it ends in (an Entry::Fresh second pass ended in a mode
+/// probe refusal when measured, 28 Sep 2026).
 async fn two_pass_call_with(
     between: impl FnOnce(&Server, &ImportLedgerLine) -> Between,
 ) -> (

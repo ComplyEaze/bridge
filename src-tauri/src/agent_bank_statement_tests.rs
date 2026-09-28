@@ -991,46 +991,63 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             ("bal", bal),
         ])
     };
-    // Every row's amount and balance differs from every total the summary
-    // reports, so a row value cannot hide behind an aggregate.
+    // Two rows in every counterparty group, and every row's amount and
+    // balance different from every total the summary reports, so a row value
+    // cannot hide behind an aggregate (a group of one row reports that row's
+    // amount as its total, under the counterparty contract).
     let rows = [
-        sbi(
+        (
             "01Aug2026",
             "ATM WDL ATM CASH 4417 SYNTHETIC QUAYSIDE",
             "512.00",
             "",
             "9488.00",
         ),
-        sbi(
+        (
             "03Aug2026",
             "BY TRANSFER-UPI/CR/612345678901/SYNTHETIC PAYER/XYZ",
             "",
             "71.00",
             "9559.00",
         ),
-        sbi(
+        (
+            "04Aug2026",
+            "ATM WDL ATM CASH 6639 SYNTHETIC LOCKSIDE",
+            "64.00",
+            "",
+            "9495.00",
+        ),
+        (
             "05Aug2026",
             "BY TRANSFER-UPI/CR/698765432109/SYNTHETIC PAYER/XYZ",
             "",
             "29.00",
-            "9588.00",
+            "9524.00",
         ),
-        sbi(
+        (
             "07Aug2026",
             "ATM WDL ATM CASH 5528 SYNTHETIC HARBOURSIDE",
             "288.00",
             "",
-            "9300.00",
+            "9236.00",
         ),
-    ];
+        (
+            "08Aug2026",
+            "ATM WDL ATM CASH 7740 SYNTHETIC WHARFSIDE",
+            "36.00",
+            "",
+            "9200.00",
+        ),
+    ]
+    .map(|(date, narration, dr, cr, bal)| sbi(date, narration, dr, cr, bal));
     let mut args = json!({
         "statement_path": never_opened("statement.pdf"),
         "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
-        "closing_balance": "9,300.00",
-        "total_debits": "800.00",
+        "closing_balance": "9,200.00",
+        "total_debits": "900.00",
         "total_credits": "100.00",
         "bank_ledger": "Synthetic Bank Ledger",
         "suspense_ledger": "Suspense"
@@ -1054,23 +1071,30 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
         ParsedStatement {
             account_number: "00000000001234".into(),
             statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9300.00").unwrap(),
+            closing: bridge_tally_core::ExactDecimal::parse("9200.00").unwrap(),
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
             build,
         }
     };
-    // Answer the second cash line; the first stays open.
+    // Answer the last two cash lines; the first two stay open.
     let unanswered = parsed_with(&OwnedRequest::from_args(&args).unwrap());
-    let answered_id = unanswered.build.records[3].bridge_txn_id.clone();
-    args["cash_answers"] = json!([{"bridge_txn_id": answered_id, "answer": "dont_know"}]);
+    args["cash_answers"] = json!(unanswered.build.records[4..]
+        .iter()
+        .map(|record| json!({"bridge_txn_id": record.bridge_txn_id, "answer": "dont_know"}))
+        .collect::<Vec<_>>());
     let request = OwnedRequest::from_args(&args).unwrap();
     let parsed = parsed_with(&request);
     let records = &parsed.build.records;
-    assert_eq!(records.len(), 4);
-    assert_eq!(records[0].disposition, Disposition::NeedsAnswer);
-    assert!(records[3].cash_answer.is_some());
+    assert_eq!(records.len(), 6);
+    let open = [&records[0], &records[2]];
+    for record in open {
+        assert_eq!(record.disposition, Disposition::NeedsAnswer);
+    }
+    assert!(records[4..]
+        .iter()
+        .all(|record| record.cash_answer.is_some()));
     let mut summary = summary(
         &request,
         &parsed,
@@ -1081,44 +1105,44 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
     );
 
     let summary_before = summary.clone();
-    // The open line's entry carries exactly the exempt fields, with the
+    // Each open line's entry carries exactly the exempt fields, with the
     // line's own values, and the fixed question and answers.
     let questions = summary["cash_questions"].as_array_mut().unwrap();
-    assert_eq!(questions.len(), 1, "only the open line is asked");
-    let entry = questions[0].as_object_mut().unwrap();
-    let mut keys: Vec<&str> = entry.keys().map(String::as_str).collect();
-    keys.sort_unstable();
-    assert_eq!(
-        keys,
-        [
-            "amount",
-            "answers",
-            "bridge_txn_id",
-            "date",
-            "movement",
-            "printed_as",
-            "question"
-        ]
-    );
-    assert_eq!(entry["bridge_txn_id"], records[0].bridge_txn_id.as_str());
-    assert_eq!(entry["date"], records[0].date.as_str());
-    assert_eq!(entry["amount"], records[0].amount.as_str());
-    assert_eq!(
-        entry["printed_as"],
-        serde_json::to_value(party_name(records[0].party.clone())).unwrap()
-    );
-    for exempt in ["bridge_txn_id", "date", "amount", "printed_as"] {
-        entry.remove(exempt);
+    assert_eq!(questions.len(), 2, "only the open lines are asked");
+    for (entry, record) in questions.iter_mut().zip(open) {
+        let entry = entry.as_object_mut().unwrap();
+        let mut keys: Vec<&str> = entry.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "amount",
+                "answers",
+                "bridge_txn_id",
+                "date",
+                "movement",
+                "printed_as",
+                "question"
+            ]
+        );
+        assert_eq!(entry["bridge_txn_id"], record.bridge_txn_id.as_str());
+        assert_eq!(entry["date"], record.date.as_str());
+        assert_eq!(entry["amount"], record.amount.as_str());
+        assert_eq!(
+            entry["printed_as"],
+            serde_json::to_value(party_name(record.party.clone())).unwrap()
+        );
+        for exempt in ["bridge_txn_id", "date", "amount", "printed_as"] {
+            entry.remove(exempt);
+        }
     }
-    // The open line's id, date and amount were present before the removal,
-    // and are scanned for below: the scan fires on a leaked row value.
+    // The open lines' ids, dates and amounts were present before the
+    // removal, and are scanned for below: the scan fires on a leaked row value.
     let whole = summary_before.to_string();
-    for token in [
-        &records[0].bridge_txn_id,
-        &records[0].date,
-        &records[0].amount,
-    ] {
-        assert!(whole.contains(token.as_str()), "{token}");
+    for record in open {
+        for token in [&record.bridge_txn_id, &record.date, &record.amount] {
+            assert!(whole.contains(token.as_str()), "{token}");
+        }
     }
 
     // With those four removed, no value of any row is left: no row's id,
@@ -1142,13 +1166,19 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             "Aug2026",
             "9488",
             "9559",
-            "9588",
+            "9495",
+            "9524",
+            "9236",
             "612345678901",
             "698765432109",
             "4417",
+            "6639",
             "5528",
+            "7740",
             "QUAYSIDE",
+            "LOCKSIDE",
             "HARBOURSIDE",
+            "WHARFSIDE",
             "ATM WDL",
             "/XYZ",
             "UPI/CR",

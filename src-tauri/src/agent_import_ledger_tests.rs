@@ -300,12 +300,7 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             )
             .unwrap();
         older
-            .persist_import_verification(
-                &stale_proof,
-                &retry.batch,
-                VerificationStatus::PostedVerified,
-                retry.generation,
-            )
+            .persist_import_verification(&stale_proof, &retry.batch, newer_status, retry.generation)
             .unwrap();
         // The file is the retry's proof, carrying the status the ledger records.
         let recorded = older
@@ -314,7 +309,7 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .unwrap()
             .batch
             .status;
-        assert_eq!(recorded, "posted_verified");
+        assert_eq!(recorded, newer_status.as_str());
         let mut expected = stale_proof.clone();
         expected["verification_status"] = json!(recorded);
         assert_eq!(

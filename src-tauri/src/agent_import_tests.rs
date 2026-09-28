@@ -958,6 +958,7 @@ fn the_markdown_proof_fences_the_company_name() {
             "\n- Company: ``` A`B``C | D ```\n",
         ),
         (json!({"name":"Two\nLines"}), "\n- Company: `Two Lines`\n"),
+        (json!({"name":""}), "\n- Company: `  `\n"),
         (json!({}), "\n- Company: `unknown`\n"),
     ] {
         let markdown =

@@ -695,7 +695,8 @@ fn markdown_table_code(text: &str) -> String {
 /// (bridge#807), may hold a backtick or a line break: control characters
 /// become spaces, so the line stays whole; the span's fence is one backtick
 /// longer than any run inside; and a text that starts and ends with a space is
-/// padded, since a code span drops one from each end.
+/// padded, since a code span drops one from each end. An empty text is padded
+/// too: a bare pair of backticks is no span.
 fn markdown_code(text: &str) -> String {
     let text = text
         .chars()
@@ -712,8 +713,9 @@ fn markdown_code(text: &str) -> String {
         .map(str::len)
         .max()
         .unwrap_or(0);
-    let padded =
-        longest_run > 0 || (text.starts_with(' ') && text.ends_with(' ') && text.trim() != "");
+    let padded = text.is_empty()
+        || longest_run > 0
+        || (text.starts_with(' ') && text.ends_with(' ') && text.trim() != "");
     let fence = "`".repeat(longest_run + 1);
     if padded {
         format!("{fence} {text} {fence}")

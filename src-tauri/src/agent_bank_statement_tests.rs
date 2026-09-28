@@ -1236,7 +1236,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
 
 /// A known gap, pinned so it cannot pass unseen: a counterparty of one row
 /// reports that row's amount as its total, for a party paid once and for one
-/// answered cash line alike. This predates the cash questions; whether to
+/// answered cash line alike, and so does a bank ledger total over one row. This predates the cash questions; whether to
 /// withhold such a total is a separate decision.
 #[test]
 fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
@@ -1337,4 +1337,7 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
     };
     assert_eq!(total_of("ATM CASH WITHDRAWAL"), "512.00");
     assert_eq!(total_of("SYNTHETIC PAYER"), "71.00");
+    // The bank ledger's totals are built from the same single rows.
+    assert_eq!(summary["bank_ledger_out"], "512.00");
+    assert_eq!(summary["bank_ledger_in"], "71.00");
 }

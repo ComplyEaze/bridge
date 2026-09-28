@@ -4386,4 +4386,133 @@ mod tests {
             "{err}"
         );
     }
+
+    /// A Journal on 2025-06-01 with no number, so its label is "Journal <guid> on 2025-06-01".
+    fn journal(guid: &str, lines: &[(&str, i64)]) -> Voucher {
+        Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250601".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: lines
+                .iter()
+                .map(|&(ledger, amount_paise)| LedgerLine {
+                    ledger: ledger.to_string(),
+                    amount_paise,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    /// Cash Dr 40,000 / Loan A Cr 40,000; Loan A Dr 25,000 / Cash Cr 25,000: one voucher, both
+    /// sides of the loan, listed.
+    fn both_sides(guid: &str) -> Voucher {
+        journal(
+            guid,
+            &[
+                ("Cash", 4_000_000),
+                ("Loan A", -4_000_000),
+                ("Loan A", 2_500_000),
+                ("Cash", -2_500_000),
+            ],
+        )
+    }
+
+    fn loan4(b: &Book, r: &TestResult) -> Vec<String> {
+        check_invariants(b, r)
+            .unwrap()
+            .into_iter()
+            .filter(|x| x.starts_with("LOAN-4"))
+            .collect()
+    }
+
+    fn gross_side<'a>(r: &'a mut TestResult, side: &str) -> &'a mut crate::findings::Figure {
+        let prefix = format!("{TEST_ID}.two_sided_gross_{side}_");
+        let mut it = r.figures.iter_mut().filter(|f| f.id.starts_with(&prefix));
+        let f = it.next().unwrap();
+        assert!(it.next().is_none(), "one listed voucher");
+        f
+    }
+
+    /// The reference's LOAN-4 amount check: a listed record whose sides differ from the voucher's
+    /// own lines on the loan is named, with each side as the record shows it (a missing debit
+    /// figure reads as Python's `None`).
+    #[test]
+    fn loan4_names_a_listed_record_whose_sides_differ_from_the_voucher() {
+        let rules = Rules::vendored().unwrap();
+        let b = book(vec![both_sides("t1")]);
+        let clean = run_on(&b, &rules).unwrap();
+        assert_eq!(loan4(&b, &clean), Vec::<String>::new());
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+
+        let mut r = clean.clone();
+        gross_side(&mut r, "credit").value = Value::Int(1);
+        assert_eq!(
+            loan4(&b, &r),
+            [format!(
+                "LOAN-4: voucher Journal t1 on 2025-06-01 (guid t1) credits loan ledger 'Loan A' \
+(tag {h}) 4000000p and debits it 2500000p, but its listed record shows 1p and 2500000p."
+            )]
+        );
+
+        let mut r = clean.clone();
+        let debit_id = gross_side(&mut r, "debit").id.clone();
+        r.figures.retain(|f| f.id != debit_id);
+        assert_eq!(
+            loan4(&b, &r),
+            [format!(
+                "LOAN-4: voucher Journal t1 on 2025-06-01 (guid t1) credits loan ledger 'Loan A' \
+(tag {h}) 4000000p and debits it 2500000p, but its listed record shows 4000000p and Nonep."
+            )]
+        );
+    }
+
+    /// The reference's `test_loan4_names_an_unlisted_unbalanced_voucher_on_the_loan_alone`: with
+    /// the listed record's figures removed, the voucher (on the loan alone, not balancing) is named
+    /// as cited by no listed record.
+    #[test]
+    fn loan4_names_an_unlisted_unbalanced_voucher_on_the_loan_alone() {
+        let rules = Rules::vendored().unwrap();
+        let b = book(vec![journal(
+            "l1",
+            &[("Loan A", -500_000), ("Loan A", 300_000)],
+        )]);
+        let mut r = run_on(&b, &rules).unwrap();
+        assert_eq!(loan4(&b, &r), Vec::<String>::new());
+        let before = r.figures.len();
+        r.figures.retain(|f| !f.id.contains("two_sided_gross_"));
+        assert_eq!(before - r.figures.len(), 2);
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        assert_eq!(
+            loan4(&b, &r),
+            [format!(
+                "LOAN-4: voucher Journal l1 on 2025-06-01 (guid l1) both credits (500000p) and \
+debits (300000p) loan ledger 'Loan A' (tag {h}), and is not an interest or TDS entry, but no listed \
+record cites it: it was netted into one entry or dropped."
+            )]
+        );
+    }
+
+    /// The reference's LOAN-4 orphan check: a listed record that also cites a voucher in the
+    /// population which does not both credit and debit the loan is named.
+    #[test]
+    fn loan4_names_a_listed_record_citing_a_one_sided_voucher() {
+        let rules = Rules::vendored().unwrap();
+        let b = book(vec![both_sides("t1"), taken("t2", "20250701")]);
+        let mut r = run_on(&b, &rules).unwrap();
+        assert_eq!(loan4(&b, &r), Vec::<String>::new());
+        gross_side(&mut r, "credit")
+            .evidence
+            .push(EvidenceRef::new("voucher", "t2"));
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        assert_eq!(
+            loan4(&b, &r),
+            [format!(
+                "LOAN-4: a listed record on loan ledger 'Loan A' (tag {h}) cites voucher guid t2, \
+which does not both credit and debit the loan in the books population."
+            )]
+        );
+    }
 }

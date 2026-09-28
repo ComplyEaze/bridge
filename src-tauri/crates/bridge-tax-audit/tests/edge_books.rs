@@ -207,6 +207,7 @@ fn rules(s: &Value) -> Rules {
             "s36_1_va" => rules.s36_1_va_due_day = None,
             "s194j" => rules.s194j_aggregate_paise = None,
             "s194t" => rules.s194t = None,
+            "tds_rates" => rules.tds_rates = None,
             other => panic!("rules_without {other} is not wired here"),
         }
     }

@@ -6230,5 +6230,29 @@
   "file": "src/tds_payees.rs",
   "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
   "to": "        .collect();\n    let listed"
+ },
+ {
+  "id": "LR-64",
+  "by": "author",
+  "what": "a refund-or-loan record on a loan with a listed voucher never says it was not compared with it",
+  "file": "src/loans_interest.rs",
+  "from": "            (!c.not_compared.is_empty()).then_some(c.not_compared),\n        );",
+  "to": "            None,\n        );"
+ },
+ {
+  "id": "LR-65",
+  "by": "author",
+  "what": "the not-computed s.194A record is raised for a deductor only, not for an unknown status",
+  "file": "src/loans_interest.rs",
+  "from": "        if s194a_open && !ex.s194a.contains(lender_type) && matches!(status, \"deductor\" | \"unknown\")",
+  "to": "        if s194a_open && !ex.s194a.contains(lender_type) && status == \"deductor\""
+ },
+ {
+  "id": "LR-66",
+  "by": "author",
+  "what": "a missing s.194A rate is read before open coverage (not judged where TDS sits on a listed voucher)",
+  "file": "src/loans_interest.rs",
+  "from": "            _ if coverage_open => \"not computed\",\n            None => \"not judged\",",
+  "to": "            None => \"not judged\",\n            _ if coverage_open => \"not computed\","
  }
 ]

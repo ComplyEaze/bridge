@@ -218,17 +218,21 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         .expect("hold publication admission");
     let (started_tx, started_rx) = std::sync::mpsc::channel();
     let (done_tx, done_rx) = std::sync::mpsc::channel();
-    let writers = ["first", "second"].map(|state| {
-        let mut update = initial.clone();
-        update.status = state.into();
+    let verdicts = [
+        VerificationStatus::PostedVerified,
+        VerificationStatus::VerificationIncomplete,
+    ];
+    let writers = verdicts.map(|verdict| {
+        let line = initial.clone();
         let settings = settings.clone();
         let started = started_tx.clone();
         let done = done_tx.clone();
         std::thread::spawn(move || {
+            let state = verdict.as_str();
             let proof = json!({"batch_id":"batch-proof", "company":{"name":state}, "writer":state});
             started.send(()).expect("writer started");
-            let result =
-                Server::new(settings).persist_import_verification(&proof, &update, generation);
+            let result = Server::new(settings)
+                .persist_import_verification(&proof, &line, verdict, generation);
             done.send(result).expect("writer result");
         })
     });
@@ -251,11 +255,10 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
             Err("import_admission_busy".into())
         );
     }
-    for (index, state) in ["first", "second"].into_iter().enumerate() {
-        let mut update = initial.clone();
-        update.status = state.into();
+    for (index, verdict) in verdicts.into_iter().enumerate() {
+        let state = verdict.as_str();
         let proof = json!({"batch_id":"batch-proof", "company":{"name":state}, "writer":state});
-        let result = server.persist_import_verification(&proof, &update, generation);
+        let result = server.persist_import_verification(&proof, &initial, verdict, generation);
         if index == 0 {
             result.unwrap();
         } else {
@@ -950,7 +953,10 @@ fn the_markdown_proof_follows_the_verification_status() {
 fn the_markdown_proof_fences_the_company_name() {
     for (company, line) in [
         (json!({"name":"Plain Co"}), "\n- Company: `Plain Co`\n"),
-        (json!({"name":"A`B``C | D"}), "\n- Company: ``` A`B``C | D ```\n"),
+        (
+            json!({"name":"A`B``C | D"}),
+            "\n- Company: ``` A`B``C | D ```\n",
+        ),
         (json!({"name":"Two\nLines"}), "\n- Company: `Two Lines`\n"),
         (json!({}), "\n- Company: `unknown`\n"),
     ] {

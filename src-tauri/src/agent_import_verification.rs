@@ -399,6 +399,25 @@ pub(super) fn verification_response_page(
     page
 }
 
+/// A verdict of `verify_import`: the only statuses a proof may carry. The
+/// ledger line keeps its status as a string, which also holds non-verdicts
+/// such as `built`; taking this type at the persist boundary keeps those out
+/// of a proof (bridge#814).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum VerificationStatus {
+    PostedVerified,
+    VerificationIncomplete,
+}
+
+impl VerificationStatus {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::PostedVerified => "posted_verified",
+            Self::VerificationIncomplete => "verification_incomplete",
+        }
+    }
+}
+
 /// The verdict `verify_import` records and the proof renders. A dispatch that
 /// needs reconciliation is never verified, whatever the readback shows; with no
 /// dispatch record, the readback alone decides (bridge#804).
@@ -406,21 +425,26 @@ pub(super) fn final_verification_status(
     dispatch: Option<&Value>,
     result: &Value,
     expected_voucher_count: usize,
-) -> &'static str {
+) -> VerificationStatus {
     if dispatch.is_some_and(|dispatch| dispatch["state"] == "reconciliation_required") {
-        "verification_incomplete"
+        VerificationStatus::VerificationIncomplete
     } else {
-        verification_status(result, expected_voucher_count)
+        readback_verdict(result, expected_voucher_count)
     }
 }
 
+/// The readback's verdict, as the string tool results and the ledger carry.
 pub(super) fn verification_status(result: &Value, expected_voucher_count: usize) -> &'static str {
+    readback_verdict(result, expected_voucher_count).as_str()
+}
+
+fn readback_verdict(result: &Value, expected_voucher_count: usize) -> VerificationStatus {
     if result["counts"]["posted_verified"].as_u64() == Some(expected_voucher_count as u64)
         && result["duplicates"].as_array().is_some_and(Vec::is_empty)
     {
-        "posted_verified"
+        VerificationStatus::PostedVerified
     } else {
-        "verification_incomplete"
+        VerificationStatus::VerificationIncomplete
     }
 }
 

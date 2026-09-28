@@ -93,12 +93,11 @@ fn repeated_verification_appends_only_compact_status_and_preserves_batch_bytes()
     let original = fs::read(&path).unwrap();
     assert!(original.len() > 1_000_000);
     for index in 0..25 {
-        batch.status = if index % 2 == 0 {
-            "posted_verified"
+        let status = if index % 2 == 0 {
+            VerificationStatus::PostedVerified
         } else {
-            "verification_incomplete"
-        }
-        .into();
+            VerificationStatus::VerificationIncomplete
+        };
         let proof = json!({"batch_id":batch.batch_id,"company":{"name":"Synthetic Book"}});
         let generation = server
             .latest_import_snapshot(&batch.batch_id)
@@ -106,7 +105,7 @@ fn repeated_verification_appends_only_compact_status_and_preserves_batch_bytes()
             .unwrap()
             .generation;
         server
-            .persist_import_verification(&proof, &batch, generation)
+            .persist_import_verification(&proof, &batch, status, generation)
             .unwrap();
     }
     let bytes = fs::read(&path).unwrap();
@@ -156,6 +155,7 @@ fn compact_status_hydrates_legacy_full_records_and_rejects_unknown_builds() {
         .persist_import_verification(
             &json!({}),
             &current,
+            VerificationStatus::VerificationIncomplete,
             server
                 .latest_import_snapshot(&current.batch_id)
                 .unwrap()
@@ -209,22 +209,29 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .unwrap()
             .generation;
         older
-            .persist_import_verification(&proof, &original, generation)
+            .persist_import_verification(
+                &proof,
+                &original,
+                VerificationStatus::VerificationIncomplete,
+                generation,
+            )
             .unwrap();
         // Both processes finish admission before either publishes its reads.
         let stale = older
             .latest_import_snapshot(&original.batch_id)
             .unwrap()
             .unwrap();
-        let mut current = newer
+        let current = newer
             .latest_import_snapshot(&original.batch_id)
             .unwrap()
             .unwrap();
-        if !identical_status {
-            current.batch.status = "posted_verified".into();
-        }
+        let newer_status = if identical_status {
+            VerificationStatus::VerificationIncomplete
+        } else {
+            VerificationStatus::PostedVerified
+        };
         newer
-            .persist_import_verification(&proof, &current.batch, current.generation)
+            .persist_import_verification(&proof, &current.batch, newer_status, current.generation)
             .unwrap();
         let paths = [
             directory.path().join("agent-import-ledger.jsonl"),
@@ -244,7 +251,12 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .unwrap();
         let stale_proof = json!({"batch_id":original.batch_id,"company":{"name":"Stale result"}});
         assert_eq!(
-            older.persist_import_verification(&stale_proof, &stale.batch, stale.generation),
+            older.persist_import_verification(
+                &stale_proof,
+                &stale.batch,
+                VerificationStatus::VerificationIncomplete,
+                stale.generation
+            ),
             Err("import_verification_conflict_retry".into())
         );
         assert_eq!(
@@ -283,15 +295,28 @@ fn stale_verifier_cannot_replace_a_newer_same_batch_publication() {
             .persist_import_verification(
                 &json!({"batch_id":other.batch_id}),
                 &other,
+                VerificationStatus::VerificationIncomplete,
                 other_generation,
             )
             .unwrap();
         older
-            .persist_import_verification(&stale_proof, &retry.batch, retry.generation)
+            .persist_import_verification(
+                &stale_proof,
+                &retry.batch,
+                VerificationStatus::PostedVerified,
+                retry.generation,
+            )
             .unwrap();
         // The file is the retry's proof, carrying the status the ledger records.
+        let recorded = older
+            .latest_import_snapshot(&original.batch_id)
+            .unwrap()
+            .unwrap()
+            .batch
+            .status;
+        assert_eq!(recorded, "posted_verified");
         let mut expected = stale_proof.clone();
-        expected["verification_status"] = json!(retry.batch.status);
+        expected["verification_status"] = json!(recorded);
         assert_eq!(
             serde_json::from_slice::<Value>(&fs::read(&paths[1]).unwrap()).unwrap(),
             expected
@@ -317,7 +342,12 @@ fn a_verification_records_each_vouchers_first_verified_alter_id_once() {
             .unwrap()
             .generation;
         server
-            .persist_import_verification(&proof, &batch, generation)
+            .persist_import_verification(
+                &proof,
+                &batch,
+                VerificationStatus::PostedVerified,
+                generation,
+            )
             .unwrap();
     };
     let imports = directory.path().join("imports");

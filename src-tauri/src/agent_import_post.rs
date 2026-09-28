@@ -1193,6 +1193,16 @@ pub(super) fn finalize_previous_attempt_reconciliation(
     }
 }
 
+const MASTERS_REVIEW: &str = "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event.";
+
+/// The message for a post whose ledgers no longer resolve to the masters
+/// approved. The ledgers are named in `masters_after_post.ledgers`, where the
+/// response's redaction reaches them, never in this text.
+pub(super) const CHANGED_MASTERS_MESSAGE: &str = concat!(
+    "Posted to Tally, but the ledgers in masters_after_post.ledgers no longer resolve to the master you approved. ",
+    "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event."
+);
+
 /// Whether the masters check across a post leaves doubt that the voucher went
 /// to the ledgers approved (#239), as the refusal code and plain message. Only
 /// an unchanged resolution, or a mark proven unmoved, admits: any other state,
@@ -1208,18 +1218,10 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
             .get("batch_step")
             .and_then(|step| batch_step_doubt(Some(step)));
     }
-    const REVIEW: &str = "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event.";
     Some(if state == "posted_under_changed_masters" {
-        let ledgers = masters["ledgers"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .collect::<Vec<_>>()
-            .join(", ");
         (
             "posted_under_changed_masters",
-            format!("Posted to Tally, but these ledgers no longer resolve to the master you approved: {ledgers}. {REVIEW}"),
+            CHANGED_MASTERS_MESSAGE.to_string(),
         )
     } else {
         let again = if state == super::MASTERS_CHECK_PENDING || state == "check_unavailable" {
@@ -1229,7 +1231,7 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
         };
         (
             "masters_after_post_unconfirmed",
-            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {REVIEW}"),
+            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {MASTERS_REVIEW}"),
         )
     })
 }

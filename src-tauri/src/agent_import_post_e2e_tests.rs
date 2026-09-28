@@ -3223,3 +3223,55 @@ fn a_pending_mark_never_erases_a_doubt() {
 mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
+
+/// Under mask_parties, a post whose ledger no longer resolves to the master
+/// approved reports it without naming the ledger: the masters list is masked
+/// and the message names none.
+#[tokio::test]
+async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
+    let replaced = replaced_once(
+        &catalogue(),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+    );
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(masters_moved_to(8)));
+    plans.extend(paired(replaced));
+    plans.extend(reconcile_readback());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::MaskParties,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    });
+    let args = saved_captured_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "posted_under_changed_masters",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["message"],
+        super::CHANGED_MASTERS_MESSAGE
+    );
+    let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
+    assert_eq!(ledgers.len(), 1, "{response}");
+    assert_ne!(ledgers[0], "Cash", "{response}");
+}

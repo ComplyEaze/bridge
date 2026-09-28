@@ -61,14 +61,15 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
-    render_proof_markdown, verification_response_page, verification_status,
+    final_verification_status, mark_verification_names, parse_import_voucher_rows,
+    parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
     VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
     batch_duplicate_sets, duplicates, observed_fingerprint, observed_voucher_identity,
+    VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -972,10 +973,11 @@ impl Server {
         // Page 1 is built from the bytes read back, not from memory, so the
         // page and the hash it names are the same file even if another
         // verification replaced it in between.
-        let proof: Value = serde_json::from_slice(&persisted).map_err(|_| {
+        let mut proof: Value = serde_json::from_slice(&persisted).map_err(|_| {
             ToolFailure::from("verification_proof_unreadable".to_string())
                 .with_prior_evidence(evidence.clone())
         })?;
+        mark_verification_names(&mut proof);
         if proof["batch_id"] != batch_id {
             return Err(
                 ToolFailure::from("verification_proof_batch_mismatch".to_string())
@@ -1004,8 +1006,9 @@ impl Server {
         if sha256 != proof_sha256 {
             return Err("verification_proof_changed".to_string().into());
         }
-        let proof: Value = serde_json::from_slice(&persisted)
+        let mut proof: Value = serde_json::from_slice(&persisted)
             .map_err(|_| "verification_proof_unreadable".to_string())?;
+        mark_verification_names(&mut proof);
         if proof["batch_id"] != batch_id
             || !proof["company"]["guid"]
                 .as_str()
@@ -1281,6 +1284,7 @@ impl Server {
             );
             payload["result"]["verification_status"] = json!(status.as_str());
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
+            mark_verification_names(&mut payload["result"]);
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1310,7 +1314,9 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // Saved with its party-name marks, so a page served from it masks
+        // names as the response's redaction requires.
+        let mut local_proof = proof.clone();
         // The files record the verdict the ledger records, whatever the caller's
         // copy says, so the proof and the ledger status cannot disagree.
         local_proof["verification_status"] = json!(update.status);

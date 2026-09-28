@@ -94,6 +94,10 @@ impl Simulator {
 
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the synthetic Tally server (a dev-dependency only): its own loopback listener and shutdown wake-up"
+        )]
         let _ = TcpStream::connect_timeout(&self.address, Duration::from_millis(50));
     }
 
@@ -156,6 +160,10 @@ impl SequenceSimulator {
 
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the synthetic Tally server (a dev-dependency only): its own loopback listener and shutdown wake-up"
+        )]
         let _ = TcpStream::connect_timeout(&self.address, Duration::from_millis(50));
     }
 
@@ -170,6 +178,10 @@ impl SequenceSimulator {
     }
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the synthetic Tally server (a dev-dependency only): its own loopback listener and shutdown wake-up"
+)]
 fn bind_loopback_listener() -> io::Result<TcpListener> {
     TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))
 }

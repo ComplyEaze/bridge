@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::endpoint_coordination::acquire as acquire_endpoint_dispatch_lease;
 use crate::tally::{TallyConfig, TallyRuntime};

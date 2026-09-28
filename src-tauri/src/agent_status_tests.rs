@@ -1,4 +1,8 @@
 //! Status-page faults against the captured gateway product observation.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,

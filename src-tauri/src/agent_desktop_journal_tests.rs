@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::desktop_journal::{DesktopJournalOperation, DesktopJournalService};
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;

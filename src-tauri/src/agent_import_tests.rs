@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::super::ToolResponse;
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;

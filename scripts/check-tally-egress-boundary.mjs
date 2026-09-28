@@ -38,12 +38,19 @@
 //    drops out, a missing root line, a failed `cargo` or an unparseable line
 //    all fail, so "nothing found" cannot stand in for "nothing was read".
 //
-// 2. A source scan of the app crate (`src-tauri/src`): asserts that
-//    `reqwest::`, `hyper::`, and raw socket construction appear only in a
-//    pinned allow-list of files. This is what catches a new call site added
-//    to an unlisted file inside `bridge` -- exactly the gap the cargo-tree
-//    check above cannot close, because `bridge` already has the dependency
-//    edge and adding a new caller inside it changes no Cargo.toml.
+// 2. Clippy lints, kept honest. src-tauri/clippy.toml refuses the egress
+//    actions everywhere in the src-tauri workspace: sending an HTTP request,
+//    opening or binding a socket, a DNS lookup, spawning a process, building a
+//    webview window. A lint fires however the client or socket was obtained,
+//    which a text scan cannot see. A reviewed call site carries
+//    `#[expect(clippy::disallowed_methods, reason = "...")]`; this gate allows
+//    that exemption only in a pinned set of files (each with its exact count)
+//    and in test-only code, and refuses anything that would turn the lints off:
+//    a lint-group allow, a lint table or CI flag, another clippy.toml, or an
+//    edit to clippy.toml itself without updating its pinned digest.
+//
+// 3. A deny-list of network-capable crates and Tauri plugins, read from both
+//    Cargo.lock files and the JS manifests.
 //
 // What this gate does NOT prove (read before relying on it further):
 //  - It does not prove the Tally transport's loopback restriction
@@ -51,27 +58,18 @@
 //    non-loopback host at request-construction time) is itself correct or
 //    still wired up -- that is a runtime property with its own tests in
 //    bridge-tally-transport, not this gate.
-//  - It does not catch an HTTP client built through indirection this scan
-//    does not pattern-match: a re-exported alias (`use reqwest as http;`
-//    then `http::Client`), a macro that expands to a reqwest call, a crate
-//    obtained through a build script, or a raw `std::net` connect spelled
-//    some way other than the literal patterns below (e.g. through a helper
-//    function whose *name* doesn't mention sockets).
-//  - It does not catch network egress performed by a non-Rust dependency
-//    (a native library, a downloaded binary, a JS/webview call outside the
-//    scanned source) -- the webview CSP (`ipc:` only) is the control for
-//    that surface, not this file.
-//  - The source scan only covers `src-tauri/src`. A new call site inside
-//    `crates/*` or `tools/*` is instead caught by the cargo-tree half
-//    (those crates would need a new Cargo.toml dependency edge to compile
-//    one), not by pattern-matching source text.
-//  - The scan matches `reqwest::`/`hyper::` as plain substrings, including
-//    inside comments and string literals. That is deliberately
-//    conservative (a mention in a comment must still live in an
-//    allow-listed file) rather than a source of missed real call sites.
+//  - The lints name specific methods. An egress path through a method they do
+//    not name (a crate on neither list, FFI, a native library) is outside them;
+//    the deny-list and the cargo-tree half narrow that, and the webview CSP
+//    (`ipc:` only) covers the JS side.
+//  - tools/ is outside the lints: its binaries do not ship. The cargo-tree half
+//    and the deny-list still cover it.
+//  - The lints run in CI's clippy steps; this gate cannot see a build that
+//    skips clippy.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -222,81 +220,158 @@ for (const workspace of workspaces) {
 }
 
 // ---------------------------------------------------------------------------
-// Check 2: inside the app crate, only these files may build an outbound
-// HTTP request or a raw socket.
+// Check 2: clippy refuses egress anywhere in the src-tauri workspace;
+// this keeps the exemptions where they were reviewed.
 // ---------------------------------------------------------------------------
 
-// Exact set, matched both ways (extra files using a forbidden pattern, and
-// allow-listed files that no longer need to be) so the list cannot drift
-// silently in either direction -- same shape as
-// admission_and_egress_files_stay_pinned.rs's pin check.
-const APP_CRATE_HTTP_ALLOW_LIST = new Set([
-  // AXAL sign-in and document upload: the two features the README paragraph
-  // 'One part of the app does upload' names as the parts of the app that DO
-  // upload, on purpose, user-initiated.
-  "src-tauri/src/axal.rs",
-  "src-tauri/src/documents.rs",
-  // The Tally HTTP transport wrapper: reqwest is used here, but only to
-  // reach Tally itself over loopback (bridge-tally-transport's
-  // `canonical_loopback_origin` rejects any other host before a request is
-  // ever built). Its test file constructs the same client for test doubles.
-  "src-tauri/src/tally/connection.rs",
-  "src-tauri/src/tally/connection_tests.rs",
+// src-tauri/clippy.toml lists the egress actions as `disallowed-methods` (sending an HTTP request,
+// opening or binding a socket, a DNS lookup, spawning a process) and `disallowed-types`, and CI's
+// clippy runs deny warnings. A reviewed site carries
+// `#[expect(clippy::disallowed_methods, reason = "...")]`. A lint fires however the client or
+// socket was obtained (an alias, a helper, a returned value), which a text scan could not see.
+// What is left to check is where those exemptions may appear, and that nothing turns the lints off.
+
+// Every production file allowed to hold an exemption, with exactly how many `clippy::disallowed_*`
+// mentions it has. A new exemption, even in a listed file, changes a count and must be reviewed here.
+const EGRESS_EXEMPTIONS = new Map([
+  // AXAL sign-in and document upload: the two parts of the app the README names as uploading
+  // ('One part of the app does upload'), on purpose and user-initiated.
+  ["src-tauri/src/axal.rs", 2],
+  ["src-tauri/src/documents.rs", 4],
+  // The loopback-only Tally transport: canonical_loopback_origin rejects any other host before
+  // a request is built.
+  ["src-tauri/crates/bridge-tally-transport/src/lib.rs", 4],
+  // Revealing an exported file in the OS file manager, and the native approval dialog helper.
+  ["src-tauri/src/commands.rs", 3],
+  ["src-tauri/src/tally/approved_import.rs", 2],
+  // The synthetic Tally server (a dev-dependency only; it never ships).
+  ["src-tauri/crates/tally-protocol-simulator/src/server.rs", 3],
 ]);
 
-const FORBIDDEN_SOURCE_PATTERNS = [
-  "reqwest::",
-  "hyper::",
-  "TcpStream::connect",
-  "UdpSocket::bind",
-  "std::net::TcpStream",
-  "std::net::UdpSocket",
+const EXEMPTION = /clippy::disallowed_(?:methods|types)/g;
+// Lint groups that would silence the egress lints wholesale.
+// An attribute only (`cfg_attr` included), not a method call such as `.expect("warnings")`.
+const LINT_ESCAPE = /#!?\[[^\]]*\b(?:allow|expect)\s*\([^)\]]*\b(?:warnings|clippy::all|clippy::style)\b/;
+
+function trackedFiles() {
+  const result = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8", windowsHide: true });
+  if (result.error || result.status !== 0) {
+    throw new Error(`git ls-files failed: ${result.error?.message ?? result.stderr}`);
+  }
+  return result.stdout.split("\0").filter(Boolean);
+}
+
+// A file is test-only when Cargo builds it only for tests (under a crate's tests/ directory), or
+// when the module line that declares it carries exactly `#[cfg(test)]`, or `#[cfg(all(test, ...))]`
+// with `test` as its first condition.
+function isTestOnly(path, rustSources) {
+  if (/^src-tauri\/(?:crates\/[^/]+\/)?tests\//.test(path)) return true;
+  let directory = path.slice(0, path.lastIndexOf("/"));
+  const file = path.slice(directory.length + 1);
+  let stem = file.replace(/\.rs$/, "");
+  if (file === "mod.rs") {
+    // `mod name;` declares name/mod.rs from the directory above it.
+    stem = directory.slice(directory.lastIndexOf("/") + 1);
+    directory = directory.slice(0, directory.lastIndexOf("/"));
+  }
+  const declarations = [];
+  for (const [candidate, lines] of rustSources) {
+    const candidateDirectory = candidate.slice(0, candidate.lastIndexOf("/"));
+    const candidateStem = candidate.slice(candidateDirectory.length + 1).replace(/\.rs$/, "");
+    lines.forEach((line, index) => {
+      const mod = line.match(/^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
+      if (!mod) return;
+      const attributes = [];
+      for (let back = index - 1; back >= 0 && /^\s*#\[/.test(lines[back]); back -= 1) attributes.push(lines[back].trim());
+      const pathAttribute = attributes.map((attribute) => attribute.match(/^#\[path\s*=\s*"([^"]+)"\]$/)?.[1]).find(Boolean);
+      const declares = pathAttribute
+        ? candidateDirectory === directory && pathAttribute === file
+        : mod[1] === stem &&
+          ((["mod", "lib", "main"].includes(candidateStem) && candidateDirectory === directory) ||
+            `${candidateDirectory}/${candidateStem}` === directory);
+      if (declares) declarations.push(attributes);
+    });
+  }
+  return (
+    declarations.length === 1 &&
+    declarations[0].some((attribute) => attribute === "#[cfg(test)]" || /^#\[cfg\(all\(test,/.test(attribute))
+  );
+}
+
+const tracked = trackedFiles();
+const rustSources = new Map(
+  tracked
+    .filter((path) => path.startsWith("src-tauri/") && path.endsWith(".rs"))
+    .map((path) => [path, readFileSync(`${root}${path}`, "utf8").split(/\r?\n/)]),
+);
+for (const [path, lines] of rustSources) {
+  const text = lines.join("\n");
+  if (LINT_ESCAPE.test(text)) {
+    egressViolations.push(`${path} silences a whole lint group (warnings, clippy::all or clippy::style), which includes the egress lints`);
+  }
+  const count = text.match(EXEMPTION)?.length ?? 0;
+  if (EGRESS_EXEMPTIONS.has(path)) {
+    if (count !== EGRESS_EXEMPTIONS.get(path)) {
+      egressViolations.push(
+        `${path} has ${count} egress-lint exemption(s), not the ${EGRESS_EXEMPTIONS.get(path)} reviewed; ` +
+          "review each call site, then update EGRESS_EXEMPTIONS in scripts/check-tally-egress-boundary.mjs",
+      );
+    }
+  } else if (count && !isTestOnly(path, rustSources)) {
+    egressViolations.push(
+      `${path} exempts itself from the egress lints but is neither a reviewed egress file nor test-only. ` +
+        'This falsifies the README promise "nothing in the Tally path sends it to a server of ours" unless ' +
+        "the call site is one of the app's documented upload features; if it is, add it to EGRESS_EXEMPTIONS.",
+    );
+  }
+}
+for (const path of EGRESS_EXEMPTIONS.keys()) {
+  if (!rustSources.has(path)) egressViolations.push(`EGRESS_EXEMPTIONS names ${path}, which is not a tracked file`);
+}
+
+// The lint configuration itself. Clippy reads the nearest clippy.toml, so a second one under
+// src-tauri would replace these lists for its crate; a lint table, a CI flag or CLIPPY_CONF_DIR could
+// switch them off.
+const CLIPPY_CONFIG_DIGEST = "7ee30761eee7198056a21f1558e3fd825e6fd882f527477e52844a2673e2deeb";
+const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
+if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
+  egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
+}
+for (const path of tracked) {
+  if (/(?:^|\/)\.?clippy\.toml$/.test(path) && path.startsWith("src-tauri/") && path !== "src-tauri/clippy.toml") {
+    egressViolations.push(`${path} would replace src-tauri/clippy.toml's egress lints for its crate`);
+  }
+  const buildInput =
+    /^\.github\//.test(path) || /(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(path) || /^src-tauri\/(?:.*\/)?Cargo\.toml$/.test(path);
+  if (!buildInput) continue;
+  const text = readFileSync(`${root}${path}`, "utf8");
+  if (/disallowed[_-](?:methods|types)|CLIPPY_CONF_DIR/.test(text) || (path.endsWith("Cargo.toml") && /^\s*(?:all|style|warnings)\s*=/m.test(text))) {
+    egressViolations.push(`${path} configures the egress lints or their groups; only src-tauri/clippy.toml may`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check 3: no network-capable crate or Tauri plugin beyond the pinned HTTP client.
+// ---------------------------------------------------------------------------
+
+// Each would add an egress path that the lints above do not name. Read from the lockfiles, so a
+// transitive arrival counts as well; a legitimate need is a reviewed change to this list.
+const DENIED_CRATES = [
+  "ureq", "isahc", "curl", "surf", "attohttpc", "tungstenite", "tokio-tungstenite", "async-tungstenite",
+  "open", "opener", "webbrowser",
+  "tauri-plugin-http", "tauri-plugin-opener", "tauri-plugin-shell", "tauri-plugin-websocket", "tauri-plugin-upload",
 ];
-
-function rustFiles(directory) {
-  const files = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === "target") continue;
-    const path = `${directory}/${entry.name}`;
-    if (entry.isDirectory()) files.push(...rustFiles(path));
-    else if (entry.name.endsWith(".rs")) files.push(path);
-  }
-  return files;
-}
-
-const appCrateSourceRoot = fileURLToPath(new URL("../src-tauri/src", import.meta.url)).replaceAll("\\", "/");
-const filesWithForbiddenPatterns = new Set();
-for (const path of rustFiles(appCrateSourceRoot)) {
-  const relativePath = `src-tauri/src${path.slice(appCrateSourceRoot.length)}`;
-  const source = readFileSync(path, "utf8");
-  if (FORBIDDEN_SOURCE_PATTERNS.some((pattern) => source.includes(pattern))) {
-    filesWithForbiddenPatterns.add(relativePath);
+const DENIED_JS_PACKAGES = /@tauri-apps\/plugin-(?:http|opener|shell|websocket|upload)\b/;
+for (const lockfile of ["src-tauri/Cargo.lock", "tools/Cargo.lock"]) {
+  const names = new Set([...readFileSync(`${root}${lockfile}`, "utf8").matchAll(/^name = "([^"]+)"$/gm)].map((match) => match[1]));
+  if (names.size === 0) egressViolations.push(`${lockfile} lists no packages; it was not read`);
+  for (const name of DENIED_CRATES) {
+    if (names.has(name)) egressViolations.push(`${lockfile} contains ${name}, a network-capable crate outside the pinned HTTP client`);
   }
 }
-
-const unlistedCallSites = [...filesWithForbiddenPatterns]
-  .filter((path) => !APP_CRATE_HTTP_ALLOW_LIST.has(path))
-  .sort();
-const staleAllowListEntries = [...APP_CRATE_HTTP_ALLOW_LIST]
-  .filter((path) => !filesWithForbiddenPatterns.has(path))
-  .sort();
-
-if (unlistedCallSites.length) {
-  egressViolations.push(
-    "src-tauri/src: found an outbound HTTP client or raw socket construction outside the pinned " +
-      `allow-list (${[...APP_CRATE_HTTP_ALLOW_LIST].sort().join(", ")}): ${unlistedCallSites.join(", ")}. ` +
-      'This falsifies the README promise "nothing in the Tally path sends it to a server of ours" ' +
-      "(README.md, 'What it does not do') unless the new call site is one of the app's already-documented upload " +
-      "features (README.md, 'One part of the app does upload'). If it is, add it to APP_CRATE_HTTP_ALLOW_LIST in " +
-      "scripts/check-tally-egress-boundary.mjs with a reviewed reason; if it is not, it does not belong.",
-  );
-}
-if (staleAllowListEntries.length) {
-  egressViolations.push(
-    "src-tauri/src: allow-listed file(s) no longer contain an outbound HTTP client or raw socket " +
-      `construction; narrow APP_CRATE_HTTP_ALLOW_LIST in scripts/check-tally-egress-boundary.mjs: ` +
-      staleAllowListEntries.join(", "),
-  );
+for (const manifest of ["package.json", "pnpm-lock.yaml"]) {
+  const denied = readFileSync(`${root}${manifest}`, "utf8").match(DENIED_JS_PACKAGES);
+  if (denied) egressViolations.push(`${manifest} contains ${denied[0]}, a Tauri plugin that opens URLs or the network`);
 }
 
 if (egressViolations.length) {
@@ -309,6 +384,6 @@ if (egressViolations.length) {
 }
 
 console.log(
-  "Tally-path egress boundary is sealed: reqwest/hyper are confined to the pinned crates and, inside " +
-    `the app crate, to ${APP_CRATE_HTTP_ALLOW_LIST.size} pinned files.`,
+  "Tally-path egress boundary is sealed: reqwest/hyper are confined to the pinned crates, egress-lint " +
+    `exemptions to ${EGRESS_EXEMPTIONS.size} reviewed files and test-only code, and no denied crate or plugin is present.`,
 );

@@ -407,7 +407,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/src/lib.rs",
-      "sha256": "c46ed5c4c876c81669df44c53cefe2b4b95ce1adbdbe09f1ef1c9a9ed8e5c519"
+      "sha256": "884344b5e6fd39d29a20158035b327fc72ff96a59f95505965c5f65a31dfe2fc"
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/tests/http_transport.rs",
@@ -431,11 +431,11 @@
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/src/server.rs",
-      "sha256": "9cb678bf368028d6402efc17c2da9a96cdab1c379a05f89277ad0e5798e37101"
+      "sha256": "17c13eee6dbed66ed549bafc6a926f8360c7056c7af7bbdad36553a285e2c567"
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs",
-      "sha256": "311b01097edc118f233d1a7ecdc26ab02b73ef97fe024b52277cecfcf2c438dc"
+      "sha256": "b56ec3f8983960545de65e93d233bf20506a60b31d50870a849f6578105bcc96"
     },
     {
       "path": "src-tauri/src/agent.rs",
@@ -599,11 +599,11 @@
     },
     {
       "path": "src-tauri/src/axal.rs",
-      "sha256": "8c5d7b1460261b079b8424d398d10f7f4f0bdc3d97964410245c68f6839a5eb1"
+      "sha256": "04737f3317862e635da71cc99ce862d83f2883203d1343a15a38f4378ac45a71"
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "c3aeb0393a79248dda574a2860af8f73a571b5987fb5fabd317c719e2174f3a9"
+      "sha256": "9f44128e722b023d24cb68ae753f1629a0b9f77115ccfa1f8d9924d839b50068"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -735,7 +735,7 @@
     },
     {
       "path": "src-tauri/src/documents.rs",
-      "sha256": "ba965c6de1d3df4d4863312c4e45a0c3f49e52c57853227feba8a15993c72fcd"
+      "sha256": "d5f9c6cc6ce8a675758b901168f07c223d105cf1aa108b43e5563ce175309554"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs",
@@ -915,7 +915,7 @@
     },
     {
       "path": "src-tauri/src/tally/approved_import.rs",
-      "sha256": "f5f57fa941e3f88bf4ccf7a42ff2e94dc1ae3c99b02cdbed74079a59575407da"
+      "sha256": "e6b431a1e5575718569049a8f81aacd2a95d3126ec733cfd3787c5f76d290f41"
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs",

@@ -136,6 +136,10 @@ pub async fn establish_credential_session(
 pub async fn validate_api_key(credentials: &AxalCredentials) -> anyhow::Result<ValidationResponse> {
     validate_credentials(credentials)?;
     let client = api_client()?;
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "AXAL sign-in: a user-initiated call to the configured AXAL endpoint, one of the two uploading features the README names"
+    )]
     let response = client
         .post(endpoint(
             credentials.base_url.as_deref(),
@@ -155,6 +159,10 @@ pub async fn check_connection_status(
     let credentials = credentials_for_session(credential_session_id, None)?;
     validate_credentials(&credentials)?;
     let client = api_client()?;
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "AXAL sign-in: a user-initiated call to the configured AXAL endpoint, one of the two uploading features the README names"
+    )]
     let response = client
         .get(endpoint(
             credentials.base_url.as_deref(),
@@ -233,7 +241,7 @@ pub fn auth_headers(credentials: &AxalCredentials) -> anyhow::Result<HeaderMap> 
     Ok(headers)
 }
 
-pub fn api_client() -> anyhow::Result<reqwest::Client> {
+fn api_client() -> anyhow::Result<reqwest::Client> {
     Ok(reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))

@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use std::process::{Command, Stdio};
 
 fn startup_command() -> Command {

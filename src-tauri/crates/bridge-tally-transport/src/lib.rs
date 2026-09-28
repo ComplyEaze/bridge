@@ -376,6 +376,10 @@ impl TallyHttpTransport {
 
     pub async fn get_status(&self) -> Result<TallyHttpResponse, TallyTransportError> {
         let url = endpoint_url(&self.config, "/status")?;
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .get(url)
@@ -395,6 +399,10 @@ impl TallyHttpTransport {
         &self,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         let url = endpoint_url(&self.config, "/status")?;
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .get(url)
@@ -415,6 +423,10 @@ impl TallyHttpTransport {
             prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let content_length = body.len();
         let url = endpoint_url(&self.config, "/")?;
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .post(url)
@@ -466,6 +478,10 @@ impl TallyHttpTransport {
             prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let content_length = body.len();
         let url = endpoint_url(&self.config, "/")?;
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+        )]
         let response = self
             .client
             .post(url)

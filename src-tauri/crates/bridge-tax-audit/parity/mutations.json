@@ -3234,10 +3234,10 @@
  {
   "id": "LR-16",
   "by": "author (Lane E2)",
-  "what": "a taken row's own amount (limb (a)) is not tested",
+  "what": "a taken row's own amount (limb (a)) is not tested in the breach test (the window's taken arm is equivalent: breach tests the same on a taken row)",
   "file": "src/loans_interest.rs",
-  "from": "    let crosses_reporting_window = if taken {\n        amt.max(after)",
-  "to": "    let crosses_reporting_window = if taken {\n        after"
+  "from": "    let crosses_breach_balance = if taken {\n        amt.max(after)",
+  "to": "    let crosses_breach_balance = if taken {\n        after"
  },
  {
   "id": "LR-17",

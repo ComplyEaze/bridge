@@ -82,7 +82,7 @@ s.269SS/269T, a forced set-off or its imbalance), the loan's later entries below
 on it, its maximum balance not computed, and its sides kept in the credit and debit totals but in no reportable
 total. Where such a voucher carries interest or TDS, the s.194A threshold or coverage can be open ("not
 computed"); TDS reaching the rate by amount but not by date reads "covered by amount, not by date". A
-`tds_payable_ledgers` figure is new on every book, so every loans golden changes. Five invented books are new:
+`tds_payable_ledgers` figure is new on every book, so every loans golden changes. Six invented books are new:
 - `edge-books/loans_interest_phase_a.json`: listed vouchers with bank, cash, expense and another loan's interest
   on their other lines; possible s.269SS, s.269T and both; forced set-offs; entries on or after a listed
   voucher's date depending on it (one naming two vouchers), and one at the limit computed without a balance
@@ -99,6 +99,11 @@ computed"); TDS reaching the rate by amount but not by date reads "covered by am
   listed voucher carries TDS, with its s.194A record.
 - `edge-books/loans_interest_phase_a_unknown_deductor.json` (an individual with a placeholder turnover, so the
   deductor status is unknown): the s.194A records for an open threshold and an open coverage.
+- `edge-books/loans_interest_walks.json` (an individual whose previous-year turnover is under the limits, taken
+  as given with no status or activity recorded, so not a deductor; added after the Phase A nightly): interest over the
+  s.194A threshold with no TDS raises no s.194A finding for a non-deductor; and a loan opening in debit, then
+  taken, interest reversed against it and a cash repayment, which is reportable on both walks while its
+  s.269T flag is not computed (the netting walk's breach balance is under the limit, the floored walk's over).
 
 ### Re-pin at the reference's current head (Lane E2, 2026-09-28)
 
@@ -159,3 +164,5 @@ and regenerating all seven goldens there gives byte-identical files.
 | `loans_interest_phase_a_unknown_deductor.json` | 4,533 | `1a7b049ac2b7b66a1c1b6309a78b06b26054cf95642f8a99241ef7107f0f259e` | `edge-books/loans_interest_phase_a_unknown_deductor.json` |
 | `edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` | 48,173 | `6e1a3b6392aeaa2687e46268642def4771a24876e466e990d3fc4e4cfdcca597` | `golden/edge.loans_interest_phase_a_refund_no_rate.loans_interest.json` |
 | `edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` | 36,192 | `f92b22ffc06e683003a71dcd9f81936e2a2e37860c1c87993fad6988244fd8ed` | `golden/edge.loans_interest_phase_a_unknown_deductor.loans_interest.json` |
+| `loans_interest_walks.json` | 3,973 | `977ea16a4d85add2e98a814a792b94072bcac30d02a612fe1335b5806e7f3a58` | `edge-books/loans_interest_walks.json` |
+| `edge.loans_interest_walks.loans_interest.json` | 23,227 | `3cc13695e0db312245ca90cc41b91ee813061dcfc57cb46560aa4328a7130e0c` | `golden/edge.loans_interest_walks.loans_interest.json` |

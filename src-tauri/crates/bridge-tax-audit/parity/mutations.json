@@ -6102,5 +6102,13 @@
   "file": "src/partners_40b_194t.rs",
   "from": "        Some(0)\n    } else {\n        deed.and_then(|d| d.interest_rate_bp)",
   "to": "        None\n    } else {\n        deed.and_then(|d| d.interest_rate_bp)"
+ },
+ {
+  "id": "PR-50",
+  "by": "author",
+  "what": "partners: the configuration is read and refused before the applicability gate (review)",
+  "file": "src/partners_40b_194t.rs",
+  "from": "    if !applicable {\n        return Ok(r);\n    }\n\n    // The configuration is refused, never read, where it could mislead: before any voucher.\n    let (partners, deed) = partners_config(cfg)?;\n    check_partners_config(&partners, book, tds_ledgers)?;\n",
+  "to": "    let (partners, deed) = partners_config(cfg)?;\n    check_partners_config(&partners, book, tds_ledgers)?;\n    if !applicable {\n        return Ok(r);\n    }\n\n"
  }
 ]

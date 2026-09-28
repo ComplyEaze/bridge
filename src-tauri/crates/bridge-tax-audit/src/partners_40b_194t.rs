@@ -49,7 +49,10 @@
 //! shared by two partners, a ledger not in the books, one ledger as both a partner's interest and
 //! remuneration ledger, and an interest or remuneration ledger that is a partner's capital or a
 //! TDS ledger. Where several are wrong, which is reported first can differ from the reference:
-//! partners are visited in key order, where the reference visits them in the file's.
+//! partners are visited in key order, where the reference visits them in the file's. A refusal's
+//! text quotes the bad value as TOML prints it (`"yes"`, `true`), where the reference prints its
+//! Python repr (`'yes'`, `True`); a missing `capital_ledgers` or a non-text ledger name is refused
+//! by the reader with its own wording, before the checks above.
 //!
 //! Every amount is carried in i128 (a year of capital-paise-days times a rate exceeds i64) and
 //! each figure is checked back into i64.
@@ -868,13 +871,15 @@ during the year) showing the authorised interest rate and remuneration clause."
         .values()
         .flat_map(|q| q.capital_ledgers.iter().cloned())
         .collect();
-    // Every partner's interest and remuneration ledger ("" is refused by the configuration check).
+    // Every partner's interest and remuneration ledger; "" is left out, as the reference's `if led`
+    // leaves it out (the configuration check refuses it only where the books have no such ledger).
     let all_int_rem: BTreeSet<String> = partners
         .values()
         .flat_map(|q| {
             q.interest_ledger
                 .iter()
                 .chain(q.remuneration_ledger.iter())
+                .filter(|l| !l.is_empty())
                 .cloned()
         })
         .collect();
@@ -2999,6 +3004,78 @@ interest_ledger = \"Interest to Partners\"\n\
         assert_eq!(
             value(&dump, &format!("s194t_tds_ledger_seen_{h}")),
             "not judged"
+        );
+    }
+
+    #[test]
+    fn a_malformed_partner_configuration_is_refused_only_where_the_test_applies() {
+        // The reference checks the configuration after the applicability gate: a company never
+        // reads it, a firm refuses it before reading any voucher.
+        let bad = "[partner_a]\ncapital_ledgers = []\n";
+        let rules = Rules::vendored().unwrap();
+        let r = run(
+            &unreadable_book(),
+            &rules,
+            &year(),
+            "company",
+            &cfg(bad),
+            &BTreeSet::new(),
+        )
+        .unwrap();
+        assert_eq!(r.figures.len(), 1);
+        config_refusal(run(
+            &unreadable_book(),
+            &rules,
+            &year(),
+            "firm",
+            &cfg(bad),
+            &BTreeSet::new(),
+        ));
+    }
+
+    #[test]
+    fn with_the_switch_on_a_deed_without_its_rate_is_judgement_required() {
+        // Behind S40B_EXCESS_COMPUTED: the statutory cap stands in for the deed's rate, and the
+        // excess finding says which of the two is missing (the reference's limits and confidence).
+        let h = hash8("partner_a");
+        // Rs 5,00,000 of interest credited, over the allowable at any rate the rules carry.
+        let plain = || {
+            vec![voucher(
+                "p1",
+                &[
+                    ("Interest to Partners", 50_000_000),
+                    ("Partner A", -50_000_000),
+                ],
+            )]
+        };
+        let excess = |config: &str| {
+            let r = go_with(plain(), config, &["TDS Payable"], true).unwrap();
+            let e = found(&r, "s40b_excess/");
+            assert_eq!(e.len(), 1);
+            (e[0].confidence, e[0].limits[0].clone(), e[0].id.clone())
+        };
+        let (c, l, id) = excess(ONE);
+        assert_eq!(id, format!("{TEST_ID}/s40b_excess/{h}"));
+        assert_eq!(c, Confidence::JudgementRequired);
+        assert_eq!(
+            l,
+            "No deed was available; the excess shown uses the statutory cap as the assumed \
+authorised rate -- confirm the deed's actual rate and terms before relying on this figure."
+        );
+        let (c, l, _) = excess(&format!("{ONE}[deed]\n"));
+        assert_eq!(c, Confidence::JudgementRequired);
+        assert_eq!(
+            l,
+            "The deed's interest rate is not recorded; the excess shown uses the statutory cap as \
+the assumed authorised rate -- confirm the deed's actual rate and terms before relying on this \
+figure."
+        );
+        let (c, l, _) = excess(&format!("{ONE}{DEED}"));
+        assert_eq!(c, Confidence::Computed);
+        assert_eq!(
+            l,
+            "Allowable interest here assumes the capital base is exactly the capital ledger(s) \
+supplied and that interest was authorised for the whole year; confirm both against the deed."
         );
     }
 }

@@ -912,10 +912,9 @@ pub enum NativeCollectionError {
     /// `STATUS` was present with a value other than `1`: Tally's own failure
     /// answer (bridge#717).
     NotSuccess,
-    /// `STATUS` was missing, self-closing or empty. Tally answered, but not
-    /// with an export: the one such answer captured is a bare `RESPONSE` for a
-    /// request it could not serve (protocol reference §12a.1). Neither broken
-    /// XML nor a failure report about this export (bridge#717).
+    /// A complete `ENVELOPE` whose `HEADER` carried no `STATUS`, an empty one
+    /// or a self-closing one: the response's structure, not a failure report
+    /// about this export. No such response has been captured (bridge#717).
     StatusAbsent,
     /// One row was refused: empty, missing an identity or a required field,
     /// repeating a field, or carrying content the row grammar does not admit.
@@ -1038,7 +1037,9 @@ pub fn parse_native_voucher_source_records_with_evidence(
     let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = configured_reader(sanitized.as_str());
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_answered = false;
     let mut collection_seen = false;
     let mut records = Vec::new();
     let mut identities = HashMap::<String, u64>::new();
@@ -1056,8 +1057,11 @@ pub fn parse_native_voucher_source_records_with_evidence(
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeCollectionError::MalformedResponse);
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
-                    native_collection_status(&mut reader, &element, status_seen)?;
+                    status_answered = native_collection_status(&mut reader, &element, status_seen)?;
                     status_seen = true;
                     continue;
                 }
@@ -1113,12 +1117,14 @@ pub fn parse_native_voucher_source_records_with_evidence(
                 let name = element.name().as_ref().to_ascii_uppercase();
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     // A self-closing STATUS is no answer (bridge#717), unless
-                    // one was already read: then it is a second STATUS.
-                    return Err(if status_seen {
-                        NativeCollectionError::MalformedResponse
-                    } else {
-                        NativeCollectionError::StatusAbsent
-                    });
+                    // one was already read: then it is a second STATUS. It is
+                    // recorded, not refused here, so a response cut off after
+                    // it still ends as malformed.
+                    if status_seen {
+                        return Err(NativeCollectionError::MalformedResponse);
+                    }
+                    status_seen = true;
+                    continue;
                 }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
@@ -1137,7 +1143,8 @@ pub fn parse_native_voucher_source_records_with_evidence(
     native_collection_export(
         NativeCollectionState {
             path,
-            status_seen,
+            envelope_seen,
+            status_answered,
             collection_seen,
             records,
             identities,
@@ -1162,7 +1169,9 @@ fn parse_native_collection_with_identity_evidence<T>(
     let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = configured_reader(sanitized.as_str());
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_answered = false;
     let mut collection_seen = false;
     let mut records = Vec::new();
     let mut identities = HashMap::<String, u64>::new();
@@ -1180,8 +1189,11 @@ fn parse_native_collection_with_identity_evidence<T>(
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeCollectionError::MalformedResponse);
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
-                    native_collection_status(&mut reader, &element, status_seen)?;
+                    status_answered = native_collection_status(&mut reader, &element, status_seen)?;
                     status_seen = true;
                     continue;
                 }
@@ -1235,12 +1247,14 @@ fn parse_native_collection_with_identity_evidence<T>(
                 let name = element.name().as_ref().to_ascii_uppercase();
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     // A self-closing STATUS is no answer (bridge#717), unless
-                    // one was already read: then it is a second STATUS.
-                    return Err(if status_seen {
-                        NativeCollectionError::MalformedResponse
-                    } else {
-                        NativeCollectionError::StatusAbsent
-                    });
+                    // one was already read: then it is a second STATUS. It is
+                    // recorded, not refused here, so a response cut off after
+                    // it still ends as malformed.
+                    if status_seen {
+                        return Err(NativeCollectionError::MalformedResponse);
+                    }
+                    status_seen = true;
+                    continue;
                 }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
@@ -1259,7 +1273,8 @@ fn parse_native_collection_with_identity_evidence<T>(
     native_collection_export(
         NativeCollectionState {
             path,
-            status_seen,
+            envelope_seen,
+            status_answered,
             collection_seen,
             records,
             identities,
@@ -1272,7 +1287,8 @@ fn parse_native_collection_with_identity_evidence<T>(
 
 struct NativeCollectionState<T> {
     path: Vec<Vec<u8>>,
-    status_seen: bool,
+    envelope_seen: bool,
+    status_answered: bool,
     collection_seen: bool,
     records: Vec<ParsedSourceRecord<T>>,
     identities: HashMap<String, u64>,
@@ -1281,33 +1297,38 @@ struct NativeCollectionState<T> {
 }
 
 /// The collection's one `STATUS`, which must read `1`. A second `STATUS` or
-/// one whose text cannot be read is the response's shape, not Tally's answer;
-/// an empty one is no answer (bridge#717).
+/// one whose text cannot be read is the response's shape, not Tally's answer.
+/// An empty one is no answer (bridge#717): `false`, left to the envelope's end
+/// to refuse, so a response cut off after it still ends as malformed.
 fn native_collection_status(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     status_seen: bool,
-) -> Result<(), NativeCollectionError> {
+) -> Result<bool, NativeCollectionError> {
     if status_seen {
         return Err(NativeCollectionError::MalformedResponse);
     }
-    let status = read_optional_text(reader, element.name())
+    let Some(status) = read_optional_text(reader, element.name())
         .map_err(|_| NativeCollectionError::MalformedResponse)?
-        .ok_or(NativeCollectionError::StatusAbsent)?;
+    else {
+        return Ok(false);
+    };
     if status != "1" {
         return Err(NativeCollectionError::NotSuccess);
     }
-    Ok(())
+    Ok(true)
 }
 
 fn native_collection_export<T>(
     state: NativeCollectionState<T>,
     allow_empty_without_row_identity: bool,
 ) -> Result<ParsedExport<ParsedSourceRecord<T>>, NativeCollectionError> {
-    if !state.path.is_empty() {
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !state.path.is_empty() || !state.envelope_seen {
         return Err(NativeCollectionError::MalformedResponse);
     }
-    if !state.status_seen {
+    if !state.status_answered {
         return Err(NativeCollectionError::StatusAbsent);
     }
     if !state.collection_seen {

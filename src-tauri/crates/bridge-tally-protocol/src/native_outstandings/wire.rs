@@ -581,6 +581,7 @@ fn parse_native_ledger_snapshot_rows(
     reader.config_mut().trim_text(true);
 
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
     let mut collection_seen = false;
     let mut entries = Vec::new();
@@ -597,11 +598,16 @@ fn parse_native_ledger_snapshot_rows(
                         "ledger_root_not_envelope",
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
-                    // An empty STATUS is no answer (bridge#717).
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
                     if text.is_empty() {
-                        return Err(NativeOutstandingsError::StatusAbsent);
+                        continue;
                     }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
@@ -650,6 +656,13 @@ fn parse_native_ledger_snapshot_rows(
     if !path.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(
             "ledger_envelope_unterminated",
+        ));
+    }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            "ledger_envelope_missing",
         ));
     }
     // No STATUS, or a self-closing one, is no answer either (bridge#717).
@@ -714,6 +727,7 @@ pub fn parse_native_group_snapshot_with_evidence(
     reader.config_mut().trim_text(true);
 
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
     let mut collection_seen = false;
     let mut entries = Vec::new();
@@ -730,11 +744,16 @@ pub fn parse_native_group_snapshot_with_evidence(
                         "group_root_not_envelope",
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
-                    // An empty STATUS is no answer (bridge#717).
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
                     if text.is_empty() {
-                        return Err(NativeOutstandingsError::StatusAbsent);
+                        continue;
                     }
                     if text != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
@@ -804,6 +823,13 @@ pub fn parse_native_group_snapshot_with_evidence(
     if !path.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(
             "group_envelope_unterminated",
+        ));
+    }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            "group_envelope_missing",
         ));
     }
     // No STATUS, or a self-closing one, is no answer either (bridge#717).
@@ -1278,6 +1304,7 @@ pub(crate) fn parse_currency_masters(
             row_empty: "currency_row_empty",
             unexpected_close: "currency_unexpected_close",
             unterminated: "currency_envelope_unterminated",
+            envelope_missing: "currency_envelope_missing",
             collection_missing: "currency_collection_missing",
         },
         |reader, element| {
@@ -1295,6 +1322,7 @@ struct CollectionCodes {
     row_empty: &'static str,
     unexpected_close: &'static str,
     unterminated: &'static str,
+    envelope_missing: &'static str,
     collection_missing: &'static str,
 }
 
@@ -1314,6 +1342,7 @@ fn walk_collection_rows(
     let mut reader = Reader::from_str(&sanitized);
     reader.config_mut().trim_text(true);
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
     let mut collection_seen = false;
     loop {
@@ -1328,11 +1357,16 @@ fn walk_collection_rows(
                         codes.root_not_envelope,
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     let text = read_element_text(&mut reader, element.name())?;
-                    // An empty STATUS is no answer (bridge#717).
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
                     if text.is_empty() {
-                        return Err(NativeOutstandingsError::StatusAbsent);
+                        continue;
                     }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
@@ -1375,6 +1409,13 @@ fn walk_collection_rows(
     }
     if !path.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(codes.unterminated));
+    }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            codes.envelope_missing,
+        ));
     }
     // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
@@ -1493,6 +1534,7 @@ pub fn parse_company_currency_name(
             row_empty: "company_currency_row_empty",
             unexpected_close: "company_currency_unexpected_close",
             unterminated: "company_currency_envelope_unterminated",
+            envelope_missing: "company_currency_envelope_missing",
             collection_missing: "company_currency_collection_missing",
         },
         |reader, element| {

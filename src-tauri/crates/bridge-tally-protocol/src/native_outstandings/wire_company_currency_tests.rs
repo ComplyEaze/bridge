@@ -176,6 +176,25 @@ fn the_company_currency_name_fails_closed() {
             Err(NativeOutstandingsError::StatusAbsent),
             "{absent:?}"
         );
+        // Cut off after it, the response is unterminated, not absent.
+        let cut = xml.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_company_currency_name(&silent[..cut], FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_envelope_unterminated"
+            )),
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_company_currency_name(empty, FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_envelope_missing"
+            )),
+            "{empty:?}"
+        );
     }
 }
 

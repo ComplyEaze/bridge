@@ -25,9 +25,10 @@ pub enum NativeOutstandingsError {
     /// exports (ledger, group, currency and company) must carry `STATUS`
     /// reading `1`, so for them this is a `STATUS` with another value.
     TallyReportedFailure,
-    /// A collection export (ledger, group, currency or company) carried no
-    /// `STATUS` answer: missing, self-closing or empty. Not used by the inverted
-    /// report, where absence is success (bridge#717).
+    /// A collection export (ledger, group, currency or company) was a complete
+    /// `ENVELOPE` whose `HEADER` carried no `STATUS`, an empty one or a
+    /// self-closing one: structural, and not yet captured from Tally. Not used
+    /// by the inverted report, where absence is success (bridge#717).
     StatusAbsent,
     /// The ledgers' own currencies could not be classified against the base
     /// currency (bridge#551): see [`super::LedgerCurrencyRefusal`].

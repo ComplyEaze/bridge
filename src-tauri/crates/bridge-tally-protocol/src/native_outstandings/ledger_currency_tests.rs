@@ -92,6 +92,21 @@ fn a_ledger_collection_status_is_one_failure_or_absent() {
             NativeOutstandingsError::StatusAbsent,
             "{absent:?}"
         );
+        // Cut off after it, the response is unterminated, not absent.
+        let cut = book.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_native_ledger_snapshot(&silent[..cut]).unwrap_err(),
+            NativeOutstandingsError::InvalidResponse("ledger_envelope_unterminated"),
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_native_ledger_snapshot(empty).unwrap_err(),
+            NativeOutstandingsError::InvalidResponse("ledger_envelope_missing"),
+            "{empty:?}"
+        );
     }
 }
 

@@ -183,6 +183,21 @@ fn a_voucher_type_list_without_a_status_answer_is_status_absent() {
             NativeCollectionError::StatusAbsent,
             "{absent:?}"
         );
+        // Cut off after it, the response is malformed, not absent.
+        let cut = VOUCHER_TYPES.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            voucher_type_refusal(&silent[..cut], COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            voucher_type_refusal(empty, COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "{empty:?}"
+        );
     }
 }
 
@@ -196,6 +211,23 @@ fn a_voucher_list_without_a_status_answer_is_status_absent() {
                 .expect_err("a voucher list without a STATUS answer is refused"),
             NativeCollectionError::StatusAbsent,
             "{absent:?}"
+        );
+        // Cut off after it, the response is malformed, not absent.
+        let cut = VOUCHERS.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&silent[..cut], COMPANY_GUID)
+                .expect_err("a cut-off voucher list is refused"),
+            NativeCollectionError::MalformedResponse,
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(empty, COMPANY_GUID)
+                .expect_err("an empty body is refused"),
+            NativeCollectionError::MalformedResponse,
+            "{empty:?}"
         );
     }
 }

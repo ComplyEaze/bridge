@@ -43,6 +43,25 @@ fn a_group_collection_status_is_one_failure_or_absent() {
             Err(NativeOutstandingsError::StatusAbsent),
             "{absent:?}"
         );
+        // Cut off after it, the response is unterminated, not absent.
+        let cut = LIVE_SHAPE.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_native_group_snapshot(&silent[..cut], COMPANY_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "group_envelope_unterminated"
+            )),
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_native_group_snapshot(empty, COMPANY_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "group_envelope_missing"
+            )),
+            "{empty:?}"
+        );
     }
 }
 

@@ -1,0 +1,154 @@
+F04 killed (full) by 5: src/lib.rs::registry::tests::caller_data_is_read_whole_and_refused_when_mistyped, tests/parity_financial_statements.rs::a_changed_value_is_reported, tests/parity_financial_statements.rs::closing_stock_from_the_stale_field_is_reported, tests/parity_financial_statements.rs::synthetic_read_matches_the_python_golden_with_report_totals, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+F03 killed (full) by 1: src/lib.rs::registry::tests::find_is_by_exact_id
+C2-35 killed (full) by 1: tests/registry.rs::the_26as_floors_are_what_each_test_emits_with_no_documents
+C1-36 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-02 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-04 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-06 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-14 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::a_sale_is_compared_with_its_cost_exactly, tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-15 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::cost_rounds_half_to_even, tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-23 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-24 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-25 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-26 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-28 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-27 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-30 killed (full) by 1: src/lib.rs::book_keeping_quality::tests::base_type_slugs_follow_the_reference
+E1B-31 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-32 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-O03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O09 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-O12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O19 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E1B-O18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O23 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-37 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-O29 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-38 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+E1B-39 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-01 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+D1-02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-06 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+D1-21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+SB-08 killed (full) by 8: tests/parity_depreciation.rs::a_changed_value_at_the_180_day_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_at_the_cash_limit_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_is_reported, tests/parity_depreciation.rs::a_flipped_confidence_is_reported, tests/parity_depreciation.rs::a_reordered_but_equal_dump_passes, tests/parity_depreciation.rs::synthetic_read_matches_the_python_golden, tests/parity_depreciation.rs::the_old_book_vs_act_title_is_reported, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+SB-09 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+MI-02 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, tests/edge_books.rs::every_edge_book_matches_the_reference
+E2B2-28 killed (full) by 1: tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+MI-01 killed (full) by 2: src/lib.rs::book_keeping_quality::tests::masterid_is_read_as_python_int_reads_it, tests/edge_books.rs::every_edge_book_matches_the_reference
+
+82 of 82 killed
+
+warning: 68 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  F03 (full): src/lib.rs::registry::tests::find_is_by_exact_id
+  C2-35 (full): tests/registry.rs::the_26as_floors_are_what_each_test_emits_with_no_documents
+  E1B-01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-06 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-23 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-24 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-25 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-26 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-27 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-28 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-30 (full): src/lib.rs::book_keeping_quality::tests::base_type_slugs_follow_the_reference
+  E1B-31 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O23 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-O29 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-37 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-38 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E1B-39 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-06 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  D1-21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  E2B2-28 (full): tests/registry.rs::every_registered_test_matches_its_synthetic_golden

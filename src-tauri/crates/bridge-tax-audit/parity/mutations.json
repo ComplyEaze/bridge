@@ -5388,8 +5388,8 @@
   "by": "author",
   "what": "tds_payees re-pin: a short deduction read as mid",
   "file": "src/tds_payees.rs",
-  "from": "                    short.push(*g);",
-  "to": "                    mid.push(*g);"
+  "from": "                short.push(*g);",
+  "to": "                mid.push(*g);"
  },
  {
   "id": "TR-32",
@@ -5462,5 +5462,133 @@
   "file": "src/tds_payees.rs",
   "from": "            credit = add(credit, tds)?;",
   "to": "            credit = add(credit, 0)?;"
+ },
+ {
+  "id": "TR-41",
+  "by": "author",
+  "what": "tds_payees P2-2: a payee debit other than the bill's own TDS read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "        Ok((debit == 0 || debit == tds)",
+  "to": "        Ok((debit == 0 || debit != 0)"
+ },
+ {
+  "id": "TR-42",
+  "by": "author",
+  "what": "tds_payees P2-2: a line on another ledger read as plain",
+  "file": "src/tds_payees.rs",
+  "from": "            && v.lines.iter().filter(|l| l.amount_paise != 0).all(|l| {",
+  "to": "            && v.lines.iter().filter(|l| l.amount_paise != 0).any(|l| {"
+ },
+ {
+  "id": "TR-43",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill's base read without its own TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            let base = tds.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;",
+  "to": "            let base = 0_i64.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;"
+ },
+ {
+  "id": "TR-44",
+  "by": "author",
+  "what": "tds_payees P2-2: the base fact given the TDS",
+  "file": "src/tds_payees.rs",
+  "from": "            bases.insert(*g, base);",
+  "to": "            bases.insert(*g, tds);"
+ },
+ {
+  "id": "TR-45",
+  "by": "author",
+  "what": "tds_payees P2-2: a TDS credit read as a reversal",
+  "file": "src/tds_payees.rs",
+  "from": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise > 0)",
+  "to": "            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise < 0)"
+ },
+ {
+  "id": "TR-46",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill leaves (A)",
+  "file": "src/tds_payees.rs",
+  "from": "const SHORT_LEAVES_A: bool = false;",
+  "to": "const SHORT_LEAVES_A: bool = true;"
+ },
+ {
+  "id": "TR-47",
+  "by": "author",
+  "what": "tds_payees P2-2: a reversal does not keep deducted bills in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "    let deducted: Vec<&str> = if reversal {",
+  "to": "    let deducted: Vec<&str> = if false {"
+ },
+ {
+  "id": "TR-48",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill also listed in (A)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g) && !off_a.contains(g))",
+  "to": "        .filter(|g| !b_rows.contains(g))"
+ },
+ {
+  "id": "TR-49",
+  "by": "author",
+  "what": "tds_payees P2-2: the reversal guard said without a candidate",
+  "file": "src/tds_payees.rs",
+  "from": "    let mut guard = if reversal && !candidates.is_empty() {",
+  "to": "    let mut guard = if reversal {"
+ },
+ {
+  "id": "TR-50",
+  "by": "author",
+  "what": "tds_payees P2-2: a bill without TDS counted as untested",
+  "file": "src/tds_payees.rs",
+  "from": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? > 0 {",
+  "to": "            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? >= 0 {"
+ },
+ {
+  "id": "TR-51",
+  "by": "author",
+  "what": "tds_payees P2-2: the unnamed payee's reason swapped",
+  "file": "src/tds_payees.rs",
+  "from": "            let why = if e == PAYEE_NOT_NAMED {",
+  "to": "            let why = if e != PAYEE_NOT_NAMED {"
+ },
+ {
+  "id": "TR-52",
+  "by": "author",
+  "what": "tds_payees P2-2: s.194C(6) not raised by a deposit-question listing",
+  "file": "src/tds_payees.rs",
+  "from": "                                .any(|(k, _)| k.starts_with(\"deducted_payment:\"))",
+  "to": "                                .any(|(k, _)| k.starts_with(\"deducted_payment_:\"))"
+ },
+ {
+  "id": "TR-53",
+  "by": "author",
+  "what": "tds_payees P2-2: a short bill counted in (A) when it is not",
+  "file": "src/tds_payees.rs",
+  "from": "    let in_a = rows.iter().filter(|g| listed_a.contains(g)).count();",
+  "to": "    let in_a = rows.iter().filter(|g| !listed_a.contains(g)).count();"
+ },
+ {
+  "id": "TR-54",
+  "by": "author",
+  "what": "tds_payees P2-2: the rate's rounding to the nearest paisa dropped (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 0).div_euclid(10_000) - 100"
+ },
+ {
+  "id": "TR-55",
+  "by": "author",
+  "what": "tds_payees P2-2: the rupee tolerance on the rate reversed (review)",
+  "file": "src/tds_payees.rs",
+  "from": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100",
+  "to": "            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) + 100"
+ },
+ {
+  "id": "TR-56",
+  "by": "author",
+  "what": "tds_payees P2-2: a deducted bill in (ii)(B) also listed on the TDS question (review)",
+  "file": "src/tds_payees.rs",
+  "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
+  "to": "        .collect();\n    let listed"
  }
 ]

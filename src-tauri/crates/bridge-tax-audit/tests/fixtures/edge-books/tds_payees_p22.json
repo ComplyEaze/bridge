@@ -1,0 +1,313 @@
+{
+ "comment": "tds_payees P2-2 at the reference's current head: a bill booked gross with its TDS debited back to the payee (Carrier A, a payee debit equal to the bill's own TDS) is rate-tested on its value before TDS and, deducted at the rate on its own voucher, leaves clause 21(b)(ii)(A) for the question on the payee's TDS; its only listing there still raises the s.194C(6) question on the goods-carriage ledger. A payee debit other than the bill's TDS (Contractor B) makes the bill untested and counted; a later voucher debiting the TDS ledger against it, with no bill of its to leave (ii)(A), adds no reversal guard. A later voucher debiting the TDS ledger against the payee (Contractor C) keeps its deducted bill in (ii)(A): the reversal is not judged. A cash-paid bill carrying TDS (no payee named) is counted as untested. Contractor D's bill (Rs 50,000.50 before TDS, Rs 499 deducted) is short of 1% only by the rate's rounding to the nearest paisa, and stays in (ii)(A).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_p22-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_p22-001"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_p22-002"
+  },
+  {
+   "name": "Hire Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_p22-003"
+  },
+  {
+   "name": "TDS Payable 194C",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-004"
+  },
+  {
+   "name": "Carrier A",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-005"
+  },
+  {
+   "name": "Contractor B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-006"
+  },
+  {
+   "name": "Contractor C",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-007"
+  },
+  {
+   "name": "Contractor D",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carrier A",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 13960000,
+   "closing": -13860000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4950000,
+   "closing": -4950000
+  },
+  {
+   "ledger": "Contractor B",
+   "opening": 0,
+   "debit": 30000,
+   "credit": 5030000,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Contractor C",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Contractor D",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4950150,
+   "closing": -4950150
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 14000000,
+   "credit": 0,
+   "closing": 14000000
+  },
+  {
+   "ledger": "Hire Charges",
+   "opening": 0,
+   "debit": 25000050,
+   "credit": 0,
+   "closing": 25000050
+  },
+  {
+   "ledger": "TDS Payable 194C",
+   "opening": 0,
+   "debit": 150000,
+   "credit": 389900,
+   "closing": -239900
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "p01",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     10000000
+    ],
+    [
+     "Carrier A",
+     -10000000
+    ],
+    [
+     "Carrier A",
+     100000
+    ],
+    [
+     "TDS Payable 194C",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     4000000
+    ],
+    [
+     "Carrier A",
+     -3960000
+    ],
+    [
+     "TDS Payable 194C",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     5000000
+    ],
+    [
+     "Contractor B",
+     -4980000
+    ],
+    [
+     "Contractor B",
+     30000
+    ],
+    [
+     "TDS Payable 194C",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-07-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     10000000
+    ],
+    [
+     "Contractor C",
+     -9900000
+    ],
+    [
+     "TDS Payable 194C",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-08-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "TDS Payable 194C",
+     100000
+    ],
+    [
+     "Contractor C",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "p06",
+   "date": "2025-09-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Hire Charges",
+     5000000
+    ],
+    [
+     "Cash",
+     -4950000
+    ],
+    [
+     "TDS Payable 194C",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p07",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "TDS Payable 194C",
+     50000
+    ],
+    [
+     "Contractor B",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "p08",
+   "date": "2025-11-14",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     5000050
+    ],
+    [
+     "Contractor D",
+     -4950150
+    ],
+    [
+     "TDS Payable 194C",
+     -49900
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Freight": "194C",
+  "Hire Charges": "194C"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable 194C"
+ ],
+ "goods_carriage_ledgers": [
+  "Freight"
+ ]
+}

@@ -26,7 +26,11 @@
 //!   every payment that attracts TDS ([`crate::tds_tranches`]) is a 21(b)(ii)(A) row. With TDS seen,
 //!   every payment is listed and one question asks the CA which it covers; a payment whose own bill
 //!   carries TDS in a month the recorded challans show nothing deposited for by the due date is a
-//!   21(b)(ii)(B) row; a bill's TDS under the section's rate is a short-deduction finding.
+//!   21(b)(ii)(B) row. A plain bill (only the section's expense, the payee and its TDS) is
+//!   rate-tested on its value before TDS: under the section's rate it is a short-deduction finding;
+//!   at or above the lower rate its own voucher deducted the tax, so it is not a 21(b)(ii)(A) row
+//!   but is listed on the TDS question for its deposit, unless a voucher touching the payee debits
+//!   a TDS ledger (a reversal is not judged). A bill carrying TDS that is not rate-tested is counted.
 //! * An individual/HUF deducts only on a supplied previous-year turnover over the business limit,
 //!   or receipts over the profession limit, as `[deductor].activity` says; otherwise the status is
 //!   `unknown`, never assumed.
@@ -1152,6 +1156,79 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
         }
     }
     let held = ctx.cfg.form_26a.get(e).copied();
+    let low_high = x.pair.map(|(a, b)| (a.min(b), a.max(b)));
+    // A plain bill: every line is the section's expense, the payee (a credit, or a debit equal to the
+    // bill's own TDS: booked gross with its TDS debited back) or a TDS ledger. Only its value is read
+    // off the books without a judgement, so only it is rate-tested.
+    let plain = |v: &Voucher| -> Result<bool> {
+        let tds = tds_on(v, tds_ledgers)?;
+        let mut debit = 0_i64;
+        for l in v
+            .lines
+            .iter()
+            .filter(|l| l.amount_paise > 0 && alias(ctx.cfg, &l.ledger) == e)
+        {
+            debit = debit
+                .checked_add(l.amount_paise)
+                .ok_or_else(|| overflow(TEST_ID))?;
+        }
+        Ok((debit == 0 || debit == tds)
+            && v.lines.iter().filter(|l| l.amount_paise != 0).all(|l| {
+                ctx.cfg.nature_by_ledger.contains_key(&l.ledger)
+                    || tds_ledgers.contains(&l.ledger)
+                    || alias(ctx.cfg, &l.ledger) == e
+            }))
+    };
+    let mut rated: Vec<&str> = Vec::new();
+    if low_high.is_some() {
+        for g in &own {
+            if plain(row.vouchers[g])? {
+                rated.push(*g);
+            }
+        }
+    }
+    // Q2-d, as a fact per bill: its own voucher's TDS against the section's rates, on the bill's
+    // value before TDS -- the payee's net credit plus its own TDS.
+    let (mut short, mut mid) = (Vec::new(), Vec::new());
+    let mut bases: BTreeMap<&str, i64> = BTreeMap::new();
+    if let Some((low, high)) = low_high {
+        let floor_rate = |base: i64, bp: i64| -> i128 {
+            (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100
+        };
+        for g in &rated {
+            let v = row.vouchers[g];
+            let tds = tds_on(v, tds_ledgers)?;
+            let mut payee = 0_i64;
+            for l in v.lines.iter().filter(|l| alias(ctx.cfg, &l.ledger) == e) {
+                payee = payee
+                    .checked_add(l.amount_paise)
+                    .ok_or_else(|| overflow(TEST_ID))?;
+            }
+            let base = tds.checked_sub(payee).ok_or_else(|| overflow(TEST_ID))?;
+            bases.insert(*g, base);
+            if i128::from(tds) < floor_rate(base, low) {
+                short.push(*g);
+            } else if low != high && i128::from(tds) < floor_rate(base, high) {
+                mid.push(*g);
+            }
+        }
+    }
+    let reversal = seen.values().any(|v| {
+        v.lines
+            .iter()
+            .any(|l| tds_ledgers.contains(&l.ledger) && l.amount_paise > 0)
+    });
+    let candidates: Vec<&str> = rated
+        .iter()
+        .copied()
+        .filter(|g| SHORT_LEAVES_A || !short.contains(g))
+        .collect();
+    // P2-2: tax deducted on its own voucher, so not (ii)(A).
+    let deducted: Vec<&str> = if reversal {
+        Vec::new()
+    } else {
+        candidates.clone()
+    };
     let b_rows: Vec<&str> = match ctx.deposited {
         Some(deposited) if !seen.is_empty() => own
             .iter()
@@ -1166,10 +1243,16 @@ year's turnover (its deductor status), so nothing is listed in clause 21(b)."
             .collect(),
         _ => Vec::new(),
     };
-    let listed: Vec<&str> = taxable
+    // Listed on the TDS question, for their deposit.
+    let off_a: Vec<&str> = deducted
         .iter()
         .copied()
         .filter(|g| !b_rows.contains(g))
+        .collect();
+    let listed: Vec<&str> = taxable
+        .iter()
+        .copied()
+        .filter(|g| !b_rows.contains(g) && !off_a.contains(g))
         .collect();
 
     for (n, g) in listed.iter().enumerate() {
@@ -1234,6 +1317,14 @@ credited: TDS is seen on vouchers touching this payee, so which payments it cove
             listed.len()
         ));
     }
+    if !off_a.is_empty() {
+        limits.push(format!(
+            "{} payment(s) are listed on this payee's TDS question as deducted on their own vouchers, \
+not in clause 21(b)(ii)(A) in this draft: tax was deducted on them. Whether it was deposited by the \
+s.139(1) due date is asked there.",
+            off_a.len()
+        ));
+    }
     if let Some(held) = held {
         limits.push(form_26a_note(held));
     }
@@ -1274,6 +1365,61 @@ challans recorded show nothing deposited by the s.139(1) due date, are listed in
         ),
         Vec::new(),
     );
+    let mut q_facts = vec![("tds_seen".to_string(), tds_seen_id)];
+    for (n, g) in off_a.iter().enumerate() {
+        let v = row.vouchers[g];
+        let ev1 = vec![voucher_ref(g, v)];
+        let id = r.fig(
+            &format!("{}_row_21b_deducted_{}_{:03}", x.prefix, x.rid, n + 1),
+            Value::Int(row.by_voucher[g]),
+            Unit::Paise,
+            &format!(
+                "One payment to this payee entity (tag {}) under {}{} whose own voucher deducts its \
+TDS, as credited to the payee: listed on this question rather than in clause 21(b)(ii)(A) in this \
+draft. It is in (ii)(B) only if that tax was not deposited by the s.139(1) due date, which the CA \
+determines. The voucher cited gives its date.",
+                x.h, x.nature, x.cat_note
+            ),
+            ev1.clone(),
+        );
+        q_facts.push((format!("deducted_payment:{:03}", n + 1), id));
+        let id = r.fig(
+            &format!("{}_row_21b_deducted_tds_{}_{:03}", x.prefix, x.rid, n + 1),
+            Value::Int(tds_on(v, tds_ledgers)?),
+            Unit::Paise,
+            &format!("The TDS on that payment's own voucher (tag {}).", x.h),
+            ev1,
+        );
+        q_facts.push((format!("deducted_tds:{:03}", n + 1), id));
+    }
+    if !off_a.is_empty() {
+        let id = r.fig(
+            &format!("{}_row_21b_deducted_total_{}", x.prefix, x.rid),
+            Value::Int(sum(off_a.iter().map(|g| row.by_voucher[g]))?),
+            Unit::Paise,
+            &format!(
+                "The payments to this payee entity (tag {}) listed on this question as deducted on \
+their own vouchers (not in clause 21(b)(ii)(A) or (ii)(B) in this draft), summed.",
+                x.h
+            ),
+            Vec::new(),
+        );
+        q_facts.push(("deducted_payments_total".to_string(), id));
+    }
+    let mut guard = if reversal && !candidates.is_empty() {
+        " A voucher touching this payee debits a ledger classified as TDS payable (a reversal or \
+correction of a deduction, or another entry): what it undoes is not judged, so no payment is listed \
+on this question as deducted on its own voucher; each stays in clause 21(b)(ii)(A) or (ii)(B)."
+            .to_string()
+    } else {
+        String::new()
+    };
+    if !off_a.is_empty() {
+        guard.push_str(
+            " A reversal of a deduction booked without this payee's ledger (against the expense, \
+say) is not seen here: the CA confirms that each deduction listed on this question stands.",
+        );
+    }
     r.findings.push(Finding {
         id: format!("{TEST_ID}/tds_seen/{}", x.rid),
         clauses: vec!["3CD-21(b)".to_string(), "3CD-34(a)".to_string()],
@@ -1282,13 +1428,13 @@ challans recorded show nothing deposited by the s.139(1) due date, are listed in
 covers, and its deposit, are the CA's to determine",
             x.nature, x.cat_note
         ),
-        facts: vec![("tds_seen".to_string(), tds_seen_id)],
+        facts: q_facts,
         evidence: voucher_refs(seen.iter().map(|(g, v)| (*g, *v))),
         confidence: Confidence::JudgementRequired,
         limits: vec![format!(
             "TDS of {} (net) is seen on {} voucher(s) touching this payee: {shown}{more}. The CA \
 determines which payments it covers and whether it was deposited by the s.139(1) due date; until \
-then every payment that attracts TDS is listed in clause 21(b){}.{}",
+then every payment that attracts TDS is listed in clause 21(b){}{}.{guard}{}",
             rupees(i128::from(tds_total)),
             seen.len(),
             if b_rows.is_empty() {
@@ -1296,6 +1442,16 @@ then every payment that attracts TDS is listed in clause 21(b){}.{}",
             } else {
                 " (in (B) where its own bill's TDS month shows nothing deposited on the challans \
 recorded)"
+            },
+            if off_a.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    ", except the {} payment(s) listed on this question as deducted on their own \
+vouchers: not in clause 21(b)(ii)(A) or (ii)(B) in this draft, they are listed here for whether the \
+tax was deposited by the due date",
+                    off_a.len()
+                )
             },
             if held == Some(true) {
                 " The payee's Form 26A is recorded as held: which payments it relieves (a failure \
@@ -1310,30 +1466,40 @@ it."
             .to_string(),
         ],
     });
-    if let Some((a, b)) = x.pair {
-        let (low, high) = (a.min(b), a.max(b));
-        if !own.is_empty() {
-            // Q2-d, as a fact per bill: its own voucher's TDS against the section's rates, tested
-            // on the credit as booked (before the TDS was added back).
-            let (mut short, mut mid) = (Vec::new(), Vec::new());
-            let floor_rate = |base: i64, bp: i64| -> i128 {
-                (i128::from(base) * i128::from(bp) + 5000).div_euclid(10_000) - 100
-            };
-            for g in &own {
-                let tds = tds_on(row.vouchers[g], tds_ledgers)?;
-                let base = row.by_voucher[g]
-                    .checked_sub(tds)
-                    .ok_or_else(|| overflow(TEST_ID))?;
-                if i128::from(tds) < floor_rate(base, low) {
-                    short.push(*g);
-                } else if low != high && i128::from(tds) < floor_rate(base, high) {
-                    mid.push(*g);
-                }
-            }
-            if !short.is_empty() || !mid.is_empty() {
-                short_deduction_finding(r, x, &short, &mid, low, high, ctx)?;
+    if low_high.is_some() {
+        // A bill carrying TDS whose rate is not tested is counted and said, never dropped silently.
+        let mut untested: Vec<&str> = Vec::new();
+        for g in &taxable {
+            if !rated.contains(g) && tds_on(row.vouchers[g], tds_ledgers)? > 0 {
+                untested.push(*g);
             }
         }
+        if !untested.is_empty() {
+            let why = if e == PAYEE_NOT_NAMED {
+                "no payee is named on them"
+            } else {
+                "each carries lines other than the section's expense, the payee and its TDS (GST, \
+another tax, another party or ledger), or more than one section"
+            };
+            r.fig(
+                &format!("{}_row_tds_bills_not_rate_tested_{}", x.prefix, x.rid),
+                count(TEST_ID, untested.len())?,
+                Unit::Count,
+                &format!(
+                    "Bills to this payee entity (tag {}) under {}{} that carry TDS but whose rate is \
+not tested, because {why}.",
+                    x.h, x.nature, x.cat_note
+                ),
+                untested.iter().map(|g| voucher_ref(g, row.vouchers[g])).collect(),
+            );
+            limits.push(format!(
+                "{} bill(s) carrying TDS are not tested against the section's rate: {why}.",
+                untested.len()
+            ));
+        }
+    }
+    if let Some((low, high)) = low_high.filter(|_| !short.is_empty() || !mid.is_empty()) {
+        short_deduction_finding(r, x, &short, &mid, (low, high), ctx, &bases, &listed)?;
     }
     Ok((limits, clauses))
 }
@@ -1424,11 +1590,16 @@ with the tax on its own bill and nothing deposited.",
     Ok(())
 }
 
+/// A bill whose own voucher deducts TDS short of the section's lower rate: false keeps it in
+/// clause 21(b)(ii)(A), with its short-deduction finding; true would move it onto the deposit
+/// question. False errs loud: a token deduction never takes a bill out of (A). As the reference
+/// sets it (28-Sep); the owner is asked.
+const SHORT_LEAVES_A: bool = false;
+
 /// Q2-d: the High Court split on whether s.40(a)(ia) reaches a short deduction, as the reference
 /// states it.
 const SHORT_DEDUCTION_SPLIT: &str = "Whether s.40(a)(ia) reaches a short deduction is not \
-settled, so these payments are not listed in clause 21(b); listing them is the CA's decision. For \
-no disallowance: PCIT v Media Worldwide Ltd, Bombay HC, ITA 19/2020, 24 April 2026 (order read), \
+settled, and listing on that ground is the CA's decision. For no disallowance: PCIT v Media Worldwide Ltd, Bombay HC, ITA 19/2020, 24 April 2026 (order read), \
 which agrees with four High Courts known only as quoted there: CIT v S.K. Tekriwal (2014) 361 ITR \
 432 (Calcutta); Future First Info Services (2023) 290 Taxman 490 (Delhi); Kishore Rao & Others \
 (HUF) (2016) 387 ITR 196 (Karnataka); Samsung Heavy Industries (2025) (Uttarakhand). For \
@@ -1452,15 +1623,18 @@ fn in_kerala_hc(state: &str) -> bool {
         .any(|w| state.chars().count() == w.len() && state.chars().map(fold).eq(w.chars()))
 }
 
-/// The reference's `_short_deduction_finding`.
+/// The reference's `_short_deduction_finding`: `bases` holds each tested bill's value before
+/// TDS, and `listed_a` the payments listed in clause 21(b)(ii)(A).
+#[allow(clippy::too_many_arguments)]
 fn short_deduction_finding(
     r: &mut TestResult,
     x: &Row21b,
     short: &[&str],
     mid: &[&str],
-    low: i64,
-    high: i64,
+    (low, high): (i64, i64),
     ctx: &Ctx,
+    bases: &BTreeMap<&str, i64>,
+    listed_a: &[&str],
 ) -> Result<()> {
     let row = x.row;
     // i64 -> f64 is exact below 2^53, as Python's `bp / 100` is.
@@ -1488,9 +1662,22 @@ the section's rate; its full amount. The voucher cited gives its date.",
             Value::Int(tds_on(v, &ctx.inputs.tds_ledgers)?),
             Unit::Paise,
             &format!("The TDS on that payment's own voucher (tag {}).", x.h),
-            ev1,
+            ev1.clone(),
         );
         facts.push((format!("short_tds:{:03}", n + 1), id));
+        let id = r.fig(
+            &format!("{}_row_short_base_{}_{:03}", x.prefix, x.rid, n + 1),
+            Value::Int(bases[g]),
+            Unit::Paise,
+            &format!(
+                "The base that payment's TDS is tested against (tag {}): the payee's net credit on \
+the bill plus the bill's own TDS, its value before TDS (a bill tested carries only the section's \
+expense, the payee and its TDS).",
+                x.h
+            ),
+            ev1,
+        );
+        facts.push((format!("short_base:{:03}", n + 1), id));
     }
     let id = r.fig(
         &format!("{}_row_short_total_{}", x.prefix, x.rid),
@@ -1528,10 +1715,30 @@ rate, summed.",
         ));
     }
     limits.push(
+        "Each bill tested carries only the section's expense, the payee and its TDS; its rate is \
+tested on the bill's value before TDS (the payee's net credit plus its own TDS)."
+            .to_string(),
+    );
+    let in_a = rows.iter().filter(|g| listed_a.contains(g)).count();
+    limits.push(
         "TDS elsewhere on this payee's vouchers may cover them: see the question on this payee's \
 TDS."
             .to_string(),
     );
+    if in_a > 0 {
+        limits.push(format!(
+            "{in_a} of these payment(s) are listed in clause 21(b)(ii)(A) in this draft; whether to \
+keep them there is the CA's decision."
+        ));
+    }
+    if in_a < rows.len() {
+        limits.push(format!(
+            "{} of these payment(s) are not listed in clause 21(b)(ii)(A) in this draft (they are in \
+(ii)(B), or on the question on this payee's TDS): tax was deducted on them; whether to list them in \
+(ii)(A) is the CA's decision.",
+            rows.len() - in_a
+        ));
+    }
     limits.push(SHORT_DEDUCTION_SPLIT.to_string());
     if let Some(state) = ctx.inputs.client_state.as_deref() {
         let state = py_strip(state);
@@ -1588,8 +1795,8 @@ fn s194c6_question(
     r.findings.push(Finding {
         id: format!("{TEST_ID}/s194c6/{rid}"),
         clauses: vec!["3CD-21(b)".to_string()],
-        title: "Payments listed in clause 21(b) on ledgers marked as goods carriage: they stay \
-listed unless the s.194C(6) conditions are evidenced"
+        title: "Payments on ledgers marked as goods carriage: they stay listed unless the s.194C(6) \
+conditions are evidenced"
             .to_string(),
         facts: Vec::new(),
         evidence: vouchers.iter().map(|(g, v)| voucher_ref(g, v)).collect(),
@@ -1597,7 +1804,8 @@ listed unless the s.194C(6) conditions are evidenced"
         limits: vec![
             format!(
                 "{} of this payee's vouchers (tag {h}) are on ledgers the client marks as goods \
-carriage (tags {tags}). Its payments stay listed in clause 21(b).",
+carriage (tags {tags}). Its payments stay where this draft lists them: in clause 21(b), or on the \
+question on this payee's TDS.",
                 vouchers.len()
             ),
             "They leave the list only if the CA holds evidence that s.194C(6) applied: the payee \
@@ -2355,7 +2563,13 @@ limit: every credit to it is listed (the list may overstate).",
                 let listed = facts.iter().any(|(k, _)| k.starts_with("payment_a:"))
                     || r.findings
                         .iter()
-                        .any(|f| f.id == format!("{TEST_ID}/not_deposited/{rid}"));
+                        .any(|f| f.id == format!("{TEST_ID}/not_deposited/{rid}"))
+                    || r.findings.iter().any(|f| {
+                        f.id == format!("{TEST_ID}/tds_seen/{rid}")
+                            && f.facts
+                                .iter()
+                                .any(|(k, _)| k.starts_with("deducted_payment:"))
+                    });
                 if nature == "194C" && !cfg.goods_carriage_ledgers.is_empty() && listed {
                     let on_goods_carriage: BTreeMap<&str, &Voucher> = row_adj
                         .vouchers

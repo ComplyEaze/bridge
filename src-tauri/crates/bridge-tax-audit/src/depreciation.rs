@@ -1115,6 +1115,7 @@ mod tests {
             s194a: None,
             s269ss_269t_exempt_lender_types: None,
             s269ss_269t_reporting_exempt_lender_types: None,
+            s269ss_269t_reporting_exempt_lender_types_accepted: None,
             s194t: None,
             s201_1a: None,
             s206c_7: None,

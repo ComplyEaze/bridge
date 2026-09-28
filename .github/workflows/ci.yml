@@ -161,6 +161,8 @@ jobs:
         run: node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
+      - run: node scripts/check-unbounded-reads.mjs
+      - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py

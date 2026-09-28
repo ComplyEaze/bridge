@@ -1642,10 +1642,10 @@
  {
   "id": "C1-24",
   "by": "author (Lane C)",
-  "what": "turnover at the threshold makes a deductor",
+  "what": "turnover at the business limit makes a deductor",
   "file": "src/tds_payees.rs",
-  "from": "Some(t) if t > threshold => \"deductor\",",
-  "to": "Some(t) if t >= threshold => \"deductor\","
+  "from": "            if turnover > business {",
+  "to": "            if turnover >= business {"
  },
  {
   "id": "C1-25",
@@ -2884,8 +2884,8 @@
   "by": "author (Lane B)",
   "what": "a loan's interest_ledger not bound",
   "file": "src/binding.rs",
-  "from": "                let name = lbinder.bind_one(name, &location)?;",
-  "to": "                let name = name.to_string();"
+  "from": "                        toml::Value::from(lbinder.bind_one(name, &location)?)",
+  "to": "                        toml::Value::from(name.clone())"
  },
  {
   "id": "LB-02",
@@ -2900,16 +2900,16 @@
   "by": "author (Lane B)",
   "what": "the bound interest ledger not written back",
   "file": "src/binding.rs",
-  "from": "                t.insert(\"interest_ledger\".to_string(), toml::Value::from(name));",
-  "to": "                let _ = name;"
+  "from": "                t.insert(\"interest_ledger\".to_string(), bound);",
+  "to": "                let _ = bound;"
  },
  {
   "id": "LB-04",
   "by": "author (Lane B)",
   "what": "a non-string interest_ledger not refused as malformed",
   "file": "src/binding.rs",
-  "from": "                let name = v.as_str().ok_or_else(|| {",
-  "to": "                let name = v.as_str().or(Some(\"5\")).ok_or_else(|| {"
+  "from": "                    _ => return Err(malformed()),",
+  "to": "                    _ => toml::Value::from(\"5\"),"
  },
  {
   "id": "LB-05",
@@ -2918,6 +2918,14 @@
   "file": "src/binding.rs",
   "from": "    let raw_loan_ledgers = table_at(&engagement.raw_cfg, &[\"loans\", \"loan_ledgers\"])?;",
   "to": "    let raw_loan_ledgers = table_at(&engagement.raw_cfg, &[\"loans\", \"loan_ledgers\"]).unwrap_or(None);"
+ },
+ {
+  "id": "LB-06",
+  "by": "author (Lane E2)",
+  "what": "an empty interest_ledger list not refused as malformed",
+  "file": "src/binding.rs",
+  "from": "                    toml::Value::Array(items) if !items.is_empty() => {",
+  "to": "                    toml::Value::Array(_) => {"
  },
  {
   "id": "D1-01",
@@ -2946,10 +2954,10 @@
  {
   "id": "D1-04",
   "by": "author (Lane B)",
-  "what": "an interest journal needs only to include the interest ledger",
+  "what": "an interest journal needs only to include one of the loan's interest ledgers",
   "file": "src/loans_interest.rs",
-  "from": "        if interest_ledger.is_some_and(|il| only(&others, il)) {",
-  "to": "        if interest_ledger.is_some_and(|il| others.contains(il)) {"
+  "from": "        if !ils.is_empty() && !rest.is_empty() && rest.iter().all(|o| ils.contains(*o)) {",
+  "to": "        if !ils.is_empty() && !rest.is_empty() && rest.iter().any(|o| ils.contains(*o)) {"
  },
  {
   "id": "D1-05",
@@ -2980,40 +2988,40 @@
   "by": "author (Lane B)",
   "what": "a repayment's reporting window read from its own amount only",
   "file": "src/loans_interest.rs",
-  "from": "                prior.max(amt) >= limit_269\n",
-  "to": "                amt >= limit_269\n"
+  "from": "    } else {\n        prior.max(amt)\n    } >= limit;\n    // 31-12",
+  "to": "    } else {\n        amt\n    } >= limit;\n    // 31-12"
  },
  {
   "id": "D1-09",
   "by": "author (Lane B)",
   "what": "a repayment's breach test ignores interest credited",
   "file": "src/loans_interest.rs",
-  "from": "                row.prior_breach.max(amt) >= limit_269",
-  "to": "                prior.max(amt) >= limit_269"
+  "from": "        row.prior_breach.max(amt)\n",
+  "to": "        prior.max(amt)\n"
  },
  {
   "id": "D1-10",
   "by": "author (Lane B)",
   "what": "the s.269SS/269T flag ignores the breach-exempt lenders",
   "file": "src/loans_interest.rs",
-  "from": "                && !exempt_269.contains(lender_type);",
-  "to": "                ;"
+  "from": "        && !c.ex.s269.contains(c.lender_type)\n        && !flag_undetermined;",
+  "to": "        && !flag_undetermined;"
  },
  {
   "id": "D1-11",
   "by": "author (Lane B)",
   "what": "reporting-exempt lenders reported in Clause 31",
   "file": "src/loans_interest.rs",
-  "from": "        if reporting_exempt_269.contains(lender_type) {",
-  "to": "        if reporting_exempt_269.contains(lender_type) && false {"
+  "from": "        if ex.reporting_accepted.contains(lender_type) && ex.reporting.contains(lender_type) {",
+  "to": "        if ex.reporting_accepted.contains(lender_type) && ex.reporting.contains(lender_type) && false {"
  },
  {
   "id": "D1-12",
   "by": "author (Lane B)",
   "what": "s.194A fires for a non-deductor",
   "file": "src/loans_interest.rs",
-  "from": "            && status == \"deductor\"",
-  "to": "            && status != \"unknown\""
+  "from": "            && (status == \"deductor\" || status == \"unknown\");",
+  "to": "            && (status == \"deductor\" || status == \"unknown\" || status == \"not_deductor\");"
  },
  {
   "id": "D1-13",
@@ -3078,6 +3086,510 @@
   "file": "src/loans_interest.rs",
   "from": "!net_reversals || is_receipt(&pop[*n].base_type)",
   "to": "is_receipt(&pop[*n].base_type)"
+ },
+ {
+  "id": "LR-01",
+  "by": "author (Lane E2)",
+  "what": "a TDS line breaks an interest journal",
+  "file": "src/loans_interest.rs",
+  "from": "            .filter(|o| !ledgers.tds.contains(*o) || ils.contains(*o))",
+  "to": "            .filter(|_| true)"
+ },
+ {
+  "id": "LR-02",
+  "by": "author (Lane E2)",
+  "what": "a TDS journal is read as a loan repaid",
+  "file": "src/loans_interest.rs",
+  "from": "            continue; // a TDS journal: neither taken nor repaid",
+  "to": "            // a TDS journal: neither taken nor repaid"
+ },
+ {
+  "id": "LR-03",
+  "by": "author (Lane E2)",
+  "what": "a TDS journal on two loans is read as repaid on each",
+  "file": "src/loans_interest.rs",
+  "from": "                .all(|o| ledgers.tds.contains(*o) || ledgers.other_loans.contains(o))",
+  "to": "                .all(|o| ledgers.tds.contains(*o))"
+ },
+ {
+  "id": "LR-04",
+  "by": "author (Lane E2)",
+  "what": "no entry is asked about as misposted interest",
+  "file": "src/loans_interest.rs",
+  "from": "        if !non_tds.is_empty()\n            && non_tds",
+  "to": "        if false && !non_tds.is_empty()\n            && non_tds"
+ },
+ {
+  "id": "LR-05",
+  "by": "author (Lane E2)",
+  "what": "interest counted net of the TDS on its journals",
+  "file": "src/loans_interest.rs",
+  "from": "            -rows.interest.iter().map(|&(_, amt)| amt).sum::<i128>() - tds_on_journals;",
+  "to": "            -rows.interest.iter().map(|&(_, amt)| amt).sum::<i128>();"
+ },
+ {
+  "id": "LR-06",
+  "by": "author (Lane E2)",
+  "what": "TDS on a voucher that also posts to another loan is counted",
+  "file": "src/loans_interest.rs",
+  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()))",
+  "to": "                        .any(|l| l.ledger.is_empty())"
+ },
+ {
+  "id": "LR-07",
+  "by": "author (Lane E2)",
+  "what": "some TDS short of the rate reads as none",
+  "file": "src/loans_interest.rs",
+  "from": "                } else if tds_on_loan > 0 {",
+  "to": "                } else if false {"
+ },
+ {
+  "id": "LR-08",
+  "by": "author (Lane E2)",
+  "what": "covered interest raises no TDS-seen finding",
+  "file": "src/loans_interest.rs",
+  "from": "        if over_194a && coverage == \"covered\" {",
+  "to": "        if false && over_194a && coverage == \"covered\" {"
+ },
+ {
+  "id": "LR-09",
+  "by": "author (Lane E2)",
+  "what": "covered interest still raises the s.194A finding",
+  "file": "src/loans_interest.rs",
+  "from": "        if over_194a && coverage != \"covered\" {",
+  "to": "        if over_194a {"
+ },
+ {
+  "id": "LR-10",
+  "by": "author (Lane E2)",
+  "what": "an entry against another loan's interest ledger is also asked about as a charge",
+  "file": "src/loans_interest.rs",
+  "from": "                && !counter.iter().all(|c| foreign_interest.contains(*c))\n",
+  "to": "\n"
+ },
+ {
+  "id": "LR-11",
+  "by": "author (Lane E2)",
+  "what": "any ledger counts as an expense ledger for the charge question",
+  "file": "src/loans_interest.rs",
+  "from": "                        .is_some_and(|l| EXPENSE_GROUPS.iter().any(|g| l.under(g)))",
+  "to": "                        .is_some()"
+ },
+ {
+  "id": "LR-12",
+  "by": "author (Lane E2)",
+  "what": "an identical narration never pairs a debit with its return",
+  "file": "src/loans_interest.rs",
+  "from": "        if every.iter().filter(|n| *n == d_key).count() != 2",
+  "to": "        if every.iter().filter(|n| *n == d_key).count() != 3"
+ },
+ {
+  "id": "LR-13",
+  "by": "author (Lane E2)",
+  "what": "repeated narrations are never named",
+  "file": "src/loans_interest.rs",
+  "from": "        for (_, vs) in by_narration.iter().filter(|(_, vs)| vs.len() >= 2) {",
+  "to": "        for (_, vs) in by_narration.iter().filter(|(_, vs)| vs.len() >= 3) {"
+ },
+ {
+  "id": "LR-14",
+  "by": "author (Lane E2)",
+  "what": "the fresh-loan walk never lifts a debit balance",
+  "file": "src/loans_interest.rs",
+  "from": "        if !is_interest && direction == \"taken\" && principal_w2 < 0 {",
+  "to": "        if false && !is_interest && direction == \"taken\" && principal_w2 < 0 {"
+ },
+ {
+  "id": "LR-15",
+  "by": "author (Lane E2)",
+  "what": "the netting walk starts from a floored opening",
+  "file": "src/loans_interest.rs",
+  "from": "    let (mut principal_net, mut breach_net) = (opening_outstanding, opening_outstanding);",
+  "to": "    let (mut principal_net, mut breach_net) = (opening_outstanding.max(0), opening_outstanding.max(0));"
+ },
+ {
+  "id": "LR-16",
+  "by": "author (Lane E2)",
+  "what": "a taken row's own amount (limb (a)) is not tested in the breach test (the window's taken arm is equivalent: breach tests the same on a taken row)",
+  "file": "src/loans_interest.rs",
+  "from": "    let crosses_breach_balance = if taken {\n        amt.max(after)",
+  "to": "    let crosses_breach_balance = if taken {\n        after"
+ },
+ {
+  "id": "LR-17",
+  "by": "author (Lane E2)",
+  "what": "a flag the two walks disagree on is still flagged",
+  "file": "src/loans_interest.rs",
+  "from": "        && !flag_undetermined;",
+  "to": "        ;"
+ },
+ {
+  "id": "LR-18",
+  "by": "author (Lane E2)",
+  "what": "lenders grouped by lower case, not case folding",
+  "file": "src/loans_interest.rs",
+  "from": "        let key = py_casefold(py_strip(&cfg.lender));",
+  "to": "        let key = py_lower(py_strip(&cfg.lender));"
+ },
+ {
+  "id": "LR-19",
+  "by": "author (Lane E2)",
+  "what": "lender names compared with their surrounding spaces",
+  "file": "src/loans_interest.rs",
+  "from": "        let key = py_casefold(py_strip(&cfg.lender));",
+  "to": "        let key = py_casefold(&cfg.lender);"
+ },
+ {
+  "id": "LR-20",
+  "by": "author (Lane E2)",
+  "what": "unnamed lenders asked about only with a hundred loans",
+  "file": "src/loans_interest.rs",
+  "from": "    if !unnamed.is_empty() && loans.len() > 1 && !unnamed_clauses.is_empty() {",
+  "to": "    if !unnamed.is_empty() && loans.len() > 100 && !unnamed_clauses.is_empty() {"
+ },
+ {
+  "id": "LR-21",
+  "by": "author (Lane E2)",
+  "what": "a ledger with an incomplete chain is not counted",
+  "file": "src/loans_interest.rs",
+  "from": "        if !led.chain_complete {",
+  "to": "        if false {"
+ },
+ {
+  "id": "LR-22",
+  "by": "author (Lane E2)",
+  "what": "a bank OD ledger gets an unlisted-loan notice",
+  "file": "src/loans_interest.rs",
+  "from": "            || led.under(BANK_OD_GROUP)\n",
+  "to": "\n"
+ },
+ {
+  "id": "LR-23",
+  "by": "author (Lane E2)",
+  "what": "a duties ledger is scanned for instalments",
+  "file": "src/loans_interest.rs",
+  "from": "        if !PATTERN_GROUPS.iter().any(|g| led.under(g)) || led.under(DUTIES_TAXES_GROUP) {",
+  "to": "        if !PATTERN_GROUPS.iter().any(|g| led.under(g)) {"
+ },
+ {
+  "id": "LR-24",
+  "by": "author (Lane E2)",
+  "what": "instalments in two months make a pattern",
+  "file": "src/loans_interest.rs",
+  "from": "                    >= PATTERN_MIN_MONTHS\n",
+  "to": "                    >= PATTERN_MIN_MONTHS - 1\n"
+ },
+ {
+  "id": "LR-25",
+  "by": "author (Lane E2)",
+  "what": "a mandate word run into the letter before it matches",
+  "file": "src/loans_interest.rs",
+  "from": "        (at == 0 || !is_ci_letter(chars[at - 1]))",
+  "to": "        true"
+ },
+ {
+  "id": "LR-26",
+  "by": "author (Lane E2)",
+  "what": "a mandate word run into the letter after it matches",
+  "file": "src/loans_interest.rs",
+  "from": "                    && (end == chars.len() || !is_ci_letter(chars[end]))",
+  "to": "                    && true"
+ },
+ {
+  "id": "LR-27",
+  "by": "author (Lane E2)",
+  "what": "five digits make a bank number",
+  "file": "src/loans_interest.rs",
+  "from": "            if len >= 6 {",
+  "to": "            if len >= 5 {"
+ },
+ {
+  "id": "LR-28",
+  "by": "author (Lane E2)",
+  "what": "Government loans taken read under the repayments' note",
+  "file": "src/loans_interest.rs",
+  "from": "        if direction == \"taken\" {\n            &self.reporting_accepted",
+  "to": "        if direction == \"taken\" {\n            &self.reporting"
+ },
+ {
+  "id": "LR-29",
+  "by": "author (Lane E2)",
+  "what": "LOAN-1 leaves out the TDS deducted on the loan",
+  "file": "src/loans_interest.rs",
+  "from": "        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;",
+  "to": "        let expected_movement = -taken_total + repaid_total - interest;"
+ },
+ {
+  "id": "LR-30",
+  "by": "author (Lane E2)",
+  "what": "LOAN-2 (C) leaves out the TDS lines",
+  "file": "src/loans_interest.rs",
+  "from": "            let residue = on_l + on_ils + net_on(v, &tds);",
+  "to": "            let residue = on_l + on_ils;"
+ },
+ {
+  "id": "LR-31",
+  "by": "author (Lane E2)",
+  "what": "LOAN-2 (E) ignores what the misposted figure cites",
+  "file": "src/loans_interest.rs",
+  "from": "                || mis_cited.contains(&v.guid)\n",
+  "to": "\n"
+ },
+ {
+  "id": "LR-32",
+  "by": "author (Lane E2)",
+  "what": "the fresh-loan maximum is never stated",
+  "file": "src/loans_interest.rs",
+  "from": "                if max_outstanding_w2 == max_outstanding {",
+  "to": "                if true {"
+ },
+ {
+  "id": "LR-33",
+  "by": "author (Lane E2)",
+  "what": "a TDS-payable ledger that is also an interest ledger is read as TDS",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|l| !not_tds.contains(l.as_str()))",
+  "to": "        .filter(|l| !l.is_empty())"
+ },
+ {
+  "id": "LR-34",
+  "by": "author (Lane E2)",
+  "what": "the deductor status unknown raises no s.194A finding",
+  "file": "src/loans_interest.rs",
+  "from": "            && (status == \"deductor\" || status == \"unknown\");",
+  "to": "            && status == \"deductor\";"
+ },
+ {
+  "id": "LR-35",
+  "by": "author (Lane E2)",
+  "what": "casefold ignores the measured table",
+  "file": "src/support.rs",
+  "from": "            Ok(i) => out.push_str(text_tables::PY_CASEFOLD[i].1),",
+  "to": "            Ok(_) => out.push_str(&py_lower(c.encode_utf8(&mut [0; 4]))),"
+ },
+ {
+  "id": "LR-36",
+  "by": "author (Lane E2)",
+  "what": "TDS on the same day as interest is read before it",
+  "file": "src/loans_interest.rs",
+  "from": "(&pop[a.0].date, u8::from(a.1 <= 0)).cmp(&(&pop[b.0].date, u8::from(b.1 <= 0)))",
+  "to": "(&pop[a.0].date, u8::from(a.1 > 0)).cmp(&(&pop[b.0].date, u8::from(b.1 > 0)))"
+ },
+ {
+  "id": "LR-37",
+  "by": "author (Lane E2)",
+  "what": "coverage allows no rupee of rounding per deduction",
+  "file": "src/loans_interest.rs",
+  "from": "                if tds_on_loan > 0 && covering >= expected - tolerance {",
+  "to": "                if tds_on_loan > 0 && covering >= expected {"
+ },
+ {
+  "id": "LR-38",
+  "by": "author (Lane E2)",
+  "what": "the s.194A rate on interest is rounded down, not half up",
+  "file": "src/loans_interest.rs",
+  "from": "                    .and_then(|x| x.checked_add(5000))",
+  "to": "                    .and_then(|x| x.checked_add(0))"
+ },
+ {
+  "id": "LR-39",
+  "by": "author",
+  "what": "a voucher with lines on one side of the loan only is read as two-sided",
+  "file": "src/loans_interest.rs",
+  "from": "    if !(on_loan().any(|l| l.amount_paise > 0) && on_loan().any(|l| l.amount_paise < 0)) {",
+  "to": "    if !(on_loan().any(|l| l.amount_paise > 0) || on_loan().any(|l| l.amount_paise < 0)) {"
+ },
+ {
+  "id": "LR-40",
+  "by": "author",
+  "what": "a balanced voucher on the loan alone is listed",
+  "file": "src/loans_interest.rs",
+  "from": "        return v\n            .lines\n            .iter()\n            .map(|l| i128::from(l.amount_paise))\n            .sum::<i128>()\n            != 0;",
+  "to": "        return true;"
+ },
+ {
+  "id": "LR-41",
+  "by": "author",
+  "what": "a TDS line no longer keeps a two-sided interest entry's interest reading",
+  "file": "src/loans_interest.rs",
+  "from": "            .all(|o| ledgers.interest.contains(*o) || ledgers.tds.contains(*o))",
+  "to": "            .all(|o| ledgers.interest.contains(*o))"
+ },
+ {
+  "id": "LR-42",
+  "by": "author",
+  "what": "a listed voucher is also netted into a taken or repaid row",
+  "file": "src/loans_interest.rs",
+  "from": "            continue; // listed by run(), never netted (#779 Phase A)",
+  "to": "            // listed by run(), and netted too"
+ },
+ {
+  "id": "LR-43",
+  "by": "author",
+  "what": "a listed voucher's credit side is left out of the loan's taken total",
+  "file": "src/loans_interest.rs",
+  "from": "        let taken_total: i128 = rows.taken.iter().map(|x| x.amount).sum::<i128>() + listed_credits;",
+  "to": "        let taken_total: i128 = rows.taken.iter().map(|x| x.amount).sum::<i128>();"
+ },
+ {
+  "id": "LR-44",
+  "by": "author",
+  "what": "a listed voucher carrying TDS but no interest does not reach s.194A",
+  "file": "src/loans_interest.rs",
+  "from": "                    l.amount_paise != 0 && (ils.contains(&l.ledger) || tds_here.contains(&l.ledger))",
+  "to": "                    l.amount_paise != 0 && ils.contains(&l.ledger)"
+ },
+ {
+  "id": "LR-45",
+  "by": "author",
+  "what": "the threshold is open whenever the interest crosses it with the listed interest",
+  "file": "src/loans_interest.rs",
+  "from": "        let threshold_open = !listed_194a.is_empty() && over_without != over_with;",
+  "to": "        let threshold_open = !listed_194a.is_empty() && over_with;"
+ },
+ {
+  "id": "LR-46",
+  "by": "author",
+  "what": "coverage is open with no TDS seen on the loan (a certain default lost)",
+  "file": "src/loans_interest.rs",
+  "from": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;",
+  "to": "        let coverage_open = !listed_194a.is_empty();"
+ },
+ {
+  "id": "LR-47",
+  "by": "author",
+  "what": "open coverage under the threshold makes the s.194A verdict open",
+  "file": "src/loans_interest.rs",
+  "from": "        let s194a_open = threshold_open || (coverage_open && over_without);",
+  "to": "        let s194a_open = threshold_open || coverage_open;"
+ },
+ {
+  "id": "LR-48",
+  "by": "author",
+  "what": "covered by amount, not by date where nothing is expected",
+  "file": "src/loans_interest.rs",
+  "from": "                } else if tds_on_loan >= expected - tolerance && expected - tolerance > 0 {",
+  "to": "                } else if tds_on_loan >= expected - tolerance {"
+ },
+ {
+  "id": "LR-49",
+  "by": "author",
+  "what": "the by-date shortfall is written as partly covered",
+  "file": "src/loans_interest.rs",
+  "from": "            let by_date = coverage == \"covered by amount, not by date\";",
+  "to": "            let by_date = false;"
+ },
+ {
+  "id": "LR-50",
+  "by": "author",
+  "what": "an open s.194A verdict still raises the ordinary s.194A finding",
+  "file": "src/loans_interest.rs",
+  "from": "        let over_194a = !s194a_open",
+  "to": "        let over_194a = true"
+ },
+ {
+  "id": "LR-51",
+  "by": "author",
+  "what": "a lender exempt from s.194A gets the not-computed s.194A record",
+  "file": "src/loans_interest.rs",
+  "from": "        if s194a_open && !ex.s194a.contains(lender_type) && matches!(status, \"deductor\" | \"unknown\")",
+  "to": "        if s194a_open && matches!(status, \"deductor\" | \"unknown\")"
+ },
+ {
+  "id": "LR-52",
+  "by": "author",
+  "what": "the open threshold's direction is read from the interest without the listed interest",
+  "file": "src/loans_interest.rs",
+  "from": "                                if over_with {",
+  "to": "                                if over_without {"
+ },
+ {
+  "id": "LR-53",
+  "by": "author",
+  "what": "an entry on the first listed voucher's own date does not depend on it",
+  "file": "src/loans_interest.rs",
+  "from": "    let after_listed = c.first_listed.is_some_and(|d| v.date >= *d);",
+  "to": "    let after_listed = c.first_listed.is_some_and(|d| v.date > *d);"
+ },
+ {
+  "id": "LR-54",
+  "by": "author",
+  "what": "an entry exactly at the limit after a listed voucher depends on it",
+  "file": "src/loans_interest.rs",
+  "from": "    if after_listed && amt < limit {",
+  "to": "    if after_listed && amt <= limit {"
+ },
+ {
+  "id": "LR-55",
+  "by": "author",
+  "what": "an entry names listed vouchers dated after it",
+  "file": "src/loans_interest.rs",
+  "from": "        .filter(|x| x.date <= v.date)",
+  "to": "        .filter(|_| true)"
+ },
+ {
+  "id": "LR-56",
+  "by": "author",
+  "what": "a row after a listed voucher keeps its balance figure",
+  "file": "src/loans_interest.rs",
+  "from": "    if !after_listed {\n        r.fig(",
+  "to": "    if true {\n        r.fig("
+ },
+ {
+  "id": "LR-57",
+  "by": "author",
+  "what": "a loan taken after a listed voucher keeps the below-zero note",
+  "file": "src/loans_interest.rs",
+  "from": "    if taken && prior < 0 && !after_listed {",
+  "to": "    if taken && prior < 0 {"
+ },
+ {
+  "id": "LR-58",
+  "by": "author",
+  "what": "a bank-only side of a listed voucher is a possible s.269SS/269T",
+  "file": "src/loans_interest.rs",
+  "from": "                        roles.keys().any(|(role, sd)| sd == side && *role != \"bank\")",
+  "to": "                        roles.keys().any(|(_, sd)| sd == side)"
+ },
+ {
+  "id": "LR-59",
+  "by": "author",
+  "what": "the first-date note is on every listed voucher",
+  "file": "src/loans_interest.rs",
+  "from": "                Some(&v.date) == first_listed,",
+  "to": "                true,"
+ },
+ {
+  "id": "LR-60",
+  "by": "author",
+  "what": "a forced set-off is stated on a voucher that does not balance",
+  "file": "src/loans_interest.rs",
+  "from": "    if set_off != 0 && balanced {\n        let id = r.fig(",
+  "to": "    if set_off != 0 {\n        let id = r.fig("
+ },
+ {
+  "id": "LR-61",
+  "by": "author",
+  "what": "LOAN-4 reads no TDS ledger, naming an interest entry net of TDS",
+  "file": "src/loans_interest.rs",
+  "from": "                    .all(|o| ils.contains(*o) || tds_read.contains(*o))",
+  "to": "                    .all(|o| ils.contains(*o))"
+ },
+ {
+  "id": "LR-62",
+  "by": "author",
+  "what": "LOAN-2 (E) does not accept a listed voucher against another loan's interest ledger",
+  "file": "src/loans_interest.rs",
+  "from": "        cited.extend(listed_sides(h, \"credit\").into_keys());",
+  "to": "        cited.extend(Vec::<String>::new());"
+ },
+ {
+  "id": "LR-63",
+  "by": "author",
+  "what": "LOAN-2 (A) reads a listed voucher's interest as misbucketed",
+  "file": "src/loans_interest.rs",
+  "from": "                let why = if listed_here.contains_key(&v.guid) {",
+  "to": "                let why = if false {"
  },
  {
   "id": "Y01",
@@ -3180,8 +3692,8 @@
   "by": "author (Lane B)",
   "what": "loans_interest: s.269SS/269T limit back in paise",
   "file": "src/loans_interest.rs",
-  "from": "limit_269_text = rupees(limit_269)",
-  "to": "limit_269_text = limit_269"
+  "from": "            rupees(limit_269),\n",
+  "to": "            limit_269,\n"
  },
  {
   "id": "PI-01",
@@ -5678,6 +6190,30 @@
   "file": "src/tds_payees.rs",
   "from": "        .filter(|g| !b_rows.contains(g))\n        .collect();\n    let listed",
   "to": "        .collect();\n    let listed"
+ },
+ {
+  "id": "LR-64",
+  "by": "author",
+  "what": "a refund-or-loan record on a loan with a listed voucher never says it was not compared with it",
+  "file": "src/loans_interest.rs",
+  "from": "            (!c.not_compared.is_empty()).then_some(c.not_compared),\n        );",
+  "to": "            None,\n        );"
+ },
+ {
+  "id": "LR-65",
+  "by": "author",
+  "what": "the not-computed s.194A record is raised for a deductor only, not for an unknown status",
+  "file": "src/loans_interest.rs",
+  "from": "        if s194a_open && !ex.s194a.contains(lender_type) && matches!(status, \"deductor\" | \"unknown\")",
+  "to": "        if s194a_open && !ex.s194a.contains(lender_type) && status == \"deductor\""
+ },
+ {
+  "id": "LR-66",
+  "by": "author",
+  "what": "a missing s.194A rate is read before open coverage (not judged where TDS sits on a listed voucher)",
+  "file": "src/loans_interest.rs",
+  "from": "            _ if coverage_open => \"not computed\",\n            None => \"not judged\",",
+  "to": "            None => \"not judged\",\n            _ if coverage_open => \"not computed\","
  },
  {
   "id": "F644-01",

@@ -1084,7 +1084,7 @@ mod tests {
         let loan = |t: &str| LoanConfig {
             lender: "L".to_string(),
             lender_type: t.to_string(),
-            interest_ledger: None,
+            interest_ledgers: BTreeSet::new(),
         };
         let loans = BTreeMap::from([
             ("Loan A".to_string(), loan("bank")),

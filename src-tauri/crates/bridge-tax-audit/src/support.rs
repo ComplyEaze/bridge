@@ -133,6 +133,22 @@ pub(crate) fn py_lower(text: &str) -> String {
     out
 }
 
+/// Python 3.13's `str.casefold()`: per character, the folded text where it differs from the
+/// lower case (`text_tables::PY_CASEFOLD`, every code point measured), else the character's own
+/// lower case, which may be longer than one character ("İ" lowers to "i" and U+0307). No
+/// final-sigma rule: casefold has none, and a lone capital sigma lowers to U+03C3 as it folds.
+pub(crate) fn py_casefold(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        let cp = u32::from(c);
+        match text_tables::PY_CASEFOLD.binary_search_by_key(&cp, |&(k, _)| k) {
+            Ok(i) => out.push_str(text_tables::PY_CASEFOLD[i].1),
+            Err(_) => out.push_str(&py_lower(c.encode_utf8(&mut [0; 4]))),
+        }
+    }
+    out
+}
+
 fn in_ranges(table: &[(u32, u32)], c: char) -> bool {
     let cp = u32::from(c);
     table
@@ -189,7 +205,7 @@ pub(crate) enum ReTok {
 
 /// Whether `c` matches the ASCII pattern character `p` under Python's `re.I`: its own two cases,
 /// plus the few non-ASCII characters `re.I` folds onto a letter (`text_tables::PY_CI_EXTRA`).
-fn py_ci_eq(c: char, p: char) -> bool {
+pub(crate) fn py_ci_eq(c: char, p: char) -> bool {
     if c.eq_ignore_ascii_case(&p) {
         return true;
     }
@@ -584,6 +600,30 @@ pub(crate) mod text_probe_tests {
 #[cfg(test)]
 mod tests {
     use super::{guid_tail12, py_lower, py_upper, rupees, LOWER_UNCHANGED, UPPER_UNCHANGED};
+
+    #[test]
+    fn casefold_folds_as_python_does() {
+        // Python 3.13: "ß".casefold() == "ss", "ẞ" -> "ss", "ﬁ" -> "fi", "ς" -> "σ", "Σ" -> "σ"
+        // (no final sigma), "µ" -> "μ", Cherokee small letters fold to capitals, and "İ" lowers to
+        // "i̇" as it folds; plain text folds to its lower case.
+        let cases = [
+            ("Straße", "strasse"),
+            ("STRAẞE", "strasse"),
+            ("ﬁnance", "finance"),
+            ("ΟΔΟΣ", "οδοσ"),
+            ("ς", "σ"),
+            ("µ", "μ"),
+            ("\u{ab70}", "\u{13a0}"),
+            ("İ", "i\u{307}"),
+            ("  Invented Lender ", "  invented lender "),
+        ];
+        for (text, folded) in cases {
+            assert_eq!(super::py_casefold(text), folded, "{text:?}");
+        }
+        assert!(crate::text_tables::PY_CASEFOLD
+            .windows(2)
+            .all(|w| w[0].0 < w[1].0));
+    }
 
     #[test]
     fn rupees_groups_as_the_reference_does() {

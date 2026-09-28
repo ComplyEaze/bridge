@@ -1,5 +1,5 @@
 {
- "comment": "tds_payees P2-2 at the reference's current head: a bill booked gross with its TDS debited back to the payee (Carrier A, a payee debit equal to the bill's own TDS) is rate-tested on its value before TDS and, deducted at the rate on its own voucher, leaves clause 21(b)(ii)(A) for the question on the payee's TDS; its only listing there still raises the s.194C(6) question on the goods-carriage ledger. A payee debit other than the bill's TDS (Contractor B) makes the bill untested and counted; a later voucher debiting the TDS ledger against it, with no bill of its to leave (ii)(A), adds no reversal guard. A later voucher debiting the TDS ledger against the payee (Contractor C) keeps its deducted bill in (ii)(A): the reversal is not judged. A cash-paid bill carrying TDS (no payee named) is counted as untested. Contractor D's bill (Rs 50,000.50 before TDS, Rs 499 deducted) is short of 1% only by the rate's rounding to the nearest paisa, and stays in (ii)(A).",
+ "comment": "tds_payees P2-2 at the reference's current head: a bill booked gross with its TDS debited back to the payee (Carrier A, a payee debit equal to the bill's own TDS) is rate-tested on its value before TDS and, deducted at the rate on its own voucher, leaves clause 21(b)(ii)(A) for the question on the payee's TDS; its only listing there still raises the s.194C(6) question on the goods-carriage ledger. A payee debit other than the bill's TDS (Contractor B) makes the bill untested and counted; a later voucher debiting the TDS ledger against it, with no bill of its to leave (ii)(A), adds no reversal guard. A later voucher debiting the TDS ledger against the payee (Contractor C) keeps its deducted bill in (ii)(A): the reversal is not judged. A cash-paid bill carrying TDS (no payee named) is counted as untested. Contractor D's bill (Rs 50,000.50 before TDS, Rs 499 deducted) is short of 1% only by the rate's rounding to the nearest paisa, and stays in (ii)(A). Contractor E's own bill also debits a GST ledger, so it is not rate-tested and is counted as untested.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -82,6 +82,22 @@
     "Current Liabilities"
    ],
    "guid": "edge-tds_payees_p22-008"
+  },
+  {
+   "name": "Input GST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-009"
+  },
+  {
+   "name": "Contractor E",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_p22-010"
   }
  ],
  "tb": [
@@ -121,6 +137,13 @@
    "closing": -4950150
   },
   {
+   "ledger": "Contractor E",
+   "opening": 0,
+   "debit": 0,
+   "credit": 11700000,
+   "closing": -11700000
+  },
+  {
    "ledger": "Freight",
    "opening": 0,
    "debit": 14000000,
@@ -130,16 +153,23 @@
   {
    "ledger": "Hire Charges",
    "opening": 0,
-   "debit": 25000050,
+   "debit": 35000050,
    "credit": 0,
-   "closing": 25000050
+   "closing": 35000050
+  },
+  {
+   "ledger": "Input GST",
+   "opening": 0,
+   "debit": 1800000,
+   "credit": 0,
+   "closing": 1800000
   },
   {
    "ledger": "TDS Payable 194C",
    "opening": 0,
    "debit": 150000,
-   "credit": 389900,
-   "closing": -239900
+   "credit": 489900,
+   "closing": -339900
   }
  ],
  "vouchers": [
@@ -294,6 +324,29 @@
      -49900
     ]
    ]
+  },
+  {
+   "guid": "p09",
+   "date": "2025-12-08",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     10000000
+    ],
+    [
+     "Input GST",
+     1800000
+    ],
+    [
+     "Contractor E",
+     -11700000
+    ],
+    [
+     "TDS Payable 194C",
+     -100000
+    ]
+   ]
   }
  ],
  "tests": [
@@ -309,5 +362,8 @@
  ],
  "goods_carriage_ledgers": [
   "Freight"
+ ],
+ "gst_ledgers": [
+  "Input GST"
  ]
 }

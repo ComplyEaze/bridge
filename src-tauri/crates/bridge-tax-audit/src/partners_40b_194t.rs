@@ -2938,6 +2938,100 @@ ledger shared by partners, on a voucher whose TDS is not booked against partners
     }
 
     #[test]
+    fn shared_tds_seen_on_a_partners_own_capital_is_not_also_listed_as_unattributed() {
+        // Kills PR-09 (`!seen.contains_key(&v.guid)` -> `true`): s1 touches A's capital and
+        // carries TDS, so it is in A's `seen`; it is also on the shared interest ledger with a bank
+        // on the TDS's side (not partners' TDS), so only the `seen` guard keeps it out of A's
+        // `unattributed`. The reference lists it for A as seen, never as "not judged".
+        let s1 = voucher(
+            "s1",
+            &[
+                ("Interest to Partners", 12_000_000),
+                ("Partner A", -5_400_000),
+                ("Bank", -5_400_000),
+                ("TDS Payable", -1_200_000),
+            ],
+        );
+        let r = go_shared(vec![s1], &format!("{SHARED}{DEED}"), &[]);
+        let ha = hash8("partner_a");
+        assert_eq!(tds_seen(&r, "partner_a"), "yes");
+        let t = found(&r, &format!("s194t/{ha}"));
+        assert_eq!(t.len(), 1);
+        assert_eq!(
+            t[0].title,
+            "Payments/credits to a partner over the s.194T threshold, with TDS seen on its \
+vouchers: which credits it covers, and its deposit, are the CA's to determine"
+        );
+        assert_eq!(
+            t[0].limits,
+            [
+                "Books only: TAN registration, challans filed and any Form 26A route are not \
+visible from vouchers.",
+                "1 interest or remuneration voucher(s) also credit a ledger this test does not read \
+(Journal s1 on 2026-03-31): the partner may be credited net of it, so this base may be understated.",
+                "1 interest or remuneration voucher(s) carry TDS but also credit another party \
+(Journal s1 on 2026-03-31): their TDS is not added back, so the interest or remuneration counted may \
+be understated by it.",
+                "1 voucher(s) touching this partner are not read exactly (Journal s1 on \
+2026-03-31): this base may be wrong in either direction.",
+                "TDS of ₹12,000 (net) is seen on 1 voucher(s) touching this partner: Journal s1 on \
+2026-03-31.",
+            ]
+        );
+        assert_eq!(
+            t[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "s1",
+                "Journal s1 on 2026-03-31"
+            )]
+        );
+    }
+
+    #[test]
+    fn shared_tds_on_a_remuneration_voucher_crediting_two_partners_is_cited() {
+        // Kills PR-12 (`remuneration_evidence.extend(shared_rem.clone())` dropped): r2's TDS side
+        // carries both partners' capitals, so for each it is a shared-TDS remuneration voucher.
+        // It is non-plain, but `other_rem` leaves shared-TDS vouchers out, it is not an interest
+        // voucher, and another partner's capital is no unread ledger: only `shared_rem` cites it.
+        let r2 = voucher(
+            "r2",
+            &[
+                ("Remuneration to Partners", 10_000_000),
+                ("Partner A", -4_500_000),
+                ("Partner B", -4_500_000),
+                ("TDS Payable", -1_000_000),
+            ],
+        );
+        let r = go(vec![r2], &format!("{SHARED}{DEED}"));
+        let (ha, hb) = (hash8("partner_a"), hash8("partner_b"));
+        for h in [&ha, &hb] {
+            assert_eq!(
+                fig(&r, &format!("remuneration_credited_{h}")).value,
+                Value::Int(4_500_000)
+            );
+        }
+        let b = found(&r, "remuneration_book_profit_required");
+        assert_eq!(b.len(), 1);
+        assert_eq!(
+            b[0].evidence,
+            [EvidenceRef::with_label(
+                "voucher",
+                "r2",
+                "Journal r2 on 2026-03-31"
+            )]
+        );
+        let note = |h: &str| {
+            format!(
+                "Partner (tag {h}): 1 remuneration voucher(s) carry TDS but also credit another \
+party (Journal r2 on 2026-03-31): the TDS is not divided between them, so remuneration_credited_{h} \
+is net of an unknown part of it."
+            )
+        };
+        assert_eq!(b[0].limits[2..], [note(&ha), note(&hb)]);
+    }
+
+    #[test]
     fn shared_tds_exactly_one_partners_stays_that_partners() {
         let a1 = voucher(
             "a1",

@@ -1100,8 +1100,10 @@ fn bound_loans(bound: &Engagement) -> Result<BTreeMap<String, loans_interest::Lo
 }
 
 /// Run `loans_interest` on a book and return its canonical parity dump, with the module's own
-/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, as
-/// the reference's pack reads it; absent without a `[tds]` table.
+/// LOAN-1/2/3 invariants. The previous-year turnover is `[tds].previous_year_turnover_paise`, and
+/// whether it is a placeholder `[tds].previous_year_turnover_status`, as the reference's pack reads
+/// them (absent without a `[tds]` table); the TDS-payable ledgers and `[deductor].activity` are read
+/// as for `tds_payees`.
 pub fn loans_interest_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1129,10 +1131,18 @@ pub fn loans_interest_on(
         rules,
         &entity_type,
         &loans,
-        turnover,
-        &cash,
-        &bank,
-        &shared,
+        &loans_interest::Inputs {
+            previous_year_turnover_paise: turnover,
+            cash: &cash,
+            bank: &bank,
+            shared_interest_ledgers: &shared,
+            tds_payable_ledgers: &tds_payable_ledgers(&bound)?,
+            deductor_activity: bound.deductor_activity,
+            turnover_is_placeholder: bound
+                .tds
+                .as_ref()
+                .is_some_and(|t| t.turnover_is_placeholder),
+        },
     )?;
     let module_check = loans_interest::check_invariants(book, &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
@@ -1607,7 +1617,7 @@ pub fn tds_payees_on(
 
 /// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
 /// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
-/// `partners_40b_194t`. Refuses a `[statutory_dues]` that is not a table.
+/// `partners_40b_194t` and `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
 pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>> {
     if bound.statutory_dues.not_a_table {
         return Err(AuditError::Config(

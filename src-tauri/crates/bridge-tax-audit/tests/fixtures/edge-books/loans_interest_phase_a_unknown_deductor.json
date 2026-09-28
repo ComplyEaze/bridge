@@ -1,0 +1,228 @@
+{
+ "comment": "loans_interest #779 Phase A review round, an individual whose previous-year turnover is a placeholder below both limits, activity not recorded (deductor status unknown, with the deductor-status question): a two-sided voucher carrying interest that takes the interest over the s.194A threshold, whether it crosses not computed (Crossing Loan); TDS on a two-sided voucher over the threshold, whether the TDS seen covers it not computed (Unknown Seen Loan), where LOAN-1 names the TDS (the reference's pinned OQ-2). Each is the not-computed s.194A record, raised for an unknown deductor status as for a deductor.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-002"
+  },
+  {
+   "name": "Crossing Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-003"
+  },
+  {
+   "name": "Unknown Seen Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-004"
+  },
+  {
+   "name": "Interest Crossing",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-005"
+  },
+  {
+   "name": "Interest Unknown Seen",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a_unknown_deductor-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6000000,
+   "closing": -6000000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 70000,
+   "closing": -70000
+  },
+  {
+   "ledger": "Crossing Loan",
+   "opening": -10000000,
+   "debit": 6000000,
+   "credit": 1300000,
+   "closing": -5300000
+  },
+  {
+   "ledger": "Interest Crossing",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 0,
+   "closing": 1300000
+  },
+  {
+   "ledger": "Interest Unknown Seen",
+   "opening": 0,
+   "debit": 10000000,
+   "credit": 0,
+   "closing": 10000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000,
+   "closing": -10000
+  },
+  {
+   "ledger": "Unknown Seen Loan",
+   "opening": -10000000,
+   "debit": 100000,
+   "credit": 10020000,
+   "closing": -19920000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "h01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Crossing",
+     800000
+    ],
+    [
+     "Crossing Loan",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "h02",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Crossing",
+     500000
+    ],
+    [
+     "Crossing Loan",
+     -500000
+    ],
+    [
+     "Crossing Loan",
+     6000000
+    ],
+    [
+     "Bank A",
+     -6000000
+    ]
+   ]
+  },
+  {
+   "guid": "s01",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Unknown Seen",
+     10000000
+    ],
+    [
+     "Unknown Seen Loan",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Unknown Seen Loan",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -10000
+    ],
+    [
+     "Unknown Seen Loan",
+     -20000
+    ],
+    [
+     "Cash",
+     -70000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "individual",
+ "previous_year_turnover_paise": 400000000,
+ "previous_year_turnover_status": "placeholder",
+ "loans": {
+  "Crossing Loan": {
+   "lender": "Invented Crossing Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Crossing"
+  },
+  "Unknown Seen Loan": {
+   "lender": "Invented Unknown Seen Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Unknown Seen"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

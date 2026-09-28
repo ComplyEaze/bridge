@@ -4,7 +4,7 @@
 //! Provenance: `rules/ay2026-27.s44ab.toml` holds byte-for-byte verbatim blocks of the
 //! reference implementation's own AY 2026-27 rules file -- `[meta]`, then `[s44ab]` as two blocks,
 //! then `[s40a3]` in full, then the first three lines of `[s269st]`, then `[s269ss_269t]`'s first
-//! three lines and its two lender-type lists with their status lines,
+//! three lines, its two lender-type lists with their status lines and the accepted-loans list,
 //! then `[depreciation]` in full with its three `[depreciation.blocks.<key>]` sub-tables, then
 //! `[due_dates]` as three blocks (header, the three dates, `status`), then `[ledger_scrutiny]` in
 //! full, then `[s194c]` and `[s194i]` in full, `[s194h]` and `[deductor]` as blocks cut clear of
@@ -28,7 +28,7 @@ use crate::error::{AuditError, Result};
 
 pub const VENDORED: &str = include_str!("../rules/ay2026-27.s44ab.toml");
 pub const VENDORED_SHA256: &str =
-    "dbccc747f7f9a24cbea6af90b49d615b9e0e48fd50afbfa065482ad2cc856f16";
+    "5485e9512b502cb0bcc4c10ed267fef32281d9e10acb0d87a4a55d153e633ec5";
 pub const SOURCE_PATH: &str = "the reference Python implementation's AY 2026-27 rules file";
 pub const SOURCE_SHA256: &str = "6a95baa80420c044f466320c92898240f7e6c292182fbffbe086207d87113857";
 pub const SOURCE_COMMIT: &str = "e2456bcf4f163cf770945e8620e715788db0ca46";
@@ -110,6 +110,10 @@ pub struct Rules {
     /// `partners_40b_194t`: `[s40b_v]`, the remuneration slab it quotes (never a computed limit).
     /// `None` without the table; the test then says the rules hold no slab.
     pub s40b_v: Option<S40bV>,
+    /// `loans_interest`: `[s269ss_269t].reporting_exempt_lender_types_accepted`, Clause
+    /// 31(a)/(b)'s own note (loans taken or accepted), `None` when absent (the test then uses its
+    /// default).
+    pub s269ss_269t_reporting_exempt_lender_types_accepted: Option<Vec<String>>,
     /// `partners_40b_194t`: `[s194t]`. `None` without the table; the test then uses its own
     /// prototype default and says so, as the reference does.
     pub s194t: Option<S194t>,
@@ -171,6 +175,8 @@ pub struct TdsRates {
     pub s194j_technical_bp: i64,
     /// `s194h_bp`: `None` when absent, as the reference's `tds_rates.get("s194h_bp")` reads it.
     pub s194h_bp: Option<i64>,
+    /// `s194a_bp`: `None` when absent (`loans_interest` then does not judge coverage).
+    pub s194a_bp: Option<i64>,
 }
 
 /// One `[entity.<type>]` table: the keys a ported test reads, each absent when the table omits
@@ -413,6 +419,16 @@ impl Rules {
                     })
                 })
                 .transpose()?,
+            s269ss_269t_reporting_exempt_lender_types_accepted: s269ss_269t
+                .contains_key("reporting_exempt_lender_types_accepted")
+                .then(|| {
+                    strings_in(
+                        s269ss_269t,
+                        "s269ss_269t",
+                        "reporting_exempt_lender_types_accepted",
+                    )
+                })
+                .transpose()?,
             s194t: optional("s194t")
                 .map(|t| -> Result<S194t> {
                     Ok(S194t {
@@ -456,6 +472,10 @@ impl Rules {
                         s194h_bp: t
                             .contains_key("s194h_bp")
                             .then(|| int_in(t, "tds_rates", "s194h_bp"))
+                            .transpose()?,
+                        s194a_bp: t
+                            .contains_key("s194a_bp")
+                            .then(|| int_in(t, "tds_rates", "s194a_bp"))
                             .transpose()?,
                     })
                 })
@@ -683,6 +703,12 @@ mod tests {
                 "statutory_corporation"
             ]
         );
+        assert_eq!(
+            rules
+                .s269ss_269t_reporting_exempt_lender_types_accepted
+                .unwrap(),
+            ["government_company", "bank", "statutory_corporation"]
+        );
     }
 
     /// The engine's own values (`load_rules("2026-27", ...)` at the reference commit).
@@ -716,6 +742,7 @@ mod tests {
                 s194j_professional_bp: 1000,
                 s194j_technical_bp: 200,
                 s194h_bp: Some(200),
+                s194a_bp: Some(1000),
             })
         );
     }

@@ -9,10 +9,11 @@
 #   3. [s269st]'s first three lines only (limit_per_person_per_day_paise, authority, status) --
 #      excludes the table's Circular 22/2017 discussion further down, which cites a private
 #      research note and is not read by any ported test.
-#   4. [s269ss_269t] as three blocks: its first three lines (limit_paise, authority, status);
-#      exempt_lender_types with its status line; and reporting_exempt_lender_types with its status
-#      line (the last two added for loans_interest). Excludes the comment lines between them,
-#      which cite private research notes.
+#   4. [s269ss_269t] as four blocks: its first three lines (limit_paise, authority, status);
+#      exempt_lender_types with its status line; reporting_exempt_lender_types with its status
+#      line; and reporting_exempt_lender_types_accepted alone (the last three added for
+#      loans_interest). Excludes the comment lines between them, which cite private research notes
+#      and the reference's own review history.
 #   5. [depreciation] in full, plus its three [depreciation.blocks.<key>] sub-tables
 #      (furniture_10, plant_machinery_15, computers_40) -- depreciation.rs reads every key in all
 #      four; excludes [s43b]/[s36_1_va] immediately after it in the source, unrelated to this test.
@@ -51,10 +52,10 @@
 #       authority and status. Excludes the header's comment lines (module history) and
 #       collected_not_paid_rate_bp, which no ported test reads and whose comment cites private
 #       research.
-#   17. [tds_rates] (added for tds_interest_201's defaults), as four blocks: the header alone; its
-#       seven rate lines; `s194h_bp` cut at its value (added for tds_payees); and `status`. Excludes
-#       the header's comment lines, `s194a_bp` (no ported test reads it yet) and `authority`, which
-#       name the reference's own modules.
+#   17. [tds_rates] (added for tds_interest_201's defaults), as five blocks: the header alone; its
+#       seven rate lines; `s194h_bp` cut at its value (added for tds_payees); `s194a_bp` in full
+#       (added for loans_interest); and `status`. Excludes the header's comment lines and
+#       `authority`, which name the reference's own modules.
 #   18. [s40b_v] (added for partners_40b_194t, which quotes the slab and its authority) as two
 #       blocks: the header alone, then its four values, authority and `status` cut at its value.
 #       Excludes the header's comment lines and the status line's trailing comment, which name the
@@ -104,6 +105,8 @@ exempt_lender_types_status = "confirm"   # the table's own status above covers l
 
 reporting_exempt_lender_types = ["government", "government_company", "bank", "statutory_corporation"]
 reporting_exempt_lender_types_status = "confirm"
+
+reporting_exempt_lender_types_accepted = ["government_company", "bank", "statutory_corporation"]
 
 [depreciation]
 half_rate_days_threshold = 180                      # put to use for less than 180 days: half the rate
@@ -239,6 +242,8 @@ s194j_technical_bp = 200
 s194t_bp = 1000
 
 s194h_bp = 200
+
+s194a_bp = 1000  # s.194A(1): interest other than interest on securities, where the payee furnishes a PAN (s.206AA otherwise)
 
 status = "confirm"
 

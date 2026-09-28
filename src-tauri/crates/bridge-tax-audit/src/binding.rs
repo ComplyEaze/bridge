@@ -755,15 +755,26 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         let mut entry = raw_loan_ledgers.expect("a key came from the table")[orig].clone();
         if let Some(t) = entry.as_table_mut() {
             if let Some(v) = t.get("interest_ledger") {
+                // One name, or (since the reference's 25-Sep change) a non-empty list of names,
+                // written back in the shape it was given.
                 let location = format!("loans.loan_ledgers.{orig}.interest_ledger");
-                let name = v.as_str().ok_or_else(|| {
+                let malformed = || {
                     AuditError::refused(
                         BIND_ID_MALFORMED,
-                        format!("{location}: expected a name, got {v}"),
+                        format!("{location}: expected a name or a list of names, got {v}"),
                     )
-                })?;
-                let name = lbinder.bind_one(name, &location)?;
-                t.insert("interest_ledger".to_string(), toml::Value::from(name));
+                };
+                let bound = match v {
+                    toml::Value::String(name) => {
+                        toml::Value::from(lbinder.bind_one(name, &location)?)
+                    }
+                    toml::Value::Array(items) if !items.is_empty() => {
+                        let names = names_at(v, &location).map_err(|_| malformed())?;
+                        toml::Value::from(lbinder.bind_list(&names, &location)?)
+                    }
+                    _ => return Err(malformed()),
+                };
+                t.insert("interest_ledger".to_string(), bound);
             }
         }
         loan_ledgers.insert(bound.clone(), entry);
@@ -1465,6 +1476,54 @@ mod tests {
         );
         let err = e.bind(&b).unwrap_err();
         assert_eq!(err.code(), Some(BIND_COLLISION));
+    }
+
+    /// A loan's `interest_ledger` may be one name or a non-empty list of names (the reference's
+    /// `name_or_list`): each name is bound, and the value keeps the shape it was given. Anything
+    /// else is refused as malformed, naming the location.
+    #[test]
+    fn a_loans_interest_ledger_list_binds_each_name_in_its_shape() {
+        let loans = |interest: &str| {
+            format!(
+                "\n[ledger_ids]\n\"Old Interest\" = {G_ROUNDOFF:?}\n\
+                 \n[loans.loan_ledgers.\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = {interest}\n\
+                 \n[loans.loan_ledgers.\"Loan B\"]\nlender = \"y\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = \"Fee\"\n"
+            )
+        };
+        let mut b = book("Cash-in-Hand", "", None);
+        for (name, group, guid) in [
+            ("Loan A", "Unsecured Loans", ""),
+            ("Loan B", "Unsecured Loans", ""),
+            ("Fee", "Indirect Expenses", ""),
+            ("Renamed Interest", "Indirect Expenses", G_ROUNDOFF),
+        ] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, group, guid, None));
+        }
+        let (bound, _) = engagement(&loans("[\"Old Interest\", \"Fee\"]"))
+            .bind(&b)
+            .unwrap();
+        let entry = |l: &str| bound.loans.loan_ledgers[l]["interest_ledger"].clone();
+        assert_eq!(
+            entry("Loan A"),
+            toml::Value::from(vec!["Renamed Interest".to_string(), "Fee".to_string()])
+        );
+        assert_eq!(entry("Loan B"), toml::Value::from("Fee"));
+        for bad in ["[]", "[\"Fee\", 3]", "5"] {
+            let err = engagement(&loans(bad)).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_ID_MALFORMED), "{bad}");
+            assert!(
+                format!("{err}").contains("loans.loan_ledgers.Loan A.interest_ledger"),
+                "{bad}: {err}"
+            );
+        }
+        let err = engagement(&loans("[\"Old Interest\", \"No Such Ledger\"]"))
+            .bind(&b)
+            .unwrap_err();
+        assert_ne!(err.code(), Some(BIND_ID_MALFORMED));
+        assert!(format!("{err}").contains("No Such Ledger"), "{err}");
     }
 
     // ---- depreciation locations ----
@@ -2372,6 +2431,78 @@ deductor_aliases = 5\n"
             );
             assert!(crate::loans_interest_on(&e, &b, &rules).is_err(), "{extra}");
         }
+    }
+
+    /// `loans_interest_on` passes the test what the reference's pack passes: the ledgers
+    /// `[statutory_dues]` classifies as TDS payable, `[deductor].activity`, and whether
+    /// `[tds].previous_year_turnover_status` is a placeholder. Each is shown to reach the result.
+    #[test]
+    fn loans_interest_on_passes_the_tds_ledgers_activity_and_placeholder() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let mut b = book_with_loan("Loan A", "", "Loan Interest", "");
+        b.ledgers.insert(
+            "TDS Payable".to_string(),
+            ledger("TDS Payable", "Duties & Taxes", "", None),
+        );
+        let line = |ledger: &str, amount_paise: i64| LedgerLine {
+            ledger: ledger.to_string(),
+            amount_paise,
+        };
+        b.vouchers.push(Voucher {
+            guid: "loan-interest-net-of-tds".to_string(),
+            date: TallyDate::parse("20250930".to_string()).unwrap(),
+            vtype: "Journal".to_string(),
+            base_type: "Journal".to_string(),
+            status: VoucherStatus::Regular,
+            lines: vec![
+                line("Loan Interest", 1_200_000),
+                line("Loan A", -1_080_000),
+                line("TDS Payable", -120_000),
+            ],
+            ..Default::default()
+        });
+        let run = |extra: &str| {
+            let mut e = engagement(&format!(
+                "\n[loans.loan_ledgers.\"Loan A\"]\nlender = \"x\"\nlender_type = \"nbfc\"\n\
+                 interest_ledger = \"Loan Interest\"\n{extra}"
+            ));
+            e.entity_type = Some("individual".to_string());
+            crate::loans_interest_on(&e, &b, &rules).unwrap()
+        };
+        let value = |dump: &serde_json::Value, prefix: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"].as_str().unwrap().starts_with(prefix))
+                .map(|f| f["value"].clone())
+        };
+        // Without [statutory_dues] the TDS line is no TDS: the journal is a loan taken.
+        let interest = "loans_interest.interest_total_";
+        assert_eq!(value(&run(""), interest), Some(serde_json::json!(0)));
+        let dues = "\n[statutory_dues.nature_by_ledger]\n\"TDS Payable\" = \"tds_payable\"\n";
+        assert_eq!(
+            value(&run(dues), interest),
+            Some(serde_json::json!(1_200_000))
+        );
+        // Rs 60 lakh: over the profession limit, under the business limit.
+        let status = |activity: &str, turnover_status: &str| {
+            let dump = run(&format!(
+                "\n[tds]\nnature_by_ledger = {{}}\npayee_aliases = {{}}\n\
+                 previous_year_turnover_paise = 600000000\n{turnover_status}\
+                 \n[deductor]\nactivity = \"{activity}\"\n"
+            ));
+            value(&dump, "loans_interest.deductor_status").unwrap()
+        };
+        assert_eq!(status("profession", ""), serde_json::json!("deductor"));
+        assert_eq!(status("business", ""), serde_json::json!("not_deductor"));
+        assert_eq!(
+            status(
+                "business",
+                "previous_year_turnover_status = \"placeholder\"\n"
+            ),
+            serde_json::json!("unknown")
+        );
     }
 
     // ---- config parse errors surface through Engagement::from_toml, not bind ----

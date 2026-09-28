@@ -3329,3 +3329,48 @@ async fn a_changed_ledger_refusal_names_no_ledger_under_mask_parties() {
         "{result}"
     );
 }
+
+/// A post whose readback fails after its masters check found a changed ledger
+/// reports that check with the ledger marked: named under none, masked under
+/// mask_parties.
+#[tokio::test]
+async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
+    let replaced = replaced_once(
+        &catalogue(),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+    );
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        // No readback is scripted, so the read after the post fails.
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.push(xml(masters_moved_to(8)));
+        plans.extend(paired(replaced.clone()));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_redacting(simulator.address(), directory.path(), redaction);
+        let args = saved_captured_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["masters_after_post"]["state"], "posted_under_changed_masters",
+            "{response}"
+        );
+        let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
+        assert_eq!(ledgers.len(), 1, "{response}");
+        assert_eq!(
+            ledgers[0] == "Cash",
+            redaction == crate::agent::Redaction::None,
+            "{response}"
+        );
+    }
+}

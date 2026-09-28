@@ -344,3 +344,43 @@ fn party_count_deduplicates_nonzero_bill_and_unallocated_parties() {
         3
     );
 }
+
+/// bridge#833: every statement and the manifest a batch writes are recorded as
+/// Bridge's own exports, so the documents uploader leaves them out of a
+/// folder the user syncs.
+#[test]
+fn every_file_a_batch_writes_is_recorded_as_an_export() {
+    crate::export_registry::init_for_tests();
+    let destination = tempfile::tempdir().expect("temporary destination");
+    let approved = approved_destination(destination.path());
+    let marker = uuid::Uuid::new_v4().to_string();
+    let result = write_bulk_party_statements(
+        &approved,
+        "Synthetic Books Pvt Ltd",
+        "20260808",
+        "xlsx",
+        &[
+            bill("Synthetic Party A", "15.00"),
+            bill("Synthetic Party B", "20.00"),
+        ],
+        &[],
+        |statement| Ok(format!("{marker} {}", statement.party).into_bytes()),
+    )
+    .expect("statement batch succeeds");
+    assert_eq!(result.written.len(), 2);
+    let recorded = crate::export_registry::recorded().expect("read the registry");
+    let mut files = result
+        .written
+        .iter()
+        .map(|written| destination.path().join(&written.file_name))
+        .collect::<Vec<_>>();
+    files.push(PathBuf::from(&result.manifest_path));
+    for file in files {
+        let bytes = fs::read(&file).expect("written file");
+        assert!(
+            recorded.contains(&crate::export_registry::content_sha256(&bytes)),
+            "{}",
+            file.display()
+        );
+    }
+}

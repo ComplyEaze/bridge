@@ -297,6 +297,16 @@ where
             "statement-{}-{as_of_yyyymmdd}",
             safe_party_slug(&statement.party)
         );
+        // Recorded before it is written, so the documents uploader never finds
+        // a statement Bridge wrote that it does not know (bridge#833).
+        if crate::export_registry::record(&bytes).is_err() {
+            failures.push(StatementFailure {
+                party,
+                code: StatementFailureCode::Write,
+                reason: UNRECORDED_EXPORT.to_string(),
+            });
+            continue;
+        }
         match write_unique_file(destination, &stem, format, &bytes) {
             Ok(path) => written.push(WrittenStatement {
                 party,
@@ -322,6 +332,7 @@ where
     };
     let manifest_bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| format!("Bridge could not build the statement manifest: {error}"))?;
+    crate::export_registry::record(&manifest_bytes).map_err(|_| UNRECORDED_EXPORT.to_string())?;
     let manifest_path = write_unique_file(
         destination,
         &format!("statement-manifest-{as_of_yyyymmdd}"),
@@ -416,6 +427,12 @@ fn safe_party_slug(party: &str) -> String {
         trimmed.chars().take(120).collect()
     }
 }
+
+/// Why a statement or manifest was not written: Bridge could not record it as
+/// its own export, and an unrecorded one could later be uploaded from a synced
+/// folder (bridge#833).
+const UNRECORDED_EXPORT: &str =
+    "Bridge could not record this file as its own export, so it did not write it.";
 
 /// Creates a previously unused filename. `create_new` closes the race between
 /// candidate selection and writing, so neither a same-run slug collision nor

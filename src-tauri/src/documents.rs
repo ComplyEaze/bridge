@@ -188,6 +188,11 @@ pub async fn scan_documents(
     let mut skipped = Vec::new();
     let mut relative_paths = HashSet::new();
     let excluded = normalized_exclusions(request.excluded_extensions.clone());
+    // Bridge's own exports hold Tally data: they are listed as skipped, never
+    // uploaded (bridge#833). Checked during the walk, so an export takes no
+    // place under the file cap or a relative path, and again after it. A
+    // record that cannot be read stops the scan rather than let one through.
+    let exports = recorded_exports()?;
     let max_file_size = request
         .max_file_size
         .unwrap_or(DEFAULT_MAX_FILE_SIZE)
@@ -242,9 +247,13 @@ pub async fn scan_documents(
             )
             .await
             {
-                Ok(Some(file)) => {
-                    push_unique_file(&mut files, &mut relative_paths, file, &mut skipped)
-                }
+                Ok(Some(file)) => push_unique_file(
+                    &mut files,
+                    &mut relative_paths,
+                    file,
+                    &mut skipped,
+                    &exports,
+                ),
                 Ok(None) => {}
                 Err(error) => skipped.push(SkippedFile {
                     path: display_root.clone(),
@@ -336,9 +345,13 @@ pub async fn scan_documents(
                     match inspect_file(&canonical_entry, &root, &request, max_file_size, &excluded)
                         .await
                     {
-                        Ok(Some(file)) => {
-                            push_unique_file(&mut files, &mut relative_paths, file, &mut skipped)
-                        }
+                        Ok(Some(file)) => push_unique_file(
+                            &mut files,
+                            &mut relative_paths,
+                            file,
+                            &mut skipped,
+                            &exports,
+                        ),
                         Ok(None) => {}
                         Err(error) => skipped.push(SkippedFile {
                             path: relative_display(&entry_path, &root),
@@ -356,6 +369,19 @@ pub async fn scan_documents(
             reason: format!("Scan stopped at the {MAX_SCANNED_FILES}-file safety limit"),
         });
     }
+    // Read again: an export Bridge wrote while this scan ran was recorded
+    // before it was written, so it is caught here.
+    let exports = recorded_exports()?;
+    files.retain(|file| {
+        let export = exports.contains(&file.integrity_hash);
+        if export {
+            skipped.push(SkippedFile {
+                path: file.relative_path.clone(),
+                reason: BRIDGE_EXPORT_SKIPPED.to_string(),
+            });
+        }
+        !export
+    });
     let total_size = files.iter().map(|file| file.size).sum();
     let registry_files = files
         .iter()
@@ -692,12 +718,33 @@ fn resolve_scanned_files(
     Ok(resolved)
 }
 
+/// The content hashes of Bridge's own exports, or the scan's error.
+fn recorded_exports() -> anyhow::Result<HashSet<String>> {
+    crate::export_registry::recorded().map_err(|code| {
+        anyhow::anyhow!(
+            "Bridge could not read its record of the files it exported ({code}), so this scan lists nothing to upload. Select the folder again; if this repeats, contact support."
+        )
+    })
+}
+
+/// Why a file Bridge itself exported is not uploaded (bridge#833).
+pub const BRIDGE_EXPORT_SKIPPED: &str =
+    "Exported by ComplyEaze Bridge from Tally data, so it is not uploaded";
+
 fn push_unique_file(
     files: &mut Vec<DocumentFile>,
     relative_paths: &mut HashSet<String>,
     file: DocumentFile,
     skipped: &mut Vec<SkippedFile>,
+    exports: &HashSet<String>,
 ) {
+    if exports.contains(&file.integrity_hash) {
+        skipped.push(SkippedFile {
+            path: file.relative_path,
+            reason: BRIDGE_EXPORT_SKIPPED.to_string(),
+        });
+        return;
+    }
     if files.len() >= MAX_SCANNED_FILES {
         return;
     }

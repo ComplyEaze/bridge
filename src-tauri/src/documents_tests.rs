@@ -296,3 +296,99 @@ async fn windows_junction_escape_is_rejected() {
         .contains("Symbolic links and filesystem reparse points")));
     std::fs::remove_dir(&junction).expect("remove junction");
 }
+
+/// bridge#833: a file Bridge exported, found in a folder the user chose, is
+/// listed as skipped with its reason and never uploaded, while the user's own
+/// file beside it, and an edited copy of the export, are scanned as usual.
+#[tokio::test]
+async fn a_bridge_export_in_a_chosen_folder_is_skipped_but_a_user_file_is_not() {
+    crate::export_registry::init_for_tests();
+    let export = format!("statement {}", uuid::Uuid::new_v4()).into_bytes();
+    crate::export_registry::record(&export).expect("record the export");
+    let selected = tempfile::tempdir().expect("selected directory");
+    std::fs::write(
+        selected.path().join("statement-party-20260928.xlsx"),
+        &export,
+    )
+    .unwrap();
+    std::fs::write(selected.path().join("renamed.xlsx"), &export).unwrap();
+    std::fs::write(selected.path().join("invoice.pdf"), b"the user's own file").unwrap();
+    let mut edited = export.clone();
+    edited.extend_from_slice(b" edited");
+    std::fs::write(selected.path().join("statement-edited.xlsx"), edited).unwrap();
+    let selections =
+        authorize_selected_paths(vec![selected.path().to_path_buf()]).expect("authorize directory");
+    let response = scan_documents(ScanDocumentsRequest {
+        selection_ids: vec![selections[0].selection_id.clone()],
+        use_hash: true,
+        max_file_size: None,
+        excluded_extensions: None,
+        exclude_hidden_files: true,
+        exclude_zero_byte_files: true,
+    })
+    .await
+    .expect("scan directory");
+    let mut scanned = response
+        .files
+        .iter()
+        .map(|file| file.relative_path.as_str())
+        .collect::<Vec<_>>();
+    scanned.sort_unstable();
+    assert_eq!(scanned, ["invoice.pdf", "statement-edited.xlsx"]);
+    let mut skipped = response
+        .skipped
+        .iter()
+        .map(|file| (file.path.as_str(), file.reason.as_str()))
+        .collect::<Vec<_>>();
+    skipped.sort_unstable();
+    assert_eq!(
+        skipped,
+        [
+            ("renamed.xlsx", super::BRIDGE_EXPORT_SKIPPED),
+            (
+                "statement-party-20260928.xlsx",
+                super::BRIDGE_EXPORT_SKIPPED
+            ),
+        ]
+    );
+}
+
+/// bridge#833: an export takes no relative path from the user's own file of
+/// the same name in another selected folder.
+#[tokio::test]
+async fn an_export_does_not_take_a_user_files_name_in_another_folder() {
+    crate::export_registry::init_for_tests();
+    let export = format!("statement {}", uuid::Uuid::new_v4()).into_bytes();
+    crate::export_registry::record(&export).expect("record the export");
+    let first = tempfile::tempdir().expect("first directory");
+    let second = tempfile::tempdir().expect("second directory");
+    std::fs::write(first.path().join("x.xlsx"), &export).unwrap();
+    std::fs::write(second.path().join("x.xlsx"), b"the user's own workbook").unwrap();
+    let selections = authorize_selected_paths(vec![
+        first.path().to_path_buf(),
+        second.path().to_path_buf(),
+    ])
+    .expect("authorize directories");
+    let response = scan_documents(ScanDocumentsRequest {
+        selection_ids: selections
+            .iter()
+            .map(|selection| selection.selection_id.clone())
+            .collect(),
+        use_hash: true,
+        max_file_size: None,
+        excluded_extensions: None,
+        exclude_hidden_files: true,
+        exclude_zero_byte_files: true,
+    })
+    .await
+    .expect("scan directories");
+    assert_eq!(response.files.len(), 1, "{:?}", response.skipped.len());
+    assert_eq!(response.files[0].relative_path, "x.xlsx");
+    assert_eq!(response.files[0].size, 23);
+    let reasons = response
+        .skipped
+        .iter()
+        .map(|file| file.reason.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(reasons, [super::BRIDGE_EXPORT_SKIPPED]);
+}

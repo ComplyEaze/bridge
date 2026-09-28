@@ -82,6 +82,17 @@ you should know they are present before deciding what to run on a machine
 holding client books. Both are documented under *Integration trust
 boundaries* below.
 
+A folder you choose to sync can also hold files Bridge exported from Tally,
+such as party statements. Bridge records the content hash of each party
+statement batch it writes (the statements and their manifest), and the document
+feature lists any file with a recorded hash as skipped and does not upload it,
+even if it was renamed or moved. A copy that has changed in any way, even by
+being opened and saved again in Excel, has another hash and is treated as your
+own file. Bridge remembers about the last 20,000 files it exported. Not yet
+recognised: exports Bridge wrote before this version, and the working paper,
+single statement, outstandings CSV, trial balance and ledger master saved to
+your Downloads folder (bridge#833). Move those out of a synced folder yourself.
+
 **One thing to understand before you use it.** When you ask an AI assistant for
 financial data through Bridge, the assistant's provider sees what it reads —
 company names, party names and amounts. That is a property of using a hosted

@@ -845,7 +845,6 @@ fn synthetic_probe_result() -> TallyProbeResult {
             features: BTreeMap::new(),
             packs: BTreeMap::new(),
         },
-        selected_read_scope: None,
         passport_snapshot_id: None,
     }
 }

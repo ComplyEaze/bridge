@@ -17,10 +17,7 @@ pub mod xml_parser;
 mod canonical_window;
 
 pub use bridge_tally_core as core;
-pub use connection::{
-    ConnectionStatus, SelectedReadScopeEvidence, TallyClient, TallyConfig, TallyProbeResult,
-    TallyProduct,
-};
+pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult, TallyProduct};
 pub(crate) use connector::core_snapshot_start_authorized_codes;
 pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,

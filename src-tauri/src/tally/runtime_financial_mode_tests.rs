@@ -92,7 +92,6 @@ fn stale_cache(runtime: &TallyRuntime, config: &TallyConfig) {
                 features: Default::default(),
                 packs: Default::default(),
             },
-            selected_read_scope: None,
             passport_snapshot_id: None,
         },
     });

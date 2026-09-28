@@ -1233,7 +1233,7 @@ no partner; the CA computes it"
             let mut ask_client = Vec::new();
             // Asked for the computation unless it is computed, or the deed authorises no interest
             // and no interest ledger is configured (nothing to ask).
-            if !excess_computed && !(no_interest && no_interest_ledger) {
+            if !(excess_computed || (no_interest && no_interest_ledger)) {
                 ask_client.push(if no_interest {
                     "The s.40(b) computation for this partner: the interest credited (the deed \
 authorises none, so all of it is disallowed)."
@@ -1857,7 +1857,7 @@ mod tests {
                 .collect(),
             vouchers,
             tb: BTreeMap::from([
-                ("Partner A".to_string(), row(-10_00_000_00)),
+                ("Partner A".to_string(), row(-100_000_000)),
                 ("Partner B".to_string(), row(0)),
             ]),
             ..Default::default()
@@ -2276,8 +2276,8 @@ names; got {got}"
         let book = book_of(vec![voucher(
             "p1",
             &[
-                ("Interest to Partners", 5_00_000_00),
-                ("Partner A", -5_00_000_00),
+                ("Interest to Partners", 50_000_000),
+                ("Partner A", -50_000_000),
             ],
         )]);
         let tds = BTreeSet::from(["TDS Payable".to_string()]);
@@ -2301,8 +2301,8 @@ names; got {got}"
             vec![voucher(
                 "p1",
                 &[
-                    ("Interest to Partners", 5_00_000_00),
-                    ("Partner A", -5_00_000_00),
+                    ("Interest to Partners", 50_000_000),
+                    ("Partner A", -50_000_000),
                 ],
             )]
         };
@@ -2329,7 +2329,7 @@ partner; the CA computes it"
         );
         assert_eq!(
             fig(&r, &format!("interest_credited_{h}")).value,
-            Value::Int(5_00_000_00)
+            Value::Int(50_000_000)
         );
         for name in ["interest_credited", "allowable_interest"] {
             assert!(fig(&r, &format!("{name}_{h}"))
@@ -2354,13 +2354,13 @@ are read as capital; configure the remuneration ledger."
         assert!(found(&r, "s40b_not_computed/").is_empty());
         assert_eq!(
             fig(&r, &format!("allowable_interest_{h}")).value,
-            Value::Int(1_00_000_00)
+            Value::Int(10_000_000)
         );
         assert_eq!(
             fig(&r, &format!("s40b_excess_{h}")).value,
-            Value::Int(4_00_000_00)
+            Value::Int(40_000_000)
         );
-        assert_eq!(fig(&r, "s40b_excess_total").value, Value::Int(4_00_000_00));
+        assert_eq!(fig(&r, "s40b_excess_total").value, Value::Int(40_000_000));
         assert!(!has_fig(&r, "s40b_excess_total_not_computed"));
         let e = found(&r, "s40b_excess/");
         assert_eq!(e.len(), 1);
@@ -2381,7 +2381,7 @@ remuneration ledger."
                 &[("Interest to Partners", paise), ("Partner A", -paise)],
             )]
         };
-        let r = go(credit(20_000_00), &format!("{ONE}{DEED}"));
+        let r = go(credit(2_000_000), &format!("{ONE}{DEED}"));
         let h = hash8("partner_a");
         let t = found(&r, &format!("s194t/{h}"));
         assert_eq!(
@@ -2399,7 +2399,7 @@ wrong (above), so whether it crosses the threshold is not computed."
             .ends_with(
                 " It may be wrong in either direction: see this partner's s.194T question."
             ));
-        let r = go(credit(20_000_01), &format!("{ONE}{DEED}"));
+        let r = go(credit(2_000_001), &format!("{ONE}{DEED}"));
         assert_eq!(
             found(&r, &format!("s194t/{h}"))[0].title,
             "Payments/credits to a partner over the s.194T threshold with no TDS ledger line seen"
@@ -2413,8 +2413,8 @@ wrong (above), so whether it crosses the threshold is not computed."
                 true,
             )
         };
-        assert!(found(&on(20_000_00).unwrap(), "s194t/").is_empty());
-        assert_eq!(found(&on(20_000_01).unwrap(), "s194t/").len(), 1);
+        assert!(found(&on(2_000_000).unwrap(), "s194t/").is_empty());
+        assert_eq!(found(&on(2_000_001).unwrap(), "s194t/").len(), 1);
     }
 
     #[test]
@@ -2462,10 +2462,10 @@ the statutory cap"
         let j1 = voucher(
             "j1",
             &[
-                ("Interest to Partners", 44_000_00),
-                ("Partner A", -19_800_00),
-                ("Partner B", -19_800_00),
-                ("TDS Payable", -4_400_00),
+                ("Interest to Partners", 4_400_000),
+                ("Partner A", -1_980_000),
+                ("Partner B", -1_980_000),
+                ("TDS Payable", -440_000),
             ],
         );
         let r = go(vec![j1], &format!("{TWO}{DEED}"));
@@ -2473,7 +2473,7 @@ the statutory cap"
         // Not added back: the partner's interest is read net of an unknown part of it.
         assert_eq!(
             fig(&r, &format!("interest_credited_{h}")).value,
-            Value::Int(19_800_00)
+            Value::Int(1_980_000)
         );
         let f = found(&r, &format!("s40b_not_computed/{h}"));
         assert_eq!(
@@ -2541,9 +2541,9 @@ wrong (above), so whether it crosses the threshold is not computed.",
             vec![voucher(
                 "i1",
                 &[
-                    ("Interest to Partners", 90_000_00),
-                    ("Partner A", -81_000_00),
-                    ("TDS on Partners 194T", -9_000_00),
+                    ("Interest to Partners", 9_000_000),
+                    ("Partner A", -8_100_000),
+                    ("TDS on Partners 194T", -900_000),
                 ],
             )]
         };
@@ -2552,7 +2552,7 @@ wrong (above), so whether it crosses the threshold is not computed.",
         let h = hash8("partner_a");
         assert_eq!(
             fig(&r, &format!("interest_credited_{h}")).value,
-            Value::Int(81_000_00)
+            Value::Int(8_100_000)
         );
         let f = found(&r, &format!("s40b_not_computed/{h}"));
         assert_eq!(
@@ -2599,7 +2599,7 @@ TDS payable in your statutory dues; otherwise, what it is.",
         assert!(found(&r, "s40b_not_computed/").is_empty());
         assert_eq!(
             fig(&r, &format!("interest_credited_{h}")).value,
-            Value::Int(90_000_00)
+            Value::Int(9_000_000)
         );
     }
 
@@ -2610,8 +2610,8 @@ TDS payable in your statutory dues; otherwise, what it is.",
         let t7 = voucher(
             "t7",
             &[
-                ("Interest to Partners", 50_000_00),
-                ("Partner A", -45_000_00),
+                ("Interest to Partners", 5_000_000),
+                ("Partner A", -4_500_000),
             ],
         );
         let r = go(vec![t7], &format!("{ONE}{DEED}"));
@@ -2649,8 +2649,8 @@ remuneration_ledger = \"Remuneration to Partners\"\n{DEED}"
             vec![voucher(
                 "o1",
                 &[
-                    ("Remuneration to Partners", 60_000_00),
-                    ("Partner A", -60_000_00),
+                    ("Remuneration to Partners", 6_000_000),
+                    ("Partner A", -6_000_000),
                 ],
             )]
         };
@@ -2690,8 +2690,8 @@ exactly; the CA computes it"
             let iz = voucher(
                 "iz",
                 &[
-                    ("Interest to Partners", 70_000_00),
-                    ("Cash", -70_000_00),
+                    ("Interest to Partners", 7_000_000),
+                    ("Cash", -7_000_000),
                     (cap, 0),
                 ],
             );
@@ -2718,16 +2718,16 @@ exactly; the CA computes it"
         let a2 = voucher(
             "a2",
             &[
-                ("Interest to Partners", 12_000_00),
-                ("Partner A", -10_800_00),
-                ("TDS Payable", -1_200_00),
+                ("Interest to Partners", 1_200_000),
+                ("Partner A", -1_080_000),
+                ("TDS Payable", -120_000),
             ],
         );
         let b1 = voucher(
             "b1",
             &[
-                ("Interest to Partners", 30_000_00),
-                ("Partner B", -30_000_00),
+                ("Interest to Partners", 3_000_000),
+                ("Partner B", -3_000_000),
             ],
         );
         let r = go(vec![a2, b1], &format!("{TWO}{DEED}"));
@@ -2750,9 +2750,9 @@ exactly; the CA computes it"
         let r1 = voucher(
             "r1",
             &[
-                ("Remuneration to Partners", 20_000_00),
-                ("Partner A", -18_000_00),
-                ("TDS on Partners 194T", -2_000_00),
+                ("Remuneration to Partners", 2_000_000),
+                ("Partner A", -1_800_000),
+                ("TDS on Partners 194T", -200_000),
             ],
         );
         let r = go(vec![r1], &config);
@@ -2782,11 +2782,11 @@ TDS on this partner's remuneration alone, classify it as TDS payable in the clie
         let m1 = voucher(
             "m1",
             &[
-                ("Interest to Partners", 4_000_00),
-                ("Remuneration to Partners", 20_000_00),
-                ("Partner A", -24_000_00),
-                ("Partner A", 1_000_00),
-                ("Cash", -1_000_00),
+                ("Interest to Partners", 400_000),
+                ("Remuneration to Partners", 2_000_000),
+                ("Partner A", -2_400_000),
+                ("Partner A", 100_000),
+                ("Cash", -100_000),
             ],
         );
         let r = go(vec![m1], &config);
@@ -2816,13 +2816,13 @@ remuneration_credited_{h} leaves out the remuneration in them."
             voucher_on(
                 "k1",
                 "20250601",
-                &[("Cash", 50_000_00), ("Partner A", -50_000_00)],
+                &[("Cash", 5_000_000), ("Partner A", -5_000_000)],
             ),
             voucher(
                 "r1",
                 &[
-                    ("Remuneration to Partners", 1_20_000_00),
-                    ("Partner A", -1_20_000_00),
+                    ("Remuneration to Partners", 12_000_000),
+                    ("Partner A", -12_000_000),
                 ],
             ),
         ];
@@ -2876,8 +2876,8 @@ capital is not in this base, which may therefore be understated."
         let i1 = voucher(
             "i1",
             &[
-                ("Interest to Partners", 60_000_00),
-                ("Partner A", -60_000_00),
+                ("Interest to Partners", 6_000_000),
+                ("Partner A", -6_000_000),
             ],
         );
         let r = go(
@@ -2908,7 +2908,7 @@ none, so all of it is disallowed)."]
         );
         assert_eq!(
             fig(&r, &format!("interest_credited_{h}")).value,
-            Value::Int(60_000_00)
+            Value::Int(6_000_000)
         );
         assert_eq!(
             fig(&r, &format!("allowable_interest_{h}")).value,
@@ -2970,9 +2970,9 @@ interest_ledger = \"Interest to Partners\"\n\
         let book = book_of(vec![voucher(
             "i1",
             &[
-                ("Interest to Partners", 90_000_00),
-                ("Partner A", -81_000_00),
-                ("TDS Payable", -9_000_00),
+                ("Interest to Partners", 9_000_000),
+                ("Partner A", -8_100_000),
+                ("TDS Payable", -900_000),
             ],
         )]);
         let rules = Rules::vendored().unwrap();
@@ -2991,11 +2991,11 @@ interest_ledger = \"Interest to Partners\"\n\
             engagement("[statutory_dues.nature_by_ledger]\n\"TDS Payable\" = \"tds_payable\"\n");
         let dump = crate::partners_40b_194t_on(&classified, &book, &rules).unwrap();
         // Read gross of the TDS on the ledger [statutory_dues] classifies, and seen.
-        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 90_000_00);
+        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 9_000_000);
         assert_eq!(value(&dump, &format!("s194t_tds_ledger_seen_{h}")), "yes");
         // The control: unclassified, the same voucher is read net and the TDS is not judged.
         let dump = crate::partners_40b_194t_on(&engagement(""), &book, &rules).unwrap();
-        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 81_000_00);
+        assert_eq!(value(&dump, &format!("interest_credited_{h}")), 8_100_000);
         assert_eq!(
             value(&dump, &format!("s194t_tds_ledger_seen_{h}")),
             "not judged"

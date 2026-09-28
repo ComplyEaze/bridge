@@ -6036,8 +6036,8 @@
   "by": "author",
   "what": "partners 4a: a partner with no interest ledger asked for the computation anyway",
   "file": "src/partners_40b_194t.rs",
-  "from": "if !excess_computed && !(no_interest && no_interest_ledger) {",
-  "to": "if !excess_computed {"
+  "from": "            if !(excess_computed || (no_interest && no_interest_ledger)) {",
+  "to": "            if !excess_computed {"
  },
  {
   "id": "PR-42",

@@ -701,6 +701,18 @@ async fn a_book_whose_company_names_no_inr_base_is_refused() {
 /// bills, groups and ledgers captured 2026-09-22/23, with the shared company
 /// and extent fixtures from earlier sessions.
 fn forex_native_plans() -> Vec<ScenarioPlan> {
+    forex_native_plans_with_ledgers(forex_ledgers())
+}
+
+fn forex_ledgers() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+    ))
+}
+
+/// FOREX's native outstandings read with its ledger snapshot replaced, for
+/// labelled edits of the captured ledgers.
+fn forex_native_plans_with_ledgers(ledgers: String) -> Vec<ScenarioPlan> {
     let extent = xml(extents());
     let mut plans = vec![status(), xml(companies()), xml(companies())];
     pair(&mut plans, extent.clone());
@@ -714,9 +726,7 @@ fn forex_native_plans() -> Vec<ScenarioPlan> {
         fixture(include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
         )),
-        fixture(include_bytes!(
-            "../../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
-        )),
+        xml(ledgers),
     ] {
         pair(&mut plans, plan);
     }
@@ -813,6 +823,65 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
             );
         }
     }
+}
+
+/// bridge#551: on a book with several masters, a ledger kept in the base
+/// currency whose closing balance Tally writes as a currency composite (a
+/// foreign-currency bill entered on a rupee party) is not read. The whole read
+/// is the in-band partial naming that ledger, with no figures (the
+/// mixed-party design, #642's stacked follow-up, sets it aside instead). A
+/// labelled edit of the captured FOREX ledgers: one `$` ledger's CURRENCYNAME
+/// becomes the base's, and its composite balance is kept.
+#[tokio::test]
+async fn a_rupee_ledger_with_a_composite_balance_refuses_the_several_currency_read_naming_it() {
+    let captured = forex_ledgers();
+    let row = captured
+        .find("<LEDGER NAME=\"FX USD Debtor 02\"")
+        .expect("captured dollar ledger");
+    let dollar = "<CURRENCYNAME TYPE=\"String\">$</CURRENCYNAME>";
+    let at = row + captured[row..].find(dollar).expect("its currency");
+    assert!(!captured[row..at].contains("</LEDGER>"));
+    let mixed = format!(
+        "{}<CURRENCYNAME TYPE=\"String\">I\u{20b9}</CURRENCYNAME>{}",
+        &captured[..at],
+        &captured[at + dollar.len()..]
+    );
+    assert!(mixed.contains("-$ 2000.00 @ I\u{20b9} 86/$  = -I\u{20b9} 172000.00"));
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans_with_ledgers(mixed));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let identity = identity_for_guid(&companies(), FOREX_GUID);
+    let runtime = TallyRuntime::default();
+    let witness = runtime
+        .detect_classified_base_currency_with_extent(config.clone(), &identity)
+        .await
+        .unwrap()
+        .admit_inr_classified()
+        .unwrap();
+    let (result, _) = runtime
+        .fetch_agent_outstandings_with_evidence(
+            config,
+            &identity,
+            TallyDate::parse("20250930").unwrap(),
+            witness,
+            OutstandingsAgeingAnchor::DueDate,
+        )
+        .await
+        .unwrap();
+    simulator.cancel();
+    assert!(
+        matches!(
+            &result,
+            OutstandingsLoadResult::Partial { reason, .. }
+                if reason.reason_code == "company_foreign_currency_ledger_balance"
+                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
+        ),
+        "{result:?}"
+    );
 }
 
 /// bridge#551: on a book with one master the classified read sends exactly

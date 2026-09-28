@@ -79,7 +79,7 @@ pub(in crate::agent) enum Entry {
 /// found that the same call redeems by entering again from the top, so every
 /// check before the wait is made again after it.
 enum Step {
-    Done(ToolOutcome),
+    Done(Box<ToolOutcome>),
     Redeem,
 }
 
@@ -434,7 +434,10 @@ impl Server {
                 // posted, and must not keep other batches waiting (#725).
                 self.post_approvals
                     .revoke(batch_id, "batch_already_dispatched");
-                return self.verify_import(args).await.map(Step::Done);
+                return self
+                    .verify_import(args)
+                    .await
+                    .map(|outcome| Step::Done(Box::new(outcome)));
             }
             // The record's own hash only proves the record agrees with itself.
             // The file Bridge built must hold exactly the XML this record
@@ -466,12 +469,12 @@ impl Server {
                     Begin::Busy(code) => return Err(code.to_string().into()),
                     Begin::Refused(code) => return Err(code.into()),
                     Begin::Waiting => {
-                        return Ok(Step::Done(self.approval_outcome(
+                        return Ok(Step::Done(Box::new(self.approval_outcome(
                             batch_id,
                             guid,
                             ApprovalState::Pending(None),
                             accumulated.clone(),
-                        )))
+                        ))))
                     }
                     Begin::Join(dialog) => {
                         // Only a click that landed while no call waited is
@@ -489,12 +492,12 @@ impl Server {
                         };
                         return match self.post_approvals.settle_join(batch_id, waited) {
                             Joined::StillOpen { remaining } => {
-                                Ok(Step::Done(self.approval_outcome(
+                                Ok(Step::Done(Box::new(self.approval_outcome(
                                     batch_id,
                                     guid,
                                     ApprovalState::Pending(Some(remaining)),
                                     accumulated.clone(),
-                                )))
+                                ))))
                             }
                             // Posted by this call when it found the click
                             // already made and the redeem fits in it, entering
@@ -508,12 +511,12 @@ impl Server {
                             {
                                 Ok(Step::Redeem)
                             }
-                            Joined::Approved => Ok(Step::Done(self.approval_outcome(
+                            Joined::Approved => Ok(Step::Done(Box::new(self.approval_outcome(
                                 batch_id,
                                 guid,
                                 ApprovalState::Approved,
                                 accumulated.clone(),
-                            ))),
+                            )))),
                             Joined::Refused(code) => Err(code.into()),
                         };
                     }
@@ -697,12 +700,12 @@ impl Server {
                                 let remaining = dialog.remaining();
                                 self.post_approvals
                                     .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(Step::Done(self.approval_outcome(
+                                return Ok(Step::Done(Box::new(self.approval_outcome(
                                     batch_id,
                                     guid,
                                     ApprovalState::Pending(Some(remaining)),
                                     accumulated.clone(),
-                                )));
+                                ))));
                             }
                             Waited::Answered((answer, answered)) => {
                                 self.post_approvals.hold_approved(
@@ -719,12 +722,12 @@ impl Server {
                                     .post_approvals
                                     .fits_in_call(call_started.elapsed(), line.vouchers.len())
                                 {
-                                    return Ok(Step::Done(self.approval_outcome(
+                                    return Ok(Step::Done(Box::new(self.approval_outcome(
                                         batch_id,
                                         guid,
                                         ApprovalState::Approved,
                                         accumulated.clone(),
-                                    )));
+                                    ))));
                                 }
                             }
                         }
@@ -1062,7 +1065,7 @@ impl Server {
             if let Some(located) = post_location.clone() {
                 proof.payload["result"]["post_location"] = located;
             }
-            Ok(Step::Done(proof))
+            Ok(Step::Done(Box::new(proof)))
         }
         .await;
         // A Join that found a click it can redeem in this call hands it to a
@@ -1075,7 +1078,7 @@ impl Server {
                     evidence: accumulated,
                 })
             }
-            Ok(Step::Done(outcome)) => Ok(outcome),
+            Ok(Step::Done(outcome)) => Ok(*outcome),
             Err(failure) => Err(failure),
         };
         // A refused redemption withdraws the approval it was to use (#725): a

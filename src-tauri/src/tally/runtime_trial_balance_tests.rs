@@ -359,3 +359,172 @@ async fn trial_balance_rejects_report_or_book_drift_and_retains_completed_source
         );
     }
 }
+
+/// bridge#551 with #692: a statement is derived only from a single-currency
+/// Trial Balance, so a several-currency book's Profit and Loss or Balance Sheet
+/// read refuses after its currency read and sends nothing more: no base
+/// identification, no Trial Balance, no group tree and no statement. A read
+/// that asked for the base-currency ledgers here would send those.
+#[tokio::test]
+async fn a_statement_read_refuses_a_several_currency_book_after_its_currency_read() {
+    let currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    for kind in [
+        bridge_tally_protocol::native_statement_reports::NativeStatementKind::BalanceSheet,
+        bridge_tally_protocol::native_statement_reports::NativeStatementKind::ProfitAndLoss,
+    ] {
+        let plans = opening_plans(currency.clone());
+        let total = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let error = TallyRuntime::default()
+            .fetch_statements(
+                config(&simulator),
+                &identity(),
+                TrialBalancePeriod::new(
+                    TallyDate::parse("20260401").unwrap(),
+                    TallyDate::parse("20260902").unwrap(),
+                )
+                .unwrap(),
+                kind,
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            error.chain().find_map(
+                |cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()
+            ),
+            Some(super::trial_balance::TrialBalanceReadError::Currency(
+                "company_base_currency_undetermined"
+            ))
+        ));
+        assert_eq!(simulator.finish().unwrap().len(), total);
+    }
+}
+
+/// bridge#551: the desktop Trial Balance, which cannot show the ledgers a
+/// several-currency book's read would leave out, still refuses such a book
+/// after its currency read, and sends nothing more. Only the MCP read asks for
+/// the base-currency ledgers.
+#[tokio::test]
+async fn the_desktop_trial_balance_still_refuses_a_several_currency_book() {
+    let currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+    ));
+    let plans = opening_plans(currency);
+    let total = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let error = TallyRuntime::default()
+        .fetch_trial_balance(
+            config(&simulator),
+            &identity(),
+            TrialBalancePeriod::new(
+                TallyDate::parse("20260401").unwrap(),
+                TallyDate::parse("20260902").unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()),
+        Some(super::trial_balance::TrialBalanceReadError::Currency(
+            "company_base_currency_undetermined"
+        ))
+    ));
+    assert_eq!(simulator.finish().unwrap().len(), total);
+}
+
+const FOREX: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+
+fn forex_identity() -> VerifiedCompanyIdentity {
+    let companies = parse_companies_from_collection(&companies()).unwrap();
+    let row = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(FOREX))
+        .unwrap();
+    VerifiedCompanyIdentity::from_observed_companies(
+        row.name.clone(),
+        FOREX.into(),
+        row.company_number.clone().unwrap(),
+        row.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap()
+}
+
+/// bridge#551: the opt-in read of a several-currency book's base-currency
+/// ledgers refuses when Tally does not identify an INR base. Labelled edits of
+/// the captured Company collection: its `CURRENCYNAME` naming the `$` master
+/// identifies a base that is not INR, and one naming no master (`€`)
+/// identifies none. Each refuses with its own typed error once the base is
+/// identified, and sends no Trial Balance request.
+#[tokio::test]
+async fn the_base_ledgers_trial_balance_refuses_a_base_that_is_not_inr_or_not_identified() {
+    let company = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+    ));
+    let rupee = "<CURRENCYNAME TYPE=\"String\">\u{20b9}</CURRENCYNAME>";
+    // The first rupee CURRENCYNAME is the FOREX company's own row.
+    let first = company.find(rupee).unwrap();
+    assert!(company.find("BRIDGE CORPUS FOREX").unwrap() < first);
+    assert!(first < company.find("BRIDGE SHAPE LAB").unwrap());
+    let naming = |value: &str| {
+        company.replacen(
+            rupee,
+            &format!("<CURRENCYNAME TYPE=\"String\">{value}</CURRENCYNAME>"),
+            1,
+        )
+    };
+    for (value, code) in [
+        ("$", "company_base_currency_not_inr"),
+        ("\u{20ac}", "company_base_currency_undetermined"),
+    ] {
+        let companies = xml(companies());
+        let mut plans = vec![status(), companies.clone(), companies];
+        pair(
+            &mut plans,
+            xml(decode(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+            ))),
+        );
+        for currency in [
+            decode(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            decode(include_bytes!(
+                "../../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            naming(value),
+        ] {
+            pair(&mut plans, xml(currency));
+        }
+        let total = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let error = TallyRuntime::default()
+            .fetch_trial_balance_with_extent(
+                config(&simulator),
+                &forex_identity(),
+                TrialBalancePeriod::new(
+                    TallyDate::parse("20260401").unwrap(),
+                    TallyDate::parse("20260902").unwrap(),
+                )
+                .unwrap(),
+                TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                error.chain().find_map(
+                    |cause| cause.downcast_ref::<super::trial_balance::TrialBalanceReadError>()
+                ),
+                Some(super::trial_balance::TrialBalanceReadError::Currency(found)) if *found == code
+            ),
+            "{value}: {error:#}"
+        );
+        assert_eq!(simulator.finish().unwrap().len(), total, "{value}");
+    }
+}

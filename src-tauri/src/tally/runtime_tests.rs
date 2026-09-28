@@ -73,6 +73,8 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         balance_response_bytes: 13,
         group_response_bytes: 17,
         groups: Vec::new(),
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
     let currency = RuntimeReadEvidence::paired("<currency/>", sha256_hex(b"currency-response"), 19);
     let baseline = TallyRuntime::party_ledger_master_source_evidence(
@@ -1155,13 +1157,7 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
         .expect_err("a non-loopback endpoint must never be contacted");
     #[cfg(not(feature = "voucher-scan"))]
     let error = runtime
-        .fetch_operator_outstandings(
-            config,
-            &identity,
-            as_of,
-            Some(OutstandingsCurrencyAssertion::Inr),
-            OutstandingsAgeingAnchor::DueDate,
-        )
+        .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)
         .await
         .expect_err("a non-loopback endpoint must never be contacted");
     assert!(

@@ -3267,10 +3267,7 @@ async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
         result["error"]["code"], "posted_under_changed_masters",
         "{response}"
     );
-    assert_eq!(
-        result["error"]["message"],
-        super::CHANGED_MASTERS_MESSAGE
-    );
+    assert_eq!(result["error"]["message"], super::CHANGED_MASTERS_MESSAGE);
     let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
     assert_eq!(ledgers.len(), 1, "{response}");
     assert_ne!(ledgers[0], "Cash", "{response}");

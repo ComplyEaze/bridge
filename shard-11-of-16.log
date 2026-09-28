@@ -1,0 +1,60 @@
+M06 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_stale_balances_41_1.rs::a_changed_value_is_reported, tests/parity_stale_balances_41_1.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M23 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M25 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits
+M21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M26 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M27 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M28 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M31 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+B04 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_stale_active_boundary_is_strictly_over_one_rupee
+B05 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_stale_balances_41_1.rs::a_changed_value_is_reported, tests/parity_stale_balances_41_1.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+B11 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+B06 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::stl1_fires_when_a_stale_ledger_has_a_population_line
+B12 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_lowest_day_is_the_first_of_equal_minima
+B13 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits
+B14 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits
+B15 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::cbi1_fires_on_a_tampered_opening_difference_and_cbi2_on_an_unwalked_negative_close
+X01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X03 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X06 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X11 survived (full)
+X14 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_stale_balances_41_1.rs::a_changed_value_is_reported, tests/parity_stale_balances_41_1.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X16 killed (full) by 1: tests/module_invariants_batch1.rs::cbi1_fires_on_a_tampered_opening_difference_and_cbi2_on_an_unwalked_negative_close
+X18 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits
+X23 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X20 killed (full) by 1: tests/own_account_terms.rs::a_malformed_value_fails_cash_book_integrity_alone
+X22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+
+37 of 37 killed
+
+warning: 19 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  M07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M23 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M26 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M31 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X16 (full): tests/module_invariants_batch1.rs::cbi1_fires_on_a_tampered_opening_difference_and_cbi2_on_an_unwalked_negative_close
+  X20 (full): tests/own_account_terms.rs::a_malformed_value_fails_cash_book_integrity_alone
+  X22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference

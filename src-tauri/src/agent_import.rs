@@ -2308,8 +2308,11 @@ fn cash_bank_refusals(
 /// narration or reference would refuse a value nothing downstream would ever
 /// notice as changed, so `validate_payload` does not.
 ///
-/// The value is escaped as the writer escapes it, so a literal `&#4;` in it
-/// is text, not a reference, and is not refused.
+/// The value's five XML characters are escaped first (`quick_xml`'s escape),
+/// so a literal `&#4;` in it is text, not a reference, and is not refused.
+/// The writer (`xml_text::escape_text`) also writes CR and LF as `&#13;` and
+/// `&#10;`; this check does not apply that step, so it judges only the text
+/// itself, not the references the writer adds for a line ending.
 fn reads_back_as_other_text(value: &str) -> bool {
     matches!(
         bridge_tally_protocol::mark_forbidden_numeric_references(&quick_xml::escape::escape(value)),

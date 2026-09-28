@@ -3337,3 +3337,36 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     assert!(!xml.contains('\r'), "no literal CR may reach the request");
     assert_eq!(decoded_element_text(&xml, "SVCURRENTCOMPANY"), company);
 }
+
+/// The bank shapes name their counterparty in PARTYLEDGERNAME, written by the
+/// same escaper; a party ledger carrying reserved characters and a trailing
+/// CR LF must come back exactly, even after XML's end-of-line folding.
+#[test]
+fn shipped_write_path_round_trips_a_party_ledger_crlf() {
+    let party = "Vendor & <Party> \"Q\" 'A'\r\n";
+    let input: ImportPayload = serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [{
+            "bridge_txn_id": "txn-party-escape",
+            "date": "2026-09-01",
+            "voucher_type": "Payment",
+            "narration": "Paid",
+            "entries": [
+                {"ledger": party, "amount": "12.50", "side": "Dr"},
+                {"ledger": "Bank", "amount": "12.50", "side": "Cr"},
+            ],
+        }]
+    }))
+    .expect("synthetic party escaping payload");
+    validate_payload(&input).expect("a party ledger with reserved characters and CR LF is valid");
+
+    let xml = render_import_xml(
+        "BRIDGE SYNTHETIC BOOK",
+        &input.vouchers,
+        "batch-party-escape",
+    );
+    assert_eq!(decoded_element_text(&xml, "PARTYLEDGERNAME"), party);
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "PARTYLEDGERNAME"), party);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
+}

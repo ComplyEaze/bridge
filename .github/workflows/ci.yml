@@ -321,7 +321,7 @@ jobs:
           toolchain: 1.96.0
           components: clippy
       - name: Install pinned nextest
-        uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: cargo-nextest@0.9.143
           fallback: none
@@ -547,7 +547,7 @@ jobs:
       - run: corepack pnpm run license:all
       - name: Install pinned package compiler cache
         id: package-sccache
-        uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
         with:
           tool: sccache@0.17.0
           fallback: none
@@ -751,31 +751,29 @@ jobs:
     needs: [bundle-smoke, native, tally-portable, workflow-consistency]
     if: ${{ always() && github.ref == 'refs/heads/master' && needs.workflow-consistency.result == 'success' }}
     runs-on: ubuntu-latest
-    # A timed-out job can report `cancelled`, which required-checks accepts from
-    # this job (a newer master run's prune supersedes it). So every step carries
-    # its own bound, and together they end before the job's: a hang anywhere
-    # fails its step instead of reading as superseded.
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
       actions: write
+    # Master runs overlap, and prunes must not run at once. queue: max keeps every
+    # waiting prune instead of cancelling the older one, so a cancelled prune
+    # means a real cancellation or a timeout, and required-checks fails on it.
     concurrency:
       group: package-compiler-cache-retention
       cancel-in-progress: false
+      queue: max
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        timeout-minutes: 2
         with:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-        timeout-minutes: 2
         with:
           node-version-file: .node-version
       # Package sccache: two newest per OS. Rust caches: newest per job/OS family.
       - name: Prune only obsolete master compiler caches
         env:
           GH_TOKEN: ${{ github.token }}
-        run: timeout 240 node scripts/prune-package-compiler-cache.mjs --apply
+        run: node scripts/prune-package-compiler-cache.mjs --apply
 
   tax-audit-mutations:
     name: Tax-audit mutation records
@@ -832,10 +830,6 @@ jobs:
     # crate: it runs the mutation runner's tests and `--verify` (no build), so a
     # bridge-tax-audit change merges only with its selected mutations proven on
     # the merged tree. Skipped on other pull requests, which is a pass here.
-    # compiler-cache-retention alone may be cancelled: master runs overlap, and
-    # its non-cancelling group still drops an older pending prune when a newer
-    # one queues. The newer prune does the same housekeeping; a failed prune
-    # still fails here.
     if: ${{ always() }}
     needs: [changes, frontend, rust-format, workflow-consistency, tally-portable, native, bundle-smoke, seam-control, compiler-cache-retention, tax-audit-mutations]
     runs-on: ubuntu-latest
@@ -852,7 +846,7 @@ jobs:
           printf '%s\n' "$NEEDS_JSON"
           failed="$(
             printf '%s' "$NEEDS_JSON" \
-              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') == 'failure' or (v.get('result') == 'cancelled' and k != 'compiler-cache-retention')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
+              | python3 -c "import json,sys; d=json.load(sys.stdin); failed=[k for k,v in d.items() if v.get('result') in ('failure','cancelled')]; failed += [] if d.get('workflow-consistency', {}).get('result') == 'success' else ['workflow-consistency']; print(' '.join(dict.fromkeys(failed)))"
           )"
           if [[ -n "$failed" ]]; then
             echo "Required jobs did not pass: $failed"

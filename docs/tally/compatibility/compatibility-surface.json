@@ -3,19 +3,19 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "22d2a90103f9bcf7ebdaca559585380f94b85bb7eeee4d3294fdb508ef58e462"
+      "sha256": "c91aab31bed4235e96f08fb36eac3e437e110b9d13f416ec342b548cf4274888"
     },
     {
       "path": ".github/workflows/dependency-security-scheduled.yml",
-      "sha256": "8ad69bb034bf740c7dfcdf6d35ebab0a25d9b70ba74a517967807aaa4e36ba17"
+      "sha256": "3e9aeddfe1762a7e7503e4a38575836a62c04a524f916b065626dade3e4a2c92"
     },
     {
       "path": ".github/workflows/dependency-security.yml",
-      "sha256": "011268f61eb283b15903023f2254e20074891d019ca863e407aec9b6203a0673"
+      "sha256": "ca6b86a444bfaf761292bc6b9d7232b60df0cde51db3a1a4d8cf12f5249b3d84"
     },
     {
       "path": "docs/adr/0004-tally-write-safety.md",
-      "sha256": "e6d2862dbc0f976c726e57ef87ebb17ac7c32f36d5c7cfdd8b417c641c3e7a66"
+      "sha256": "1e9803c8964b72e47eaa9e441a0e35ba1a8da728361d22f607193b14ca3dfe34"
     },
     {
       "path": "docs/adr/0005-tally-snapshot-recovery.md",
@@ -443,11 +443,11 @@
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
-      "sha256": "a33d058af8dde72bd5eaca413ec571912afed95cc5b8b2d583c87872ade92616"
+      "sha256": "966961cf1529cbd697eec580c6ba0cbb8771a32f010b00c29445a8f99ace5f08"
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "15ff59340ccdd987d586a208c0a62dd78ee8d8f5f444cb61b41a053f4ddb513e"
+      "sha256": "85ce3fe708fa04dee704613279725ad4cb72272f43bd5bbb488d0699479575d4"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -475,11 +475,11 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "ef60bef8bed8e3560a32f0bc2d379cc73926b9b4b99004d86e5dbadf2c930c5c"
+      "sha256": "cb3f85ad2746b2bddb9b5511de3da4f95a988eadd674539dcefc862e620e05ba"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
-      "sha256": "ddd62b039045a3f32b1a649e59e7a517d1394247f24ad23f7c7ff6cc2cabd8f5"
+      "sha256": "6e0e0b29f3666077d6d74f020da08932c140f399d40a60383048f2c7cae3bb0d"
     },
     {
       "path": "src-tauri/src/agent_import_amend.rs",
@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs",
-      "sha256": "2233c0c45ead47d84b6e0404904b3232d9bd86c3ff865cf4ccb6291b78083c1c"
+      "sha256": "f6903435f32f4195afc6de395a157002ee16422ca60c42678f3739f86ee7df77"
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",

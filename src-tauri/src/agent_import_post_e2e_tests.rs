@@ -945,6 +945,24 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
         appended_kinds(&before, &journal(directory.path())),
         ["verification_status"]
     );
+    // The readback before the post left a proof of a batch never sent: it says
+    // the batch is not verified, and must not forbid sending it (bridge#804).
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.proof.md", line.batch_id)),
+    )
+    .unwrap();
+    assert!(
+        markdown.contains("**Not verified — this report does not confirm posting.**"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Verification status: `verification_incomplete`"),
+        "{markdown}"
+    );
+    assert!(!markdown.contains("resend"), "{markdown}");
     assert_eq!(
         scripted.previews(),
         [agent_review_preview(&line, &server.settings.endpoint).unwrap()]

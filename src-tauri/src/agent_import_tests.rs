@@ -271,6 +271,9 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         .expect("published status");
     assert_eq!(proof["writer"], latest.batch.status);
     assert!(markdown.contains(&format!("- Company: `{}`", latest.batch.status)));
+    // The files carry the status the ledger records, not the caller's copy.
+    assert_eq!(proof["verification_status"], latest.batch.status);
+    assert!(markdown.contains(&format!("- Verification status: `{}`", latest.batch.status)));
 }
 
 #[test]
@@ -831,6 +834,112 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     assert_eq!(
         verification_status(&result, line.vouchers.len()),
         "posted_verified"
+    );
+}
+
+/// The Markdown proof carries `verification_status`, lists the batch's own
+/// duplicates, and shows the reconciliation banner whenever the status is not
+/// `posted_verified`, including when it is absent (bridge#804).
+#[test]
+fn the_markdown_proof_follows_the_verification_status() {
+    let banner = "this report does not confirm posting";
+    let resend = "do not rebuild or resend it";
+    let proof = |status: Option<&str>, duplicates: Value| {
+        let mut proof = json!({"batch_id":"batch-md","counts":{"posted_verified":1},
+            "vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified"}],
+            "duplicates":duplicates,"unrelated_duplicates_in_window":[]});
+        if let Some(status) = status {
+            proof["verification_status"] = json!(status);
+        }
+        proof
+    };
+    let clean = render_proof_markdown(&proof(Some("posted_verified"), json!([])));
+    assert!(!clean.contains(banner), "{clean}");
+    assert!(
+        clean.contains("- Verification status: `posted_verified`"),
+        "{clean}"
+    );
+    assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
+    assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // Not verified with no duplicates, or no status at all, is not clean either:
+    // the banner follows the status, not the duplicate list. With no dispatch
+    // record Bridge did not send the batch, so the banner forbids no resend.
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, json!([])));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(markdown.contains("**Not verified"), "{markdown}");
+        assert!(!markdown.contains(resend), "{markdown}");
+        assert!(
+            !markdown.contains("| Duplicate in this batch |"),
+            "{markdown}"
+        );
+    }
+    // A dispatch record reading verified does not override the status, and a
+    // dispatched batch keeps the instruction not to resend.
+    let mut dispatched = proof(Some("verification_incomplete"), json!([]));
+    dispatched["dispatch"] = json!({"state":"posted_verified","response_state":"response_clean"});
+    let markdown = render_proof_markdown(&dispatched);
+    assert!(markdown.contains(resend), "{markdown}");
+    // An error, or an unverified dispatch, shows the banner on its own, even
+    // beside a verified status. Only a dispatched batch is told not to resend:
+    // the wording follows the dispatch record, not the error.
+    let mut errored = proof(Some("posted_verified"), json!([]));
+    errored["error"] = json!({"code":"import_reconciliation_required"});
+    let markdown = render_proof_markdown(&errored);
+    assert!(markdown.contains(banner), "{markdown}");
+    assert!(!markdown.contains(resend), "{markdown}");
+    let mut unreconciled = proof(Some("posted_verified"), json!([]));
+    unreconciled["dispatch"] =
+        json!({"state":"reconciliation_required","response_state":"response_missing"});
+    let mut errored_after_dispatch = errored.clone();
+    errored_after_dispatch["dispatch"] =
+        json!({"state":"posted_verified","response_state":"response_clean"});
+    for flagged in [unreconciled, errored_after_dispatch] {
+        let markdown = render_proof_markdown(&flagged);
+        assert!(markdown.contains(resend), "{markdown}");
+    }
+    let duplicates = json!([
+        {"kind":"remote_id","remote_id":"remote-1","count":2},
+        {"kind":"accounting_fingerprint","fingerprint_sha256":"ab12","voucher_ids":["guid:a","guid:b","guid:c"],"remote_ids":[]}
+    ]);
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, duplicates.clone()));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(
+            markdown.contains(&format!(
+                "- Verification status: `{}`",
+                status.unwrap_or("unknown")
+            )),
+            "{status:?}: {markdown}"
+        );
+        assert!(
+            markdown.contains("- Duplicates in this batch: 2"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| remote_id | `remote-1` | 2 |"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| accounting_fingerprint | `ab12` | 3 |"),
+            "{markdown}"
+        );
+    }
+    // A REMOTEID holding a pipe or backticks keeps its row and its code span.
+    let odd = json!([{"kind":"remote_id","remote_id":"a|b`c``d","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(
+        markdown.contains("| remote_id | ``` a\\|b`c``d ``` | 2 |"),
+        "{markdown}"
+    );
+    // A line break or a space at each end keeps the row and the text whole.
+    let odd = json!([{"kind":"remote_id","remote_id":"x\ny","count":2},
+        {"kind":"remote_id","remote_id":" z ","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(markdown.contains("| remote_id | `x y` | 2 |"), "{markdown}");
+    assert!(
+        markdown.contains("| remote_id | `  z  ` | 2 |"),
+        "{markdown}"
     );
 }
 

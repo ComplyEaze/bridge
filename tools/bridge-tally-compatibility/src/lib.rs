@@ -329,7 +329,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // post redeems across calls: what it is bound to, how long it lasts, that it is
 // spent once before the intent, and when it is revoked; a defect there could
 // post a batch on an approval for something else, or on one withdrawn.
-pub const MAX_SURFACE_FILES: usize = 286;
+// `src-tauri/crates/bridge-bank-statement/src/cash.rs` decides which parsed
+// party is a cash withdrawal or deposit, which answers a person may give for
+// one, which need a ledger and which Bridge refuses; a defect there could post
+// a cash line to a ledger nobody chose.
+pub const MAX_SURFACE_FILES: usize = 287;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

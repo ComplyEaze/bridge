@@ -286,6 +286,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     assert_eq!(northwind["ledger"], "Northwind Traders");
     assert_eq!(northwind["disposition"], "Receipt");
     assert_eq!(northwind["total"], "10000.00");
+    // A known gap, pinned so it cannot pass unseen: a party of one row shows
+    // that row's amount as its total.
+    assert_eq!(northwind["rows"], 1);
 
     // row-level content stays in the file: no reference, narration, label or
     // transaction date reaches the response
@@ -1104,6 +1107,41 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
         200_000,
     );
 
+    // Every key the summary carries, so a new one cannot slip past the scan.
+    let mut top: Vec<&str> = summary
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    top.sort_unstable();
+    assert_eq!(
+        top,
+        [
+            "account_last4",
+            "bank",
+            "bank_ledger_in",
+            "bank_ledger_out",
+            "cash_questions",
+            "cash_questions_omitted",
+            "cash_questions_open",
+            "counterparties",
+            "counterparties_omitted",
+            "ledgers_to_validate",
+            "ledgers_to_validate_omitted",
+            "next_step",
+            "path",
+            "proposals_id",
+            "reconciled",
+            "rows_in_window",
+            "sha256",
+            "skipped",
+            "statement_rows",
+            "suspense_by_reason",
+            "suspense_rows",
+            "vouchers"
+        ]
+    );
     let summary_before = summary.clone();
     // Each open line's entry carries exactly the exempt fields, with the
     // line's own values, and the fixed question and answers.
@@ -1155,6 +1193,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             [
                 record.bridge_txn_id.clone(),
                 record.date.clone(),
+                record.date.replace('-', ""),
                 record.amount.clone(),
             ]
         })
@@ -1193,4 +1232,109 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             "{token} left the machine: {text}"
         );
     }
+}
+
+/// A known gap, pinned so it cannot pass unseen: a counterparty of one row
+/// reports that row's amount as its total, for a party paid once and for one
+/// answered cash line alike. This predates the cash questions; whether to
+/// withhold such a total is a separate decision.
+#[test]
+fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let sbi = |date: &str, narration: &str, dr: &str, cr: &str, bal: &str| {
+        Row::from_pairs([
+            ("date", date),
+            ("narr", narration),
+            ("narr_spaced", narration),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", dr),
+            ("cr", cr),
+            ("bal", bal),
+        ])
+    };
+    let rows = [
+        sbi(
+            "01Aug2026",
+            "ATM WDL ATM CASH 4417 SYNTHETIC QUAYSIDE",
+            "512.00",
+            "",
+            "9488.00",
+        ),
+        sbi(
+            "03Aug2026",
+            "BY TRANSFER-UPI/CR/612345678901/SYNTHETIC PAYER/XYZ",
+            "",
+            "71.00",
+            "9559.00",
+        ),
+    ];
+    let mut args = json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "10,000.00",
+        "closing_balance": "9,559.00",
+        "total_debits": "512.00",
+        "total_credits": "71.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let parsed_with = |request: &OwnedRequest| {
+        let build = build(
+            &rows,
+            Bank::Sbi,
+            &Mapping::default(),
+            &BuildOptions {
+                bank_ledger: "Synthetic Bank Ledger",
+                suspense_ledger: "Suspense",
+                account_label: "Synthetic SB xx1234",
+                account_number: "00000000001234",
+                date_from: None,
+                date_to: None,
+                cash_answers: &request.cash_answers,
+            },
+        )
+        .unwrap();
+        ParsedStatement {
+            account_number: "00000000001234".into(),
+            statement_rows: rows.len(),
+            closing: bridge_tally_core::ExactDecimal::parse("9559.00").unwrap(),
+            totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+            check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+            counterparties: group_counterparties(&build.records).unwrap(),
+            build,
+        }
+    };
+    let open = parsed_with(&OwnedRequest::from_args(&args).unwrap());
+    args["cash_answers"] = json!([{
+        "bridge_txn_id": open.build.records[0].bridge_txn_id,
+        "answer": "owner_use",
+        "ledger": "Drawings"
+    }]);
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let parsed = parsed_with(&request);
+    let summary = summary(
+        &request,
+        &parsed,
+        "statement-x",
+        Path::new("/x"),
+        "0",
+        200_000,
+    );
+    assert_eq!(summary["cash_questions"], json!([]));
+    let total_of = |party: &str| {
+        let group = summary["counterparties"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|group| group["party"] == serde_json::to_value(party_name(party)).unwrap())
+            .unwrap_or_else(|| panic!("{party}: {summary}"));
+        assert_eq!(group["rows"], 1, "{party}");
+        group["total"].clone()
+    };
+    assert_eq!(total_of("ATM CASH WITHDRAWAL"), "512.00");
+    assert_eq!(total_of("SYNTHETIC PAYER"), "71.00");
 }

@@ -716,7 +716,8 @@ pub fn group_counterparties(
             None => bucket.spellings.push((record.party.clone(), amount)),
         }
     }
-    // Stable sorts, largest first, so ties keep first-appearance order.
+    // A stable sort, largest first, so ties keep first-appearance order. The
+    // parse summary re-sorts without amounts; a new consumer must too.
     buckets.sort_by(|left, right| right.total.cmp_magnitude(&left.total));
     Ok(buckets
         .into_iter()

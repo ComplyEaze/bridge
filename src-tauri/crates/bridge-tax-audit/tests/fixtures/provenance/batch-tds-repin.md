@@ -31,7 +31,8 @@ Each book names, in its own `comment`, what it reaches at the reference's curren
   (untested, counted), then a TDS reversal against it that adds no guard (it has no bill to leave (ii)(A)); a
   later voucher debiting the TDS ledger against a payee, which keeps its deducted bill in (ii)(A) (the reversal
   guard); a cash-paid bill carrying TDS with no payee named (untested, counted); and a bill short of the lower
-  rate only through the rate's rounding to the nearest paisa (Rs 50,000.50 before TDS, Rs 499 deducted).
+  rate only through the rate's rounding to the nearest paisa (Rs 50,000.50 before TDS, Rs 499 deducted); and a
+  payee's own bill that also debits a GST ledger (untested, counted).
 
 Regression fixtures only: the evidence for real books is local parity on the real reads, never committed.
 The refusals the reference raises (a reversal naming a bill credited to no payee, a 194H mapping with no
@@ -66,5 +67,5 @@ other golden in this batch regenerates byte-identical:
 | `edge.tds_payees_deductor_placeholder.tds_payees.json` | 20,327 | `140b4e54cdfd3f13a0bc12156d50560bfd2ab83a4b5c40a849383b68d9071bc5` | `golden/edge.tds_payees_deductor_placeholder.tds_payees.json` |
 | `tds_payees_deductor_activity_unknown.json` | 1,445 | `b7ea95f59f19a30fd4d2feaa5dd9800fed586d40db89dc38d8df744286afadb8` | `edge-books/tds_payees_deductor_activity_unknown.json` |
 | `edge.tds_payees_deductor_activity_unknown.tds_payees.json` | 16,206 | `cf39e0c5f26bf10ceb30be03456bd2367a5438a455a682a19152720b4fbc7693` | `golden/edge.tds_payees_deductor_activity_unknown.tds_payees.json` |
-| `tds_payees_p22.json` | 5,626 | `3b79889e9f42977993a16002da85b24577907a4b94dad85f58e3c12dedd56bfd` | `edge-books/tds_payees_p22.json` |
-| `edge.tds_payees_p22.tds_payees.json` | 68,302 | `e7fdbed5b845978012beb7be24a809909fe2ed3ae697634950d1e81d9a8b9e67` | `golden/edge.tds_payees_p22.tds_payees.json` |
+| `tds_payees_p22.json` | 6,563 | `f8162441e75a8fd6077952e0d0f3605938e4fb5b549fdb940789f8d616965db1` | `edge-books/tds_payees_p22.json` |
+| `edge.tds_payees_p22.tds_payees.json` | 75,723 | `468efba0fb78d89b5891076ccd865a910d0eb8e17e0141beee85a3b609247fe3` | `golden/edge.tds_payees_p22.tds_payees.json` |

@@ -304,12 +304,16 @@ pub(super) fn verify_batch(
                 json!({"bridge_txn_id":expected.bridge_txn_id,"status":"matching_content_observed","marker":marker,"attribution":"not_established","accounting_effective":voucher_is_accounting_effective(matched)?,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
             } else if matched.cancelled == Some(true) {
                 // Tally drops a cancelled voucher's entries from this read
-                // (protocol reference §9.14 for a gateway cancel; a screen
-                // cancel is captured in fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md),
-                // so its entries never match: it is cancelled, not changed.
+                // (measured for Journals only: protocol reference §9.14, PARTIAL,
+                // for a gateway cancel; a screen cancel is captured in
+                // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
+                // need not match: it is cancelled, not changed.
                 // Only the header is compared, so a re-date before the cancel
-                // still shows. The fingerprint branch above cannot see a
-                // cancelled row: with no entries, no build's fingerprint matches.
+                // still shows, if it stays inside the read window: a voucher
+                // re-dated out of it is not read, so is not found unless another
+                // voucher in the window has its content. The fingerprint branch
+                // above cannot see a cancelled row whose entries were dropped:
+                // with no entries, no build's fingerprint matches.
                 counts
                     .entry("posted_not_effective")
                     .and_modify(|count| *count += 1);
@@ -395,13 +399,52 @@ pub(super) fn verification_response_page(
     page
 }
 
+/// A verdict of `verify_import`: the only statuses a proof may carry. The
+/// ledger line keeps its status as a string, which also holds non-verdicts
+/// such as `built`; taking this type at the persist boundary keeps those out
+/// of a proof (bridge#814).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum VerificationStatus {
+    PostedVerified,
+    VerificationIncomplete,
+}
+
+impl VerificationStatus {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::PostedVerified => "posted_verified",
+            Self::VerificationIncomplete => "verification_incomplete",
+        }
+    }
+}
+
+/// The verdict `verify_import` records and the proof renders. A dispatch that
+/// needs reconciliation is never verified, whatever the readback shows; with no
+/// dispatch record, the readback alone decides (bridge#804).
+pub(super) fn final_verification_status(
+    dispatch: Option<&Value>,
+    result: &Value,
+    expected_voucher_count: usize,
+) -> VerificationStatus {
+    if dispatch.is_some_and(|dispatch| dispatch["state"] == "reconciliation_required") {
+        VerificationStatus::VerificationIncomplete
+    } else {
+        readback_verdict(result, expected_voucher_count)
+    }
+}
+
+/// The readback's verdict, as the string tool results and the ledger carry.
 pub(super) fn verification_status(result: &Value, expected_voucher_count: usize) -> &'static str {
+    readback_verdict(result, expected_voucher_count).as_str()
+}
+
+fn readback_verdict(result: &Value, expected_voucher_count: usize) -> VerificationStatus {
     if result["counts"]["posted_verified"].as_u64() == Some(expected_voucher_count as u64)
         && result["duplicates"].as_array().is_some_and(Vec::is_empty)
     {
-        "posted_verified"
+        VerificationStatus::PostedVerified
     } else {
-        "verification_incomplete"
+        VerificationStatus::VerificationIncomplete
     }
 }
 
@@ -594,10 +637,17 @@ pub(super) fn duplicates(
                 .or_default()
                 .insert(identity.clone());
         }
-        fingerprints
-            .entry(fingerprint.clone())
-            .or_default()
-            .insert(identity.clone(), voucher.remote_id.clone());
+        // A cancel whose entries this read dropped (measured for Journals only;
+        // see `verify_batch`) fingerprints as its date and type alone, which
+        // says nothing of what it recorded, so every such cancel of one date
+        // and type would pair (bridge#767). It is left out; a cancelled row
+        // that came back with its entries keeps its fingerprint.
+        if !(voucher.cancelled == Some(true) && voucher.entries.is_empty()) {
+            fingerprints
+                .entry(fingerprint.clone())
+                .or_default()
+                .insert(identity.clone(), voucher.remote_id.clone());
+        }
     }
     let mut result = remote.into_iter().filter(|(_, identities)| identities.len() > 1)
         .map(|(remote_id, identities)| json!({"kind":"remote_id","remote_id":remote_id,"count":identities.len()}))
@@ -634,21 +684,78 @@ pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> 
     }
 }
 
+/// `text` as a code span inside a Markdown table cell. A REMOTEID comes from
+/// Tally and may hold `|`, a backtick or a line break: the pipe is escaped, so
+/// the row keeps its cells, and the rest is [`markdown_code`]'s.
+fn markdown_table_code(text: &str) -> String {
+    markdown_code(&text.replace('|', "\\|"))
+}
+
+/// `text` as a Markdown code span. Text from Tally, such as a company name
+/// (bridge#807), may hold a backtick or a line break: control characters
+/// become spaces, so the line stays whole; the span's fence is one backtick
+/// longer than any run inside; and a text that starts and ends with a space is
+/// padded, since a code span drops one from each end. An empty text is padded
+/// too: a bare pair of backticks is no span.
+fn markdown_code(text: &str) -> String {
+    let text = text
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    let longest_run = text
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let padded = text.is_empty()
+        || longest_run > 0
+        || (text.starts_with(' ')
+            && text.ends_with(' ')
+            && !text.chars().all(|character| character == ' '));
+    let fence = "`".repeat(longest_run + 1);
+    if padded {
+        format!("{fence} {text} {fence}")
+    } else {
+        format!("{fence}{text}{fence}")
+    }
+}
+
 pub(super) fn render_proof_markdown(proof: &Value) -> String {
     let mut output = format!(
         "# Voucher import verification — {}\n\n",
         proof["batch_id"].as_str().unwrap_or("unknown")
     );
     let dispatch_state = proof["dispatch"]["state"].as_str();
-    if !proof["error"].is_null()
-        || (proof.get("dispatch").is_some()
+    // The banner follows the verdict itself, so a batch that is not verified
+    // never reads clean; an absent status is not a verified one (bridge#804).
+    let verification_status = proof["verification_status"].as_str();
+    let not_verified = verification_status != Some("posted_verified");
+    let dispatched = proof.get("dispatch").is_some();
+    let banner = !proof["error"].is_null()
+        || not_verified
+        || (dispatched
             && !matches!(
                 dispatch_state,
                 Some("posted_verified" | "previous_attempt_reconciled")
-            ))
-    {
+            ));
+    // Whether to forbid a resend depends only on whether Bridge sent the batch.
+    // With no dispatch record it did not, and the batch may not be in Tally at
+    // all (the readback before a post), so there is nothing to reconcile.
+    if banner && dispatched {
         output.push_str("**Reconciliation required — this report does not confirm posting.**\n\nA matching voucher readback alone is insufficient. Reconcile the original saved batch; do not rebuild or resend it.\n\n");
+    } else if banner {
+        output.push_str("**Not verified — this report does not confirm posting.**\n\nThe verification status, the counts and any duplicates below say what the readback found.\n\n");
     }
+    output.push_str(&format!(
+        "- Verification status: `{}`\n",
+        verification_status.unwrap_or("unknown")
+    ));
     if let Some(state) = dispatch_state {
         output.push_str(&format!(
             "- Dispatch verdict: `{state}`\n- Response state: `{}`\n",
@@ -660,13 +767,35 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: `{}`\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", proof["company"]["name"].as_str().unwrap_or("unknown"), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",
             row["bridge_txn_id"].as_str().unwrap_or("unknown"),
             row["status"].as_str().unwrap_or("unknown")
         ));
+    }
+    let batch_duplicates = proof["duplicates"].as_array().cloned().unwrap_or_default();
+    if !batch_duplicates.is_empty() {
+        output.push_str("\n| Duplicate in this batch | Key | Vouchers |\n| --- | --- | --- |\n");
+        for duplicate in &batch_duplicates {
+            let (key, vouchers) = if duplicate["kind"] == "remote_id" {
+                (
+                    &duplicate["remote_id"],
+                    duplicate["count"].as_u64().unwrap_or(0),
+                )
+            } else {
+                (
+                    &duplicate["fingerprint_sha256"],
+                    duplicate["voucher_ids"].as_array().map_or(0, Vec::len) as u64,
+                )
+            };
+            output.push_str(&format!(
+                "| {} | {} | {vouchers} |\n",
+                duplicate["kind"].as_str().unwrap_or("unknown"),
+                markdown_table_code(key.as_str().unwrap_or("unknown"))
+            ));
+        }
     }
     output.push_str(&format!(
         "\nEvidence hashes: company `{}`, voucher read `{}`.\n",

@@ -841,7 +841,7 @@ client book, 2026-09-28).**
   was created, the day's count was back to its count before the delete.
 - **Confidence.** PARTIAL by §9.14's convention: one voucher, one session, one client book, not
   repeated. The counters and the read-back agree, but only one voucher was read back. The
-  source evidence does not give the deleted voucher's type.
+  deleted voucher's type was not recorded.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.
 The `Alter` failures on record (§9.6, and `IMPLEMENTATION_GUIDE.md` §3.1) came from an

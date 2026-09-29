@@ -431,7 +431,7 @@ the `FETCH` list and looks at what arrives.
 > - **Native posting.** `post_import` with its approval had not been observed on Gold, on Windows
 >   or on Education when this correction was written (2026-09-25). A native post (a batch with a
 >   recorded `dispatch_intent`) was later captured on Gold on 2026-09-28 (§9.14's recorded-list item:
->   one client book, a debug build). The evidence for that item does not record the approval step.
+>   one client book, a debug build). The approval step was not recorded.
 >   Windows and Education remain unobserved.
 > - **Reads at scale.** Reads of books of thousands of vouchers are the open failure in bridge#485.
 >

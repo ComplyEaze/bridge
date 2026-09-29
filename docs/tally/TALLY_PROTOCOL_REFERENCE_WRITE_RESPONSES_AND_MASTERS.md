@@ -344,8 +344,10 @@ client book, 2026-09-28).**
   piloted with the same Object diff.
 - **Re-read.** A compliance `ledger_masters` read of all 699 ledgers found the count unchanged and
   every renamed ledger under its new name. Parent, opening balance and GSTIN fields had 0 changes.
-- **Scope.** A gateway rename keeps the GUID, as §12a.9 observed for a rename in Tally's screens.
-  Aliases and a rename that collides with an existing name were not measured.
+- **Scope.** The GUID was diffed only for the pilot ledger and the two piloted groups, and it was
+  unchanged (§12a.9 observed the same for a rename in Tally's screens). The other 122 ledgers were
+  counted and re-read for parent, opening balance and GSTIN, not for GUID. Aliases and a rename that
+  collides with an existing name were not measured.
 - **Confidence.** VERIFIED because the pilot was diffed before and after and 122 more were counted;
   still one session on one client book, so **Confidence: PARTIAL** beyond it.
 
@@ -762,12 +764,13 @@ Gold, one client book, 2026-09-28).**
 - **Vouchers.** A ledger whose stored name ends in CR LF was named with the CR LF written as
   `&#13;&#10;` inside `LEDGERNAME` and `PARTYLEDGERNAME`. 6 vouchers returned `CREATED`, and
   `ledger_movement` on that ledger then showed exactly those 6.
-- **Masters.** The same encoding worked in the `NAME` attribute of a ledger `Alter` (§9.4).
+- **Masters.** The same encoding was reported to work in the `NAME` attribute of a ledger `Alter`
+  (§9.4). No read-back of that `Alter` is recorded, so this clause is **PARTIAL**.
 - **Bridge.** Bridge's import file writes CR and LF this way (`xml_escape`, bridge#626).
 - **Not sent.** A raw CR LF was not sent. XML 1.0 normalises a raw CR LF in content to LF, so a
   raw line break would name a ledger the book does not hold; that is **UNVERIFIED** against Tally.
-- **Confidence.** VERIFIED for the 6 vouchers and the one `Alter` shape, because `ledger_movement`
-  read back exactly those 6 and the `Alter` was read back. It is one session on one client book, so
+- **Confidence.** VERIFIED for the 6 vouchers, because `ledger_movement` read back exactly those 6.
+  The `Alter` clause is PARTIAL (reported, not read back). It is one session on one client book, so
   **Confidence: PARTIAL** beyond it.
 
 

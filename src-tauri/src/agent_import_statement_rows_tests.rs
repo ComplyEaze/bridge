@@ -416,3 +416,52 @@ fn a_build_records_the_row_key_of_each_voucher_that_has_one() {
     );
     assert!(recorded_statement_rows(&keyed.vouchers, &BTreeMap::new()).is_none());
 }
+
+#[test]
+fn a_rebuilt_batch_that_remaps_a_posted_row_is_still_refused() {
+    // Batch A posted the 900.00 row. A rebuild (not an amendment) maps that
+    // row to another ledger and adds its 800.00 twin: the twin's exemption
+    // must not let the remapped, already-posted row post a second time.
+    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let mut rebuilt = batch_v1(build_many(&[
+        ("st-20260901-cccc", Some(key("stmt-1", "900.00"))),
+        ("st-20260901-bbbb", Some(key("stmt-1", "800.00"))),
+    ]));
+    rebuilt.vouchers[0].entries[0].ledger = "Rent Paid".into();
+    let rows = journal(&[&earlier, &rebuilt]);
+    let result = verify(&rebuilt, vec![posted(&earlier, 1)], &rows);
+    assert_eq!(
+        post::require_absent_verification_result(&result, 2),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
+fn a_copied_narration_tag_is_not_a_row_identity() {
+    // The row was entered by hand by duplicating the posted voucher in Tally,
+    // so two observed vouchers carry one tag. The tag then proves nothing.
+    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    let rows = journal(&[&earlier, &later]);
+    let original = posted(&earlier, 1);
+    let mut copy = posted(&earlier, 2);
+    copy.narration = original.narration.clone();
+    let result = verify(&later, vec![original, copy], &rows);
+    assert_eq!(
+        admission(&result),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
+fn a_recorded_company_guid_matches_in_any_letter_case() {
+    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    let mut rows = journal(&[&earlier, &later]);
+    for (company, _) in rows.values_mut() {
+        *company = company.to_uppercase();
+    }
+    assert_ne!(rows.values().next().unwrap().0, GUID);
+    let result = verify(&later, vec![posted(&earlier, 1)], &rows);
+    assert_eq!(admission(&result), Ok(()));
+}

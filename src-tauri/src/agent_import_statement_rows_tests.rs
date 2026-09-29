@@ -244,6 +244,20 @@ fn a_row_recorded_for_another_company_proves_nothing_here() {
 }
 
 #[test]
+fn our_own_row_recorded_for_another_company_proves_nothing_here() {
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
+    let mut rows = journal(&[&earlier, &later]);
+    rows.get_mut("st-20260901-bbbb").unwrap().0 = OTHER_COMPANY.into();
+    let result = verify(&later, vec![posted(&earlier, 1)], &rows);
+    assert_eq!(status_of(&result), "matching_content_observed");
+    assert_eq!(
+        admission(&result),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
 fn a_tag_the_journal_never_recorded_is_still_refused() {
     let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
     let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));

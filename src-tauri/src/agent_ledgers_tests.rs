@@ -869,6 +869,13 @@ mod through_the_tool {
     /// changed. The same text serves every extent read of the call, so the
     /// brackets stay equal unless a test changes the closing one.
     fn extent_with_master_mark(mark: u64) -> String {
+        extent_with_marks(mark, Some(None))
+    }
+
+    /// `extent_with_master_mark` with the captured company's voucher
+    /// high-water (`ALTVCHID`) kept (`Some(None)`), moved to another value
+    /// (`Some(Some(value))`) or removed (`None`).
+    fn extent_with_marks(mark: u64, voucher: Option<Option<u64>>) -> String {
         let extent = include_str!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
         );
@@ -877,15 +884,27 @@ mod through_the_tool {
         let end = at + extent[at..].find("</COMPANY>").unwrap();
         let from = "<ALTMSTID TYPE=\"Number\"> 219</ALTMSTID>";
         assert_eq!(extent[start..end].matches(from).count(), 1);
-        format!(
-            "{}{}{}",
-            &extent[..start],
-            extent[start..end].replace(
-                from,
-                &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>")
-            ),
-            &extent[end..]
-        )
+        let mut company = extent[start..end].replace(
+            from,
+            &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>"),
+        );
+        let voucher_line = company
+            .lines()
+            .find(|line| line.contains("<ALTVCHID "))
+            .expect("the captured company has a voucher high-water")
+            .to_owned();
+        match voucher {
+            Some(None) => {}
+            Some(Some(value)) => {
+                company = company.replace(
+                    &voucher_line,
+                    &format!("     <ALTVCHID TYPE=\"Number\"> {value}</ALTVCHID>"),
+                );
+            }
+            None => company = company.replace(&format!("{voucher_line}\n"), ""),
+        }
+        assert_eq!(voucher.is_none(), !company.contains("<ALTVCHID "));
+        format!("{}{}{}", &extent[..start], company, &extent[end..])
     }
 
     /// The compliance sequence on a book whose master mark is `mark`, with the
@@ -897,8 +916,18 @@ mod through_the_tool {
         reads: Vec<String>,
         closing: Option<String>,
     ) -> Vec<ScenarioPlan> {
+        marked_plans_over(extent_with_master_mark(mark), reads, closing)
+    }
+
+    /// `marked_compliance_plans` over an extent text of the caller's making,
+    /// used for every extent read before the source's closing one.
+    fn marked_plans_over(
+        extent: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
         let company = xml(companies());
-        let extent = xml(extent_with_master_mark(mark));
+        let extent = xml(extent);
         let currency = xml(captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
         )));
@@ -1091,6 +1120,16 @@ mod through_the_tool {
         first: (String, String),
         second: (String, String),
     ) -> Vec<ScenarioPlan> {
+        split_plans_closing(mark, first, second, extent_with_master_mark(mark))
+    }
+
+    /// `split_plans` whose source ends on the given closing extent.
+    fn split_plans_closing(
+        mark: u64,
+        first: (String, String),
+        second: (String, String),
+        closing: String,
+    ) -> Vec<ScenarioPlan> {
         let rows = split_book();
         let mut plans = marked_compliance_plans(
             mark,
@@ -1104,7 +1143,7 @@ mod through_the_tool {
             ],
             None,
         );
-        pair(&mut plans, xml(extent_with_master_mark(mark)));
+        pair(&mut plans, xml(closing));
         plans
     }
 
@@ -1192,6 +1231,78 @@ mod through_the_tool {
         )
         .await;
         assert_eq!(cause, "parent_part_row_differs_from_catalogue");
+    }
+
+    /// The voucher high-water moving between the parts of a split read, as when
+    /// a voucher is posted after the first part's balances were read, refuses the
+    /// whole read on its closing extent: no rows are released (#679).
+    #[tokio::test]
+    async fn a_split_read_whose_book_changes_between_parts_is_refused() {
+        let rows = split_book();
+        let plans = split_plans_closing(
+            6_000,
+            part_reads(&under(&rows, &[BIG, NESTED])),
+            part_reads(&under(&rows, &[OTHER])),
+            extent_with_marks(6_000, Some(Some(999_999))),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "every part was read before the closing extent");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "party_ledger_extent_changed");
+    }
+
+    /// A book too large for one read whose Tally reports no voucher high-water
+    /// cannot be proved unchanged across parts, so it is refused after the
+    /// catalogue and before any part is requested (#679).
+    #[tokio::test]
+    async fn a_split_read_needs_the_voucher_high_water_before_any_part_is_read() {
+        let rows = split_book();
+        let plans = marked_plans_over(
+            extent_with_marks(6_000, None),
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_partition_voucher_witness_absent");
+        assert!(error["remediation"]
+            .as_str()
+            .unwrap()
+            .contains("fields=basic"));
+    }
+
+    /// One part needs no witness: a counted book that fits one read is read
+    /// whole with or without a voucher high-water, as before.
+    #[tokio::test]
+    async fn a_counted_read_of_one_part_does_not_need_the_voucher_high_water() {
+        let extent = extent_with_marks(5_000, None);
+        let plans = marked_plans_over(
+            extent.clone(),
+            vec![catalogue(), masters(), balances(), groups()],
+            Some(extent),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+    }
+
+    /// A part that returns one of its ledgers twice is refused as a repeat.
+    #[tokio::test]
+    async fn a_part_that_repeats_a_ledger_is_refused() {
+        let rows = split_book();
+        let mut doubled = under(&rows, &[BIG, NESTED]);
+        doubled.push(doubled[0]);
+        let cause = split_refusal(part_reads(&doubled), part_reads(&under(&rows, &[OTHER]))).await;
+        assert_eq!(cause, "parent_part_row_repeated");
     }
 
     /// A catalogue that names another company does not size this one: it is

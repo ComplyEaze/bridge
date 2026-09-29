@@ -170,6 +170,12 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: ParentPartitionError,
     },
+    /// A book read as several parts (#679) reads each part's balances at a
+    /// different moment, so its balances only agree if no voucher was written
+    /// meanwhile, and only the company's voucher high-water proves that. This
+    /// Tally did not report one in its extent, so no part was requested.
+    #[error("Tally did not report the voucher high-water a multi-part ledger read needs")]
+    VoucherWitnessAbsent,
 }
 
 impl PartyLedgerMasterSourceValidationError {
@@ -195,6 +201,7 @@ impl PartyLedgerMasterSourceValidationError {
             Self::CatalogueTooLarge { .. } => "ledger_catalogue_too_large",
             Self::LedgerCountInvalid { source } => source.safe_code(),
             Self::ParentPartition { source } => source.safe_code(),
+            Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
         }
     }
 }
@@ -245,6 +252,10 @@ const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 /// three or four parts. Set from the measurement (#679) before this ships.
 const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 500;
 
+/// The ceiling on one parent group is the whole-read bound: a group with more
+/// ledgers than one part may carry (4,266) is refused as `parent_over_budget`,
+/// never split, because a group cannot be read in pieces by `$Parent`.
+///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
 /// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
@@ -1426,15 +1437,25 @@ impl TallyClient {
                 if admit_compliance_master_read(master_mark, Some(counted))?
                     == ComplianceAdmission::InParts
                 {
-                    partition = Some(
-                        ParentPartition::plan(
-                            catalogue.identified_parents(),
-                            parent_partition_limits(),
-                        )
-                        .map_err(|source| {
-                            PartyLedgerMasterSourceValidationError::ParentPartition { source }
-                        })?,
-                    );
+                    let planned = ParentPartition::plan(
+                        catalogue.identified_parents(),
+                        parent_partition_limits(),
+                    )
+                    .map_err(|source| {
+                        PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                    })?;
+                    // Each part's balances are read at a different moment; the
+                    // closing extent equalling the opening only proves nothing
+                    // was written between them when it carries the voucher
+                    // high-water, so several parts need it to be there.
+                    if planned.parts().len() > 1
+                        && opening_extent.voucher_alter_id_high_water().is_none()
+                    {
+                        return Err(anyhow::Error::new(
+                            PartyLedgerMasterSourceValidationError::VoucherWitnessAbsent,
+                        ));
+                    }
+                    partition = Some(planned);
                 }
             }
             let group_request = render_native_group_snapshot_request(identity.display_name());
@@ -2289,8 +2310,10 @@ struct PartyLedgerMasterPartRead {
     balance_response_bytes: usize,
 }
 
-/// A single read's own hash and size, unchanged; several parts' summed size and
-/// the hash of their ordered hashes.
+/// A single read's own response hash and size, unchanged. For several parts the
+/// hash is NOT a response hash: it is the SHA-256 of the parts' response hashes
+/// joined in part order, so it identifies the set of parts read, and the size is
+/// their sum.
 fn aggregate_part_evidence<'a>(parts: impl Iterator<Item = (&'a str, usize)>) -> (String, usize) {
     let parts = parts.collect::<Vec<_>>();
     if let [(sha256, bytes)] = parts.as_slice() {

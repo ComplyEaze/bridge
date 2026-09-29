@@ -1881,6 +1881,33 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
 /// A book of about a thousand and a half parents, most with a single ledger,
 /// is planned into a handful of parts by ledger count, not refused for its
 /// parent count (#679): the shape of a real book of about 9,500 ledgers.
+/// More parts than Bridge will send is refused at the real limits: thirteen
+/// groups of 2,134 ledgers cannot share a part (two are 4,268, over 4,266), so
+/// they need thirteen against a ceiling of twelve.
+#[test]
+fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
+    use bridge_tally_protocol::parent_partition::{ParentPartition, ParentPartitionError};
+    let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
+    for parent in 0..13 {
+        for _ in 0..2_134 {
+            let index = rows.len();
+            rows.push((
+                format!("Ledger {index}"),
+                format!("guid-{index}"),
+                Some(format!("Parent {parent}")),
+            ));
+        }
+    }
+    let error = ParentPartition::plan(
+        rows.iter()
+            .map(|(name, guid, parent)| (name.as_str(), guid.as_str(), parent.as_deref())),
+        super::parent_partition_limits(),
+    )
+    .unwrap_err();
+    assert_eq!(error, ParentPartitionError::TooManyParts { parts: 13 });
+    assert_eq!(error.safe_code(), "parent_partition_too_many_parts");
+}
+
 #[test]
 fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
     use bridge_tally_protocol::parent_partition::ParentPartition;

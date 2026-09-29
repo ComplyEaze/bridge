@@ -654,6 +654,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              ledger_masters with fields=basic, which returns names, parents and opening \
              balances without the compliance fields. Retrying this call refuses again.",
         ),
+        "parent_partition_voucher_witness_absent" => Some(
+            "This book is too large for one compliance read, so Bridge reads it as several \
+             parts, and balances read at different moments only agree if no voucher was \
+             written between them. Bridge proves that with the company's voucher high-water \
+             (`voucher_alter_id` in the company extent), and this Tally did not report one. \
+             No part was requested. Call ledger_masters with fields=basic. Retrying this \
+             call refuses again.",
+        ),
         "ledger_without_parent"
         | "parent_name_unsupported"
         | "parent_partition_duplicate_ledger_identity" => Some(

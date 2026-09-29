@@ -498,8 +498,8 @@ are unchanged.
 
 ## Pull-request type labels
 
-`node scripts/next-version.mjs` proposes the next version from the type label of
-each merged pull request. The `PR labels` workflow therefore fails a pull
+A release proposal reads the type label of each merged pull request. The
+`PR labels` workflow therefore fails a pull
 request that does not carry exactly one of `type:feature`, `type:bug`,
 `type:rectify` or `type:chore`, so a missing label is fixed on the pull request
 and does not block a release later. Dependabot pull requests are skipped; their

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // A release proposal reads each merged pull request's type label. Failing here, at the pull
-// request, keeps a missing label from blocking a release later. The four names are the ones
-// scripts/next-version.mjs classifies.
+// request, keeps a missing label from blocking a release later.
 import { pathToFileURL } from "node:url";
 
 export const TYPE_LABELS = ["type:feature", "type:bug", "type:rectify", "type:chore"];

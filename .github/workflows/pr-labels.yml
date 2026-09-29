@@ -4,7 +4,7 @@ name: PR labels
 # the author is still on the pull request, keeps a missing label from blocking a release later.
 on:
   pull_request:
-    types: [opened, reopened, labeled, unlabeled]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
 
 permissions:
   contents: read

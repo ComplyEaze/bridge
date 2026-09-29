@@ -3387,3 +3387,351 @@ fn a_twin_needing_both_folds_is_still_found() {
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
     }
 }
+
+/// The decoded, unescaped text of the first element named `tag` in `xml`.
+/// Panics if `xml` does not parse as well-formed XML, or has no such element.
+fn decoded_element_text(xml: &str, tag: &str) -> String {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    loop {
+        match reader
+            .read_event()
+            .expect("request must be well-formed XML")
+        {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag.as_bytes() => {
+                let raw = reader
+                    .read_text(event.name())
+                    .unwrap_or_else(|_| panic!("<{tag}> must have a matching close tag"));
+                let decoded = raw.decode().expect("text must decode as UTF-8");
+                return quick_xml::escape::unescape(&decoded)
+                    .expect("text must unescape")
+                    .into_owned();
+            }
+            quick_xml::events::Event::Eof => panic!("no <{tag}> element in:\n{xml}"),
+            _ => {}
+        }
+    }
+}
+
+/// The shipped voucher-import write path (`render_voucher_xml` via
+/// `render_import_xml`, which also renders the enclosing envelope with
+/// `render_import_envelope`): a narration, reference and ledger name
+/// carrying every reserved XML character, and a ledger name ending in one CR
+/// LF (the one control text a ledger name may carry, bridge#626), each parse
+/// back out of the rendered request exactly as supplied (bridge#832).
+#[test]
+fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
+    let narration = "Paid & <vendor> \"X\" 'Y'";
+    let reference = "REF & <NO> \"1\" 'A'";
+    let ledger = "Bridge & <Ledger> \"Q\" 'A'\r\n";
+    let input: ImportPayload = serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [{
+            "bridge_txn_id": "txn-escape",
+            "date": "2026-09-01",
+            "voucher_type": "Journal",
+            "narration": narration,
+            "reference": reference,
+            "entries": [
+                {"ledger": ledger, "amount": "12.50", "side": "Dr"},
+                {"ledger": "Bridge Offset", "amount": "12.50", "side": "Cr"},
+            ],
+        }]
+    }))
+    .expect("synthetic escaping payload");
+    validate_payload(&input).expect("reserved characters and a trailing ledger CR LF are valid");
+
+    let company = "BRIDGE & <SYNTHETIC> \"BOOK\" 'X'";
+    let xml = render_import_xml(company, &input.vouchers, "batch-escape");
+
+    // The whole rendered request must be well-formed XML: an escaping bug can
+    // make it exactly not that.
+    let mut reader = quick_xml::Reader::from_str(&xml);
+    while reader
+        .read_event()
+        .expect("import request must be well-formed XML")
+        != quick_xml::events::Event::Eof
+    {}
+
+    let attribution = import_identity("batch-escape", "txn-escape");
+    assert_eq!(
+        decoded_element_text(&xml, "NARRATION"),
+        format!("{narration} [BRIDGE:{attribution}]")
+    );
+    assert_eq!(decoded_element_text(&xml, "REFERENCE"), reference);
+    assert_eq!(decoded_element_text(&xml, "LEDGERNAME"), ledger);
+    // A conforming XML parser folds a literal CR LF (and a lone CR) to LF
+    // before the application sees the text (XML 1.0, end-of-line handling);
+    // character references are not folded. quick_xml's decode() skips that
+    // step, so apply it here: only an escaped CR LF survives it (bridge#626).
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "LEDGERNAME"), ledger);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
+    assert_eq!(decoded_element_text(&xml, "SVCURRENTCOMPANY"), company);
+}
+
+/// The bank shapes name their counterparty in PARTYLEDGERNAME, written by the
+/// same escaper; a party ledger carrying reserved characters and a trailing
+/// CR LF must come back exactly, even after XML's end-of-line folding.
+#[test]
+fn shipped_write_path_round_trips_a_party_ledger_crlf() {
+    let party = "Vendor & <Party> \"Q\" 'A'\r\n";
+    let input: ImportPayload = serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [{
+            "bridge_txn_id": "txn-party-escape",
+            "date": "2026-09-01",
+            "voucher_type": "Payment",
+            "narration": "Paid",
+            "entries": [
+                {"ledger": party, "amount": "12.50", "side": "Dr"},
+                {"ledger": "Bank", "amount": "12.50", "side": "Cr"},
+            ],
+        }]
+    }))
+    .expect("synthetic party escaping payload");
+    validate_payload(&input).expect("a party ledger with reserved characters and CR LF is valid");
+
+    let xml = render_import_xml(
+        "BRIDGE SYNTHETIC BOOK",
+        &input.vouchers,
+        "batch-party-escape",
+    );
+    assert_eq!(decoded_element_text(&xml, "PARTYLEDGERNAME"), party);
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "PARTYLEDGERNAME"), party);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
+}
+
+/// A verification result with a divergent row, from the verifier itself: its
+/// entries name "Private Synthetic Party", "Expense" and "Bank".
+fn divergent_verification() -> Value {
+    let input = payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "synthetic-redaction-batch".into(),
+        company_guid: GUID.into(),
+        company: None,
+        txn_ids: vec!["txn-001".into()],
+        date_from: "20260901".into(),
+        date_to: "20260901".into(),
+        sha256: "synthetic-hash".into(),
+        built_at: now(),
+        status: "built".into(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".into(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let voucher = ReadVoucher {
+        remote_id: None,
+        guid: Some("synthetic-guid-1".into()),
+        master_id: None,
+        alter_id: Some(11),
+        date: Some("20260901".into()),
+        voucher_type: Some("Payment".into()),
+        narration: Some("[BRIDGE:txn-001]".into()),
+        voucher_number: None,
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: vec![ReadEntry {
+            ledger: "Private Synthetic Party".into(),
+            amount: "-12.50".into(),
+            is_deemed_positive: "Yes".into(),
+        }],
+    };
+    let result = verify_observed_batch(&line, &[voucher]).expect("divergent verification");
+    assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
+    result
+}
+
+/// Every path at which a value holds a party-name mark, with array positions
+/// as `*`.
+fn marked_paths(value: &Value, path: &str, found: &mut std::collections::BTreeSet<String>) {
+    match value {
+        Value::Object(fields) if fields.contains_key("$bridge_agent_party_name") => {
+            found.insert(path.to_string());
+        }
+        Value::Object(fields) => {
+            for (key, field) in fields {
+                marked_paths(field, &format!("{path}/{key}"), found);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                marked_paths(item, &format!("{path}/*"), found);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The one list of name fields covers every name the verifier marks: a result
+/// saved with its marks removed (the older plain format) and marked again has the
+/// verifier's marks back, and the masters list's too, and no others.
+#[test]
+fn the_name_field_list_covers_every_name_a_verification_marks() {
+    let mut result = divergent_verification();
+    result["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+    let mut marked = std::collections::BTreeSet::new();
+    marked_paths(&result, "", &mut marked);
+    assert!(!marked.is_empty(), "the verifier marks its names");
+    let mut saved = super::super::redact_value(result, super::super::Redaction::None);
+    let mut plain = std::collections::BTreeSet::new();
+    marked_paths(&saved, "", &mut plain);
+    assert!(plain.is_empty(), "{saved}");
+    mark_verification_names(&mut saved);
+    let mut again = std::collections::BTreeSet::new();
+    marked_paths(&saved, "", &mut again);
+    marked.insert("/masters_after_post/ledgers/*".to_string());
+    assert_eq!(again, marked);
+    let listed: std::collections::BTreeSet<String> = VERIFICATION_NAME_FIELDS
+        .iter()
+        .map(|path| format!("/{}", path.join("/")))
+        .collect();
+    assert_eq!(again, listed, "the list names exactly the marked fields");
+}
+
+/// Verification pages apply the configured redaction to ledger names. A saved
+/// proof holding a divergent row (made by the verifier and saved as the tool
+/// saves it) is served under mask_parties with no ledger name, and under none
+/// with the names, so the check is not vacuous.
+#[tokio::test]
+async fn verification_pages_mask_ledger_names_under_mask_parties() {
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server_with = |redaction| {
+        Server::new(super::super::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().to_path_buf(),
+            max_rows: 10,
+            max_bytes: 200_000,
+            redaction,
+            import_enabled: true,
+            writes_enabled: false,
+            batch_post_enabled: false,
+        })
+    };
+    let masked = server_with(super::super::Redaction::MaskParties);
+    let built = masked
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let first = masked
+        .call_tool_response("verify_import", args.clone())
+        .await
+        .value;
+    assert_ne!(first["isError"], true, "{first}");
+
+    // A divergent row from the verifier and a changed-masters doubt, saved in
+    // the older plain format (plain names, and a message listing the ledgers)
+    // and in the current, marked one.
+    let divergent = divergent_verification();
+    let proof_path = masked
+        .imports_dir()
+        .unwrap()
+        .join(format!("{batch_id}.proof.json"));
+    let original: Value = serde_json::from_slice(&fs::read(&proof_path).unwrap()).unwrap();
+    let names = ["Private Synthetic Party", "Private Changed Ledger"];
+    for old_format in [true, false] {
+        let mut proof = original.clone();
+        proof["vouchers"] = divergent["vouchers"].clone();
+        proof["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+        proof["error"] = json!({"code":"posted_under_changed_masters","message":"Posted to Tally, but these ledgers no longer resolve to the master you approved: Private Changed Ledger. Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event."});
+        if old_format {
+            proof = super::super::redact_value(proof, super::super::Redaction::None);
+        }
+        let bytes = serde_json::to_vec_pretty(&proof).unwrap();
+        fs::write(&proof_path, &bytes).unwrap();
+        let mut saved = args.clone();
+        saved["proof_sha256"] = json!(crate::agent::sha256_hex(&bytes));
+        saved["offset"] = json!(0);
+        // Unmasked, the names are there, so the check is not vacuous; the
+        // message names no ledger in either format.
+        let plain = server_with(super::super::Redaction::None)
+            .call_tool_response("verify_import", saved.clone())
+            .await
+            .value;
+        // The saved doubt is reported as the tool's error, with the page.
+        assert_eq!(
+            plain["structuredContent"]["result"]["error"]["code"], "posted_under_changed_masters",
+            "{plain}"
+        );
+        for name in names {
+            assert!(plain.to_string().contains(name), "{name}: {plain}");
+        }
+        assert_eq!(
+            plain["structuredContent"]["result"]["error"]["message"],
+            super::post::CHANGED_MASTERS_MESSAGE
+        );
+        // drop_narration drops narrations only: the names stay, and a
+        // verification page carries no narration to drop.
+        let narrations = server_with(super::super::Redaction::DropNarration)
+            .call_tool_response("verify_import", saved.clone())
+            .await
+            .value;
+        for name in names {
+            assert!(
+                narrations.to_string().contains(name),
+                "{name}: {narrations}"
+            );
+        }
+        assert!(
+            !narrations.to_string().contains("\"narration\""),
+            "{narrations}"
+        );
+        let later = server_with(super::super::Redaction::MaskParties)
+            .call_tool_response("verify_import", saved)
+            .await
+            .value;
+        assert_eq!(
+            later["structuredContent"]["result"]["error"]["code"], "posted_under_changed_masters",
+            "{later}"
+        );
+        for name in names {
+            assert!(
+                !later.to_string().contains(name),
+                "{name} under mask_parties (old format {old_format}): {later}"
+            );
+        }
+    }
+}
+
+/// Page 1 is served through the same step as every later page: from a saved
+/// proof holding plain names, the first page carries them only under none.
+#[test]
+fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
+    let mut proof = divergent_verification();
+    proof["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+    let saved = super::super::redact_value(proof, super::super::Redaction::None);
+    let bytes = serde_json::to_vec_pretty(&saved).unwrap();
+    let (_, page) = served_verification_page(&bytes, 0).unwrap();
+    let served = |redaction| {
+        super::super::redact_tool_response("verify_import", json!({ "result": page }), redaction)
+            .to_string()
+    };
+    let (plain, masked) = (
+        served(super::super::Redaction::None),
+        served(super::super::Redaction::MaskParties),
+    );
+    for name in ["Private Synthetic Party", "Private Changed Ledger"] {
+        assert!(plain.contains(name), "{name}: {plain}");
+        assert!(
+            !masked.contains(name),
+            "{name} under mask_parties: {masked}"
+        );
+    }
+}

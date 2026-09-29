@@ -98,12 +98,16 @@ each part is one filtered master and balance read, all inside the one extent bra
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned (causes
 `parent_part_rows_missing`, `parent_part_row_outside_parents`, `parent_part_row_not_in_catalogue`,
-`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). A book that cannot be split
-is refused before any master request: one parent group over 4,266 ledgers (`parent_over_budget`),
-more than 12 parts (`parent_partition_too_many_parts`), a ledger with no parent
-(`ledger_without_parent`), a parent name that cannot sit in a filter, such as one with a control
-character (`parent_name_unsupported`, which carries `unsupported_parent_ledgers`, the number of
-ledgers under such names and no name) or a repeated ledger GUID
+`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). Ledgers under a parent group
+whose name cannot sit in a filter, such as one with a control character, are read as one extra
+last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
+parents per formula, all applied together), and the same coverage proof applies to it. A book
+that cannot be split is refused before any master request: one parent group, or the ledgers
+under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 12 named parts
+(`parent_partition_too_many_parts`), a complement filter over 256 KiB
+(`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
+ledger under an unnameable parent name (`parent_name_unsupported`, which carries
+`unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
 count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
 refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`

@@ -1286,22 +1286,136 @@ mod through_the_tool {
             .contains("fields=basic"));
     }
 
-    /// A parent name with a control character cannot sit in a filter, so its
-    /// ledgers are refused with the count of them and the cause that says so,
-    /// not called parentless, and the name is not echoed (#679).
-    #[tokio::test]
-    async fn a_parent_name_with_a_control_character_is_refused_with_its_ledger_count() {
+    const ODD: &str = "Odd\tParent";
+
+    /// The split book plus `odd` ledgers under a parent name no filter can
+    /// carry (a control character), and the whole sequence for reading it:
+    /// the catalogue, the two named parts, then the complement part, then the
+    /// groups.
+    fn complement_book(
+        odd: usize,
+        reads: impl FnOnce(&[Generated]) -> [(String, String); 3],
+    ) -> (Vec<Generated>, Vec<ScenarioPlan>) {
         let mut rows = split_book();
-        for _ in 0..3 {
+        for _ in 0..odd {
             let index = rows.len();
             rows.push(Generated {
                 index,
                 name: format!("Generated Ledger {index:05}"),
-                parent: "Odd\tParent",
+                parent: ODD,
             });
         }
-        let plans = marked_plans_over(
-            extent_with_marks(6_000, Some(Some(1))),
+        let [first, second, third] = reads(&rows);
+        let mut plans = marked_compliance_plans(
+            6_000,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                first.0,
+                first.1,
+                second.0,
+                second.1,
+                third.0,
+                third.1,
+                groups(),
+            ],
+            None,
+        );
+        pair(&mut plans, xml(extent_with_master_mark(6_000)));
+        (rows, plans)
+    }
+
+    fn complement_reads(rows: &[Generated]) -> [(String, String); 3] {
+        [
+            part_reads(&under(rows, &[BIG, NESTED])),
+            part_reads(&under(rows, &[OTHER])),
+            part_reads(&under(rows, &[ODD])),
+        ]
+    }
+
+    /// Ledgers under a parent name with a control character cannot be named by
+    /// any filter, so they are read as one extra part that excludes every
+    /// named parent, and every ledger comes back once (#679).
+    #[tokio::test]
+    async fn ledgers_under_an_unnameable_parent_are_read_as_a_complement_part() {
+        let (_, mut plans) = complement_book(3, complement_reads);
+        plans.extend([xml(companies()), status(), xml(companies())]);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            2_000_000,
+        )
+        .await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+        assert_eq!(response["structuredContent"]["result"]["total"], 4_303);
+    }
+
+    /// A complement part that returns a ledger of a named part, as when the
+    /// exclusion was ignored, is refused rather than deduplicated.
+    #[tokio::test]
+    async fn a_complement_part_that_carries_a_named_ledger_is_refused() {
+        let (_, plans) = complement_book(3, |rows| {
+            let mut wide = under(rows, &[ODD]);
+            wide.push(under(rows, &[OTHER])[0]);
+            [
+                part_reads(&under(rows, &[BIG, NESTED])),
+                part_reads(&under(rows, &[OTHER])),
+                part_reads(&wide),
+            ]
+        });
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "the whole bracket is read before coverage");
+        assert_eq!(refusal(&response)["cause"], "parent_part_row_outside_parents");
+    }
+
+    /// A complement part that omits one of the unnameable ledgers is refused.
+    #[tokio::test]
+    async fn a_complement_part_that_omits_a_ledger_is_refused() {
+        let (_, plans) = complement_book(3, |rows| {
+            let mut short = under(rows, &[ODD]);
+            short.pop();
+            [
+                part_reads(&under(rows, &[BIG, NESTED])),
+                part_reads(&under(rows, &[OTHER])),
+                part_reads(&short),
+            ]
+        });
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        assert_eq!(refusal(&response)["cause"], "parent_part_rows_missing");
+    }
+
+    /// More unnameable ledgers than one read holds are refused right after
+    /// the catalogue, with the parent name not echoed (#679).
+    #[tokio::test]
+    async fn more_unnameable_ledgers_than_one_read_holds_are_refused_after_the_catalogue() {
+        let rows = generated(&[(BIG, 1), (ODD, 4_267)]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        assert_eq!(refusal(&response)["cause"], "parent_over_budget");
+        assert!(!response.to_string().contains("Odd"));
+    }
+
+    /// A book whose every ledger sits under an unnameable parent has no named
+    /// part to exclude, so it is refused with the count of them, the cause
+    /// that says so, and no name echoed (#679).
+    #[tokio::test]
+    async fn a_book_with_no_nameable_parent_is_refused_with_its_ledger_count() {
+        let rows = generated(&[(ODD, 4_300)]);
+        let plans = marked_compliance_plans(
+            6_000,
             vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
             None,
         );
@@ -1312,7 +1426,7 @@ mod through_the_tool {
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed");
         assert_eq!(error["cause"], "parent_name_unsupported");
-        assert_eq!(error["unsupported_parent_ledgers"], 3);
+        assert_eq!(error["unsupported_parent_ledgers"], 4_300);
         assert!(!response.to_string().contains("Odd"), "{error}");
         assert!(error["remediation"]
             .as_str()

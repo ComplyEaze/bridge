@@ -10,7 +10,7 @@
 use bridge_tally_primitives::TallyDate;
 
 use crate::outstandings_shared::DateBoundaryProfile;
-use crate::parent_partition::{ParentPart, PARENT_FORMULA_NAME};
+use crate::parent_partition::ParentPart;
 use crate::xml_text::escape_text as xml_escape;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,20 +197,33 @@ fn render_native_ledger_snapshot(
     )
 }
 
-/// The `SYSTEM` formula and `FILTERS` element for a parent part, both empty
+/// The `SYSTEM` formulas and `FILTERS` element for a parent part, both empty
 /// for the unfiltered read so its bytes do not change. The formula text is
-/// built and escaped by [`ParentPart::formula`]; it holds no `$$` function, so
-/// section 6.1's space hazard does not apply.
+/// built and escaped by [`ParentPart::formulas`]; it holds no `$$` function,
+/// so section 6.1's space hazard does not apply. Several formulas are listed
+/// comma-separated and all apply (AND), which is how the complement part's
+/// `NOT (...)` chunks combine (section 11e).
 fn parent_filter_parts(part: Option<&ParentPart>) -> (String, String) {
     match part {
         None => (String::new(), String::new()),
-        Some(part) => (
-            format!(
-                r#"<SYSTEM TYPE="Formulae" NAME="{PARENT_FORMULA_NAME}">{}</SYSTEM>"#,
-                part.formula()
-            ),
-            format!("<FILTERS>{PARENT_FORMULA_NAME}</FILTERS>"),
-        ),
+        Some(part) => {
+            let formulas = part.formulas();
+            let systems = formulas
+                .iter()
+                .map(|formula| {
+                    format!(
+                        r#"<SYSTEM TYPE="Formulae" NAME="{}">{}</SYSTEM>"#,
+                        formula.name, formula.text
+                    )
+                })
+                .collect::<String>();
+            let names = formulas
+                .iter()
+                .map(|formula| formula.name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            (systems, format!("<FILTERS>{names}</FILTERS>"))
+        }
     }
 }
 

@@ -536,6 +536,22 @@ reporting date. Whether those rows moved because of a mistyped far-future vouche
 legitimate later-dated ones is UNVERIFIED, as is a book whose stray voucher sits in another
 parent.
 
+**`NOT` filters, several of them listed together, reach the ledgers a parent filter cannot name
+(PARTIAL, one real book of about 9.5 thousand ledgers, read-only, 2026-09-29).** A parent name with
+a control character cannot be written into a `$Parent = "..."` literal, so its ledgers are in no
+named part. On the balance-free ledger catalogue collection, `NOT ($Parent = "A" OR ...)` formulas (each at most 200
+terms), each declared as its own `SYSTEM` formula and all listed in one comma-separated `FILTERS`
+element, applied together as an AND. With one, two, three and five formulas the row counts each
+matched the count the catalogue predicted, every GUID was distinct, and every row was bound to the
+selected company. With enough formulas to exclude every parent whose name can be written (about
+1.35 thousand parents), the response was exactly the four ledgers under three parents whose names
+carry a control character: 3.9 s, an 8 KB response for a 54 KB request. UNVERIFIED: a book whose
+unnameable parents hold thousands of ledgers, a parent name that differs from another only in case
+(whether Tally's `=` folds case here was not tested), and the same formulas on the master
+and balance collections (only the catalogue collection was measured; Bridge sends them on those two
+and checks every part against the catalogue by GUID before releasing a row, so a collection that
+ignored them would be refused, not misread).
+
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
 or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 1.00 s on the synthetic
 book (the whole party-ledger master) and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the

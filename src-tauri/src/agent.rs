@@ -676,6 +676,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              ledger_masters with fields=basic, which returns names, parents and opening \
              balances without the compliance fields. Retrying this call refuses again.",
         ),
+        "parent_complement_over_budget" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but reaching the ledgers under parent groups whose names a filter cannot \
+             carry needs a filter larger than Bridge will send. No master was requested. Call \
+             ledger_masters with fields=basic. Retrying this call refuses again.",
+        ),
         "parent_partition_voucher_witness_absent" => Some(
             "This book is too large for one compliance read, so Bridge reads it as several \
              parts, and balances read at different moments only agree if no voucher was \
@@ -686,11 +692,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "parent_name_unsupported" => Some(
             "This book is too large for one compliance read and Bridge reads it by parent \
-             group, but `unsupported_parent_ledgers` of its ledgers sit under a parent group \
-             whose name a filter cannot carry (a quotation mark, a control character, an empty \
-             name or an unexpected replacement character), so no filter can name them. No \
-             master was requested. Call ledger_masters with fields=basic. Retrying this call \
-             refuses again.",
+             group, but all `unsupported_parent_ledgers` of its ledgers sit under parent \
+             groups whose names a filter cannot carry (a quotation mark, a control character, \
+             an empty name or an unexpected replacement character), so there is no named \
+             group to read them apart from. No master was requested. Call ledger_masters with \
+             fields=basic. Retrying this call refuses again.",
         ),
         "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
             "This book is too large for one compliance read and Bridge reads it by parent \

@@ -264,6 +264,12 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
+/// Most bytes of `NOT` formula text the complement part's request may carry
+/// (#679). UNVERIFIED: Bridge's own bound. One live probe sent 54 KB of
+/// request for 1,354 parents; the 12-part, 200-parents-per-part limits already
+/// cap the parents at 2,400, so this is a backstop against very long names.
+const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
+
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
@@ -273,6 +279,7 @@ fn parent_partition_limits() -> PartitionLimits {
             / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
         max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
         max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
+        max_complement_formula_bytes: PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED,
     }
 }
 

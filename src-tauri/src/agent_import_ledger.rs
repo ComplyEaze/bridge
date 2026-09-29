@@ -137,6 +137,26 @@ impl From<&ImportLedgerLine> for StatusRecord {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct VerificationGeneration(usize);
 
+/// Every statement row the journal records, by the narration tag its voucher
+/// carries, with the company it was built for (#865). Read in the same pass as
+/// the snapshot, so a verification sees the rows of batches other than its own.
+pub(super) type StatementRows = BTreeMap<String, (String, StatementRowKey)>;
+
+fn note_statement_rows(rows: &mut StatementRows, batch: &ImportLedgerLine) {
+    for voucher in &batch.vouchers {
+        if let Some(key) = batch
+            .statement_rows
+            .as_ref()
+            .and_then(|recorded| recorded.get(&voucher.bridge_txn_id))
+        {
+            rows.insert(
+                batch.attribution_tag(voucher),
+                (batch.company_guid.clone(), key.clone()),
+            );
+        }
+    }
+}
+
 pub(super) struct BatchSnapshot {
     pub(super) batch: ImportLedgerLine,
     pub(super) dispatched: bool,
@@ -145,6 +165,9 @@ pub(super) struct BatchSnapshot {
     pub(super) native_remote_id: Option<String>,
     // Last matching physical journal record, including identical status appends.
     pub(super) generation: VerificationGeneration,
+    /// The statement rows of every batch in the journal. Filled only by
+    /// [`read_snapshot`]; empty where a reader does not need them.
+    pub(super) statement_rows: StatementRows,
 }
 
 enum Record {
@@ -159,40 +182,50 @@ pub(super) fn read_snapshot(
     batch_id: Option<&str>,
 ) -> Result<Option<BatchSnapshot>, String> {
     let mut selected: Option<BatchSnapshot> = None;
-    scan_records(reader, |record, generation| match record {
-        Record::Batch(batch) if batch_id == Some(batch.batch_id.as_str()) => {
-            selected = Some(BatchSnapshot {
-                response: selected
-                    .as_ref()
-                    .and_then(|snapshot| snapshot.response.clone()),
-                native_remote_id: selected
-                    .as_ref()
-                    .and_then(|snapshot| snapshot.native_remote_id.clone()),
-                dispatched: selected
-                    .as_ref()
-                    .is_some_and(|snapshot| snapshot.dispatched),
-                batch: *batch,
-                generation,
-            });
+    let mut statement_rows = StatementRows::new();
+    scan_records(reader, |record, generation| {
+        if let (Some(_), Record::Batch(batch)) = (batch_id, &record) {
+            note_statement_rows(&mut statement_rows, batch);
         }
-        Record::Status(update) if batch_id == Some(update.batch_id.as_str()) => {
-            // Whole-journal admission already established the preceding batch.
-            let snapshot = selected
-                .as_mut()
-                .expect("status refers to an admitted batch");
-            if let Some(response) = update.response {
-                snapshot.response = Some(response);
+        match record {
+            Record::Batch(batch) if batch_id == Some(batch.batch_id.as_str()) => {
+                selected = Some(BatchSnapshot {
+                    response: selected
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.response.clone()),
+                    native_remote_id: selected
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.native_remote_id.clone()),
+                    dispatched: selected
+                        .as_ref()
+                        .is_some_and(|snapshot| snapshot.dispatched),
+                    batch: *batch,
+                    generation,
+                    statement_rows: StatementRows::new(),
+                });
             }
-            snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
-            if update.native_remote_id.is_some() {
-                snapshot.native_remote_id = update.native_remote_id.clone();
+            Record::Status(update) if batch_id == Some(update.batch_id.as_str()) => {
+                // Whole-journal admission already established the preceding batch.
+                let snapshot = selected
+                    .as_mut()
+                    .expect("status refers to an admitted batch");
+                if let Some(response) = update.response {
+                    snapshot.response = Some(response);
+                }
+                snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
+                if update.native_remote_id.is_some() {
+                    snapshot.native_remote_id = update.native_remote_id.clone();
+                }
+                snapshot.batch.status = update.status;
+                snapshot.generation = generation;
             }
-            snapshot.batch.status = update.status;
-            snapshot.generation = generation;
+            _ => {}
         }
-        _ => {}
     })?;
-    Ok(selected)
+    Ok(selected.map(|snapshot| BatchSnapshot {
+        statement_rows,
+        ..snapshot
+    }))
 }
 
 /// Validate the entire journal, retaining every build that carries one wire
@@ -214,6 +247,7 @@ pub(super) fn read_lineage(
                 dispatched: prior.is_some_and(|snapshot| snapshot.dispatched),
                 batch: *batch,
                 generation,
+                statement_rows: StatementRows::new(),
             };
             match latest.get(&snapshot.batch.batch_id) {
                 Some(index) => builds[*index] = snapshot,
@@ -466,6 +500,7 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 dispatched,
                 batch: *batch,
                 generation,
+                statement_rows: StatementRows::new(),
             });
         }
         Record::Status(update) => {

@@ -41,6 +41,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         .collect::<Vec<_>>();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -145,6 +146,7 @@ fn delimiter_bearing_ledger_names_do_not_create_accounting_duplicates() {
         &[None, None],
         &BTreeSet::new(),
         &BTreeSet::new(),
+        &BTreeMap::new(),
     );
     assert!(
         batch.is_empty(),
@@ -302,6 +304,7 @@ fn cancelled_vouchers_pair_neither_in_the_batch_nor_in_the_window() {
             &tags,
             &expected_tags,
             &BTreeSet::new(),
+            &BTreeMap::new(),
         );
         assert!(batch.is_empty(), "{tags:?}: {batch:?}");
         assert!(unrelated.is_empty(), "{tags:?}: {unrelated:?}");

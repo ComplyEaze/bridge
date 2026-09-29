@@ -188,6 +188,7 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -363,6 +364,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -465,6 +467,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -553,6 +556,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -726,6 +730,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -760,6 +765,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -981,6 +987,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1073,6 +1080,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1142,6 +1150,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1205,6 +1214,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let mut line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1275,6 +1285,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1341,6 +1352,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     validate_payload(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1401,6 +1413,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let input = payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -2193,7 +2206,7 @@ mod boundary_tests;
 mod multiplicity_tests;
 
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
-    verify_batch(line, &ImportReadSource::admit(rows.to_vec())?)
+    verify_batch(line, &ImportReadSource::admit(rows.to_vec())?, &Default::default())
 }
 
 #[tokio::test]
@@ -2468,6 +2481,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        statement_rows: None,
         batch_id: "batch-dispatched-endpoint".into(),
         identity_scheme: Some(ImportIdentityScheme::BatchV1),
         amends_batch_id: None,

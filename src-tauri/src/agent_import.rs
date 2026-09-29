@@ -4,6 +4,7 @@ use super::{
     party_name, required_string, sha256_hex, sha256_json, standard_ledger_catalog_read, Evidence,
     Server, ToolFailure, ToolOutcome, VOUCHER_CHECKPOINT_NOT_OBSERVED,
 };
+use super::bank_statement::StatementRowKey;
 use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::standard_ledger_catalog::{
     admit_standard_ledger_catalog_request, parse_standard_ledger_catalog_response,
@@ -283,6 +284,12 @@ pub(super) struct ImportLedgerLine {
     /// existed: such a batch is refused for posting and must be rebuilt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ledger_identities: Option<Vec<BoundLedger>>,
+    /// The statement row behind each voucher, by `bridge_txn_id` (#865). Set
+    /// only on a build from a bank-statement proposals file, and there only for
+    /// the vouchers whose row carried a key. Absent on every other build and on
+    /// all older records: those keep the strict accounting-fingerprint rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    statement_rows: Option<BTreeMap<String, StatementRowKey>>,
 }
 
 /// A requested name and every live ledger whose stored name folds equal to it
@@ -861,6 +868,19 @@ impl Server {
                 built_at: now(),
                 status: "built".to_string(),
                 pre_import_mark: mark,
+                statement_rows: Some(
+                    payload
+                        .vouchers
+                        .iter()
+                        .filter_map(|voucher| {
+                            resolved
+                                .row_keys
+                                .get(&voucher.bridge_txn_id)
+                                .map(|key| (voucher.bridge_txn_id.clone(), key.clone()))
+                        })
+                        .collect::<BTreeMap<_, _>>(),
+                )
+                .filter(|rows| !rows.is_empty()),
                 vouchers: payload.vouchers,
                 ledger_identities: Some(build_binding),
             };
@@ -1103,6 +1123,7 @@ impl Server {
             generation,
             response: dispatch_response,
             dispatched,
+            statement_rows,
             ..
         } = self
             .latest_import_snapshot(batch_id)?
@@ -1165,7 +1186,7 @@ impl Server {
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
             corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)?;
-            let result = verify_batch(&line, &observed)?;
+            let result = verify_batch(&line, &observed, &statement_rows)?;
             let mut closing_mode_evidence = None;
             if result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {
                 // Positive rows are direct observations. Absence additionally requires

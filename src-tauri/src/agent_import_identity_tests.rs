@@ -249,7 +249,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     );
     let source = parse_import_vouchers(&xml, CAPTURED_GUID).unwrap();
     assert_eq!(source.rows.len(), 1);
-    let result = verify_batch(&line, &source).unwrap();
+    let result = verify_batch(&line, &source, &Default::default()).unwrap();
     assert_eq!(result["counts"]["posted_verified"], 1);
     assert_eq!(result["counts"]["matching_content_observed"], 0);
     assert_eq!(result["duplicates"], json!([]));
@@ -265,7 +265,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     // Keep the actual observed source and all expected accounting fields intact.
     // A different batch must not inherit this posting's attribution.
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
-    let other = verify_batch(&line, &source).unwrap();
+    let other = verify_batch(&line, &source, &Default::default()).unwrap();
     assert_eq!(other["counts"]["posted_verified"], 0);
     assert_eq!(other["counts"]["matching_content_observed"], 1);
     assert_eq!(other["vouchers"][0]["marker"], "accounting_fingerprint");

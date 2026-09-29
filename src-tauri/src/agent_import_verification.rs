@@ -148,9 +148,35 @@ pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerp
     )
 }
 
+/// Two statement rows are provably different when they are of one account and
+/// each printed a running balance, and the balances differ (#865). Anything
+/// less, a missing digest or balance, or another account, proves nothing, so
+/// the two stay indistinguishable and the duplicate guard keeps refusing.
+fn statement_rows_differ(a: &StatementRowKey, b: &StatementRowKey) -> bool {
+    !a.account.is_empty()
+        && a.account == b.account
+        && !a.balance.is_empty()
+        && !b.balance.is_empty()
+        && a.balance != b.balance
+}
+
+/// The recorded statement row behind a narration tag, if it was built for this
+/// company. A row recorded for another company says nothing here.
+fn recorded_statement_row<'a>(
+    statement_rows: &'a StatementRows,
+    company_guid: &str,
+    tag: &str,
+) -> Option<&'a StatementRowKey> {
+    statement_rows
+        .get(tag)
+        .filter(|(company, _)| company == company_guid)
+        .map(|(_, key)| key)
+}
+
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
+    statement_rows: &StatementRows,
 ) -> Result<Value, String> {
     // Normalize only the comparison copies. Persisted batches and generated XML
     // retain their original amount lexemes and remain backward compatible.
@@ -214,6 +240,26 @@ pub(super) fn verify_batch(
                 .flatten()
         })
         .collect::<Vec<_>>();
+    // A voucher another batch posted is not this batch's twin when every
+    // expected voucher of its fingerprint came from a different statement row
+    // (#865). It is then no fallback candidate for any of them.
+    let other_statement_row = |index: usize| -> bool {
+        let Some(theirs) = observed_tags[index]
+            .and_then(|tag| recorded_statement_row(statement_rows, &line.company_guid, tag))
+        else {
+            return false;
+        };
+        let mut twins = expected_fingerprints
+            .iter()
+            .zip(&expected_markers)
+            .filter(|(fingerprint, _)| **fingerprint == observed_fingerprints[index])
+            .peekable();
+        twins.peek().is_some()
+            && twins.all(|(_, marker)| {
+                recorded_statement_row(statement_rows, &line.company_guid, marker)
+                    .is_some_and(|ours| statement_rows_differ(ours, theirs))
+            })
+    };
     let mut tagged = BTreeMap::<&str, VerificationCandidates>::new();
     let mut fallback = BTreeMap::<&VerificationFingerprint, VerificationCandidates>::new();
     for (index, voucher) in observed.iter().enumerate() {
@@ -223,7 +269,7 @@ pub(super) fn verify_batch(
             .is_some_and(|mark| voucher.alter_id.is_some_and(|id| id > mark));
         if let Some(tag) = observed_tags[index].filter(|tag| expected_tags.contains(tag)) {
             tagged.entry(tag).or_default().insert(index, after_mark);
-        } else {
+        } else if !other_statement_row(index) {
             fallback
                 .entry(&observed_fingerprints[index])
                 .or_default()
@@ -354,6 +400,16 @@ pub(super) fn verify_batch(
         &observed_tags,
         &expected_tags,
         &fully_verified_identities,
+        &observed_identities
+            .iter()
+            .zip(&observed_tags)
+            .filter_map(|(identity, tag)| {
+                Some((
+                    identity.as_str(),
+                    recorded_statement_row(statement_rows, &line.company_guid, (*tag)?)?,
+                ))
+            })
+            .collect(),
     );
     Ok(
         json!({"counts":counts,"vouchers":rows,"duplicates":batch_duplicates,"unrelated_duplicates_in_window":unrelated_duplicates_in_window,"ambiguous_within_batch":ambiguous_within_batch}),
@@ -456,6 +512,7 @@ pub(super) fn batch_duplicate_sets(
     tags: &[Option<&str>],
     expected_tags: &BTreeSet<&str>,
     fully_verified_identities: &BTreeSet<String>,
+    statement_rows: &BTreeMap<&str, &StatementRowKey>,
 ) -> (Vec<Value>, Vec<Value>) {
     // Serialize the structured vector before hashing: ledger names may contain
     // the delimiters used inside an entry, so joining entries is ambiguous.
@@ -468,7 +525,7 @@ pub(super) fn batch_duplicate_sets(
                     ids.iter().all(|id| {
                         id.as_str()
                             .is_some_and(|id| fully_verified_identities.contains(id))
-                    })
+                    }) || every_pair_is_a_different_statement_row(ids, statement_rows)
                 })
         });
     let batch_indexes = (0..observed.len())
@@ -507,6 +564,26 @@ pub(super) fn batch_duplicate_sets(
         batch.into_iter().map(safe_duplicate).collect(),
         unrelated.into_iter().map(safe_duplicate).collect(),
     )
+}
+
+/// A group of vouchers that share an accounting fingerprint is no duplicate
+/// when every pair of them is provably a different statement row (#865): each
+/// is one this journal recorded, and each pair passes [`statement_rows_differ`].
+fn every_pair_is_a_different_statement_row(
+    ids: &[Value],
+    statement_rows: &BTreeMap<&str, &StatementRowKey>,
+) -> bool {
+    let keys = ids
+        .iter()
+        .map(|id| id.as_str().and_then(|id| statement_rows.get(id)))
+        .collect::<Option<Vec<_>>>();
+    keys.is_some_and(|keys| {
+        keys.iter().enumerate().all(|(index, first)| {
+            keys[index + 1..]
+                .iter()
+                .all(|second| statement_rows_differ(first, second))
+        })
+    })
 }
 
 /// A bank voucher whose readback carried no `EFFECTIVEDATE`: its effective

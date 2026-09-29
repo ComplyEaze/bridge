@@ -38,6 +38,7 @@ use bridge_bank_statement::pipeline::{prepare, ParsedStatement, StatementRequest
 use bridge_bank_statement::proposals::StatementRecord;
 use bridge_bank_statement::proposals::{format_amount, Disposition};
 use bridge_bank_statement::Refusal;
+use serde::Deserialize;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -587,11 +588,24 @@ pub(super) struct AnsweredCashLedger {
     pub(super) cash_in_hand: bool,
 }
 
+/// Where a voucher's statement row sits, kept in the import journal (#865):
+/// the account it came from, as a local equality key, and the running balance
+/// printed on the row. The journal is Bridge's own file; neither value is sent
+/// to Tally or returned in a tool response.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub(super) struct StatementRowKey {
+    pub(super) account: String,
+    pub(super) balance: String,
+}
+
 /// `build_import_xml`'s arguments, and what the proposals file requires of the
 /// book beyond them.
 pub(super) struct ResolvedImport {
     pub(super) args: Value,
     pub(super) cash_ledgers: Vec<AnsweredCashLedger>,
+    /// Each built voucher's statement row, by `bridge_txn_id`. Empty for
+    /// inline vouchers and for a file written before rows carried a key.
+    pub(super) row_keys: BTreeMap<String, StatementRowKey>,
 }
 
 /// The voucher type and side an answer puts its named ledger on, for an
@@ -654,6 +668,7 @@ pub(super) fn resolve_import_arguments(
         return Ok(ResolvedImport {
             args: args.clone(),
             cash_ledgers: Vec::new(),
+            row_keys: BTreeMap::new(),
         });
     };
     if object.contains_key("vouchers") {
@@ -762,6 +777,18 @@ pub(super) fn resolve_import_arguments(
         }
         cash_ledgers.push(need);
     }
+    let row_keys = records
+        .iter()
+        .filter_map(|record| {
+            Some((
+                record["bridge_txn_id"].as_str()?.to_string(),
+                StatementRowKey {
+                    account: record["account_digest"].as_str()?.to_string(),
+                    balance: record["balance"].as_str()?.to_string(),
+                },
+            ))
+        })
+        .collect();
     let mut resolved = object.clone();
     resolved.remove("proposals_id");
     resolved.remove("proposals_sha256");
@@ -769,6 +796,7 @@ pub(super) fn resolve_import_arguments(
     Ok(ResolvedImport {
         args: Value::Object(resolved),
         cash_ledgers,
+        row_keys,
     })
 }
 

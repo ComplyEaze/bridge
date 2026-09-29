@@ -757,6 +757,7 @@ impl Server {
                             queued.groups,
                             queued.currencies,
                             queued.ledger_binding,
+                            &snapshot.statement_rows,
                         )?;
                         admit_queued_aim(
                             queued.company_marks_at_binding,
@@ -1457,12 +1458,13 @@ fn recheck_import_admission(
     groups: Option<&str>,
     currencies: &str,
     ledger_binding: &bridge_tally_protocol::StandardLedgerCatalogBinding,
+    statement_rows: &ledger::StatementRows,
 ) -> anyhow::Result<()> {
     let observed = parse_import_vouchers(first, company_guid).map_err(anyhow::Error::msg)?;
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
         .map_err(anyhow::Error::msg)?;
-    let result = verify_batch(line, &observed).map_err(anyhow::Error::msg)?;
+    let result = verify_batch(line, &observed, statement_rows).map_err(anyhow::Error::msg)?;
     require_absent_verification_result(&result, line.vouchers.len()).map_err(|code| match code
         .as_str()
     {

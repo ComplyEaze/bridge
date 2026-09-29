@@ -17,7 +17,7 @@ use crate::bank::{Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION};
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
 use crate::mapping::{Mapping, Treatment};
-use crate::money::money;
+use crate::money::{balance, money};
 use crate::parse::Row;
 use crate::refusal::Refusal;
 use crate::text::{ledger_key, mapping_key, squash, strip};
@@ -145,6 +145,13 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// Which account the row came from, as [`account_digest`] keys it (#865).
+    pub account_digest: String,
+    /// The running balance printed on the row, as an exact two-place decimal;
+    /// `None` when the statement has no balance column or the cell is not an
+    /// amount. Two rows of one account with one date, side and amount differ in
+    /// this alone, so it is what tells a second same-day payment from a repeat.
+    pub balance: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -180,6 +187,16 @@ fn two_places(text: &str) -> String {
 /// scale is already at most two places.
 pub fn format_amount(value: &ExactDecimal) -> String {
     two_places(value.as_str())
+}
+
+/// A local equality key for an account, not a secret: an account number has too
+/// little entropy to hide behind a hash. It says only whether two records name
+/// the same account, and it stays in Bridge's own files: it is never sent to
+/// Tally and never returned in a tool response (#865).
+pub fn account_digest(account_number: &str) -> String {
+    let material = ["bridge.statement.account.v1", account_number].join("\0");
+    let digest = Sha256::digest(material.as_bytes());
+    digest[..8].iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {
@@ -348,6 +365,10 @@ pub fn build(
         window_ids.insert(txn_id.clone());
         let debit = money(row.get(DEBIT), DEBIT, number)?;
         let credit = money(row.get(CREDIT), CREDIT, number)?;
+        let printed_balance = balance(row.get(BALANCE), BALANCE, number)
+            .ok()
+            .flatten()
+            .map(|value| format_amount(&value));
         let (amount, outward) = match (debit, credit) {
             (Some(_), Some(_)) => {
                 return Err(Refusal::at_row(
@@ -403,6 +424,8 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        account_digest: account_digest(options.account_number),
+                        balance: printed_balance,
                     });
                     continue;
                 };
@@ -446,6 +469,8 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        account_digest: account_digest(options.account_number),
+                        balance: printed_balance,
                     });
                     continue;
                 }
@@ -529,6 +554,8 @@ pub fn build(
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            account_digest: account_digest(options.account_number),
+            balance: printed_balance,
         });
     }
     if let Some(stale) = options

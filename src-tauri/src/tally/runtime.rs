@@ -2,6 +2,7 @@ use super::{
     ConnectionStatus, TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity,
 };
 use super::{TallyProbeResult, TallyVoucher};
+use crate::endpoint_wire::WireGateConfig;
 use crate::observability::BodyBytesObservation;
 use crate::reports::party_ledger_master::PartyLedgerMasterSource;
 use crate::tally::connection::canonical_loopback_origin;
@@ -48,7 +49,7 @@ use bridge_tally_protocol::{
     parse_companies_from_collection, parse_native_ledger_source_records_with_evidence,
     xml_read_profiles::ReadOnlyProfile,
 };
-use bridge_tally_transport::TallyTransportError;
+use bridge_tally_transport::{TallyTransportError, WireWaitBudget};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -564,6 +565,10 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
             TallyTransportError::ConnectionFailed => AuditPartFailureKind::Unreachable,
+            // Held back by the endpoint's wire gate (#697): nothing was sent.
+            TallyTransportError::WireRefused { refusal } => {
+                AuditPartFailureKind::NotSent(refusal.safe_code())
+            }
             other => AuditPartFailureKind::Other(other.safe_code()),
         }
     } else if error
@@ -711,6 +716,46 @@ tokio::task_local! {
     /// during one: an operation already sent to Tally runs to completion, since
     /// abandoning a request does not stop Tally (protocol reference §11b.2).
     pub(crate) static TOOL_CANCELLATION: CancellationToken;
+}
+
+tokio::task_local! {
+    /// One user-level operation's wait for the endpoint wire lock (#697 item
+    /// (a)): one MCP tool call, or a desktop command that scopes it (the ones
+    /// in `commands.rs` that call `with_operation_wire_budget`), whose host
+    /// gives up after about 60 s. Every runtime operation run in this task
+    /// draws on the one budget the first of them creates, so the call waits at
+    /// most `WireRetryPolicy::total` in all, however many runtime operations
+    /// it makes. A task without it (a spawned snapshot run, a test, and the
+    /// desktop commands that do not scope it) gives each runtime operation a
+    /// budget of its own: still bounded, never unbounded, but not one budget
+    /// for the whole command.
+    static OPERATION_WIRE_BUDGET: std::sync::OnceLock<WireWaitBudget>;
+}
+
+/// Run `operation`, one MCP tool call or one desktop command, under one wire
+/// lock wait budget shared by every runtime operation it makes in this task.
+///
+/// The operation is boxed: a tool call's state machine is large, and scoped
+/// inline it grew the MCP loop's future past a 2 MiB test thread's stack (and
+/// would past Windows' 1 MiB main thread's; see `run_post`).
+pub(crate) async fn with_operation_wire_budget<F: Future>(operation: F) -> F::Output {
+    OPERATION_WIRE_BUDGET
+        .scope(std::sync::OnceLock::new(), Box::pin(operation))
+        .await
+}
+
+/// A failed pre-intent read as the typed admission refusal, with the transport
+/// failure as context (a context value is not reachable by `downcast_ref`). A
+/// wire refusal stays the error itself: it says the port was busy, with a
+/// retry time, and nothing was sent.
+fn unconfirmed_unless_wire_refused(
+    error: anyhow::Error,
+    unconfirmed: super::approved_import::ApprovedImportAdmissionError,
+) -> anyhow::Error {
+    if crate::endpoint_wire::wire_refusal(&error).is_some() {
+        return error;
+    }
+    anyhow::Error::new(unconfirmed).context(format!("{error:#}"))
 }
 
 /// The tool call was withdrawn before this operation started; nothing was sent.
@@ -2003,6 +2048,7 @@ fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
             | TallyTransportError::UnsupportedContentEncoding => {
                 "segment_response_encoding_invalid"
             }
+            TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
         };
     }
     let deadline_exceeded = error.chain().any(|cause| {
@@ -2133,11 +2179,15 @@ struct TallySession {
 }
 
 impl TallySession {
-    fn new(endpoint: EndpointKey, config: TallyConfig) -> anyhow::Result<Self> {
+    fn new(
+        endpoint: EndpointKey,
+        config: TallyConfig,
+        wire: &WireGateConfig,
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::new(config)?,
+            client: TallyClient::with_wire(config, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2151,11 +2201,12 @@ impl TallySession {
         endpoint: EndpointKey,
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::with_transport_policy(config, policy)?,
+            client: TallyClient::with_transport_policy(config, policy, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2326,6 +2377,9 @@ pub struct TallyRuntime {
     unallocated_balance_coverage: Option<QualifiedUnallocatedBalanceCoverage>,
     #[cfg(feature = "voucher-scan")]
     outstandings_boundary_profile_override: Option<DateBoundaryProfile>,
+    /// The per-port wire lock every session's client gates its sends on
+    /// (`endpoint_wire`).
+    wire: WireGateConfig,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
 }
@@ -2448,6 +2502,7 @@ impl Default for TallyRuntime {
             unallocated_balance_coverage: None,
             #[cfg(feature = "voucher-scan")]
             outstandings_boundary_profile_override: None,
+            wire: WireGateConfig::default(),
             #[cfg(test)]
             transport_policy: None,
         }
@@ -2486,6 +2541,20 @@ impl TallyRuntime {
             transport_policy: Some(policy),
             ..Self::default()
         }
+    }
+
+    /// Share `wire`'s root (another runtime's, or a test's), or shorten its
+    /// retry bound. Only before the first request: a session keeps the gate it
+    /// was built with.
+    #[cfg(test)]
+    pub(crate) fn with_wire_gate_config(mut self, wire: WireGateConfig) -> Self {
+        self.wire = wire;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn wire_gate_config(&self) -> &WireGateConfig {
+        &self.wire
     }
 
     /// Manual-only admission for the ignored Billwise Lab reconciliation
@@ -2533,11 +2602,13 @@ impl TallyRuntime {
         }
         #[cfg(test)]
         let session = Arc::new(match self.transport_policy {
-            Some(policy) => TallySession::with_transport_policy(endpoint.clone(), config, policy)?,
-            None => TallySession::new(endpoint.clone(), config)?,
+            Some(policy) => {
+                TallySession::with_transport_policy(endpoint.clone(), config, policy, &self.wire)?
+            }
+            None => TallySession::new(endpoint.clone(), config, &self.wire)?,
         });
         #[cfg(not(test))]
-        let session = Arc::new(TallySession::new(endpoint.clone(), config)?);
+        let session = Arc::new(TallySession::new(endpoint.clone(), config, &self.wire)?);
         sessions.insert(
             endpoint,
             SessionSlot {
@@ -2585,7 +2656,14 @@ impl TallyRuntime {
         }
         let session = self.session(config)?;
         let request = session.begin_request()?;
-        let client = session.client.clone();
+        // One wire-lock wait budget (#697 item (a)) for every send of every
+        // attempt below, shared with every other runtime operation of the
+        // enclosing tool call or desktop command when it scoped one.
+        let fresh = || WireWaitBudget::new(self.wire.retry().total());
+        let budget = OPERATION_WIRE_BUDGET
+            .try_with(|shared| shared.get_or_init(fresh).clone())
+            .unwrap_or_else(|_| fresh());
+        let client = session.client.for_operation(budget);
         let endpoint = EndpointIdentity::new(session.endpoint.as_str().to_string())
             .map_err(anyhow::Error::new)?;
         let effective_cancellation = request.cancellation.child_token();
@@ -3130,7 +3208,7 @@ impl TallyRuntime {
                             observe_read_boundary(&client).await?;
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
-                        let source = client
+                        let (source, count_evidence) = client
                             .fetch_party_ledger_master_source(
                                 &identity,
                                 boundary_profile,
@@ -3138,7 +3216,8 @@ impl TallyRuntime {
                             )
                             .await?;
                         evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone());
+                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
+                                .combine(count_evidence);
                         bracket_verified_company_identity(&client, &identity).await?;
                         let closing_evidence =
                             confirm_read_boundary(&client, boundary_profile).await?;
@@ -3715,10 +3794,10 @@ impl TallyRuntime {
                             .await
                             .map_err(|error| {
                                 with_read_evidence(
-                                    anyhow::Error::new(
+                                    unconfirmed_unless_wire_refused(
+                                        error,
                                         super::approved_import::ApprovedImportAdmissionError::MastersUnconfirmed,
-                                    )
-                                    .context(format!("{error:#}")),
+                                    ),
                                     admission_evidence.clone(),
                                 )
                             })?;
@@ -3809,10 +3888,10 @@ impl TallyRuntime {
                         // nothing was sent, never an unknown outcome.
                         let before_marks = client.post_xml_raw(marks_xml.clone()).await.map_err(|error| {
                             with_read_evidence(
-                                anyhow::Error::new(
+                                unconfirmed_unless_wire_refused(
+                                    error,
                                     super::approved_import::ApprovedImportAdmissionError::CompanyScopeUnconfirmed,
-                                )
-                                .context(format!("{error:#}")),
+                                ),
                                 admission_evidence.clone(),
                             )
                         })?;
@@ -3849,6 +3928,22 @@ impl TallyRuntime {
                             None => marked,
                         }
                     })?;
+                    // The wire lock for the one import send is taken before its
+                    // attempt is recorded (#697), tried once and never waited for:
+                    // a wait here would sit between the aim marks read above and
+                    // the attempt's record, after which the approval could no
+                    // longer be trusted. A taken lock refuses the post here:
+                    // nothing recorded, nothing sent. Held, it covers the record
+                    // (a local disk write that waits on no other process) and is
+                    // spent on the one send.
+                    let wire = client.acquire_wire().await.map_err(|refused| {
+                        with_read_evidence(
+                            anyhow::Error::from(super::approved_import::PreIntentQueueRefusal {
+                                source: refused,
+                            }),
+                            admission_evidence.clone(),
+                        )
+                    })?;
                     before_dispatch().map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
@@ -3861,7 +3956,7 @@ impl TallyRuntime {
                         with_read_evidence(error, admission_evidence.clone())
                     })?;
                     let mut response_evidence = RuntimeReadEvidence::empty();
-                    let body = client
+                    let body = wire
                         .post_probe_xml(xml, &mut response_evidence)
                         .await
                         .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -5134,7 +5229,11 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         Some(
             TallyTransportError::EndpointInvalid { .. }
             | TallyTransportError::PolicyInvalid { .. }
-            | TallyTransportError::ClientInitializationFailed,
+            | TallyTransportError::ClientInitializationFailed
+            // A wire-gate refusal sent nothing: it is neither retried by the
+            // read policy (the gate already waited its bound) nor a transport
+            // failure for the circuit breaker.
+            | TallyTransportError::WireRefused { .. },
         ) => ReadFailureClass::Validation,
         None => ReadFailureClass::Validation,
     }

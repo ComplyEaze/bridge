@@ -33,6 +33,10 @@ pub struct AuditCompanyPart {
 pub enum AuditCompanyPartError {
     Malformed,
     StatusNotSuccess,
+    /// A complete `ENVELOPE` whose `HEADER` carried no `STATUS`, an empty one
+    /// or a self-closing one: the response's structure, not Tally's failure
+    /// answer. No such response has been captured (bridge#717, #863).
+    StatusAbsent,
     NotExactlyOneCompany,
     FieldMissingOrRepeated,
     GuidMismatch,
@@ -44,6 +48,7 @@ impl AuditCompanyPartError {
         match self {
             Self::Malformed => "audit_company_part_malformed",
             Self::StatusNotSuccess => "audit_company_part_status_not_success",
+            Self::StatusAbsent => "audit_company_part_status_absent",
             Self::NotExactlyOneCompany => "audit_company_part_not_exactly_one_company",
             Self::FieldMissingOrRepeated => "audit_company_part_field_missing_or_repeated",
             Self::GuidMismatch => "audit_company_part_guid_mismatch",
@@ -88,6 +93,7 @@ pub fn admit_audit_company_part(
     let mut current_text: Option<(usize, String)> = None;
     let mut status_text: Option<String> = None;
     let mut roots = 0usize;
+    let mut envelope_seen = false;
     let at = |path: &[Vec<u8>], expected: &[&[u8]]| {
         path.len() == expected.len()
             && path
@@ -108,6 +114,7 @@ pub fn admit_audit_company_part(
                     if roots > 1 {
                         return Err(AuditCompanyPartError::Malformed);
                     }
+                    envelope_seen = !is_empty && element.as_slice() == b"ENVELOPE";
                 }
                 // The engines read a field's text up to its first child, so a
                 // field with a child would be read differently here and there.
@@ -154,8 +161,14 @@ pub fn admit_audit_company_part(
                         }
                     }
                 }
-                if at(&path, &STATUS_PATH) && !is_empty {
-                    status_text = Some(String::new());
+                // A self-closing STATUS is recorded as an empty one, so a
+                // second STATUS of any kind is still a second (bridge#863).
+                if at(&path, &STATUS_PATH) {
+                    if is_empty {
+                        status.push(String::new());
+                    } else {
+                        status_text = Some(String::new());
+                    }
                 }
                 if is_empty {
                     path.pop();
@@ -242,11 +255,15 @@ pub fn admit_audit_company_part(
             _ => {}
         }
     }
-    if !path.is_empty() {
+    // An empty body, one whose root is not ENVELOPE, or a second STATUS is the
+    // response's shape, not an answer about it (bridge#717, #863).
+    if !path.is_empty() || !envelope_seen || status.len() > 1 {
         return Err(AuditCompanyPartError::Malformed);
     }
-    if status.len() != 1 || status[0].trim() != "1" {
-        return Err(AuditCompanyPartError::StatusNotSuccess);
+    match status.first().map(|value| value.trim()) {
+        None | Some("") => return Err(AuditCompanyPartError::StatusAbsent),
+        Some("1") => {}
+        Some(_) => return Err(AuditCompanyPartError::StatusNotSuccess),
     }
     if messages != 1 || message_children != 1 || companies != 1 {
         return Err(AuditCompanyPartError::NotExactlyOneCompany);

@@ -422,6 +422,7 @@ pub(crate) fn group_snapshot_cause(
     match error {
         NativeOutstandingsError::InvalidResponse(code) => Some(code),
         NativeOutstandingsError::TallyReportedFailure => Some("group_status_not_success"),
+        NativeOutstandingsError::StatusAbsent => Some("group_status_absent"),
         _ => None,
     }
 }

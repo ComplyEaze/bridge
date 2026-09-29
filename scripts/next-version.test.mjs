@@ -50,6 +50,22 @@ test("an unclassified pull request refuses the proposal unless a level is given"
   assert.equal(overridden.overridden, true);
 });
 
+test("the highest kind among a pull request's labels and its closed issues' wins", () => {
+  const result = propose({ current: "0.3.0", pulls: [pull(5, ["type:chore"], ["breaking"])] });
+  assert.equal(result.classified[0].kind, "breaking");
+  assert.equal(result.next, "0.4.0");
+});
+
+test("--level cannot release nothing, and lowering the level is flagged", () => {
+  const none = propose({ current: "0.3.0", pulls: [], level: "patch" });
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /nothing to release/);
+  const lowered = propose({ current: "0.3.0", pulls: [pull(6, ["type:feature"])], level: "patch" });
+  assert.equal(lowered.lowered, true);
+  const same = propose({ current: "0.3.0", pulls: [pull(6, ["type:feature"])], level: "minor" });
+  assert.equal(same.lowered, false);
+});
+
 test("a pull request with no label of its own takes the closed issue's", () => {
   const result = propose({ current: "0.3.0", pulls: [pull(3, [], ["area:tally", "type:bug"])] });
   assert.equal(result.ok, true);

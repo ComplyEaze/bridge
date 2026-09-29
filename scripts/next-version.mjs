@@ -11,8 +11,9 @@
 //   node scripts/next-version.mjs --level minor   override the proposed level
 //   node scripts/next-version.mjs --apply         write the proposed version
 //
-// A pull request is classified by its own labels, else by the labels of the
-// issues it closes. Any pull request left unclassified makes the proposal
+// A pull request is classified by its own labels together with the labels of
+// the issues it closes, the highest kind winning: a chore that closes a
+// `breaking` issue is breaking. Any pull request left unclassified makes the proposal
 // refuse, naming each one, unless --level is given: a guessed level would be
 // silent, and the level is the one judgement this script cannot make.
 import { execFileSync } from "node:child_process";
@@ -123,7 +124,7 @@ export function writeVersions(next, base = root) {
 export function propose({ current, pulls, level }) {
   const classified = pulls.map((pull) => ({
     ...pull,
-    kind: classify(pull.labels) ?? classify(pull.issueLabels ?? []),
+    kind: classify([...pull.labels, ...(pull.issueLabels ?? [])]),
   }));
   const unclassified = classified.filter((pull) => !pull.kind);
   const kinds = [...new Set(classified.map((pull) => pull.kind).filter(Boolean))];
@@ -131,9 +132,12 @@ export function propose({ current, pulls, level }) {
   if (!level && unclassified.length) {
     return { ok: false, current, classified, unclassified, reason: "unclassified pull requests; label them or pass --level" };
   }
+  if (!classified.length) return { ok: false, current, classified, unclassified, reason: "nothing to release: no merged pull requests" };
   const chosen = level ?? proposedLevel;
-  if (!chosen) return { ok: false, current, classified, unclassified, reason: "nothing to release: documentation only, or no merged pull requests" };
-  return { ok: true, current, next: bump(current, chosen), level: chosen, proposedLevel, overridden: Boolean(level), classified, unclassified };
+  if (!chosen) return { ok: false, current, classified, unclassified, reason: "nothing to release: documentation only" };
+  const rank = { patch: 0, minor: 1, major: 2 };
+  const lowered = Boolean(level && proposedLevel && rank[level] < rank[proposedLevel]);
+  return { ok: true, current, next: bump(current, chosen), level: chosen, proposedLevel, overridden: Boolean(level), lowered, classified, unclassified };
 }
 
 export function draftNotes(classified) {
@@ -194,7 +198,10 @@ function pullsSince(tag, to) {
 
 function argument(name) {
   const index = process.argv.indexOf(name);
-  return index === -1 ? undefined : process.argv[index + 1];
+  if (index === -1) return undefined;
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith("--")) throw new Error(`${name} needs a value`);
+  return value;
 }
 
 async function main() {
@@ -209,6 +216,12 @@ async function main() {
   const to = argument("--to") ?? "HEAD";
   const since = argument("--since") ?? latestReleaseTag(run("git", ["tag", "--list"]).split("\n"));
   if (!since) throw new Error("no release tag found; run git fetch --tags origin, or pass --since TAG");
+  // After a version pull request merges and before its tag exists, the files
+  // already say the next version; proposing again would bump it twice.
+  const tagged = /(\d+\.\d+\.\d+)$/.exec(since)?.[1];
+  if (!argument("--since") && tagged && tagged !== current) {
+    throw new Error(`the version files say ${current} but the last release tag, ${since}, is ${tagged}; tag ${current} first, or pass --since TAG`);
+  }
   if (!argument("--since")) {
     // A stale clone would silently compare against an older release.
     const remote = latestReleaseTag(run("git", ["ls-remote", "--tags", "--refs", "origin"]).split("\n").map((line) => line.split("refs/tags/")[1] ?? ""));
@@ -235,6 +248,7 @@ async function main() {
     return;
   }
   console.log(`proposed level ${result.proposedLevel ?? "none"}${result.overridden ? `, overridden to ${result.level}` : ""}: ${current} -> ${result.next}`);
+  if (result.lowered) console.log(`WARNING: --level ${result.level} is lower than the proposed ${result.proposedLevel}; the labels say this release changes more than that.`);
   console.log(`\n${draftNotes(result.classified)}\n`);
   if (process.argv.includes("--apply")) {
     writeVersions(result.next);

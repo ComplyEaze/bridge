@@ -549,17 +549,23 @@ patch for a fix-only release:
 | What merged since the last release | Before 1.0.0 | From 1.0.0 |
 | --- | --- | --- |
 | Something an existing user relies on was removed or changed (label `breaking`) | minor (0.3.0 → 0.4.0) | major |
-| A new capability (`type:feature`) | minor | minor |
-| Only fixes, rectifications or maintenance (`type:bug`, `type:rectify`, `type:chore`, `dependencies`) | patch (0.3.0 → 0.3.1) | patch |
-| Documentation only | no release | no release |
+| A new capability (`type:feature`, `enhancement`) | minor | minor |
+| Only fixes, rectifications or maintenance (`type:bug`, `type:rectify`, `bug`, `type:chore`, `dependencies`, `github_actions`, `infra`) | patch (0.3.0 → 0.3.1) | patch |
+| Documentation only (`documentation`) | no release | no release |
 
 `node scripts/next-version.mjs` proposes the version:
 - It reads the pull requests squash-merged since the last `mcp-preview-*` or
   `v*` tag, from `git log`.
-- It classifies each by its own labels, or else by the labels of the issues it
-  closes.
-- It refuses, and names them, while any pull request is unclassified. Label
-  them, or choose the level yourself with `--level`, which the output records.
+- It classifies each by its own labels together with the labels of the issues
+  it closes, the highest kind winning.
+- It refuses, and names them, while any pull request is unclassified. Expect
+  this: many merged pull requests carry no classifying label and close no
+  labelled issue. Label them, or choose the level yourself with `--level`,
+  which the output records and warns about when it is lower than the labels
+  imply. `--level` cannot release nothing.
+- It refuses when the version files already differ from the last release tag,
+  which is the state after a version pull request merges and before its tag
+  exists.
 
 `--apply` writes the version to `package.json`, `packaging/mcpb/manifest.json`,
 `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the `bridge` entry in

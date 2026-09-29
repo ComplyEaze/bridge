@@ -2316,7 +2316,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         (
             false,
             1,
-            |input| input.vouchers[0].narration = Some("line one\nline two".into()),
+            |input| input.vouchers[0].narration = Some("line one\u{2028}line two".into()),
             Some("import_review_layout_text"),
         ),
     ];

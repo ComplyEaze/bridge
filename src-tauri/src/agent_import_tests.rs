@@ -2297,6 +2297,103 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
     }
 }
 
+/// bridge#866: the build's warning names the refusal `post_import` returns for
+/// that saved batch, not one fixed reason, and reflects the batch-posting
+/// setting. Each case is a different admission family.
+#[tokio::test]
+async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
+    // (batch posting, vouchers, edit, refusal the build must name)
+    type Edit = fn(&mut ImportPayload);
+    let cases: [(bool, usize, Edit, Option<&str>); 4] = [
+        (false, 2, |_| {}, Some("import_post_requires_one_voucher")),
+        (true, 2, |_| {}, None),
+        (
+            false,
+            1,
+            |input| input.vouchers[0].voucher_number = Some("TEST-1".into()),
+            Some("import_post_numbered_journal_unsupported"),
+        ),
+        (
+            false,
+            1,
+            |input| input.vouchers[0].narration = Some("line one\nline two".into()),
+            Some("import_review_layout_text"),
+        ),
+    ];
+    for (batch_post_enabled, voucher_count, edit, refusal) in cases {
+        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
+            .expect("captured build plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(crate::agent::Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 10,
+            max_bytes: 200_000,
+            redaction: crate::agent::Redaction::None,
+            import_enabled: true,
+            writes_enabled: true,
+            batch_post_enabled,
+        });
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(voucher_count);
+        edit(&mut input);
+        let built = server
+            .build_import_xml(&serde_json::to_value(input).unwrap())
+            .await
+            .unwrap();
+        let result = &built.payload["result"];
+        let first = result["warnings"][0].as_str().unwrap();
+        let batch_id = result["batch_id"].as_str().unwrap();
+        match refusal {
+            None => assert!(first.contains("call post_import; it requires"), "{first}"),
+            Some(code) => {
+                assert!(
+                    first.contains(&format!("refuse it as {code} (")),
+                    "the warning must name {code}: {first}"
+                );
+                assert!(!first.contains("requires one unnumbered"), "{first}");
+                // The saved batch's own admission gives the same code.
+                let line = server
+                    .latest_import_snapshot(batch_id)
+                    .unwrap()
+                    .unwrap()
+                    .batch;
+                assert_eq!(
+                    post::admit_saved_voucher(
+                        &line,
+                        &server.settings.endpoint,
+                        post::PostScope::Vouchers,
+                        server.post_voucher_limit(post::PostScope::Vouchers),
+                    )
+                    .err()
+                    .as_deref(),
+                    Some(code)
+                );
+            }
+        }
+        if refusal == Some("import_post_requires_one_voucher") {
+            assert!(first.contains("batch posting is off"), "{first}");
+            // Refused before any Tally request, with the same code.
+            let response = server
+                .call_tool_response(
+                    "post_import",
+                    json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
+                )
+                .await;
+            assert_eq!(
+                response.value["structuredContent"]["result"]["error"]["code"],
+                "import_post_requires_one_voucher",
+                "{}",
+                response.value
+            );
+        }
+        assert_eq!(simulator.finish().unwrap().len(), 32);
+    }
+}
+
 fn corroborate_observed_window(
     observed: &[ReadVoucher],
     corroboration: &[ReadVoucher],

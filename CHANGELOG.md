@@ -66,7 +66,7 @@ Each line names the pull requests it comes from.
 ### In plain words: `mcp-preview-0.3.0` (26 Sep 2026), since `mcp-preview-0.2.0` (16 Sep 2026)
 
 These changes are in the published `mcp-preview-0.3.0` build. Each line names
-the pull requests it comes from, except where it names an open issue.
+the pull requests it comes from, except where it names an issue.
 
 **What you can do now**
 
@@ -167,8 +167,8 @@ the pull requests it comes from, except where it names an open issue.
 - The tools workspace moved off a yanked `chacha20` and a vulnerable `rustls`,
   and CI audits its lockfile (#455, #458).
 - CI now fails if an HTTP call appears outside the files allowed to make
-  one. The README's promise that Tally data is never uploaded now has a test
-  behind it (#701).
+  one. This checks where network code may live; it does not by itself prove
+  that no data leaves the machine (#701).
 - We deleted legacy code that nothing reached (#473, #495).
 
 **Known limits of 0.3.0**

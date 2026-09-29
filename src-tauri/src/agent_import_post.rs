@@ -259,6 +259,8 @@ impl Server {
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: std::time::Instant,
     ) -> anyhow::Result<String> {
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
         let first = crate::tally::runtime::with_operation_wire_budget(
             self.runtime
                 .read_company_marks_once(self.tally_config(), request.clone()),

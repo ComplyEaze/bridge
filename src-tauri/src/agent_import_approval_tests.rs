@@ -1856,9 +1856,10 @@ async fn two_pass_call_recording(
     (answer, line, directory, server, scripted)
 }
 
-/// Both passes of a call take their budgets from the call's start, not their
-/// own (V4 P3(1) on #889): the redeem-only pass is entered later, and a start
-/// taken afresh there would hand it a full ceiling it no longer has.
+/// Both passes of a call, and the marks readback that spends the budget, take
+/// it from the call's start, not their own (V4 P3(1) on #889): the redeem-only
+/// pass is entered later, and a start taken afresh there would hand it a full
+/// ceiling it no longer has.
 #[tokio::test]
 async fn both_passes_of_a_call_take_their_budgets_from_the_calls_start() {
     let starts: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Default::default();
@@ -1868,8 +1869,15 @@ async fn both_passes_of_a_call_take_their_budgets_from_the_calls_start() {
     )
     .await;
     let starts = starts.lock().unwrap().clone();
-    assert_eq!(starts.len(), 2, "one start per pass: {answer}");
-    assert_eq!(starts[0], starts[1], "the second pass restarted the clock");
+    assert_eq!(
+        starts.len(),
+        3,
+        "each pass's entry, then the marks readback that reads the budget: {answer}"
+    );
+    assert!(
+        starts.iter().all(|start| *start == starts[0]),
+        "a pass or the readback restarted the clock: {starts:?}"
+    );
 }
 
 /// An approval lost between the passes (here withdrawn, as an expiry landing

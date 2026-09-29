@@ -360,6 +360,143 @@ fn recovery_failure_retains_the_saved_dispatch_response() {
 }
 
 #[test]
+fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
+    let response = dispatch_response("success", 1, 0);
+    let after = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "tally_endpoint_busy",
+    );
+    let error = &after["result"]["error"];
+    assert_eq!(error["code"], "tally_endpoint_busy");
+    assert_eq!(
+        error["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    assert_eq!(
+        error["next_step"],
+        "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
+    );
+    // Held back before any attempt was recorded: it says when to retry but
+    // offers no verify_import step.
+    let before =
+        reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
+    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    // An attempt that could not be observed: the verify_import step, worded
+    // without claiming a send.
+    let unknown = reconciliation_failure_payload("bridge-test", None, None, "tally_endpoint_busy");
+    assert_eq!(
+        unknown["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    let step = unknown["result"]["error"]["next_step"].as_str().unwrap();
+    assert!(step.contains("verify_import") && step.contains("could not be observed"));
+    assert!(!step.contains("already sent"));
+    // No other code gains the fields.
+    let other = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "verification_transport_failed",
+    );
+    assert!(other["result"]["error"].get("next_step").is_none());
+}
+
+/// A wire refusal replaces a generic failure code with the refusal's own, but
+/// never the code that tells the caller not to rebuild an unknown post.
+#[test]
+fn a_wire_refusal_never_replaces_the_unknown_post_outcome_code() {
+    let refused = || {
+        anyhow::Error::new(bridge_tally_transport::TallyTransportError::WireRefused {
+            refusal: bridge_tally_transport::WireRefusal::Busy,
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("import_dispatch_outcome_unknown", refused()).code,
+        "import_dispatch_outcome_unknown"
+    );
+    assert_eq!(
+        ToolFailure::from_runtime("status_probe_unavailable", refused()).code,
+        "tally_endpoint_busy"
+    );
+}
+
+/// A cause is added only when it says something the code does not.
+#[test]
+fn a_failure_cause_never_repeats_its_own_code() {
+    assert_eq!(
+        refusal_cause("tally_endpoint_busy", None, Some("tally_endpoint_busy")),
+        None
+    );
+    assert_eq!(
+        refusal_cause(
+            "post_queue_read_failed",
+            None,
+            Some("tally_connection_failed")
+        ),
+        Some("tally_connection_failed")
+    );
+    assert_eq!(
+        refusal_cause("post_queue_read_failed", Some("group"), Some("other")),
+        Some("group")
+    );
+}
+
+/// The marks readback after a sent post draws on a wait budget of its own. A
+/// call whose admission reads have spent the shared budget would otherwise be
+/// refused as busy at once, and the refusal reads as an unconfirmed step: a
+/// lasting doubt on a batch that posted cleanly (#697). The lock is never free
+/// here, so the wait itself is what is measured; nothing is sent.
+#[tokio::test]
+async fn the_marks_readback_after_a_post_waits_on_a_budget_of_its_own() {
+    use crate::endpoint_wire::{wire_refusal, FileWireGate};
+    use bridge_tally_transport::{TallyWireGate, WireRefusal, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let budget = Duration::from_millis(600);
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap());
+    let _other = FileWireGate::new(wire.root().clone(), endpoint.clone())
+        .try_acquire()
+        .unwrap();
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire);
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let busy = |result: anyhow::Result<String>| {
+        wire_refusal(&result.expect_err("the wire lock is held")) == Some(WireRefusal::Busy)
+    };
+    crate::tally::runtime::with_operation_wire_budget(async {
+        // The call's admission reads spend its whole budget.
+        let spent = server
+            .runtime
+            .read_company_marks_once(server.tally_config(), request())
+            .await;
+        assert!(busy(spent));
+        let started = Instant::now();
+        let after = server.read_marks_after_post(request()).await;
+        assert!(busy(after));
+        assert!(
+            started.elapsed() >= budget,
+            "the readback must wait on a fresh budget, not inherit the spent one"
+        );
+    })
+    .await;
+}
+
+#[test]
 fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncertain() {
     let directory = tempfile::tempdir().unwrap();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1520,10 +1657,16 @@ fn a_changed_ledger_is_named_in_plain_words_only_when_nothing_was_attempted() {
     let message = error["message"].as_str().unwrap();
     assert!(
         message.starts_with(
-            "A ledger this batch names is no longer the one it was built against (L1, L2, L3, L4, L5, L6, L7, L8 and 1 more)"
+            "A ledger this batch names (listed in error.ledgers_changed) is no longer the one it was built against"
         ),
         "{message}"
     );
+    assert!(!message.contains("L1"), "{message}");
+    // Listed, each marked as a party name, up to the bound; counted in full.
+    let listed = (1..=8)
+        .map(|n| serde_json::to_value(party_name(format!("L{n}"))).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(error["ledgers_changed"], json!(listed));
     assert_eq!(error["ledgers_changed_total"], 9);
     for attempted in [json!(true), Value::Null] {
         assert_eq!(refused(attempted)["message"], "generic");

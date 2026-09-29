@@ -52,8 +52,8 @@ config, each through the reference's own `tae.config` reader (so each is refused
 interest_ledger?}}, the interest ledger one name or a list; default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
 default false: true sets the module's NET_REVERSALS switch, reaching the dormant reversal rule in `run` and
 in the module invariant alike); and for `partners_40b_194t`: `entity_type` as for `tds_payees`, `partners`
-({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}) and `deed` (a table such as
-{interest_rate_bp}, absent meaning none); and for `bank_reconciliation`: `bank_statement` (an invented
+({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}), `deed` (a table such as
+{interest_rate_bp}, absent meaning none) and `tds_payable_ledgers` (as for `tds_payees`); and for `bank_reconciliation`: `bank_statement` (an invented
 statement in the shape `parity/python_golden.py --emit-bank-statement` writes), `bank_reconciliation_ledger`
 and `bank_charge_terms` (default []); the statement's rows also feed the module invariant, as the
 reference's pack sets `eng.bank`; and for `high_value_register`: `bank_statement` (optional here, absent
@@ -298,7 +298,8 @@ def main() -> int:
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),
         "loans_interest": loans_interest_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
-            eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"))),
+            eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"),
+            tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])))),
         "party_monthly": lambda: (party_monthly, party_monthly.run(
             eng, rules, cash, bank,
             top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",

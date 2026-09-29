@@ -29,6 +29,7 @@
           </div>
           <p id="release-status" class="release-status" role="status">Checking releases…</p>
         </div>
+        <noscript><p class="channel-note">The download buttons need JavaScript. Without it, open the <a href="https://github.com/lamemustafa/bridge/releases">releases page</a>, take the newest mcp-preview release that lists a <code>.mcpb</code> for your computer, and compare it with the matching <code>.sha256</code> file.</p></noscript>
         <p id="channel-note" class="channel-note">Unsigned previews are for evaluation. Review the checksum and release notes before opening one.</p>
         <div class="downloads">
           <a class="download-option" data-platform="windows-x64" aria-disabled="true">
@@ -58,7 +59,7 @@
           <p><strong>If the page hangs instead of refusing the connection,</strong> Tally may simply be busy behind another request. Wait and retry rather than changing the setting.</p>
         </details>
         <ol>
-          <li>Open the downloaded <code>.mcpb</code> file. In Claude Desktop, choose <strong>Settings → Extensions → Advanced settings → Install Extension…</strong> if your computer does not open it automatically.</li>
+          <li>In Claude Desktop, choose <strong>Settings → Extensions → Advanced settings → Install Extension…</strong> and pick the downloaded <code>.mcpb</code> file. Opening the file directly may also work on your computer.</li>
           <li>Keep the Tally host as <strong>localhost</strong>. ComplyEaze Bridge accepts only a local loopback connection; it does not expose Tally to the internet.</li>
           <li>On a Mac, Tally must already be available on <strong>localhost</strong> through a local Windows VM or organization-approved local forwarding. A separate PC or LAN-only Tally cannot be reached by entering its network address.</li>
           <li>Set <strong>Your Tally port</strong> to the HTTP gateway port you switched on above, then finish the extension setup.</li>

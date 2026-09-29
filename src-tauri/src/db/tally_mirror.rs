@@ -95,6 +95,8 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "response_truncated",
     "runtime_capacity_reached",
     "snapshot_checkpoint_changed",
+    "tally_endpoint_busy",
+    "tally_endpoint_lock_unavailable",
     "transport_policy_invalid",
     "unclassified_tally_error",
     "voucher_export_invalid",

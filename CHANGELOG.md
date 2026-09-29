@@ -5,9 +5,10 @@ All notable changes to Bridge are documented here. The project follows
 
 ## [Unreleased]
 
-Builds are versioned on the `0.3.x` line, as unsigned MCPB previews (tags
-`mcp-preview-*`). The version boundary between the published MIT-licensed
-`v0.1.0` release and Apache-2.0 builds from current source stays unambiguous.
+Published builds are unsigned MCPB previews (tags `mcp-preview-*`), so far on
+the `0.3.x` line. The number of the next build is chosen when it is released.
+The version boundary between the published MIT-licensed `v0.1.0` release and
+Apache-2.0 builds from current source stays unambiguous.
 
 ### In plain words: in source since `mcp-preview-0.3.0` (26 Sep 2026)
 
@@ -18,7 +19,9 @@ Each line names the pull requests it comes from.
 
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
   line for line to Tally's own statement; otherwise it is refused, and the
-  lines that differ are named (#774).
+  lines that differ are named. A book with stock items is expected to be
+  refused, because no such book has been measured, and the tie-out itself has
+  been measured on two synthetic books only (#774).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read
@@ -95,7 +98,8 @@ the pull requests it comes from, except where it names an open issue.
 - An approval counts only when the approval window returns a fresh one-time
   token. How the window closes no longer decides it (#665, #704).
 - ComplyEaze Bridge confirms the company as its last step before posting, and
-  reports where the voucher landed (#607).
+  reports where the voucher landed. A post can still land in a company that was
+  renamed after that check (#607, #574).
 - It refuses to post if a ledger changed since the voucher was prepared, if
   the company's masters changed between its final checks and the post, or if
   the saved file no longer matches its record (#578, #615, #616).
@@ -103,7 +107,8 @@ the pull requests it comes from, except where it names an open issue.
   reported as not verified and needing reconciliation, so you check it in
   Tally (#623).
 - It records each voucher's import identity before sending it, and never sends
-  one twice (#582, #678).
+  one twice: it refuses an import identity its own journal already records
+  (#582, #678).
 - It refuses to post into a book with more than one currency defined (#613).
 - When Tally rejects a line, you see Tally's own error text, kept short and
   safe to display (#695).
@@ -152,7 +157,8 @@ the pull requests it comes from, except where it names an open issue.
   - bank reconciliation;
   - a high-value register.
   (#501, #504, #508, #560, #561, #571, #592, #593, #618, #636, #710, #713)
-- Every module is mutation-tested in CI (#646, #682).
+- Mutation testing covers every module: a change to one is checked in the pull
+  request, and the whole list is re-run nightly (#646, #682).
 - Its accuracy is **not yet proven publicly**. Issue #738 proposes how to
   prove it.
 
@@ -169,8 +175,11 @@ the pull requests it comes from, except where it names an open issue.
 
 - The package is unsigned. It is for evaluation, not production.
 - Native Windows validation with Tally and Claude Desktop is outstanding
-  (#293, #702). Intel Mac is not qualified.
+  (#702; the Tauri desktop app's own Windows catalog flow is #293). Intel Mac
+  is not qualified.
 - How long Claude Desktop waits on one tool call is not measured (#703).
+- There is no tool to delete or undo a posted voucher, and a ledger that was
+  replaced is not always noticed (#623).
 
 ### Removed
 

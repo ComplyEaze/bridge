@@ -1,0 +1,74 @@
+{
+ "comment": "tds_payees: an individual recorded as carrying on both a business and a profession, receipts at or under the profession limit, is not a deductor, so a payee over the limit is listed nowhere in clause 21(b).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Contract Labour",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_deductor_both-000"
+  },
+  {
+   "name": "Builder B21",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_deductor_both-001"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Builder B21",
+   "opening": 0,
+   "debit": 0,
+   "credit": 12000000,
+   "closing": -12000000
+  },
+  {
+   "ledger": "Contract Labour",
+   "opening": 0,
+   "debit": 12000000,
+   "credit": 0,
+   "closing": 12000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "d01",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     12000000
+    ],
+    [
+     "Builder B21",
+     -12000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "individual",
+ "previous_year_turnover_paise": 450000000,
+ "deductor_activity": "both",
+ "nature_by_ledger": {
+  "Contract Labour": "194C"
+ }
+}

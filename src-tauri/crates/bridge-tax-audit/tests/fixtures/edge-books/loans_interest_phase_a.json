@@ -1,0 +1,668 @@
+{
+ "comment": "loans_interest #779 Phase A (vouchers both crediting and debiting a loan: listed, never netted), clause 31, a firm: two two-sided vouchers on one loan (cash in and bank out: possible s.269SS; bank in and cash out: possible s.269T), a row before the first (computed, with its balance figure), a cash repayment on its date and a bank repayment after both (each depends on them, naming only those on or before its date), a cash repayment exactly at the limit and a cash loan over it (computed on their own amount and flagged, no balance figure), no maximum outstanding (Mixed Loan); a two-sided voucher against an expense ledger and another loan's interest ledger whose other debits fall short of the credit (a forced set-off), then a cash loan walked from below zero, without the below-zero note (Below Zero Loan); a balanced voucher on the loan alone, not listed (Only Loan); an interest entry net of a TDS ledger outside Duties & Taxes with its reversal in the same voucher, keeping the interest reading, and an interest entry carrying another loan's line, listed, which leaves s.194A coverage not computed (Kappa Loan); a fully exempt lender's two-sided voucher, figures only (Bank Term Loan); a Government lender, 31(a) only and exempt from s.269SS/269T, with a forced set-off and a depending loan taken (Govt Loan); a voucher against only another loan's interest ledger on both sides (Misposted Loan).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_phase_a-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_phase_a-002"
+  },
+  {
+   "name": "TDS Deducted",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_phase_a-003"
+  },
+  {
+   "name": "Mixed Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-004"
+  },
+  {
+   "name": "Below Zero Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-005"
+  },
+  {
+   "name": "Only Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-006"
+  },
+  {
+   "name": "Kappa Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-007"
+  },
+  {
+   "name": "Bank Term Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-008"
+  },
+  {
+   "name": "Govt Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-009"
+  },
+  {
+   "name": "Misposted Loan",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_phase_a-010"
+  },
+  {
+   "name": "Interest Kappa",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a-011"
+  },
+  {
+   "name": "Processing Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_phase_a-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 18850000,
+   "credit": 5700000,
+   "closing": 13150000
+  },
+  {
+   "ledger": "Bank Term Loan",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 3200000,
+   "closing": -2200000
+  },
+  {
+   "ledger": "Below Zero Loan",
+   "opening": 0,
+   "debit": 1100000,
+   "credit": 3500000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 9000000,
+   "credit": 3500000,
+   "closing": 5500000
+  },
+  {
+   "ledger": "Govt Loan",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 4000000,
+   "closing": -2500000
+  },
+  {
+   "ledger": "Interest Kappa",
+   "opening": 0,
+   "debit": 3500000,
+   "credit": 900000,
+   "closing": 2600000
+  },
+  {
+   "ledger": "Kappa Loan",
+   "opening": 0,
+   "debit": 550000,
+   "credit": 7800000,
+   "closing": -7250000
+  },
+  {
+   "ledger": "Misposted Loan",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 100000,
+   "closing": -50000
+  },
+  {
+   "ledger": "Mixed Loan",
+   "opening": -5000000,
+   "debit": 6300000,
+   "credit": 10500000,
+   "closing": -9200000
+  },
+  {
+   "ledger": "Only Loan",
+   "opening": 0,
+   "debit": 900000,
+   "credit": 3550000,
+   "closing": -2650000
+  },
+  {
+   "ledger": "Processing Charges",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "TDS Deducted",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "a01",
+   "date": "2025-04-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     1000000
+    ],
+    [
+     "Mixed Loan",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "a02",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Cash",
+     4000000
+    ],
+    [
+     "Mixed Loan",
+     -4000000
+    ],
+    [
+     "Mixed Loan",
+     2500000
+    ],
+    [
+     "Bank A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a03",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Mixed Loan",
+     500000
+    ],
+    [
+     "Cash",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "a04",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Mixed Loan",
+     2000000
+    ],
+    [
+     "Cash",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "a05",
+   "date": "2025-08-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     2500000
+    ],
+    [
+     "Mixed Loan",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "a06",
+   "date": "2025-12-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Bank A",
+     3000000
+    ],
+    [
+     "Mixed Loan",
+     -3000000
+    ],
+    [
+     "Mixed Loan",
+     1000000
+    ],
+    [
+     "Cash",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "a07",
+   "date": "2026-01-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Mixed Loan",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "b01",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Below Zero Loan",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "b02",
+   "date": "2025-05-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Below Zero Loan",
+     -1000000
+    ],
+    [
+     "Below Zero Loan",
+     600000
+    ],
+    [
+     "Processing Charges",
+     100000
+    ],
+    [
+     "Interest Kappa",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "b03",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     2500000
+    ],
+    [
+     "Below Zero Loan",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "c01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     3000000
+    ],
+    [
+     "Only Loan",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Only Loan",
+     -500000
+    ],
+    [
+     "Only Loan",
+     500000
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-07-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Only Loan",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "d01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     5000000
+    ],
+    [
+     "Kappa Loan",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "d02",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Kappa",
+     3000000
+    ],
+    [
+     "TDS Deducted",
+     -300000
+    ],
+    [
+     "Kappa Loan",
+     -2700000
+    ],
+    [
+     "Kappa Loan",
+     500000
+    ],
+    [
+     "Interest Kappa",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "d03",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Kappa",
+     100000
+    ],
+    [
+     "Kappa Loan",
+     -100000
+    ],
+    [
+     "Kappa Loan",
+     50000
+    ],
+    [
+     "Only Loan",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "e01",
+   "date": "2025-05-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     3000000
+    ],
+    [
+     "Bank Term Loan",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-08-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Bank Term Loan",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ],
+    [
+     "Bank Term Loan",
+     -200000
+    ],
+    [
+     "Processing Charges",
+     200000
+    ]
+   ]
+  },
+  {
+   "guid": "g01",
+   "date": "2025-05-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     3000000
+    ],
+    [
+     "Govt Loan",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "g02",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Govt Loan",
+     -500000
+    ],
+    [
+     "Govt Loan",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "g03",
+   "date": "2026-02-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     500000
+    ],
+    [
+     "Govt Loan",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "m01",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest Kappa",
+     100000
+    ],
+    [
+     "Misposted Loan",
+     -100000
+    ],
+    [
+     "Misposted Loan",
+     50000
+    ],
+    [
+     "Interest Kappa",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "k09",
+   "date": "2025-10-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank A",
+     350000
+    ],
+    [
+     "Interest Kappa",
+     -350000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Mixed Loan": {
+   "lender": "Invented Mixed Lender",
+   "lender_type": "person"
+  },
+  "Below Zero Loan": {
+   "lender": "Invented Below Zero Lender",
+   "lender_type": "person"
+  },
+  "Only Loan": {
+   "lender": "Invented Only Lender",
+   "lender_type": "person"
+  },
+  "Kappa Loan": {
+   "lender": "Invented Kappa Lender",
+   "lender_type": "person",
+   "interest_ledger": "Interest Kappa"
+  },
+  "Bank Term Loan": {
+   "lender": "Invented Term Bank",
+   "lender_type": "bank"
+  },
+  "Govt Loan": {
+   "lender": "Invented Government Department",
+   "lender_type": "government"
+  },
+  "Misposted Loan": {
+   "lender": "Invented Misposted Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable",
+  "TDS Deducted"
+ ]
+}

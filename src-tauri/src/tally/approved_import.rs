@@ -4,7 +4,7 @@ use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::{
     outstandings_shared::DateBoundaryProfile, StandardLedgerCatalogBinding,
 };
-use std::{io::Read, process::Stdio, time::Duration};
+use std::{io::Read, num::NonZeroUsize, process::Stdio, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 const MAX_PREVIEW_BYTES: usize = 8_000;
@@ -22,6 +22,30 @@ const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
 /// The same for the post dialog (#635). Distinct from the review's, so a
 /// subprocess in one mode can never answer the other.
 const POST_TOKEN_PREFIX: &str = "bridge-post-approved:";
+
+/// How many vouchers a dialog asks about, so that its title and button say so
+/// (#746). Never zero: a dialog about no voucher approves nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct VoucherCount(NonZeroUsize);
+
+impl VoucherCount {
+    pub(crate) fn new(count: usize) -> Option<Self> {
+        NonZeroUsize::new(count).map(Self)
+    }
+
+    /// The count line the dialog child reads, in the one form the parent
+    /// writes: decimal digits, with no sign and no leading zero.
+    fn parse(line: &str) -> Option<Self> {
+        let count = line.parse::<NonZeroUsize>().ok()?;
+        (count.to_string() == line).then_some(Self(count))
+    }
+
+    /// `None` for one voucher, whose dialog keeps its single-voucher words,
+    /// and the count for a batch.
+    fn batch(self) -> Option<NonZeroUsize> {
+        (self.0.get() > 1).then_some(self.0)
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct ApprovedImport {
@@ -79,10 +103,9 @@ impl ApprovedImport {
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
     ) -> Result<Self, String> {
-        if voucher_dates.is_empty() {
-            return Err("voucher_date_invalid".into());
-        }
-        approve(preview).await?;
+        let count = VoucherCount::new(voucher_dates.len())
+            .ok_or_else(|| "voucher_date_invalid".to_string())?;
+        approve(count, preview).await?;
         Ok(Self {
             xml,
             voucher_dates,
@@ -164,6 +187,157 @@ impl ApprovedImport {
     }
 }
 
+/// How long a post dialog stays open before it approves nothing: the limit
+/// [`nonce_bound_dialog`] applies. Used only to tell a caller how much of it
+/// remains; the dialog enforces its own.
+const POST_DIALOG_LIMIT: Duration = Duration::from_secs(120);
+
+/// When a post dialog was answered, and whether the answer approved: stamped
+/// by the dialog's own task as it ends, so an approval's age runs from the
+/// click, not from whichever call later collects it (#725). Both clocks are
+/// kept: the monotonic one does not advance while the machine sleeps.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Answered {
+    pub(crate) approved: bool,
+    pub(crate) at: std::time::Instant,
+    pub(crate) at_wall: std::time::SystemTime,
+}
+
+impl Answered {
+    fn now(approved: bool) -> Self {
+        Self {
+            approved,
+            at: std::time::Instant::now(),
+            at_wall: std::time::SystemTime::now(),
+        }
+    }
+}
+
+/// A post dialog left open after the MCP call that asked it returned (#725).
+/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// that the dialog's time limit and its child's exit are observed while no call
+/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
+/// read, so a late click approves nothing.
+pub(crate) struct PendingPostApproval {
+    task: tokio::task::JoinHandle<Result<ApprovedImport, String>>,
+    /// The answer and, for a refusal, its code: one stamp, set once.
+    answered: std::sync::Arc<std::sync::OnceLock<(Answered, Option<String>)>>,
+    started: std::time::Instant,
+}
+
+impl PendingPostApproval {
+    /// Ask the person in a dialog that may outlive the calling call:
+    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
+    /// task. Nothing else can be run there.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn ask(
+        xml: String,
+        preview: String,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        let answered = std::sync::Arc::new(std::sync::OnceLock::new());
+        let stamp = std::sync::Arc::clone(&answered);
+        let dialog = async move {
+            let answer = ApprovedImport::confirm(
+                xml,
+                &preview,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+                company_marks_request,
+            )
+            .await;
+            // Stamped before the task ends, never after: a task seen finished
+            // with no stamp is one that ended without an answer. A refusal's
+            // code is stamped with it, so it can be read without the task.
+            let _ = stamp.set((
+                Answered::now(answer.is_ok()),
+                answer.as_ref().err().cloned(),
+            ));
+            answer
+        };
+        Self {
+            task: tokio::spawn(carry_approval_scope(dialog)),
+            answered,
+            started: std::time::Instant::now(),
+        }
+    }
+
+    /// The person's answer and when it was given, if it arrives within
+    /// `budget`, or the dialog back while it is still open. A task that ended
+    /// without an answer (aborted or panicked) approves nothing.
+    pub(crate) async fn answer_within(
+        mut self,
+        budget: Duration,
+    ) -> Result<(Result<ApprovedImport, String>, Answered), Self> {
+        match tokio::time::timeout(budget, &mut self.task).await {
+            Err(_) => Err(self),
+            Ok(Ok(answer)) => {
+                let at = self
+                    .answered()
+                    .unwrap_or_else(|| Answered::now(answer.is_ok()));
+                Ok((answer, at))
+            }
+            Ok(Err(_)) => Ok((
+                Err("import_approval_unavailable".into()),
+                Answered::now(false),
+            )),
+        }
+    }
+
+    /// Whether the dialog has been answered, and how, without waiting.
+    pub(crate) fn answered(&self) -> Option<Answered> {
+        self.answered.get().map(|(answered, _)| *answered)
+    }
+
+    /// Why the dialog approved nothing, once it has ended without an approval:
+    /// the stamped refusal code, or `import_approval_unavailable` for a task
+    /// that ended with no answer, as [`Self::answer_within`] reports it.
+    /// `None` while the dialog is open, and for an approval.
+    pub(crate) fn refusal(&self) -> Option<String> {
+        // Finished is read before the stamp: the stamp is set before the task
+        // ends, so a task seen finished with no stamp truly ended unanswered.
+        // Read the other way, a dialog stamped and finished between the two
+        // reads would drop a real approval as unavailable.
+        let finished = self.task.is_finished();
+        match self.answered.get() {
+            Some((_, refusal)) => refusal.clone(),
+            None if finished => Some("import_approval_unavailable".into()),
+            None => None,
+        }
+    }
+
+    /// How much of the dialog's time limit remains.
+    pub(crate) fn remaining(&self) -> Duration {
+        POST_DIALOG_LIMIT.saturating_sub(self.started.elapsed())
+    }
+}
+
+impl Drop for PendingPostApproval {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+impl ApprovedImport {
+    /// How many vouchers the person was asked about: the dialog's count is
+    /// taken from these dates (#746), so a redeemed approval can be held to the
+    /// batch it is redeemed for.
+    pub(crate) fn voucher_count(&self) -> usize {
+        self.voucher_dates.len()
+    }
+}
+
 /// A person's answer to the review dialog for a doubted post (#239): that
 /// they checked the voucher in Tally. It changes nothing in Tally and
 /// authorises no post: it is a different type from [`ApprovedImport`], built
@@ -173,8 +347,8 @@ impl ApprovedImport {
 pub(crate) struct ReviewAcknowledged(());
 
 impl ReviewAcknowledged {
-    pub(crate) async fn confirm(preview: &str) -> Result<Self, String> {
-        approve_review(preview).await?;
+    pub(crate) async fn confirm(count: VoucherCount, preview: &str) -> Result<Self, String> {
+        approve_review(count, preview).await?;
         Ok(Self(()))
     }
 }
@@ -195,6 +369,11 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// import lookup could take for it (bridge#626).
     #[error("ledger_has_folded_twin")]
     LedgerFoldedTwin,
+    /// The group collection the queue re-read for a bank voucher's
+    /// classification could not be parsed. Carries the snapshot parser's own
+    /// data-free code, as the read before approval does (bridge#717).
+    #[error("group_export_invalid")]
+    GroupExportInvalid { cause: Option<&'static str> },
     /// A bank voucher reached the queue without its group read, or a Journal
     /// with one: a wiring fault, refused before any request is sent.
     #[error("import_post_admission_inconsistent")]
@@ -208,9 +387,9 @@ pub(crate) enum ApprovedImportAdmissionError {
     #[error("post_company_scope_unconfirmed")]
     CompanyScopeUnconfirmed,
     /// The company defines more than one Currency master. Bridge's amounts are
-    /// plain base-currency figures, and which master is the base cannot be
-    /// identified yet (bridge#601), so no leg can be shown to be in it
-    /// (bridge#551). Carries every master's NAME, for the refusal to name.
+    /// plain base-currency figures, and the write path does not compare a
+    /// leg's currency with an identified base yet, so no leg can be shown to
+    /// be in it (bridge#551). Carries every master's NAME, for the refusal to name.
     #[error("import_multi_currency_unsupported")]
     MultiCurrencyBook { currencies: Vec<String> },
     /// The company's Currency masters read as none, or the response does not
@@ -234,6 +413,19 @@ pub(crate) enum ApprovedImportAdmissionError {
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
 }
 
+/// The data-free code a group snapshot refusal carries as its `cause`, for
+/// the read before approval and the queue's re-read alike (bridge#676, #717).
+pub(crate) fn group_snapshot_cause(
+    error: &bridge_tally_protocol::native_outstandings::NativeOutstandingsError,
+) -> Option<&'static str> {
+    use bridge_tally_protocol::native_outstandings::NativeOutstandingsError;
+    match error {
+        NativeOutstandingsError::InvalidResponse(code) => Some(code),
+        NativeOutstandingsError::TallyReportedFailure => Some("group_status_not_success"),
+        _ => None,
+    }
+}
+
 /// A failure inside the endpoint queue before the dispatch intent is recorded
 /// (#656): every queue read, and the admission recheck, run in one block whose
 /// error this wraps; the intent, the POST and the readback run after it. So it
@@ -245,6 +437,44 @@ pub(crate) enum ApprovedImportAdmissionError {
 pub(crate) struct PreIntentQueueRefusal {
     #[source]
     pub(crate) source: anyhow::Error,
+}
+
+/// A refusal under the exclusive admission lock, just before the dispatch
+/// intent is appended (#711). Nothing was recorded and nothing was sent, so
+/// each keeps its own code instead of the catch-all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum UnderLockRefusal {
+    #[error("import_batch_not_found")]
+    BatchNotFound,
+    #[error("import_already_attempted")]
+    AlreadyAttempted,
+    #[error("import_remote_id_reused")]
+    RemoteIdReused,
+    #[error("import_batch_changed")]
+    BatchChanged,
+}
+
+impl UnderLockRefusal {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            Self::BatchNotFound => "import_batch_not_found",
+            Self::AlreadyAttempted => "import_already_attempted",
+            Self::RemoteIdReused => "import_remote_id_reused",
+            Self::BatchChanged => "import_batch_changed",
+        }
+    }
+}
+
+/// Why `before_dispatch` refused. Only a named check made before the intent
+/// append is `Refused`; the lock, the journal read and the append itself are
+/// `Other`, which keeps the catch-all because the append may have recorded an
+/// intent (#711).
+/// Built explicitly at each site: this file holds no conversion (the approval
+/// seam gate refuses any `impl From`).
+#[derive(Debug)]
+pub(crate) enum BeforeDispatchError {
+    Refused(UnderLockRefusal),
+    Other(String),
 }
 
 /// The native approval every real post goes through. Outside this crate's own
@@ -263,6 +493,19 @@ use confirm_review as approve_review;
 #[cfg(test)]
 use test_seam::approve_review;
 
+/// What a post dialog's own task runs under (#725). Outside this crate's unit
+/// tests it is the dialog alone: nothing is carried into the task.
+#[cfg(not(test))]
+use carry_nothing as carry_approval_scope;
+
+#[cfg(test)]
+use test_seam::carry_approval_scope;
+
+#[cfg(not(test))]
+fn carry_nothing<F>(dialog: F) -> F {
+    dialog
+}
+
 /// A scripted answer to the native approval, for this crate's unit tests only
 /// (bridge#583). It is compiled only under bare `cfg(test)`, which Cargo sets
 /// for no shipped build and no feature, variable or flag can set at runtime;
@@ -276,6 +519,12 @@ pub(crate) mod test_seam {
     /// Present in any binary this module is compiled into, and in no other.
     pub(crate) const SEAM_MARKER: &str = "bridge-test-approval-seam-5f1c9e7a";
 
+    const ONE: super::VoucherCount = super::VoucherCount(std::num::NonZeroUsize::MIN);
+
+    fn count(count: usize) -> super::VoucherCount {
+        super::VoucherCount::new(count).unwrap()
+    }
+
     /// What a test decided, and every preview the post path asked it about.
     #[derive(Clone)]
     pub(crate) struct ScriptedApproval {
@@ -284,9 +533,17 @@ pub(crate) mod test_seam {
         /// Every preview the review dialog was asked about, kept apart from
         /// the post dialog's so a test can tell which dialog a person saw.
         reviews: Arc<Mutex<Vec<String>>>,
+        /// The voucher count each dialog was asked about, in the same order
+        /// as `previews` and `reviews` (#746).
+        counts: Arc<Mutex<Vec<usize>>>,
+        review_counts: Arc<Mutex<Vec<usize>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
         while_pending: Option<Arc<dyn Fn() + Send + Sync>>,
+        /// When set, the post dialog stays open until a test answers it
+        /// through [`ScriptedApproval::answer`], as a person who has not yet
+        /// clicked would (#725). `approve` is then ignored.
+        held: Option<Arc<tokio::sync::watch::Sender<Option<bool>>>>,
     }
 
     impl ScriptedApproval {
@@ -306,12 +563,39 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// A post dialog that stays open until [`ScriptedApproval::answer`].
+        pub(crate) fn held() -> Self {
+            Self {
+                held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
+                ..Self::new(false)
+            }
+        }
+
+        /// Whether a held post dialog is still open: its task is waiting for
+        /// an answer. False once the task was aborted, which closes it.
+        pub(crate) fn is_waiting(&self) -> bool {
+            self.held
+                .as_ref()
+                .is_some_and(|held| held.receiver_count() > 0)
+        }
+
+        /// Answer a held post dialog. Answering one that was closed (its task
+        /// aborted) reaches nothing.
+        pub(crate) fn answer(&self, approve: bool) {
+            if let Some(held) = &self.held {
+                held.send_replace(Some(approve));
+            }
+        }
+
         fn new(approve: bool) -> Self {
             Self {
                 approve,
                 previews: Arc::default(),
                 reviews: Arc::default(),
+                counts: Arc::default(),
+                review_counts: Arc::default(),
                 while_pending: None,
+                held: None,
             }
         }
 
@@ -321,6 +605,14 @@ pub(crate) mod test_seam {
 
         pub(crate) fn reviews(&self) -> Vec<String> {
             self.reviews.lock().unwrap().clone()
+        }
+
+        pub(crate) fn counts(&self) -> Vec<usize> {
+            self.counts.lock().unwrap().clone()
+        }
+
+        pub(crate) fn review_counts(&self) -> Vec<usize> {
+            self.review_counts.lock().unwrap().clone()
         }
     }
 
@@ -333,16 +625,31 @@ pub(crate) mod test_seam {
 
     /// The test-build approval. Unscoped, it declines at once and starts no
     /// process, so no test can reach a real dialog or approve by default.
-    pub(super) async fn approve(preview: &str) -> Result<(), String> {
+    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
         let decision = SCRIPTED_APPROVAL
             .try_with(|scripted| {
                 scripted.previews.lock().unwrap().push(preview.to_string());
+                scripted.counts.lock().unwrap().push(count.0.get());
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
-                scripted.approve
+                match &scripted.held {
+                    Some(held) => Err(held.subscribe()),
+                    None => Ok(scripted.approve),
+                }
             })
-            .unwrap_or(false);
+            .unwrap_or(Ok(false));
+        let decision = match decision {
+            Ok(decision) => decision,
+            Err(mut held) => {
+                let answered = held
+                    .wait_for(Option::is_some)
+                    .await
+                    .map(|answer| *answer == Some(true))
+                    .unwrap_or(false);
+                answered
+            }
+        };
         std::hint::black_box(SEAM_MARKER);
         if decision {
             Ok(())
@@ -351,12 +658,37 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// Carries the test's scripted decision into a post dialog's own task
+    /// (#725). A task-local does not cross `tokio::spawn`, so without this a
+    /// dialog asked from its task would find no decision and decline; with it,
+    /// the task sees exactly the decision the asking test scoped, and an
+    /// unscoped test still declines.
+    pub(crate) fn carry_approval_scope<F>(
+        dialog: F,
+    ) -> impl std::future::Future<Output = F::Output> + Send + 'static
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send,
+    {
+        let scripted = SCRIPTED_APPROVAL.try_with(Clone::clone).ok();
+        async move {
+            match scripted {
+                Some(scripted) => SCRIPTED_APPROVAL.scope(scripted, dialog).await,
+                None => dialog.await,
+            }
+        }
+    }
+
     /// The test-build review dialog, scripted by the same decision and
     /// declining the same way when unscoped.
-    pub(super) async fn approve_review(preview: &str) -> Result<(), String> {
+    pub(super) async fn approve_review(
+        count: super::VoucherCount,
+        preview: &str,
+    ) -> Result<(), String> {
         let decision = SCRIPTED_APPROVAL
             .try_with(|scripted| {
                 scripted.reviews.lock().unwrap().push(preview.to_string());
+                scripted.review_counts.lock().unwrap().push(count.0.get());
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
@@ -378,7 +710,7 @@ pub(crate) mod test_seam {
     async fn the_real_approval_refuses_an_oversized_preview_before_starting_a_process() {
         let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
         assert_eq!(
-            super::confirm(&oversized).await,
+            super::confirm(ONE, &oversized).await,
             Err("import_review_too_large".to_string())
         );
     }
@@ -388,7 +720,7 @@ pub(crate) mod test_seam {
     async fn the_real_review_refuses_an_oversized_preview_before_starting_a_process() {
         let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
         assert_eq!(
-            super::confirm_review(&oversized).await,
+            super::confirm_review(ONE, &oversized).await,
             Err("ack_review_too_large".to_string())
         );
     }
@@ -443,45 +775,57 @@ pub(crate) mod test_seam {
         let script = directory.path().join("not-executable");
         std::fs::write(&script, "#!/bin/sh\n: > \"$0.ran\"\nexit 0\n").unwrap();
         assert_eq!(
-            super::confirm_with(&script, "Post").await,
+            super::confirm_with(&script, ONE, "Post").await,
             Err("import_approval_unavailable".to_string())
         );
         assert!(!stub_ran(&script));
     }
 
-    /// Only the token echoing this call's nonce is an answer. An older build
-    /// that ignores `--confirm-review` and exits 0, a process that echoes its
-    /// input, and a token for another nonce are refused; the right token is
-    /// accepted whatever the exit status, which is not an answer.
+    /// Only the token echoing this call's nonce is an answer, and it is
+    /// accepted whatever the exit status. A person's decline is no token and
+    /// exit 1. A clean exit without the token is never that (#689): it is an
+    /// executable that is not this dialog, so it is refused as unavailable:
+    /// an older build that ignores `--confirm-review`, a process that echoes
+    /// its input, a token for another nonce, or the post dialog's token.
     #[cfg(unix)]
     #[tokio::test]
     async fn the_review_is_answered_only_by_the_token_for_its_nonce() {
         let directory = tempfile::tempdir().unwrap();
         let answers = [
-            ("an older build exits 0", "cat > /dev/null; exit 0"),
-            ("an echo of the input", "cat"),
+            (
+                "a person's decline: no token, exit 1",
+                "cat > /dev/null; exit 1",
+                Err("ack_review_declined"),
+            ),
+            (
+                "an older build exits 0",
+                "cat > /dev/null; exit 0",
+                Err("ack_review_unavailable"),
+            ),
+            ("an echo of the input", "cat", Err("ack_review_unavailable")),
             (
                 "a token for another nonce",
                 "cat > /dev/null; echo bridge-review-acknowledged:00000000-0000-4000-8000-000000000000",
+                Err("ack_review_unavailable"),
             ),
             (
                 "the post dialog's token for this nonce",
                 "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
+                Err("ack_review_unavailable"),
             ),
             (
                 "the token, but a failing exit",
                 "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null; exit 1",
+                Ok(()),
             ),
         ];
-        for (name, body) in answers {
+        for (name, body, expected) in answers {
+            // The stand-in must have run: a spawn failure is also
+            // `ack_review_unavailable`, and would pass a row without reaching
+            // the clean-exit-without-token arm it is here to pin.
             let script = stub(directory.path(), body);
-            let result = super::confirm_review_with(&script, "Review").await;
-            let expected = if name == "the token, but a failing exit" {
-                Ok(())
-            } else {
-                Err("ack_review_declined".to_string())
-            };
-            assert_eq!(result, expected, "{name}");
+            let result = super::confirm_review_with(&script, ONE, "Review").await;
+            assert_eq!(result, expected.map_err(str::to_string), "{name}");
             assert!(stub_ran(&script), "{name}: the stand-in ran");
         }
         // The control: the token for this call's nonce is accepted.
@@ -490,7 +834,7 @@ pub(crate) mod test_seam {
             "read nonce; printf 'bridge-review-acknowledged:%s\\n' \"$nonce\"; cat > /dev/null",
         );
         assert_eq!(
-            super::confirm_review_with(&echoes_token, "Review").await,
+            super::confirm_review_with(&echoes_token, ONE, "Review").await,
             Ok(())
         );
         assert!(stub_ran(&echoes_token));
@@ -519,7 +863,7 @@ pub(crate) mod test_seam {
         ] {
             let script = stub(directory.path(), body);
             assert_eq!(
-                super::confirm_with(&script, "Post").await,
+                super::confirm_with(&script, ONE, "Post").await,
                 Err("import_approval_declined".to_string()),
                 "{name}"
             );
@@ -557,7 +901,7 @@ pub(crate) mod test_seam {
             // reaching the clean-exit-without-token arm it is here to pin.
             let script = stub(directory.path(), body);
             assert_eq!(
-                super::confirm_with(&script, "Post").await,
+                super::confirm_with(&script, ONE, "Post").await,
                 Err("import_approval_unavailable".to_string()),
                 "{name}"
             );
@@ -568,7 +912,7 @@ pub(crate) mod test_seam {
             directory.path(),
             "read nonce; printf 'bridge-post-approved:%s\\n' \"$nonce\"; cat > /dev/null",
         );
-        assert_eq!(super::confirm_with(&approves, "Post").await, Ok(()));
+        assert_eq!(super::confirm_with(&approves, ONE, "Post").await, Ok(()));
         assert!(stub_ran(&approves));
     }
 
@@ -587,7 +931,7 @@ pub(crate) mod test_seam {
             ),
         );
         for _ in 0..2 {
-            assert_eq!(super::confirm_with(&approves, "Post").await, Ok(()));
+            assert_eq!(super::confirm_with(&approves, ONE, "Post").await, Ok(()));
         }
         assert!(stub_ran(&approves));
         let nonces = std::fs::read_to_string(&seen).unwrap();
@@ -599,24 +943,124 @@ pub(crate) mod test_seam {
         assert_ne!(nonces[0], nonces[1]);
     }
 
+    /// Each dialog child is told the voucher count its title and button
+    /// name, on the line after the nonce, and then the preview (#746). The
+    /// stand-in saves the bytes the parent sent, and the child's own parser
+    /// reads them, so the writer and the parser are tested together.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn each_dialog_child_is_told_the_voucher_count() {
+        let directory = tempfile::tempdir().unwrap();
+        for (prefix, review, sent, preview) in [
+            ("bridge-post-approved:", false, 200, "Post"),
+            ("bridge-review-acknowledged:", true, 7, "Review"),
+        ] {
+            let input = directory.path().join(format!("input-{sent}"));
+            let answers = stub(
+                directory.path(),
+                &format!(
+                    "cat > '{}'; nonce=$(head -n 1 '{}'); printf '{prefix}%s\\n' \"$nonce\"",
+                    input.display(),
+                    input.display()
+                ),
+            );
+            let result = if review {
+                super::confirm_review_with(&answers, count(sent), preview).await
+            } else {
+                super::confirm_with(&answers, count(sent), preview).await
+            };
+            assert_eq!(result, Ok(()), "{prefix}");
+            assert!(stub_ran(&answers), "{prefix}");
+            let input = std::fs::read_to_string(&input).unwrap();
+            let (_, shown, text) = super::dialog_input(&input).expect("the parent's shape");
+            assert_eq!((shown, text), (count(sent), preview), "{prefix}");
+        }
+    }
+
+    /// One voucher keeps the single-voucher words. A batch names its count in
+    /// each title and on the post button, which never reads "Cancel", the
+    /// label that carries the decline (#746).
+    #[cfg(not(windows))]
+    #[test]
+    fn each_dialog_names_a_batch_by_its_count() {
+        assert_eq!(
+            super::post_words(ONE),
+            (
+                "Bridge — approve one voucher".to_string(),
+                "Post voucher".to_string()
+            )
+        );
+        assert_eq!(
+            super::post_words(count(200)),
+            (
+                "Bridge — approve 200 vouchers".to_string(),
+                "Post 200 vouchers".to_string()
+            )
+        );
+        assert_eq!(super::post_words(count(2)).1, "Post 2 vouchers");
+        assert_eq!(
+            super::review_title(ONE),
+            "Bridge — record that you reviewed one voucher"
+        );
+        assert_eq!(
+            super::review_title(count(50)),
+            "Bridge — record that you reviewed 50 vouchers"
+        );
+    }
+
+    /// The same for the Windows titles, which carry the question.
+    #[cfg(windows)]
+    #[test]
+    fn each_windows_dialog_names_a_batch_by_its_count() {
+        assert_eq!(super::post_question(ONE), "Bridge — post this voucher?");
+        assert_eq!(
+            super::post_question(count(200)),
+            "Bridge — post 200 vouchers?"
+        );
+        assert_eq!(
+            super::review_question(ONE),
+            "Bridge — record that you reviewed this voucher?"
+        );
+        assert_eq!(
+            super::review_question(count(50)),
+            "Bridge — record that you reviewed these 50 vouchers?"
+        );
+    }
+
     /// The dialog subprocesses show a dialog only for input of the shape the
-    /// parent sends: a nonce line, then a preview within the limit.
+    /// parent sends: a nonce line, a count line in the one form the parent
+    /// writes, then a preview within the limit.
     #[test]
     fn a_dialog_subprocess_admits_only_the_parents_input_shape() {
         let nonce = "9c8d8de4-c06c-447b-8309-60ba702bf663";
         assert_eq!(
-            super::dialog_input(&format!("{nonce}\nReview")),
-            Some((nonce, "Review"))
+            super::dialog_input(&format!("{nonce}\n1\nReview")),
+            Some((nonce, ONE, "Review"))
+        );
+        assert_eq!(
+            super::dialog_input(&format!("{nonce}\n200\nPost\nmore")),
+            Some((nonce, count(200), "Post\nmore"))
         );
         let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
         for input in [
             "Review".to_string(),
-            "not-a-nonce\nReview".to_string(),
-            format!("{nonce}\n"),
-            format!("{nonce}\nRe\0view"),
-            format!("{nonce}\n{oversized}"),
+            "not-a-nonce\n1\nReview".to_string(),
+            format!("{nonce}\n1\n"),
+            format!("{nonce}\n1\nRe\0view"),
+            format!("{nonce}\n1\n{oversized}"),
+            // The count line absent, zero, signed, padded, empty, too large,
+            // or not a number.
+            format!("{nonce}\nReview"),
+            format!("{nonce}\n0\nReview"),
+            format!("{nonce}\n+2\nReview"),
+            format!("{nonce}\n02\nReview"),
+            format!("{nonce}\n 2\nReview"),
+            format!("{nonce}\n2 \nReview"),
+            format!("{nonce}\n\nReview"),
+            format!("{nonce}\n99999999999999999999999\nReview"),
+            format!("{nonce}\ntwo\nReview"),
         ] {
-            assert_eq!(super::dialog_input(&input), None, "{input:.40}");
+            assert_eq!(super::dialog_input(&input), None, "{input:.60}");
         }
     }
 }
@@ -627,16 +1071,28 @@ pub(crate) mod test_seam {
 /// server instead, reads the preview as input and exits 0 at its end. So the
 /// parent sends a fresh nonce and requires the token that echoes it, which
 /// only this dialog's positive button prints, and a clean exit as well.
-async fn confirm(preview: &str) -> Result<(), String> {
+async fn confirm(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "import_approval_unavailable")?;
-    confirm_with(&executable, preview).await
+    confirm_with(&executable, count, preview).await
 }
 
-async fn confirm_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+async fn confirm_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("import_review_too_large".into());
     }
-    match nonce_bound_dialog(executable, "--confirm-journal", POST_TOKEN_PREFIX, preview).await {
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-journal",
+        POST_TOKEN_PREFIX,
+        count,
+        preview,
+    )
+    .await
+    {
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -651,18 +1107,36 @@ async fn confirm_with(executable: &std::path::Path, preview: &str) -> Result<(),
 
 /// The review dialog for a doubted post (#239): its own subprocess mode, so
 /// its title and button never read as approving a post. It is answered by
-/// the token alone, as the post dialog is by the token and a clean exit.
-async fn confirm_review(preview: &str) -> Result<(), String> {
+/// the token alone, as the post dialog is by the token and a clean exit; a
+/// clean exit without the token is unavailable, as the post dialog's is.
+async fn confirm_review(count: VoucherCount, preview: &str) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "ack_review_unavailable")?;
-    confirm_review_with(&executable, preview).await
+    confirm_review_with(&executable, count, preview).await
 }
 
-async fn confirm_review_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+async fn confirm_review_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("ack_review_too_large".into());
     }
-    match nonce_bound_dialog(executable, "--confirm-review", REVIEW_TOKEN_PREFIX, preview).await {
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-review",
+        REVIEW_TOKEN_PREFIX,
+        count,
+        preview,
+    )
+    .await
+    {
         Ok(answer) if answer.token_matched => Ok(()),
+        // A person's decline is no token and exit 1: `run_review_confirmation`
+        // returns false. A clean exit without the token is never that; it is
+        // an executable that is not this dialog, such as one ignoring the
+        // flag (#689).
+        Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
         Err(DialogFailure::TimedOut) => Err("ack_review_timed_out".into()),
@@ -682,13 +1156,15 @@ enum DialogFailure {
 }
 
 /// Show `preview` in the native dialog `mode` selects, in a subprocess of
-/// `executable`, and read its answer. The parent sends a fresh nonce line and
-/// then the preview; the child prints `prefix` and that nonce only when the
-/// person chose the positive button.
+/// `executable`, and read its answer. The parent sends a fresh nonce line, a
+/// line with the voucher count the dialog's title and button name (#746),
+/// and then the preview; the child prints `prefix` and that nonce only when
+/// the person chose the positive button.
 async fn nonce_bound_dialog(
     executable: &std::path::Path,
     mode: &str,
     prefix: &str,
+    count: VoucherCount,
     preview: &str,
 ) -> Result<DialogAnswer, DialogFailure> {
     let nonce = uuid::Uuid::new_v4().to_string();
@@ -703,7 +1179,7 @@ async fn nonce_bound_dialog(
     let (answer, status) = tokio::time::timeout(Duration::from_secs(120), async {
         let mut input = child.stdin.take().ok_or(DialogFailure::Unavailable)?;
         input
-            .write_all(format!("{nonce}\n{preview}").as_bytes())
+            .write_all(format!("{nonce}\n{}\n{preview}", count.0).as_bytes())
             .await
             .map_err(|_| DialogFailure::Unavailable)?;
         drop(input);
@@ -756,7 +1232,8 @@ pub fn run_review_confirmation() -> bool {
     )
 }
 
-/// Read the parent's nonce line and preview from `input`, show `dialog`, and
+/// Read the parent's nonce line, count line and preview from `input`, show
+/// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
 /// entry points pass stdin, stdout and their own dialog. The parent's tests
 /// stand a script in for the child, so taking these as parameters is the only
@@ -764,11 +1241,13 @@ pub fn run_review_confirmation() -> bool {
 /// declined dialog writes nothing (#687).
 fn answer_with_token(
     prefix: &str,
-    dialog: fn(&str) -> bool,
+    dialog: fn(VoucherCount, &str) -> bool,
     input: impl Read,
     mut output: impl std::io::Write,
 ) -> bool {
     let mut text = String::new();
+    // The nonce line is 37 bytes and the count line at most 21, so 64 covers
+    // both: a preview at the limit is still read whole.
     if input
         .take(MAX_PREVIEW_BYTES as u64 + 64)
         .read_to_string(&mut text)
@@ -776,10 +1255,10 @@ fn answer_with_token(
     {
         return false;
     }
-    let Some((nonce, preview)) = dialog_input(&text) else {
+    let Some((nonce, count, preview)) = dialog_input(&text) else {
         return false;
     };
-    if !dialog(preview) {
+    if !dialog(count, preview) {
         return false;
     }
     output
@@ -788,23 +1267,35 @@ fn answer_with_token(
         && output.flush().is_ok()
 }
 
-/// The nonce line and the preview, when the input has the shape the parent
-/// sends; `None` shows no dialog.
-fn dialog_input(input: &str) -> Option<(&str, &str)> {
-    let (nonce, preview) = input.split_once('\n')?;
+/// The nonce line, the voucher count and the preview, when the input has the
+/// shape the parent sends; `None` shows no dialog.
+fn dialog_input(input: &str) -> Option<(&str, VoucherCount, &str)> {
+    let (nonce, rest) = input.split_once('\n')?;
+    let (count, preview) = rest.split_once('\n')?;
+    let count = VoucherCount::parse(count)?;
     (uuid::Uuid::parse_str(nonce).is_ok()
         && !preview.contains('\0')
         && !preview.is_empty()
         && preview.len() <= MAX_PREVIEW_BYTES)
-        .then_some((nonce, preview))
+        .then_some((nonce, count, preview))
+}
+
+/// The acknowledgement dialog's title: the single-voucher words for one, and
+/// the count for a batch (#746).
+#[cfg(not(windows))]
+fn review_title(count: VoucherCount) -> String {
+    match count.batch() {
+        None => "Bridge — record that you reviewed one voucher".into(),
+        Some(count) => format!("Bridge — record that you reviewed {count} vouchers"),
+    }
 }
 
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
-fn show_review_acknowledgement(preview: &str) -> bool {
+fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     rfd::MessageDialog::new()
-        .set_title("Bridge — record that you reviewed one voucher")
+        .set_title(review_title(count))
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
@@ -815,13 +1306,24 @@ fn show_review_acknowledgement(preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())
 }
 
+/// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
+/// custom labels, so the title asks the question, with the count for a batch
+/// (#746).
 #[cfg(windows)]
-fn show_review_acknowledgement(preview: &str) -> bool {
+fn review_question(count: VoucherCount) -> String {
+    match count.batch() {
+        None => "Bridge — record that you reviewed this voucher?".into(),
+        Some(count) => format!("Bridge — record that you reviewed these {count} vouchers?"),
+    }
+}
+
+#[cfg(windows)]
+fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = "Bridge — record that you reviewed this voucher?"
+    let title: Vec<u16> = review_question(count)
         .encode_utf16()
         .chain(Some(0))
         .collect();
@@ -837,34 +1339,56 @@ fn show_review_acknowledgement(preview: &str) -> bool {
     }
 }
 
+/// The post dialog's title and positive button. One voucher keeps the
+/// single-voucher words; a batch names its count in both, so neither calls a
+/// batch one voucher (#746).
 #[cfg(not(windows))]
-fn show_review(preview: &str) -> bool {
+fn post_words(count: VoucherCount) -> (String, String) {
+    match count.batch() {
+        None => ("Bridge — approve one voucher".into(), POST_LABEL.into()),
+        Some(count) => (
+            format!("Bridge — approve {count} vouchers"),
+            format!("Post {count} vouchers"),
+        ),
+    }
+}
+
+#[cfg(not(windows))]
+fn show_review(count: VoucherCount, preview: &str) -> bool {
+    let (title, button) = post_words(count);
     rfd::MessageDialog::new()
-        .set_title("Bridge — approve one voucher")
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Posting requires
         // the explicitly matched positive button; Return may leave this dialog open.
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
-            POST_LABEL.into(),
+            button.clone(),
         ))
         .show()
-        == rfd::MessageDialogResult::Custom(POST_LABEL.into())
+        == rfd::MessageDialogResult::Custom(button)
+}
+
+/// The Windows post dialog's title. Its Yes/No/Cancel box has no custom
+/// labels, so the title asks the question, with the count for a batch (#746).
+#[cfg(windows)]
+fn post_question(count: VoucherCount) -> String {
+    match count.batch() {
+        None => "Bridge — post this voucher?".into(),
+        Some(count) => format!("Bridge — post {count} vouchers?"),
+    }
 }
 
 #[cfg(windows)]
-fn show_review(preview: &str) -> bool {
+fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = "Bridge — post this voucher?"
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
+    let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
     // no parent HWND is borrowed. No application state is exposed to callbacks.
     unsafe {

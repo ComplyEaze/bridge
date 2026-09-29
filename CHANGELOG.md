@@ -5,15 +5,65 @@ All notable changes to Bridge are documented here. The project follows
 
 ## [Unreleased]
 
-The next release line is `0.2.x`. This creates an unambiguous version boundary
-between the published MIT-licensed `v0.1.0` release and Apache-2.0 builds from
-current source.
+Builds are versioned on the `0.3.x` line, as unsigned MCPB previews (tags
+`mcp-preview-*`). The version boundary between the published MIT-licensed
+`v0.1.0` release and Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: since the `mcp-preview-0.2.0` build (16 Sep 2026)
+### In plain words: in source since `mcp-preview-0.3.0` (26 Sep 2026)
 
-These changes are in the source. They are not yet in a published package.
-Each line names the pull requests it comes from, except where it names an open
-issue.
+These changes are on the main branch. They are not yet in a published package.
+Each line names the pull requests it comes from.
+
+**What you can do now**
+
+- Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
+  line for line to Tally's own statement; otherwise it is refused, and the
+  lines that differ are named (#774).
+- Read books that define more than one currency. Outstandings set aside
+  foreign-currency ledgers, and a rupee ledger with a foreign-currency
+  balance, and name them. Compliance ledgers and the Trial Balance are read
+  through the book's base currency. The `vouchers` tool withholds a voucher
+  whose amount Tally stored in a foreign currency instead of refusing the
+  whole day. The desktop app follows the same read (#642, #647, #649, #715,
+  #781, #824, #825).
+- A ledger read on a several-currency book, or one whose base currency is not
+  INR, is refused before any request to Tally, instead of returning bare
+  numbers (#751).
+- A bank-statement cash line is now asked its purpose. An unanswered line
+  blocks the import file; "don't know" posts to a suspense ledger, tagged and
+  listed (#817).
+
+**Safer or fixed**
+
+- If you are slow at the approval window, the agent's call no longer waits
+  on it. The agent is told the approval is pending and asks again. A click
+  made while no call is waiting is posted by the next call, not one call later
+  (#792, #854).
+- The approval window for a batch names how many vouchers it covers, in its
+  title and its button. The review window shows a debit the way the post
+  window does (#757, #762).
+- A voucher you cancel in Tally after ComplyEaze Bridge posted it reads back
+  as posted but not effective, not as changed. Cancelled vouchers are no
+  longer reported as duplicates of each other (#771, #789).
+- A recorded review can no longer answer for a different doubt than the one it
+  covers (#755, #769, #809, #813, #831).
+- Tally's own error text on a rejected line is read safely, including text
+  with an `&` in it (#733, #763).
+- The desktop app's documents upload skips files ComplyEaze Bridge itself
+  exported (#847).
+
+**Also in source**
+
+- The tax-audit engine gained its stock and party-monthly tests. The engine is
+  still not in the extension, and its accuracy is not yet proven publicly (#738,
+  #744, #788).
+- The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
+  (#805).
+
+### In plain words: `mcp-preview-0.3.0` (26 Sep 2026), since `mcp-preview-0.2.0` (16 Sep 2026)
+
+These changes are in the published `mcp-preview-0.3.0` build. Each line names
+the pull requests it comes from, except where it names an open issue.
 
 **What you can do now**
 
@@ -114,6 +164,13 @@ issue.
   one. The README's promise that Tally data is never uploaded now has a test
   behind it (#701).
 - We deleted legacy code that nothing reached (#473, #495).
+
+**Known limits of 0.3.0**
+
+- The package is unsigned. It is for evaluation, not production.
+- Native Windows validation with Tally and Claude Desktop is outstanding
+  (#293, #702). Intel Mac is not qualified.
+- How long Claude Desktop waits on one tool call is not measured (#703).
 
 ### Removed
 

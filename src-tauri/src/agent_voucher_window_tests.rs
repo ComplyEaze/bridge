@@ -1538,6 +1538,115 @@ fn split_read_checks(
     );
 }
 
+/// #680: the carry-forward #494 added, driven through the reader. A 4-day
+/// window is refused, and so is its left 2-day half. The right 2-day half is
+/// as wide as a span already refused on this call, so it is split without
+/// being sent, and all four days are read singly, in date order.
+#[tokio::test]
+async fn a_sibling_as_wide_as_a_refused_part_is_split_without_being_sent() {
+    let shape = VoucherReadShape::ImportVerification;
+    let mut plans = oversized();
+    plans.extend(oversized());
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    for _ in 0..3 {
+        plans.extend(paired(&xml_plan(empty_collection())));
+    }
+    plans.extend(paired(&mark(1)));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260804"),
+        shape,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(1)),
+        },
+        WindowReadLimits::for_shape(shape),
+    )
+    .await;
+    let outcome = outcome.expect("the window is read in single days");
+    assert_eq!(
+        outcome.reads,
+        ["20260801", "20260802", "20260803", "20260804"].map(|day| part(day, day, None))
+    );
+    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    assert_eq!(observed.len(), 34);
+    assert_requests(
+        &observed,
+        &[1, 3, 5, 11, 17, 23],
+        &[
+            render("20260801", "20260804"),
+            render("20260801", "20260802"),
+            render("20260801", "20260801"),
+            render("20260802", "20260802"),
+            render("20260803", "20260803"),
+            render("20260804", "20260804"),
+        ],
+    );
+    let right_half = request_sha(&render("20260803", "20260804"));
+    assert!(
+        observed
+            .iter()
+            .all(|request| request.request_body_sha256 != right_half),
+        "the right half was sent, though a part as wide was already refused"
+    );
+    assert_eq!(
+        observed[29].request_body_sha256,
+        request_sha(&render_agent_company_high_water(&company()))
+    );
+    // Every row one undivided read would have returned, in date order.
+    assert_eq!(
+        outcome.rows,
+        parse_agent_rows(&three_vouchers(), GUID).unwrap()
+    );
+}
+
+/// The control for the test above: a sibling narrower than every part refused
+/// so far is read, not split. A 5-day window divides 3/2; the 3-day half is
+/// refused, so its 2-day left part and the window's 2-day right half are both
+/// read whole.
+#[tokio::test]
+async fn a_sibling_narrower_than_every_refused_part_is_read() {
+    let shape = VoucherReadShape::ImportVerification;
+    let mut plans = oversized();
+    plans.extend(oversized());
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    for _ in 0..2 {
+        plans.extend(paired(&xml_plan(empty_collection())));
+    }
+    plans.extend(paired(&mark(1)));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260805"),
+        shape,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(1)),
+        },
+        WindowReadLimits::for_shape(shape),
+    )
+    .await;
+    let outcome = outcome.expect("the window is read in three parts");
+    assert_eq!(
+        outcome.reads,
+        [
+            part("20260801", "20260802", None),
+            part("20260803", "20260803", None),
+            part("20260804", "20260805", None),
+        ]
+    );
+    let render = |from, to| shape.render(&company(), from, to, None).unwrap();
+    assert_eq!(observed.len(), 28);
+    assert_requests(
+        &observed,
+        &[1, 3, 5, 11, 17],
+        &[
+            render("20260801", "20260805"),
+            render("20260801", "20260803"),
+            render("20260801", "20260802"),
+            render("20260803", "20260803"),
+            render("20260804", "20260805"),
+        ],
+    );
+}
+
 #[tokio::test]
 async fn a_failed_parse_keeps_the_evidence_of_the_part_just_read() {
     let (outcome, _) = read_window(
@@ -3785,4 +3894,90 @@ fn window_timings_drop_only_their_parts_when_over_the_allowance() {
             "parts_omitted": 3,
         })
     );
+}
+
+// -- #674: a withheld voucher is admitted through a divided window -----------
+
+/// `xml` with its first voucher's three amounts (party entry, its bill
+/// allocation, sales entry) replaced by the composites captured from the
+/// several-currency book. A synthetic mutation of a captured response.
+fn with_first_voucher_composite(xml: &str) -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml"
+    );
+    let forex = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let composites: Vec<&str> = forex
+        .split("<AMOUNT")
+        .skip(1)
+        .filter_map(|tail| Some(&tail[tail.find('>')? + 1..tail.find("</AMOUNT>")?]))
+        .collect();
+    assert_eq!(composites.len(), 3);
+    let start = xml.find("<VOUCHER ").unwrap();
+    let end = start + xml[start..].find("</VOUCHER>").unwrap();
+    let mut voucher = xml[start..end].to_string();
+    let plain: Vec<String> = voucher
+        .split("<AMOUNT")
+        .skip(1)
+        .filter_map(|tail| Some(tail[tail.find('>')? + 1..tail.find("</AMOUNT>")?].to_string()))
+        .collect();
+    assert_eq!(plain.len(), 3, "{plain:?}");
+    for (plain, composite) in plain.iter().zip(&composites) {
+        let at = voucher.find(&format!(">{plain}</AMOUNT>")).unwrap();
+        voucher.replace_range(at + 1..at + 1 + plain.len(), composite);
+    }
+    format!("{}{voucher}{}", &xml[..start], &xml[end..])
+}
+
+#[tokio::test]
+async fn a_withheld_voucher_is_admitted_through_a_divided_window() {
+    // The plan of the test above, with the first voucher of the second part a
+    // composite one: the census, part spans and union checks all see it.
+    let census = WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+        (day("20260801"), 3),
+        (day("20260802"), 4),
+        (day("20260802"), 5),
+    ]);
+    let mut plans = paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])));
+    plans.extend(paired(&xml_plan(with_first_voucher_composite(
+        &relabelled(&vouchers_kept(2), &[(2, "20260801"), (3, "20260801")]),
+    ))));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(4, "20260802"), (5, "20260802")],
+    ))));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let identity = identity();
+    let outcome = server
+        .read_voucher_window(
+            &identity,
+            identity.display_name(),
+            "20260801",
+            "20260802",
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Counted(census),
+            three_a_read(),
+            |xml| parse_agent_rows_withholding(xml, GUID),
+        )
+        .await
+        .unwrap();
+    simulator.finish().unwrap();
+    assert_eq!(outcome.rows.len(), 5);
+    let withheld: Vec<Option<u64>> = outcome
+        .rows
+        .iter()
+        .filter(|row| matches!(row, VoucherRow::Withheld(_)))
+        .map(|row| row.window_alter_id())
+        .collect();
+    assert_eq!(withheld, vec![Some(2)]);
+    assert_eq!(outcome.reads.len(), 3);
 }

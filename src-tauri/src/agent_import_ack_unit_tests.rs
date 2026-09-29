@@ -21,7 +21,7 @@ fn doubt() -> Value {
 }
 
 #[test]
-fn the_review_shows_the_doubt_and_the_voucher_as_read() {
+fn the_review_shows_the_doubt_and_the_voucher() {
     let mut voucher = row_json(2, "Paid");
     voucher["amounts"][1]["is_deemed_positive"] = json!("No");
     voucher["amounts"][1]["amount"] = json!("1.00");
@@ -32,7 +32,7 @@ fn the_review_shows_the_doubt_and_the_voucher_as_read() {
         "  \"Cash\"",
         "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
         "Narration:\n  \"Paid\"",
-        "Dr -1.00  \"Ledger 0\"",
+        "Dr 1.00  \"Ledger 0\"",
         "Cr 1.00  \"Ledger 1\"",
         &format!("Batch: {BATCH}"),
         "reconciliation_required",
@@ -46,6 +46,44 @@ fn the_review_shows_the_doubt_and_the_voucher_as_read() {
     );
 }
 
+/// A debit is shown negated, in the digits Tally sent (#730): `1234.50`,
+/// never `1234.5`, so where Tally echoes the build's figure the person reads
+/// the same text in both dialogs. A debit Tally holds with an unexpected positive
+/// sign is not rescued into looking normal: it shows negative, as it is. A
+/// zero debit takes no sign, and a credit shows as it is, whatever its sign.
+/// An amount that is not a decimal refuses.
+#[test]
+fn a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is() {
+    let mut voucher = row_json(5, "Paid");
+    voucher["amounts"][0]["amount"] = json!("-1234.50");
+    voucher["amounts"][1]["amount"] = json!("2.00");
+    voucher["amounts"][2]["is_deemed_positive"] = json!("No");
+    voucher["amounts"][2]["amount"] = json!("1232.50");
+    voucher["amounts"][3]["amount"] = json!("0.00");
+    voucher["amounts"][4]["is_deemed_positive"] = json!("No");
+    voucher["amounts"][4]["amount"] = json!("-3.10");
+    let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
+    let preview = review_preview(BATCH, MARKER, "Books", &doubt(), &voucher).unwrap();
+    for shown in [
+        "Dr 1234.50  \"Ledger 0\"",
+        "Dr -2.00  \"Ledger 1\"",
+        "Cr 1232.50  \"Ledger 2\"",
+        "Dr 0.00  \"Ledger 3\"",
+        "Cr -3.10  \"Ledger 4\"",
+    ] {
+        assert!(preview.contains(shown), "{shown}: {preview}");
+    }
+    assert!(!preview.contains("Dr -1234.50"), "{preview}");
+
+    let mut unreadable = row_json(2, "Paid");
+    unreadable["amounts"][0]["amount"] = json!("one rupee");
+    let unreadable: ReadVoucher = serde_json::from_value(unreadable).unwrap();
+    assert_eq!(
+        review_preview(BATCH, MARKER, "Books", &doubt(), &unreadable),
+        Err("ack_readback_not_matched".to_string())
+    );
+}
+
 /// Each cap refuses on its own: every fixture below exceeds exactly one, so
 /// a cap that stopped being checked lets its fixture through.
 #[test]
@@ -53,7 +91,7 @@ fn each_review_cap_refuses_on_its_own() {
     let wide_ledgers = |entries: usize| {
         let mut voucher = row(entries, "Paid");
         for (index, entry) in voucher.entries.iter_mut().enumerate() {
-            entry.ledger = format!("{index:02}{}", "L".repeat(83));
+            entry.ledger = format!("{index:02}{}", "L".repeat(85));
         }
         voucher
     };
@@ -334,6 +372,43 @@ fn a_review_names_its_doubt_and_two_doubts_need_a_name() {
         (DoubtKind::BatchStep, doubt()),
     ];
     assert_eq!(select_doubt(None, &step_only), Ok(DoubtKind::BatchStep));
+    // A doubt held only by the check record is observed too (#722): beside
+    // another doubt it needs a name, and alone it is the one chosen.
+    let masters_unavailable = [
+        (DoubtKind::Masters, MastersRecord::DoubtRecordUnavailable),
+        (DoubtKind::BatchStep, doubt()),
+    ];
+    assert_eq!(
+        select_doubt(None, &masters_unavailable),
+        Err("ack_doubt_ambiguous")
+    );
+    // The mirror: a masters doubt with its file, beside a step doubt without.
+    let step_unavailable_beside = [
+        (DoubtKind::Masters, doubt()),
+        (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
+    ];
+    assert_eq!(
+        select_doubt(None, &step_unavailable_beside),
+        Err("ack_doubt_ambiguous")
+    );
+    // Both held only by the check record: no name could be reviewed, so the
+    // choice itself refuses as unavailable, not as ambiguous.
+    let both_unavailable = [
+        (DoubtKind::Masters, MastersRecord::DoubtRecordUnavailable),
+        (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
+    ];
+    assert_eq!(
+        select_doubt(None, &both_unavailable),
+        Err("ack_doubt_record_unavailable")
+    );
+    let step_unavailable = [
+        (DoubtKind::Masters, NoDoubt),
+        (DoubtKind::BatchStep, MastersRecord::DoubtRecordUnavailable),
+    ];
+    assert_eq!(
+        select_doubt(None, &step_unavailable),
+        Ok(DoubtKind::BatchStep)
+    );
     // A single post can hold no step doubt.
     let single = [(DoubtKind::Masters, doubt())];
     assert_eq!(select_doubt(None, &single), Ok(DoubtKind::Masters));
@@ -398,6 +473,19 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
     assert_eq!(
         refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
         Some("ack_no_observed_doubt")
+    );
+    // A check the review's own read finished as a masters doubt whose file
+    // could not be written: refused after that read, and never read as no
+    // doubt (#770). The caller refuses such a doubt before the read only when
+    // it was already there; this is the one left to `admit_review`.
+    fs::write(
+        masters_check_path(imports.path(), BATCH),
+        br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        refused(&verified(3), &rows, DoubtKind::Masters).as_deref(),
+        Some("ack_doubt_record_unavailable")
     );
 }
 
@@ -611,6 +699,73 @@ fn a_batch_kind_whose_verdict_is_pending_reads_pending() {
     assert_eq!(check("unchanged", "matched"), None);
 }
 
+/// A doubt the check record holds whose own file is absent reads
+/// `doubt_record_unavailable`, not `null` (#722): the verdict counts it as
+/// doubt, and no review can bind to it. For each kind, and for one voucher.
+#[test]
+fn a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable() {
+    let imports = tempfile::tempdir().unwrap();
+    let unavailable = json!({"state":"doubt_record_unavailable"});
+    let check = |line: &ImportLedgerLine, masters: &str, step: &str| {
+        fs::write(
+            masters_check_path(imports.path(), BATCH),
+            serde_json::to_vec(&json!({"state":masters,"batch_step":{"state":step}})).unwrap(),
+        )
+        .unwrap();
+        operator_review(imports.path(), line, &batch_rows(line))
+    };
+    let batch = posted_batch(2);
+    let review = check(&batch, "posted_under_changed_masters", "matched").unwrap();
+    assert_eq!(review["masters"], unavailable, "{review}");
+    assert_eq!(review["batch_step"], Value::Null, "{review}");
+    let review = check(&batch, "unchanged", "unmatched").unwrap();
+    assert_eq!(review["batch_step"], unavailable, "{review}");
+    assert_eq!(review["masters"], Value::Null, "{review}");
+    let single = posted_batch(1);
+    assert_eq!(
+        check(&single, "posted_under_changed_masters", "matched"),
+        Some(unavailable)
+    );
+    // A review already recorded outranks the absent file: it reads stale,
+    // as a review whose doubt can no longer be read does, for each kind.
+    for (kind, masters, step) in [
+        (
+            DoubtKind::Masters,
+            "posted_under_changed_masters",
+            "matched",
+        ),
+        (DoubtKind::BatchStep, "unchanged", "unmatched"),
+    ] {
+        fs::write(kind.ack_path(imports.path(), BATCH), b"{}").unwrap();
+        let review = check(&batch, masters, step).unwrap();
+        assert_eq!(review[kind.name()]["state"], "stale", "{review}");
+        fs::remove_file(kind.ack_path(imports.path(), BATCH)).unwrap();
+    }
+    fs::write(masters_ack_path(imports.path(), BATCH), b"{}").unwrap();
+    let review = check(&single, "posted_under_changed_masters", "matched").unwrap();
+    assert_eq!(review["state"], "stale", "{review}");
+    fs::remove_file(masters_ack_path(imports.path(), BATCH)).unwrap();
+    // Control: with each doubt's own file written, the review reads it.
+    fs::write(
+        super::masters_doubt_path(imports.path(), BATCH),
+        MASTERS_DOUBT,
+    )
+    .unwrap();
+    let review = check(&batch, "posted_under_changed_masters", "matched").unwrap();
+    assert_eq!(review["masters"]["state"], "absent", "{review}");
+    assert_eq!(
+        check(&single, "posted_under_changed_masters", "matched").unwrap()["state"],
+        "absent"
+    );
+    fs::write(
+        super::batch_step_doubt_path(imports.path(), BATCH),
+        STEP_DOUBT,
+    )
+    .unwrap();
+    let review = check(&batch, "unchanged", "unmatched").unwrap();
+    assert_eq!(review["batch_step"]["state"], "absent", "{review}");
+}
+
 /// A debit total is the negated sum of what Tally holds, never each line's
 /// magnitude: a debit line with an unexpected sign still shows as it is.
 #[test]
@@ -628,4 +783,32 @@ fn a_debit_total_is_the_negated_sum_not_each_lines_magnitude() {
         preview.contains("Dr 3  Cr 0  2 entries  \"Odd\""),
         "{preview}"
     );
+}
+
+/// After an unnamed review's read (#756): a second observed doubt refuses as
+/// `select_doubt` would; one or none leaves the choice as it was.
+#[test]
+fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
+    use MastersRecord::{DoubtRecordUnavailable, NoDoubt, Pending};
+    let doubt = || MastersRecord::Doubt {
+        raw: b"{}".to_vec(),
+    };
+    let cases: [([MastersRecord; 2], Result<(), &str>); 6] = [
+        ([doubt(), doubt()], Err("ack_doubt_ambiguous")),
+        (
+            [doubt(), DoubtRecordUnavailable],
+            Err("ack_doubt_ambiguous"),
+        ),
+        (
+            [DoubtRecordUnavailable, DoubtRecordUnavailable],
+            Err("ack_doubt_record_unavailable"),
+        ),
+        ([NoDoubt, doubt()], Ok(())),
+        ([Pending, doubt()], Ok(())),
+        ([NoDoubt, NoDoubt], Ok(())),
+    ];
+    for ([masters, step], expected) in cases {
+        let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
+        assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
+    }
 }

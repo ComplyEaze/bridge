@@ -218,17 +218,21 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         .expect("hold publication admission");
     let (started_tx, started_rx) = std::sync::mpsc::channel();
     let (done_tx, done_rx) = std::sync::mpsc::channel();
-    let writers = ["first", "second"].map(|state| {
-        let mut update = initial.clone();
-        update.status = state.into();
+    let verdicts = [
+        VerificationStatus::PostedVerified,
+        VerificationStatus::VerificationIncomplete,
+    ];
+    let writers = verdicts.map(|verdict| {
+        let line = initial.clone();
         let settings = settings.clone();
         let started = started_tx.clone();
         let done = done_tx.clone();
         std::thread::spawn(move || {
+            let state = verdict.as_str();
             let proof = json!({"batch_id":"batch-proof", "company":{"name":state}, "writer":state});
             started.send(()).expect("writer started");
-            let result =
-                Server::new(settings).persist_import_verification(&proof, &update, generation);
+            let result = Server::new(settings)
+                .persist_import_verification(&proof, &line, verdict, generation);
             done.send(result).expect("writer result");
         })
     });
@@ -251,11 +255,10 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
             Err("import_admission_busy".into())
         );
     }
-    for (index, state) in ["first", "second"].into_iter().enumerate() {
-        let mut update = initial.clone();
-        update.status = state.into();
+    for (index, verdict) in verdicts.into_iter().enumerate() {
+        let state = verdict.as_str();
         let proof = json!({"batch_id":"batch-proof", "company":{"name":state}, "writer":state});
-        let result = server.persist_import_verification(&proof, &update, generation);
+        let result = server.persist_import_verification(&proof, &initial, verdict, generation);
         if index == 0 {
             result.unwrap();
         } else {
@@ -271,6 +274,9 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         .expect("published status");
     assert_eq!(proof["writer"], latest.batch.status);
     assert!(markdown.contains(&format!("- Company: `{}`", latest.batch.status)));
+    // The files carry the status the ledger records, not the caller's copy.
+    assert_eq!(proof["verification_status"], latest.batch.status);
+    assert!(markdown.contains(&format!("- Verification status: `{}`", latest.batch.status)));
 }
 
 #[test]
@@ -834,6 +840,234 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     );
 }
 
+/// The Markdown proof carries `verification_status`, lists the batch's own
+/// duplicates, and shows the reconciliation banner whenever the status is not
+/// `posted_verified`, including when it is absent (bridge#804).
+#[test]
+fn the_markdown_proof_follows_the_verification_status() {
+    let banner = "this report does not confirm posting";
+    let resend = "do not rebuild or resend it";
+    let proof = |status: Option<&str>, duplicates: Value| {
+        let mut proof = json!({"batch_id":"batch-md","counts":{"posted_verified":1},
+            "vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified"}],
+            "duplicates":duplicates,"unrelated_duplicates_in_window":[]});
+        if let Some(status) = status {
+            proof["verification_status"] = json!(status);
+        }
+        proof
+    };
+    let clean = render_proof_markdown(&proof(Some("posted_verified"), json!([])));
+    assert!(!clean.contains(banner), "{clean}");
+    assert!(
+        clean.contains("- Verification status: `posted_verified`"),
+        "{clean}"
+    );
+    assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
+    assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // Not verified with no duplicates, or no status at all, is not clean either:
+    // the banner follows the status, not the duplicate list. With no dispatch
+    // record Bridge did not send the batch, so the banner forbids no resend.
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, json!([])));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(markdown.contains("**Not verified"), "{markdown}");
+        assert!(!markdown.contains(resend), "{markdown}");
+        assert!(
+            !markdown.contains("| Duplicate in this batch |"),
+            "{markdown}"
+        );
+    }
+    // A dispatch record reading verified does not override the status, and a
+    // dispatched batch keeps the instruction not to resend.
+    let mut dispatched = proof(Some("verification_incomplete"), json!([]));
+    dispatched["dispatch"] = json!({"state":"posted_verified","response_state":"response_clean"});
+    let markdown = render_proof_markdown(&dispatched);
+    assert!(markdown.contains(resend), "{markdown}");
+    // An error, or an unverified dispatch, shows the banner on its own, even
+    // beside a verified status. Only a dispatched batch is told not to resend:
+    // the wording follows the dispatch record, not the error.
+    let mut errored = proof(Some("posted_verified"), json!([]));
+    errored["error"] = json!({"code":"import_reconciliation_required"});
+    let markdown = render_proof_markdown(&errored);
+    assert!(markdown.contains(banner), "{markdown}");
+    assert!(!markdown.contains(resend), "{markdown}");
+    let mut unreconciled = proof(Some("posted_verified"), json!([]));
+    unreconciled["dispatch"] =
+        json!({"state":"reconciliation_required","response_state":"response_missing"});
+    let mut errored_after_dispatch = errored.clone();
+    errored_after_dispatch["dispatch"] =
+        json!({"state":"posted_verified","response_state":"response_clean"});
+    for flagged in [unreconciled, errored_after_dispatch] {
+        let markdown = render_proof_markdown(&flagged);
+        assert!(markdown.contains(resend), "{markdown}");
+    }
+    let duplicates = json!([
+        {"kind":"remote_id","remote_id":"remote-1","count":2},
+        {"kind":"accounting_fingerprint","fingerprint_sha256":"ab12","voucher_ids":["guid:a","guid:b","guid:c"],"remote_ids":[]}
+    ]);
+    for status in [Some("verification_incomplete"), None] {
+        let markdown = render_proof_markdown(&proof(status, duplicates.clone()));
+        assert!(markdown.contains(banner), "{status:?}: {markdown}");
+        assert!(
+            markdown.contains(&format!(
+                "- Verification status: `{}`",
+                status.unwrap_or("unknown")
+            )),
+            "{status:?}: {markdown}"
+        );
+        assert!(
+            markdown.contains("- Duplicates in this batch: 2"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| remote_id | `remote-1` | 2 |"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("| accounting_fingerprint | `ab12` | 3 |"),
+            "{markdown}"
+        );
+    }
+    // A REMOTEID holding a pipe or backticks keeps its row and its code span.
+    let odd = json!([{"kind":"remote_id","remote_id":"a|b`c``d","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(
+        markdown.contains("| remote_id | ``` a\\|b`c``d ``` | 2 |"),
+        "{markdown}"
+    );
+    // A line break or a space at each end keeps the row and the text whole.
+    let odd = json!([{"kind":"remote_id","remote_id":"x\ny","count":2},
+        {"kind":"remote_id","remote_id":" z ","count":2}]);
+    let markdown = render_proof_markdown(&proof(Some("verification_incomplete"), odd));
+    assert!(markdown.contains("| remote_id | `x y` | 2 |"), "{markdown}");
+    assert!(
+        markdown.contains("| remote_id | `  z  ` | 2 |"),
+        "{markdown}"
+    );
+}
+
+/// The company name comes from Tally and is printed as a code span outside any
+/// table: a backtick run gets a longer fence, a pipe is left as it is, and a
+/// line break becomes a space, so the line stays whole (bridge#807).
+#[test]
+fn the_markdown_proof_fences_the_company_name() {
+    for (company, line) in [
+        (json!({"name":"Plain Co"}), "\n- Company: `Plain Co`\n"),
+        (
+            json!({"name":"A`B``C | D"}),
+            "\n- Company: ``` A`B``C | D ```\n",
+        ),
+        (json!({"name":"Two\nLines"}), "\n- Company: `Two Lines`\n"),
+        (json!({"name":""}), "\n- Company: `  `\n"),
+        (json!({"name":" \u{a0} "}), "\n- Company: `  \u{a0}  `\n"),
+        (json!({}), "\n- Company: `unknown`\n"),
+    ] {
+        let markdown =
+            render_proof_markdown(&json!({"batch_id":"batch-md","company":company.clone()}));
+        assert!(markdown.contains(line), "{company}: {markdown}");
+    }
+}
+
+/// Why leaving cancelled rows out of the fingerprint check (bridge#767) changes
+/// no verdict. A cancelled pair could only reach `duplicates` through a batch
+/// row with no entries, and a batch row is the one holder of its marker. So a
+/// cancelled copy A′ carrying verified A's marker, beside an unrelated cancel C
+/// of the same date and type, is refused before any duplicate check, with or
+/// without C. If that admission rule ever loosens, this fails and the verdict
+/// question must be asked again. A cancelled copy that kept its entries is not
+/// left out, so it still blocks the batch as it did before.
+#[test]
+fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
+    let input = payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-cancelled-copy".to_string(),
+        company_guid: GUID.to_string(),
+        company: None,
+        txn_ids: vec!["txn-001".to_string()],
+        date_from: "20260901".to_string(),
+        date_to: "20260901".to_string(),
+        sha256: "hash".to_string(),
+        built_at: now(),
+        status: "built".to_string(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".to_string(),
+            value: Some(10),
+            master_value: Some(7),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let posted = ReadVoucher {
+        remote_id: Some("posted-1".to_string()),
+        guid: Some("posted-guid".to_string()),
+        alter_id: Some(11),
+        date: Some("20260901".to_string()),
+        voucher_type: Some("Payment".to_string()),
+        narration: Some("[BRIDGE:txn-001]".to_string()),
+        voucher_number: None,
+        master_id: None,
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: vec![
+            ReadEntry {
+                ledger: "Expense".to_string(),
+                amount: "-12.50".to_string(),
+                is_deemed_positive: "Yes".to_string(),
+            },
+            ReadEntry {
+                ledger: "Bank".to_string(),
+                amount: "12.50".to_string(),
+                is_deemed_positive: "No".to_string(),
+            },
+        ],
+    };
+    let cancel = |guid: &str, alter_id: u64, narration: Option<&str>| ReadVoucher {
+        remote_id: Some(format!("{guid}-remote")),
+        guid: Some(guid.to_string()),
+        alter_id: Some(alter_id),
+        narration: narration.map(str::to_string),
+        cancelled: Some(true),
+        entries: Vec::new(),
+        ..posted.clone()
+    };
+    let copy = cancel("copy-guid", 5, Some("[BRIDGE:txn-001]"));
+    let unrelated = cancel("unrelated-guid", 3, None);
+    for observed in [
+        vec![posted.clone(), copy.clone(), unrelated.clone()],
+        vec![posted.clone(), copy],
+    ] {
+        assert_eq!(
+            verify_observed_batch(&line, &observed),
+            Err("import_verification_tag_ambiguous".into())
+        );
+    }
+    // With the marker only on A, the unrelated cancel does not touch the verdict.
+    let result =
+        verify_observed_batch(&line, &[posted.clone(), unrelated]).expect("verification result");
+    assert_eq!(result["duplicates"], json!([]), "{result}");
+    assert_eq!(
+        verification_status(&result, line.vouchers.len()),
+        "posted_verified"
+    );
+    // An unmarked cancelled copy that came back WITH A's entries still pairs
+    // with A: dropped entries are measured for Journals only, and a cancel that
+    // keeps them is not left out, so this verdict is what it was before #767.
+    let mut kept = cancel("kept-guid", 5, None);
+    kept.entries = posted.entries.clone();
+    let result = verify_observed_batch(&line, &[posted, kept]).expect("verification result");
+    let duplicates = result["duplicates"].as_array().unwrap();
+    assert_eq!(duplicates.len(), 1, "{result}");
+    assert_eq!(duplicates[0]["kind"], "accounting_fingerprint", "{result}");
+    assert_eq!(
+        verification_status(&result, line.vouchers.len()),
+        "verification_incomplete"
+    );
+}
+
 #[test]
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = payload();
@@ -1159,6 +1393,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     divergent.entries[0].amount = "-12.51".to_string();
     let result = verify_observed_batch(&line, &[divergent]).expect("numeric divergence");
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
+    assert_eq!(result["vouchers"][0]["alter_id"], 11);
 }
 
 #[test]
@@ -1174,7 +1409,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         company: None,
         txn_ids: vec!["txn-001".to_string()],
         date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_to: "20260902".to_string(),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1215,18 +1450,52 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
             ["vouchers"][0]["status"],
         "posted_verified"
     );
-    for (cancelled, optional) in [(Some(true), Some(false)), (Some(false), Some(true))] {
+    for (cancelled, optional, reason) in [
+        (Some(true), Some(false), "voucher_cancelled"),
+        (Some(false), Some(true), "voucher_optional"),
+        (Some(true), Some(true), "voucher_cancelled"),
+    ] {
         let mut ineffective = observed.clone();
         ineffective.cancelled = cancelled;
         ineffective.optional = optional;
         let result =
             verify_observed_batch(&line, &[ineffective]).expect("ineffective voucher result");
         assert_eq!(result["vouchers"][0]["status"], "posted_not_effective");
+        assert_eq!(result["vouchers"][0]["reason"], reason);
         assert_eq!(
             result["vouchers"][0]["not_observed"],
             json!(["effective_date"])
         );
         assert_eq!(result["counts"]["posted_not_effective"], 1);
+    }
+    // An optional voucher keeps its entries (observed once, 2026-09-26), so a
+    // change to them still diverges. A cancelled one loses them (bridge#758),
+    // so only its header is compared: the cancel alone shows no diff, and a
+    // re-date before the cancel still shows while it stays inside the read
+    // window, which is widened here to hold it.
+    let mut changed = observed.clone();
+    changed.entries[0].amount = "-12.51".to_string();
+    let mut optional = changed.clone();
+    optional.optional = Some(true);
+    let result = verify_observed_batch(&line, &[optional]).expect("changed optional voucher");
+    assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
+    let mut cancelled = changed;
+    cancelled.cancelled = Some(true);
+    cancelled.entries.clear();
+    for (date, diffs) in [("20260901", json!([])), ("20260902", json!(["date"]))] {
+        let mut redated = cancelled.clone();
+        redated.date = Some(date.to_string());
+        verification_window_identities(
+            &ImportReadSource::admit(vec![redated.clone()]).unwrap(),
+            &line.date_from,
+            &line.date_to,
+        )
+        .expect("a date the windowed read can return");
+        let result = verify_observed_batch(&line, &[redated]).expect("cancelled voucher");
+        let item = &result["vouchers"][0];
+        assert_eq!(item["status"], "posted_not_effective", "{result}");
+        assert_eq!(item["reason"], "voucher_cancelled", "{result}");
+        assert_eq!(item["diffs"], diffs, "{result}");
     }
     let mut missing = observed;
     missing.optional = None;

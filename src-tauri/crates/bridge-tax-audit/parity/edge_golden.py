@@ -20,7 +20,8 @@ builds the same book in Rust and compares whole dumps. Python 3.13 is pinned bec
 tables (15.1.0) are the ones the crate's case mapping reproduces (`src/support.rs`).
 
 Spec keys: `period` ([start, end], ISO; default the AY 2026-27 previous year), `groups` ({name:
-parent or null}), `ledgers` ([{name, chain, guid}]), `tb` ([{ledger, opening, debit, credit,
+parent or null}), `ledgers` ([{name, chain, guid, chain_complete?}], `chain_complete` a boolean, absent
+meaning true), `tb` ([{ledger, opening, debit, credit,
 closing}]), `vouchers` ([{guid, date, base_type, vtype?, number?, reference?, status?, narration?,
 masterid?, inventory?, lines: [[ledger, paise], ...]}]; `number` defaults to the GUID, so pass `""`
 to test a voucher with no number; `reference` is text, absent meaning ""; `masterid` is text, absent
@@ -36,12 +37,19 @@ to drop, e.g. ["ledger_scrutiny"]; the Rust side must map each one, see `tests/e
 `statutory_dues` ({nature_by_ledger?, salary_expense_ledgers?}), `tests`; per voucher `party`
 (PARTYLEDGERNAME, default ""); for `tds_payees`: `entity_type` (default "individual"),
 `nature_by_ledger`, `payee_aliases`, `s194j_category_by_ledger` (each default {}) and
-`previous_year_turnover_paise` (default absent); and for `tds_tcs_26as`/`twentysixas_receipts`:
+`previous_year_turnover_paise` (default absent), and the inputs the reference's pack reads from the client
+config, each through the reference's own `tae.config` reader (so each is refused as a client config would be):
+`reversals`, `gst_separate_by_agreement`, `foreseeability` (the `[tds_payees]` keys), `challans` (as
+`[[tds.challans]]`, each `date` an ISO date string), `form_26a`, `previous_year_turnover_status` and
+`goods_carriage_ledgers` (the `[tds]` keys), `deductor_activity` (`[deductor].activity`), `client_state`
+(`[client].state`), `tds_payable_ledgers` (the ledgers `[statutory_dues]` classifies as TDS payable),
+`gst_ledgers` (the `[roles].tax_ledgers` ledgers) and the keys of `partners`; and for `tds_tcs_26as`/`twentysixas_receipts`:
 `form26as`, `ais`, `tis` (invented document rows in the shape `parity/python_golden.py
 --emit-traces-documents` writes; default []) and `tds_ledgers`, `tcs_ledgers`,
 `advance_tax_ledgers`, `deductor_aliases` (default empty); and for `loans_interest`: `entity_type` and
-`previous_year_turnover_paise` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
-interest_ledger?}}, default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
+`previous_year_turnover_paise`, `previous_year_turnover_status`, `deductor_activity` and
+`tds_payable_ledgers` as for `tds_payees`, `loans` ({loan ledger: {lender, lender_type,
+interest_ledger?}}, the interest ledger one name or a list; default {}), `shared_interest_ledgers` (default []) and `net_reversals` (a boolean,
 default false: true sets the module's NET_REVERSALS switch, reaching the dormant reversal rule in `run` and
 in the module invariant alike); and for `partners_40b_194t`: `entity_type` as for `tds_payees`, `partners`
 ({key: {capital_ledgers, interest_ledger?, remuneration_ledger?}}, default {}) and `deed` (a table such as
@@ -52,13 +60,20 @@ reference's pack sets `eng.bank`; and for `high_value_register`: `bank_statement
 meaning none supplied), `ais` as above, `s194n_terms` and `round_off_ledgers` (default []),
 `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
-recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it).
+recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
+for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
+closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
+rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
+`is_integrated` (true, false, or absent/null for unknown); and for `party_monthly`: `cash`, `bank` and
+`period` as above, and `top_n` (a non-negative integer, default the module's PARTY_TOP_N; Python would slice
+a negative one from the end, which the Rust `usize` cannot express, so both sides refuse it).
 """
 from __future__ import annotations
 
 import copy
 import json
 import sys
+from types import SimpleNamespace
 from datetime import date
 from pathlib import Path
 
@@ -69,10 +84,11 @@ def main() -> int:
     engine, spec_path, out_dir = sys.argv[1], Path(sys.argv[2]), Path(sys.argv[3])
     sys.path.insert(0, str(Path(engine).resolve()))
     from tae.adapters.bank_documents import BankStatementDoc
+    from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-                                 high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, stale_balances_41_1,
-                                 statutory_dues_43b, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
+                                 high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
+                                 statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules
     from tae.model import (BankStatementRow, Book, Engagement, Group, InventoryLine, Ledger, LedgerLine, Period,
@@ -84,9 +100,6 @@ def main() -> int:
     status = {s: getattr(VoucherStatus, s.upper()) for s in STATUS}
     start, end = spec.get("period", ["2025-04-01", "2026-03-31"])
     groups = {n: Group(name=n, parent=p) for n, p in spec["groups"].items()}
-    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
-                                 chain=tuple(l["chain"]), chain_complete=True, guid=l.get("guid", ""))
-               for l in spec["ledgers"]}
     # Typed strictly, the same way tests/edge_books.rs reads them, so that a mistyped key fails on
     # both sides instead of building two different books.
     def typed(d, key, ok, what, absent=None, nullable=True):
@@ -95,6 +108,13 @@ def main() -> int:
         if not ok(d[key]):
             raise SystemExit(f"{spec_path.name}: {key} must be {what}, got {d[key]!r}")
         return d[key]
+
+    ledgers = {l["name"]: Ledger(name=l["name"], parent=l["chain"][0] if l["chain"] else "",
+                                 chain=tuple(l["chain"]),
+                                 chain_complete=typed(l, "chain_complete", lambda x: isinstance(x, bool),
+                                                      "true or false", absent=True, nullable=False),
+                                 guid=l.get("guid", ""))
+               for l in spec["ledgers"]}
 
     def integer(x):
         return isinstance(x, int) and not isinstance(x, bool)
@@ -148,10 +168,17 @@ def main() -> int:
         # canonical dump below calls check_invariants in this same process, before anything resets it.
         loans_interest.NET_REVERSALS = typed(spec, "net_reversals", lambda x: isinstance(x, bool), "true or false",
                                              absent=False, nullable=False)
+        # As tae/pack.py passes them: the deductor activity and the turnover's status through the
+        # reference's own readers, from a config built out of the spec's keys.
+        from tae import config as tc
+        cfg = {"tds": {k: spec[k] for k in ("previous_year_turnover_status",) if k in spec},
+               "deductor": {"activity": spec["deductor_activity"]} if "deductor_activity" in spec else {}}
         return loans_interest, loans_interest.run(
             eng, rules, {k: dict(v) for k, v in spec.get("loans", {}).items()},
             spec.get("previous_year_turnover_paise"), cash, bank,
-            frozenset(spec.get("shared_interest_ledgers", [])))
+            frozenset(spec.get("shared_interest_ledgers", [])),
+            tds_payable_ledgers=frozenset(spec.get("tds_payable_ledgers", [])),
+            deductor_activity=tc.deductor_activity(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg))
 
     # One runner per test an edge book may name: the module and its result, run as the reference's
     # pack runs it.
@@ -199,6 +226,62 @@ def main() -> int:
             s194n_recipient_type=recipient, round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])),
             counterparty_type_by_ledger=dict(spec.get("counterparty_types", {})))
 
+    def stock_run():
+        # As tae/pack.py: invented masters and both Stock Summaries, typed strictly as
+        # tests/edge_books.rs reads them; STK-1 gets them bound, as pack.py passes them.
+        number = lambda x: integer(x) or isinstance(x, float)
+        text = lambda x: isinstance(x, str)
+
+        def qty(d, key):
+            q = typed(d, key, number, "a number or null")
+            return None if q is None else float(q)
+
+        items = {n: StockItemMaster(name=n, guid=typed(m, "guid", text, "text", absent="", nullable=False), parent="",
+                                     base_unit=typed(m, "base_unit", text, "text", absent="", nullable=False),
+                                     opening_qty=qty(m, "opening_qty"),
+                                     opening_value_paise=typed(m, "opening_value", integer, "an integer or null"),
+                                     closing_qty=qty(m, "closing_qty"),
+                                     closing_value_paise=typed(m, "closing_value", integer, "an integer or null"))
+                 for n, m in spec.get("stock_items", {}).items()}
+
+        def snapshot(key):
+            s = spec[key]
+            return StockSnapshot(date.fromisoformat(s["as_of"]), {
+                n: StockSnapshotRow(name=n, guid="", qty=qty(r, "qty"),
+                                    value_paise=typed(r, "value", integer, "an integer or null"),
+                                    rate_paise=typed(r, "rate", integer, "an integer or null"))
+                for n, r in s["rows"].items()})
+
+        opening, closing = snapshot("stock_opening"), snapshot("stock_closing")
+        module = SimpleNamespace(TEST_ID=stock.TEST_ID, check_invariants=lambda e, res: stock.check_invariants(
+            e, res, items, closing, opening_snapshot=opening))
+        integrated = typed(spec, "is_integrated", lambda x: isinstance(x, bool), "true, false or null")
+        return module, stock.run(eng, {"version": rules.version}, items, opening, closing, integrated)
+
+    def tds_payees_run():
+        # As tae/pack.py's _tds_payees: every client-config input through the reference's own reader, from a
+        # config built out of the spec's keys.
+        from tae import config as tc
+        tds_tbl = {k: spec[k] for k in ("nature_by_ledger", "previous_year_turnover_status", "goods_carriage_ledgers",
+                                        "form_26a") if k in spec}
+        if "challans" in spec:
+            tds_tbl["challans"] = [{**c, "date": date.fromisoformat(c["date"])} if isinstance(c.get("date"), str) else c
+                                   for c in spec["challans"]]
+        cfg = {"tds": tds_tbl,
+               "tds_payees": {k: spec[k] for k in ("reversals", "gst_separate_by_agreement", "foreseeability")
+                              if k in spec},
+               "client": {"state": spec["client_state"]} if "client_state" in spec else {},
+               "deductor": {"activity": spec["deductor_activity"]} if "deductor_activity" in spec else {}}
+        return tds_payees, tds_payees.run(
+            eng, rules, dict(spec.get("nature_by_ledger", {})), dict(spec.get("payee_aliases", {})),
+            spec.get("previous_year_turnover_paise"), dict(spec.get("s194j_category_by_ledger", {})),
+            reversals=tc.tds_payees_reversals(cfg), gst_separate=tc.tds_payees_gst_separate(cfg),
+            gst_ledgers=frozenset(spec.get("gst_ledgers", [])), tds_ledgers=frozenset(spec.get("tds_payable_ledgers", [])),
+            foreseeability_names=frozenset(tc.tds_payees_foreseeability(cfg)),
+            other_names=frozenset(spec.get("partners", {})), challans=tc.tds_challans(cfg), form_26a=tc.tds_form_26a(cfg),
+            client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
+            deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
+
     runners = {
         "bank_reconciliation": bank_reconciliation_run,
         "book_keeping_quality": lambda: (book_keeping_quality, book_keeping_quality.run(
@@ -216,12 +299,15 @@ def main() -> int:
         "loans_interest": loans_interest_run,
         "partners_40b_194t": lambda: (partners_40b_194t, partners_40b_194t.run(
             eng, rules, {k: dict(v) for k, v in spec.get("partners", {}).items()}, spec.get("deed"))),
+        "party_monthly": lambda: (party_monthly, party_monthly.run(
+            eng, rules, cash, bank,
+            top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
+                        absent=party_monthly.PARTY_TOP_N, nullable=False))),
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),
-        "tds_payees": lambda: (tds_payees, tds_payees.run(
-            eng, rules, dict(spec.get("nature_by_ledger", {})), dict(spec.get("payee_aliases", {})),
-            spec.get("previous_year_turnover_paise"), dict(spec.get("s194j_category_by_ledger", {})))),
+        "stock": stock_run,
+        "tds_payees": tds_payees_run,
         "tds_tcs_26as": lambda: (tds_tcs_26as, tds_tcs_26as.run(
             eng, rules, form26as=form26as, ais_rows=ais, tis_rows=tis,
             tds_ledgers=set(spec.get("tds_ledgers", [])), tcs_ledgers=set(spec.get("tcs_ledgers", [])),

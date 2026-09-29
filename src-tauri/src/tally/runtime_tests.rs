@@ -3,9 +3,10 @@ use crate::commands::VerifiedCompanyIdentity;
 use crate::tally::TallyProduct;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
-use bridge_tally_protocol::native_outstandings::parse_native_ledger_snapshot;
+use bridge_tally_protocol::native_outstandings::{
+    compute_native_outstandings, parse_native_ledger_snapshot,
+};
 use std::collections::BTreeMap;
-use tally_protocol_simulator::Fixture;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn verified_identity(name: &str, guid: &str) -> VerifiedCompanyIdentity {
@@ -72,6 +73,8 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         balance_response_bytes: 13,
         group_response_bytes: 17,
         groups: Vec::new(),
+        foreign_currency_ledgers_excluded: Vec::new(),
+        mixed_currency_ledgers_excluded: Vec::new(),
     };
     let currency = RuntimeReadEvidence::paired("<currency/>", sha256_hex(b"currency-response"), 19);
     let baseline = TallyRuntime::party_ledger_master_source_evidence(
@@ -232,6 +235,7 @@ fn single_company_forex_ledger_capture_returns_a_typed_partial() {
             .map(|base| ClassifiedLedgerSnapshot {
                 base,
                 foreign: Vec::new(),
+                mixed: Vec::new(),
                 unobserved: 0,
             })
             .map_err(anyhow::Error::from)
@@ -247,8 +251,12 @@ fn single_company_forex_ledger_capture_returns_a_typed_partial() {
     ));
 }
 
-#[tokio::test]
-async fn single_company_read_returns_the_forex_capture_partial() {
+/// The single-company outstandings read of the captured book whose ledger
+/// snapshot holds a composite, under the currency witness `witness` builds
+/// from the scripted extent.
+async fn forex_capture_read(
+    witness: impl FnOnce(&str, &VerifiedCompanyIdentity) -> OutstandingsCurrencyWitness,
+) -> OutstandingsLoadResult {
     const EXTENT: &str = include_str!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     );
@@ -325,19 +333,68 @@ async fn single_company_read_returns_the_forex_capture_partial() {
             },
             &identity,
             TallyDate::parse("20260401").expect("captured book as-of"),
-            inr_witness_for_tests(extent, &identity),
+            witness(extent, &identity),
             OutstandingsAgeingAnchor::DueDate,
         )
         .await
         .expect("foreign-currency capture returns an in-band partial");
-
-    assert!(matches!(
-        result,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "company_foreign_currency_ledger_balance"
-                && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
-    ));
     server.await.expect("synthetic outstandings server task");
+    result
+}
+
+fn assert_forex_capture_refused(result: &OutstandingsLoadResult) {
+    assert!(
+        matches!(
+            result,
+            OutstandingsLoadResult::Partial { reason, .. }
+                if reason.reason_code == "company_foreign_currency_ledger_balance"
+                    && reason.foreign_currency_ledger_name.as_deref() == Some("FX USD Debtor 02")
+        ),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn single_company_read_returns_the_forex_capture_partial() {
+    let result =
+        forex_capture_read(|extent, identity| inr_witness_for_tests(extent, identity).into()).await;
+    assert_forex_capture_refused(&result);
+}
+
+/// bridge#642: every production outstandings read admits its currency through
+/// `admit_inr_classified`, which also admits a book with one Currency master.
+/// Such a book keeps its refusal of a composite value, as before, under that
+/// witness: the one-master INR currency capture, identified as production
+/// identifies it.
+#[tokio::test]
+async fn a_one_master_book_under_the_production_witness_keeps_its_composite_refusal() {
+    const CURRENCY: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    );
+    let currency = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        CURRENCY,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        CURRENCY.len(),
+    )
+    .expect("captured currency response decodes")
+    .text;
+    let masters =
+        bridge_tally_protocol::native_outstandings::parse_currency_master_list(&currency).unwrap();
+    assert_eq!(masters.count(), 1);
+    let result = forex_capture_read(|extent, identity| {
+        ClassifiedCompanyCurrencyRead {
+            currency_count: masters.count(),
+            identified: masters.identify_base(None),
+            extent: inr_witness_for_tests(extent, identity).currency_read_extent,
+            evidence: RuntimeReadEvidence::empty(),
+        }
+        .admit_inr_classified()
+        .expect("one INR master admits")
+        .into()
+    })
+    .await;
+    assert_forex_capture_refused(&result);
 }
 
 #[test]
@@ -1154,13 +1211,7 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
         .expect_err("a non-loopback endpoint must never be contacted");
     #[cfg(not(feature = "voucher-scan"))]
     let error = runtime
-        .fetch_operator_outstandings(
-            config,
-            &identity,
-            as_of,
-            OutstandingsCurrencyAssertion::Inr,
-            OutstandingsAgeingAnchor::DueDate,
-        )
+        .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)
         .await
         .expect_err("a non-loopback endpoint must never be contacted");
     assert!(
@@ -1480,170 +1531,15 @@ fn ordinary_read_admission_and_review_reservation_are_mutually_exclusive() {
         .reserve_cached_probe_fresh(&config, "review-lease", 300_000)
         .expect("reserve after read")
         .expect("fresh review");
-    assert!(runtime.begin_ordinary_read(&config).is_err());
-    assert!(reservation.authorize(&runtime, &config).is_ok());
-    assert!(reservation
-        .authorize(
-            &runtime,
-            &TallyConfig {
-                host: "127.0.0.2".to_string(),
-                port: 9004,
-            },
-        )
-        .is_err());
-}
-
-#[tokio::test]
-async fn qualification_rejects_a_reservation_from_another_runtime_before_dispatch() {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind cross-runtime qualification server");
-    let address = listener.local_addr().expect("qualification server address");
-    let config = TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    };
-    let owner_runtime = TallyRuntime::default();
-    let executing_runtime = TallyRuntime::default();
-    let session = owner_runtime
-        .session(config.clone())
-        .expect("owner runtime session");
-    let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-cross-runtime".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    drop(session);
-    let reservation = owner_runtime
-        .reserve_cached_probe_fresh(&config, "review-cross-runtime", 300_000)
-        .expect("reserve owner review")
-        .expect("fresh owner review");
-
-    let error = executing_runtime
-        .qualify_selected_ledgers(
-            config,
-            &reservation,
-            &verified_identity("Synthetic Company", "synthetic-guid"),
-        )
-        .await
-        .expect_err("another runtime must not borrow the reservation");
-    assert!(error
-        .to_string()
-        .contains("reviewed setup operation ownership changed"));
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_millis(50), listener.accept(),)
-            .await
-            .is_err()
+    let refused = runtime
+        .begin_ordinary_read(&config)
+        .err()
+        .expect("an ordinary read is refused while a review is reserved");
+    assert_eq!(
+        refused.to_string(),
+        "Tally reviewed setup operation is in progress"
     );
-}
-
-#[tokio::test]
-async fn production_identity_bracket_rechecks_the_tuple_around_selected_ledger_qualification() {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind qualification server");
-    let address = listener.local_addr().expect("qualification server address");
-    let company_list = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="BRIDGE SYNTHETIC BOOK"><GUID TYPE="String">00000000-0000-4000-8000-000000000001</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
-    let ledger_export = Fixture::NormalExport.body().into_owned();
-    let server = tokio::spawn(async move {
-        let mut requests = Vec::new();
-        for body in [
-            company_list.to_string(),
-            company_list.to_string(),
-            ledger_export,
-            company_list.to_string(),
-        ] {
-            let (mut socket, _) = listener.accept().await.expect("accept reserved read");
-            let request = read_http_request(&mut socket).await;
-            assert!(request.starts_with(b"POST /"));
-            requests.push(request);
-            socket
-                .write_all(&utf16_xml_response(body))
-                .await
-                .expect("write reserved read response");
-        }
-        requests
-    });
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-qualified-tuple".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    drop(session);
-    let reservation = runtime
-        .reserve_cached_probe_fresh(&config, "review-qualified-tuple", 300_000)
-        .expect("reserve reviewed setup")
-        .expect("fresh review");
-
-    let ordinary_read = runtime
-        .fetch_companies(config.clone())
-        .await
-        .expect_err("ordinary reads must remain blocked by the reservation");
-    assert!(ordinary_read
-        .to_string()
-        .contains("reviewed setup operation is in progress"));
-    let companies = runtime
-        .fetch_companies_for_reservation(config.clone(), &reservation)
-        .await
-        .expect("reservation owner may recheck company tuple");
-    assert_eq!(companies.len(), 1);
-    let identity = VerifiedCompanyIdentity::from_observed_companies(
-        "BRIDGE SYNTHETIC BOOK".to_string(),
-        "00000000-0000-4000-8000-000000000001".to_string(),
-        "100001".to_string(),
-        "20260401".to_string(),
-        &[TallyCompany {
-            name: "BRIDGE SYNTHETIC BOOK".to_string(),
-            guid: Some("00000000-0000-4000-8000-000000000001".to_string()),
-            company_number: Some("100001".to_string()),
-            books_from: Some("20260401".to_string()),
-        }],
-    )
-    .expect("synthetic qualification identity is complete");
-    let observation = runtime
-        .qualify_selected_ledgers(config, &reservation, &identity)
-        .await
-        .expect("qualification must run after the reserved tuple recheck");
-    assert_eq!(observation.result_bucket, "non_empty_observed");
-    let requests = server.await.expect("finish reserved qualification server");
-    assert_eq!(requests.len(), 4);
-    let decoded = requests
-        .iter()
-        .map(|request| {
-            let body_start = request
-                .windows(4)
-                .position(|bytes| bytes == b"\r\n\r\n")
-                .expect("request has complete HTTP headers")
-                + 4;
-            bridge_tally_protocol::decode_tally_text_bytes_limited(
-                &request[body_start..],
-                request.len() - body_start,
-            )
-            .expect("decode dispatched Tally request")
-            .text
-        })
-        .collect::<Vec<_>>();
-    for (index, request) in [0, 1, 3].into_iter().map(|index| (index, &decoded[index])) {
-        assert!(
-            request.contains("<TYPE>Collection</TYPE>"),
-            "request {index}"
-        );
-        assert!(request.contains("<TYPE>Company</TYPE>"), "request {index}");
-        assert!(!request.contains("<SVCURRENTCOMPANY>"), "request {index}");
-    }
-    assert!(decoded[2].contains("<SVCURRENTCOMPANY>BRIDGE SYNTHETIC BOOK</SVCURRENTCOMPANY>"));
+    drop(reservation);
 }
 
 #[test]
@@ -1707,62 +1603,6 @@ async fn aborting_a_task_drops_and_releases_its_review_reservation() {
     assert!(runtime
         .reserve_cached_probe_fresh(&config, "review-abort", 300_000)
         .expect("reserve after abort")
-        .is_some());
-}
-
-#[tokio::test]
-async fn aborting_pending_qualification_releases_review_and_active_request() {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind pending qualification server");
-    let address = listener.local_addr().expect("pending server address");
-    let (accepted_tx, accepted_rx) = tokio::sync::oneshot::channel();
-    let server = tokio::spawn(async move {
-        let (_socket, _) = listener.accept().await.expect("accept qualification");
-        accepted_tx.send(()).expect("announce accepted request");
-        std::future::pending::<()>().await;
-    });
-    let runtime = Arc::new(TallyRuntime::default());
-    let config = TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-pending".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    drop(session);
-    let task_runtime = Arc::clone(&runtime);
-    let task_config = config.clone();
-    let task = tokio::spawn(async move {
-        let reservation = task_runtime
-            .reserve_cached_probe_fresh(&task_config, "review-pending", 300_000)
-            .expect("reserve pending review")
-            .expect("fresh pending review");
-        let _ = task_runtime
-            .qualify_selected_ledgers(
-                task_config,
-                &reservation,
-                &verified_identity("Synthetic Company", "synthetic-guid"),
-            )
-            .await;
-    });
-    accepted_rx.await.expect("qualification reached server");
-    task.abort();
-    let _ = task.await;
-    server.abort();
-    let snapshots = runtime.snapshots().expect("runtime snapshots after abort");
-    assert_eq!(snapshots.len(), 1);
-    assert_eq!(snapshots[0].active_requests, 0);
-    assert!(snapshots[0].active_request_ids.is_empty());
-    assert!(runtime
-        .reserve_cached_probe_fresh(&config, "review-pending", 300_000)
-        .expect("reserve after pending abort")
         .is_some());
 }
 
@@ -1960,85 +1800,4 @@ fn telemetry_preview_is_privacy_reduced_and_checksummed() {
         "fixed_dimensions_bucketed_values_v1"
     );
     assert_eq!(preview_value["authenticity_claim"], "none");
-}
-
-/// Both selected-read qualifiers send a custom report whose TDL Education
-/// answers with a blocking dialog on the Tally screen (bridge#45). When the
-/// identity bracket before it reports Education, the qualifier refuses before
-/// sending: only that one company-list request reaches the endpoint.
-#[tokio::test]
-async fn selected_read_qualification_is_refused_before_sending_in_education() {
-    for vouchers in [false, true] {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind qualification server");
-        let address = listener.local_addr().expect("qualification server address");
-        let company_list = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="BRIDGE SYNTHETIC BOOK"><GUID TYPE="String">00000000-0000-4000-8000-000000000001</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM><EDUMODE TYPE="Logical">Yes</EDUMODE></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
-        let server = tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.expect("accept identity bracket");
-            let request = read_http_request(&mut socket).await;
-            socket
-                .write_all(&utf16_xml_response(company_list))
-                .await
-                .expect("write identity bracket response");
-            drop(listener);
-            request
-        });
-        let runtime = TallyRuntime::default();
-        let config = TallyConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        };
-        let session = runtime.session(config.clone()).expect("runtime session");
-        let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-        *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-            review_id: "review-education".to_string(),
-            observed_at_unix_ms,
-            freshness_origin_unix_ms: observed_at_unix_ms,
-            result: synthetic_probe_result(),
-            reserved: false,
-        });
-        drop(session);
-        let reservation = runtime
-            .reserve_cached_probe_fresh(&config, "review-education", 300_000)
-            .expect("reserve reviewed setup")
-            .expect("fresh review");
-        let identity = VerifiedCompanyIdentity::from_observed_companies(
-            "BRIDGE SYNTHETIC BOOK".to_string(),
-            "00000000-0000-4000-8000-000000000001".to_string(),
-            "100001".to_string(),
-            "20260401".to_string(),
-            &[TallyCompany {
-                name: "BRIDGE SYNTHETIC BOOK".to_string(),
-                guid: Some("00000000-0000-4000-8000-000000000001".to_string()),
-                company_number: Some("100001".to_string()),
-                books_from: Some("20260401".to_string()),
-            }],
-        )
-        .expect("synthetic qualification identity is complete");
-        let refused = if vouchers {
-            runtime
-                .qualify_selected_vouchers(
-                    config,
-                    &reservation,
-                    &identity,
-                    "20260401".to_string(),
-                    "20260430".to_string(),
-                )
-                .await
-        } else {
-            runtime
-                .qualify_selected_ledgers(config, &reservation, &identity)
-                .await
-        }
-        .expect_err("Education refuses the report before it is sent");
-        assert!(
-            refused
-                .chain()
-                .any(|cause| cause.is::<EducationReportFamilyRefusal>()),
-            "{vouchers}: {refused:#}"
-        );
-        let request = server.await.expect("identity bracket server");
-        assert!(request.starts_with(b"POST /"), "{vouchers}");
-    }
 }

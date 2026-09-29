@@ -178,7 +178,12 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             .unwrap()
             .generation;
         server
-            .persist_import_verification(&json!({"batch_id":line.batch_id}), &line, generation)
+            .persist_import_verification(
+                &json!({"batch_id":line.batch_id}),
+                &line,
+                VerificationStatus::VerificationIncomplete,
+                generation,
+            )
             .unwrap();
         let paths = [
             server.settings.data_dir.join("agent-import-ledger.jsonl"),

@@ -117,6 +117,7 @@ async fn an_approved_review_is_recorded_once_and_changes_no_verdict() {
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["operator_review"]["state"], "current", "{response}");
     assert_eq!(approval.reviews().len(), 1, "{response}");
+    assert_eq!(approval.review_counts(), [1], "{response}");
     assert!(approval.previews().is_empty(), "no post dialog: {response}");
     let review = &approval.reviews()[0];
     assert!(review.contains("Cash"), "the doubt is shown: {review}");
@@ -679,6 +680,134 @@ fn dispatched_batch(server: &Server) -> ImportLedgerLine {
     line
 }
 
+/// A single Payment Bridge posted, captured (fixtures `wa1-payment-*`, one
+/// `verify_import`): its debit reads back from Tally as `-1.00`, with the
+/// trailing zeros the post dialog showed.
+const WA1_BATCH: &str = "bridge-78ce4328-9c2a-4827-8584-821d6d656b40";
+
+/// That readback, in the captured order, as [`d3_batch_readback`] reads the
+/// batch's.
+fn wa1_payment_readback() -> Vec<ScenarioPlan> {
+    let extent = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-company-extent.utf16le.xml"
+    ));
+    let high_water = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-company-high-water.utf16le.xml"
+    ));
+    let census = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-voucher-census.utf16le.xml"
+    ));
+    let readback = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-import-verification.utf16le.xml"
+    ));
+    "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
+        .chars()
+        .map(|step| match step {
+            'S' => status(),
+            'E' => xml(extent.clone()),
+            'H' => xml(high_water.clone()),
+            'C' => xml(census.clone()),
+            _ => xml(readback.clone()),
+        })
+        .collect()
+}
+
+/// The sha256 of each request that capture carried, in the same order; `None`
+/// for the status probe. The extent and high-water requests are the d3
+/// capture's too.
+fn wa1_payment_requests() -> Vec<Option<&'static str>> {
+    "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
+        .chars()
+        .map(|step| match step {
+            'S' => None,
+            'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
+            'H' => Some("0930288f6eb531926d018cc4762288084831b8fad16a554e48fafbd694e245c2"),
+            'C' => Some("bad372eab88eed8009e302e573309d34aba6edf3fdb2da8a6b4bc2b1330ec7eb"),
+            _ => Some("a29a7448361733300968450db07bbbbc0754fd8eac8901decc1fc94510bc6955"),
+        })
+        .collect()
+}
+
+/// The review shows each entry of the voucher exactly as the post dialog
+/// showed it for the same voucher (#730): the post dialog's lines, rendered
+/// from the post's own journal, are each a line of the review, read back from
+/// Tally's capture. Tally sent the debit as `-1.00`, so this proves the sign
+/// and the digits: a canonical negation would read `Dr 1`.
+#[tokio::test]
+async fn the_review_shows_each_entry_as_the_post_dialog_did() {
+    let mut plans = wa1_payment_readback();
+    plans.extend(wa1_payment_readback());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let origin =
+        super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-journal.jsonl"
+        )
+        .replace("http://127.0.0.1:9102", &origin),
+    )
+    .unwrap();
+    let imports = server.imports_dir().unwrap();
+    fs::write(
+        imports.join(format!("{WA1_BATCH}.xml")),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-import.xml"
+        ),
+    )
+    .unwrap();
+    for record in ["masters_check", "masters_doubt"] {
+        fs::write(imports.join(format!("{WA1_BATCH}.{record}.json")), DOUBT).unwrap();
+    }
+    let line = server
+        .import_ledger()
+        .unwrap()
+        .into_iter()
+        .find(|line| line.batch_id == WA1_BATCH)
+        .unwrap();
+    let post = admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":WA1_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.reviews().len(), 1, "{response}");
+    let review = &approval.reviews()[0];
+    let entries = post
+        .lines()
+        .filter(|line| line.starts_with("Dr ") || line.starts_with("Cr "))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        entries,
+        ["Dr 1.00  \"Test Expense B\"", "Cr 1.00  \"Cash\""],
+        "{post}"
+    );
+    for entry in entries {
+        assert!(
+            review.lines().any(|line| line == entry),
+            "{entry}: {review}"
+        );
+    }
+    // Every request Bridge sent is the one the capture answered.
+    let requests = sent(simulator);
+    let expected = [wa1_payment_requests(), wa1_payment_requests()].concat();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
+}
+
 /// A batch of several vouchers with no doubt recorded is refused before any
 /// request: there is nothing to review. (Before batch reviews, slice D2b,
 /// any batch was refused here as `ack_batch_not_posted`.)
@@ -725,6 +854,291 @@ async fn a_batch_step_review_left_pending_is_refused_before_any_request() {
     assert!(sent(simulator).is_empty());
 }
 
+/// A doubt whose own file cannot be written (#722): the write is made to fail
+/// by a directory standing where the file goes. The check record keeps the
+/// doubt and says why no review can find it, and a review of that doubt is
+/// refused before any request, for each kind. The control is the same doubt
+/// with its file written, whose check record carries no mark; that such a
+/// doubt reads as reviewable is the unit tests' control.
+#[tokio::test]
+async fn a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request() {
+    let changed = json!({"state":"posted_under_changed_masters","ledgers":["Cash"]});
+    let step =
+        json!({"before":10,"after":13,"step":3,"reported_created":2,"matches_created":false});
+    for (kind, blocked) in [
+        ("masters", "masters_doubt.json"),
+        ("batch_step", "batch_step_doubt.json"),
+    ] {
+        for write_fails in [true, false] {
+            let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+            let directory = tempfile::tempdir().unwrap();
+            let server = server_at(simulator.address(), directory.path());
+            let line = dispatched_batch(&server);
+            let imports = server.imports_dir().unwrap();
+            server
+                .record_post_checks_pending(&line.batch_id, true)
+                .unwrap();
+            let doubt_path = imports.join(format!("{}.{blocked}", line.batch_id));
+            if write_fails {
+                block(doubt_path.clone());
+            }
+            // In the post's own order: the step verdict, then the masters
+            // verdict, which rewrites the check record around the step.
+            let (step, masters) = if kind == "masters" {
+                (json!({"matches_created":true}), changed.clone())
+            } else {
+                (step.clone(), json!({"state":"unchanged"}))
+            };
+            server.record_batch_step_verdict(&line.batch_id, &step);
+            server.record_masters_verdict_for(&line.batch_id, masters, true);
+            if write_fails {
+                fs::remove_dir_all(&doubt_path).unwrap();
+            }
+            assert_eq!(doubt_path.is_file(), !write_fails, "{kind}");
+            let check: Value = serde_json::from_slice(
+                &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
+            )
+            .unwrap();
+            let verdict = if kind == "masters" {
+                &check
+            } else {
+                &check["batch_step"]
+            };
+            // The verdict recorded is the doubt itself, for either kind.
+            assert_eq!(
+                verdict["state"],
+                if kind == "masters" {
+                    "posted_under_changed_masters"
+                } else {
+                    "unmatched"
+                },
+                "{kind}: {check}"
+            );
+            assert_eq!(
+                verdict["doubt_record"],
+                if write_fails {
+                    json!("unavailable")
+                } else {
+                    Value::Null
+                },
+                "{kind}: {check}"
+            );
+            // Marked or not, the verdict is still doubt.
+            let expected = if kind == "masters" {
+                "posted_under_changed_masters"
+            } else {
+                "batch_step_unconfirmed"
+            };
+            assert_eq!(
+                post_doubt(
+                    read_masters_check(&imports, &line.batch_id).as_ref(),
+                    line.vouchers.len()
+                )
+                .map(|(code, _)| code),
+                Some(expected),
+                "{kind}: {check}"
+            );
+            if !write_fails {
+                continue;
+            }
+            let response = acknowledge(
+                &server,
+                json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":kind}),
+                ScriptedApproval::approving(),
+            )
+            .await;
+            assert_eq!(
+                response["structuredContent"]["result"]["error"]["code"],
+                "ack_doubt_record_unavailable",
+                "{kind}: {response}"
+            );
+            assert!(sent(simulator).is_empty(), "{kind}: no request");
+        }
+    }
+}
+
+/// With no doubt named, a batch whose masters doubt is held only by the check
+/// record, beside a step doubt with its own file, needs a name; one whose two
+/// doubts are both held only by the check record is refused as unavailable,
+/// since no name could be reviewed. Either way, before any request.
+#[tokio::test]
+async fn an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any_request() {
+    let changed = json!({"state":"posted_under_changed_masters","ledgers":["Cash"]});
+    let step =
+        json!({"before":10,"after":13,"step":3,"reported_created":2,"matches_created":false});
+    for (step_file_fails, code) in [
+        (false, "ack_doubt_ambiguous"),
+        (true, "ack_doubt_record_unavailable"),
+    ] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let line = dispatched_batch(&server);
+        let imports = server.imports_dir().unwrap();
+        server
+            .record_post_checks_pending(&line.batch_id, true)
+            .unwrap();
+        let masters_doubt = imports.join(format!("{}.masters_doubt.json", line.batch_id));
+        let step_doubt = imports.join(format!("{}.batch_step_doubt.json", line.batch_id));
+        block(masters_doubt.clone());
+        if step_file_fails {
+            block(step_doubt.clone());
+        }
+        server.record_batch_step_verdict(&line.batch_id, &step);
+        server.record_masters_verdict_for(&line.batch_id, changed.clone(), true);
+        fs::remove_dir_all(&masters_doubt).unwrap();
+        if step_file_fails {
+            fs::remove_dir_all(&step_doubt).unwrap();
+        }
+        assert_eq!(step_doubt.is_file(), !step_file_fails, "{code}");
+        // The check record holds both doubts, each marked when its file failed.
+        let check: Value = serde_json::from_slice(
+            &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
+        assert_eq!(check["doubt_record"], "unavailable", "{check}");
+        assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
+        assert_eq!(
+            check["batch_step"]["doubt_record"],
+            if step_file_fails {
+                json!("unavailable")
+            } else {
+                Value::Null
+            },
+            "{check}"
+        );
+        let response = acknowledge(
+            &server,
+            json!({"company_guid":GUID,"batch_id":line.batch_id}),
+            ScriptedApproval::approving(),
+        )
+        .await;
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], code, "{response}");
+        if code == "ack_doubt_ambiguous" {
+            assert_eq!(error["cause"], "masters_and_batch_step", "{response}");
+        }
+        assert!(sent(simulator).is_empty(), "{code}: no request");
+    }
+}
+
+/// A masters review was recorded while its doubt file existed; that file was
+/// later lost, and the step doubt's own file was never written. An unnamed
+/// review is refused as unavailable before any request, where master before
+/// #769 asked for a name (`ack_doubt_ambiguous`), and a review naming
+/// `masters` is refused the same way, where before #770 the stale review
+/// answered `ack_already_recorded`.
+#[tokio::test]
+async fn two_doubts_without_their_files_are_refused_named_or_not() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let line = dispatched_batch(&server);
+    let imports = server.imports_dir().unwrap();
+    server
+        .record_post_checks_pending(&line.batch_id, true)
+        .unwrap();
+    let step_doubt = imports.join(format!("{}.batch_step_doubt.json", line.batch_id));
+    block(step_doubt.clone());
+    server.record_batch_step_verdict(
+        &line.batch_id,
+        &json!({"before":10,"after":13,"step":3,"reported_created":2,"matches_created":false}),
+    );
+    server.record_masters_verdict_for(
+        &line.batch_id,
+        json!({"state":"posted_under_changed_masters","ledgers":["Cash"]}),
+        true,
+    );
+    fs::remove_dir_all(&step_doubt).unwrap();
+    let masters_doubt = imports.join(format!("{}.masters_doubt.json", line.batch_id));
+    assert!(masters_doubt.is_file(), "the masters doubt was written");
+    // The check record holds both doubts: the masters one unmarked, since its
+    // file was written, and the step one marked, since its file was not.
+    let check: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{}.masters_check.json", line.batch_id))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(check["state"], "posted_under_changed_masters", "{check}");
+    assert_eq!(check["doubt_record"], Value::Null, "{check}");
+    assert_eq!(check["batch_step"]["state"], "unmatched", "{check}");
+    assert_eq!(
+        check["batch_step"]["doubt_record"], "unavailable",
+        "{check}"
+    );
+    // A review of it recorded, then its doubt file lost.
+    fs::write(
+        imports.join(format!("{}.masters_ack.json", line.batch_id)),
+        b"{}",
+    )
+    .unwrap();
+    fs::remove_file(&masters_doubt).unwrap();
+    for args in [
+        json!({"company_guid":GUID,"batch_id":line.batch_id}),
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"masters"}),
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"batch_step"}),
+    ] {
+        let response = acknowledge(&server, args.clone(), ScriptedApproval::approving()).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"],
+            "ack_doubt_record_unavailable",
+            "{args}: {response}"
+        );
+    }
+    assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// One voucher's doubt recorded only in the check record is refused before
+/// any request, never as no doubt: no read can bring its file back (#770).
+#[tokio::test]
+async fn a_doubt_recorded_only_in_the_check_record_is_refused() {
+    let marked = br#"{"state":"posted_under_changed_masters","ledgers":["Cash"],"doubt_record":"unavailable"}"#;
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(&simulator, directory.path(), clean(), Some(marked), None);
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(!ack_path(&server).exists(), "nothing written");
+    assert!(sent(simulator).is_empty(), "no request");
+}
+
+/// A review recorded while its doubt file existed, the file then lost: the
+/// doubt is refused as unavailable before any request, not answered
+/// `ack_already_recorded` by the stale review, which would leave it
+/// unreviewable for good (#770). The check record carries no mark, since the
+/// file was written and lost later.
+#[tokio::test]
+async fn a_review_left_by_a_lost_doubt_file_does_not_answer_for_it() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
+        clean(),
+        Some(DOUBT.as_bytes()),
+        None,
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let outcome = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        outcome["structuredContent"]["result"]["error"]["code"], "ack_doubt_record_unavailable",
+        "{outcome}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert_eq!(
+        fs::read(ack_path(&server)).unwrap(),
+        b"{}",
+        "the record is kept"
+    );
+    assert!(sent(simulator).is_empty(), "no request");
+}
+
 /// The live batch post of slice D3 (a licensed TallyPrime 7.1 Silver lab, 50
 /// Journals on a synthetic company), as the journal and saved file recorded it.
 const D3_BATCH: &str = "bridge-1e5b2cd7-f5c6-4d51-adc9-53a4dfa370bb";
@@ -735,18 +1149,31 @@ const D3_GUID: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
 /// (`H`), the voucher census (`C`) and the import verification read (`V`),
 /// each response as Tally sent it (fixtures `d3-batch-*`, one capture).
 fn d3_batch_readback() -> Vec<ScenarioPlan> {
-    let extent = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
-    ));
-    let high_water = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
-    ));
-    let census = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
-    ));
-    let readback = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
-    ));
+    d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
+        ),
+    ])
+}
+
+/// One `verify_import` of that batch in the captured order, answered from one
+/// capture's extent, high-water, census and verification responses.
+fn d3_readback_of([extent, high_water, census, readback]: [&[u8]; 4]) -> Vec<ScenarioPlan> {
+    let (extent, high_water, census, readback) = (
+        captured(extent),
+        captured(high_water),
+        captured(census),
+        captured(readback),
+    );
     "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
         .chars()
         .map(|step| match step {
@@ -774,6 +1201,30 @@ fn d3_batch_requests() -> Vec<Option<&'static str>> {
         .collect()
 }
 
+/// A server holding the D3 post's journal and saved file as written, with the
+/// journal's origin moved to the simulator (a dispatched batch verifies only
+/// on the origin it recorded).
+fn d3_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Server {
+    let server = server_at(simulator.address(), directory);
+    let origin =
+        super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    fs::write(
+        directory.join("agent-import-ledger.jsonl"),
+        include_str!("../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-journal.jsonl")
+            .replace("http://127.0.0.1:9001", &origin),
+    )
+    .unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{D3_BATCH}.xml")),
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import.xml"),
+    )
+    .unwrap();
+    server
+}
+
 /// A person reviews the doubted 50-voucher batch through the whole path: the
 /// read, the dialog, the second read and the write. The record binds every
 /// voucher as Tally holds it, in batch order, and a later readback reports it
@@ -786,21 +1237,8 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
     plans.extend(d3_batch_readback());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
-    let origin =
-        super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
-    fs::write(
-        directory.path().join("agent-import-ledger.jsonl"),
-        include_str!("../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-journal.jsonl")
-            .replace("http://127.0.0.1:9001", &origin),
-    )
-    .unwrap();
+    let server = d3_server(&simulator, directory.path());
     let imports = server.imports_dir().unwrap();
-    fs::write(
-        imports.join(format!("{D3_BATCH}.xml")),
-        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import.xml"),
-    )
-    .unwrap();
     let step = json!({"state":"unmatched","target_voucher_step":{
         "before":1419,"after":1470,"step":51,"reported_created":50,"matches_created":false}});
     fs::write(
@@ -825,6 +1263,8 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
         "{response}"
     );
     assert_eq!(approval.reviews().len(), 1, "{response}");
+    // The dialog's title names the fifty vouchers it shows (#746).
+    assert_eq!(approval.review_counts(), [50], "{response}");
     let review = &approval.reviews()[0];
     for shown in [
         "Record that you reviewed 50 vouchers in \"BRIDGE AMEND LAB\"",
@@ -903,4 +1343,713 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
             Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
         }
     }
+}
+
+/// The same batch read back after a person cancelled D3-003 in Tally's own
+/// screen (Alt+X), captured at the wire in one run (fixtures `d3-cancelled-*`).
+/// Tally keeps the cancelled voucher's number and marker but drops its ledger
+/// entries, so its content can never match the build; it must still read as
+/// cancelled, not as a content change (bridge#758).
+#[tokio::test]
+async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+        ),
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_not_effective"], 1, "{verified}");
+    assert_eq!(result["counts"]["posted_divergent"], 0, "{verified}");
+    assert_eq!(result["counts"]["posted_verified"], 49, "{verified}");
+    // The one voucher not verified is D3-003, reported as cancelled.
+    assert_eq!(
+        result["unverified_vouchers"],
+        json!([{"bridge_txn_id":"D3-003","status":"posted_not_effective","marker":"narration_tag",
+            "reason":"voucher_cancelled","diffs":[],"voucher_number":"3",
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-00000550","master_id":"1360","alter_id":1685}]),
+        "{verified}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{verified}"
+    );
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{D3_BATCH}.proof.md")),
+    )
+    .unwrap();
+    assert!(
+        markdown
+            .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("| D3-003 | posted_not_effective |"),
+        "{markdown}"
+    );
+
+    // Every request Bridge sent is the one the capture answered.
+    let requests = sent(simulator);
+    let expected = d3_batch_requests();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
+}
+
+/// Add a synthetic, unmarked voucher to one captured response: a copy of
+/// D3-005 under a new GUID, MASTERID and AlterID, with Bridge's marker removed
+/// from its narration. It is not live evidence. Its IDs are arbitrary, chosen
+/// only to be unused in the capture: AlterID 1419 with MASTERID 1998 is not a
+/// pair Tally would produce for a voucher entered again by hand. The outcome
+/// does not depend on them, since D3-005 itself matches by its marker.
+fn with_d3_005_copy(bytes: &[u8]) -> Vec<u8> {
+    let text = captured(bytes);
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000552</GUID>";
+    assert_eq!(text.matches(guid).count(), 1);
+    let start = text[..text.find(guid).unwrap()].rfind("<VOUCHER ").unwrap();
+    let end = start + text[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    let original = &text[start..end];
+    let mut copy = original
+        .replace("-00000552", "-000009f5")
+        .replace(
+            "<MASTERID TYPE=\"Number\"> 1362</MASTERID>",
+            "<MASTERID TYPE=\"Number\"> 1998</MASTERID>",
+        )
+        .replace(
+            "<ALTERID TYPE=\"Number\"> 1424</ALTERID>",
+            "<ALTERID TYPE=\"Number\"> 1419</ALTERID>",
+        );
+    if let Some(marker) = copy.find(" [BRIDGE:") {
+        let close = marker + copy[marker..].find(']').unwrap() + 1;
+        copy.replace_range(marker..close, "");
+    }
+    for field in ["-000009f5", "1998</MASTERID>", "1419</ALTERID>"] {
+        assert!(copy.contains(field), "{field}: {copy}");
+    }
+    assert!(!copy.contains("[BRIDGE:"), "{copy}");
+    format!("{}\n    {copy}{}", &text[..end], &text[end..])
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect()
+}
+
+/// A batch the accountant imported by hand (the D3 journal with its dispatch
+/// records left out), read back with all 50 vouchers matching and a synthetic
+/// unmarked copy of D3-005 beside them. The JSON says verification_incomplete
+/// for the duplicate. The Markdown proof must say so too, and must not read as
+/// a clean post (bridge#804).
+#[tokio::test]
+async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown() {
+    let census = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
+    ));
+    let readback = with_d3_005_copy(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
+        ),
+        &census,
+        &readback,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    // Keep only the built batch and its first verification: no dispatch.
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    let lines = fs::read_to_string(&journal).unwrap();
+    let kept = lines
+        .lines()
+        .filter(|line| !line.contains("\"record_type\":\"dispatch_"))
+        .take(2)
+        .collect::<Vec<_>>();
+    assert_eq!(kept.len(), 2);
+    assert!(
+        !kept.iter().any(|line| line.contains("dispatch")),
+        "{kept:?}"
+    );
+    fs::write(&journal, format!("{}\n", kept.join("\n"))).unwrap();
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_verified"], 50, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    let duplicates = result["duplicates"].as_array().unwrap();
+    assert_eq!(duplicates.len(), 1, "{verified}");
+    assert_eq!(
+        duplicates[0]["kind"], "accounting_fingerprint",
+        "{verified}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{verified}"
+    );
+    let markdown = fs::read_to_string(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{D3_BATCH}.proof.md")),
+    )
+    .unwrap();
+    assert!(
+        markdown.contains("this report does not confirm posting"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Verification status: `verification_incomplete`"),
+        "{markdown}"
+    );
+    assert!(
+        markdown.contains("- Duplicates in this batch: 1"),
+        "{markdown}"
+    );
+    let fingerprint = duplicates[0]["fingerprint_sha256"].as_str().unwrap();
+    assert!(
+        markdown.contains(&format!("| accounting_fingerprint | `{fingerprint}` | 2 |")),
+        "{markdown}"
+    );
+}
+
+/// The same capture with D3-004 read as cancelled too, derived in memory: its
+/// `ISCANCELLED` and ledger entries as the captured D3-003 cancel reads them,
+/// every other field as captured for D3-004. That is a state Tally would not
+/// produce (a cancel also raised D3-003's AlterID), kept so the census still
+/// counts it; the second cancel is synthetic, not live evidence. Two cancelled
+/// Journals of one date share a fingerprint with no entries, which says nothing
+/// about their content, so they are not duplicates (bridge#767).
+#[tokio::test]
+async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
+    let readback = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+    ));
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000551</GUID>";
+    assert_eq!(readback.matches(guid).count(), 1);
+    let start = readback[..readback.find(guid).unwrap()]
+        .rfind("<VOUCHER ")
+        .unwrap();
+    let end = start + readback[start..].find("</VOUCHER>").unwrap();
+    let block = &readback[start..end];
+    assert!(
+        block.contains("<VOUCHERNUMBER>4</VOUCHERNUMBER>"),
+        "{block}"
+    );
+    let effective = r#"<ISCANCELLED TYPE="Logical">No</ISCANCELLED>"#;
+    assert_eq!(block.matches(effective).count(), 1, "{block}");
+    let first_entry = block.find("<ALLLEDGERENTRIES.LIST>").unwrap();
+    let closing = "</ALLLEDGERENTRIES.LIST>";
+    let after_entries = block.rfind(closing).unwrap() + closing.len();
+    let cancelled_block = format!(
+        "{}<ALLLEDGERENTRIES.LIST>     </ALLLEDGERENTRIES.LIST>{}",
+        block[..first_entry].replace(
+            effective,
+            r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#
+        ),
+        &block[after_entries..]
+    );
+    let derived = format!(
+        "{}{cancelled_block}{}",
+        &readback[..start],
+        &readback[end..]
+    );
+    assert_eq!(
+        derived
+            .matches(r#"<ISCANCELLED TYPE="Logical">Yes</ISCANCELLED>"#)
+            .count(),
+        2
+    );
+    let derived = derived
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
+        ),
+        &derived,
+    ])))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        )
+        .await;
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(result["counts"]["posted_not_effective"], 2, "{verified}");
+    assert_eq!(result["counts"]["posted_verified"], 48, "{verified}");
+    let unverified = result["unverified_vouchers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| (row["bridge_txn_id"].as_str(), row["reason"].as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unverified,
+        [
+            (Some("D3-003"), Some("voucher_cancelled")),
+            (Some("D3-004"), Some("voucher_cancelled"))
+        ],
+        "{verified}"
+    );
+    assert_eq!(result["duplicates"], json!([]), "{verified}");
+    assert_eq!(
+        result["unrelated_duplicates_in_window"],
+        json!([]),
+        "{verified}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{verified}"
+    );
+    let requests = sent(simulator);
+    let expected = d3_batch_requests();
+    assert_eq!(requests.len(), expected.len(), "{requests:?}");
+    for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
+        match expected {
+            None => assert_eq!(request.method, "GET", "request {index}"),
+            Some(sha256) => assert_eq!(request.request_body_sha256, sha256, "request {index}"),
+        }
+    }
+}
+
+/// A paired read of `catalogue`, bracketed the way the D3 capture brackets its
+/// reads, with its company extent. The one capture (fixture
+/// `d3-amend-lab-ledger-catalogue`, read once) answers both reads of the pair.
+fn d3_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
+    let extent = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+    ));
+    vec![
+        xml(extent.clone()),
+        xml(catalogue.clone()),
+        status(),
+        xml(catalogue),
+        status(),
+        xml(extent),
+    ]
+}
+
+/// The post path's catalogue request for the D3 company: the one the capture
+/// answered (its sidecar's `source_request_sha256`).
+const D3_CATALOGUE_REQUEST: &str =
+    "589566214e5ab516d415e7a9ea3e143ed63452a8a732de0d50d6cb857c0aef2c";
+
+/// How many of `observed` are that catalogue request.
+fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    observed
+        .iter()
+        .filter(|request| request.request_body_sha256 == D3_CATALOGUE_REQUEST)
+        .count()
+}
+
+fn d3_catalogue() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml"
+    ))
+}
+
+/// The same catalogue with Cash on another GUID, as a ledger renamed and
+/// replaced would read.
+fn d3_catalogue_with_cash_replaced() -> String {
+    replaced_once(
+        &d3_catalogue(),
+        ">17a10910-773c-42c6-bd66-7bba9a392536-0000001f</GUID>",
+        ">17a10910-773c-42c6-bd66-7bba9a392536-000000ff</GUID>",
+    )
+}
+
+/// The D3 batch with its step doubt observed and its masters check left
+/// pending, as a post that ended before the check finished leaves it.
+fn d3_step_doubt_beside_a_pending_check(server: &Server) {
+    let imports = server.imports_dir().unwrap();
+    let step = json!({"state":"unmatched","target_voucher_step":{
+        "before":1419,"after":1470,"step":51,"reported_created":50,"matches_created":false}});
+    fs::write(
+        imports.join(format!("{D3_BATCH}.batch_step_doubt.json")),
+        serde_json::to_vec(&step).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        imports.join(format!("{D3_BATCH}.masters_check.json")),
+        serde_json::to_vec(&json!({"state":"check_pending","batch_step":step})).unwrap(),
+    )
+    .unwrap();
+}
+
+/// An unnamed review chooses the step doubt, the only one observed, while
+/// the masters check is pending. Its own read finishes that check as a doubt
+/// (#756). The review is refused as ambiguous after that read, with no dialog
+/// and no record, rather than admitting a step review the person did not
+/// name while a masters doubt now stands.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
+    // The read did finish the check as a doubt: that is what refused it.
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+}
+
+/// The control: the same read finishes the check as unchanged, the step doubt
+/// is still the only one, and the unnamed review goes ahead to its dialog.
+#[tokio::test]
+async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue()));
+    plans.extend(d3_batch_readback());
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    assert!(imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .exists());
+    // The first read finished the check, unchanged: the second read sends no
+    // catalogue request.
+    assert_eq!(masters_check_of(&server, D3_BATCH)["state"], "unchanged");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+}
+
+/// The catalogue read refused, as Tally answers when the company cannot be
+/// selected (the live answer `moved_masters_that_cannot_be_re_read_are_not_verified`
+/// scripts, for this company): the masters check cannot finish and stays
+/// pending.
+fn d3_catalogue_refused() -> Vec<ScenarioPlan> {
+    // Both reads of the pair are sent even when the first is refused.
+    d3_catalogue_read(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA>\
+         <LINEERROR>Could not set 'SVCurrentCompany' to 'BRIDGE AMEND LAB'</LINEERROR>\
+         </DATA></BODY></ENVELOPE>"
+            .to_string(),
+    )
+}
+
+/// The first read cannot finish the pending masters check (its catalogue read
+/// is refused), so the step doubt is still the only one and the dialog is
+/// shown. The read after the dialog finishes the check as a doubt (#756): the
+/// unnamed review is refused then, and nothing is recorded.
+#[tokio::test]
+async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_refused());
+    plans.extend(d3_batch_readback());
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+        approval.clone(),
+    )
+    .await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "ack_doubt_ambiguous", "{response}");
+    assert_eq!(
+        result["error"]["cause"], "masters_and_batch_step",
+        "{response}"
+    );
+    assert_eq!(
+        approval.review_counts(),
+        [50],
+        "the dialog was shown: {response}"
+    );
+    let imports = server.imports_dir().unwrap();
+    assert!(!imports
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
+        .exists());
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    // Both reads ran in full, the refused catalogue pair included.
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 4, "{response}");
+}
+
+/// A review NAMING the step doubt goes ahead when its first read finishes the
+/// masters check as a second doubt (#756): the person named what they review,
+/// and the record covers only that doubt. The masters doubt stands for its own
+/// review.
+#[tokio::test]
+async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    plans.extend(d3_batch_readback());
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"batch_step"}),
+        approval.clone(),
+    )
+    .await;
+    assert!(
+        response["structuredContent"]["result"]["error"].is_null(),
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [50], "{response}");
+    let imports = server.imports_dir().unwrap();
+    let record: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{D3_BATCH}.batch_step_ack.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(record["doubt"], "batch_step", "{record}");
+    assert!(imports
+        .join(format!("{D3_BATCH}.masters_doubt.json"))
+        .is_file());
+    assert!(!imports
+        .join(format!("{D3_BATCH}.masters_ack.json"))
+        .exists());
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+}
+
+/// A review on file answers "already recorded" only for the doubt it covers
+/// (#808). Beside a different doubt it is refused as stale, before any
+/// request and with no dialog; beside its own doubt, or when the record names
+/// no doubt this build can read, it is refused as already recorded.
+#[tokio::test]
+async fn a_recorded_review_answers_only_for_the_doubt_it_covers() {
+    let other =
+        r#"{"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Bank"]}"#;
+    for (record, code) in [
+        (
+            json!({"doubt_sha256": crate::agent::sha256_hex(other.as_bytes())}),
+            "ack_recorded_review_stale",
+        ),
+        (
+            json!({"doubt_sha256": crate::agent::sha256_hex(DOUBT.as_bytes())}),
+            "ack_already_recorded",
+        ),
+        (json!({}), "ack_already_recorded"),
+    ] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let (server, args) = doubted(&simulator, directory.path());
+        let bytes = serde_json::to_vec(&record).unwrap();
+        fs::write(ack_path(&server), &bytes).unwrap();
+        let approval = ScriptedApproval::approving();
+        let response = acknowledge(&server, args, approval.clone()).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{record}: {response}"
+        );
+        assert!(approval.reviews().is_empty(), "{record}: no dialog");
+        assert_eq!(fs::read(ack_path(&server)).unwrap(), bytes, "{record}");
+        assert!(sent(simulator).is_empty(), "{record}: no request");
+    }
+}
+
+/// The #808 path: a masters review was recorded for an earlier doubt, and
+/// the check was later set pending again (a losing second post's mark). The
+/// review's own read finishes the check as a new doubt, and the call is
+/// refused as stale before the dialog, never as that new doubt's review. The
+/// control: a record of that same doubt answers as already recorded.
+#[tokio::test]
+async fn a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes() {
+    let earlier =
+        r#"{"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Bank"]}"#;
+    let (code, finished) =
+        review_beside_a_pending_check(&crate::agent::sha256_hex(earlier.as_bytes())).await;
+    assert_eq!(code, "ack_recorded_review_stale");
+    let (code, again) = review_beside_a_pending_check(&crate::agent::sha256_hex(&finished)).await;
+    assert_eq!(
+        again, finished,
+        "the read finishes the same doubt each time"
+    );
+    assert_eq!(code, "ack_already_recorded");
+}
+
+/// One named masters review of the D3 batch, whose masters check is pending
+/// and whose review record covers `doubt_sha256`, while its read finishes the
+/// check as a doubt. Returns the refusal code and the doubt the read wrote,
+/// after checking that no dialog was shown, the record is unchanged, and
+/// every scripted request was sent.
+async fn review_beside_a_pending_check(doubt_sha256: &str) -> (String, Vec<u8>) {
+    let mut plans = d3_batch_readback();
+    plans.extend(d3_catalogue_read(d3_catalogue_with_cash_replaced()));
+    let scripted = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = d3_server(&simulator, directory.path());
+    d3_step_doubt_beside_a_pending_check(&server);
+    let imports = server.imports_dir().unwrap();
+    let record_path = imports.join(format!("{D3_BATCH}.masters_ack.json"));
+    let record = serde_json::to_vec(&json!({ "doubt_sha256": doubt_sha256 })).unwrap();
+    fs::write(&record_path, &record).unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"masters"}),
+        approval.clone(),
+    )
+    .await;
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    assert_eq!(fs::read(&record_path).unwrap(), record);
+    // The read did finish the check as a doubt: that is what was compared.
+    let finished = fs::read(imports.join(format!("{D3_BATCH}.masters_doubt.json"))).unwrap();
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), scripted, "{response}");
+    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    let code = response["structuredContent"]["result"]["error"]["code"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    (code, finished)
+}
+
+/// A batch's step verdict left pending is recorded only by a post, so no read
+/// can finish it: a review already on file for it still answers first, before
+/// any request, as it did before #808.
+#[tokio::test]
+async fn a_recorded_step_review_beside_a_pending_step_answers_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let line = dispatched_batch(&server);
+    server
+        .record_post_checks_pending(&line.batch_id, true)
+        .unwrap();
+    let record = serde_json::to_vec(&json!({"doubt_sha256": "0".repeat(64)})).unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.batch_step_ack.json", line.batch_id)),
+        record,
+    )
+    .unwrap();
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"batch_step"}),
+        ScriptedApproval::approving(),
+    )
+    .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_already_recorded",
+        "{response}"
+    );
+    assert!(sent(simulator).is_empty());
+}
+
+/// A record this build cannot read names no doubt, so no read could change
+/// its answer: beside a pending masters check it answers before any request.
+#[tokio::test]
+async fn an_unreadable_record_beside_a_pending_check_answers_before_any_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let (server, args) = seeded(
+        &simulator,
+        directory.path(),
+        clean(),
+        Some(br#"{"state":"check_pending"}"#),
+        None,
+    );
+    fs::write(ack_path(&server), b"{}").unwrap();
+    let approval = ScriptedApproval::approving();
+    let response = acknowledge(&server, args, approval.clone()).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_already_recorded",
+        "{response}"
+    );
+    assert!(approval.reviews().is_empty(), "no dialog");
+    assert!(sent(simulator).is_empty(), "no request");
 }

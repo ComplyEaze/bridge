@@ -18,6 +18,19 @@ pub struct TrialBalanceRequest {
 pub struct TrialBalanceResponse {
     read: TrialBalanceRead,
     export_id: String,
+    /// Present only when the read covers a several-currency book's
+    /// base-currency ledgers; the screen shows it with the ledgers left out
+    /// (bridge#709).
+    scope_limitation: Option<&'static str>,
+}
+
+fn scope_limitation(read: &TrialBalanceRead) -> Option<&'static str> {
+    match read.ledger_scope {
+        crate::tally::runtime::TrialBalanceLedgerScope::AllLedgers => None,
+        crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly { .. } => {
+            Some(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION)
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,7 +121,7 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
                 "This report currently requires observed Licensed TallyPrime. Education support needs further qualification.");
         }
         return local_error(reason.safe_code(), "Bridge could not admit this Trial Balance period or currency.",
-            "Choose dates on or after book start. This report currently requires one observed INR currency master.");
+            "Choose dates on or after book start. This report requires an INR base currency that Tally identifies.");
     }
     if let Some(reason) = error.chain().find_map(|cause| {
         cause.downcast_ref::<bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError>()
@@ -138,6 +151,27 @@ fn read_error(error: anyhow::Error) -> TallyCommandError {
 #[path = "commands_trial_balance_tests.rs"]
 mod tests;
 
+/// The desktop's Trial Balance read. The screen and its workbook show the
+/// ledgers a several-currency book's read leaves out, so it asks for the
+/// base-currency ledgers explicitly (bridge#709); every other caller keeps
+/// the default refusal.
+pub(crate) async fn read_desktop_trial_balance(
+    runtime: &TallyRuntime,
+    config: TallyConfig,
+    identity: &VerifiedCompanyIdentity,
+    period: TrialBalancePeriod,
+) -> anyhow::Result<TrialBalanceRead> {
+    runtime
+        .fetch_trial_balance_with_extent(
+            config,
+            identity,
+            period,
+            crate::tally::runtime::TrialBalanceCurrencyScope::BaseCurrencyLedgersOnly,
+        )
+        .await
+        .map(|(read, _)| read)
+}
+
 #[tauri::command]
 pub async fn fetch_tally_trial_balance(
     request: TrialBalanceRequest,
@@ -155,10 +189,10 @@ pub async fn fetch_tally_trial_balance(
     })?;
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
-    let read = runtime
-        .fetch_trial_balance(request.config, &identity, period)
+    let read = read_desktop_trial_balance(&runtime, request.config, &identity, period)
         .await
         .map_err(read_error)?;
+    let scope_limitation = scope_limitation(&read);
     let export_id = exports.insert(read.clone()).map_err(|_| {
         local_error(
             "trial_balance_export_budget",
@@ -166,7 +200,11 @@ pub async fn fetch_tally_trial_balance(
             "Review the selected company and retry with a smaller supported source.",
         )
     })?;
-    Ok(TrialBalanceResponse { read, export_id })
+    Ok(TrialBalanceResponse {
+        read,
+        export_id,
+        scope_limitation,
+    })
 }
 
 /// The webview sends only an opaque handle; no amounts, rows or Tally request

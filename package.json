@@ -1,7 +1,7 @@
 {
   "name": "bridge",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "type": "module",
   "description": "Bridge is the open-source Tauri implementation of AXAL Sync with local edge-first sync workflows.",
@@ -37,8 +37,6 @@
     "check:fixture-provenance": "node scripts/check-fixture-provenance.mjs",
     "check:tally-request-builder-hazards": "node scripts/check-tally-request-builder-hazards.mjs",
     "check:unbounded-reads": "node scripts/check-unbounded-reads.mjs",
-    "check:pii-regex-regression-coverage": "node scripts/check-pii-regex-regression-coverage.mjs",
-    "check:parser-test-symmetry": "node scripts/check-parser-test-symmetry.mjs",
     "check:gh-api-pagination": "node scripts/check-gh-api-pagination.mjs",
     "report:file-sizes": "node scripts/report-file-sizes.mjs",
     "security:audit:frontend": "corepack pnpm audit --prod --audit-level high",
@@ -51,19 +49,19 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@tauri-apps/cli": "^2.11.4",
+    "@tauri-apps/cli": "^2.11.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "jsdom": "^30.1.0",
+    "jsdom": "^30.1.1",
     "typescript": "^7.0.2",
-    "vite": "^8.3.0",
+    "vite": "^8.3.1",
     "vitest": "^5.0.1",
     "yaml": "2.9.1"
   }

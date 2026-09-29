@@ -14,8 +14,8 @@ use thiserror::Error;
 pub mod bills_native_outstandings_probe_receipt;
 
 pub const LIVE_RECEIPT_SCHEMA_VERSION: u16 = 1;
-pub const SURFACE_SCHEMA_VERSION: u16 = 1;
-pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 1;
+pub const SURFACE_SCHEMA_VERSION: u16 = 2;
+pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 2;
 pub const TRUST_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const ATTESTATION_SCHEMA_VERSION: u16 = 1;
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
@@ -313,7 +313,31 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // `src-tauri/src/agent_voucher_type_class.rs` (bridge#625) decides which
 // vouchers a type filter returns, and which request is refused as ambiguous;
 // a defect there reports a class of vouchers as absent.
-pub const MAX_SURFACE_FILES: usize = 280;
+// `bridge-tally-protocol/src/native_statement_reports.rs`,
+// `src-tauri/src/reports/statements.rs` (with its tests, as every file under
+// `src-tauri/src/reports` is required) and `src-tauri/src/agent_statements.rs`
+// (bridge#692) parse Tally's own Balance Sheet and Profit and Loss, derive both
+// statements from the Trial Balance and group tree, and decide which result
+// `profit_and_loss` and `balance_sheet` report as established; a defect there
+// reports a profit that omits a line.
+// `bridge-tally-protocol/src/currency_composite.rs` (bridge#674) decides
+// whether an amount is a foreign-currency composite, which decides whether a
+// `vouchers` read withholds a voucher or refuses its window; a defect there
+// sets aside an amount that should have refused, or refuses a window that
+// should have been read.
+// `src-tauri/src/agent_import_approval.rs` (bridge#725) holds the approval a
+// post redeems across calls: what it is bound to, how long it lasts, that it is
+// spent once before the intent, and when it is revoked; a defect there could
+// post a batch on an approval for something else, or on one withdrawn.
+// `src-tauri/crates/bridge-bank-statement/src/cash.rs` decides which parsed
+// party is a cash withdrawal or deposit, which answers a person may give for
+// one, which need a ledger and which Bridge refuses; a defect there could post
+// a cash line to a ledger nobody chose.
+// `src-tauri/src/export_registry.rs` (bridge#833) records the files Bridge
+// exports from Tally data (bulk party statements so far), and the documents
+// uploader skips a file whose hash it holds; a defect there uploads a
+// client's exported statements from a folder the user syncs.
+pub const MAX_SURFACE_FILES: usize = 288;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;
@@ -887,35 +911,46 @@ pub struct SurfaceFile {
     pub sha256: String,
 }
 
+/// The surface stores only its pins. Its digest is computed, never stored, so
+/// two changes to different pins merge without touching a shared line
+/// (docs/proposed-order-independent-seal.md, bridge#760).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompatibilitySurfaceManifest {
     pub schema_version: u16,
     pub files: Vec<SurfaceFile>,
-    pub manifest_sha256: String,
 }
 
+/// The value schema 1 stored as `manifest_sha256` was the checksum of this
+/// view: the manifest with that field present and empty. Hashing the same view
+/// means the same pins give the same digest, so the schema change alone does
+/// not move it. Any change to a pinned file still moves it and invalidates
+/// evidence bound to the old digest, as before.
+#[derive(Serialize)]
+struct SurfaceDigestView<'a> {
+    schema_version: u16,
+    files: &'a [SurfaceFile],
+    manifest_sha256: &'static str,
+}
+
+const SURFACE_DIGEST_DOMAIN: &[u8] = b"bridge.tally.compatibility-surface/1\0";
+const SURFACE_DIGEST_VIEW_SCHEMA_VERSION: u16 = 1;
+
 impl CompatibilitySurfaceManifest {
-    pub fn seal(mut self) -> Result<Self, CompatibilityError> {
-        self.manifest_sha256.clear();
-        self.validate_shape(false)?;
-        self.manifest_sha256 = checksum(b"bridge.tally.compatibility-surface/1\0", &self)?;
+    /// The surface digest that receipts, attestations and the gate bind to.
+    pub fn digest(&self) -> Result<String, CompatibilityError> {
         self.validate()?;
-        Ok(self)
+        checksum(
+            SURFACE_DIGEST_DOMAIN,
+            &SurfaceDigestView {
+                schema_version: SURFACE_DIGEST_VIEW_SCHEMA_VERSION,
+                files: &self.files,
+                manifest_sha256: "",
+            },
+        )
     }
 
     pub fn validate(&self) -> Result<(), CompatibilityError> {
-        self.validate_shape(true)?;
-        let mut unsigned = self.clone();
-        let supplied = std::mem::take(&mut unsigned.manifest_sha256);
-        let expected = checksum(b"bridge.tally.compatibility-surface/1\0", &unsigned)?;
-        if supplied != expected {
-            return Err(invalid("surface_checksum_mismatch"));
-        }
-        Ok(())
-    }
-
-    fn validate_shape(&self, require_checksum: bool) -> Result<(), CompatibilityError> {
         if self.schema_version != SURFACE_SCHEMA_VERSION {
             return Err(invalid("surface_schema_unsupported"));
         }
@@ -930,11 +965,6 @@ impl CompatibilitySurfaceManifest {
                 return Err(invalid("surface_files_not_unique_sorted"));
             }
             previous = Some(&file.path);
-        }
-        if require_checksum {
-            validate_sha256(&self.manifest_sha256)?;
-        } else if !self.manifest_sha256.is_empty() {
-            return Err(invalid("surface_checksum_must_start_empty"));
         }
         Ok(())
     }
@@ -990,8 +1020,8 @@ impl CompatibilitySurfaceManifest {
         Ok(())
     }
 
-    /// Refreshes only existing surface-file digests. The returned manifest intentionally retains
-    /// the old manifest checksum so that `seal-surface` remains the explicit attestation step.
+    /// Refreshes every pinned file's digest from its bytes. With no stored manifest checksum,
+    /// this is the whole reseal, for a changed pin list too.
     pub fn rehash_files(
         &self,
         repository_root: &Path,
@@ -1294,7 +1324,6 @@ pub struct SupportClaim {
 pub struct SupportClaimsManifest {
     pub schema_version: u16,
     pub bridge_commit_sha: String,
-    pub compatibility_surface_sha256: String,
     pub claims: Vec<SupportClaim>,
 }
 
@@ -1307,7 +1336,6 @@ impl SupportClaimsManifest {
             return Err(invalid("support_manifest_invalid"));
         }
         validate_commit(&self.bridge_commit_sha)?;
-        validate_sha256(&self.compatibility_surface_sha256)?;
         let mut ids = BTreeSet::new();
         let mut previous_id: Option<&str> = None;
         for claim in &self.claims {
@@ -1327,17 +1355,6 @@ impl SupportClaimsManifest {
         let value: Self = parse_bounded_json(bytes)?;
         value.validate()?;
         Ok(value)
-    }
-
-    pub fn repoint_surface(
-        mut self,
-        surface: &CompatibilitySurfaceManifest,
-    ) -> Result<Self, CompatibilityError> {
-        self.validate()?;
-        surface.validate()?;
-        self.compatibility_surface_sha256 = surface.manifest_sha256.clone();
-        self.validate()?;
-        Ok(self)
     }
 
     pub fn to_pretty_json(&self) -> Result<Vec<u8>, CompatibilityError> {
@@ -1475,9 +1492,7 @@ pub fn enforce_support_gate(
     manifest.validate()?;
     surface.validate_files(repository_root)?;
     trust.validate()?;
-    if manifest.compatibility_surface_sha256 != surface.manifest_sha256 {
-        return Err(gate("support_surface_mismatch"));
-    }
+    let surface_digest = surface.digest()?;
     let receipt_by_checksum = receipts
         .iter()
         .map(|receipt| {
@@ -1516,7 +1531,7 @@ pub fn enforce_support_gate(
             .copied()
             .ok_or_else(|| gate("attestation_missing"))?;
         attestation.verify(trust, now_unix_ms)?;
-        if attestation.compatibility_surface_sha256 != surface.manifest_sha256
+        if attestation.compatibility_surface_sha256 != surface_digest
             || attestation.review_commit_sha != manifest.bridge_commit_sha
         {
             return Err(gate("attestation_scope_mismatch"));
@@ -1529,7 +1544,14 @@ pub fn enforce_support_gate(
             .get(attestation.receipt_sha256.as_str())
             .copied()
             .ok_or_else(|| gate("receipt_missing"))?;
-        validate_receipt_for_claim(receipt, claim, manifest, surface, attestation, now_unix_ms)?;
+        validate_receipt_for_claim(
+            receipt,
+            claim,
+            manifest,
+            &surface_digest,
+            attestation,
+            now_unix_ms,
+        )?;
     }
     Ok(report)
 }
@@ -1538,14 +1560,14 @@ fn validate_receipt_for_claim(
     receipt: &LiveCompatibilityReceipt,
     claim: &SupportClaim,
     manifest: &SupportClaimsManifest,
-    surface: &CompatibilitySurfaceManifest,
+    surface_digest: &str,
     attestation: &ReviewedEvidenceAttestation,
     now_unix_ms: i64,
 ) -> Result<(), CompatibilityError> {
     let max_age_ms = i64::from(claim.max_evidence_age_days) * 24 * 60 * 60 * 1000;
     if receipt.working_tree_dirty
         || receipt.bridge_commit_sha != manifest.bridge_commit_sha
-        || receipt.compatibility_surface_sha256 != surface.manifest_sha256
+        || receipt.compatibility_surface_sha256 != surface_digest
         || receipt.receipt_sha256 != attestation.receipt_sha256
         || receipt.observed_at_unix_ms > attestation.reviewed_at_unix_ms
         || receipt.product.value != claim.product

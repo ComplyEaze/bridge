@@ -108,6 +108,13 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::partners_40b_194t_on(e, b, r),
     },
     PortedTest {
+        id: "party_monthly",
+        // 16 with all four groups and no voucher (edge book pm_empty): per block the total row's
+        // year and voucher count, and the Trial Balance movement and difference.
+        min_figures: 16,
+        run_on: |e, b, r, _| crate::party_monthly_on(e, b, r),
+    },
+    PortedTest {
         id: "stale_balances_41_1",
         min_figures: 1,
         run_on: |e, b, r, _| crate::stale_balances_41_1_on(e, b, r),
@@ -116,6 +123,12 @@ pub const PORTED: &[PortedTest] = &[
         id: "statutory_dues_43b",
         min_figures: 4,
         run_on: |e, b, r, _| crate::statutory_dues_43b_on(e, b, r),
+    },
+    PortedTest {
+        id: "stock",
+        // 30 on any book; one more when a Stock-in-Hand ledger has no Trial Balance row.
+        min_figures: 30,
+        run_on: |e, b, r, _| crate::stock_on(e, b, r),
     },
     PortedTest {
         id: "tds_payees",

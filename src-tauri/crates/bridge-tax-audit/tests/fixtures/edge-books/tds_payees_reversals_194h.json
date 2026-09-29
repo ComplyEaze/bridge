@@ -1,0 +1,395 @@
+{
+ "comment": "tds_payees reversals and s.194H: reversals against an over-limit payee classified bill-specific (named, not applied), as a credit note, not at all, and as a duplicate of, or specific to, another payee's bill (unclassified on this row); a reversal settled partly by bank is its payment, never an unnamed credit; a section that reverses and books reads its cash credit as unnamed; an agent over the s.194H limit with TDS on its bill; an individual recorded as a profession with receipts over the profession limit is a deductor.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-001"
+  },
+  {
+   "name": "Contract Labour",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-002"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-003"
+  },
+  {
+   "name": "Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-004"
+  },
+  {
+   "name": "TDS Payable 194H",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-005"
+  },
+  {
+   "name": "Builder B11",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-006"
+  },
+  {
+   "name": "Builder B12",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-007"
+  },
+  {
+   "name": "Builder B13",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-008"
+  },
+  {
+   "name": "Builder B14",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-009"
+  },
+  {
+   "name": "Agent A1",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_reversals_194h-010"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Agent A1",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2450000,
+   "closing": -2450000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  },
+  {
+   "ledger": "Builder B11",
+   "opening": 0,
+   "debit": 1850000,
+   "credit": 11000000,
+   "closing": -9150000
+  },
+  {
+   "ledger": "Builder B12",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Builder B13",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Builder B14",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 0,
+   "closing": 800000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  },
+  {
+   "ledger": "Commission",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 0,
+   "closing": 2500000
+  },
+  {
+   "ledger": "Contract Labour",
+   "opening": 0,
+   "debit": 11500000,
+   "credit": 3150000,
+   "closing": 8350000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "TDS Payable 194H",
+   "opening": 0,
+   "debit": 0,
+   "credit": 50000,
+   "closing": -50000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     8000000
+    ],
+    [
+     "Builder B11",
+     -8000000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     3000000
+    ],
+    [
+     "Builder B11",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "r03",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     1000000
+    ],
+    [
+     "Contract Labour",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     500000
+    ],
+    [
+     "Contract Labour",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "r05",
+   "date": "2025-06-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     200000
+    ],
+    [
+     "Contract Labour",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "r06",
+   "date": "2025-06-08",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     100000
+    ],
+    [
+     "Contract Labour",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "r07",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Contract Labour",
+     500000
+    ],
+    [
+     "Builder B12",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "r08",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B13",
+     500000
+    ],
+    [
+     "Contract Labour",
+     -300000
+    ],
+    [
+     "Bank",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "r09",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B14",
+     800000
+    ],
+    [
+     "Freight",
+     400000
+    ],
+    [
+     "Contract Labour",
+     -1000000
+    ],
+    [
+     "Cash",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "r10",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Commission",
+     2500000
+    ],
+    [
+     "Agent A1",
+     -2450000
+    ],
+    [
+     "TDS Payable 194H",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "r11",
+   "date": "2025-06-09",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Builder B11",
+     50000
+    ],
+    [
+     "Contract Labour",
+     -50000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "individual",
+ "previous_year_turnover_paise": 600000000,
+ "deductor_activity": "profession",
+ "nature_by_ledger": {
+  "Contract Labour": "194C",
+  "Freight": "194C",
+  "Commission": "194H"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable 194H"
+ ],
+ "reversals": {
+  "r03": {
+   "kind": "bill_specific",
+   "bill": "r01"
+  },
+  "r04": {
+   "kind": "credit_note"
+  },
+  "r06": {
+   "kind": "duplicate_or_error",
+   "bill": "r07"
+  },
+  "r11": {
+   "kind": "bill_specific",
+   "bill": "r07"
+  }
+ }
+}

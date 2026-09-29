@@ -177,25 +177,63 @@ const pageHead = `<!doctype html>
         <a class="wordmark" href="./">ComplyEaze Bridge</a>
         <nav class="masthead-links"><a class="quiet-link" href="./">Install</a><a class="quiet-link" href="${REPOSITORY_URL}/releases">All releases</a></nav>
       </header>
-      <article class="changelog">
-        <h1>What changed</h1>
 `;
-const pageTail = `      </article>
-    </main>
+const pageTail = `    </main>
   </body>
 </html>
 `;
 
-export function renderPage(sections) {
-  const parts = sections.map(({ label, date, body }) => {
-    const title = label.toLowerCase() === "unreleased" ? "In source, not yet published" : `${label}${date ? `, ${date}` : ""}`;
-    return `        <section>\n          <h2>${escapeHtml(title)}</h2>\n${renderBody(body)}\n        </section>\n`;
+export const TEMPLATE_MARKER = "<!-- changelog -->";
+
+const isUnreleased = (label) => label.toLowerCase() === "unreleased";
+
+// One anchor per section, unique even if the changelog repeats a label: "0.3.0" is "v0-3-0".
+function sectionIds(sections) {
+  const seen = new Map();
+  return sections.map(({ label }) => {
+    const base = isUnreleased(label) ? "unreleased" : `v${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    return count === 1 ? base : `${base}-${count}`;
   });
-  return pageHead + parts.join("") + pageTail;
 }
 
-export function fallbackPage() {
-  return `${pageHead}        <p>The change list could not be prepared for this page. Read <a href="${REPOSITORY_URL}/releases">the releases on GitHub</a>.</p>\n${pageTail}`;
+// The generated part of the page: a version index, then one section per changelog entry. A
+// template supplies everything around it, so restyling never touches generated output.
+export function renderArticle(sections) {
+  const ids = sectionIds(sections);
+  const latest = sections.findIndex(({ label }) => !isUnreleased(label));
+  const index = sections.map(({ label }, at) => `<a href="#${ids[at]}">${escapeHtml(label)}</a>`).join("");
+  const parts = sections.map(({ label, date, body }, at) => {
+    const unreleased = isUnreleased(label);
+    const when = !date ? "" : /^\d{4}-\d{2}-\d{2}$/.test(date) ? `, <time datetime="${date}">${date}</time>` : `, ${escapeHtml(date)}`;
+    const heading = unreleased ? "In source, not yet published" : `${escapeHtml(label)}${when}`;
+    const anchor = `<a class="anchor" href="#${ids[at]}" aria-label="Link to ${escapeHtml(label)}">#</a>`;
+    const attributes = `id="${ids[at]}" data-version="${escapeHtml(unreleased ? "unreleased" : label)}"${at === latest ? ' data-latest="true"' : ""}`;
+    return `        <section ${attributes}>\n          <h2>${heading} ${anchor}</h2>\n${renderBody(body)}\n        </section>\n`;
+  });
+  return `      <nav class="changelog-index" aria-label="Versions">${index}</nav>\n      <article class="changelog">\n        <h1>What changed</h1>\n${parts.join("")}      </article>\n`;
+}
+
+export function fallbackArticle() {
+  return `      <article class="changelog">\n        <h1>What changed</h1>\n        <p>The change list could not be prepared for this page. Read <a href="${REPOSITORY_URL}/releases">the releases on GitHub</a>.</p>\n      </article>\n`;
+}
+
+// A template is used only when it holds the marker exactly once; otherwise the built-in page is.
+export function usableTemplate(template) {
+  return template !== undefined && template.split(TEMPLATE_MARKER).length === 2;
+}
+
+export function renderPage(sections, template) {
+  return wrap(renderArticle(sections), template);
+}
+
+export function fallbackPage(template) {
+  return wrap(fallbackArticle(), template);
+}
+
+function wrap(article, template) {
+  return usableTemplate(template) ? template.replace(TEMPLATE_MARKER, () => article) : pageHead + article + pageTail;
 }
 
 function warn(message) {
@@ -228,19 +266,32 @@ export function main(argv) {
     return 0;
   }
   if (command === "page") {
+    let template;
+    const templatePath = args.includes("--template") ? argument(args, "--template") : undefined;
+    if (templatePath !== undefined) {
+      try {
+        template = readFileSync(templatePath, "utf8");
+        if (!usableTemplate(template)) {
+          warn(`${templatePath} must contain ${TEMPLATE_MARKER} exactly once; using the built-in page`);
+          template = undefined;
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") warn(`could not read ${templatePath} (${error.message}); using the built-in page`);
+      }
+    }
     let html;
     try {
       const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
       for (const problem of problems) warn(problem);
-      html = renderPage(sections);
+      html = renderPage(sections, template);
     } catch (error) {
       warn(`could not render CHANGELOG.md for the site (${error.message}); the page links to the releases instead`);
-      html = fallbackPage();
+      html = fallbackPage(template);
     }
     writeFileSync(argument(args, "--out"), html);
     return 0;
   }
-  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F --out F | page --changelog F --out F");
+  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F --out F | page --changelog F [--template F] --out F");
   return 2;
 }
 

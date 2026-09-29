@@ -616,6 +616,13 @@ disagree.
   deploy, not when the file changes.
   Neither step can stop a release or a deploy; each warns and falls back, so a
   missing section shows as a warning in the run, not as a failed release.
+- The page's look belongs to a tracked template, `site/changelog.template.html`,
+  which holds the line `<!-- changelog -->` exactly once. The generator puts a
+  version index and the sections there and writes `site/changelog.html`, which
+  is ignored by git and never edited by hand. Each section has an `id` (`v0-3-0`,
+  or `unreleased`), a `data-version`, and `data-latest="true"` on the newest
+  published one. With no template, or one without the marker, the deploy uses
+  a plain built-in page and never fails.
 - At cut time, in the pull request that bumps the version: rename the
   plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
   leave a fresh `## [Unreleased]` above it. If the section is missing, the

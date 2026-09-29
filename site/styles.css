@@ -187,3 +187,7 @@ code {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+.changelog-index { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-top: clamp(24px, 5vw, 40px); }
+.changelog-index a { color: var(--accent); }
+.changelog .anchor { color: var(--ink-faint); margin-left: 8px; text-decoration: none; }
+.changelog .anchor:hover, .changelog .anchor:focus { color: var(--accent); }

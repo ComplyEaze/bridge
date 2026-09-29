@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
-import { composeBody, fallbackPage, parseChangelog, parseChangelogWithProblems, pickNotes, renderBody, renderPage, versionFromTag } from "./release-notes.mjs";
+import { TEMPLATE_MARKER, composeBody, fallbackPage, parseChangelog, parseChangelogWithProblems, pickNotes, renderBody, renderPage, versionFromTag } from "./release-notes.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -133,10 +133,70 @@ test("the real CHANGELOG.md parses into sections that render and publish", () =>
   assert.match(published.body, /^### In plain words: `mcp-preview-0\.3\.0`/);
   const page = renderPage(sections);
   assert.doesNotMatch(page, /<script|javascript:|\]\(/);
-  assert.match(page, /<h2>0\.3\.0, 2026-09-26<\/h2>/);
+  assert.match(page, /<h2>0\.3\.0, <time datetime="2026-09-26">2026-09-26<\/time> <a class="anchor" href="#v0-3-0" aria-label="Link to 0\.3\.0">#<\/a><\/h2>/);
   const hrefs = [...page.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
-  assert.ok(hrefs.every((href) => /^(https:\/\/|\.\/)/.test(href)), hrefs.find((href) => !/^(https:\/\/|\.\/)/.test(href)));
+  assert.ok(hrefs.every((href) => /^(https:\/\/|\.\/|#v?[a-z0-9-]+$)/.test(href)), hrefs.find((href) => !/^(https:\/\/|\.\/|#v?[a-z0-9-]+$)/.test(href)));
   assert.match(fallbackPage(), /releases/);
+});
+
+test("the page markup is the contract the site templates rely on", () => {
+  const html = renderPage(parseChangelog(changelog));
+  const ids = [...html.matchAll(/<section id="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(ids, ["unreleased", "v0-4-0", "v0-3-0"]);
+  assert.match(html, /<nav class="changelog-index" aria-label="Versions"><a href="#unreleased">Unreleased<\/a><a href="#v0-4-0">0\.4\.0<\/a><a href="#v0-3-0">0\.3\.0<\/a><\/nav>\n      <article class="changelog">\n        <h1>What changed<\/h1>/);
+  assert.equal([...html.matchAll(/data-latest="true"/g)].length, 1);
+  assert.match(html, /<section id="v0-4-0" data-version="0\.4\.0" data-latest="true">/);
+  assert.match(html, /<section id="unreleased" data-version="unreleased">\n\s+<h2>In source, not yet published <a class="anchor" href="#unreleased" aria-label="Link to Unreleased">#<\/a><\/h2>/);
+  const odd = renderPage(parseChangelog("## [1.0.0] - soon <b>\n\n- One.\n\n## [1.0.0]\n\n- Again.\n\n## [1.0.0-rc.1]\n\n- Rc.\n"));
+  assert.deepEqual([...odd.matchAll(/<section id="([^"]+)"/g)].map((match) => match[1]), ["v1-0-0", "v1-0-0-2", "v1-0-0-rc-1"]);
+  assert.doesNotMatch(odd, /<time|<b>/);
+  assert.match(odd, /1\.0\.0, soon &lt;b&gt;/);
+});
+
+test("a template wraps the generated article only when it holds the marker exactly once", () => {
+  const sections = parseChangelog("## [1.0.0] - 2026-10-01\n\n- Costs $& and $1 (#5).\n");
+  const template = `<html><body class="mine">\n${TEMPLATE_MARKER}\n</body></html>\n`;
+  const wrapped = renderPage(sections, template);
+  assert.match(wrapped, /^<html><body class="mine">\n      <nav class="changelog-index"/);
+  assert.match(wrapped, /Costs \$&amp; and \$1/);
+  assert.doesNotMatch(wrapped, /<!-- changelog -->/);
+  assert.equal(wrapped.split("<html>").length, 2);
+  for (const bad of ["<html></html>", `${TEMPLATE_MARKER}${TEMPLATE_MARKER}`, undefined]) {
+    assert.match(renderPage(sections, bad), /^<!doctype html>/, String(bad));
+  }
+  assert.match(fallbackPage(template), /^<html><body class="mine">[\s\S]*could not be prepared/);
+});
+
+function generate(dir, templateText) {
+  writeFileSync(join(dir, "CHANGELOG.md"), "## [1.0.0] - 2026-10-01\n\n- One.\n");
+  const args = ["scripts/release-notes.mjs", "page", "--changelog", join(dir, "CHANGELOG.md"), "--out", join(dir, "out.html")];
+  if (templateText !== null) {
+    if (templateText === undefined) rmSync(join(dir, "t.html"), { force: true });
+    else writeFileSync(join(dir, "t.html"), templateText);
+    args.push("--template", join(dir, "t.html"));
+  }
+  const result = spawnSync("node", args, { cwd: root, encoding: "utf8" });
+  return { result, html: readFileSync(join(dir, "out.html"), "utf8") };
+}
+
+test("the page command uses the template, and a missing or malformed one never fails the deploy", () => {
+  inTemporaryRepository((dir) => {
+    const good = generate(dir, `<p>mine</p>${TEMPLATE_MARKER}`);
+    assert.equal(good.result.status, 0);
+    assert.match(good.html, /^<p>mine<\/p>      <nav class="changelog-index"/);
+    assert.equal(good.result.stdout.includes("::warning::"), false);
+    const missing = generate(dir, undefined);
+    assert.equal(missing.result.status, 0);
+    assert.match(missing.html, /^<!doctype html>/);
+    assert.equal(missing.result.stdout.includes("::warning::"), false, "no template yet is normal, not a warning");
+    const malformed = generate(dir, "<p>no marker</p>");
+    assert.equal(malformed.result.status, 0);
+    assert.match(malformed.html, /^<!doctype html>/);
+    assert.match(malformed.result.stdout, /::warning::.*exactly once/);
+    const none = generate(dir, null);
+    assert.equal(none.result.status, 0);
+    assert.match(none.html, /^<!doctype html>/);
+  });
 });
 
 const publish = () => workflow(".github/workflows/release-mcpb-preview.yml").jobs["publish-preview"];
@@ -243,7 +303,8 @@ test("the publish and deploy workflows keep the notes wiring in order", () => {
   const render = step(deploy, "Render the changelog page");
   const upload = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   assert.ok(deploy.steps.indexOf(render) < deploy.steps.indexOf(upload), "the changelog page is rendered before the site is uploaded");
-  assert.match(render.run, /node scripts\/release-notes\.mjs page --changelog CHANGELOG\.md --out site\/changelog\.html/);
+  assert.match(render.run, /node scripts\/release-notes\.mjs page --changelog CHANGELOG\.md --template site\/changelog\.template\.html --out site\/changelog\.html/);
   assert.match(read(".gitignore"), /^site\/changelog\.html$/m);
+  assert.doesNotMatch(read(".gitignore"), /changelog\.template/);
   assert.match(read("site/index.html"), /href="\.\/changelog\.html"/);
 });

@@ -213,15 +213,6 @@ fn observed_statement_row<'a>(
         .map(|(_, key, _)| key)
 }
 
-/// One statement row: the same non-empty file hash and the same non-empty
-/// printed balance.
-fn is_same_statement_row(a: &StatementRowKey, b: &StatementRowKey) -> bool {
-    !a.statement.is_empty()
-        && a.statement == b.statement
-        && !a.balance.is_empty()
-        && a.balance == b.balance
-}
-
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
@@ -283,9 +274,12 @@ pub(super) fn verify_batch(
                 .flatten()
         })
         .collect::<Vec<_>>();
-    // A voucher another batch posted is not this batch's twin when every
-    // expected voucher of its fingerprint came from a different statement row
-    // (#865). It is then no fallback candidate for any of them.
+    // A voucher another batch posted is not this batch's twin when it is a
+    // provably different statement row from EVERY expected voucher of this
+    // batch (#865). It is then no fallback candidate. Different balances in one
+    // file also rule out "the same row", so a rebuilt, remapped batch that
+    // holds the posted row itself never qualifies. (A tag on two observed
+    // vouchers never reaches here: `ImportReadSource::admit` refuses it.)
     let other_statement_row = |index: usize| -> bool {
         let Some(theirs) = observed_tags[index].and_then(|tag| {
             observed_statement_row(
@@ -297,26 +291,10 @@ pub(super) fn verify_batch(
         }) else {
             return false;
         };
-        // An expected voucher that is this very row means the row is already
-        // posted, whatever it is now mapped to: not an exemption. (A tag on two
-        // observed vouchers never reaches here: `ImportReadSource::admit`
-        // refuses it.)
-        if expected_markers.iter().any(|marker| {
+        expected_markers.iter().all(|marker| {
             recorded_statement_row(statement_rows, &line.company_guid, marker)
-                .is_some_and(|ours| is_same_statement_row(ours, theirs))
-        }) {
-            return false;
-        }
-        let mut twins = expected_fingerprints
-            .iter()
-            .zip(&expected_markers)
-            .filter(|(fingerprint, _)| **fingerprint == observed_fingerprints[index])
-            .peekable();
-        twins.peek().is_some()
-            && twins.all(|(_, marker)| {
-                recorded_statement_row(statement_rows, &line.company_guid, marker)
-                    .is_some_and(|ours| statement_rows_differ(ours, theirs))
-            })
+                .is_some_and(|ours| statement_rows_differ(ours, theirs))
+        })
     };
     let mut tagged = BTreeMap::<&str, VerificationCandidates>::new();
     let mut fallback = BTreeMap::<&VerificationFingerprint, VerificationCandidates>::new();

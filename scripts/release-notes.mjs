@@ -1,0 +1,212 @@
+// One source for what changed: CHANGELOG.md. `notes` composes a GitHub release body from it and
+// `page` renders the same file for the install site, so the two cannot drift. Neither may block a
+// release or a deploy: every fallback prints a warning and still writes a usable file.
+import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
+const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+const sectionHeading = /^## \[([^\]]+)\](?: - (\S.*))?\s*$/;
+const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;
+const fence = /^\s*(```|~~~)/;
+
+export function versionFromTag(tag) {
+  return previewTag.exec(tag)?.[1];
+}
+
+// Sections open at a level-two `## [label]` heading outside a fenced block. Link reference
+// definitions (`[0.1.0]: https://...`) trail the last section and are not part of its text.
+export function parseChangelog(source) {
+  const sections = [];
+  let current;
+  let fenced = false;
+  for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    if (fence.test(line)) fenced = !fenced;
+    const heading = !fenced && sectionHeading.exec(line);
+    if (heading) {
+      current = { label: heading[1], date: heading[2], lines: [] };
+      sections.push(current);
+    } else if (current && (fenced || !linkDefinition.test(line))) {
+      current.lines.push(line);
+    }
+  }
+  return sections.map(({ label, date, lines }) => ({ label, date, body: lines.join("\n").trim() }));
+}
+
+export function pickNotes(sections, tag) {
+  const version = versionFromTag(tag);
+  if (version === undefined) throw new Error(`not an mcp-preview tag: ${tag}`);
+  const own = sections.find((section) => section.label === version && section.body !== "");
+  if (own) return { mode: "version", body: own.body };
+  const unreleased = sections.find((section) => section.label.toLowerCase() === "unreleased" && section.body !== "");
+  if (unreleased) return { mode: "unreleased", body: unreleased.body };
+  return { mode: "none", body: "" };
+}
+
+export function composeBody(picked, footer) {
+  const tail = footer.trim();
+  return picked.body === "" ? `${tail}\n` : `${picked.body}\n\n---\n\n${tail}\n`;
+}
+
+const escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// A single pass over the raw text: every emitted piece is escaped or built from a matched token,
+// so nothing from the changelog reaches the page as markup.
+const inlineToken = /`([^`\n]+)`|\*\*([^*\n]+)\*\*|\[([^\]\n]+)\]\((https:\/\/[^)\s"<>]+)\)|(?<![\w&/#])#(\d{1,6})\b/g;
+
+function inline(text) {
+  let html = "";
+  let last = 0;
+  for (const match of text.matchAll(inlineToken)) {
+    html += escapeHtml(text.slice(last, match.index));
+    const [, code, bold, linkText, url, issue] = match;
+    if (code !== undefined) html += `<code>${escapeHtml(code)}</code>`;
+    else if (bold !== undefined) html += `<strong>${escapeHtml(bold)}</strong>`;
+    else if (url !== undefined) html += `<a href="${escapeHtml(url)}">${escapeHtml(linkText)}</a>`;
+    else html += `<a href="${REPOSITORY_URL}/issues/${issue}">#${issue}</a>`;
+    last = match.index + match[0].length;
+  }
+  return html + escapeHtml(text.slice(last));
+}
+
+function blocks(body) {
+  const out = [];
+  let paragraph = [];
+  let item;
+  const flush = () => {
+    if (paragraph.length) out.push({ type: "p", text: paragraph.join(" ") });
+    paragraph = [];
+    item = undefined;
+  };
+  let fenced = false;
+  for (const line of body.split("\n")) {
+    if (fence.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || line.trim() === "") {
+      if (!fenced) flush();
+      continue;
+    }
+    const heading = /^(#{3,6}) (.+)$/.exec(line);
+    const bullet = /^(\s*)[-*] (.+)$/.exec(line);
+    if (heading) {
+      flush();
+      out.push({ type: "h", level: heading[1].length, text: heading[2] });
+    } else if (bullet) {
+      flush();
+      item = { type: "li", depth: Math.min(Math.floor(bullet[1].length / 2), 3), text: bullet[2] };
+      out.push(item);
+    } else if (item) {
+      item.text += ` ${line.trim()}`;
+    } else {
+      paragraph.push(line.trim());
+    }
+  }
+  flush();
+  return out;
+}
+
+export function renderBody(body) {
+  const html = [];
+  let depth = -1;
+  for (const block of blocks(body)) {
+    if (block.type !== "li") {
+      while (depth >= 0) html.push("</li></ul>"), depth -= 1;
+    }
+    if (block.type === "h") html.push(`<h${block.level}>${inline(block.text)}</h${block.level}>`);
+    else if (block.type === "p") html.push(`<p>${inline(block.text)}</p>`);
+    else {
+      const target = Math.min(block.depth, depth + 1);
+      if (target > depth) {
+        html.push("<ul>");
+        depth += 1;
+      } else {
+        html.push("</li>");
+        while (depth > target) html.push("</ul></li>"), depth -= 1;
+      }
+      html.push(`<li>${inline(block.text)}`);
+    }
+  }
+  while (depth >= 0) html.push("</li></ul>"), depth -= 1;
+  return html.join("\n");
+}
+
+const pageHead = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>What changed in ComplyEaze Bridge</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="masthead">
+        <a class="wordmark" href="./">ComplyEaze Bridge</a>
+        <nav class="masthead-links"><a class="quiet-link" href="./">Install</a><a class="quiet-link" href="${REPOSITORY_URL}/releases">All releases</a></nav>
+      </header>
+      <article class="changelog">
+        <h1>What changed</h1>
+`;
+const pageTail = `      </article>
+    </main>
+  </body>
+</html>
+`;
+
+export function renderPage(sections) {
+  const parts = sections.map(({ label, date, body }) => {
+    const title = label.toLowerCase() === "unreleased" ? "In source, not yet published" : `${label}${date ? `, ${date}` : ""}`;
+    return `        <section>\n          <h2>${escapeHtml(title)}</h2>\n${renderBody(body)}\n        </section>\n`;
+  });
+  return pageHead + parts.join("") + pageTail;
+}
+
+export function fallbackPage() {
+  return `${pageHead}        <p>The change list could not be prepared for this page. Read <a href="${REPOSITORY_URL}/releases">the releases on GitHub</a>.</p>\n${pageTail}`;
+}
+
+function warn(message) {
+  console.log(`::warning::${message}`);
+}
+
+function argument(args, name) {
+  const at = args.indexOf(name);
+  if (at < 0 || args[at + 1] === undefined) throw new Error(`missing ${name}`);
+  return args[at + 1];
+}
+
+export function main(argv) {
+  const [command, ...args] = argv;
+  if (command === "notes") {
+    const tag = argument(args, "--tag");
+    const footer = readFileSync(argument(args, "--footer"), "utf8");
+    let picked = { mode: "none", body: "" };
+    try {
+      picked = pickNotes(parseChangelog(readFileSync(argument(args, "--changelog"), "utf8")), tag);
+    } catch (error) {
+      warn(`could not read release notes from CHANGELOG.md (${error.message})`);
+    }
+    if (picked.mode === "none") warn(`CHANGELOG.md has no section for ${tag}; the release carries the standard text and GitHub's change list only`);
+    if (picked.mode === "unreleased") warn(`CHANGELOG.md has no ${versionFromTag(tag)} section; the release carries its [Unreleased] text`);
+    writeFileSync(argument(args, "--out"), composeBody(picked, footer));
+    console.log(picked.mode);
+    return 0;
+  }
+  if (command === "page") {
+    let html;
+    try {
+      html = renderPage(parseChangelog(readFileSync(argument(args, "--changelog"), "utf8")));
+    } catch (error) {
+      warn(`could not render CHANGELOG.md for the site (${error.message}); the page links to the releases instead`);
+      html = fallbackPage();
+    }
+    writeFileSync(argument(args, "--out"), html);
+    return 0;
+  }
+  console.error("usage: release-notes.mjs notes --tag T --changelog F --footer F --out F | page --changelog F --out F");
+  return 2;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main(process.argv.slice(2));

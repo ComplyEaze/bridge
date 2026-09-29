@@ -595,8 +595,9 @@ disagree.
 2. **Safer or fixed.** Refusals, safety checks and bug fixes, described by
    what the user sees.
 3. **Known limits.** Name what still does not work, and link the issue.
-4. **All changes.** Paste GitHub's generated list here. `.github/release.yml`
-   groups it by the existing `type:*` labels.
+4. **All changes.** GitHub's generated list, grouped by the existing `type:*`
+   labels through `.github/release.yml`. The publish workflow appends it; do
+   not paste it by hand.
 
 **`CHANGELOG.md`**
 
@@ -604,6 +605,20 @@ disagree.
   written from the merged pull requests since the last build.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
+- `CHANGELOG.md` is the one source for the notes. The publish workflow takes
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
+  puts it above the unsigned-preview text, and appends GitHub's list. The
+  install page's "What changed" page renders the same file at deploy time.
+  Neither step can stop a release or a deploy; each warns and falls back, so a
+  missing section shows as a warning in the run, not as a failed release.
+- At cut time, in the pull request that bumps the version: rename the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
+  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  release carries the `[Unreleased]` text instead (with a warning); if that is
+  empty too, only the standard text and GitHub's list.
+- The install page shows the file's text as written, so a claim added here is
+  a claim on the public site. Escape nothing by hand: the renderer escapes all
+  text and links only `https://` addresses and `#123` issue numbers.
 
 **Writing rules for notes, the install page and posts**
 

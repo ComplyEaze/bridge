@@ -3308,6 +3308,44 @@ is net of an unknown part of it."
     }
 
     #[test]
+    fn a_zero_line_on_a_capital_touches_no_capital_so_the_voucher_is_listed_for_the_other_partner()
+    {
+        // Shared interest booked and reversed (nets to nil) beside a ZERO line on A's capital.
+        // Only a non-zero line touches a ledger (the reference's walk), so no capital is touched
+        // and the voucher is off-capital for B, though its lines net to nil.
+        let z2 = voucher(
+            "z2",
+            &[
+                ("Interest to Partners", 500_000),
+                ("Interest to Partners", -500_000),
+                ("Partner A", 0),
+            ],
+        );
+        let r = go_shared(vec![z2], &format!("{SHARED}{DEED}"), &[]);
+        let off = found(&r, &format!("off_capital/{}", hash8("partner_b")));
+        assert_eq!(off.len(), 1);
+        assert!(off[0].evidence.iter().any(|e| e.id == "z2"));
+    }
+
+    #[test]
+    fn a_one_paisa_line_on_a_capital_still_touches_it_and_leaves_the_voucher_out_for_the_other_partner(
+    ) {
+        // The same shape with A's capital carrying a single paisa (balanced by the bank): a
+        // non-zero line, whatever its size, touches the capital.
+        let z3 = voucher(
+            "z3",
+            &[
+                ("Interest to Partners", 500_000),
+                ("Interest to Partners", -500_000),
+                ("Partner A", 1),
+                ("Bank", -1),
+            ],
+        );
+        let r = go_shared(vec![z3], &format!("{SHARED}{DEED}"), &[]);
+        assert!(found(&r, &format!("off_capital/{}", hash8("partner_b"))).is_empty());
+    }
+
+    #[test]
     fn a_shared_remuneration_voucher_crediting_one_partner_and_a_bank_is_listed_for_the_other() {
         let m2 = voucher(
             "m2",

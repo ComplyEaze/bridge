@@ -414,3 +414,12 @@ Append-only log. Newest entry at the bottom. This branch is never merged.
   - The run was sixteen shards. Container restarts roughly every hour killed runs; each shard was pushed to `cloud/lane-e-644-shards-3` as it finished, and a committed `resume.sh` restarts only the missing ones.
 - A Sonnet pre-push check found nothing. **Pushed 6df2162b.** #826's body and a comment give the numbers.
 - Next: #826 waits on CI, review and the merge (Lane D). Then #662's remainder (CI wiring for `check-unbounded-reads.mjs`), #658 and #667.
+
+## 2026-09-29 15:30 UTC — #826 (#644): a third master merge (#820), and records for it (760023e1)
+
+- Master's #820 re-pinned partners_40b_194t, which invalidated 6df2162b's records. The third merge, 800d9396, adds `?` to partners' 16 `r.fig` calls and rewords its comment. The pre-check and the test-only `fig(&r, …)` helper are unchanged. The list is 843; 413 tests pass; fmt and clippy are clean; a Sonnet check found no P1 or P2.
+- **Records:** 843 run, 839 killed, and the survivors are X11, A04, A19 and S08. `--verify` gives 683 of 683.
+  - The run was sixteen shards through `resume.sh` on `cloud/lane-e-644-shards-4`. Two container restarts and a git 503 cost only the shards in flight.
+- A Sonnet pre-push check found no P1 or P2. **Pushed 760023e1.** #826's body and a comment give the numbers.
+- I pushed a notification to the owner: each master re-pin of a module this PR touches (#812, #821, #820) costs a merge and a full run, so a prompt merge of #826 would end the cycle.
+- Next: #826 waits on CI, review and the merge (Lane D). Then #662's remainder, #658 and #667.

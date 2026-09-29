@@ -9,7 +9,7 @@ import { parseDocument } from "yaml";
 
 const defaultBranchGuard = "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)";
 // The install page also redeploys after a successful preview publication, from the default branch only.
-const installPageGuard = `${defaultBranchGuard} && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == github.event.repository.default_branch))`;
+const installPageGuard = `${defaultBranchGuard} && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == github.event.repository.default_branch))`;
 
 async function workflow(path) {
   const source = await readFile(new URL(path, import.meta.url), "utf8");
@@ -183,6 +183,17 @@ test("publication workflow checks reject disabled or misplaced controls", async 
   anyConclusion.jobs.deploy.if = anyConclusion.jobs.deploy.if.replace("github.event.workflow_run.conclusion == 'success' && ", "");
   assert.notEqual(anyConclusion.jobs.deploy.if, page.jobs.deploy.if);
   assert.throws(() => assertInstallPageWorkflow(anyConclusion), /successful publication/);
+
+  // workflow_run matches by workflow name, so a pull request's same-named workflow or a fork's run must not qualify.
+  for (const condition of [
+    "github.event.workflow_run.event == 'workflow_dispatch' && ",
+    "github.event.workflow_run.head_repository.full_name == github.repository && ",
+  ]) {
+    const relaxed = structuredClone(page);
+    relaxed.jobs.deploy.if = relaxed.jobs.deploy.if.replace(condition, "");
+    assert.notEqual(relaxed.jobs.deploy.if, page.jobs.deploy.if, condition);
+    assert.throws(() => assertInstallPageWorkflow(relaxed), /successful publication/, condition);
+  }
 });
 
 test("the MCPB smoke binds initialize serverInfo.version to the archived manifest", async () => {

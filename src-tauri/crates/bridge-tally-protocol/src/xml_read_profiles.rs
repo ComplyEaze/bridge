@@ -17,6 +17,7 @@ use crate::outstandings::{
 #[cfg(feature = "voucher-scan")]
 use crate::outstandings_shared::PinnedCompany;
 use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
+use crate::xml_text::escape_text as xml_escape;
 use crate::{
     encode_tally_xml_request_utf16le, BRIDGE_LEDGER_EXPORT_SCHEMA,
     BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
@@ -1114,15 +1115,6 @@ fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
         from = xml_escape(from),
         to = xml_escape(to),
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 fn valid_yyyymmdd(value: &str) -> bool {

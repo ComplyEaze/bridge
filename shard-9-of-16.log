@@ -1,0 +1,75 @@
+A03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+T07 killed (full) by 1: src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+A02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A06 killed (full) by 3: src/lib.rs::creditor_ageing_43bh::tests::same_day_bills_come_before_payments_and_excess_becomes_an_advance, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A05 killed (full) by 3: src/lib.rs::creditor_ageing_43bh::tests::same_day_bills_come_before_payments_and_excess_becomes_an_advance, src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date, tests/edge_books.rs::every_edge_book_matches_the_reference
+A04 survived (full)
+A07 killed (full) by 2: src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date, tests/edge_books.rs::every_edge_book_matches_the_reference
+A08 killed (full) by 1: src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date
+A11 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A10 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A12 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A19 survived (full)
+A20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A23 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A24 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A26 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+A25 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A31 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A32 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R03 killed (full) by 2: src/lib.rs::creditor_ageing_43bh::tests::a_post_year_payment_settles_the_oldest_lot_first, tests/edge_books.rs::every_edge_book_matches_the_reference
+R04 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+R07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R06 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+R22 killed (full) by 1: src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date
+R09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+A37 killed (full) by 1: src/lib.rs::creditor_ageing_43bh::tests::a_lag_is_bounded_by_pythons_date_range
+SB-08 killed (full) by 8: tests/parity_depreciation.rs::a_changed_value_at_the_180_day_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_at_the_cash_limit_boundary_is_reported, tests/parity_depreciation.rs::a_changed_value_is_reported, tests/parity_depreciation.rs::a_flipped_confidence_is_reported, tests/parity_depreciation.rs::a_reordered_but_equal_dump_passes, tests/parity_depreciation.rs::synthetic_read_matches_the_python_golden, tests/parity_depreciation.rs::the_old_book_vs_act_title_is_reported, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+
+41 of 41 killed
+
+warning: 30 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  T07 (full): src/lib.rs::support::text_probe_tests::the_reference_regexes_match_as_python_does
+  A01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A08 (full): src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date
+  A09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A10 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A11 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A24 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A25 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A31 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  A32 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R06 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  R22 (full): src/lib.rs::creditor_ageing_43bh::tests::the_opening_lot_is_tracked_by_position_not_date
+  A37 (full): src/lib.rs::creditor_ageing_43bh::tests::a_lag_is_bounded_by_pythons_date_range

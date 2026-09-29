@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "36a583a160c61d560012956fec200d12447554bcf7dbfd128dc9daf11c85c009"
+      "sha256": "de883549615440c1a826db4c8383d5dbdce6b1b4b708066e5181af1a88b29285"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",

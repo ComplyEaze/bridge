@@ -927,7 +927,7 @@
     },
     {
       "path": "src-tauri/src/tally/approved_import.rs",
-      "sha256": "dc5c4745789954fb54d6736a435bc2938df8dee95efb79753c8866555b457ef8"
+      "sha256": "bb577c86111c20e82313c5f4b2982ea4cb10fbafadad0253d89413e6cb6edf9f"
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs",

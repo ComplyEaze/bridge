@@ -398,3 +398,21 @@ fn the_journal_read_returns_every_batchs_rows_with_its_company() {
         (GUID.to_string(), key("stmt-1", "800.00"))
     );
 }
+
+#[test]
+fn a_build_records_the_row_key_of_each_voucher_that_has_one() {
+    let keyed = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let mut row_keys = BTreeMap::new();
+    row_keys.insert(
+        keyed.vouchers[0].bridge_txn_id.clone(),
+        key("stmt-1", "900.00"),
+    );
+    row_keys.insert("some-other-txn".to_string(), key("stmt-1", "1.00"));
+    let recorded = recorded_statement_rows(&keyed.vouchers, &row_keys).unwrap();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(
+        recorded[&keyed.vouchers[0].bridge_txn_id],
+        key("stmt-1", "900.00")
+    );
+    assert!(recorded_statement_rows(&keyed.vouchers, &BTreeMap::new()).is_none());
+}

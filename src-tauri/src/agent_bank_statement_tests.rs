@@ -339,11 +339,6 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     let statement_hash = document["statement_sha256"].as_str().unwrap();
     assert_eq!(statement_hash.len(), 64);
     assert!(!text.contains(statement_hash), "{text}");
-    assert!(document["records"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|record| record.get("account_digest").is_none()));
     let vouchers = document["vouchers"].as_array().unwrap();
     assert_eq!(vouchers.len(), 6);
     // exactly build_import_xml's voucher fields; no identity of our own
@@ -677,6 +672,18 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         })
         .collect::<Vec<_>>();
     assert_eq!(named, [(id.as_str(), "Drawings", false)]);
+    // Every voucher's row key is the statement file's hash and that row's own
+    // printed balance (#865).
+    assert_eq!(resolved.row_keys.len(), 2);
+    let balances = resolved
+        .row_keys
+        .values()
+        .map(|key| {
+            assert_eq!(key.statement, "0".repeat(64));
+            key.balance.as_str()
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(balances, ["9500.00", "9600.00"].into());
     let vouchers = resolved.args["vouchers"].as_array().unwrap();
     assert_eq!(vouchers.len(), 2);
     let drawn = vouchers

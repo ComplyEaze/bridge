@@ -868,19 +868,7 @@ impl Server {
                 built_at: now(),
                 status: "built".to_string(),
                 pre_import_mark: mark,
-                statement_rows: Some(
-                    payload
-                        .vouchers
-                        .iter()
-                        .filter_map(|voucher| {
-                            resolved
-                                .row_keys
-                                .get(&voucher.bridge_txn_id)
-                                .map(|key| (voucher.bridge_txn_id.clone(), key.clone()))
-                        })
-                        .collect::<BTreeMap<_, _>>(),
-                )
-                .filter(|rows| !rows.is_empty()),
+                statement_rows: recorded_statement_rows(&payload.vouchers, &resolved.row_keys),
                 vouchers: payload.vouchers,
                 ledger_identities: Some(build_binding),
             };
@@ -1773,6 +1761,22 @@ fn append_import_ledger_bytes(
         return Err("import_ledger_unavailable".to_string());
     }
     Ok(())
+}
+
+/// The row keys of the vouchers a build carries, for the journal record (#865).
+fn recorded_statement_rows(
+    vouchers: &[ImportVoucher],
+    row_keys: &BTreeMap<String, StatementRowKey>,
+) -> Option<BTreeMap<String, StatementRowKey>> {
+    let rows = vouchers
+        .iter()
+        .filter_map(|voucher| {
+            row_keys
+                .get(&voucher.bridge_txn_id)
+                .map(|key| (voucher.bridge_txn_id.clone(), key.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
+    (!rows.is_empty()).then_some(rows)
 }
 
 fn canonical_batch_guid(guid: &str) -> String {

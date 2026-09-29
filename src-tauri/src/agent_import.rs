@@ -1621,6 +1621,17 @@ impl Server {
         }
     }
 
+    /// The batch, already sent or found posted, that holds a row of `line`.
+    pub(super) fn import_rows_already_posted_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<Option<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::rows_already_posted(reader, line),
+            None => Ok(None),
+        }
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,

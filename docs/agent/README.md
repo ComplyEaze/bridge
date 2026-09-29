@@ -541,6 +541,20 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    with `import_batch_not_found`, `import_already_attempted`,
    `import_batch_changed` or `import_remote_id_reused`, and this post sends
    nothing. Rebuild only when `attempt_recorded` is `false`.
+   A batch holding a row that another batch of the same company already sent to
+   Tally, or that a readback found posted, refuses with
+   `import_txn_already_posted`, both before the approval dialog and again under
+   the lock (#876). Two vouchers are the same row when they share a
+   transaction id and either the id is the `st-YYYYMMDD-<16 hex>` form a
+   bank-statement build derives (it survives a change of ledger) or their date
+   and amounts agree. Do not rebuild it: verify the earlier batch, which the error's
+   `blocking_batch_id` names. Limits: a
+   batch imported by hand through Tally's Import menu is never marked as sent,
+   so it counts only after `verify_import` has recorded `posted_verified`; a
+   batch that was sent and failed also blocks a rebuild of the same row (alter
+   the voucher in Tally, or import the file by hand); a rebuild that both
+   renames a hand-typed transaction id and changes the amounts is not seen;
+   two Bridge installs on one company keep separate journals.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the

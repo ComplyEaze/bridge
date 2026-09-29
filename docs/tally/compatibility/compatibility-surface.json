@@ -39,7 +39,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE.md",
-      "sha256": "bcd86524771fdfed81a9db4d821f4c29d16f05ccc8b483ab31256f4712d701f3"
+      "sha256": "a8fe79ef1e655b33c753c8e10b0b583aeb13f561aa6ca99e2f281fc1c54dadfc"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md",
@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "4371dac97965707db36a6a0a280ca5f4e6419770c7f606e9948e6a0238b152dc"
+      "sha256": "463588c414956a5315463c3f33bfbf82981396fc5404e2940da14481650b49f9"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -443,7 +443,7 @@
     },
     {
       "path": "src-tauri/src/agent.rs",
-      "sha256": "cd08b3a069cc705965b50df5c86687d5f3224f4f296bf866340e2ccf49a8c51b"
+      "sha256": "9bde42feb259392db1c33c5cf5b86f6b47440050349e04b6d0fa6587a04b7900"
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
@@ -451,7 +451,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "ff0c8a73fb4e0e767ad121eac59a365be2618ba66ac74cbe05946d30636fc4e5"
+      "sha256": "c1999ff06562f78c9dd682dfb8a7502840334fb5fd90d32677f20dd01137f7c1"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -607,7 +607,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "c3aeb0393a79248dda574a2860af8f73a571b5987fb5fabd317c719e2174f3a9"
+      "sha256": "43e617fc34e836d0544759e25e9c0c974d550b632ad3c191fb40e29745cec19b"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -931,7 +931,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "98bc6308428ea9bb840c2471bab03da72d8f89d7ace583c4bd1cfa99e3b94fb9"
+      "sha256": "223f523b804e7ad1432c05268189aa0ba447b5ac2bd27cc2c8d398a92523b45e"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",
@@ -947,7 +947,7 @@
     },
     {
       "path": "src-tauri/src/tally/runtime.rs",
-      "sha256": "310ef10f9266a1f21dac99a25417f9d5172b4572747b1174934c77d042d47ce9"
+      "sha256": "24b0ccd7cf7027061da6da7d287a808e9ca65d8e72f815fb82b616045ffc78d7"
     },
     {
       "path": "src-tauri/src/tally/runtime_control.rs",

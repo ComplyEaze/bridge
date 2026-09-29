@@ -1,0 +1,75 @@
+F06 killed (full) by 1: src/lib.rs::ledger_ids::tests::guid_tag_strips_and_lowercases_as_python_does
+A35 killed (full) by 1: src/lib.rs::py_int_tests::py_int_takes_what_pythons_int_takes
+A34 killed (full) by 1: src/lib.rs::py_int_tests::py_int_takes_what_pythons_int_takes
+A30 killed (full) by 1: tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C1-33 killed (full) by 2: src/lib.rs::binding::tests::loans_interest_on_passes_the_tds_ledgers_activity_and_placeholder, src/lib.rs::binding::tests::the_tds_tables_are_read_strictly
+A38 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+C1-40 killed (full) by 4: src/lib.rs::binding::tests::each_tds_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_alias_and_category_keys_follow_a_rename_by_identity, src/lib.rs::binding::tests::tds_keys_are_bound_and_alias_values_are_left_alone, src/lib.rs::binding::tests::the_tds_tables_are_read_strictly
+C2-12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-14 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-20 killed (full) by 3: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+C2-18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-23 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-24 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-26 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-25 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-29 killed (full) by 3: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+C2-27 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-30 killed (full) by 1: tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+C2-32 killed (full) by 5: src/lib.rs::binding::tests::each_tds_26as_location_refuses_a_name_that_matches_nothing, src/lib.rs::binding::tests::tds_26as_ledgers_and_alias_values_are_bound, src/lib.rs::binding::tests::the_tds_26as_table_is_read_strictly, tests/registry.rs::every_registered_test_matches_its_synthetic_golden, tests/registry.rs::the_26as_floors_are_what_each_test_emits_with_no_documents
+C2-31 killed (full) by 3: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+C2-40 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+C2-41 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+D1-20 killed (full) by 1: src/lib.rs::binding::tests::a_malformed_loans_value_fails_only_loans_interest
+C2-42 killed (full) by 1: src/lib.rs::binding::tests::the_tds_26as_table_is_read_strictly
+PI-08 killed (full) by 1: src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int
+E2A-15 killed (full) by 3: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+E2A-20 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-21 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-22 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-33 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-35 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2A-34 killed (full) by 1: src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+E2B2-27 killed (full) by 1: tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+
+40 of 40 killed
+
+warning: 31 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  F06 (full): src/lib.rs::ledger_ids::tests::guid_tag_strips_and_lowercases_as_python_does
+  A30 (full): tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+  A34 (full): src/lib.rs::py_int_tests::py_int_takes_what_pythons_int_takes
+  A35 (full): src/lib.rs::py_int_tests::py_int_takes_what_pythons_int_takes
+  A38 (full): src/lib.rs::binding::tests::a_malformed_value_in_a_tests_own_table_fails_only_that_test
+  C2-12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-14 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-23 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-24 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-26 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-30 (full): tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+  C2-40 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  C2-41 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  C2-42 (full): src/lib.rs::binding::tests::the_tds_26as_table_is_read_strictly
+  D1-20 (full): src/lib.rs::binding::tests::a_malformed_loans_value_fails_only_loans_interest
+  PI-08 (full): src/lib.rs::py_int_tests::past_the_i64_range_is_not_the_same_as_not_an_int
+  E2A-20 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-21 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-22 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-33 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-34 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2A-35 (full): src/lib.rs::documents::tests::a_bank_statement_is_read_as_the_emitter_writes_it_and_bad_shapes_refuse
+  E2B2-27 (full): tests/registry.rs::every_registered_test_matches_its_synthetic_golden

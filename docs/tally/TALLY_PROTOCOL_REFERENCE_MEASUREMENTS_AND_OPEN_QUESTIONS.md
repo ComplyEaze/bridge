@@ -480,12 +480,13 @@ size below is wire bytes: the responses are UTF-16LE, so the file size is the by
   of the master read's bytes and 35 to 41 percent of its time on this book, which is why the read is
   admitted by a count and not by the mark alone once the mark is high enough to matter (#668).
 
-**A second book, PARTIAL, 2026-09-29 (one licensed 7.1 Silver book of 9,451 ledgers, 1,354
-parents of which 1,008 hold one ledger, `ALTMSTID` 20,190; read by scripts).** Whole reads: the
-catalogue 11.6 MB in 1.5 s; balances 12.4 MB in 12.0 s. Balance time is not linear from parts: a
-262-row part took 0.10 s (0.4 ms per row) and the whole took 12.0 s (1.3 ms per row). A parent-group
-part of the master with the compliance fields took 0.07 s at 19 rows, 0.52 s at 262 rows and 0.78 s
-at 1,471 rows (4.1 MB); every row bound to the selected company. The 3,750-byte budget held (mean
+**A second book, PARTIAL, 2026-09-29 (one licensed 7.1 Silver book of about 9.5 thousand ledgers,
+about 1.35 thousand parents of which about three quarters hold one ledger, `ALTMSTID` about 20
+thousand; read by scripts).** Whole reads: the
+catalogue about 11.6 MB in about 1.5 s; balances about 12.4 MB in about 12 s. Balance time is not linear from parts: a
+part of a few hundred rows took about 0.1 s (0.4 ms per row) and the whole took about 12 s (1.3 ms per row). A parent-group
+part of the master with the compliance fields took under 0.1 s at about 20 rows, about 0.5 s at a few hundred rows and
+under 0.8 s at about 1.5 thousand rows (about 4 MB); every row bound to the selected company. The 3,750-byte budget held (mean
 1,900 to 2,800).
 
 **Filters other than the parent returned an empty collection — the cause is UNVERIFIED, so do not
@@ -495,7 +496,7 @@ absent company returns: `$Name >= "lo" AND $Name < "hi"` (lower-case bounds, the
 bounds of a real name range), `$$StringPart:$Name:0:1 = "X"`, `$AlterID > 0 AND $AlterID <= 2000`
 and `$AlterID > 10000 AND $AlterID <= 12000`. Whether Tally does not support them on this
 collection or the formula syntax was wrong is not known. Only `$Parent = "..."` is measured to
-partition. Splitting by parent fits this book poorly: 1,008 of 1,354 parents hold one ledger.
+partition. Splitting by parent fits this book poorly: about three quarters of its parents hold one ledger.
 
 **Every one of those filter forms partitions on the synthetic book, so the empty result is not "the
 filter is unsupported" (PARTIAL, one synthetic book of 1,989 ledgers, no vouchers, 2026-09-29).**
@@ -508,8 +509,8 @@ with `OR`, including one whose name contains `&` (360 and 400 rows, each the uni
 Every request took 0.07 to 0.45 s. This is the prerequisite for splitting a read by several
 parents at once (#679).
 
-**The filter mechanism also works on the second book (PARTIAL, one real book of 9,451 ledgers,
-2026-09-29).** On the balance collection an exact-name filter for a name taken from that book's own
+**The filter mechanism also works on the second book (PARTIAL, one real book of about 9.5 thousand
+ledgers, 2026-09-29).** On the balance collection an exact-name filter for a name taken from that book's own
 catalogue returned exactly 1 row (the must-match control that was missing), and `$Parent = "a" OR
 $Parent = "b"` for two parents of 3 ledgers each returned 6 rows, 3 from each, every row bound to the
 selected company; both took under 0.11 s. So the earlier empty results on that book were not "the
@@ -518,20 +519,20 @@ match rows on it is still UNVERIFIED: they were not re-sent, and the untested ex
 the bounds they used matched no ledger.
 
 **A one-day voucher census at a far-future date was answered normally with zero vouchers
-(PARTIAL, one book, 2026-09-29).** On the second book a census for a day in the year 5042, the
+(PARTIAL, one book, 2026-09-29).** On the second book a census for a far-future day, the
 company header's own last-voucher date, returned a well-formed empty collection in 0.18 s, while the same request for a
-day known to hold 282 vouchers returned all 282. It is UNVERIFIED that zero means no voucher sits on
+day known to hold a few hundred vouchers returned all of them. It is UNVERIFIED that zero means no voucher sits on
 that day: a five-digit-year date literal may not parse to that date and match nothing, and a census cannot
 tell the two apart.
 
 **Tally honours a far-future `SVTODATE` on the balance collection; it does not clamp it (PARTIAL,
-one parent of 80 ledgers on the second book, 2026-09-29).** The same parent read as at 20260401,
-at 20260929 and at the year-5042 date returned the same 80 ledgers and the same opening balances
-each time, with closing balances that differ in 27 rows (first and second date), 42 (first and
-third) and 15 (second and third). If the far-future date were dropped or replaced by the reporting
+one parent of about 80 ledgers on the second book, 2026-09-29).** The same parent read as at
+20260401, at 20260929 and at a far-future date returned the same ledgers and the same opening balances
+each time, with closing balances that differ in tens of rows (first and second date, first and third) and in
+fewer than 20 (second and third). If the far-future date were dropped or replaced by the reporting
 date the second and third reads would be identical, so it was applied as a later date. What that
 proves is only that an as-of balance read at such a date takes in whatever is dated after the
-reporting date. Whether the 15 rows moved because of a mistyped far-future voucher or because of
+reporting date. Whether those rows moved because of a mistyped far-future voucher or because of
 legitimate later-dated ones is UNVERIFIED, as is a book whose stray voucher sits in another
 parent.
 

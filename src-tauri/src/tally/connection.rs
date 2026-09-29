@@ -212,7 +212,7 @@ const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
 /// 2026-09-29), so 1,600 leaves about 45% for longer names. It bounds the
 /// mark, not the ledgers: past `budget / 1,600` = 10,000 the mark alone is
 /// refused. That reach is Bridge's own choice, not a measured limit: a
-/// 9,451-ledger catalogue read 11.6 MB in 1.5 s.
+/// catalogue of about 9,500 ledgers read about 11.6 MB in about 1.5 s.
 const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
 
 /// A compliance master response estimate for a ledger count, or an upper

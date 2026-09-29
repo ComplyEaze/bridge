@@ -480,10 +480,28 @@ size below is wire bytes: the responses are UTF-16LE, so the file size is the by
   of the master read's bytes and 35 percent of its time on this book, which is why the read is
   admitted by a count and not by the mark alone once the mark is high enough to matter (#668).
 
-**Not established:** anything about vouchers, a book with real party data, a book above a few
-thousand ledgers, or any size at which Tally stops answering. The largest single latency in 60
-requests was 2.93 s. Do not read the 3,750-byte budget or the 10,000-mark reach for the count as
-measured limits: they are Bridge's own choices, set above the row cost seen here.
+**A second book, PARTIAL, 2026-09-29 (one licensed 7.1 Silver book of 9,451 ledgers, 1,354
+parents of which 1,008 hold one ledger, `ALTMSTID` 20,190; read by scripts).** Whole reads: the
+catalogue 11.6 MB in 1.5 s; balances 12.4 MB in 12.0 s. Balance time is not linear from parts: a
+262-row part took 0.10 s (0.4 ms per row) and the whole took 12.0 s (1.3 ms per row). A parent-group
+part of the master with the compliance fields took 0.07 s at 19 rows, 0.52 s at 262 rows and 0.78 s
+at 1,471 rows (4.1 MB); every row bound to the selected company. The 3,750-byte budget held (mean
+1,900 to 2,800).
+
+**Filters other than the parent returned an empty collection — the cause is UNVERIFIED, so do not
+build a split on them (#679).** Each of these, sent on the ledger balance collection with the
+parent filter's formula mechanism, returned zero rows and the same 2,994-byte body a closed or
+absent company returns: `$Name >= "lo" AND $Name < "hi"` (lower-case bounds, then the exact-case
+bounds of a real name range), `$$StringPart:$Name:0:1 = "X"`, `$AlterID > 0 AND $AlterID <= 2000`
+and `$AlterID > 10000 AND $AlterID <= 12000`. Whether Tally does not support them on this
+collection or the formula syntax was wrong is not known. Only `$Parent = "..."` is measured to
+partition. Splitting by parent fits this book poorly: 1,008 of 1,354 parents hold one ledger.
+
+**Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
+or the cause of the empty filters above. The largest single latency was 2.93 s on the synthetic
+book and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
+10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
+row cost seen here.
 
 ## 11a. Scale measurements — 11,287-voucher corpus
 

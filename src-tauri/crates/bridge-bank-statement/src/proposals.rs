@@ -147,9 +147,10 @@ pub struct StatementRecord {
     pub cash_answer: Option<CashAnswer>,
     /// The running balance printed on the row, as a canonical two-place
     /// decimal (no leading zeros, no negative zero); `None` when the statement
-    /// has no balance column or the cell is not an amount. Two rows of one
-    /// statement with one date, side and amount differ in this alone, so it is
-    /// what tells a second same-day payment from a repeat (#865).
+    /// has no balance column or the cell is not an amount. Within one
+    /// statement file a row prints one balance, so it tells a second same-day
+    /// payment from a repeat; two such rows can also print equal balances,
+    /// which stays refused (#865).
     pub balance: Option<String>,
 }
 

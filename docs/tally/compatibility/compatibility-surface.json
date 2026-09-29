@@ -199,7 +199,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/proposals.rs",
-      "sha256": "f3d285cdae4cf8c94689675399572f5b9a41ec2caaa381a33b434425815e22de"
+      "sha256": "396007f13a7853e7772252e55e451593b12113efa2af433d69e88b4c32e8e9a7"
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/text.rs",

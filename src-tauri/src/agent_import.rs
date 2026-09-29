@@ -3111,7 +3111,21 @@ impl Server {
     /// which goes first to its own file. The check record keeps its masters
     /// verdict as it is. A verdict that cannot be written leaves the step
     /// pending, which is doubt.
+    #[cfg(test)]
     pub(super) fn record_batch_step_verdict(&self, batch_id: &str, target_voucher_step: &Value) {
+        self.record_batch_step_verdict_caused(batch_id, target_voucher_step, None);
+    }
+
+    /// As [`Self::record_batch_step_verdict`], with `cause` naming why the
+    /// step could not be read when the marks readback failed (#884). It is
+    /// recorded beside the verdict and never changes it: a step not read is
+    /// still doubt.
+    pub(super) fn record_batch_step_verdict_caused(
+        &self,
+        batch_id: &str,
+        target_voucher_step: &Value,
+        cause: Option<&str>,
+    ) {
         let Ok(imports) = self.imports_dir() else {
             return;
         };
@@ -3120,6 +3134,9 @@ impl Server {
         } else {
             json!({"state": "unmatched", "target_voucher_step": target_voucher_step})
         };
+        if let Some(cause) = cause {
+            verdict["cause"] = json!(cause);
+        }
         if verdict["state"] != "matched" {
             record_doubt(&batch_step_doubt_path(&imports, batch_id), &mut verdict);
         }

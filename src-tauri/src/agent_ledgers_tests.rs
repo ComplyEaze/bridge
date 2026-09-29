@@ -944,30 +944,94 @@ mod through_the_tool {
         assert!(remediation.contains("fields=basic"), "{error}");
     }
 
-    /// The captured catalogue widened to `rows` ledgers: the nine captured
-    /// rows first, then copies of the first with a distinct name and GUID.
-    fn catalogue(rows: usize) -> String {
-        let captured = captured(include_bytes!(
+    /// The captured nine-ledger catalogue.
+    fn catalogue() -> String {
+        captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
-        ));
-        if rows <= 9 {
-            return captured;
+        ))
+    }
+
+    /// One generated ledger: a distinct name and GUID under a named parent.
+    struct Generated {
+        index: usize,
+        name: String,
+        parent: &'static str,
+    }
+
+    impl Generated {
+        fn guid(&self) -> String {
+            format!("{GUID}-{:08x}", 0x1000 + self.index)
         }
-        let first = captured.find("    <LEDGER ").unwrap();
-        let end = captured.find("</COLLECTION>").unwrap();
-        let template_end =
-            first + captured[first..].find("</LEDGER>").unwrap() + "</LEDGER>\n".len();
-        let template = &captured[first..template_end];
-        let mut widened = captured[..end].to_owned();
-        for i in 9..rows {
-            widened.push_str(
+    }
+
+    /// `spec` parents with that many ledgers each, in spec order.
+    fn generated(spec: &[(&'static str, usize)]) -> Vec<Generated> {
+        let mut rows = Vec::new();
+        for (parent, count) in spec {
+            for _ in 0..*count {
+                let index = rows.len();
+                rows.push(Generated {
+                    index,
+                    name: format!("Generated Ledger {index:05}"),
+                    parent,
+                });
+            }
+        }
+        rows
+    }
+
+    /// The rows whose parent is one of `parents`.
+    fn under<'a>(rows: &'a [Generated], parents: &[&str]) -> Vec<&'a Generated> {
+        rows.iter()
+            .filter(|row| parents.contains(&row.parent))
+            .collect()
+    }
+
+    /// A captured party-master response with its ledgers replaced by
+    /// `rows`, each cut from the captured first ledger. The catalogue, master
+    /// and balance reads all use it; the opening balance is the row's index, so
+    /// the master and the balance agree.
+    fn with_ledgers(captured_response: String, rows: &[&Generated]) -> String {
+        const MARK: &str = "</LEDGER>";
+        let first = captured_response.find("    <LEDGER ").unwrap();
+        let first_end = first + captured_response[first..].find(MARK).unwrap() + MARK.len();
+        let last_end = captured_response.rfind(MARK).unwrap() + MARK.len();
+        let template = captured_response[first..first_end].trim_start();
+        let mut out = captured_response[..first].to_owned();
+        for (position, row) in rows.iter().enumerate() {
+            if position > 0 {
+                out.push_str("\n    ");
+            }
+            out.push_str(
                 &template
-                    .replace("Bridge Nested Debtor WR4", &format!("Filler Ledger {i}"))
-                    .replace("-000000d5", &format!("-f{i:07x}")),
+                    .replace("Bridge Nested Debtors WR4", row.parent)
+                    .replace("Bridge Nested Debtor WR4", &row.name)
+                    .replace("-000000d5", &format!("-{:08x}", 0x1000 + row.index))
+                    .replace(
+                        "<ALTERID TYPE=\"Number\"> 215<",
+                        &format!("<ALTERID TYPE=\"Number\"> {}<", 1_000 + row.index),
+                    )
+                    .replace(
+                        "<MASTERID TYPE=\"Number\"> 213<",
+                        &format!("<MASTERID TYPE=\"Number\"> {}<", 10 + row.index),
+                    )
+                    .replace(">-50000.00<", &format!(">-{}.00<", 1 + row.index)),
             );
         }
-        widened.push_str(&captured[end..]);
-        widened
+        out.push_str(&captured_response[last_end..]);
+        out
+    }
+
+    fn generated_catalogue(rows: &[&Generated]) -> String {
+        with_ledgers(catalogue(), rows)
+    }
+
+    fn generated_masters(rows: &[&Generated]) -> String {
+        with_ledgers(masters(), rows)
+    }
+
+    fn generated_balances(rows: &[&Generated]) -> String {
+        with_ledgers(balances(), rows)
     }
 
     /// A mark past the master bound but within the catalogue's reach is
@@ -978,7 +1042,7 @@ mod through_the_tool {
     async fn a_book_whose_counted_ledgers_fit_is_read_though_its_mark_does_not() {
         let plans = marked_compliance_plans(
             5_000,
-            vec![catalogue(9), masters(), balances(), groups()],
+            vec![catalogue(), masters(), balances(), groups()],
             Some(extent_with_master_mark(5_000)),
         );
         let total = plans.len();
@@ -993,30 +1057,140 @@ mod through_the_tool {
         assert_eq!(items(&response), items(&unsized_response));
     }
 
-    /// The same mark with a catalogue of 4,267 ledgers, one more than fit,
-    /// refuses right after the catalogue: no master request is sent, and the
-    /// refusal carries the count.
+    /// A book counted at 4,267 ledgers under one parent, one more than a
+    /// read holds, cannot be split by parent: it refuses right after the
+    /// catalogue, and no master request is sent (#679).
     #[tokio::test]
-    async fn a_book_whose_counted_ledgers_are_over_the_bound_is_refused_before_the_master_read() {
-        let plans = marked_compliance_plans(5_000, vec![catalogue(4_267)], None);
+    async fn a_parent_holding_more_ledgers_than_one_read_is_refused_before_the_master_read() {
+        let rows = generated(&[("Sundry Debtors", 4_267)]);
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&under(&rows, &["Sundry Debtors"]))],
+            None,
+        );
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
         assert_eq!(requests, total, "nothing is sent after the catalogue pair");
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "ledger_masters_too_large");
-        assert_eq!(
-            error["size"],
-            json!({"master_alter_id": 5_000, "counted_ledgers": 4_267, "estimated_bytes": 16_001_250, "budget_bytes": 16_000_000})
+        assert_eq!(error["cause"], "parent_over_budget");
+    }
+
+    const BIG: &str = "Sundry Debtors";
+    const NESTED: &str = "Bridge Nested Debtors WR4";
+    const OTHER: &str = "Sundry Creditors";
+
+    /// 4,300 ledgers under three parents. Largest first, the debtors and the
+    /// nested group fill the first read (3,300) and the creditors the second.
+    fn split_book() -> Vec<Generated> {
+        generated(&[(BIG, 2_200), (OTHER, 1_000), (NESTED, 1_100)])
+    }
+
+    /// The whole sequence for the split book: the catalogue, then one master
+    /// and one balance read per part, then the groups.
+    fn split_plans(first: (String, String), second: (String, String)) -> Vec<ScenarioPlan> {
+        let rows = split_book();
+        let mut plans = marked_compliance_plans(
+            6_000,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                first.0,
+                first.1,
+                second.0,
+                second.1,
+                groups(),
+            ],
+            None,
         );
+        pair(&mut plans, xml(extent_with_master_mark(6_000)));
+        plans
+    }
+
+    fn part_reads(rows: &[&Generated]) -> (String, String) {
+        (generated_masters(rows), generated_balances(rows))
+    }
+
+    /// A book too large for one read but with no parent too large is read in
+    /// parts, one filtered master and balance pair per part, and every ledger
+    /// comes back once (#679).
+    #[tokio::test]
+    async fn a_book_too_large_for_one_read_is_read_in_parts_by_parent() {
+        let rows = split_book();
+        let mut plans = split_plans(
+            part_reads(&under(&rows, &[BIG, NESTED])),
+            part_reads(&under(&rows, &[OTHER])),
+        );
+        plans.extend([xml(companies()), status(), xml(companies())]);
+        let total = plans.len();
+        let (response, requests) = call_with_max_bytes(
+            plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+            2_000_000,
+        )
+        .await;
+        assert_eq!(requests, total);
+        assert_ne!(response["isError"], true, "{response}");
+        assert_eq!(response["structuredContent"]["result"]["total"], 4_300);
+        let names = items(&response)
+            .iter()
+            .map(|item| item["name"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert!(names.windows(2).all(|pair| pair[0] <= pair[1]), "sorted by name");
+    }
+
+    async fn split_refusal(first: (String, String), second: (String, String)) -> String {
+        let plans = split_plans(first, second);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "the whole bracket is read before coverage");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        error["cause"].as_str().unwrap().to_owned()
+    }
+
+    /// A part that omits one of its parent's ledgers, as when a ledger was
+    /// deleted, or a filter was ignored in the wrong direction, is refused.
+    #[tokio::test]
+    async fn a_part_that_omits_a_ledger_of_its_parents_is_refused() {
+        let rows = split_book();
+        let mut short = under(&rows, &[BIG, NESTED]);
+        short.pop();
+        let cause = split_refusal(part_reads(&short), part_reads(&under(&rows, &[OTHER]))).await;
+        assert_eq!(cause, "parent_part_rows_missing");
+    }
+
+    /// A part that carries another part's ledger, as when Tally ignored the
+    /// filter, is refused rather than deduplicated.
+    #[tokio::test]
+    async fn a_part_that_carries_another_parts_ledger_is_refused() {
+        let rows = split_book();
+        let mut wide = under(&rows, &[BIG, NESTED]);
+        wide.push(under(&rows, &[OTHER])[0]);
+        let cause = split_refusal(part_reads(&wide), part_reads(&under(&rows, &[OTHER]))).await;
+        assert_eq!(cause, "parent_part_row_outside_parents");
+    }
+
+    /// A ledger renamed between the catalogue and its part is refused.
+    #[tokio::test]
+    async fn a_part_whose_ledger_differs_from_the_catalogue_is_refused() {
+        let rows = split_book();
+        let (masters_0, balances_0) = part_reads(&under(&rows, &[BIG, NESTED]));
+        let renamed = |text: String| text.replace("Generated Ledger 00005", "Renamed Ledger");
+        let cause = split_refusal(
+            (renamed(masters_0), renamed(balances_0)),
+            part_reads(&under(&rows, &[OTHER])),
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_differs_from_catalogue");
     }
 
     /// A catalogue that names another company does not size this one: it is
     /// refused on identity before any master request is sent.
     #[tokio::test]
     async fn a_count_from_another_company_is_refused_before_the_master_read() {
-        let other = catalogue(9).replace(GUID, "00000000-0000-0000-0000-000000000000");
+        let other = catalogue().replace(GUID, "00000000-0000-0000-0000-000000000000");
         let plans = marked_compliance_plans(5_000, vec![other], None);
         let total = plans.len();
         let (response, requests) =
@@ -1032,7 +1206,13 @@ mod through_the_tool {
     #[tokio::test]
     async fn a_catalogue_that_changes_between_its_two_reads_is_refused_before_the_master_read() {
         let mut plans = marked_compliance_plans(5_000, Vec::new(), None);
-        plans.extend([xml(catalogue(9)), status(), xml(catalogue(10)), status()]);
+        let changed = generated(&[(BIG, 10)]);
+        plans.extend([
+            xml(catalogue()),
+            status(),
+            xml(generated_catalogue(&under(&changed, &[BIG]))),
+            status(),
+        ]);
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
@@ -1054,7 +1234,7 @@ mod through_the_tool {
         };
         let counted_plans = marked_compliance_plans(
             5_000,
-            vec![catalogue(9), masters(), balances(), groups()],
+            vec![catalogue(), masters(), balances(), groups()],
             Some(extent_with_master_mark(5_000)),
         );
         let (counted, _) = call(
@@ -1073,7 +1253,7 @@ mod through_the_tool {
         )
         .await;
         // UTF-16LE on the wire, with its two-byte byte-order mark.
-        let catalogue_wire = 2 + 2 * catalogue(9).encode_utf16().count() as u64;
+        let catalogue_wire = 2 + 2 * catalogue().encode_utf16().count() as u64;
         assert_eq!(
             bytes(&counted) - bytes(&admitted),
             2 * catalogue_wire,

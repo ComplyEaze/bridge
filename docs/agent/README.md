@@ -90,16 +90,29 @@ carries `native_report_pair_changed`. A voucher-window part that is not admitted
 (`voucher_window_part_not_admitted`) names why, and a census disagreement also carries
 `counts`, the rows the part `returned` against the rows the census `counted`.
 A compliance ledger read (`ledger_masters fields=compliance`) whose estimated response is over
-Bridge's budget is refused before any master request (#637, #668). The refusal has cause
+Bridge's budget is refused before any master request (#637, #668, #679). The refusal has cause
 `ledger_masters_too_large` and a `size` object: `master_alter_id`, `counted_ledgers`,
-`estimated_bytes` and `budget_bytes`. A company whose master-alteration mark puts the estimate over
-budget, but is at most 10,000, has its ledgers counted first with a balance-free catalogue read
-(a stable pair, bound to the company by name and GUID), and is refused only when the count is over
-budget (`counted_ledgers` is that count). The read's extent bracket still checks the book
-afterwards, so a book that grows between the count and the master read is refused, but only after
-that read was sent. Above 10,000 the mark alone is refused and `counted_ledgers` is
-null: the mark is an upper bound on ledgers, since every master raises it, so a company with fewer
-ledgers may be refused. `fields=basic` still reads it.
+`estimated_bytes` and `budget_bytes`. A company whose master-alteration mark puts the estimate
+over budget, but is at most 10,000, has its ledgers counted first with a balance-free catalogue
+read (a stable pair, bound to the company by name and GUID). A count that fits is read whole.
+A count that does not is read in parts (#679): the catalogue's parent groups are packed into
+parts of at most 4,266 ledgers and 8 parents, and each part is one filtered master and balance
+read, all inside the one extent bracket. Every ledger the catalogue named must come back exactly
+once, in its own part, with the name and parent the catalogue gave it; otherwise the whole call is
+refused and nothing partial is returned (causes `parent_part_rows_missing`,
+`parent_part_row_outside_parents`, `parent_part_row_not_in_catalogue`,
+`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). A book that cannot be
+split is refused before any master request: one parent group over 4,266 ledgers
+(`parent_over_budget`), more than 12 parts (`parent_partition_too_many_parts`), a ledger with no
+parent (`ledger_without_parent`), a parent name that cannot sit in a filter
+(`parent_name_unsupported`) or a repeated ledger GUID
+(`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket
+still checks the book afterwards, so a book that grows between the count and the last read is
+refused, but only after those reads were sent. Above a mark of 10,000 the mark alone is refused
+with `ledger_masters_too_large` and `counted_ledgers` null: the mark is an upper bound on ledgers,
+since every master raises it, so a company with fewer ledgers may be refused. The limits are
+unverified against a live Tally beyond a two-parent filter; `fields=basic` still reads any of
+these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only

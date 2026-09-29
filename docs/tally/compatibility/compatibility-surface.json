@@ -370,6 +370,10 @@
       "sha256": "58bf5ffef1e877e9c68fa5e1551e56b3fb6b893b76ebd437ac6d03e909814863"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/parent_partition.rs",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs",
       "sha256": "8450b31d046703d1768cd31f39d7c863490cac68aeebd003799752451d7680ec"
     },

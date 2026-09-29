@@ -1859,6 +1859,17 @@ fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_mark(
     }
 }
 
+/// A parent-partition refusal surfaces under its own safe code, so an agent
+/// can tell "one parent is too large" from a validation failure (#679).
+#[test]
+fn a_parent_partition_refusal_keeps_its_own_safe_code() {
+    use bridge_tally_protocol::parent_partition::ParentPartitionError;
+    let error = super::PartyLedgerMasterSourceValidationError::ParentPartition {
+        source: ParentPartitionError::ParentOverBudget { ledgers: 4_267 },
+    };
+    assert_eq!(error.safe_code(), "parent_over_budget");
+}
+
 /// With a count, the count decides: as many ledgers as fit are admitted and
 /// one more is refused carrying the count and the estimate it produced.
 #[test]

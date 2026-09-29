@@ -542,6 +542,16 @@ book (the whole party-ledger master) and 12.0 s on the second (the whole balance
 10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
 row cost seen here.
 
+**Bridge's parent partition (#679) is CODE, live unproven.** A counted book that does not fit one read
+is split by the parent groups the catalogue names: packed first-fit-decreasing into parts of at most
+4,266 ledgers and 8 parents, at most 12 parts, and read through the `$Parent = "a" OR $Parent = "b"`
+filter measured above, with the reserved root written as `&#4; Primary`. Each part is read as its
+master pair then its balance pair inside one extent bracket, and every catalogue ledger must come back
+exactly once, from its own part, with the catalogue's name and parent, or the whole call is refused. The
+eight-parent and 12-part limits and the length of an `OR` formula beyond two parents are Bridge's own
+choices, UNVERIFIED against Tally. Whether the catalogue's and the master's parent text always agree
+byte for byte is UNVERIFIED; if they differ the read fails closed as `parent_part_row_differs_from_catalogue`.
+
 ## 11a. Scale measurements — 11,287-voucher corpus
 
 **VERIFIED 2026-07-29** on a generated production-shaped corpus: 25 customers and 15

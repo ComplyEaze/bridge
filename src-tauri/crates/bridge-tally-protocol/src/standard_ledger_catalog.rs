@@ -187,6 +187,18 @@ impl StandardLedgerCatalog {
             .map(|entry| (entry.name.as_str(), entry.parent.as_deref()))
     }
 
+    /// Each ledger's name, GUID and immediate parent, for planning parent
+    /// parts and checking the parts' rows against this catalogue (bridge#679).
+    pub fn identified_parents(&self) -> impl Iterator<Item = (&str, &str, Option<&str>)> {
+        self.entries.iter().map(|entry| {
+            (
+                entry.name.as_str(),
+                entry.guid.as_str(),
+                entry.parent.as_deref(),
+            )
+        })
+    }
+
     pub fn bind_selected(
         &self,
         requested_names: impl IntoIterator<Item = String>,

@@ -40,20 +40,24 @@ use bridge_tally_protocol::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
         render_native_ledger_export_request, render_native_ledger_snapshot_request,
-        render_native_voucher_export_request, render_party_ledger_master_request,
-        NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod, NativeOutstandingsError,
+        render_native_ledger_snapshot_request_for_parents, render_native_voucher_export_request,
+        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+        BaseCurrencyName, ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
+        NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
+    parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_native_voucher_source_records_with_evidence,
     parse_standard_ledger_catalog, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
-    StandardLedgerCatalogError, TallyTextEncoding,
+    ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
+    TallyTextEncoding,
 };
 use bridge_tally_transport::{
     canonical_loopback_origin as transport_canonical_origin, TallyEndpointConfig,
@@ -158,6 +162,15 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: StandardLedgerCatalogError,
     },
+    /// A book too large to read whole (#668) could not be read as parts by
+    /// immediate parent group (#679): a group too large for one part, too many
+    /// parts, a ledger or group name the filter cannot carry, or a part whose
+    /// rows are not the catalogue's. Nothing is released from a partial read.
+    #[error("Tally compliance master read could not be split by parent group")]
+    ParentPartition {
+        #[source]
+        source: ParentPartitionError,
+    },
 }
 
 impl PartyLedgerMasterSourceValidationError {
@@ -182,6 +195,7 @@ impl PartyLedgerMasterSourceValidationError {
             Self::MasterResponseInvalid { .. } => "master_response_invalid",
             Self::TooLarge { .. } => "ledger_masters_too_large",
             Self::LedgerCountInvalid { source } => source.safe_code(),
+            Self::ParentPartition { source } => source.safe_code(),
         }
     }
 }
@@ -214,6 +228,30 @@ const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
 /// refused. That reach is Bridge's own choice, not a measured limit: a
 /// catalogue of about 9,500 ledgers read about 11.6 MB in about 1.5 s.
 const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
+
+/// Most immediate parent groups one part's `$Parent = "A" OR $Parent = "B"`
+/// formula names (#679). UNVERIFIED: an `OR` of two parents is measured
+/// (protocol reference section 11e); a longer formula or a larger parent count
+/// is not. Chosen well inside any plausible limit, and only more parts, never
+/// a longer formula, are the cost of a smaller number.
+const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 8;
+
+/// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
+/// the serial requests one call may spend (four per part), not a measured
+/// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
+const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
+
+/// The limits a book's parent parts must fit (#679): each part's estimated
+/// master response is inside the same budget a whole read is admitted by, so
+/// the per-part ledger bound is the whole-read bound.
+fn parent_partition_limits() -> PartitionLimits {
+    PartitionLimits {
+        max_ledgers_per_part: COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+            / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+        max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
+        max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
+    }
+}
 
 /// A compliance master response estimate for a ledger count, or an upper
 /// bound on one, and whether it
@@ -1348,6 +1386,7 @@ impl TallyClient {
             .map_err(|_| {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
             })?;
+            let mut partition = None;
             if admission == ComplianceAdmission::CountFirst {
                 let catalogue_request =
                     render_standard_ledger_catalog_request(identity.display_name())?;
@@ -1362,103 +1401,73 @@ impl TallyClient {
                     catalogue_bytes,
                 );
                 evidence = evidence.clone().combine(count_evidence.clone());
-                let counted = parse_standard_ledger_catalog_response(
+                let catalogue = parse_standard_ledger_catalog_response(
                     &catalogue_body,
                     identity.display_name(),
                     identity.company_guid(),
                 )
-                .map_err(
-                    |source| PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source },
-                )?
-                .names()
-                .count() as u64;
-                admit_compliance_master_read(master_mark, Some(counted))?;
-            }
-            let requests = [
-                render_party_ledger_master_request(identity.display_name(), &master_period),
-                render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
-                render_native_group_snapshot_request(identity.display_name()),
-            ];
-            let request_sha256 = party_ledger_request_commitment(&requests);
-            let [master_request, balance_request, group_request] = requests;
-            let master_pair = self
-                .fetch_native_report_paired(master_request.clone())
-                .await?;
-            let (master_body, master_response_bytes, master_response_sha256) =
-                master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
-            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                &master_request,
-                master_response_sha256.clone(),
-                master_response_bytes,
-            ));
-            // Refuse a wrong or damaged master before any further request; its
-            // amounts are admitted below, once the snapshot names the ledgers
-            // set aside (bridge#551).
-            let structure =
-                parse_native_party_ledger_master_structure(&master_body, identity.company_guid())
-                    .map_err(party_ledger_master_master_snapshot_error)?;
-            if !structure.evidence.duplicate_identities.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
-                ));
-            }
-            let balance_pair = self
-                .fetch_native_report_paired(balance_request.clone())
-                .await?;
-            let (balance_body, balance_response_bytes, balance_response_sha256) =
-                balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
-            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                &balance_request,
-                balance_response_sha256.clone(),
-                balance_response_bytes,
-            ));
-            // Each ledger's own currency is compared with the base before any
-            // balance is parsed (bridge#551): a foreign ledger's balance is a
-            // composite display string, never rupees, so the ledger leaves the
-            // source, its master row included, and is named instead. So does a
-            // base-currency ledger with any composite balance: a rupee ledger a
-            // foreign-currency entry touched. A base of one master refuses a
-            // ledger in another currency outright. An assertion with no base
-            // (one master whose NAME was not read) keeps the unclassified read.
-            let (balances, foreign_currency_ledgers_excluded, mixed_currency_ledgers_excluded) =
-                match &ledger_currency_base {
-                    Some(base) => {
-                        let classified = parse_compliance_ledger_snapshot_for_company(
-                            &balance_body,
-                            identity.company_guid(),
-                            base,
+                .map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source }
+                })?;
+                let counted = catalogue.names().count() as u64;
+                // A count the whole read cannot fit is read as parts by parent
+                // group (#679); the catalogue that counted the book also
+                // names each ledger's parent, so nothing more is asked first.
+                if admit_compliance_master_read(master_mark, Some(counted)).is_err() {
+                    partition = Some(
+                        ParentPartition::plan(
+                            catalogue.identified_parents(),
+                            parent_partition_limits(),
                         )
-                        .map_err(party_ledger_master_balance_snapshot_error)?;
-                        (classified.base, classified.foreign, classified.mixed)
-                    }
-                    None => (
-                        parse_native_ledger_snapshot_for_company(
-                            &balance_body,
-                            identity.company_guid(),
+                        .map_err(|source| {
+                            PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                        })?,
+                    );
+                }
+            }
+            let group_request = render_native_group_snapshot_request(identity.display_name());
+            let part_requests = match &partition {
+                None => vec![(
+                    render_party_ledger_master_request(identity.display_name(), &master_period),
+                    render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
+                )],
+                Some(partition) => partition
+                    .parts()
+                    .iter()
+                    .map(|part| {
+                        (
+                            render_party_ledger_master_request_for_parents(
+                                identity.display_name(),
+                                &master_period,
+                                part,
+                            ),
+                            render_native_ledger_snapshot_request_for_parents(
+                                identity.display_name(),
+                                &balance_period,
+                                part,
+                            ),
                         )
-                        .map_err(party_ledger_master_balance_snapshot_error)?,
-                        Vec::new(),
-                        Vec::new(),
-                    ),
-                };
-            // Ledger names are unique within a Tally company, so a ledger set
-            // aside is the master row with its name. The master is parsed only
-            // now, leaving those rows' openings unparsed.
-            let set_aside = foreign_currency_ledgers_excluded
+                    })
+                    .collect(),
+            };
+            let committed_requests = part_requests
                 .iter()
-                .map(|ledger| ledger.ledger.clone())
-                .chain(mixed_currency_ledgers_excluded.iter().cloned())
-                .collect::<BTreeSet<_>>();
-            let master = parse_native_party_ledger_master_records_leaving_unparsed(
-                &master_body,
-                identity.company_guid(),
-                &set_aside,
-            )
-            .map_err(party_ledger_master_master_snapshot_error)?;
-            if !master.evidence.duplicate_identities.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
-                ));
+                .flat_map(|(master, balance)| [master.clone(), balance.clone()])
+                .chain(std::iter::once(group_request.clone()))
+                .collect::<Vec<_>>();
+            let request_sha256 = party_ledger_request_commitment(&committed_requests);
+            let mut reads = Vec::with_capacity(part_requests.len());
+            for (master_request, balance_request) in &part_requests {
+                reads.push(
+                    self.read_party_ledger_master_part(
+                        identity,
+                        master_request,
+                        balance_request,
+                        ledger_currency_base.as_ref(),
+                        &mut evidence,
+                    )
+                    .await?,
+                );
             }
             let group_pair = self
                 .fetch_native_report_paired(group_request.clone())
@@ -1482,72 +1491,60 @@ impl TallyClient {
                     PairedReadValidationError::PartyLedgerExtent,
                 ));
             }
-
-            let mut balances_by_key = HashMap::new();
-            for balance in balances {
-                let key = ledger_display_key(&balance.name, balance.parent.as_deref());
-                if balances_by_key.insert(key, balance).is_some() {
-                    return Err(anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::DuplicateBalanceDisplayKey,
-                    ));
-                }
-            }
-            let mut rows = Vec::with_capacity(master.records.len());
-            for source in master
-                .records
-                .into_iter()
-                .filter(|source| !set_aside.contains(&source.record.ledger.name))
-            {
-                let key = ledger_display_key(
-                    &source.record.ledger.name,
-                    source.record.ledger.parent.nonempty_returned_text(),
-                );
-                let balance = balances_by_key.remove(&key).ok_or_else(|| {
-                    anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger,
-                    )
-                })?;
-                let guid = source.identities.guid.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
-                })?;
-                let master_id = source.identities.master_id.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterId)
-                })?;
-                let alter_id = source.alter_id.ok_or_else(|| {
-                    anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterAlterId)
-                })?;
-                let master_opening =
-                    source
-                        .record
-                        .ledger
-                        .opening_balance
-                        .as_deref()
-                        .ok_or_else(|| {
-                            anyhow::Error::new(
-                                PartyLedgerMasterSourceValidationError::MasterOpeningBalance,
-                            )
+            // The parts together must be the catalogue's ledgers, each once, in
+            // the part its parent names, and with the catalogue's name and
+            // parent: a part that lost, doubled or renamed a row is withheld.
+            if let Some(partition) = &partition {
+                let mut coverage = partition.coverage();
+                for (index, read) in reads.iter().enumerate() {
+                    for source in &read.master.records {
+                        let guid = source.identities.guid.as_deref().ok_or_else(|| {
+                            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
                         })?;
-                if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
-                    return Err(anyhow::Error::new(
-                        PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
-                    ));
+                        coverage
+                            .accept(
+                                index,
+                                guid,
+                                &source.record.ledger.name,
+                                source.record.ledger.parent.nonempty_returned_text(),
+                            )
+                            .map_err(|source| {
+                                PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                            })?;
+                    }
                 }
-                rows.push(PartyLedgerMasterRow {
-                    name: source.record.ledger.name,
-                    parent: source.record.ledger.parent,
-                    party_gstin: source.record.ledger.party_gstin,
-                    fields: source.record.fields,
-                    guid,
-                    master_id,
-                    alter_id,
-                    opening_balance: balance.opening_balance,
-                    closing_balance: balance.closing_balance,
-                });
+                coverage.finish().map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::ParentPartition { source }
+                })?;
             }
-            if !balances_by_key.is_empty() {
-                return Err(anyhow::Error::new(
-                    PartyLedgerMasterSourceValidationError::BalanceLedgerAbsentFromMasterEvidence,
-                ));
+
+            let (master_response_sha256, master_response_bytes) =
+                aggregate_part_evidence(reads.iter().map(|read| {
+                    (
+                        read.master_response_sha256.as_str(),
+                        read.master_response_bytes,
+                    )
+                }));
+            let (balance_response_sha256, balance_response_bytes) =
+                aggregate_part_evidence(reads.iter().map(|read| {
+                    (
+                        read.balance_response_sha256.as_str(),
+                        read.balance_response_bytes,
+                    )
+                }));
+            let several_parts = reads.len() > 1;
+            let mut rows = Vec::new();
+            let mut foreign_currency_ledgers_excluded = Vec::new();
+            let mut mixed_currency_ledgers_excluded = Vec::new();
+            for read in reads {
+                foreign_currency_ledgers_excluded.extend(read.foreign.iter().cloned());
+                mixed_currency_ledgers_excluded.extend(read.mixed.iter().cloned());
+                rows.extend(join_party_ledger_master_part(read)?);
+            }
+            if several_parts {
+                foreign_currency_ledgers_excluded
+                    .sort_by(|left, right| left.ledger.cmp(&right.ledger));
+                mixed_currency_ledgers_excluded.sort();
             }
             rows.sort_by(|left, right| left.name.cmp(&right.name).then(left.guid.cmp(&right.guid)));
             let source = PartyLedgerMasterSource {
@@ -1576,6 +1573,105 @@ impl TallyClient {
         }
         .await;
         result.map_err(|error| crate::tally::runtime::with_read_evidence(error, evidence))
+    }
+
+    /// One master-and-balance pair of a compliance ledger read: the whole book,
+    /// or one parent part of it (#679). Each response is checked against the
+    /// selected company and classified before any other request is sent.
+    async fn read_party_ledger_master_part(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        master_request: &str,
+        balance_request: &str,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<PartyLedgerMasterPartRead> {
+        let master_pair = self
+            .fetch_native_report_paired(master_request.to_owned())
+            .await?;
+        let (master_body, master_response_bytes, master_response_sha256) =
+            master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
+        *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+            master_request,
+            master_response_sha256.clone(),
+            master_response_bytes,
+        ));
+        // Refuse a wrong or damaged master before any further request; its
+        // amounts are admitted below, once the snapshot names the ledgers
+        // set aside (bridge#551).
+        let structure =
+            parse_native_party_ledger_master_structure(&master_body, identity.company_guid())
+                .map_err(party_ledger_master_master_snapshot_error)?;
+        if !structure.evidence.duplicate_identities.is_empty() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            ));
+        }
+        let balance_pair = self
+            .fetch_native_report_paired(balance_request.to_owned())
+            .await?;
+        let (balance_body, balance_response_bytes, balance_response_sha256) =
+            balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
+        *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+            balance_request,
+            balance_response_sha256.clone(),
+            balance_response_bytes,
+        ));
+        // Each ledger's own currency is compared with the base before any
+        // balance is parsed (bridge#551): a foreign ledger's balance is a
+        // composite display string, never rupees, so the ledger leaves the
+        // source, its master row included, and is named instead. So does a
+        // base-currency ledger with any composite balance: a rupee ledger a
+        // foreign-currency entry touched. A base of one master refuses a
+        // ledger in another currency outright. An assertion with no base
+        // (one master whose NAME was not read) keeps the unclassified read.
+        let (balances, foreign, mixed) = match ledger_currency_base {
+            Some(base) => {
+                let classified = parse_compliance_ledger_snapshot_for_company(
+                    &balance_body,
+                    identity.company_guid(),
+                    base,
+                )
+                .map_err(party_ledger_master_balance_snapshot_error)?;
+                (classified.base, classified.foreign, classified.mixed)
+            }
+            None => (
+                parse_native_ledger_snapshot_for_company(&balance_body, identity.company_guid())
+                    .map_err(party_ledger_master_balance_snapshot_error)?,
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
+        // Ledger names are unique within a Tally company, so a ledger set
+        // aside is the master row with its name. The master is parsed only
+        // now, leaving those rows' openings unparsed.
+        let set_aside = foreign
+            .iter()
+            .map(|ledger| ledger.ledger.clone())
+            .chain(mixed.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let master = parse_native_party_ledger_master_records_leaving_unparsed(
+            &master_body,
+            identity.company_guid(),
+            &set_aside,
+        )
+        .map_err(party_ledger_master_master_snapshot_error)?;
+        if !master.evidence.duplicate_identities.is_empty() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
+            ));
+        }
+        Ok(PartyLedgerMasterPartRead {
+            master,
+            balances,
+            foreign,
+            mixed,
+            set_aside,
+            master_response_sha256,
+            master_response_bytes,
+            balance_response_sha256,
+            balance_response_bytes,
+        })
     }
 
     /// Reads the documented standard ledger collection as an explicitly limited
@@ -2167,7 +2263,111 @@ fn has_presentation_equivalent_guid_siblings(companies: &[TallyCompany]) -> bool
     })
 }
 
-fn party_ledger_request_commitment(requests: &[String; 3]) -> String {
+/// One master-and-balance pair as read and classified, before it is joined
+/// (#679): the whole book's, or one parent part's.
+struct PartyLedgerMasterPartRead {
+    master: ParsedExport<ParsedSourceRecord<PartyLedgerMasterRecord>>,
+    balances: Vec<LedgerSnapshotEntry>,
+    foreign: Vec<ForeignCurrencyLedger>,
+    mixed: Vec<String>,
+    set_aside: BTreeSet<String>,
+    master_response_sha256: String,
+    master_response_bytes: usize,
+    balance_response_sha256: String,
+    balance_response_bytes: usize,
+}
+
+/// A single read's own hash and size, unchanged; several parts' summed size and
+/// the hash of their ordered hashes.
+fn aggregate_part_evidence<'a>(parts: impl Iterator<Item = (&'a str, usize)>) -> (String, usize) {
+    let parts = parts.collect::<Vec<_>>();
+    if let [(sha256, bytes)] = parts.as_slice() {
+        return ((*sha256).to_owned(), *bytes);
+    }
+    let joined = parts
+        .iter()
+        .map(|(sha256, _)| *sha256)
+        .collect::<Vec<_>>()
+        .join(":");
+    let bytes = parts
+        .iter()
+        .fold(0usize, |total, (_, bytes)| total.saturating_add(*bytes));
+    (sha256_hex(joined.as_bytes()), bytes)
+}
+
+/// Joins one read's master rows to its balances by `(name, parent)`, leaving out
+/// the ledgers set aside for currency, and refuses any row or balance the other
+/// side lacks.
+fn join_party_ledger_master_part(
+    read: PartyLedgerMasterPartRead,
+) -> anyhow::Result<Vec<PartyLedgerMasterRow>> {
+    let mut balances_by_key = HashMap::new();
+    for balance in read.balances {
+        let key = ledger_display_key(&balance.name, balance.parent.as_deref());
+        if balances_by_key.insert(key, balance).is_some() {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::DuplicateBalanceDisplayKey,
+            ));
+        }
+    }
+    let mut rows = Vec::with_capacity(read.master.records.len());
+    for source in read
+        .master
+        .records
+        .into_iter()
+        .filter(|source| !read.set_aside.contains(&source.record.ledger.name))
+    {
+        let key = ledger_display_key(
+            &source.record.ledger.name,
+            source.record.ledger.parent.nonempty_returned_text(),
+        );
+        let balance = balances_by_key.remove(&key).ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalanceMissingMasterLedger)
+        })?;
+        let guid = source.identities.guid.ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterGuid)
+        })?;
+        let master_id = source
+            .identities
+            .master_id
+            .ok_or_else(|| anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterId))?;
+        let alter_id = source.alter_id.ok_or_else(|| {
+            anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterAlterId)
+        })?;
+        let master_opening = source
+            .record
+            .ledger
+            .opening_balance
+            .as_deref()
+            .ok_or_else(|| {
+                anyhow::Error::new(PartyLedgerMasterSourceValidationError::MasterOpeningBalance)
+            })?;
+        if !party_ledger_master_openings_agree(master_opening, &balance.opening_balance)? {
+            return Err(anyhow::Error::new(
+                PartyLedgerMasterSourceValidationError::OpeningBalancesDisagreed,
+            ));
+        }
+        rows.push(PartyLedgerMasterRow {
+            name: source.record.ledger.name,
+            parent: source.record.ledger.parent,
+            party_gstin: source.record.ledger.party_gstin,
+            fields: source.record.fields,
+            guid,
+            master_id,
+            alter_id,
+            opening_balance: balance.opening_balance,
+            closing_balance: balance.closing_balance,
+        });
+    }
+    if !balances_by_key.is_empty() {
+        return Err(anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::BalanceLedgerAbsentFromMasterEvidence,
+        ));
+    }
+    Ok(rows)
+}
+
+fn party_ledger_request_commitment(requests: &[String]) -> String {
     let hashes = requests
         .iter()
         .map(|request| {

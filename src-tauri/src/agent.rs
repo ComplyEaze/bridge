@@ -638,16 +638,47 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_masters_too_large" => Some(
-            "The estimated compliance response is over Bridge's budget, so no master request \
-             was sent: a read of that size has left Tally's gateway unable to answer (#637). \
-             When `size.counted_ledgers` is a number, Bridge counted that many ledgers with a \
-             catalogue read and refused on the count. When it is null, the company's \
-             master-alteration mark (`size.master_alter_id`) is too high to count within \
-             budget and was refused as it stands; the mark is an UPPER BOUND on ledgers, since \
+            "The company's master-alteration mark (`size.master_alter_id`) is above what Bridge \
+             can bound a ledger count for, so no request for ledgers was sent: a read of that \
+             size has left Tally's gateway unable to answer (#637). `size.counted_ledgers` is \
+             null because nothing was counted. The mark is an UPPER BOUND on ledgers, since \
              stock items, units and every other master raise it too, so a company with fewer \
              ledgers may be refused. Call ledger_masters with fields=basic, which returns \
              names, parents and opening balances without the compliance fields. Retrying this \
              call refuses again. A `group` filter does not narrow the request.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book too
+        // large for one compliance read is read as parts by parent group (#679).
+        "parent_over_budget" | "parent_partition_too_many_parts" => Some(
+            "This book has more ledgers than one compliance read may carry, so Bridge reads it \
+             as parts by immediate parent group, and it cannot be split that way: either one \
+             group holds more ledgers than a part may (Bridge does not split a group), or the \
+             groups need more parts than Bridge will send. No master was requested. Call \
+             ledger_masters with fields=basic, which returns names, parents and opening \
+             balances without the compliance fields. Retrying this call refuses again.",
+        ),
+        "ledger_without_parent"
+        | "parent_name_unsupported"
+        | "parent_partition_duplicate_ledger_identity" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but its ledger catalogue holds a ledger with no parent group, a group name \
+             a filter cannot carry (a quotation mark, a control character, an empty name or an \
+             unexpected replacement character) or a repeated ledger identity. No master was \
+             requested. Call ledger_masters with fields=basic. Retrying this call refuses \
+             again.",
+        ),
+        "parent_part_row_outside_parents"
+        | "parent_part_row_not_in_catalogue"
+        | "parent_part_row_differs_from_catalogue"
+        | "parent_part_row_repeated"
+        | "parent_part_rows_missing" => Some(
+            "The parts of this parent-group read did not add up to the ledger catalogue that \
+             planned them, so Bridge released nothing: a part returned a ledger it should not \
+             have, returned one twice, or missed one, or a ledger's name or group differs \
+             between the catalogue and the part. A ledger added, renamed, moved or deleted \
+             during the read can cause it; retry once while the book is quiet. A repeat means \
+             Tally's filtered read and its catalogue disagree about this book: call \
+             ledger_masters with fields=basic instead.",
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a

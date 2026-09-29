@@ -317,7 +317,7 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
         return tally_command_error(
             "ledger_masters_too_large",
             "Response size",
-            "Bridge withheld the party/ledger master: the compliance read is over the size Bridge will request, because a read of that size has left Tally unable to answer. Bridge sized it by the ledgers a catalogue read counted, or, when the company's master-alteration mark was too high to count within budget, by the mark itself, an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
+            "Bridge withheld the party/ledger master: the compliance read is over the size Bridge will request, because a read of that size has left Tally unable to answer. The company's master-alteration mark was too high to count within budget, so Bridge sized it by the mark itself, an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
             "after_change",
             false,
             "Do not retry the unchanged export: it refuses again.",

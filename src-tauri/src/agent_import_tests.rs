@@ -2398,10 +2398,25 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
     let off = native_post_refusal_reason("import_post_requires_one_voucher", 1);
-    assert!(off.contains("one voucher (batch posting is off)"), "{off}");
+    assert!(
+        off.contains("one voucher (the limit while batch posting is off)"),
+        "{off}"
+    );
     let on = native_post_refusal_reason("import_post_requires_one_voucher", 50);
     assert!(on.contains("1 to 50 vouchers"), "{on}");
     assert!(!on.contains("batch posting is off"), "{on}");
+    let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported", 1);
+    assert!(numbered.contains("carries its own number"), "{numbered}");
+    for code in ["import_review_layout_text", "import_review_format_text"] {
+        let text = native_post_refusal_reason(code, 1);
+        assert!(text.contains("company name, a ledger name"), "{text}");
+        assert!(text.contains("cannot show faithfully"), "{text}");
+    }
+    let dialog = native_post_refusal_reason("import_review_too_large", 1);
+    assert!(
+        dialog.contains("does not fit in one native dialog"),
+        "{dialog}"
+    );
     let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
     assert!(too_large.contains("(50)"), "{too_large}");
     // An unlisted code keeps its own name in the warning and a neutral reason.

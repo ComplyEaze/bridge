@@ -1812,7 +1812,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
     let count = if voucher_limit > 1 {
         format!("1 to {voucher_limit} vouchers")
     } else {
-        "one voucher (batch posting is off)".to_string()
+        "one voucher (the limit while batch posting is off)".to_string()
     };
     match code {
         "import_post_requires_one_voucher" => format!(
@@ -1821,22 +1821,15 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
         "import_post_batch_too_large" => format!(
             "this batch has more vouchers than native posting takes at once ({voucher_limit})"
         ),
-        "import_post_amendment_requires_file_import" => {
-            "an amendment alters vouchers already in the book, which only a file import can do".to_string()
-        }
         "import_post_numbered_journal_unsupported" => {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "a ledger name, narration or reference holds a line break or another character the approval dialog cannot show faithfully".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
         }
-        "import_post_endpoint_mismatch" => {
-            "the Tally endpoint has changed since this batch was built".to_string()
-        }
-        "import_batch_changed" => "the saved record no longer matches the file Bridge built".to_string(),
         _ => "post_import refuses this batch for the same reason".to_string(),
     }
 }

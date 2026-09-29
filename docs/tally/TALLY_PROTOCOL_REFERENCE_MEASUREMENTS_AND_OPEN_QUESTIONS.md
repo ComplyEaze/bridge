@@ -497,8 +497,28 @@ and `$AlterID > 10000 AND $AlterID <= 12000`. Whether Tally does not support the
 collection or the formula syntax was wrong is not known. Only `$Parent = "..."` is measured to
 partition. Splitting by parent fits this book poorly: 1,008 of 1,354 parents hold one ledger.
 
+**Every one of those filter forms partitions on the synthetic book, so the empty result is not "the
+filter is unsupported" (PARTIAL, one synthetic book of 1,989 ledgers, no vouchers, 2026-09-29).**
+Each returned exactly the expected rows, compared as sets by name: the name range, the `StringPart`
+prefix and the `AlterID` span on the balance collection, on the master collection and on a custom
+`TYPE Ledger` collection with no `ISMODIFY` (300, 300 and 100 rows); a single comparison (`$Name >
+"lo"`, 1,787 rows) and `$AlterID > 100` (1,987 rows), the latter also through a `$$Number:` cast
+with the same set; an exact-name filter (the must-match control, 1 row); and two parents joined
+with `OR`, including one whose name contains `&` (360 and 400 rows, each the union of its parts).
+Every request took 0.07 to 0.45 s. This is the prerequisite for splitting a read by several
+parents at once (#679). The empty result on the second book is still UNVERIFIED: the untested
+explanation is that those filters matched no ledger there, and no 1-row control was sent to that
+book.
+
+**A one-day voucher census at a far-future date was answered normally with zero vouchers
+(PARTIAL, one book, 2026-09-29).** On the second book a census for a day in the year 5042, the
+company header's own last-voucher date, returned a well-formed empty collection in 0.18 s, while the same request for a
+day known to hold 282 vouchers returned all 282. It is UNVERIFIED that zero means no voucher sits on
+that day: a five-digit-year date literal may not parse to that date and match nothing, and a census cannot
+tell the two apart.
+
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
-or the cause of the empty filters above. The largest single latency was 2.93 s on the synthetic
+or the cause of the empty filters on the second book. The largest single latency was 2.93 s on the synthetic
 book and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
 10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
 row cost seen here.

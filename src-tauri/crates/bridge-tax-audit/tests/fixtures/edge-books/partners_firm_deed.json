@@ -1,5 +1,5 @@
 {
- "comment": "partners_40b_194t: a firm with a deed (rate below the statutory cap). A goes into debit for part of the year, B's withdrawal falls on the first day, a transfer moves capital from B to A, one voucher carries both the interest and the remuneration ledger (read as interest), A's interest journal carries a TDS line under Duties & Taxes, B's interest journal has no number (its label uses the GUID's tail), C names its capital ledger twice (its opening counts twice) and has no interest or remuneration ledger, and an optional voucher on A's capital is outside the population.",
+ "comment": "partners_40b_194t: a firm with a deed (rate below the statutory cap). A goes into debit for part of the year, B's withdrawal falls on the first day, a transfer moves capital from B to A, one voucher carries both the interest and the remuneration ledger (split exactly: the interest ledger's own debit is the interest), A's interest journal carries a TDS line on a ledger no configuration classifies as TDS payable (so it is neither added back nor seen, and whether TDS was deducted is not judged), B's interest journal has no number (its label uses the GUID's tail), C has one capital ledger and no interest or remuneration ledger, and an optional voucher on A's capital is outside the population.",
  "groups": {
   "Current Assets": null,
   "Bank Accounts": "Current Assets",
@@ -324,7 +324,6 @@
   },
   "partner_c": {
    "capital_ledgers": [
-    "C Capital",
     "C Capital"
    ]
   }

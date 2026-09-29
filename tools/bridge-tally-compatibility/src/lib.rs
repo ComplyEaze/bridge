@@ -337,7 +337,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // exports from Tally data (bulk party statements so far), and the documents
 // uploader skips a file whose hash it holds; a defect there uploads a
 // client's exported statements from a folder the user syncs.
-pub const MAX_SURFACE_FILES: usize = 288;
+// `bridge-tally-protocol/src/xml_text.rs` (bridge#832) is the one escaper every
+// request renderer uses, the voucher-import write path included; a defect there
+// changes which ledger or company a posted voucher names, or lets a value
+// break out of the element it belongs to.
+pub const MAX_SURFACE_FILES: usize = 289;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

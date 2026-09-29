@@ -673,3 +673,15 @@ fn an_unreadable_amount_fails_closed() {
     let candidate = plain("new", "t1", BANK_TO_B);
     assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
 }
+
+/// The same holds when it is the candidate's own amount that cannot be read.
+#[test]
+fn an_unreadable_candidate_amount_fails_closed() {
+    let old = plain("old", "t1", BANK_TO_A);
+    let candidate = plain(
+        "new",
+        "t1",
+        &[("Bank", "not-a-number", "Cr"), ("Ledger B", "1", "Dr")],
+    );
+    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+}

@@ -7,7 +7,7 @@
 //
 //   node scripts/next-version.mjs                 propose only (read-only)
 //   node scripts/next-version.mjs --since TAG     compare against TAG instead
-//   node scripts/next-version.mjs --to REF        compare up to REF (default HEAD)
+//   node scripts/next-version.mjs --to REF        compare up to REF (default origin/master)
 //   node scripts/next-version.mjs --level minor   override the proposed level
 //   node scripts/next-version.mjs --apply         write the proposed version
 //
@@ -152,8 +152,53 @@ export function draftNotes(classified) {
   return lines.join("\n");
 }
 
-function run(command, args) {
-  return execFileSync(command, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }).trim();
+// A failed or slow command is reported as one line naming it, never as a stack trace, and never
+// as a hang: `gh` waits on the network and a maintainer cannot tell a stall from a slow answer.
+export function run(command, args, { timeoutMs = 60_000, cwd = root } = {}) {
+  try {
+    return execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 }).trim();
+  } catch (error) {
+    const shown = `${command} ${args.slice(0, 3).join(" ")}`;
+    const failure = (kind, message) => Object.assign(new Error(message), { kind, status: error.status });
+    if (error.code === "ETIMEDOUT") throw failure("timeout", `${shown} timed out after ${timeoutMs / 1000}s; check the network and authentication, then run it again`);
+    if (error.code === "ENOBUFS") throw failure("failed", `${shown} printed more output than the ${64} MB limit`);
+    if (error.code === "ENOENT") throw failure("missing", `${command} is not installed or not on PATH`);
+    const detail = String(error.stderr ?? "").trim().split("\n")[0];
+    throw failure("failed", `${shown} failed${detail ? `: ${detail}` : ""}`);
+  }
+}
+
+const ALLOWED_FLAGS = { "--since": true, "--to": true, "--level": true, "--apply": false };
+
+// An unknown flag, a positional argument, or `--level=minor` used to be ignored, which turns a
+// mistyped --level into a silent default. Each is refused, naming the accepted form.
+export function checkArguments(args) {
+  const seen = new Set();
+  for (let at = 0; at < args.length; at += 1) {
+    const token = args[at];
+    const [name] = token.split("=", 1);
+    if (!token.startsWith("--")) throw new Error(`unexpected argument ${token}; the flags are ${Object.keys(ALLOWED_FLAGS).join(", ")}`);
+    if (!(name in ALLOWED_FLAGS)) throw new Error(`unknown flag ${name}; the flags are ${Object.keys(ALLOWED_FLAGS).join(", ")}`);
+    if (token.includes("=")) throw new Error(`write ${name} ${token.slice(name.length + 1) || "VALUE"}, with a space: the ${name}=VALUE form is not read`);
+    if (seen.has(name)) throw new Error(`${name} is given twice; only one value would be used`);
+    seen.add(name);
+    if (ALLOWED_FLAGS[name]) at += 1;
+  }
+}
+
+function readVersionsAt(ref) {
+  return Object.fromEntries(Object.entries(VERSION_FILES).map(([file, spec]) => [file, spec.read(run("git", ["show", `${ref}:${file}`])) ?? null]));
+}
+
+// `rev-parse --verify --quiet` exits 1 with no output for an unknown name; any other failure is
+// git itself failing and is reported as that.
+function requireCommit(ref, advice) {
+  try {
+    run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+  } catch (error) {
+    if (error.kind === "failed" && error.status === 1) throw new Error(`${ref} does not exist here; ${advice}`);
+    throw error;
+  }
 }
 
 export function latestReleaseTag(tags) {
@@ -179,11 +224,23 @@ export function pullNumbers(subjects) {
   return { numbers, missing };
 }
 
-function pullsSince(tag, to) {
+function pullsSince(tag, to, level) {
   const { numbers, missing } = pullNumbers(run("git", ["log", "--format=%s", `${tag}..${to}`]).split("\n"));
   const pulls = [];
   for (const number of numbers) {
-    const pull = JSON.parse(run("gh", ["pr", "view", String(number), "--json", "number,title,labels,closingIssuesReferences"]));
+    let pull;
+    try {
+      pull = JSON.parse(run("gh", ["pr", "view", String(number), "--json", "number,title,labels,closingIssuesReferences"]));
+    } catch (error) {
+      if (error.kind !== "failed") throw error;
+      // --level is the documented way past a pull request that cannot be classified, so it also
+      // covers one that cannot be read; it is listed as unclassified, never dropped.
+      if (level) {
+        pulls.push({ number, title: "(not readable as a pull request)", labels: [], issueLabels: [] });
+        continue;
+      }
+      throw new Error(`#${number} could not be read as a pull request. If it is an issue number, the commit subject ends with it instead of its pull request number; pass --level to override. (${error.message})`);
+    }
     const issueLabels = [];
     for (const issue of pull.closingIssuesReferences ?? []) {
       issueLabels.push(...JSON.parse(run("gh", ["issue", "view", String(issue.number), "--json", "labels"])).labels.map((label) => label.name));
@@ -200,11 +257,12 @@ function argument(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   const value = process.argv[index + 1];
-  if (value === undefined || value.startsWith("--")) throw new Error(`${name} needs a value`);
+  if (value === undefined || value.startsWith("-")) throw new Error(`${name} needs a value that does not start with "-"`);
   return value;
 }
 
 async function main() {
+  checkArguments(process.argv.slice(2));
   const versions = readVersions();
   const distinct = [...new Set(Object.values(versions))];
   if (distinct.length !== 1 || !distinct[0]) {
@@ -213,7 +271,17 @@ async function main() {
   const current = distinct[0];
   const level = argument("--level");
   if (level && !["major", "minor", "patch"].includes(level)) throw new Error("--level must be major, minor or patch");
-  const to = argument("--to") ?? "HEAD";
+  // HEAD would count the commits of an unmerged working branch as unclassified direct pushes.
+  const to = argument("--to") ?? "origin/master";
+  requireCommit(to, "run git fetch origin, or pass --to REF (the default is origin/master)");
+  if (!argument("--to")) {
+    // The range ends at a remote-tracking ref, so a stale one would silently undercount, and the
+    // version files read here must be the ones that range ends with, or a bump would repeat.
+    const tip = run("git", ["ls-remote", "origin", "refs/heads/master"]).split(/\s/)[0];
+    if (tip && tip !== run("git", ["rev-parse", "origin/master"])) throw new Error("origin/master here is not origin's current master; run git fetch origin");
+    const atTo = [...new Set(Object.values(readVersionsAt(to)))];
+    if (atTo.length !== 1 || atTo[0] !== current) throw new Error(`the version files here say ${current} but ${to} says ${atTo.join(" and ")}; merge or rebase onto ${to} first, or pass --to HEAD`);
+  }
   const since = argument("--since") ?? latestReleaseTag(run("git", ["tag", "--list"]).split("\n"));
   if (!since) throw new Error("no release tag found; run git fetch --tags origin, or pass --since TAG");
   // After a version pull request merges and before its tag exists, the files
@@ -225,16 +293,23 @@ async function main() {
   if (!argument("--since")) {
     // A stale clone would silently compare against an older release.
     const remote = latestReleaseTag(run("git", ["ls-remote", "--tags", "--refs", "origin"]).split("\n").map((line) => line.split("refs/tags/")[1] ?? ""));
-    if (remote && remote !== since) throw new Error(`the newest release tag on origin is ${remote}, but the local one is ${since}; run git fetch --tags origin`);
+    if (remote && remote !== since) {
+      const newest = latestReleaseTag([remote, since]);
+      throw new Error(newest === remote
+        ? `the newest release tag on origin is ${remote}, but the local one is ${since}; run git fetch --tags origin`
+        : `the local release tag ${since} is newer than origin's ${remote}; push it (git push origin ${since}) or pass --since TAG`);
+    }
   }
   // git log A..B does not fail when A is not an ancestor of B; it silently
   // returns a different set of commits.
+  requireCommit(since, "run git fetch --tags origin, or pass --since TAG");
   try {
-    execFileSync("git", ["merge-base", "--is-ancestor", since, to], { cwd: root, stdio: "ignore" });
-  } catch {
-    throw new Error(`${since} is not an ancestor of ${to}; the pull requests since it cannot be listed`);
+    run("git", ["merge-base", "--is-ancestor", since, to]);
+  } catch (error) {
+    if (error.kind === "failed" && error.status === 1) throw new Error(`${since} is not an ancestor of ${to}; the pull requests since it cannot be listed`);
+    throw error;
   }
-  const result = propose({ current, pulls: pullsSince(since, to), level });
+  const result = propose({ current, pulls: pullsSince(since, to, level), level });
 
   console.log(`current version ${current}; last release tag ${since}; compared up to ${to}`);
   console.log(`${result.classified.length} commits since then`);
@@ -257,4 +332,11 @@ async function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`next-version: ${error.message}`);
+    process.exitCode = 1;
+  }
+}

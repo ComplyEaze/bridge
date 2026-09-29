@@ -3257,6 +3257,120 @@ fn a_twin_needing_both_folds_is_still_found() {
     }
 }
 
+/// The decoded, unescaped text of the first element named `tag` in `xml`.
+/// Panics if `xml` does not parse as well-formed XML, or has no such element.
+fn decoded_element_text(xml: &str, tag: &str) -> String {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    loop {
+        match reader
+            .read_event()
+            .expect("request must be well-formed XML")
+        {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag.as_bytes() => {
+                let raw = reader
+                    .read_text(event.name())
+                    .unwrap_or_else(|_| panic!("<{tag}> must have a matching close tag"));
+                let decoded = raw.decode().expect("text must decode as UTF-8");
+                return quick_xml::escape::unescape(&decoded)
+                    .expect("text must unescape")
+                    .into_owned();
+            }
+            quick_xml::events::Event::Eof => panic!("no <{tag}> element in:\n{xml}"),
+            _ => {}
+        }
+    }
+}
+
+/// The shipped voucher-import write path (`render_voucher_xml` via
+/// `render_import_xml`, which also renders the enclosing envelope with
+/// `render_import_envelope`): a narration, reference and ledger name
+/// carrying every reserved XML character, and a ledger name ending in one CR
+/// LF (the one control text a ledger name may carry, bridge#626), each parse
+/// back out of the rendered request exactly as supplied (bridge#832).
+#[test]
+fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
+    let narration = "Paid & <vendor> \"X\" 'Y'";
+    let reference = "REF & <NO> \"1\" 'A'";
+    let ledger = "Bridge & <Ledger> \"Q\" 'A'\r\n";
+    let input: ImportPayload = serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [{
+            "bridge_txn_id": "txn-escape",
+            "date": "2026-09-01",
+            "voucher_type": "Journal",
+            "narration": narration,
+            "reference": reference,
+            "entries": [
+                {"ledger": ledger, "amount": "12.50", "side": "Dr"},
+                {"ledger": "Bridge Offset", "amount": "12.50", "side": "Cr"},
+            ],
+        }]
+    }))
+    .expect("synthetic escaping payload");
+    validate_payload(&input).expect("reserved characters and a trailing ledger CR LF are valid");
+
+    let company = "BRIDGE & <SYNTHETIC> \"BOOK\" 'X'";
+    let xml = render_import_xml(company, &input.vouchers, "batch-escape");
+
+    // The whole rendered request must be well-formed XML: an escaping bug can
+    // make it exactly not that.
+    let mut reader = quick_xml::Reader::from_str(&xml);
+    while reader
+        .read_event()
+        .expect("import request must be well-formed XML")
+        != quick_xml::events::Event::Eof
+    {}
+
+    let attribution = import_identity("batch-escape", "txn-escape");
+    assert_eq!(
+        decoded_element_text(&xml, "NARRATION"),
+        format!("{narration} [BRIDGE:{attribution}]")
+    );
+    assert_eq!(decoded_element_text(&xml, "REFERENCE"), reference);
+    assert_eq!(decoded_element_text(&xml, "LEDGERNAME"), ledger);
+    // A conforming XML parser folds a literal CR LF (and a lone CR) to LF
+    // before the application sees the text (XML 1.0, end-of-line handling);
+    // character references are not folded. quick_xml's decode() skips that
+    // step, so apply it here: only an escaped CR LF survives it (bridge#626).
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "LEDGERNAME"), ledger);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
+    assert_eq!(decoded_element_text(&xml, "SVCURRENTCOMPANY"), company);
+}
+
+/// The bank shapes name their counterparty in PARTYLEDGERNAME, written by the
+/// same escaper; a party ledger carrying reserved characters and a trailing
+/// CR LF must come back exactly, even after XML's end-of-line folding.
+#[test]
+fn shipped_write_path_round_trips_a_party_ledger_crlf() {
+    let party = "Vendor & <Party> \"Q\" 'A'\r\n";
+    let input: ImportPayload = serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [{
+            "bridge_txn_id": "txn-party-escape",
+            "date": "2026-09-01",
+            "voucher_type": "Payment",
+            "narration": "Paid",
+            "entries": [
+                {"ledger": party, "amount": "12.50", "side": "Dr"},
+                {"ledger": "Bank", "amount": "12.50", "side": "Cr"},
+            ],
+        }]
+    }))
+    .expect("synthetic party escaping payload");
+    validate_payload(&input).expect("a party ledger with reserved characters and CR LF is valid");
+
+    let xml = render_import_xml(
+        "BRIDGE SYNTHETIC BOOK",
+        &input.vouchers,
+        "batch-party-escape",
+    );
+    assert_eq!(decoded_element_text(&xml, "PARTYLEDGERNAME"), party);
+    let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
+    assert_eq!(decoded_element_text(&folded, "PARTYLEDGERNAME"), party);
+    assert!(!xml.contains('\r'), "no literal CR may reach the request");
+}
+
 /// A verification result with a divergent row, from the verifier itself: its
 /// entries name "Private Synthetic Party", "Expense" and "Bank".
 fn divergent_verification() -> Value {

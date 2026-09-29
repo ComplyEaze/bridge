@@ -15,8 +15,9 @@ Intel Mac and other platforms are not qualified. Package availability
 is not a host-validation claim; read each release's notes for its current
 runtime gaps.
 
-An **unsigned preview** is labelled as a prerelease and is only for evaluation;
-it is not signed or notarized. Each archive has a same-named `.sha256` file and
+An **unsigned preview** is published as a GitHub prerelease, and the newest one
+may later be marked Latest. Either way it is only for evaluation; it is not
+signed or notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 

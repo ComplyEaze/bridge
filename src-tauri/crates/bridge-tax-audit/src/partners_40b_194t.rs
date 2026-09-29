@@ -3842,8 +3842,9 @@ supplied and that interest was authorised for the whole year; confirm both again
     #[test]
     fn a_side_test_on_lines_of_extreme_amounts_does_not_overflow() {
         // Only the sign of a line and of the net it is compared with decides the side; their
-        // product must never be formed (four lines of i64::MAX net to 2^65, and 2^63 * 2^65 does
-        // not fit i128).
+        // product must never be formed. Four lines of i64::MAX net to 2^65 - 4, and a line of
+        // that size times it exceeds i128::MAX. The overflow shows as a panic in a debug build (the
+        // test profile), which is how this test fails without the fix.
         let big = i64::MAX;
         let own_side = voucher(
             "x1",
@@ -3865,7 +3866,8 @@ supplied and that interest was authorised for the whole year; confirm both again
                 ("Interest to Partners", big),
             ],
         );
-        // The walk finishes, and the total that no longer fits i64 is refused with a typed error.
+        // Partner A's walk (both sites) finishes; partner B's pass then meets a credit of 2^63
+        // (the negated i64::MIN), which no longer fits i64, and refuses it with a typed error.
         let refusal = config_refusal(go_with(
             vec![own_side, tds_side],
             &format!("{TWO}{DEED}"),

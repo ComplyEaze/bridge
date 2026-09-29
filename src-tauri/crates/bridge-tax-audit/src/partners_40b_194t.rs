@@ -400,7 +400,8 @@ fn walk<'a>(
                 .lines
                 .iter()
                 .filter(|l| {
-                    i128::from(l.amount_paise) * own_net < 0 && !tds_ledgers.contains(&l.ledger)
+                    i128::from(l.amount_paise).signum() * own_net.signum() < 0
+                        && !tds_ledgers.contains(&l.ledger)
                 })
                 .map(|l| l.ledger.as_str())
                 .collect();
@@ -1534,7 +1535,8 @@ remuneration, commission, bonus and interest to a partner).{}",
                 .lines
                 .iter()
                 .filter(|l| {
-                    i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)
+                    i128::from(l.amount_paise).signum() * tds.signum() < 0
+                        && !tds_ledgers.contains(&l.ledger)
                 })
                 .map(|l| l.ledger.as_str())
                 .collect();
@@ -3835,5 +3837,41 @@ supplied and that interest was authorised for the whole year; confirm both again
         // Implied by the Python: A's own capital never appears off-capital here, since p2's side
         // opposite A's interest ledger is B's capital alone.
         assert!(found(&r, &format!("off_capital/{ha}")).is_empty());
+    }
+
+    #[test]
+    fn a_side_test_on_lines_of_extreme_amounts_does_not_overflow() {
+        // Only the sign of a line and of the net it is compared with decides the side; their
+        // product must never be formed (four lines of i64::MAX net to 2^65, and 2^63 * 2^65 does
+        // not fit i128).
+        let big = i64::MAX;
+        let own_side = voucher(
+            "x1",
+            &[
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Interest to Partners", big),
+                ("Partner B", i64::MIN),
+            ],
+        );
+        let tds_side = voucher(
+            "x2",
+            &[
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("TDS Payable", big),
+                ("Interest to Partners", big),
+            ],
+        );
+        // The walk finishes, and the total that no longer fits i64 is refused with a typed error.
+        let refusal = config_refusal(go_with(
+            vec![own_side, tds_side],
+            &format!("{TWO}{DEED}"),
+            &["TDS Payable"],
+            S40B_EXCESS_COMPUTED,
+        ));
+        assert!(refusal.contains("overflowed i64 paise"), "{refusal}");
     }
 }

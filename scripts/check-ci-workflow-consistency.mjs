@@ -365,6 +365,31 @@ for (const step of parseWorkflowSteps(workflow)) {
   }
 }
 
+// ADR 0004: `lab-writes` compiles the lab-only Tally write tools. The only way in is an explicit
+// `--features lab-writes`, which no workflow, action or Cargo config (an alias could carry it) may
+// name, so no feature (default included) and no dependency declaration in either workspace may turn
+// it on for a build that did not ask.
+for (const manifest of ["src-tauri", "tools"]) {
+  for (const candidate of workspaceMetadata(resolve(repositoryRoot, manifest, "Cargo.toml")).packages) {
+    for (const [feature, members] of Object.entries(candidate.features)) {
+      if (members.some((member) => /(?:^|\/)lab-writes$/.test(member))) {
+        failures.push(`${candidate.name}: feature ${feature} enables lab-writes`);
+      }
+    }
+    for (const dependency of candidate.dependencies ?? []) {
+      if (dependency.features?.includes("lab-writes")) {
+        failures.push(`${candidate.name}: its ${dependency.name} dependency enables lab-writes`);
+      }
+    }
+  }
+}
+const buildInputs = /^\.github\/(?:workflows|actions)\/|(?:^|\/)\.cargo\/config(?:\.toml)?$/;
+for (const file of trackedFiles().filter((path) => buildInputs.test(path))) {
+  if (/lab[-_]writes|--all-features/i.test(readFileSync(resolve(repositoryRoot, file), "utf8"))) {
+    failures.push(`${file} names lab-writes or --all-features; no CI build may compile the lab write tools`);
+  }
+}
+
 for (const stalePath of staleToolPaths()) {
   failures.push(`stale tools-workspace path: ${stalePath.file} references ${stalePath.path}`);
 }

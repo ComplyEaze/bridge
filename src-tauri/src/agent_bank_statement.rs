@@ -355,12 +355,11 @@ fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Valu
     )
     .map_err(|refusal| refused(&refusal))?;
     let statement_sha256 = sha256_hex(&bytes);
-    let (proposals_id, path, file_sha256) = persist(data_dir, request, &parsed, &statement_sha256)?;
+    let (proposals_id, file_sha256) = persist(data_dir, request, &parsed, &statement_sha256)?;
     Ok(summary(
         request,
         &parsed,
         &proposals_id,
-        &path,
         &file_sha256,
         max_bytes,
     ))
@@ -378,7 +377,7 @@ fn persist(
     request: &OwnedRequest,
     parsed: &ParsedStatement,
     statement_sha256: &str,
-) -> Result<(String, PathBuf, String), String> {
+) -> Result<(String, String), String> {
     let directory = data_dir.join(PROPOSALS_DIRECTORY);
     ensure_private_directory(&directory)
         .map_err(|_| "statement_proposals_directory_unavailable".to_string())?;
@@ -425,14 +424,13 @@ fn persist(
         let _ = fs::remove_file(&staged);
         return Err(error);
     }
-    Ok((proposals_id, path, sha256_hex(&bytes)))
+    Ok((proposals_id, sha256_hex(&bytes)))
 }
 
 fn summary(
     request: &OwnedRequest,
     parsed: &ParsedStatement,
     proposals_id: &str,
-    path: &Path,
     file_sha256: &str,
     max_bytes: usize,
 ) -> Value {
@@ -503,7 +501,6 @@ fn summary(
     };
     json!({
         "proposals_id": proposals_id,
-        "path": path.to_str().unwrap_or_default(),
         "sha256": file_sha256,
         "bank": request.bank.name(),
         "account_last4": account_last4(&parsed.account_number),

@@ -464,3 +464,56 @@ fn a_recorded_company_guid_matches_in_any_letter_case() {
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
     assert_eq!(admission(&result), Ok(()));
 }
+
+#[test]
+fn one_differing_twin_does_not_clear_an_unkeyed_twin_of_the_same_fingerprint() {
+    // The batch holds a keyed row that differs from the posted one and an inline
+    // voucher of the same fingerprint, which may be the posted one again.
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let mixed = build_many(&[
+        ("st-20260901-bbbb", Some(key("stmt-1", "800.00"))),
+        ("inline-1", None),
+    ]);
+    let rows = journal(&[&earlier, &mixed]);
+    let observed = ImportReadSource::admit(vec![posted(&earlier, 1)]).unwrap();
+    let result = verify_batch(&mixed, &observed, &rows).unwrap();
+    assert_eq!(
+        post::require_absent_verification_result(&result, 2),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
+fn one_differing_twin_does_not_clear_a_twin_from_another_statement_file() {
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let mixed = build_many(&[
+        ("st-20260901-bbbb", Some(key("stmt-1", "800.00"))),
+        ("st-20260901-cccc", Some(key("stmt-2", "700.00"))),
+    ]);
+    let rows = journal(&[&earlier, &mixed]);
+    let observed = ImportReadSource::admit(vec![posted(&earlier, 1)]).unwrap();
+    let result = verify_batch(&mixed, &observed, &rows).unwrap();
+    assert_eq!(
+        post::require_absent_verification_result(&result, 2),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
+fn a_posted_pair_from_two_files_is_a_duplicate_set() {
+    let first = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let second = build_of("st-20260901-bbbb", Some(key("stmt-2", "800.00")));
+    let rows = journal(&[&first, &second]);
+    let result = verify(&second, vec![posted(&first, 1), posted(&second, 2)], &rows);
+    assert!(!result["duplicates"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn a_posted_pair_with_a_row_of_another_company_is_a_duplicate_set() {
+    let first = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let second = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
+    let mut rows = journal(&[&first, &second]);
+    rows.get_mut("st-20260901-aaaa").unwrap().0 = OTHER_COMPANY.into();
+    let result = verify(&second, vec![posted(&first, 1), posted(&second, 2)], &rows);
+    assert!(!result["duplicates"].as_array().unwrap().is_empty());
+}

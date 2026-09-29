@@ -145,8 +145,11 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
 });
 
 // Runs the summary step's own shell in a shallow clone, as the deploy job's checkout is, with `gh`
-// replaced by a function that applies the step's real --jq filter to a fixture deployment list.
-function runSiteSummaryStep(run, { previous, changeSite }) {
+// replaced by a function that answers the two Deployments API reads the step makes by applying the
+// step's real --jq filters to fixtures. `deployments` is newest first: each has the commit it
+// deployed ("self" is the commit being deployed, "first" an earlier one, "unknown" one that cannot
+// be fetched) and its statuses, newest first.
+function runSiteSummaryStep(run, { deployments, changeSite }) {
   const dir = mkdtempSync(join(tmpdir(), "bridge-site-summary-"));
   const env = { PATH: process.env.PATH, HOME: dir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
   const git = (cwd, ...args) => {
@@ -167,19 +170,24 @@ function runSiteSummaryStep(run, { previous, changeSite }) {
   if (changeSite) writeFileSync(join(seed, "site", "index.html"), changeSite);
   git(seed, "add", ".");
   git(seed, "commit", "-q", "-m", "second");
+  const second = git(seed, "rev-parse", "HEAD");
   git(dir, "clone", "-q", "--bare", seed, origin);
   git(origin, "config", "uploadpack.allowAnySHA1InWant", "true");
   const work = join(dir, "work");
   git(dir, "clone", "-q", "--depth=1", `file://${origin}`, work);
-  const shas = { none: "", first, unknown: "0123456789abcdef0123456789abcdef01234567" };
-  const deployments = previous === "none" ? [] : [{ sha: shas[previous], created_at: "2026-09-27T19:02:44Z" }];
-  writeFileSync(join(dir, "deployments.json"), JSON.stringify(deployments));
+  const shas = { self: second, first, unknown: "0123456789abcdef0123456789abcdef01234567" };
+  writeFileSync(join(dir, "deployments.json"), JSON.stringify(deployments.map((deployment, index) => ({ id: 900 + index, sha: shas[deployment.sha] }))));
+  deployments.forEach((deployment, index) => writeFileSync(join(dir, `statuses-${900 + index}.json`), JSON.stringify(deployment.states.map((state) => ({ state })))));
   writeFileSync(join(dir, "summary.md"), "");
-  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; jq -r "$4" "${dir}/deployments.json"; }\n${run}`;
-  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
+  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; case "$2" in
+    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=*) jq -c ".[:\${2##*per_page=}]" "${dir}/deployments.json" | jq -r "$4" ;;
+    repos/example/bridge/deployments/*/statuses\\?per_page=1) id="\${2#*/deployments/}"; jq -r "$4" "${dir}/statuses-\${id%%/*}.json" ;;
+    *) exit 97 ;;
+  esac; }\n${run}`;
+  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
   const summary = readFileSync(join(dir, "summary.md"), "utf8");
   rmSync(dir, { recursive: true, force: true });
-  return { status: result.status, stderr: result.stderr, summary, first };
+  return { status: result.status, stderr: result.stderr, summary };
 }
 
 test("the site summary step is informational, permitted to read deployments, and shows what would go live", async (t) => {
@@ -191,34 +199,48 @@ test("the site summary step is informational, permitted to read deployments, and
   assert.equal(page.permissions.deployments, "read");
   const summary = step(page.jobs.deploy, "Summarize site changes since the last deploy");
   assert.equal(summary["continue-on-error"], true, "a failed summary must not stop the deploy");
+  assert.equal(typeof summary["timeout-minutes"], "number", "a hung summary must time out inside the step, where continue-on-error applies");
+  assert.ok(summary["timeout-minutes"] <= 5);
   assert.equal(summary.if, undefined);
   const names = page.jobs.deploy.steps.map((candidate) => candidate.name ?? candidate.uses);
   assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/deploy-pages@")), "the summary is written before the deploy");
 
-  const changed = runSiteSummaryStep(summary.run, { previous: "first", changeSite: "<p>two</p>\n" });
+  // This job's own deployment already exists and lists first; a failed one never went live.
+  const own = { sha: "self", states: ["queued", "waiting"] };
+  const failed = { sha: "unknown", states: ["failure", "queued"] };
+  const live = { sha: "first", states: ["success", "in_progress", "queued"] };
+
+  const changed = runSiteSummaryStep(summary.run, { deployments: [own, failed, live], changeSite: "<p>two</p>\n```\n" });
   assert.equal(changed.status, 0, changed.stderr);
   assert.match(changed.summary, /site\/index\.html/);
   assert.match(changed.summary, /^-<p>one<\/p>$/m);
   assert.match(changed.summary, /^\+<p>two<\/p>$/m);
   assert.doesNotMatch(changed.summary, /outside site|README/, "only site/ is compared, in the file list and the diff");
+  assert.match(changed.summary, /^~~~~diff\n[\s\S]*^\+```\n[\s\S]*^~~~~$/m, "a diff line with a code fence stays inside the summary's fence");
 
-  const unchanged = runSiteSummaryStep(summary.run, { previous: "first" });
+  const unchanged = runSiteSummaryStep(summary.run, { deployments: [own, live] });
   assert.equal(unchanged.status, 0, unchanged.stderr);
   assert.match(unchanged.summary, /Nothing under `site\/` differs from /);
-  assert.doesNotMatch(unchanged.summary, /```diff/);
+  assert.doesNotMatch(unchanged.summary, /~~~~diff/);
 
-  const none = runSiteSummaryStep(summary.run, { previous: "none" });
-  assert.equal(none.status, 0, none.stderr);
-  assert.match(none.summary, /No earlier deployment was found/);
+  for (const deployments of [[], [own], [own, failed]]) {
+    const none = runSiteSummaryStep(summary.run, { deployments });
+    assert.equal(none.status, 0, none.stderr);
+    assert.match(none.summary, /No earlier successful deployment of another commit was found/);
+  }
 
-  const unfetchable = runSiteSummaryStep(summary.run, { previous: "unknown" });
+  const unfetchable = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "unknown", states: ["success"] }] });
   assert.equal(unfetchable.status, 0, unfetchable.stderr);
   assert.match(unfetchable.summary, /could not be fetched, so nothing was compared/);
 
-  const long = runSiteSummaryStep(summary.run, { previous: "first", changeSite: Array.from({ length: 400 }, (_, i) => `<p>line ${i}</p>`).join("\n") + "\n" });
+  const long = runSiteSummaryStep(summary.run, { deployments: [own, live], changeSite: Array.from({ length: 400 }, (_, i) => `<p>line ${i}</p>`).join("\n") + "\n" });
   assert.equal(long.status, 0, long.stderr);
-  assert.match(long.summary, /The diff continues past 300 lines/);
+  assert.match(long.summary, /The diff is cut at 300 lines of 400 characters/);
   assert.doesNotMatch(long.summary, /line 399/);
+
+  const wide = runSiteSummaryStep(summary.run, { deployments: [own, live], changeSite: `<p>${"x".repeat(5000)}</p>\n` });
+  assert.equal(wide.status, 0, wide.stderr);
+  assert.ok(wide.summary.length < 3000, `a 5,000-character line is cut, not copied whole (${wide.summary.length})`);
 });
 
 test("publication workflows enforce their parsed trigger, dependency, branch, and platform controls", async () => {

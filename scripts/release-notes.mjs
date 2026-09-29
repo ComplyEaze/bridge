@@ -6,31 +6,63 @@ import { pathToFileURL } from "node:url";
 
 const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
 const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
-const sectionHeading = /^## \[([^\]]+)\](?: - (\S.*))?\s*$/;
+const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;
 const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;
-const fence = /^\s*(```|~~~)/;
+const fenceLine = /^\s*(`{3,}|~{3,})(.*)$/;
 
 export function versionFromTag(tag) {
   return previewTag.exec(tag)?.[1];
 }
 
-// Sections open at a level-two `## [label]` heading outside a fenced block. Link reference
-// definitions (`[0.1.0]: https://...`) trail the last section and are not part of its text.
-export function parseChangelog(source) {
+// A fence opens on three or more backticks or tildes and closes only on the same character, at
+// least as many, with nothing after them. A backtick fence's info string cannot hold a backtick,
+// so an inline ```code``` span is not a fence.
+function nextFence(line, open) {
+  const match = fenceLine.exec(line);
+  if (open) {
+    const closes = match && match[1][0] === open.char && match[1].length >= open.length && match[2].trim() === "";
+    return closes ? undefined : open;
+  }
+  if (!match || (match[1][0] === "`" && match[2].includes("`"))) return undefined;
+  return { char: match[1][0], length: match[1].length };
+}
+
+function scan(source, trackFences) {
   const sections = [];
+  const strays = [];
   let current;
-  let fenced = false;
+  let open;
   for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
-    if (fence.test(line)) fenced = !fenced;
-    const heading = !fenced && sectionHeading.exec(line);
+    const before = open;
+    if (trackFences) open = nextFence(line, open);
+    const inFence = before !== undefined || open !== undefined;
+    const heading = !inFence && sectionHeading.exec(line);
     if (heading) {
       current = { label: heading[1], date: heading[2], lines: [] };
       sections.push(current);
-    } else if (current && (fenced || !linkDefinition.test(line))) {
+    } else if (current && (inFence || !linkDefinition.test(line))) {
       current.lines.push(line);
     }
+    if (!inFence && !heading && /^## /.test(line)) strays.push(line);
   }
-  return sections.map(({ label, date, lines }) => ({ label, date, body: lines.join("\n").trim() }));
+  return { sections: sections.map(({ label, date, lines }) => ({ label, date, body: lines.join("\n").trim() })), strays, unterminatedFence: open !== undefined };
+}
+
+// Sections open at a level-two `## [label]` heading outside a fenced block. Link reference
+// definitions (`[0.1.0]: https://...`) trail the last section and are not part of its text. A
+// fence that never closes would swallow every later section, so it is read again ignoring fences
+// and reported through `problems`.
+export function parseChangelogWithProblems(source) {
+  const first = scan(source, true);
+  const result = first.unterminatedFence ? scan(source, false) : first;
+  const problems = [];
+  if (first.unterminatedFence) problems.push("a code fence in CHANGELOG.md is never closed; sections were read ignoring fences");
+  for (const line of result.strays) problems.push(`CHANGELOG.md has a level-two heading that is not a section, so it is not published as one: ${line}`);
+  return { sections: result.sections, problems };
+}
+
+export function parseChangelog(source) {
+  return parseChangelogWithProblems(source).sections;
 }
 
 export function pickNotes(sections, tag) {
@@ -78,14 +110,13 @@ function blocks(body) {
     paragraph = [];
     item = undefined;
   };
-  let fenced = false;
+  let open;
   for (const line of body.split("\n")) {
-    if (fence.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced || line.trim() === "") {
-      if (!fenced) flush();
+    const before = open;
+    open = nextFence(line, open);
+    if (before !== undefined || open !== undefined) continue;
+    if (line.trim() === "") {
+      flush();
       continue;
     }
     const heading = /^(#{3,6}) (.+)$/.exec(line);
@@ -184,12 +215,14 @@ export function main(argv) {
     const footer = readFileSync(argument(args, "--footer"), "utf8");
     let picked = { mode: "none", body: "" };
     try {
-      picked = pickNotes(parseChangelog(readFileSync(argument(args, "--changelog"), "utf8")), tag);
+      const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
+      for (const problem of problems) warn(problem);
+      picked = pickNotes(sections, tag);
     } catch (error) {
       warn(`could not read release notes from CHANGELOG.md (${error.message})`);
     }
     if (picked.mode === "none") warn(`CHANGELOG.md has no section for ${tag}; the release carries the standard text and GitHub's change list only`);
-    if (picked.mode === "unreleased") warn(`CHANGELOG.md has no ${versionFromTag(tag)} section; the release carries its [Unreleased] text`);
+    if (picked.mode === "unreleased") warn(`CHANGELOG.md has no ${versionFromTag(tag)} section; the release carries its [Unreleased] text, which may describe changes this build does not have. Check the release body`);
     writeFileSync(argument(args, "--out"), composeBody(picked, footer));
     console.log(picked.mode);
     return 0;
@@ -197,7 +230,9 @@ export function main(argv) {
   if (command === "page") {
     let html;
     try {
-      html = renderPage(parseChangelog(readFileSync(argument(args, "--changelog"), "utf8")));
+      const { sections, problems } = parseChangelogWithProblems(readFileSync(argument(args, "--changelog"), "utf8"));
+      for (const problem of problems) warn(problem);
+      html = renderPage(sections);
     } catch (error) {
       warn(`could not render CHANGELOG.md for the site (${error.message}); the page links to the releases instead`);
       html = fallbackPage();

@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
-import { composeBody, fallbackPage, parseChangelog, pickNotes, renderBody, renderPage, versionFromTag } from "./release-notes.mjs";
+import { composeBody, fallbackPage, parseChangelog, parseChangelogWithProblems, pickNotes, renderBody, renderPage, versionFromTag } from "./release-notes.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -62,6 +62,26 @@ test("the changelog parser keeps fenced text, drops link definitions and reads d
   assert.deepEqual(parseChangelog(changelog.replace(/\n/g, "\r\n")).map((section) => section.label), ["Unreleased", "0.4.0", "0.3.0"]);
 });
 
+test("fences follow their own marker, and an unclosed fence cannot hide later sections", () => {
+  const labels = (source) => parseChangelog(source).map((section) => section.label);
+  const tail = "\n## [0.3.0] - 2026-09-26\n\n- Three.\n";
+  assert.deepEqual(labels("## [0.4.0] - 2026-10-01\n\n```\n~~~\n## [9.9.9]\n```\n" + tail), ["0.4.0", "0.3.0"]);
+  assert.deepEqual(labels("## [0.4.0] - 2026-10-01\n\n```foo``` starts this line.\n" + tail), ["0.4.0", "0.3.0"]);
+  assert.deepEqual(parseChangelogWithProblems("## [0.4.0] - 2026-10-01\n\n```foo``` starts this line.\n" + tail).problems, []);
+  assert.deepEqual(labels("## [0.4.0] - 2026-10-01\n\n````\n```\n## [9.9.9]\n````\n" + tail), ["0.4.0", "0.3.0"]);
+  const open = parseChangelogWithProblems("## [0.4.0] - 2026-10-01\n\n```\nnever closed\n" + tail);
+  assert.deepEqual(open.sections.map((section) => section.label), ["0.4.0", "0.3.0"]);
+  assert.match(open.problems.join("\n"), /never closed/);
+  assert.deepEqual(parseChangelogWithProblems(changelog).problems, []);
+});
+
+test("headings with an en or em dash or a v prefix are sections; other level-two headings are reported", () => {
+  const parsed = parseChangelogWithProblems("## [0.4.0] \u2014 2026-10-01\n\n- Four.\n\n## [v0.3.0] \u2013 2026-09-26\n\n- Three.\n\n## Notes\n\nx\n");
+  assert.deepEqual(parsed.sections.map((section) => [section.label, section.date]), [["0.4.0", "2026-10-01"], ["0.3.0", "2026-09-26"]]);
+  assert.match(parsed.problems.join("\n"), /as one: ## Notes/);
+  assert.equal(pickNotes(parsed.sections, "mcp-preview-0.3.0").mode, "version");
+});
+
 test("notes fall back from the version section to a non-empty Unreleased to nothing", () => {
   const sections = parseChangelog(changelog);
   assert.deepEqual(pickNotes(sections, "mcp-preview-0.4.0"), { mode: "version", body: sections[1].body });
@@ -102,7 +122,8 @@ test("nested and wrapped list items render as balanced lists", () => {
 
 test("the real CHANGELOG.md parses into sections that render and publish", () => {
   const source = read("CHANGELOG.md");
-  const sections = parseChangelog(source);
+  const { sections, problems } = parseChangelogWithProblems(source);
+  assert.deepEqual(problems, []);
   const labels = sections.map((section) => section.label);
   assert.equal(new Set(labels).size, labels.length, "section labels must be unique");
   assert.equal(labels[0], "Unreleased");
@@ -134,7 +155,7 @@ function inTemporaryRepository(callback) {
 }
 
 function runStep(dir, run, env, prelude = "") {
-  const result = spawnSync("bash", ["-c", `${prelude}\n${run}`], { cwd: dir, encoding: "utf8", env: { ...process.env, RUNNER_TEMP: join(dir, "tmp"), ...env } });
+  const result = spawnSync("bash", ["-eo", "pipefail", "-c", `${prelude}\n${run}`], { cwd: dir, encoding: "utf8", env: { ...process.env, RUNNER_TEMP: join(dir, "tmp"), ...env } });
   return result;
 }
 

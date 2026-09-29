@@ -599,6 +599,9 @@ disagree.
    labels through `.github/release.yml`. The publish workflow appends it; do
    not paste it by hand.
 
+   On the release page the written parts come first, then the standard
+   unsigned-preview text, then this generated list.
+
 **`CHANGELOG.md`**
 
 - Each release gets an "In plain words" section above the detailed entries,
@@ -608,17 +611,24 @@ disagree.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
   the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
   puts it above the unsigned-preview text, and appends GitHub's list. The
-  install page's "What changed" page renders the same file at deploy time.
+  install page's "What changed" page renders the same file when the install
+  page is deployed, so a changelog edit reaches the site with the next
+  deploy, not when the file changes.
   Neither step can stop a release or a deploy; each warns and falls back, so a
   missing section shows as a warning in the run, not as a failed release.
 - At cut time, in the pull request that bumps the version: rename the
   plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
   leave a fresh `## [Unreleased]` above it. If the section is missing, the
-  release carries the `[Unreleased]` text instead (with a warning); if that is
-  empty too, only the standard text and GitHub's list.
-- The install page shows the file's text as written, so a claim added here is
-  a claim on the public site. Escape nothing by hand: the renderer escapes all
-  text and links only `https://` addresses and `#123` issue numbers.
+  release carries the `[Unreleased]` text instead (with a warning), which may
+  describe changes that build does not have, so read the release body; if that
+  is empty too, only the standard text and GitHub's list. Headings must read
+  `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
+  closed, or another level-two heading, is reported as a warning in the run.
+- The install page shows this file's headings, paragraphs and bullets, so a
+  claim added here is a claim on the public site. Fenced code is left out, and
+  tables and quotes show as plain text. Escape nothing by hand: the renderer
+  escapes all text and links only `https://` addresses and `#123` issue
+  numbers.
 
 **Writing rules for notes, the install page and posts**
 

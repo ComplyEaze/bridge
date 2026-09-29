@@ -492,6 +492,18 @@ fn already_posted(journal: Vec<Vec<u8>>, candidate: &ImportLedgerLine) -> bool {
     blocker(journal, candidate).is_some()
 }
 
+/// #876: a journal written before compact status records holds the verified
+/// status on the full batch record itself; that batch's row still counts.
+#[test]
+fn a_full_record_already_marked_posted_verified_blocks_its_row() {
+    let mut old = plain("old", STATEMENT_ID, BANK_TO_A);
+    old.status = "posted_verified".into();
+    let rebuilt = plain("new", STATEMENT_ID, BANK_TO_B);
+    assert!(already_posted(vec![record(&old)], &rebuilt));
+    old.status = "built".into();
+    assert!(!already_posted(vec![record(&old)], &rebuilt));
+}
+
 /// #876: the row a statement build derived is one row wherever it is posted, so
 /// a rebuild that only remaps its ledger, dispatched or found posted before,
 /// is refused; a batch only built, another company, and the batch itself are not.

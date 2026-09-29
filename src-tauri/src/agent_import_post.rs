@@ -1297,7 +1297,7 @@ const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could no
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so only a readback can lift it.
-const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch. If it finds the voucher, the row is in the books: do not post it again. If Tally rejected that batch and the voucher is not in Tally, ask the user to enter it in Tally or import that batch's file by hand, then verify_import that batch. Never rebuild the row to retry.";
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch. If it finds the voucher, the row is in the books: do not post it again. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally, or to import by hand the file of the batch that carries the corrected row. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1322,6 +1322,7 @@ fn reconciliation_failure_payload(
     // A recorded non-attempt (`Some(false)`) offers no step: its message says
     // no attempt was recorded.
     if code == "import_txn_already_posted" {
+        payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
         payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
     }
     if code == "tally_endpoint_busy" {

@@ -2209,7 +2209,11 @@ mod multiplicity_tests;
 mod statement_rows_tests;
 
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
-    verify_batch(line, &ImportReadSource::admit(rows.to_vec())?, &Default::default())
+    verify_batch(
+        line,
+        &ImportReadSource::admit(rows.to_vec())?,
+        &Default::default(),
+    )
 }
 
 #[tokio::test]

@@ -1415,7 +1415,10 @@ fn validate_post_profile_with_evidence(
 }
 
 /// Every one of the batch's `voucher_count` vouchers is absent from the book.
-fn require_absent_verification_result(result: &Value, voucher_count: usize) -> Result<(), String> {
+pub(super) fn require_absent_verification_result(
+    result: &Value,
+    voucher_count: usize,
+) -> Result<(), String> {
     if voucher_count == 0
         || result["counts"]["not_found"].as_u64() != Some(voucher_count as u64)
         || result["vouchers"].as_array().map(Vec::len) != Some(voucher_count)

@@ -419,6 +419,8 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
+        account_digest: String::new(),
+        balance: None,
     }
 }
 

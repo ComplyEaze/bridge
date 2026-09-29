@@ -104,7 +104,7 @@ fn status_of(result: &Value) -> &str {
 
 /// The pre-post absence check the admission runs, as its typed verdict.
 fn admission(result: &Value) -> Result<(), String> {
-    require_absent_verification_result(result, 1)
+    post::require_absent_verification_result(result, 1)
 }
 
 #[test]

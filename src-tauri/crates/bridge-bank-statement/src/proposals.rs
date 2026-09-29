@@ -196,7 +196,10 @@ pub fn format_amount(value: &ExactDecimal) -> String {
 pub fn account_digest(account_number: &str) -> String {
     let material = ["bridge.statement.account.v1", account_number].join("\0");
     let digest = Sha256::digest(material.as_bytes());
-    digest[..8].iter().map(|byte| format!("{byte:02x}")).collect()
+    digest[..8]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {

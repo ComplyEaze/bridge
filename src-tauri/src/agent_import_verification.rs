@@ -163,7 +163,7 @@ fn statement_rows_differ(a: &StatementRowKey, b: &StatementRowKey) -> bool {
 /// The recorded statement row behind a narration tag, if it was built for this
 /// company. A row recorded for another company says nothing here.
 fn recorded_statement_row<'a>(
-    statement_rows: &'a StatementRows,
+    statement_rows: &'a ledger::StatementRows,
     company_guid: &str,
     tag: &str,
 ) -> Option<&'a StatementRowKey> {
@@ -176,7 +176,7 @@ fn recorded_statement_row<'a>(
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
-    statement_rows: &StatementRows,
+    statement_rows: &ledger::StatementRows,
 ) -> Result<Value, String> {
     // Normalize only the comparison copies. Persisted batches and generated XML
     // retain their original amount lexemes and remain backward compatible.
@@ -504,6 +504,7 @@ fn readback_verdict(result: &Value, expected_voucher_count: usize) -> Verificati
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn batch_duplicate_sets(
     observed: &[ReadVoucher],
     identities: &[String],

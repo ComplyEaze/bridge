@@ -1,0 +1,63 @@
+M09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M08 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M11 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M10 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive
+M12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M14 killed (full) by 6: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M30 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::lsc1_fires_when_the_walk_exceeds_the_tb_debit_by_more_than_a_rupee
+B07 killed (full) by 6: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+B08 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_large_boundary_and_cash_paid_debits_only
+B09 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_large_boundary_and_cash_paid_debits_only
+B10 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::lsc1_fires_when_the_walk_exceeds_the_tb_debit_by_more_than_a_rupee
+B17 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_without_its_rules_table_uses_the_default
+B19 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive
+B20 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period
+B18 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive
+X07 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+X08 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+X17 killed (full) by 1: tests/module_invariants_batch1.rs::lsc1_reports_a_tag_it_cannot_resolve
+F03 killed (full) by 1: src/lib.rs::registry::tests::find_is_by_exact_id
+F04 killed (full) by 5: src/lib.rs::registry::tests::caller_data_is_read_whole_and_refused_when_mistyped, tests/parity_financial_statements.rs::a_changed_value_is_reported, tests/parity_financial_statements.rs::closing_stock_from_the_stale_field_is_reported, tests/parity_financial_statements.rs::synthetic_read_matches_the_python_golden_with_report_totals, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C1-36 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-03 killed (full) by 3: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-04 killed (full) by 2: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-06 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-08 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-10 killed (full) by 2: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering, tests/edge_books.rs::every_edge_book_matches_the_reference
+C2-11 killed (full) by 1: tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+C2-35 killed (full) by 1: tests/registry.rs::the_26as_floors_are_what_each_test_emits_with_no_documents
+C2-36 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+C2-38 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+C2-37 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+E2B2-28 killed (full) by 1: tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+C2-39 killed (full) by 1: tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+
+40 of 40 killed
+
+warning: 19 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  M09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X08 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  X17 (full): tests/module_invariants_batch1.rs::lsc1_reports_a_tag_it_cannot_resolve
+  F03 (full): src/lib.rs::registry::tests::find_is_by_exact_id
+  C2-01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  C2-11 (full): tests/edge_books.rs::the_26as_invariants_catch_a_row_of_the_wrong_part
+  C2-35 (full): tests/registry.rs::the_26as_floors_are_what_each_test_emits_with_no_documents
+  C2-36 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  C2-37 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  C2-38 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  C2-39 (full): tests/edge_books.rs::each_26as_invariant_fires_on_its_own_tampering
+  E2B2-28 (full): tests/registry.rs::every_registered_test_matches_its_synthetic_golden

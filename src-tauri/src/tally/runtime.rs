@@ -744,6 +744,19 @@ pub(crate) async fn with_operation_wire_budget<F: Future>(operation: F) -> F::Ou
         .await
 }
 
+/// As [`with_operation_wire_budget`], with the shared wait budget already
+/// set to `total` (capped at `WIRE_WAIT_MAX`) rather than the policy's own.
+pub(crate) async fn with_operation_wire_budget_of<F: Future>(
+    total: std::time::Duration,
+    operation: F,
+) -> F::Output {
+    let budget = std::sync::OnceLock::new();
+    let _ = budget.set(WireWaitBudget::new(total));
+    OPERATION_WIRE_BUDGET
+        .scope(budget, Box::pin(operation))
+        .await
+}
+
 /// A failed pre-intent read as the typed admission refusal, with the transport
 /// failure as context (a context value is not reachable by `downcast_ref`). A
 /// wire refusal stays the error itself: it says the port was busy, with a
@@ -2552,7 +2565,6 @@ impl TallyRuntime {
         self
     }
 
-    #[cfg(test)]
     pub(crate) fn wire_gate_config(&self) -> &WireGateConfig {
         &self.wire
     }

@@ -200,6 +200,21 @@ impl Server {
         }
     }
 
+    /// The marks readback after a sent post. It gets a wire wait of its own:
+    /// the admission reads may have spent the call's budget, and a marks read
+    /// refused as busy after a sent post would record a lasting doubt on a
+    /// clean batch (#697).
+    async fn read_marks_after_post(
+        &self,
+        request: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> anyhow::Result<String> {
+        crate::tally::runtime::with_operation_wire_budget(
+            self.runtime
+                .read_company_marks_once(self.tally_config(), request),
+        )
+        .await
+    }
+
     /// The company's masters across the post (#239). Only when the snapshots
     /// either side of the POST prove the target's master mark unchanged is
     /// nothing read. Otherwise (the mark moved, or either snapshot could not
@@ -972,9 +987,11 @@ impl Server {
                         _ => None,
                     }
                 });
+                // A wire-gate refusal before the intent (#697) becomes the code
+                // itself in `from_runtime`; it is not repeated as the cause.
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
-                    failure.cause = group.or(transport);
+                    failure.cause = refusal_cause(&failure.code, group, transport);
                 }
                 failure
             })?;
@@ -1009,8 +1026,7 @@ impl Server {
             // been attempted, so a slow or failed read delays nothing that records
             // the post. A failed read is reported, never guessed.
             let marks_after = self
-                .runtime
-                .read_company_marks_once(self.tally_config(), company_marks_request.clone())
+                .read_marks_after_post(company_marks_request.clone())
                 .await
                 .ok()
                 .and_then(|marks| location::parse_all_company_marks(&marks).ok());
@@ -1230,6 +1246,23 @@ fn post_failure_outcome(
         truncated: false,
     }
 }
+/// The cause a failure adds to its code: none when it would only repeat the
+/// code, as a wire refusal's transport code does once `from_runtime` made it the
+/// code itself (#697).
+fn refusal_cause(
+    code: &str,
+    group: Option<&'static str>,
+    transport: Option<&'static str>,
+) -> Option<&'static str> {
+    group.or(transport).filter(|cause| code != *cause)
+}
+
+/// What a caller does when the port was busy for the readback after its own
+/// send (#697). Tally may or may not have accepted it; only the proof is missing.
+const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again.";
+
+/// The same, when whether the post was sent could not be observed.
+const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
 fn reconciliation_failure_payload(
     batch_id: &str,
@@ -1237,9 +1270,26 @@ fn reconciliation_failure_payload(
     response: Option<&ledger::DispatchResponse>,
     code: &str,
 ) -> Value {
-    json!({"result":{"batch_id":batch_id,"attempt_recorded":attempted,"dispatch_response":response,"error":{"code":code,
+    let mut payload = json!({"result":{"batch_id":batch_id,"attempt_recorded":attempted,"dispatch_response":response,"error":{"code":code,
         "message":if attempted == Some(false) { "No posting attempt was recorded. Review the error before requesting approval again." }
-        else { "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry." }}}})
+        else { "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry." }}}});
+    // Every busy refusal says when to retry. A recorded attempt makes it the
+    // readback after a send; an unknown attempt (`None`) gets the same step in
+    // words that do not claim a send, since verify_import is right either way.
+    // A recorded non-attempt (`Some(false)`) offers no step: its message says
+    // no attempt was recorded.
+    if code == "tally_endpoint_busy" {
+        payload["result"]["error"]["retry_after_s"] =
+            json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+        match attempted {
+            Some(true) => {
+                payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
+            }
+            None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
+            Some(false) => {}
+        }
+    }
+    payload
 }
 
 fn mark_reconciliation_required(payload: &mut Value) {

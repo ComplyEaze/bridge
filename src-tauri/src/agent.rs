@@ -496,6 +496,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::RequestFailed
                 | Transport::HttpStatus { .. }
                 | Transport::UnsupportedContentEncoding => Some(Unanswered(transport.safe_code())),
+                // Bridge's own wire gate held the request back: nothing was sent.
+                Transport::WireRefused { refusal } => Some(Unanswered(refusal.safe_code())),
                 Transport::InvalidEncoding {
                     code: code @ "response_content_type_unsupported",
                 } => Some(Unanswered(code)),
@@ -685,6 +687,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
         ),
+        // #697: every Bridge process sends to one Tally one request at a time.
+        "tally_endpoint_busy" => Some(
+            "Another Bridge window or AI client was talking to this Tally for the whole \
+             bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
+             same request is safe to repeat.",
+        ),
         "import_post_window_not_bounded" => Some(
             "Before posting, Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
@@ -747,6 +755,16 @@ impl ToolFailure {
             .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
         {
             "request_cancelled"
+        } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
+            // Never in place of an unknown post outcome: that code is what
+            // tells the caller not to rebuild. A wire refusal cannot reach it
+            // (the post's lock is taken before its attempt is recorded), and
+            // this keeps it so.
+            .filter(|_| code != "import_dispatch_outcome_unknown")
+        {
+            // Held back by the endpoint's wire gate: nothing was sent, and
+            // the caller's next step is the refusal's, not the operation's.
+            refusal.safe_code()
         } else if error
             .chain()
             .any(|cause| cause.is::<crate::tally::runtime::EducationBoundaryRefusal>())
@@ -952,6 +970,13 @@ impl Server {
                 evidence.state = "partial";
                 evidence.reason_code = Some(code.clone());
                 let mut error = json!({"code": code, "message": "Bridge refused this operation."});
+                // Retryable as it stands (#697): another Bridge window or AI
+                // client held the Tally endpoint for the whole bounded wait.
+                // A few bytes, so it is kept under any response budget.
+                if code == "tally_endpoint_busy" {
+                    error["retry_after_s"] =
+                        json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+                }
                 // Additive: `code` and `message` keep their existing shape for
                 // every refusal, and `remediation` appears only for the codes
                 // that have a concrete next step to name.

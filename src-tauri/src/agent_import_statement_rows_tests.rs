@@ -389,14 +389,10 @@ fn the_journal_read_returns_every_batchs_rows_with_its_company() {
     let first_tag = first.attribution_tag(&first.vouchers[0]);
     let second_tag = second.attribution_tag(&second.vouchers[0]);
     assert_eq!(snapshot.statement_rows.len(), 2);
-    assert_eq!(
-        snapshot.statement_rows[&first_tag],
-        (GUID.to_string(), key("stmt-1", "900.00"))
-    );
-    assert_eq!(
-        snapshot.statement_rows[&second_tag],
-        (GUID.to_string(), key("stmt-1", "800.00"))
-    );
+    let (company, row, _) = &snapshot.statement_rows[&first_tag];
+    assert_eq!((company.as_str(), row), (GUID, &key("stmt-1", "900.00")));
+    let (company, row, _) = &snapshot.statement_rows[&second_tag];
+    assert_eq!((company.as_str(), row), (GUID, &key("stmt-1", "800.00")));
 }
 
 #[test]

@@ -190,7 +190,7 @@ fn recorded_statement_row<'a>(
 ) -> Option<&'a StatementRowKey> {
     statement_rows
         .get(tag)
-        .filter(|(company, _)| company.eq_ignore_ascii_case(company_guid))
+        .filter(|(company, _, _)| company.eq_ignore_ascii_case(company_guid))
         .map(|(_, key, _)| key)
 }
 

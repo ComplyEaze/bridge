@@ -263,15 +263,16 @@ So the two measurements cover different halves and neither covers the third case
   correction primitive for anyone targeting that environment.
 - **Stored state, licensed 7.1 Gold — confirmed via the UI (§9.12b).** The voucher was gone
   afterwards. No gateway response exists to corroborate it.
-- **Gateway on a licensed SKU — UNVERIFIED**, on Gold and on the Silver/Journal profile this
+- **Gateway on a licensed SKU — UNVERIFIED as first written (2026-09-25); see the note below**, on Gold and on the Silver/Journal profile this
   section is about alike. §9.7 does not reach it because its baseline is Educational; §9.12b does
   not reach it because a UI import returns nothing.
   **Superseded for one case (2026-09-28):** a gateway `Delete` by the creation `REMOTEID` returned
-  `DELETED=1` on licensed Gold for one directly imported voucher (§9.12b, PARTIAL beyond that
-  voucher); §9.14 also records a gateway `Delete` by `REMOTEID` (`DELETED=1`) and, in its Gold block, a same-`REMOTEID` upsert.
+  `DELETED=1` on licensed Gold for one directly imported voucher (§9.12b, PARTIAL: one voucher).
+  §9.14's `DELETED=1` on a `REMOTEID` delete is separate and older: Silver, Journal, PARTIAL, and
+  not new here. Its Gold block records a same-`REMOTEID` upsert, not a delete.
 
-Say which of the three you are standing on. "Delete works" is true in two of them and unproven in
-the one a licensed integration actually runs in.
+Say which of the three you are standing on. "Delete works" is true in two of them and, apart from
+the single Gold voucher noted above, unproven in the one a licensed integration actually runs in.
 
 **Qualifying it on a new SKU or voucher type takes more than "read one voucher back".** A single
 read cannot tell *the original is gone* from *my read did not cover it*: an incomplete, failed or
@@ -764,8 +765,9 @@ Gold, one client book, 2026-09-28).**
 - **Bridge.** Bridge's import file writes CR and LF this way (`xml_escape`, bridge#626).
 - **Not sent.** A raw CR LF was not sent. XML 1.0 normalises a raw CR LF in content to LF, so a
   raw line break would name a ledger the book does not hold; that is **UNVERIFIED** against Tally.
-- **Confidence.** VERIFIED for the 6 vouchers and the one `Alter` shape; one session on one client
-  book, so **Confidence: PARTIAL** beyond it.
+- **Confidence.** VERIFIED for the 6 vouchers and the one `Alter` shape, because `ledger_movement`
+  read back exactly those 6 and the `Alter` was read back. It is one session on one client book, so
+  **Confidence: PARTIAL** beyond it.
 
 
 #

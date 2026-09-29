@@ -428,8 +428,10 @@ the `FETCH` list and looks at what arrives.
 > So a live monetary read of a Gold book (`verify_import` over vouchers with amounts) and the
 > gateway import of Bridge-built Payment, Receipt and Contra files are both observed on Gold. Two
 > things are not:
-> - **Native posting.** `post_import` with its approval has not been observed on Gold, on Windows
->   or on Education.
+> - **Native posting.** `post_import` with its approval had not been observed on Gold, on Windows
+>   or on Education when this correction was written (2026-09-25). Bridge's native post was later
+>   captured on Gold on 2026-09-28 (§9.14's recorded-list item: one client book, a debug build).
+>   Windows and Education remain unobserved.
 > - **Reads at scale.** Reads of books of thousands of vouchers are the open failure in bridge#485.
 >
 > Neither run exercised a second Tally user writing during the read. That is the case Gold adds
@@ -538,6 +540,10 @@ Retain, duplicates not prevented). Path: raw gateway requests (G), not Bridge's 
 run per item, one voucher each (2026-09-25); per P5 an anomaly is repeated before it is believed, so
 each is PARTIAL until it is.** Counters were read from the saved responses and state
 from a Voucher collection readback, not from the counters alone.
+
+**Exception, dated 2026-09-28.** The recorded-list item and the Payment, Receipt and Contra block
+below were measured on licensed TallyPrime 7.1 Gold, on one client book. The recorded-list item
+used Bridge's native post; the upsert block used the gateway. Each states its own scope.
 
 - **`ACTION="Cancel"` with the full voucher body cancels in place. PARTIAL — observed once (G).**
   - The response reported `ALTERED=1` and `CANCELLED=0`, with all other counters zero.

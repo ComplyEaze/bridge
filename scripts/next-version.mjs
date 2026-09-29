@@ -156,11 +156,12 @@ export function draftNotes(classified) {
 // as a hang: `gh` waits on the network and a maintainer cannot tell a stall from a slow answer.
 export function run(command, args, { timeoutMs = 60_000, cwd = root } = {}) {
   try {
-    return execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs }).trim();
+    return execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 }).trim();
   } catch (error) {
     const shown = `${command} ${args.slice(0, 3).join(" ")}`;
-    const failure = (kind, message) => Object.assign(new Error(message), { kind });
-    if (error.code === "ETIMEDOUT") throw failure("timeout", `${shown} timed out after ${timeoutMs / 1000}s; check the network and gh authentication, then run it again`);
+    const failure = (kind, message) => Object.assign(new Error(message), { kind, status: error.status });
+    if (error.code === "ETIMEDOUT") throw failure("timeout", `${shown} timed out after ${timeoutMs / 1000}s; check the network and authentication, then run it again`);
+    if (error.code === "ENOBUFS") throw failure("failed", `${shown} printed more output than the ${64} MB limit`);
     if (error.code === "ENOENT") throw failure("missing", `${command} is not installed or not on PATH`);
     const detail = String(error.stderr ?? "").trim().split("\n")[0];
     throw failure("failed", `${shown} failed${detail ? `: ${detail}` : ""}`);
@@ -172,13 +173,31 @@ const ALLOWED_FLAGS = { "--since": true, "--to": true, "--level": true, "--apply
 // An unknown flag, a positional argument, or `--level=minor` used to be ignored, which turns a
 // mistyped --level into a silent default. Each is refused, naming the accepted form.
 export function checkArguments(args) {
+  const seen = new Set();
   for (let at = 0; at < args.length; at += 1) {
     const token = args[at];
     const [name] = token.split("=", 1);
     if (!token.startsWith("--")) throw new Error(`unexpected argument ${token}; the flags are ${Object.keys(ALLOWED_FLAGS).join(", ")}`);
     if (!(name in ALLOWED_FLAGS)) throw new Error(`unknown flag ${name}; the flags are ${Object.keys(ALLOWED_FLAGS).join(", ")}`);
     if (token.includes("=")) throw new Error(`write ${name} ${token.slice(name.length + 1) || "VALUE"}, with a space: the ${name}=VALUE form is not read`);
+    if (seen.has(name)) throw new Error(`${name} is given twice; only one value would be used`);
+    seen.add(name);
     if (ALLOWED_FLAGS[name]) at += 1;
+  }
+}
+
+function readVersionsAt(ref) {
+  return Object.fromEntries(Object.entries(VERSION_FILES).map(([file, spec]) => [file, spec.read(run("git", ["show", `${ref}:${file}`])) ?? null]));
+}
+
+// `rev-parse --verify --quiet` exits 1 with no output for an unknown name; any other failure is
+// git itself failing and is reported as that.
+function requireCommit(ref, advice) {
+  try {
+    run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+  } catch (error) {
+    if (error.kind === "failed" && error.status === 1) throw new Error(`${ref} does not exist here; ${advice}`);
+    throw error;
   }
 }
 
@@ -232,7 +251,7 @@ function argument(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   const value = process.argv[index + 1];
-  if (value === undefined || value.startsWith("--")) throw new Error(`${name} needs a value`);
+  if (value === undefined || value.startsWith("-")) throw new Error(`${name} needs a value that does not start with "-"`);
   return value;
 }
 
@@ -248,10 +267,14 @@ async function main() {
   if (level && !["major", "minor", "patch"].includes(level)) throw new Error("--level must be major, minor or patch");
   // HEAD would count the commits of an unmerged working branch as unclassified direct pushes.
   const to = argument("--to") ?? "origin/master";
-  try {
-    run("git", ["rev-parse", "--verify", "--quiet", `${to}^{commit}`]);
-  } catch {
-    throw new Error(`${to} does not exist here; run git fetch origin, or pass --to REF`);
+  requireCommit(to, "run git fetch origin, or pass --to REF (the default is origin/master)");
+  if (!argument("--to")) {
+    // The range ends at a remote-tracking ref, so a stale one would silently undercount, and the
+    // version files read here must be the ones that range ends with, or a bump would repeat.
+    const tip = run("git", ["ls-remote", "origin", "refs/heads/master"]).split(/\s/)[0];
+    if (tip && tip !== run("git", ["rev-parse", "origin/master"])) throw new Error("origin/master here is not origin's current master; run git fetch origin");
+    const atTo = [...new Set(Object.values(readVersionsAt(to)))];
+    if (atTo.length !== 1 || atTo[0] !== current) throw new Error(`the version files here say ${current} but ${to} says ${atTo.join(" and ")}; merge or rebase onto ${to} first, or pass --to HEAD`);
   }
   const since = argument("--since") ?? latestReleaseTag(run("git", ["tag", "--list"]).split("\n"));
   if (!since) throw new Error("no release tag found; run git fetch --tags origin, or pass --since TAG");
@@ -273,10 +296,12 @@ async function main() {
   }
   // git log A..B does not fail when A is not an ancestor of B; it silently
   // returns a different set of commits.
+  requireCommit(since, "run git fetch --tags origin, or pass --since TAG");
   try {
-    execFileSync("git", ["merge-base", "--is-ancestor", since, to], { cwd: root, stdio: "ignore" });
-  } catch {
-    throw new Error(`${since} is not an ancestor of ${to}; the pull requests since it cannot be listed`);
+    run("git", ["merge-base", "--is-ancestor", since, to]);
+  } catch (error) {
+    if (error.kind === "failed" && error.status === 1) throw new Error(`${since} is not an ancestor of ${to}; the pull requests since it cannot be listed`);
+    throw error;
   }
   const result = propose({ current, pulls: pullsSince(since, to), level });
 

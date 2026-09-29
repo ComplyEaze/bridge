@@ -173,6 +173,7 @@ test("unknown flags, stray arguments and the --flag=value form are refused", () 
   assert.throws(() => checkArguments(["--apply=true"]), /the --apply=VALUE form is not read/);
   assert.throws(() => checkArguments(["minor"]), /unexpected argument minor/);
   assert.throws(() => checkArguments(["--level", "minor", "extra"]), /unexpected argument extra/);
+  assert.throws(() => checkArguments(["--level", "patch", "--level", "major"]), /--level is given twice/);
 });
 
 // The script is copied into a throwaway repository with a bare origin and a stub `gh`, because
@@ -201,7 +202,8 @@ function inRelease(callback) {
       mkdirSync(dirname(join(work, file)), { recursive: true });
       copyFileSync(join(repository, file), join(work, file));
     }
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+    const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+    const env = { ...inherited, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", PATH: `${bin}:${process.env.PATH}`, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
     const git = (...args) => execFileSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: work, env, stdio: "pipe" });
     const commit = (subject) => git("commit", "--allow-empty", "-q", "-m", subject);
     const current = readVersions(work)["package.json"];
@@ -246,6 +248,27 @@ test("a subject ending in an issue number, and a bad flag, end the run with one 
   assert.match(flag.stderr, /^next-version: write --level minor, with a space/);
 }));
 
+test("the default range refuses a stale origin/master and version files that differ from it", skipOnWindows, () => inRelease(({ git, commit, next, current, work }) => {
+  commit("Fix a thing (#11)");
+  git("push", "-q", "origin", "master", "--tags");
+  assert.equal(next().status, 0);
+
+  git("update-ref", "refs/remotes/origin/master", "HEAD~1");
+  const stale = next();
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /origin\/master here is not origin's current master; run git fetch origin/);
+  git("fetch", "-q", "origin");
+
+  writeVersions("0.0.7", work);
+  git("add", "-A");
+  commit("Bump the version (#12)");
+  git("push", "-q", "origin", "master");
+  git("reset", "-q", "--hard", "HEAD~1");
+  const bumped = next();
+  assert.equal(bumped.status, 1);
+  assert.match(bumped.stderr, new RegExp(`the version files here say ${current.replaceAll(".", "\\.")} but origin/master says 0\\.0\\.7`));
+}));
+
 test("the guards in main refuse a stale, ahead or inconsistent release state", skipOnWindows, () => inRelease(({ git, commit, next, current, work }) => {
   commit("Fix a thing (#11)");
   git("push", "-q", "origin", "master", "--tags");
@@ -272,6 +295,12 @@ test("the guards in main refuse a stale, ahead or inconsistent release state", s
   git("checkout", "-q", "--orphan", "elsewhere");
   commit("An unrelated root");
   git("tag", "v0.0.1");
+  const missing = next("--since", "no-such-tag");
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /no-such-tag does not exist here/);
+  assert.doesNotMatch(missing.stderr, /not an ancestor/);
+  const dashed = next("--since", "-x");
+  assert.match(dashed.stderr, /--since needs a value that does not start with "-"/);
   const unrelated = next("--since", "v0.0.1");
   assert.equal(unrelated.status, 1);
   assert.match(unrelated.stderr, /v0\.0\.1 is not an ancestor of origin\/master/);

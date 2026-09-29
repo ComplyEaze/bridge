@@ -142,17 +142,16 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: anyhow::Error,
     },
-    /// The estimated master response is over the budget, so no master
-    /// request was sent (#637): on the ledgers a paired catalogue counted
-    /// (`counted_ledgers`), or, with none counted, on the company's
-    /// master-alteration mark, an upper bound on its ledgers (#668). Numbers
-    /// only.
-    #[error("Tally compliance master read is estimated beyond Bridge's response budget")]
-    TooLarge {
+    /// The catalogue that would count a book's ledgers before its master read
+    /// (#668) is estimated beyond the transport's response cap, so nothing was
+    /// sent after the opening extent: the company's master-alteration mark, an
+    /// upper bound on its ledgers, times the catalogue's bytes per ledger is
+    /// over the limit. Numbers only.
+    #[error("Tally ledger catalogue is estimated beyond Bridge's response limit")]
+    CatalogueTooLarge {
         master_alter_id: u64,
-        counted_ledgers: Option<u64>,
         estimated_bytes: u64,
-        budget_bytes: u64,
+        limit_bytes: u64,
     },
     /// The ledger catalogue that counts a marked book's ledgers before its
     /// master read (#668) failed validation: another company, a damaged
@@ -193,7 +192,7 @@ impl PartyLedgerMasterSourceValidationError {
             Self::BalanceCompanyIdentityUnverified => "balance_company_identity_unverified",
             Self::GroupCompanyIdentityUnverified => "group_company_identity_unverified",
             Self::MasterResponseInvalid { .. } => "master_response_invalid",
-            Self::TooLarge { .. } => "ledger_masters_too_large",
+            Self::CatalogueTooLarge { .. } => "ledger_catalogue_too_large",
             Self::LedgerCountInvalid { source } => source.safe_code(),
             Self::ParentPartition { source } => source.safe_code(),
         }
@@ -223,18 +222,28 @@ const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
 /// Bytes one ledger is estimated to add to the balance-free ledger catalogue
 /// response that counts a marked book's ledgers (#668). PARTIAL: a synthetic
 /// book of 1,989 ledgers read 1,104 bytes per ledger (2.2 MB, 0.35 s;
-/// 2026-09-29), so 1,600 leaves about 45% for longer names. It bounds the
-/// mark, not the ledgers: past `budget / 1,600` = 10,000 the mark alone is
-/// refused. That reach is Bridge's own choice, not a measured limit: a
-/// catalogue of about 9,500 ledgers read about 11.6 MB in about 1.5 s.
-const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
+/// 2026-09-29) and a real book of about 9,500 ledgers read about 1,221 (about
+/// 11.6 MB in about 1.5 s), so 1,400 leaves about 15% over the larger.
+const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_400;
+
+/// The largest estimated catalogue response Bridge will request (#679). A
+/// catalogue is not read in parts, and a response over the transport's cap
+/// (`XML_RESPONSE_MAX_BYTES`, 32 MiB) makes the transport return as soon as the
+/// running total passes it, dropping the connection with the rest of the
+/// response unread: an abandoned read, which can leave Tally's gateway busy.
+/// So the catalogue is bounded before it is sent, not left to the cap. 32 MB
+/// is under the cap by about 1.5 MB. UNVERIFIED as a margin: it is Bridge's
+/// own choice. At 1,400 bytes per unit of mark it admits a mark of 22,857.
+const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 
 /// Most immediate parent groups one part's `$Parent = "A" OR $Parent = "B"`
 /// formula names (#679). UNVERIFIED: an `OR` of two parents is measured
-/// (protocol reference section 11e); a longer formula or a larger parent count
-/// is not. Chosen well inside any plausible limit, and only more parts, never
-/// a longer formula, are the cost of a smaller number.
-const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 8;
+/// (protocol reference section 11e); a longer formula, Tally's cost for one and
+/// any limit on its length are not. A book has about one parent per ten
+/// ledgers, most with one ledger, so parts are packed by ledger count and this
+/// only bounds how many parents share a part: 500 puts about 1,350 parents in
+/// three or four parts. Set from the measurement (#679) before this ships.
+const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 500;
 
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
@@ -286,19 +295,23 @@ fn compliance_estimate_unverified(count: u64) -> ComplianceEstimate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ComplianceAdmission {
     Admitted,
-    /// The mark does not fit but a paired catalogue read does: count the
+    /// The mark does not fit whole but its catalogue can be read: count the
     /// ledgers, then admit again with the count (#668).
     CountFirst,
+    /// The counted ledgers do not fit one read: read them in parts by parent
+    /// group (#679).
+    InParts,
 }
 
-/// Sizes a compliance read before any master request is sent (#637, #668).
+/// Sizes a compliance read before any master request is sent (#637, #668, #679).
 ///
 /// With `counted` ledgers the count decides: the estimate is `counted` times
-/// the per-ledger constant. Without one, the company's master-alteration mark
-/// (`ALTMSTID`, from the opening extent; the extent read already fails closed
-/// without it, `require_master_witness`) stands in: it fits, or it is within
-/// reach of a catalogue read ([`ComplianceAdmission::CountFirst`]), or it is
-/// refused with no count.
+/// the per-ledger constant, and a count that does not fit is read in parts.
+/// Without one, the company's master-alteration mark (`ALTMSTID`, from the
+/// opening extent; the extent read already fails closed without it,
+/// `require_master_witness`) stands in: it fits, or the catalogue that counts
+/// the book fits the transport ([`ComplianceAdmission::CountFirst`]), or the
+/// read is refused before anything is sent after the extent.
 ///
 /// The mark is an UPPER BOUND on ledgers, not a count: every master of every
 /// type (stock items, units, groups and the rest) raises it, and so does every
@@ -313,28 +326,25 @@ fn admit_compliance_master_read(
     master_alter_id: u64,
     counted: Option<u64>,
 ) -> Result<ComplianceAdmission, PartyLedgerMasterSourceValidationError> {
-    let too_large = |estimate: ComplianceEstimate| {
-        Err(PartyLedgerMasterSourceValidationError::TooLarge {
-            master_alter_id,
-            counted_ledgers: counted,
-            estimated_bytes: estimate.estimated_bytes,
-            budget_bytes: COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
-        })
-    };
-    let estimate = compliance_estimate_unverified(counted.unwrap_or(master_alter_id));
-    if estimate.fits {
+    if compliance_estimate_unverified(counted.unwrap_or(master_alter_id)).fits {
         return Ok(ComplianceAdmission::Admitted);
     }
-    let catalogue_fits = compliance_estimate(
+    if counted.is_some() {
+        return Ok(ComplianceAdmission::InParts);
+    }
+    let catalogue = compliance_estimate(
         master_alter_id,
         LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL,
-        COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
-    )
-    .fits;
-    if counted.is_none() && catalogue_fits {
+        LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+    );
+    if catalogue.fits {
         return Ok(ComplianceAdmission::CountFirst);
     }
-    too_large(estimate)
+    Err(PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
+        master_alter_id,
+        estimated_bytes: catalogue.estimated_bytes,
+        limit_bytes: LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+    })
 }
 
 /// A paired or bracketed read observed movement in the endpoint's data. This
@@ -1413,7 +1423,9 @@ impl TallyClient {
                 // A count the whole read cannot fit is read as parts by parent
                 // group (#679); the catalogue that counted the book also
                 // names each ledger's parent, so nothing more is asked first.
-                if admit_compliance_master_read(master_mark, Some(counted)).is_err() {
+                if admit_compliance_master_read(master_mark, Some(counted))?
+                    == ComplianceAdmission::InParts
+                {
                     partition = Some(
                         ParentPartition::plan(
                             catalogue.identified_parents(),

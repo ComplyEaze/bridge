@@ -920,28 +920,31 @@ mod through_the_tool {
         plans
     }
 
-    /// A master mark past what a catalogue read can bound within the budget
-    /// (10,000) refuses right after the source's opening extent, as before
-    /// #668: no catalogue, ledger, balance or group request is sent, and the
-    /// refusal names the mark as an upper bound and says no ledgers were
-    /// counted.
+    /// A master mark whose catalogue cannot fit the response limit (22,857)
+    /// refuses right after the source's opening extent: no catalogue, ledger,
+    /// balance or group request is sent, because a catalogue past the
+    /// transport's cap is cut off mid-read (#679). The refusal names the mark
+    /// as an upper bound.
     #[tokio::test]
-    async fn a_book_whose_master_mark_is_over_the_bound_is_refused_before_any_ledger_read() {
-        let plans = marked_compliance_plans(10_001, Vec::new(), None);
-        let total = plans.len();
-        let (response, requests) =
-            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
-        assert_eq!(requests, total, "nothing is sent after the opening extent");
-        let error = refusal(&response);
-        assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "ledger_masters_too_large");
-        assert_eq!(
-            error["size"],
-            json!({"master_alter_id": 10_001, "counted_ledgers": null, "estimated_bytes": 37_503_750, "budget_bytes": 16_000_000})
-        );
-        let remediation = error["remediation"].as_str().unwrap();
-        assert!(remediation.contains("UPPER BOUND"), "{error}");
-        assert!(remediation.contains("fields=basic"), "{error}");
+    async fn a_book_whose_catalogue_cannot_fit_the_response_limit_is_refused_before_any_ledger_read(
+    ) {
+        for mark in [22_858_u64, 1_000_000] {
+            let plans = marked_compliance_plans(mark, Vec::new(), None);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "nothing is sent after the opening extent");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "ledger_catalogue_too_large");
+            assert_eq!(
+                error["size"],
+                json!({"master_alter_id": mark, "estimated_bytes": mark * 1_400, "limit_bytes": 32_000_000})
+            );
+            let remediation = error["remediation"].as_str().unwrap();
+            assert!(remediation.contains("UPPER BOUND"), "{error}");
+            assert!(remediation.contains("fields=basic"), "{error}");
+        }
     }
 
     /// The captured nine-ledger catalogue.
@@ -1083,10 +1086,14 @@ mod through_the_tool {
 
     /// The whole sequence for the split book: the catalogue, then one master
     /// and one balance read per part, then the groups.
-    fn split_plans(first: (String, String), second: (String, String)) -> Vec<ScenarioPlan> {
+    fn split_plans(
+        mark: u64,
+        first: (String, String),
+        second: (String, String),
+    ) -> Vec<ScenarioPlan> {
         let rows = split_book();
         let mut plans = marked_compliance_plans(
-            6_000,
+            mark,
             vec![
                 generated_catalogue(&rows.iter().collect::<Vec<_>>()),
                 first.0,
@@ -1097,7 +1104,7 @@ mod through_the_tool {
             ],
             None,
         );
-        pair(&mut plans, xml(extent_with_master_mark(6_000)));
+        pair(&mut plans, xml(extent_with_master_mark(mark)));
         plans
     }
 
@@ -1107,37 +1114,41 @@ mod through_the_tool {
 
     /// A book too large for one read but with no parent too large is read in
     /// parts, one filtered master and balance pair per part, and every ledger
-    /// comes back once (#679).
+    /// comes back once, whatever its mark: 6,000 is within the old mark cap,
+    /// 10,001 and 20,000 were refused on the mark alone before #679 (#679).
     #[tokio::test]
     async fn a_book_too_large_for_one_read_is_read_in_parts_by_parent() {
-        let rows = split_book();
-        let mut plans = split_plans(
-            part_reads(&under(&rows, &[BIG, NESTED])),
-            part_reads(&under(&rows, &[OTHER])),
-        );
-        plans.extend([xml(companies()), status(), xml(companies())]);
-        let total = plans.len();
-        let (response, requests) = call_with_max_bytes(
-            plans,
-            json!({"company_guid":GUID,"fields":"compliance"}),
-            2_000_000,
-        )
-        .await;
-        assert_eq!(requests, total);
-        assert_ne!(response["isError"], true, "{response}");
-        assert_eq!(response["structuredContent"]["result"]["total"], 4_300);
-        let names = items(&response)
-            .iter()
-            .map(|item| item["name"].as_str().unwrap())
-            .collect::<Vec<_>>();
-        assert!(
-            names.windows(2).all(|pair| pair[0] <= pair[1]),
-            "sorted by name"
-        );
+        for mark in [6_000_u64, 10_001, 20_000] {
+            let rows = split_book();
+            let mut plans = split_plans(
+                mark,
+                part_reads(&under(&rows, &[BIG, NESTED])),
+                part_reads(&under(&rows, &[OTHER])),
+            );
+            plans.extend([xml(companies()), status(), xml(companies())]);
+            let total = plans.len();
+            let (response, requests) = call_with_max_bytes(
+                plans,
+                json!({"company_guid":GUID,"fields":"compliance"}),
+                2_000_000,
+            )
+            .await;
+            assert_eq!(requests, total, "mark {mark}");
+            assert_ne!(response["isError"], true, "mark {mark}: {response}");
+            assert_eq!(response["structuredContent"]["result"]["total"], 4_300);
+            let names = items(&response)
+                .iter()
+                .map(|item| item["name"].as_str().unwrap())
+                .collect::<Vec<_>>();
+            assert!(
+                names.windows(2).all(|pair| pair[0] <= pair[1]),
+                "sorted by name"
+            );
+        }
     }
 
     async fn split_refusal(first: (String, String), second: (String, String)) -> String {
-        let plans = split_plans(first, second);
+        let plans = split_plans(6_000, first, second);
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;

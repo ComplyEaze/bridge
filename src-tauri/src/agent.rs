@@ -413,7 +413,7 @@ struct ToolFailure {
     /// What each request of a window read cost up to its failure (#595), when
     /// the failure came out of one. Data-free.
     window_timings: Option<Box<WindowReadTimings>>,
-    /// The count and estimate a read was refused on before it was sent (#637).
+    /// The mark and estimate a read was refused on before it was sent (#637).
     /// Numbers only; boxed to keep the refusal small on every other path.
     read_size: Option<Box<ReadSize>>,
     /// Set when no response reached Tally-protocol parsing (#629). The refusal
@@ -434,15 +434,14 @@ struct Candidates {
     items: Vec<Value>,
 }
 
-/// A compliance read refused on its size before the master request was sent:
-/// the master mark, the ledgers a catalogue counted (none when the mark alone
-/// was refused), the estimated response and the budget it exceeded.
+/// A compliance read refused before any ledger request was sent because the
+/// catalogue that would count its ledgers is over the response limit: the
+/// master mark, the estimated catalogue response and the limit it exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
-    counted_ledgers: Option<u64>,
     estimated_bytes: u64,
-    budget_bytes: u64,
+    limit_bytes: u64,
 }
 
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
@@ -450,16 +449,14 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
-            crate::tally::connection::PartyLedgerMasterSourceValidationError::TooLarge {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
-                counted_ledgers,
                 estimated_bytes,
-                budget_bytes,
+                limit_bytes,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
-                counted_ledgers: *counted_ledgers,
                 estimated_bytes: *estimated_bytes,
-                budget_bytes: *budget_bytes,
+                limit_bytes: *limit_bytes,
             }),
             _ => None,
         }
@@ -637,15 +634,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              not because the response was damaged. Retrying refuses again.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
-        "ledger_masters_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) is above what Bridge \
-             can bound a ledger count for, so no request for ledgers was sent: a read of that \
-             size has left Tally's gateway unable to answer (#637). `size.counted_ledgers` is \
-             null because nothing was counted. The mark is an UPPER BOUND on ledgers, since \
-             stock items, units and every other master raise it too, so a company with fewer \
-             ledgers may be refused. Call ledger_masters with fields=basic, which returns \
-             names, parents and opening balances without the compliance fields. Retrying this \
-             call refuses again. A `group` filter does not narrow the request.",
+        "ledger_catalogue_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above what \
+             Bridge can read a ledger catalogue for, so no request for ledgers was sent: a \
+             catalogue past the transport's response cap is cut off mid-read, which can leave \
+             Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
+             since stock items, units and every other master raise it too, so a company with \
+             fewer ledgers may be refused. Call ledger_masters with fields=basic, which \
+             returns names, parents and opening balances without the compliance fields. \
+             Retrying this call refuses again. A `group` filter does not narrow the request.",
         ),
         // Causes reached through `party_ledger_master_read_failed` when a book too
         // large for one compliance read is read as parts by parent group (#679).
@@ -1023,9 +1020,8 @@ impl Server {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["size"] = json!({
                             "master_alter_id": size.master_alter_id,
-                            "counted_ledgers": size.counted_ledgers,
                             "estimated_bytes": size.estimated_bytes,
-                            "budget_bytes": size.budget_bytes,
+                            "limit_bytes": size.limit_bytes,
                         });
                     }
                 }

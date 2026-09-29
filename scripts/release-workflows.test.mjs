@@ -99,12 +99,15 @@ function assertInstallPageWorkflow(page) {
 
 // Runs the snapshot step's own shell with `gh` replaced by a function that applies the step's
 // real --jq filter to fixture JSON, so the draft filter and the empty guard are exercised, not matched.
+// Each release is its own page, as `gh api --paginate` would print them, so the step must collect
+// every page into one list.
 function runSnapshotStep(run, releases) {
   const dir = mkdtempSync(join(tmpdir(), "bridge-snapshot-"));
   mkdirSync(join(dir, "site"));
   copyFileSync(new URL("../site/release-catalog.mjs", import.meta.url), join(dir, "site", "release-catalog.mjs"));
-  writeFileSync(join(dir, "fixture.json"), JSON.stringify(releases));
-  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; jq "$4" fixture.json; }\n${run}`;
+  const pages = releases.length ? releases.map((release) => [release]) : [[]];
+  pages.forEach((page, index) => writeFileSync(join(dir, `page-${String(index).padStart(3, "0")}.json`), JSON.stringify(page)));
+  const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; for page in page-*.json; do jq -c "$5" "$page"; done; }\n${run}`;
   const result = spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8", env: { ...process.env, REPOSITORY: "example/bridge" } });
   const written = existsSync(join(dir, "site", "releases.json")) ? readFileSync(join(dir, "site", "releases.json"), "utf8") : undefined;
   rmSync(dir, { recursive: true, force: true });

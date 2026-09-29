@@ -73,6 +73,15 @@ fn never_opened(name: &str) -> String {
         .into_owned()
 }
 
+/// Where a parse result's proposals file is, from its proposals_id, as
+/// build_import_xml resolves it.
+fn proposals_file(directory: &Path, result: &Value) -> PathBuf {
+    directory
+        .join("agent")
+        .join(PROPOSALS_DIRECTORY)
+        .join(format!("{}.json", result["proposals_id"].as_str().unwrap()))
+}
+
 fn error_code(response: &Value) -> Option<&str> {
     response["structuredContent"]["result"]["error"]["code"].as_str()
 }
@@ -310,7 +319,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
         );
     }
 
-    let path = PathBuf::from(result["path"].as_str().unwrap());
+    // The result names the file by its id; its path is not returned.
+    assert!(result.get("path").is_none(), "{result}");
+    let path = proposals_file(directory.path(), result);
     let bytes = fs::read(&path).unwrap();
     assert_eq!(sha256_hex(&bytes), result["sha256"]);
     #[cfg(unix)]
@@ -392,9 +403,7 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     let mut remapped = arguments(&statement, &password_file);
     remapped["mapping"] = json!([]);
     let second = server.call_tool("parse_bank_statement", remapped).await;
-    let second_path = second["structuredContent"]["result"]["path"]
-        .as_str()
-        .unwrap();
+    let second_path = proposals_file(directory.path(), &second["structuredContent"]["result"]);
     let second_document: Value = serde_json::from_slice(&fs::read(second_path).unwrap()).unwrap();
     let labels = |document: &Value| {
         document["vouchers"]
@@ -622,20 +631,13 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     });
     let request = OwnedRequest::from_args(&args).unwrap();
     let open = parsed_with(&request.cash_answers);
-    let summary_open = summary(
-        &request,
-        &open,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        200_000,
-    );
+    let summary_open = summary(&request, &open, "statement-x", "0", 200_000);
     assert_eq!(summary_open["cash_questions"].as_array().unwrap().len(), 1);
     let id = summary_open["cash_questions"][0]["bridge_txn_id"]
         .as_str()
         .unwrap()
         .to_string();
-    let (proposals_id, _, digest) =
+    let (proposals_id, digest) =
         persist(directory.path(), &request, &open, &"0".repeat(64)).unwrap();
     let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
     assert_eq!(
@@ -647,7 +649,7 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         json!([{"bridge_txn_id": id, "answer": "owner_use", "ledger": "Drawings"}]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let answered = parsed_with(&request.cash_answers);
-    let (proposals_id, _, digest) =
+    let (proposals_id, digest) =
         persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
@@ -674,14 +676,7 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     assert_eq!(drawn["voucher_type"], "Payment");
     assert_eq!(drawn["entries"][0]["ledger"], "Drawings");
     assert_eq!(drawn["entries"][0]["side"], "Dr");
-    let summary = summary(
-        &request,
-        &answered,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        200_000,
-    );
+    let summary = summary(&request, &answered, "statement-x", "0", 200_000);
     assert_eq!(summary["cash_questions"], json!([]));
     // Only the unidentified transfer went to suspense; the answered cash line
     // did not.
@@ -696,7 +691,7 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         json!([{"bridge_txn_id": id, "answer": "business_cash", "ledger": "Cash"}]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let kept = parsed_with(&request.cash_answers);
-    let (proposals_id, _, digest) =
+    let (proposals_id, digest) =
         persist(directory.path(), &request, &kept, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
@@ -791,14 +786,7 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
     }))
     .unwrap();
     let max_bytes = 40_000;
-    let summary = summary(
-        &request,
-        &parsed,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        max_bytes,
-    );
+    let summary = summary(&request, &parsed, "statement-x", "0", max_bytes);
     let listed = |key: &str| summary[key].as_array().unwrap().len();
     let omitted = |key: &str| usize::try_from(summary[key].as_u64().unwrap()).unwrap();
     assert_eq!(summary["cash_questions_open"], 300);
@@ -945,14 +933,7 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
     }))
     .unwrap();
     let max_bytes = 40_000;
-    let summary = summary(
-        &request,
-        &parsed,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        max_bytes,
-    );
+    let summary = summary(&request, &parsed, "statement-x", "0", max_bytes);
     let listed = summary["ledgers_to_validate"].as_array().unwrap().len();
     let omitted =
         usize::try_from(summary["ledgers_to_validate_omitted"].as_u64().unwrap()).unwrap();
@@ -1098,14 +1079,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
     assert!(records[4..]
         .iter()
         .all(|record| record.cash_answer.is_some()));
-    let mut summary = summary(
-        &request,
-        &parsed,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        200_000,
-    );
+    let mut summary = summary(&request, &parsed, "statement-x", "0", 200_000);
 
     // Every key the summary carries, so a new one cannot slip past the scan.
     let mut top: Vec<&str> = summary
@@ -1130,7 +1104,6 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             "ledgers_to_validate",
             "ledgers_to_validate_omitted",
             "next_step",
-            "path",
             "proposals_id",
             "reconciled",
             "rows_in_window",
@@ -1360,14 +1333,7 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
     }]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let parsed = parsed_with(&request);
-    let summary = summary(
-        &request,
-        &parsed,
-        "statement-x",
-        Path::new("/x"),
-        "0",
-        200_000,
-    );
+    let summary = summary(&request, &parsed, "statement-x", "0", 200_000);
     assert_eq!(summary["cash_questions"], json!([]));
     let total_of = |party: &str| {
         let group = summary["counterparties"]

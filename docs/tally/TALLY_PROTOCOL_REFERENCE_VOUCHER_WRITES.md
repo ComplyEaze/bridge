@@ -556,7 +556,7 @@ from a Voucher collection readback, not from the counters alone.
   - The upsert reported `CREATED=1`, with a **new GUID**, a **new MASTERID** (7 before, 855 after) and the number 815.
   - A resend therefore undoes a delete, and neither the GUID nor the MASTERID survives it. Anything keyed on either (a baseline, a binding) must treat the re-created voucher as new. The REMOTEID is the only link, and after a delete that link re-creates the voucher rather than restoring it.
   - **Current behaviour:** Bridge's native post sends a fresh random REMOTEID for every post and records it with the dispatch intent (#582), so it never resends one.
-  - **The recorded list is in batch voucher order. VERIFIED on one run (licensed TallyPrime 7.1 Gold, 2026-09-28).** For 9 of 9 batches whose import request was captured, `dispatch_intent.native_remote_ids` equalled the captured `REMOTEID` attributes, in order. So the recorded list can address each voucher of a batch, for example for the upsert in the Gold block below.
+  - **The recorded list is in batch voucher order. VERIFIED on one run (licensed TallyPrime 7.1 Gold, 2026-09-28).** For 9 of 9 batches whose import request was captured, `dispatch_intent.native_remote_ids` equalled the captured `REMOTEID` attributes, in order. So the recorded list can address each voucher of a batch, for example for the upsert in the Gold block below. It is one session on one client book, with the request captured for 9 of the 10 batches (one was not captured), on a debug build of master 4857aff6, so a second book would strengthen it.
   - **Design consequence, not current behaviour:** a batch-posting design must refuse to resend a REMOTEID Bridge has already sent, because a resend after a delete re-creates the voucher under a new GUID.
 - **Manual numbering with duplicates prevented refuses, and two of the three refusals are silent. PARTIAL — observed once each (G).** The same Journal type was switched to Manual with Prevent Duplicates, then restored.
   - An upsert (same `REMOTEID`) with no `VOUCHERNUMBER` reported `ERRORS=1` with `LINEERROR` "Voucher Number cannot be left BLANK!", and no create or alter counter moved.
@@ -567,13 +567,13 @@ from a Voucher collection readback, not from the counters alone.
   - An upsert omitting `REFERENCE` kept the stored value: omitted fields merge. **VERIFIED for a `REFERENCE` written over the gateway**, licensed 7.1 Silver. There are two independent runs: this block's (G), and a 2026-09-26 repeat through Bridge's own `build_import_xml` amendment file, sent unchanged (`ALTERED 1`, reference kept; bridge#239 comment of that date). A `REFERENCE` typed in Tally's own screens is **not measured**.
   - Each upsert moved the voucher's ALTERID to the book's next mark. PARTIAL — observed across several upserts on one book (G).
 
-**Not measured here:** other voucher types, Gold concurrency, an edit in Tally's
+**Not measured in the Journal block above (see the Gold block below for Payment, Receipt and Contra):** other voucher types, Gold concurrency, an edit in Tally's
 own screens, and repeatability beyond one run (except the `REFERENCE` merge above, repeated
 once on 2026-09-26). A masters delete in the same session drew no
 response, and its cause is **UNVERIFIED**; nothing is recorded about it here.
 
 **Payment, Receipt and Contra on Gold: an upsert alters in place. VERIFIED on one run (licensed
-TallyPrime 7.1 Gold, one book, 2026-09-28).**
+TallyPrime 7.1 Gold, one client book, 2026-09-28).**
 - **What was sent.** The request shape was §9.13's, with the same `REMOTEID` a voucher was created
   with, `ACTION="Create"`, and only the `NARRATION` changed. It was byte-identical to Bridge's own
   native request apart from `NARRATION`: a renderer reproduced 258 of 258 captured native vouchers
@@ -589,3 +589,6 @@ TallyPrime 7.1 Gold, one book, 2026-09-28).**
 - **What it extends.** It extends the Journal-on-Silver upsert above to Payment, Receipt and Contra
   on Gold, for a narration change only. A changed amount, ledger or date was not sent, and
   neither was a repeat run on a second book.
+- **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because 308
+  vouchers were read back in full. It is still one session on one client book, not repeated on a
+  second, so treat it as **Confidence: PARTIAL** beyond that book.

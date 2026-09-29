@@ -326,7 +326,7 @@ and `PROMPT_PLAYBOOK.md` Phase 4 step 3a. This section records the gateway obser
 it does not grant dispatch authority from a pre-read.
 
 **A rename by `Alter` changes only the name. VERIFIED on one run (licensed TallyPrime 7.1 Gold, one
-book, 2026-09-28).**
+client book, 2026-09-28).**
 - **Request.** `REPORTNAME` `All Masters`. A `LEDGER` (or `GROUP`) with `NAME="<old name>"` and
   `ACTION="Alter"`, carrying only
   `<LANGUAGENAME.LIST><NAME.LIST TYPE="String"><NAME><new name></NAME></NAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST>`.
@@ -340,6 +340,8 @@ book, 2026-09-28).**
   every renamed ledger under its new name. Parent, opening balance and GSTIN fields had 0 changes.
 - **Scope.** A gateway rename keeps the GUID, as §12a.9 observed for a rename in Tally's screens.
   Aliases and a rename that collides with an existing name were not measured.
+- **Confidence.** VERIFIED because the pilot was diffed before and after and 122 more were counted;
+  still one session on one client book, so **Confidence: PARTIAL** beyond it.
 
 ### 9.4a A partial ledger `Alter` preserves the omitted Party GSTIN
 
@@ -750,7 +752,7 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
 
 **Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
-Gold, one book, 2026-09-28).**
+Gold, one client book, 2026-09-28).**
 - **Vouchers.** A ledger whose stored name ends in CR LF was named with the CR LF written as
   `&#13;&#10;` inside `LEDGERNAME` and `PARTYLEDGERNAME`. 6 vouchers returned `CREATED`, and
   `ledger_movement` on that ledger then showed exactly those 6.
@@ -758,6 +760,8 @@ Gold, one book, 2026-09-28).**
 - **Bridge.** Bridge's import file writes CR and LF this way (`xml_escape`, bridge#626).
 - **Not sent.** A raw CR LF was not sent. XML 1.0 normalises a raw CR LF in content to LF, so a
   raw line break would name a ledger the book does not hold; that is **UNVERIFIED** against Tally.
+- **Confidence.** VERIFIED for the 6 vouchers and the one `Alter` shape; one session on one client
+  book, so **Confidence: PARTIAL** beyond it.
 
 
 #

@@ -831,14 +831,16 @@ Worth noting against `IMPLEMENTATION_GUIDE.md` §3.3a, which records that Tally 
 attribute with a value of its own: the client-supplied string still **worked as a delete key**
 afterwards. Whatever the export shows, the value you sent remains addressable.
 
-**Repeated on Gold. VERIFIED on one run (licensed TallyPrime 7.1 Gold, one book, 2026-09-28, one
+**Repeated on Gold. VERIFIED on one run (licensed TallyPrime 7.1 Gold, one client book, 2026-09-28, one
 voucher).**
 - **The voucher.** It was first created by a direct gateway import with a client-supplied `REMOTEID`,
   not by Bridge's native post.
-- **The delete.** It used §9.13's `VOUCHER` shape with that creation `REMOTEID` and
+- **The delete.** It used the same `VOUCHER` shape, with that creation `REMOTEID` and
   `ACTION="Delete"`. It returned `DELETED=1`, with every other counter 0.
 - **Read-back.** A vouchers read of that day no longer held the voucher. After a replacement Contra
   was created, the day's count was back to its count before the delete.
+- **Confidence.** One voucher, one session, one client book: **Confidence: PARTIAL** beyond it. The
+  deleted voucher's type was not recorded.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.
 The `Alter` failures on record (§9.6, and `IMPLEMENTATION_GUIDE.md` §3.1) came from an

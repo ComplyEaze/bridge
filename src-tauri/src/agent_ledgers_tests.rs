@@ -2839,6 +2839,36 @@ mod through_the_tool {
         assert_eq!(result["structuredContent"]["evidence"]["state"], "partial");
     }
 
+    /// A tool call, served over MCP, fits the 2 MiB a test thread gets by
+    /// default, held here whatever `RUST_MIN_STACK` says (#697). A debug build
+    /// has no room to spare: measured, the call needed about 1.75 MiB, and a
+    /// stack overflow aborts the whole test binary rather than failing one
+    /// test. Any change that makes a tool call's future larger has to box it
+    /// (see `with_operation_wire_budget`) before this passes again.
+    #[test]
+    fn a_tool_call_fits_a_two_mib_stack() {
+        const STACK: usize = 2 * 1024 * 1024;
+        std::thread::Builder::new()
+            .stack_size(STACK)
+            .spawn(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        let (response, requests) = serve_ledger_masters_then(&[
+                            r#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}"#,
+                        ])
+                        .await;
+                        assert_eq!(requests, identity_plans().len(), "{response}");
+                        assert_eq!(response["result"]["isError"], true, "{response}");
+                    });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn an_unrelated_notification_does_not_stop_the_call() {
         // Control: a cancellation naming another request, and a plain

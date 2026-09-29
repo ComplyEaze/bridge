@@ -19,6 +19,7 @@ use super::{
     xml_parser::{self, TallyCompany},
     VerifiedCompanyIdentity,
 };
+use crate::endpoint_wire::WireGateConfig;
 use crate::reports::party_ledger_master::{PartyLedgerMasterRow, PartyLedgerMasterSource};
 use crate::tally::runtime::{
     with_read_evidence, PartyLedgerMasterCurrencyAssertion, RuntimeReadEvidence,
@@ -57,7 +58,7 @@ use bridge_tally_protocol::{
 };
 use bridge_tally_transport::{
     canonical_loopback_origin as transport_canonical_origin, TallyEndpointConfig,
-    TallyHttpTransport, TallyTransportError,
+    TallyHttpTransport, TallyTransportError, WireHeldTransport,
 };
 
 pub type TallyConfig = TallyEndpointConfig;
@@ -386,6 +387,27 @@ pub(crate) struct RawTallyResponse {
     pub(crate) encoded_sha256: String,
 }
 
+/// A Tally client holding its endpoint's wire lock for exactly one send (#697):
+/// the import POST, whose attempt is recorded between taking the lock and
+/// sending. Spending it on that send, or dropping it, releases the lock.
+pub(super) struct WireHeldClient<'a> {
+    client: &'a TallyClient,
+    wire: WireHeldTransport<'a>,
+}
+
+impl WireHeldClient<'_> {
+    /// [`TallyClient::post_probe_xml`] under the held lock: one send, which
+    /// spends it. It does not wait for the lock again.
+    pub(super) async fn post_probe_xml(
+        self,
+        xml: String,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<String> {
+        let response = self.wire.post_xml_decoded(xml).await?;
+        self.client.probe_response(response, evidence)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Tally native report changed between paired reads")]
 pub(crate) struct NativeReportPairDrift;
@@ -654,8 +676,16 @@ const ENCODING_UTF16_LE_BOM: u8 = 4;
 const ENCODING_UTF16_BE_BOM: u8 = 5;
 
 impl TallyClient {
+    /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
+    /// shared per-user coordination root.
     pub fn new(config: TallyConfig) -> anyhow::Result<Self> {
-        let http = TallyHttpTransport::new(config.clone())?;
+        Self::with_wire(config, &WireGateConfig::default())
+    }
+
+    /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
+    pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
+        let http = TallyHttpTransport::new(config.clone())?
+            .with_wire_gate(wire.gate_for(&config), wire.retry());
         Ok(Self {
             config,
             http,
@@ -664,18 +694,31 @@ impl TallyClient {
         })
     }
 
+    /// A clone for one runtime operation (#697 item (a)): every send it and
+    /// its clones make draws on `budget` for the wire lock, so the operation
+    /// waits at most that long however many sends it makes. The observation
+    /// counters stay shared, as for any clone.
+    pub(crate) fn for_operation(&self, budget: bridge_tally_transport::WireWaitBudget) -> Self {
+        Self {
+            http: self.http.for_operation(budget),
+            ..self.clone()
+        }
+    }
+
     pub fn canonical_origin(&self) -> anyhow::Result<String> {
         canonical_loopback_origin(&self.config)
     }
 
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
+        let wire = WireGateConfig::default();
         let http = TallyHttpTransport::with_builder(
             config.clone(),
             bridge_tally_transport::TransportPolicy::default(),
             builder,
         )
-        .expect("build synthetic Tally HTTP transport");
+        .expect("build synthetic Tally HTTP transport")
+        .with_wire_gate(wire.gate_for(&config), wire.retry());
         Self {
             config,
             http,
@@ -688,9 +731,11 @@ impl TallyClient {
     pub(crate) fn with_transport_policy(
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         let http =
-            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?;
+            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
+                .with_wire_gate(wire.gate_for(&config), wire.retry());
         Ok(Self {
             config,
             http,
@@ -1096,6 +1141,24 @@ impl TallyClient {
         evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<String> {
         let response = self.http.post_xml_decoded(xml).await?;
+        self.probe_response(response, evidence)
+    }
+
+    /// Take this endpoint's wire lock for one send, once (a taken lock is
+    /// refused, not waited for, so no wait can land between the caller's own
+    /// checks): before an import POST's attempt is recorded. The lock is spent
+    /// on that one send by [`WireHeldClient`]; nothing that waits on another
+    /// process may run while it is held.
+    pub(super) async fn acquire_wire(&self) -> anyhow::Result<WireHeldClient<'_>> {
+        let wire = self.http.acquire_wire_lock().await?;
+        Ok(WireHeldClient { client: self, wire })
+    }
+
+    fn probe_response(
+        &self,
+        response: bridge_tally_transport::TallyDecodedHttpResponse,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<String> {
         let wire = RuntimeReadEvidence {
             request_sha256: response
                 .request_body_sha256()

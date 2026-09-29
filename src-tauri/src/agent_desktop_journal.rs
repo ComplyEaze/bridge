@@ -69,10 +69,8 @@ impl DesktopJournalService {
             Err(failure) => {
                 // This Err boundary precedes approval/dispatch. It does not
                 // prove that unreadable history contains no earlier attempt.
-                let mut operation = DesktopJournalOperation::from_failure(
-                    failure,
-                    "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.",
-                );
+                let message = "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.";
+                let mut operation = DesktopJournalOperation::from_failure(failure, message);
                 operation.result["result"]["dispatch"] =
                     json!({"state":"admission_refused","resent":false});
                 operation

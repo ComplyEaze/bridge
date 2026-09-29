@@ -244,7 +244,7 @@ jobs:
           combined="$RUNNER_TEMP/release-notes-combined.md"
           if generated="$(gh api --method POST "repos/$GH_REPO/releases/generate-notes" -f "tag_name=$RELEASE_TAG" --jq .body)" \
             && [ -n "$generated" ] \
-            && { cat "$RUNNER_TEMP/release-notes.md"; printf '\n---\n\n%s\n' "$generated"; } >"$combined" \
+            && { cat "$RUNNER_TEMP/release-notes.md" && printf '\n---\n\n%s\n' "$generated"; } >"$combined" \
             && gh release edit "$RELEASE_TAG" --notes-file "$combined"; then
             echo "appended GitHub's generated change list to $RELEASE_TAG"
           else

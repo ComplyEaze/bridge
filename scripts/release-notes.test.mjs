@@ -62,6 +62,12 @@ test("the changelog parser keeps fenced text, drops link definitions and reads d
   assert.deepEqual(parseChangelog(changelog.replace(/\n/g, "\r\n")).map((section) => section.label), ["Unreleased", "0.4.0", "0.3.0"]);
 });
 
+test("a byte-order mark before the first heading does not hide that section", () => {
+  const { sections, problems } = parseChangelogWithProblems("\uFEFF## [0.3.0] - 2026-01-01\n\n- Fixed a thing.\n");
+  assert.deepEqual(sections.map(({ label }) => label), ["0.3.0"]);
+  assert.deepEqual(problems, []);
+});
+
 test("fences follow their own marker, and an unclosed fence cannot hide later sections", () => {
   const labels = (source) => parseChangelog(source).map((section) => section.label);
   const tail = "\n## [0.3.0] - 2026-09-26\n\n- Three.\n";
@@ -260,8 +266,8 @@ test("the change-list step appends GitHub's list, and a failure leaves the relea
   esac
 }`;
   const env = { RELEASE_TAG: "mcp-preview-0.4.0", GH_REPO: "example/bridge" };
-  const attempt = (generate, edit) => inTemporaryRepository((dir) => {
-    writeFileSync(join(dir, "tmp", "release-notes.md"), "Written.\n");
+  const attempt = (generate, edit, written = true) => inTemporaryRepository((dir) => {
+    if (written) writeFileSync(join(dir, "tmp", "release-notes.md"), "Written.\n");
     const result = runStep(dir, run, env, stub(generate, edit));
     const readOrUndefined = (path) => { try { return readFileSync(join(dir, path), "utf8"); } catch { return undefined; } };
     return { result, combined: readOrUndefined("tmp/release-notes-combined.md"), edited: readOrUndefined("edited-notes.md") };
@@ -273,12 +279,14 @@ test("the change-list step appends GitHub's list, and a failure leaves the relea
   assert.equal(ok.combined, "Written.\n\n---\n\n## What's Changed\n* item\n");
   assert.equal(ok.edited, ok.combined, "the edit call receives the combined file");
 
-  for (const [label, generate, edit] of [
+  for (const [label, generate, edit, written] of [
     ["generation fails", "return 1", "true"],
     ["generation is empty", "printf ''", "true"],
     ["the edit fails", "printf 'list'", "return 1"],
+    ["the written notes are gone", "printf 'list'", `cp "$5" edited-notes.md`, false],
   ]) {
-    const failed = attempt(generate, edit);
+    const failed = attempt(generate, edit, written);
+    assert.equal(failed.edited === undefined || label === "the edit fails", true, `${label}: the release notes must not be replaced`);
     assert.equal(failed.result.status, 0, `${label}: ${failed.result.stderr}`);
     assert.match(failed.result.stdout, /::warning::could not append/, label);
   }

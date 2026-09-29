@@ -28,6 +28,7 @@ function nextFence(line, open) {
 }
 
 function scan(source, trackFences) {
+  source = source.replace(/^\uFEFF/, "");
   const sections = [];
   const strays = [];
   let current;

@@ -126,6 +126,31 @@ fn validate(read: &TrialBalanceRead) -> Result<(), TrialBalanceExportStoreError>
             return Err(TrialBalanceExportStoreError::ResourceLimit);
         }
     }
+    // A several-currency read's excluded ledgers are workbook cells too
+    // (bridge#709).
+    if let crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+        base_name,
+        foreign,
+        mixed,
+        ..
+    } = &read.ledger_scope
+    {
+        if foreign.len().saturating_add(mixed.len()) > MAX_ROWS {
+            return Err(TrialBalanceExportStoreError::ResourceLimit);
+        }
+        let excluded = foreign
+            .iter()
+            .flat_map(|ledger| [ledger.ledger.as_str(), ledger.currency.as_str()])
+            .chain(mixed.iter().map(String::as_str));
+        for text in std::iter::once(base_name.as_str()).chain(excluded) {
+            if text.len() > MAX_CELL_TEXT_BYTES {
+                return Err(TrialBalanceExportStoreError::ResourceLimit);
+            }
+            bytes = bytes
+                .checked_add(text.len())
+                .ok_or(TrialBalanceExportStoreError::ResourceLimit)?;
+        }
+    }
     for row in &read.report.rows {
         for text in [&row.name, &row.guid, row.parent.workbook_text()] {
             if text.len() > MAX_CELL_TEXT_BYTES {

@@ -426,6 +426,11 @@ pub struct ClassifiedLedgerSnapshot {
     /// parsed: a foreign balance is a composite display string, and a zero one
     /// is a plain `0.00` that would pass for the base.
     pub foreign: Vec<super::ForeignCurrencyLedger>,
+    /// Base-currency ledgers with an opening or closing Tally wrote as a
+    /// currency composite, in read order: rupee ledgers a foreign-currency
+    /// entry touched. Named, never parsed (bridge#642). On the captured
+    /// several-currency book one closing is `-$ 100.00 @ I₹ 201/$  = -I₹ 20100.00`.
+    pub mixed: Vec<String>,
     /// Base ledgers whose `CURRENCYNAME` was absent or empty, on a book with one
     /// Currency master (see [`super::LedgerCurrencies::unobserved`]).
     pub unobserved: usize,
@@ -441,7 +446,57 @@ pub fn parse_native_ledger_snapshot_classified(
     xml: &str,
     base: &super::BaseCurrencyName,
 ) -> Result<ClassifiedLedgerSnapshot, NativeOutstandingsError> {
+    classify_snapshot_rows(parse_native_ledger_snapshot_rows(xml)?, base)
+}
+
+/// As [`parse_native_ledger_snapshot_classified`], admitted only when Tally's
+/// collection-level compute proves every row came from the selected company,
+/// exactly as [`parse_native_ledger_snapshot_for_company`] requires. The
+/// compliance source reads its balances this way (bridge#551).
+pub fn parse_native_ledger_snapshot_classified_for_company(
+    xml: &str,
+    expected_company_guid: &str,
+    base: &super::BaseCurrencyName,
+) -> Result<ClassifiedLedgerSnapshot, NativeOutstandingsError> {
     let rows = parse_native_ledger_snapshot_rows(xml)?;
+    require_snapshot_company(&rows, expected_company_guid)?;
+    classify_snapshot_rows(rows, base)
+}
+
+/// The compliance source's balance snapshot of a book with several Currency
+/// masters (bridge#551): the plain base-currency rows parsed; the ledgers kept
+/// in another currency named; and the base-currency ledgers with a value Tally
+/// wrote as a currency composite named, their balances never parsed. Such a
+/// ledger is a rupee ledger a foreign-currency entry touched: on the captured
+/// several-currency book its closing is `-$ 100.00 @ I₹ 201/$  = -I₹ 20100.00`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComplianceLedgerSnapshot {
+    pub base: Vec<LedgerSnapshotEntry>,
+    pub foreign: Vec<super::ForeignCurrencyLedger>,
+    pub mixed: Vec<String>,
+}
+
+/// [`ComplianceLedgerSnapshot`] from a snapshot that Tally's collection-level
+/// compute proves came from the selected company: the same classification the
+/// outstandings read uses (bridge#642).
+pub fn parse_compliance_ledger_snapshot_for_company(
+    xml: &str,
+    expected_company_guid: &str,
+    base: &super::BaseCurrencyName,
+) -> Result<ComplianceLedgerSnapshot, NativeOutstandingsError> {
+    let classified =
+        parse_native_ledger_snapshot_classified_for_company(xml, expected_company_guid, base)?;
+    Ok(ComplianceLedgerSnapshot {
+        base: classified.base,
+        foreign: classified.foreign,
+        mixed: classified.mixed,
+    })
+}
+
+fn classify_snapshot_rows(
+    rows: Vec<ParsedLedgerSnapshotRow>,
+    base: &super::BaseCurrencyName,
+) -> Result<ClassifiedLedgerSnapshot, NativeOutstandingsError> {
     let classified = super::classify_ledger_currencies(
         base,
         rows.iter()
@@ -451,16 +506,29 @@ pub fn parse_native_ledger_snapshot_classified(
     let foreign_names = classified
         .foreign
         .iter()
-        .map(|ledger| ledger.ledger.as_str())
+        .map(|ledger| ledger.ledger.clone())
         .collect::<std::collections::BTreeSet<_>>();
-    let base_rows = rows
-        .into_iter()
-        .filter(|row| !foreign_names.contains(row.name.as_str()))
-        .map(ParsedLedgerSnapshotRow::into_entry)
-        .collect::<Result<Vec<_>, _>>()?;
+    // A base-currency row with any composite value is named and never parsed
+    // (bridge#642): parsing it would refuse the read, and reading its base
+    // part would mix a converted amount into rupee figures.
+    let mut base_rows = Vec::new();
+    let mut mixed = Vec::new();
+    for row in rows {
+        if foreign_names.contains(&row.name) {
+            continue;
+        }
+        if crate::native_trial_balance::is_currency_composite(&row.opening_text)
+            || crate::native_trial_balance::is_currency_composite(&row.closing_text)
+        {
+            mixed.push(row.name);
+            continue;
+        }
+        base_rows.push(row.into_entry()?);
+    }
     Ok(ClassifiedLedgerSnapshot {
         base: base_rows,
         foreign: classified.foreign,
+        mixed,
         unobserved: classified.unobserved,
     })
 }
@@ -474,7 +542,20 @@ pub fn parse_native_ledger_snapshot_for_company(
     expected_company_guid: &str,
 ) -> Result<Vec<LedgerSnapshotEntry>, NativeOutstandingsError> {
     let entries = parse_native_ledger_snapshot_rows(xml)?;
-    for row in &entries {
+    require_snapshot_company(&entries, expected_company_guid)?;
+    entries
+        .into_iter()
+        .map(ParsedLedgerSnapshotRow::into_entry)
+        .collect()
+}
+
+/// Every row's collection-level company GUID matches the selected company, and
+/// there is at least one row.
+fn require_snapshot_company(
+    rows: &[ParsedLedgerSnapshotRow],
+    expected_company_guid: &str,
+) -> Result<(), NativeOutstandingsError> {
+    for row in rows {
         let response_company_guid = row.response_company_guid.as_deref().ok_or(
             NativeOutstandingsError::InvalidResponse("ledger_response_company_guid_missing"),
         )?;
@@ -484,15 +565,12 @@ pub fn parse_native_ledger_snapshot_for_company(
             ));
         }
     }
-    if entries.is_empty() {
+    if rows.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(
             "ledger_response_company_guid_missing",
         ));
     }
-    entries
-        .into_iter()
-        .map(ParsedLedgerSnapshotRow::into_entry)
-        .collect()
+    Ok(())
 }
 
 fn parse_native_ledger_snapshot_rows(

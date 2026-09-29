@@ -85,7 +85,10 @@ fn a_part_never_exceeds_the_ledger_or_parent_limits() {
 #[test]
 fn a_parent_over_the_ledger_limit_is_refused_not_split() {
     let error = plan(&rows(&[("A", 11), ("B", 1)]), LIMITS).unwrap_err();
-    assert_eq!(error, ParentPartitionError::ParentOverBudget { ledgers: 11 });
+    assert_eq!(
+        error,
+        ParentPartitionError::ParentOverBudget { ledgers: 11 }
+    );
     assert_eq!(error.safe_code(), "parent_over_budget");
 }
 
@@ -156,7 +159,13 @@ fn parent_names_that_cannot_sit_in_a_literal_are_refused() {
 
 #[test]
 fn ordinary_parent_names_are_accepted_as_they_are() {
-    for name in ["Sundry Debtors", "Duties & Taxes", "Bank <A/C>", "O'Neil", "  Sales"] {
+    for name in [
+        "Sundry Debtors",
+        "Duties & Taxes",
+        "Bank <A/C>",
+        "O'Neil",
+        "  Sales",
+    ] {
         assert_eq!(ParentName::parse(name).unwrap().as_catalogue_text(), name);
     }
 }
@@ -230,7 +239,12 @@ fn coverage_matches_guids_ignoring_ascii_case() {
     let all = rows(&[("A", 1)]);
     let (partition, mut coverage) = covered(&all);
     coverage
-        .accept(part_index(&partition, "A"), "GUID-A-0", "A-ledger-0", Some("A"))
+        .accept(
+            part_index(&partition, "A"),
+            "GUID-A-0",
+            "A-ledger-0",
+            Some("A"),
+        )
         .unwrap();
     coverage.finish().unwrap();
 }

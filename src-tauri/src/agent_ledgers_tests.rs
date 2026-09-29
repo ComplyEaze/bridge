@@ -958,12 +958,6 @@ mod through_the_tool {
         parent: &'static str,
     }
 
-    impl Generated {
-        fn guid(&self) -> String {
-            format!("{GUID}-{:08x}", 0x1000 + self.index)
-        }
-    }
-
     /// `spec` parents with that many ledgers each, in spec order.
     fn generated(spec: &[(&'static str, usize)]) -> Vec<Generated> {
         let mut rows = Vec::new();
@@ -1136,7 +1130,10 @@ mod through_the_tool {
             .iter()
             .map(|item| item["name"].as_str().unwrap())
             .collect::<Vec<_>>();
-        assert!(names.windows(2).all(|pair| pair[0] <= pair[1]), "sorted by name");
+        assert!(
+            names.windows(2).all(|pair| pair[0] <= pair[1]),
+            "sorted by name"
+        );
     }
 
     async fn split_refusal(first: (String, String), second: (String, String)) -> String {

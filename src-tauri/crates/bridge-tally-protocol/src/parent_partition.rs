@@ -91,7 +91,9 @@ impl std::fmt::Display for ParentPartitionError {
             Self::TooManyParts { .. } => "the parent groups need more parts than allowed",
             Self::RowOutsideParts => "a part returned a ledger outside its parent groups",
             Self::RowNotInCatalogue => "a part returned a ledger the catalogue does not hold",
-            Self::RowDiffersFromCatalogue => "a part returned a ledger that differs from the catalogue",
+            Self::RowDiffersFromCatalogue => {
+                "a part returned a ledger that differs from the catalogue"
+            }
             Self::RowRepeated => "a ledger was returned more than once across the parts",
             Self::RowsMissing => "the parts did not return every catalogue ledger",
         })
@@ -117,10 +119,7 @@ pub struct ParentName {
 impl ParentName {
     /// `text` is the parent exactly as the catalogue decoded it.
     pub fn parse(text: &str) -> Result<Self, ParentPartitionError> {
-        if text.trim().is_empty()
-            || text.contains('"')
-            || text.chars().any(char::is_control)
-        {
+        if text.trim().is_empty() || text.contains('"') || text.chars().any(char::is_control) {
             return Err(ParentPartitionError::ParentNameUnsupported);
         }
         if text.contains('\u{fffd}') && !is_exact_reserved_root(text) {

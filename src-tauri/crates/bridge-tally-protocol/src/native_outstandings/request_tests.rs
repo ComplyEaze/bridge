@@ -312,7 +312,13 @@ fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
     let rows = parents
         .iter()
         .enumerate()
-        .map(|(index, parent)| (format!("l{index}"), format!("g{index}"), (*parent).to_owned()))
+        .map(|(index, parent)| {
+            (
+                format!("l{index}"),
+                format!("g{index}"),
+                (*parent).to_owned(),
+            )
+        })
         .collect::<Vec<_>>();
     let partition = crate::parent_partition::ParentPartition::plan(
         rows.iter()
@@ -330,8 +336,7 @@ fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
 fn strip_parent_filter(xml: &str) -> String {
     let start = xml.find("<SYSTEM ").expect("formula present");
     let end = xml.find("</SYSTEM>").unwrap() + "</SYSTEM>".len();
-    format!("{}{}", &xml[..start], &xml[end..])
-        .replace("<FILTERS>BridgeParentPart</FILTERS>", "")
+    format!("{}{}", &xml[..start], &xml[end..]).replace("<FILTERS>BridgeParentPart</FILTERS>", "")
 }
 
 /// bridge#679: a parent part adds one formula and one filter reference to the
@@ -340,12 +345,9 @@ fn strip_parent_filter(xml: &str) -> String {
 fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
     let from = TallyDate::parse("20250401").unwrap();
     let to = TallyDate::parse("20260401").unwrap();
-    let export = NativeLedgerExportPeriod::new(
-        DateBoundaryProfile::ModeAgnostic,
-        from.clone(),
-        to.clone(),
-    )
-    .unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
+            .unwrap();
     let snapshot =
         NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
     let part = one_part(&["Sundry Debtors", "Duties & Taxes"]);
@@ -366,7 +368,8 @@ fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
         assert!(filtered.contains(
             r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeParentPart">$Parent = "Duties &amp; Taxes" OR $Parent = "Sundry Debtors"</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
         ));
-        assert!(filtered.contains("</COMPUTE><FILTERS>BridgeParentPart</FILTERS></COLLECTION></TDLMESSAGE>"));
+        assert!(filtered
+            .contains("</COMPUTE><FILTERS>BridgeParentPart</FILTERS></COLLECTION></TDLMESSAGE>"));
     }
 }
 

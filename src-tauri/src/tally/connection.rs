@@ -49,7 +49,7 @@ use bridge_tally_protocol::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
-    parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
+    parent_partition::{ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,

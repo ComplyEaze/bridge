@@ -1879,7 +1879,7 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
 }
 
 /// A book of about a thousand and a half parents, most with a single ledger,
-/// is planned into a handful of parts by ledger count, not refused for its
+/// is planned into eight parts by ledger count, not refused for its
 /// parent count (#679): the shape of a real book of about 9,500 ledgers.
 /// More parts than Bridge will send is refused at the real limits: thirteen
 /// groups of 2,134 ledgers cannot share a part (two are 4,268, over 4,266), so
@@ -1935,7 +1935,7 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
     )
     .unwrap();
     let limits = super::parent_partition_limits();
-    assert!(partition.parts().len() <= 4, "{}", partition.parts().len());
+    assert!(partition.parts().len() <= 8, "{}", partition.parts().len());
     let mut ledgers = 0;
     let mut parents = 0;
     for part in partition.parts() {

@@ -3684,6 +3684,12 @@ fn tally_error_code(error: &TallyError) -> &'static str {
             "http_client_initialization_failed" => "http_client_initialization_failed",
             "query_profile_not_supported" => "query_profile_not_supported",
             "runtime_capacity_reached" => "runtime_capacity_reached",
+            // The wire gate (#697) sent nothing: another Bridge process held
+            // the port, or the coordination file could not be opened. Each
+            // keeps its own code, so a busy port is never read as a book that
+            // lacks a capability.
+            "tally_endpoint_busy" => "tally_endpoint_busy",
+            "tally_endpoint_lock_unavailable" => "tally_endpoint_lock_unavailable",
             "transport_policy_invalid" => "transport_policy_invalid",
             _ => "capability_not_supported",
         },

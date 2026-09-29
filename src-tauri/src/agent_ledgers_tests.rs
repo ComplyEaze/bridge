@@ -901,7 +901,12 @@ mod through_the_tool {
                     &format!("     <ALTVCHID TYPE=\"Number\"> {value}</ALTVCHID>"),
                 );
             }
-            None => company = company.replace(&format!("{voucher_line}\n"), ""),
+            None => {
+                company = company
+                    .split_inclusive('\n')
+                    .filter(|line| !line.contains("<ALTVCHID "))
+                    .collect();
+            }
         }
         assert_eq!(voucher.is_none(), !company.contains("<ALTVCHID "));
         format!("{}{}{}", &extent[..start], company, &extent[end..])
@@ -1248,7 +1253,10 @@ mod through_the_tool {
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
-        assert_eq!(requests, total, "every part was read before the closing extent");
+        assert_eq!(
+            requests, total,
+            "every part was read before the closing extent"
+        );
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed");
         assert_eq!(error["cause"], "party_ledger_extent_changed");
@@ -1295,14 +1303,34 @@ mod through_the_tool {
         assert_ne!(response["isError"], true, "{response}");
     }
 
-    /// A part that returns one of its ledgers twice is refused as a repeat.
+    /// A part that returns one of its ledgers twice is refused on that read,
+    /// before its balances are read: the master parser's own duplicate-identity
+    /// refusal comes first, so the coverage check's repeat (`parent_part_row_repeated`,
+    /// covered in the protocol crate) is a second line of defence, not a path
+    /// the tool reaches.
     #[tokio::test]
-    async fn a_part_that_repeats_a_ledger_is_refused() {
+    async fn a_part_that_repeats_a_ledger_is_refused_at_its_master_read() {
         let rows = split_book();
         let mut doubled = under(&rows, &[BIG, NESTED]);
         doubled.push(doubled[0]);
-        let cause = split_refusal(part_reads(&doubled), part_reads(&under(&rows, &[OTHER]))).await;
-        assert_eq!(cause, "parent_part_row_repeated");
+        let plans = marked_compliance_plans(
+            6_000,
+            vec![
+                generated_catalogue(&rows.iter().collect::<Vec<_>>()),
+                generated_masters(&doubled),
+            ],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "nothing is sent after the doubled master pair"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "duplicate_master_identity");
     }
 
     /// A catalogue that names another company does not size this one: it is
@@ -3136,6 +3164,36 @@ mod through_the_tool {
             "request_cancelled"
         );
         assert_eq!(result["structuredContent"]["evidence"]["state"], "partial");
+    }
+
+    /// A tool call, served over MCP, fits the 2 MiB a test thread gets by
+    /// default, held here whatever `RUST_MIN_STACK` says (#697). A debug build
+    /// has no room to spare: measured, the call needed about 1.75 MiB, and a
+    /// stack overflow aborts the whole test binary rather than failing one
+    /// test. Any change that makes a tool call's future larger has to box it
+    /// (see `with_operation_wire_budget`) before this passes again.
+    #[test]
+    fn a_tool_call_fits_a_two_mib_stack() {
+        const STACK: usize = 2 * 1024 * 1024;
+        std::thread::Builder::new()
+            .stack_size(STACK)
+            .spawn(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        let (response, requests) = serve_ledger_masters_then(&[
+                            r#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}"#,
+                        ])
+                        .await;
+                        assert_eq!(requests, identity_plans().len(), "{response}");
+                        assert_eq!(response["result"]["isError"], true, "{response}");
+                    });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[tokio::test]

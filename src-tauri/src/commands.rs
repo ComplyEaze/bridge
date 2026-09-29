@@ -31,7 +31,7 @@ use crate::sync::snapshot::{
     SqliteSnapshotStateStore,
 };
 use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
-use crate::tally::runtime::TallyRuntimeControlError;
+use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
 };
@@ -124,7 +124,34 @@ fn desktop_journal_command_error(
 #[path = "commands_native_ledger_tests.rs"]
 mod native_ledger_tests;
 
+/// The desktop's words for a send the endpoint wire gate held back (#697).
+/// Nothing was sent in either case.
+fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> TallyCommandError {
+    use bridge_tally_transport::WireRefusal;
+    match refusal {
+        WireRefusal::Busy => tally_command_error(
+            "tally_endpoint_busy",
+            "Operation",
+            "Another Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
+            "safe",
+            false,
+            "Try again in a few seconds. Nothing was sent to Tally.",
+        ),
+        WireRefusal::Unavailable => tally_command_error(
+            "tally_endpoint_lock_unavailable",
+            "Operation",
+            "Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
+            "after_change",
+            false,
+            "Check that Bridge's Application Support folder is available and writable, then try again.",
+        ),
+    }
+}
+
 fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
+    if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error) {
+        return wire_refusal_command_error(refusal);
+    }
     if error.chain().any(|cause| {
         cause
             .downcast_ref::<PartyLedgerMasterSourceValidationError>()
@@ -1344,8 +1371,9 @@ pub async fn start_tally_core_snapshot(
 
     // Persist only the profile produced by the exact canary used for this run. A prior generic
     // endpoint probe intentionally cannot authorize a pack snapshot.
-    let canary = connector
-        .probe()
+    // One wire-lock wait budget for this command's reads (#697); the run it
+    // starts below is a spawned task, whose operations have their own.
+    let canary = with_operation_wire_budget(connector.probe())
         .await
         .map_err(|_| "The read-only Core Accounting canary could not complete".to_string())?;
     if !canary.reachable
@@ -1854,6 +1882,15 @@ pub async fn export_party_ledger_master(
     request: CompanyRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<String, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
+}
+
+async fn export_party_ledger_master_once(
+    app: tauri::AppHandle,
+    request: CompanyRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<String, TallyCommandError> {
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
     // The classified read admits a book with several Currency masters when
@@ -1912,6 +1949,14 @@ pub async fn export_party_ledger_master(
 /// operation validates the complete requested window before filtering.
 #[tauri::command]
 pub async fn fetch_selected_ledger_entries(
+    request: SelectedLedgerEntriesRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<serde_json::Value, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(fetch_selected_ledger_entries_once(request, runtime)).await
+}
+
+async fn fetch_selected_ledger_entries_once(
     request: SelectedLedgerEntriesRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<serde_json::Value, TallyCommandError> {
@@ -1992,12 +2037,13 @@ pub async fn fetch_tally_outstandings(
     working_paper_exports: State<'_, WorkingPaperExportStore>,
     party_statement_sources: State<'_, PartyStatementSourceStore>,
 ) -> Result<FetchOutstandingsResponse, TallyCommandError> {
-    read_screen_outstandings(
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(read_screen_outstandings(
         request,
         &runtime,
         &working_paper_exports,
         &party_statement_sources,
-    )
+    ))
     .await
 }
 
@@ -2245,6 +2291,17 @@ pub async fn fetch_tally_outstandings_all_companies(
     request: AllCompaniesOutstandingsRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
+    // One wire-lock wait budget for the whole sweep (#697).
+    with_operation_wire_budget(fetch_tally_outstandings_all_companies_once(
+        request, runtime,
+    ))
+    .await
+}
+
+async fn fetch_tally_outstandings_all_companies_once(
+    request: AllCompaniesOutstandingsRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
     if request.companies.is_empty() {
         return Ok(Vec::new());
     }
@@ -2380,9 +2437,13 @@ pub async fn desktop_post_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::post_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::post_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]
@@ -2390,9 +2451,13 @@ pub async fn desktop_reconcile_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::reconcile_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::reconcile_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]

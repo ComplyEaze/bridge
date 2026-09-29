@@ -93,7 +93,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers and 500 parents, and
+parent groups are packed by ledger count into parts of at most 4,266 ledgers and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned (causes

@@ -111,6 +111,12 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// - `endpoint_coordination.rs` -- the advisory per-user, per-port lease the
 ///   shipped post path takes before dispatch, so two of one OS user's Bridge
 ///   processes cannot both hold it while posting to one Tally port.
+/// - `bridge-tally-transport/src/wire_gate.rs` and `endpoint_wire.rs`
+///   (bridge#697) -- the one-send-at-a-time lock on a Tally port and its wait
+///   budget. They decide whether a send waits, goes ahead or is refused, and,
+///   through the import POST's single try, whether an import is sent at all.
+///   An edit that turned that one try into a wait would pass every other
+///   pinned file.
 ///
 /// What leaves the machine, and the record of it:
 /// - `documents.rs` -- which storage URLs customer documents may be uploaded
@@ -345,7 +351,7 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // ledger read too large for one request may be split by parent group, and
 // whether the parts together returned every ledger the catalogue named, once;
 // a defect there returns a book with ledgers missing or repeated.
-pub const MAX_SURFACE_FILES: usize = 290;
+pub const MAX_SURFACE_FILES: usize = 292;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

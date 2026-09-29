@@ -4,8 +4,11 @@
 //! `SVCURRENTCOMPANY` element decodes to the raw name, byte for byte.
 //!
 //! One table-driven test per always-compiled renderer family, plus one small
-//! test each for the two non-default-feature families, instead of a
-//! near-duplicate escaping test in every renderer file.
+//! test for the non-default `voucher-scan` family, instead of a near-duplicate
+//! escaping test in every renderer file. The qualification-only Bills probe may
+//! not be referenced outside its own module (the live-read boundary gate), so
+//! its escaping stays tested there
+//! (`dynamic_values_are_escaped_and_cannot_inject_requests_or_variables`).
 
 use quick_xml::events::Event;
 
@@ -100,22 +103,4 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
 fn outstandings_request_company_name_round_trips() {
     let request = crate::outstandings::render_ledger_opening_coverage(NAME);
     assert_eq!(decoded_svcurrentcompany(&request), NAME);
-}
-
-/// The sealed native-outstandings probe is compiled only under its own
-/// non-default feature.
-#[cfg(feature = "bills-native-outstandings-probe")]
-#[test]
-fn bills_probe_company_name_round_trips() {
-    use crate::bills_native_outstandings_probe::{
-        NativeLedgerOutstandingsProbeScope, ValidatedProbeCompanyName, ValidatedProbeLedgerName,
-        ValidatedProbeToDate,
-    };
-    let scope = NativeLedgerOutstandingsProbeScope::new(
-        ValidatedProbeCompanyName::new(NAME).unwrap(),
-        ValidatedProbeLedgerName::new("BRIDGE TEMPLATE LEDGER").unwrap(),
-        ValidatedProbeToDate::new("20260430").unwrap(),
-    );
-    let probe = scope.seal();
-    assert_eq!(decoded_svcurrentcompany(probe.rendered_xml()), NAME);
 }

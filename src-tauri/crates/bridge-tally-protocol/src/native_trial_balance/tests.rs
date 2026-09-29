@@ -443,3 +443,65 @@ fn a_set_aside_row_still_binds_to_the_company() {
         ))
     );
 }
+
+/// The Trial Balance's STATUS must read `1`; another value is Tally's failure
+/// answer. A complete envelope with no STATUS, an empty one or a self-closing
+/// one is no answer, with its own exact code, which the desktop shows as the
+/// generic "could not be represented safely" message (bridge#717, #863).
+#[test]
+fn a_trial_balance_status_is_one_failure_absent_or_repeated() {
+    let failed = KNOWN_LAB.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1);
+    assert_ne!(failed, KNOWN_LAB);
+    assert_eq!(
+        parse_native_trial_balance(&failed, COMPANY),
+        Err(NativeTrialBalanceError::TallyReportedFailure)
+    );
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = KNOWN_LAB.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, KNOWN_LAB);
+        assert_eq!(
+            parse_native_trial_balance(&silent, COMPANY),
+            Err(NativeTrialBalanceError::InvalidResponse(
+                "trial_balance_status_absent"
+            )),
+            "{absent:?}"
+        );
+        // Cut off after it, the response is unterminated, not absent.
+        let cut = KNOWN_LAB.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_native_trial_balance(&silent[..cut], COMPANY),
+            Err(NativeTrialBalanceError::InvalidResponse(
+                "trial_balance_envelope_unterminated"
+            )),
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_native_trial_balance(empty, COMPANY),
+            Err(NativeTrialBalanceError::InvalidResponse(
+                "trial_balance_envelope_incomplete"
+            )),
+            "{empty:?}"
+        );
+    }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS></STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS/><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = KNOWN_LAB.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_native_trial_balance(&doubled, COMPANY),
+            Err(NativeTrialBalanceError::InvalidResponse(
+                "trial_balance_duplicate_status"
+            )),
+            "{repeated:?}"
+        );
+    }
+}

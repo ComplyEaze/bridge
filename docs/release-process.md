@@ -518,8 +518,7 @@ certificates and OS-warning bypass instructions are not acceptable substitutes.
 `site/` is a small static installer page. Its workflow is manual so publishing
 it remains an explicit maintainer action. Once GitHub Pages is configured for
 this repository, it resolves GitHub Release assets by exact release tag and
-labels its downloads as unsigned previews, by tag name, whether or not GitHub
-marks the release a prerelease. It does not proxy Tally,
+labels prerelease downloads as unsigned previews. It does not proxy Tally,
 create an account, or run a cloud relay.
 
 ## Release rhythm and notes

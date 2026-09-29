@@ -1524,10 +1524,16 @@ fn a_changed_ledger_is_named_in_plain_words_only_when_nothing_was_attempted() {
     let message = error["message"].as_str().unwrap();
     assert!(
         message.starts_with(
-            "A ledger this batch names is no longer the one it was built against (L1, L2, L3, L4, L5, L6, L7, L8 and 1 more)"
+            "A ledger this batch names (listed in error.ledgers_changed) is no longer the one it was built against"
         ),
         "{message}"
     );
+    assert!(!message.contains("L1"), "{message}");
+    // Listed, each marked as a party name, up to the bound; counted in full.
+    let listed = (1..=8)
+        .map(|n| serde_json::to_value(party_name(format!("L{n}"))).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(error["ledgers_changed"], json!(listed));
     assert_eq!(error["ledgers_changed_total"], 9);
     for attempted in [json!(true), Value::Null] {
         assert_eq!(refused(attempted)["message"], "generic");

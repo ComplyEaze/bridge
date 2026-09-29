@@ -368,6 +368,57 @@ pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<b
     }
 }
 
+/// Every place a verification result names a ledger, as a path from the
+/// result (`*` for each element of an array). The one list that marking reads,
+/// and that its test holds against the names the verifier marks.
+pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 3] = [
+    &[
+        "vouchers", "*", "diffs", "*", "entries", "expected", "*", "ledger",
+    ],
+    &[
+        "vouchers", "*", "diffs", "*", "entries", "observed", "*", "ledger",
+    ],
+    &["masters_after_post", "ledgers", "*"],
+];
+
+/// Marks every ledger name a verification result carries as a party name, so
+/// the response's configured redaction applies to it. Names already marked are
+/// left as they are; a proof saved with plain names is marked the same way.
+/// A posted_under_changed_masters message is given its current text, which
+/// names no ledger.
+pub(super) fn mark_verification_names(result: &mut Value) {
+    fn mark_at(value: &mut Value, path: &[&str]) {
+        match path.split_first() {
+            None => {
+                if let Value::String(name) = value {
+                    *value =
+                        serde_json::to_value(party_name(std::mem::take(name))).unwrap_or_default();
+                }
+            }
+            Some((&"*", rest)) => {
+                if let Some(items) = value.as_array_mut() {
+                    for item in items {
+                        mark_at(item, rest);
+                    }
+                }
+            }
+            Some((key, rest)) => {
+                if let Some(next) = value.get_mut(*key) {
+                    mark_at(next, rest);
+                }
+            }
+        }
+    }
+    for path in VERIFICATION_NAME_FIELDS {
+        mark_at(result, path);
+    }
+    if result.pointer("/error/code") == Some(&json!("posted_under_changed_masters")) {
+        if let Some(message) = result.pointer_mut("/error/message") {
+            *message = json!(super::post::CHANGED_MASTERS_MESSAGE);
+        }
+    }
+}
+
 /// The `verify_import` response for one page of a verification (bridge#627).
 ///
 /// Every row that is not `posted_verified`, the duplicate lists, the counts and

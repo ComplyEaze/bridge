@@ -15,6 +15,7 @@ use bridge_tally_core::master_binding::{
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -61,14 +62,15 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
-    render_proof_markdown, verification_response_page, verification_status,
+    final_verification_status, mark_verification_names, parse_import_voucher_rows,
+    parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
     VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
     batch_duplicate_sets, duplicates, observed_fingerprint, observed_voucher_identity,
+    VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -972,24 +974,22 @@ impl Server {
         // Page 1 is built from the bytes read back, not from memory, so the
         // page and the hash it names are the same file even if another
         // verification replaced it in between.
-        let proof: Value = serde_json::from_slice(&persisted).map_err(|_| {
-            ToolFailure::from("verification_proof_unreadable".to_string())
-                .with_prior_evidence(evidence.clone())
-        })?;
+        let (proof, page) = served_verification_page(&persisted, 0)
+            .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if proof["batch_id"] != batch_id {
             return Err(
                 ToolFailure::from("verification_proof_batch_mismatch".to_string())
                     .with_prior_evidence(evidence),
             );
         }
-        let page = verification_response_page(&proof, &sha256_hex(&persisted), 0);
         self.admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
         Ok(outcome)
     }
 
-    /// A later page of a verification, from its persisted proof only.
+    /// A later page of a verification, from its persisted proof only (see
+    /// [`served_verification_page`]).
     fn verify_import_page(
         &self,
         args: &Value,
@@ -1004,8 +1004,7 @@ impl Server {
         if sha256 != proof_sha256 {
             return Err("verification_proof_changed".to_string().into());
         }
-        let proof: Value = serde_json::from_slice(&persisted)
-            .map_err(|_| "verification_proof_unreadable".to_string())?;
+        let (proof, page) = served_verification_page(&persisted, offset)?;
         if proof["batch_id"] != batch_id
             || !proof["company"]["guid"]
                 .as_str()
@@ -1013,7 +1012,6 @@ impl Server {
         {
             return Err("verification_proof_batch_mismatch".to_string().into());
         }
-        let page = verification_response_page(&proof, &sha256, offset);
         self.admit_verification_page(&page)?;
         Ok(ToolOutcome {
             payload: json!({"company": proof["company"], "result": page}),
@@ -1280,6 +1278,8 @@ impl Server {
                 line.vouchers.len(),
             );
             payload["result"]["verification_status"] = json!(status.as_str());
+            // Marked before it is saved, so the proof holds the marks too.
+            mark_verification_names(&mut payload["result"]);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
@@ -1310,7 +1310,9 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // Saved with its party-name marks, so a page served from it masks
+        // names as the response's redaction requires.
+        let mut local_proof = proof.clone();
         // The files record the verdict the ledger records, whatever the caller's
         // copy says, so the proof and the ledger status cannot disagree.
         local_proof["verification_status"] = json!(update.status);
@@ -2307,8 +2309,11 @@ fn cash_bank_refusals(
 /// narration or reference would refuse a value nothing downstream would ever
 /// notice as changed, so `validate_payload` does not.
 ///
-/// The value is escaped as the writer escapes it, so a literal `&#4;` in it
-/// is text, not a reference, and is not refused.
+/// The value's five XML characters are escaped first (`quick_xml`'s escape),
+/// so a literal `&#4;` in it is text, not a reference, and is not refused.
+/// The writer (`xml_text::escape_text`) also writes CR and LF as `&#13;` and
+/// `&#10;`; this check does not apply that step, so it judges only the text
+/// itself, not the references the writer adds for a line ending.
 fn reads_back_as_other_text(value: &str) -> bool {
     matches!(
         bridge_tally_protocol::mark_forbidden_numeric_references(&quick_xml::escape::escape(value)),
@@ -2939,21 +2944,6 @@ pub(super) fn render_import_verification_in_span(
     format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
 }
 
-/// Escapes text for the import file. CR and LF are written as character
-/// references: raw, an XML reader folds CR LF to LF and the file would name a
-/// ledger the book does not hold. Only a ledger name ending in a line break can
-/// carry either here (bridge#626); every other field refuses control text.
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-        .replace('\r', "&#13;")
-        .replace('\n', "&#10;")
-}
-
 pub(super) fn local_evidence(label: &str) -> Evidence {
     Evidence {
         request_sha256: sha256_hex(label.as_bytes()),
@@ -3246,6 +3236,18 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
+
+/// A verification page as it is served, from the saved proof's bytes: the
+/// proof, with every ledger name marked so the response's redaction applies,
+/// and the page from `offset`. Page 1 and every later page are served
+/// through this, so they cannot differ in what they mark.
+fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, Value), String> {
+    let mut proof: Value = serde_json::from_slice(persisted)
+        .map_err(|_| "verification_proof_unreadable".to_string())?;
+    mark_verification_names(&mut proof);
+    let page = verification_response_page(&proof, &sha256_hex(persisted), offset);
+    Ok((proof, page))
+}
 
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]

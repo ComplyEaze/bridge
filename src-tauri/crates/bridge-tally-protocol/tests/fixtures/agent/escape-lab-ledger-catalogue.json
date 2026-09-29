@@ -1,0 +1,15 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver synthetic-company StandardLedgerCatalogV1 read, request rendered by render_standard_ledger_catalog_request(\"BRIDGE ESCAPE & LAB\") -- the company name needs XML escaping and the request sent it XML-escaped, as master already renders it (bridge#832)",
+  "observed_date": "2026-09-28",
+  "source_response_bytes": 5248,
+  "source_response_sha256": "f2566d3d23f38005c6002aa4a3b68d6852b5120f5e03e8a7b836467a59ae7909",
+  "source_request_bytes": 1988,
+  "source_request_sha256": "9aad79916d51d7663b59b92ed30db3dc170f721da0912228ae6f16de87d60524",
+  "fixture_bytes": 5248,
+  "fixture_sha256": "f2566d3d23f38005c6002aa4a3b68d6852b5120f5e03e8a7b836467a59ae7909",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 2,
+  "transformation": [],
+  "provenance_limit": "Byte-exact live response, sent once (not a paired read) from a synthetic lab company named `BRIDGE ESCAPE & LAB` (GUID 21463ec7-c236-44fb-a06d-20f0ad8a6df3), captured 28 Sep 2026 15:28 IST on TallyPrime 7.1 Silver. Establishes only that Tally answers Bridge's own escaped StandardLedgerCatalogV1 request for a company whose name needs escaping, and echoes the company name back XML-escaped; it does not establish anything about an unescaped request, which this company was never sent.",
+  "sensitivity_review": "Operator-created synthetic lab company (Cash, Profit & Loss A/c -- both Tally built-ins) with a deliberately reserved-character company name for escaping coverage; no GSTIN, PAN, email, phone, address, URL, credentials or machine paths."
+}

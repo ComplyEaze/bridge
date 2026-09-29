@@ -5,8 +5,9 @@ All notable changes to Bridge are documented here. The project follows
 
 ## [Unreleased]
 
-Published builds are unsigned MCPB previews (tags `mcp-preview-*`), so far on
-the `0.3.x` line. The number of the next build is chosen when it is released.
+Published builds are unsigned MCPB previews (tags `mcp-preview-*`): so far
+`mcp-preview-0.2.0` and `mcp-preview-0.3.0`. The number of the next build is
+chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
@@ -27,14 +28,15 @@ Each line names the pull requests it comes from.
   balance, and name them. Compliance ledgers and the Trial Balance are read
   through the book's base currency. The `vouchers` tool withholds a voucher
   whose amount Tally stored in a foreign currency instead of refusing the
-  whole day. The desktop app follows the same read (#642, #647, #649, #715,
+  whole date window. The desktop app follows the same read (#642, #647, #649, #715,
   #781, #824, #825).
 - A ledger read on a several-currency book, or one whose base currency is not
   INR, is refused before any request to Tally, instead of returning bare
   numbers (#751).
-- A bank-statement cash line is now asked its purpose. An unanswered line
-  blocks the import file; "don't know" posts to a suspense ledger, tagged and
-  listed (#817).
+- A recognised bank-statement cash line is now asked its purpose. An
+  unanswered line blocks the import file; "don't know" posts to a suspense
+  ledger, tagged and listed. Other unmapped cash lines still go to suspense,
+  tagged and counted (#817).
 
 **Safer or fixed**
 
@@ -51,9 +53,9 @@ Each line names the pull requests it comes from.
 - A recorded review can no longer answer for a different doubt than the one it
   covers (#755, #769, #809, #813, #831).
 - Tally's own error text on a rejected line is read safely, including text
-  with an `&` in it (#733, #763).
-- The desktop app's documents upload skips files ComplyEaze Bridge itself
-  exported (#847).
+  with an `&` in it (#763).
+- The desktop app's documents upload skips unchanged copies of the
+  party-statement batches it wrote (#847).
 
 **Also in source**
 
@@ -62,6 +64,8 @@ Each line names the pull requests it comes from.
   #744, #788).
 - The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
   (#805).
+
+## [0.3.0] - 2026-09-26
 
 ### In plain words: `mcp-preview-0.3.0` (26 Sep 2026), since `mcp-preview-0.2.0` (16 Sep 2026)
 
@@ -157,8 +161,9 @@ the pull requests it comes from, except where it names an issue.
   - bank reconciliation;
   - a high-value register.
   (#501, #504, #508, #560, #561, #571, #592, #593, #618, #636, #710, #713)
-- Mutation testing covers every module: a change to one is checked in the pull
-  request, and the whole list is re-run nightly (#646, #682).
+- Its tests are mutation-tested: a check limited to the paths a change
+  touches runs in the pull request, and the recorded list is re-run nightly
+  (#646, #682). Coverage of every module is not claimed.
 - Its accuracy is **not yet proven publicly**. Issue #738 proposes how to
   prove it.
 
@@ -175,11 +180,18 @@ the pull requests it comes from, except where it names an issue.
 
 - The package is unsigned. It is for evaluation, not production.
 - Native Windows validation with Tally and Claude Desktop is outstanding
-  (#702; the Tauri desktop app's own Windows catalog flow is #293). Intel Mac
-  is not qualified.
+  (the Tauri desktop app's own Windows catalog flow is #293). The posting
+  approval's decision also has no behavioural test on Windows (#702). Intel
+  Mac is not qualified.
 - How long Claude Desktop waits on one tool call is not measured (#703).
 - There is no tool to delete or undo a posted voucher, and a ledger that was
   replaced is not always noticed (#623).
+
+## [0.2.0] - 2026-09-16
+
+These are the detailed entries that were in this file when `mcp-preview-0.2.0`
+was published. They were written before the plain-words summaries began, and
+there is no summary for that build.
 
 ### Removed
 

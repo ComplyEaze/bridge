@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import {
-  VERSION_FILES, bump, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, writeVersions,
+  VERSION_FILES, bump, checkArguments, classify, draftNotes, latestReleaseTag, levelFor, propose, pullNumbers, readVersions, run, writeVersions,
 } from "./next-version.mjs";
 
 const repository = resolve(import.meta.dirname, "..");
@@ -157,3 +158,126 @@ test("a README with two current-version sentences is refused before any file is 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("a command that stalls or fails is reported as one line naming it", () => {
+  assert.throws(() => run(process.execPath, ["-e", "setTimeout(() => {}, 5000)"], { timeoutMs: 200 }), (error) => error.kind === "timeout" && /timed out after 0\.2s/.test(error.message));
+  assert.throws(() => run(process.execPath, ["-e", "console.error('boom\\nmore'); process.exit(3)"]), (error) => error.kind === "failed" && /failed: boom$/.test(error.message));
+  assert.throws(() => run("next-version-no-such-command", []), (error) => error.kind === "missing");
+});
+
+test("unknown flags, stray arguments and the --flag=value form are refused", () => {
+  assert.doesNotThrow(() => checkArguments(["--since", "v1.0.0", "--to", "HEAD", "--level", "minor", "--apply"]));
+  assert.doesNotThrow(() => checkArguments([]));
+  assert.throws(() => checkArguments(["--lvel", "minor"]), /unknown flag --lvel/);
+  assert.throws(() => checkArguments(["--level=minor"]), /write --level minor, with a space/);
+  assert.throws(() => checkArguments(["--apply=true"]), /the --apply=VALUE form is not read/);
+  assert.throws(() => checkArguments(["minor"]), /unexpected argument minor/);
+  assert.throws(() => checkArguments(["--level", "minor", "extra"]), /unexpected argument extra/);
+});
+
+// The script is copied into a throwaway repository with a bare origin and a stub `gh`, because
+// its guards read git state, the version files and the network, all of which this fakes.
+const gh = `#!/bin/sh
+if [ "$1 $2" = "pr view" ]; then
+  case "$3" in
+    626) echo "GraphQL: Could not resolve to a PullRequest with the number of 626." >&2; exit 1 ;;
+    *) printf '{"number":%s,"title":"change %s","labels":[{"name":"type:bug"}],"closingIssuesReferences":[]}\\n' "$3" "$3" ;;
+  esac
+else
+  echo "unexpected gh $*" >&2; exit 97
+fi
+`;
+
+function inRelease(callback) {
+  const base = mkdtempSync(join(tmpdir(), "next-version-cli-"));
+  try {
+    const work = join(base, "work");
+    const origin = join(base, "origin.git");
+    const bin = join(base, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "gh"), gh);
+    chmodSync(join(bin, "gh"), 0o755);
+    for (const file of [...Object.keys(VERSION_FILES), "README.md", "scripts/next-version.mjs"]) {
+      mkdirSync(dirname(join(work, file)), { recursive: true });
+      copyFileSync(join(repository, file), join(work, file));
+    }
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+    const git = (...args) => execFileSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: work, env, stdio: "pipe" });
+    const commit = (subject) => git("commit", "--allow-empty", "-q", "-m", subject);
+    const current = readVersions(work)["package.json"];
+    execFileSync("git", ["init", "--bare", "-q", origin], { env });
+    git("init", "-q", "-b", "master");
+    git("add", "-A");
+    commit("Start");
+    git("tag", `mcp-preview-${current}`);
+    git("remote", "add", "origin", origin);
+    const next = (...args) => spawnSync(process.execPath, ["scripts/next-version.mjs", ...args], { cwd: work, env, encoding: "utf8" });
+    return callback({ git, commit, next, current, work });
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+}
+const skipOnWindows = { skip: process.platform === "win32" && "the gh stub is a POSIX script" };
+
+test("the default comparison stops at origin/master, so a working branch's commits are not counted", skipOnWindows, () => inRelease(({ git, commit, next }) => {
+  commit("Fix a thing (#11)");
+  git("push", "-q", "origin", "master", "--tags");
+  git("checkout", "-q", "-b", "lane/work");
+  commit("wip, no pull request number");
+  const result = next();
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /compared up to origin\/master/);
+  assert.match(result.stdout, /1 commits since then/);
+  assert.doesNotMatch(result.stdout, /#\?/);
+  const explicit = next("--to", "HEAD");
+  assert.equal(explicit.status, 1, "an explicit --to HEAD still counts the branch's commit");
+  assert.match(explicit.stdout, /#\? wip, no pull request number/);
+}));
+
+test("a subject ending in an issue number, and a bad flag, end the run with one clear line", skipOnWindows, () => inRelease(({ git, commit, next }) => {
+  commit("Fix another thing (#626)");
+  git("push", "-q", "origin", "master", "--tags");
+  const issue = next();
+  assert.equal(issue.status, 1);
+  assert.match(issue.stderr, /^next-version: #626 could not be read as a pull request\. If it is an issue number/);
+  assert.doesNotMatch(issue.stderr, /\n\s+at /, "no stack trace");
+  const flag = next("--level=minor");
+  assert.equal(flag.status, 1);
+  assert.match(flag.stderr, /^next-version: write --level minor, with a space/);
+}));
+
+test("the guards in main refuse a stale, ahead or inconsistent release state", skipOnWindows, () => inRelease(({ git, commit, next, current, work }) => {
+  commit("Fix a thing (#11)");
+  git("push", "-q", "origin", "master", "--tags");
+  assert.equal(next().status, 0);
+
+  git("tag", "mcp-preview-9.9.9");
+  const unreleased = next();
+  assert.equal(unreleased.status, 1);
+  assert.match(unreleased.stderr, /the version files say .* but the last release tag, mcp-preview-9\.9\.9, is 9\.9\.9/);
+  git("tag", "-d", "mcp-preview-9.9.9");
+
+  git("push", "-q", "origin", "HEAD:refs/tags/mcp-preview-9.9.9");
+  const stale = next();
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /the newest release tag on origin is mcp-preview-9\.9\.9, but the local one is .*; run git fetch --tags origin/);
+  git("push", "-q", "origin", ":refs/tags/mcp-preview-9.9.9");
+
+  git("push", "-q", "origin", "HEAD:refs/tags/mcp-preview-0.0.1", `:refs/tags/mcp-preview-${current}`);
+  const ahead = next();
+  assert.equal(ahead.status, 1);
+  assert.match(ahead.stderr, new RegExp(`the local release tag mcp-preview-${current.replaceAll(".", "\\.")} is newer than origin's mcp-preview-0\\.0\\.1; push it`));
+  assert.doesNotMatch(ahead.stderr, /git fetch/, "fetching cannot fix a tag that origin lacks");
+
+  git("checkout", "-q", "--orphan", "elsewhere");
+  commit("An unrelated root");
+  git("tag", "v0.0.1");
+  const unrelated = next("--since", "v0.0.1");
+  assert.equal(unrelated.status, 1);
+  assert.match(unrelated.stderr, /v0\.0\.1 is not an ancestor of origin\/master/);
+
+  writeFileSync(join(work, "package.json"), readFileSync(join(work, "package.json"), "utf8").replace(`"version": "${current}"`, '"version": "0.0.7"'));
+  const disagree = next();
+  assert.equal(disagree.status, 1);
+  assert.match(disagree.stderr, /version files disagree/);
+}));

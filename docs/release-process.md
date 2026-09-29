@@ -563,7 +563,9 @@ patch for a fix-only release:
 
 `node scripts/next-version.mjs` proposes the version:
 - It reads the pull requests squash-merged since the last `mcp-preview-*` or
-  `v*` tag, from `git log`.
+  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+  `HEAD` would count an unmerged working branch's commits as direct pushes).
+  Run `git fetch --tags origin` first.
 - It classifies each by its own labels together with the labels of the issues
   it closes, the highest kind winning.
 - It refuses, and names them, while any pull request is unclassified. Expect
@@ -571,6 +573,9 @@ patch for a fix-only release:
   labelled issue. Label them, or choose the level yourself with `--level`,
   which the output records and warns about when it is lower than the labels
   imply. `--level` cannot release nothing.
+- It refuses an unknown flag, a stray argument, and the `--level=minor` form
+  (write `--level minor`), rather than ignoring them. A `gh` failure or a
+  60-second stall ends the run with one line naming the command.
 - It refuses when the version files already differ from the last release tag,
   which is the state after a version pull request merges and before its tag
   exists.

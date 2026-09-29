@@ -236,13 +236,21 @@ test("the default comparison stops at origin/master, so a working branch's commi
   assert.match(explicit.stdout, /#\? wip, no pull request number/);
 }));
 
-test("a subject ending in an issue number, and a bad flag, end the run with one clear line", skipOnWindows, () => inRelease(({ git, commit, next }) => {
+test("a subject ending in an issue number, and a bad flag, end the run with one clear line", skipOnWindows, () => inRelease(({ git, commit, next, current }) => {
   commit("Fix another thing (#626)");
   git("push", "-q", "origin", "master", "--tags");
   const issue = next();
   assert.equal(issue.status, 1);
   assert.match(issue.stderr, /^next-version: #626 could not be read as a pull request\. If it is an issue number/);
   assert.doesNotMatch(issue.stderr, /\n\s+at /, "no stack trace");
+  // --level is the escape the message names, so it has to work on this input.
+  const overridden = next("--level", "patch");
+  assert.equal(overridden.status, 0, overridden.stdout + overridden.stderr);
+  assert.match(overridden.stdout, /unclassified \(1\):\n  #626 /);
+  assert.match(overridden.stdout, /overridden to patch: /);
+  const withSince = next("--level", "minor", "--since", `mcp-preview-${current}`);
+  assert.equal(withSince.status, 0, withSince.stdout + withSince.stderr);
+  assert.match(withSince.stdout, /overridden to minor: /);
   const flag = next("--level=minor");
   assert.equal(flag.status, 1);
   assert.match(flag.stderr, /^next-version: write --level minor, with a space/);

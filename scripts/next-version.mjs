@@ -224,7 +224,7 @@ export function pullNumbers(subjects) {
   return { numbers, missing };
 }
 
-function pullsSince(tag, to) {
+function pullsSince(tag, to, level) {
   const { numbers, missing } = pullNumbers(run("git", ["log", "--format=%s", `${tag}..${to}`]).split("\n"));
   const pulls = [];
   for (const number of numbers) {
@@ -233,6 +233,12 @@ function pullsSince(tag, to) {
       pull = JSON.parse(run("gh", ["pr", "view", String(number), "--json", "number,title,labels,closingIssuesReferences"]));
     } catch (error) {
       if (error.kind !== "failed") throw error;
+      // --level is the documented way past a pull request that cannot be classified, so it also
+      // covers one that cannot be read; it is listed as unclassified, never dropped.
+      if (level) {
+        pulls.push({ number, title: "(not readable as a pull request)", labels: [], issueLabels: [] });
+        continue;
+      }
       throw new Error(`#${number} could not be read as a pull request. If it is an issue number, the commit subject ends with it instead of its pull request number; pass --level to override. (${error.message})`);
     }
     const issueLabels = [];
@@ -303,7 +309,7 @@ async function main() {
     if (error.kind === "failed" && error.status === 1) throw new Error(`${since} is not an ancestor of ${to}; the pull requests since it cannot be listed`);
     throw error;
   }
-  const result = propose({ current, pulls: pullsSince(since, to), level });
+  const result = propose({ current, pulls: pullsSince(since, to, level), level });
 
   console.log(`current version ${current}; last release tag ${since}; compared up to ${to}`);
   console.log(`${result.classified.length} commits since then`);

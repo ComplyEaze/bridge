@@ -3130,7 +3130,7 @@ impl TallyRuntime {
                             observe_read_boundary(&client).await?;
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
-                        let source = client
+                        let (source, count_evidence) = client
                             .fetch_party_ledger_master_source(
                                 &identity,
                                 boundary_profile,
@@ -3138,7 +3138,8 @@ impl TallyRuntime {
                             )
                             .await?;
                         evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone());
+                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
+                                .combine(count_evidence);
                         bracket_verified_company_identity(&client, &identity).await?;
                         let closing_evidence =
                             confirm_read_boundary(&client, boundary_profile).await?;

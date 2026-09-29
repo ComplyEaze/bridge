@@ -1817,30 +1817,77 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
     assert!(post_xml.text.contains("<ID>BridgeCompanyExtent</ID>"));
 }
 
-/// The refusal admits a master mark whose estimate fits and refuses one more,
-/// carrying the numbers it refused on (#637).
+/// A mark whose master estimate fits is admitted with no count read; one more
+/// needs the count, and past the mark the catalogue can be read within budget
+/// (10,000) it is refused on the mark alone, saying no ledgers were counted
+/// (#637, #668). The limits are the constants' own quotients, so a changed
+/// constant moves them and the test still pins each side of each.
 #[test]
-fn the_compliance_read_admits_a_mark_within_budget_and_refuses_one_more() {
-    let limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
-        / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
-    assert!(super::admit_compliance_master_read(limit).is_ok());
-    match super::admit_compliance_master_read(limit + 1) {
+fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_mark() {
+    let budget = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED;
+    let master_limit = budget / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
+    let count_limit = budget / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
+    assert_eq!((master_limit, count_limit), (4_266, 10_000));
+    assert_eq!(
+        super::admit_compliance_master_read(master_limit, None).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(master_limit + 1, None).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(count_limit, None).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    match super::admit_compliance_master_read(count_limit + 1, None) {
         Err(super::PartyLedgerMasterSourceValidationError::TooLarge {
             master_alter_id,
+            counted_ledgers,
             estimated_bytes,
             budget_bytes,
         }) => {
-            assert_eq!(master_alter_id, limit + 1);
+            assert_eq!(master_alter_id, count_limit + 1);
+            assert_eq!(counted_ledgers, None);
             assert_eq!(
                 estimated_bytes,
-                (limit + 1) * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+                (count_limit + 1) * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+            );
+            assert_eq!(budget_bytes, budget);
+        }
+        other => panic!("expected a size refusal on the mark, got {other:?}"),
+    }
+}
+
+/// With a count, the count decides: as many ledgers as fit are admitted and
+/// one more is refused carrying the count and the estimate it produced.
+#[test]
+fn a_counted_compliance_read_is_admitted_at_the_master_limit_and_refused_one_over() {
+    let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+        / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
+    assert_eq!(
+        super::admit_compliance_master_read(9_000, Some(master_limit)).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    match super::admit_compliance_master_read(9_000, Some(master_limit + 1)) {
+        Err(super::PartyLedgerMasterSourceValidationError::TooLarge {
+            master_alter_id,
+            counted_ledgers,
+            estimated_bytes,
+            budget_bytes,
+        }) => {
+            assert_eq!(master_alter_id, 9_000);
+            assert_eq!(counted_ledgers, Some(master_limit + 1));
+            assert_eq!(
+                estimated_bytes,
+                (master_limit + 1) * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
             );
             assert_eq!(
                 budget_bytes,
                 super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
             );
         }
-        other => panic!("expected a size refusal, got {other:?}"),
+        other => panic!("expected a size refusal on the count, got {other:?}"),
     }
 }
 

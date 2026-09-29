@@ -89,12 +89,17 @@ A read whose two paired halves differ, because the book changed while Bridge was
 carries `native_report_pair_changed`. A voucher-window part that is not admitted
 (`voucher_window_part_not_admitted`) names why, and a census disagreement also carries
 `counts`, the rows the part `returned` against the rows the census `counted`.
-A compliance ledger read (`ledger_masters fields=compliance`) that its company's master-alteration
-mark cannot bound within Bridge's response budget is refused before any ledger request (#637). The
-refusal has cause `ledger_masters_too_large` and a `size` object: `master_alter_id`,
-`estimated_bytes` and `budget_bytes`. The mark is an upper bound on ledgers, since every master
-raises it, so a company with fewer ledgers may be refused. `fields=basic` still reads it, and a
-precise count is pending (#668).
+A compliance ledger read (`ledger_masters fields=compliance`) whose estimated response is over
+Bridge's budget is refused before any master request (#637, #668). The refusal has cause
+`ledger_masters_too_large` and a `size` object: `master_alter_id`, `counted_ledgers`,
+`estimated_bytes` and `budget_bytes`. A company whose master-alteration mark puts the estimate over
+budget, but is at most 10,000, has its ledgers counted first with a balance-free catalogue read
+(a stable pair, bound to the company by name and GUID), and is refused only when the count is over
+budget (`counted_ledgers` is that count). The read's extent bracket still checks the book
+afterwards, so a book that grows between the count and the master read is refused, but only after
+that read was sent. Above 10,000 the mark alone is refused and `counted_ledgers` is
+null: the mark is an upper bound on ledgers, since every master raises it, so a company with fewer
+ledgers may be refused. `fields=basic` still reads it.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only

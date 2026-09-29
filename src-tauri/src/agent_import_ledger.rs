@@ -155,7 +155,7 @@ pub(super) fn note_statement_rows(rows: &mut StatementRows, batch: &ImportLedger
             .statement_rows
             .as_ref()
             .and_then(|recorded| recorded.get(&voucher.bridge_txn_id))
-            .zip(verification::recorded_fingerprint(voucher));
+            .and_then(|key| Some((key, verification::recorded_fingerprint(voucher)?)));
         if let Some((key, fingerprint)) = recorded {
             rows.insert(
                 batch.attribution_tag(voucher),

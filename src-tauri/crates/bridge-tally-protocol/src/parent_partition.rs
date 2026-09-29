@@ -39,9 +39,11 @@ const RESERVED_ROOT_REQUEST_LITERAL: &str = "&#4; Primary";
 pub enum ParentPartitionError {
     /// A ledger carries no immediate parent, so no `$Parent` part holds it.
     LedgerWithoutParent,
-    /// A parent name cannot be placed in a formula literal: it holds a quote or
-    /// a control character, or a reserved-value marker that is not the root.
-    ParentNameUnsupported,
+    /// `ledgers` ledgers carry a parent name that cannot be placed in a formula
+    /// literal: a blank name, one holding a quote or a control character, or a
+    /// reserved-value marker that is not the root. It says how many ledgers,
+    /// never which parent or which ledger.
+    ParentNameUnsupported { ledgers: u64 },
     /// Two catalogue rows share one GUID, so a row cannot be matched to one
     /// ledger.
     DuplicateLedgerIdentity,
@@ -68,7 +70,7 @@ impl ParentPartitionError {
     pub const fn safe_code(self) -> &'static str {
         match self {
             Self::LedgerWithoutParent => "ledger_without_parent",
-            Self::ParentNameUnsupported => "parent_name_unsupported",
+            Self::ParentNameUnsupported { .. } => "parent_name_unsupported",
             Self::DuplicateLedgerIdentity => "parent_partition_duplicate_ledger_identity",
             Self::ParentOverBudget { .. } => "parent_over_budget",
             Self::TooManyParts { .. } => "parent_partition_too_many_parts",
@@ -85,7 +87,7 @@ impl std::fmt::Display for ParentPartitionError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
             Self::LedgerWithoutParent => "a ledger has no immediate parent group",
-            Self::ParentNameUnsupported => "a parent group name cannot be used in a filter",
+            Self::ParentNameUnsupported { .. } => "a parent group name cannot be used in a filter",
             Self::DuplicateLedgerIdentity => "the ledger catalogue repeats a ledger GUID",
             Self::ParentOverBudget { .. } => "one parent group holds more ledgers than a part may",
             Self::TooManyParts { .. } => "the parent groups need more parts than allowed",
@@ -101,6 +103,26 @@ impl std::fmt::Display for ParentPartitionError {
 }
 
 impl std::error::Error for ParentPartitionError {}
+
+/// What the catalogue observed for one ledger's immediate parent. A parent
+/// the catalogue could not carry safely (a control or deceptive display
+/// character, a blank or over-long name) is `Unsupported`, not `Absent`: the
+/// ledger has a parent, and the filter cannot name it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParentObservation<'a> {
+    Absent,
+    Unsupported,
+    Named(&'a str),
+}
+
+impl<'a> From<Option<&'a str>> for ParentObservation<'a> {
+    fn from(parent: Option<&'a str>) -> Self {
+        match parent {
+            Some(name) if !name.is_empty() => Self::Named(name),
+            _ => Self::Absent,
+        }
+    }
+}
 
 /// An immediate parent group name that is safe to place in a quoted formula
 /// literal, held as the catalogue returned it.
@@ -120,10 +142,10 @@ impl ParentName {
     /// `text` is the parent exactly as the catalogue decoded it.
     pub fn parse(text: &str) -> Result<Self, ParentPartitionError> {
         if text.trim().is_empty() || text.contains('"') || text.chars().any(char::is_control) {
-            return Err(ParentPartitionError::ParentNameUnsupported);
+            return Err(ParentPartitionError::ParentNameUnsupported { ledgers: 1 });
         }
         if text.contains('\u{fffd}') && !is_exact_reserved_root(text) {
-            return Err(ParentPartitionError::ParentNameUnsupported);
+            return Err(ParentPartitionError::ParentNameUnsupported { ledgers: 1 });
         }
         Ok(Self {
             text: text.to_owned(),
@@ -209,22 +231,38 @@ impl ParentPartition {
     /// parent)`, packing parents largest first into the first part with room.
     /// Deterministic: the same rows give the same parts in any input order.
     pub fn plan<'a>(
-        rows: impl IntoIterator<Item = (&'a str, &'a str, Option<&'a str>)>,
+        rows: impl IntoIterator<Item = (&'a str, &'a str, ParentObservation<'a>)>,
         limits: PartitionLimits,
     ) -> Result<Self, ParentPartitionError> {
         let mut counts = BTreeMap::<ParentName, u64>::new();
         let mut rows_by_guid = HashMap::<String, (String, ParentName)>::new();
+        let mut unsupported = 0u64;
         for (name, guid, parent) in rows {
-            let parent = parent
-                .filter(|parent| !parent.is_empty())
-                .ok_or(ParentPartitionError::LedgerWithoutParent)
-                .and_then(ParentName::parse)?;
+            let parent = match parent {
+                ParentObservation::Absent => return Err(ParentPartitionError::LedgerWithoutParent),
+                ParentObservation::Unsupported => {
+                    unsupported += 1;
+                    continue;
+                }
+                ParentObservation::Named(text) => match ParentName::parse(text) {
+                    Ok(parent) => parent,
+                    Err(_) => {
+                        unsupported += 1;
+                        continue;
+                    }
+                },
+            };
             *counts.entry(parent.clone()).or_default() += 1;
             let previous =
                 rows_by_guid.insert(guid.to_ascii_lowercase(), (name.to_owned(), parent));
             if previous.is_some() {
                 return Err(ParentPartitionError::DuplicateLedgerIdentity);
             }
+        }
+        if unsupported > 0 {
+            return Err(ParentPartitionError::ParentNameUnsupported {
+                ledgers: unsupported,
+            });
         }
         let mut ordered = counts.into_iter().collect::<Vec<_>>();
         ordered.sort_by(|(left_name, left), (right_name, right)| {

@@ -321,8 +321,13 @@ fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
         })
         .collect::<Vec<_>>();
     let partition = crate::parent_partition::ParentPartition::plan(
-        rows.iter()
-            .map(|(name, guid, parent)| (name.as_str(), guid.as_str(), Some(parent.as_str()))),
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                crate::parent_partition::ParentObservation::from(Some(parent.as_str())),
+            )
+        }),
         crate::parent_partition::PartitionLimits {
             max_ledgers_per_part: 100,
             max_parents_per_part: 100,

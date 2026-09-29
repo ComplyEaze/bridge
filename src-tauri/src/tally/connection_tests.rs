@@ -1886,7 +1886,9 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
 /// they need thirteen against a ceiling of twelve.
 #[test]
 fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
-    use bridge_tally_protocol::parent_partition::{ParentPartition, ParentPartitionError};
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, ParentPartitionError,
+    };
     let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
     for parent in 0..13 {
         for _ in 0..2_134 {
@@ -1899,8 +1901,13 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
         }
     }
     let error = ParentPartition::plan(
-        rows.iter()
-            .map(|(name, guid, parent)| (name.as_str(), guid.as_str(), parent.as_deref())),
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        }),
         super::parent_partition_limits(),
     )
     .unwrap_err();
@@ -1910,7 +1917,7 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
 
 #[test]
 fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
-    use bridge_tally_protocol::parent_partition::ParentPartition;
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
     let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
     let mut add = |parent: String, count: usize| {
         for _ in 0..count {
@@ -1929,8 +1936,13 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
         add(format!("Small Parent {index}"), 3);
     }
     let partition = ParentPartition::plan(
-        rows.iter()
-            .map(|(name, guid, parent)| (name.as_str(), guid.as_str(), parent.as_deref())),
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        }),
         super::parent_partition_limits(),
     )
     .unwrap();

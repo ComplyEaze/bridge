@@ -1286,6 +1286,40 @@ mod through_the_tool {
             .contains("fields=basic"));
     }
 
+    /// A parent name with a control character cannot sit in a filter, so its
+    /// ledgers are refused with the count of them and the cause that says so,
+    /// not called parentless, and the name is not echoed (#679).
+    #[tokio::test]
+    async fn a_parent_name_with_a_control_character_is_refused_with_its_ledger_count() {
+        let mut rows = split_book();
+        for _ in 0..3 {
+            let index = rows.len();
+            rows.push(Generated {
+                index,
+                name: format!("Generated Ledger {index:05}"),
+                parent: "Odd\tParent",
+            });
+        }
+        let plans = marked_plans_over(
+            extent_with_marks(6_000, Some(Some(1))),
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_name_unsupported");
+        assert_eq!(error["unsupported_parent_ledgers"], 3);
+        assert!(!response.to_string().contains("Odd"), "{error}");
+        assert!(error["remediation"]
+            .as_str()
+            .unwrap()
+            .contains("fields=basic"));
+    }
+
     /// One part needs no witness: a counted book that fits one read is read
     /// whole with or without a voucher high-water, as before.
     #[tokio::test]

@@ -25,8 +25,13 @@ fn plan(
     limits: PartitionLimits,
 ) -> Result<ParentPartition, ParentPartitionError> {
     ParentPartition::plan(
-        rows.iter()
-            .map(|(name, guid, parent)| (name.as_str(), guid.as_str(), parent.as_deref())),
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        }),
         limits,
     )
 }
@@ -126,6 +131,48 @@ fn a_ledger_without_a_parent_is_refused() {
 }
 
 #[test]
+fn ledgers_whose_parent_cannot_be_carried_are_counted_not_called_parentless() {
+    let mut all = rows(&[("A", 1)]);
+    let unsupported = ["u1", "u2", "u3"].map(|name| (name, format!("guid-{name}")));
+    let mut observed = all
+        .iter()
+        .map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        })
+        .collect::<Vec<_>>();
+    for (name, guid) in &unsupported {
+        observed.push((name, guid.as_str(), ParentObservation::Unsupported));
+    }
+    let error = ParentPartition::plan(observed, LIMITS).unwrap_err();
+    assert_eq!(
+        error,
+        ParentPartitionError::ParentNameUnsupported { ledgers: 3 }
+    );
+    assert_eq!(error.safe_code(), "parent_name_unsupported");
+    all.push(("orphan".into(), "guid-orphan".into(), None));
+    assert_eq!(
+        plan(&all, LIMITS).unwrap_err(),
+        ParentPartitionError::LedgerWithoutParent
+    );
+}
+
+#[test]
+fn unsupported_named_parents_are_counted_across_the_whole_catalogue() {
+    let mut all = rows(&[("A", 2)]);
+    all.push(("t1".into(), "guid-t1".into(), Some("tab\there".into())));
+    all.push(("t2".into(), "guid-t2".into(), Some("tab\there".into())));
+    all.push(("q1".into(), "guid-q1".into(), Some("a\"b".into())));
+    assert_eq!(
+        plan(&all, LIMITS).unwrap_err(),
+        ParentPartitionError::ParentNameUnsupported { ledgers: 3 }
+    );
+}
+
+#[test]
 fn a_repeated_guid_is_refused_ignoring_ascii_case() {
     let mut all = rows(&[("A", 1)]);
     all.push(("other".into(), "GUID-A-0".into(), Some("A".into())));
@@ -151,7 +198,7 @@ fn parent_names_that_cannot_sit_in_a_literal_are_refused() {
     ] {
         assert_eq!(
             ParentName::parse(name).unwrap_err(),
-            ParentPartitionError::ParentNameUnsupported,
+            ParentPartitionError::ParentNameUnsupported { ledgers: 1 },
             "{name:?}"
         );
     }
@@ -325,7 +372,7 @@ fn an_empty_catalogue_plans_no_parts_and_finishes() {
 fn every_error_has_a_distinct_safe_code() {
     let codes = [
         ParentPartitionError::LedgerWithoutParent,
-        ParentPartitionError::ParentNameUnsupported,
+        ParentPartitionError::ParentNameUnsupported { ledgers: 1 },
         ParentPartitionError::DuplicateLedgerIdentity,
         ParentPartitionError::ParentOverBudget { ledgers: 1 },
         ParentPartitionError::TooManyParts { parts: 1 },

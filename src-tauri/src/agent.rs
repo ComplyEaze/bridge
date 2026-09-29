@@ -416,6 +416,9 @@ struct ToolFailure {
     /// The mark and estimate a read was refused on before it was sent (#637).
     /// Numbers only; boxed to keep the refusal small on every other path.
     read_size: Option<Box<ReadSize>>,
+    /// How many ledgers a parent-group read was refused over because their
+    /// parent group name cannot be carried in a filter. A count only.
+    unsupported_parent_ledgers: Option<u64>,
     /// Set when no response reached Tally-protocol parsing (#629). The refusal
     /// then names the configured endpoint, so a wrong or reset port is visible
     /// instead of reading as a Tally data problem.
@@ -442,6 +445,22 @@ struct ReadSize {
     master_alter_id: u64,
     estimated_bytes: u64,
     limit_bytes: u64,
+}
+
+fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
+    error.chain().find_map(|cause| {
+        match cause
+            .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
+        {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::ParentPartition {
+                source:
+                    bridge_tally_protocol::parent_partition::ParentPartitionError::ParentNameUnsupported {
+                        ledgers,
+                    },
+            } => Some(*ledgers),
+            _ => None,
+        }
+    })
 }
 
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
@@ -537,6 +556,7 @@ impl From<String> for ToolFailure {
             counts: None,
             window_timings: None,
             read_size: None,
+            unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
         }
@@ -664,15 +684,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              No part was requested. Call ledger_masters with fields=basic. Retrying this \
              call refuses again.",
         ),
-        "ledger_without_parent"
-        | "parent_name_unsupported"
-        | "parent_partition_duplicate_ledger_identity" => Some(
+        "parent_name_unsupported" => Some(
             "This book is too large for one compliance read and Bridge reads it by parent \
-             group, but its ledger catalogue holds a ledger with no parent group, a group name \
-             a filter cannot carry (a quotation mark, a control character, an empty name or an \
-             unexpected replacement character) or a repeated ledger identity. No master was \
-             requested. Call ledger_masters with fields=basic. Retrying this call refuses \
-             again.",
+             group, but `unsupported_parent_ledgers` of its ledgers sit under a parent group \
+             whose name a filter cannot carry (a quotation mark, a control character, an empty \
+             name or an unexpected replacement character), so no filter can name them. No \
+             master was requested. Call ledger_masters with fields=basic. Retrying this call \
+             refuses again.",
+        ),
+        "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but its ledger catalogue holds a ledger with no parent group or a repeated \
+             ledger identity. No master was requested. Call ledger_masters with fields=basic. \
+             Retrying this call refuses again.",
         ),
         "parent_part_row_outside_parents"
         | "parent_part_row_not_in_catalogue"
@@ -878,6 +902,7 @@ impl ToolFailure {
             counts: None,
             window_timings: None,
             read_size: read_size_refusal(&error).map(Box::new),
+            unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
         }
@@ -991,6 +1016,7 @@ impl Server {
                 counts,
                 window_timings,
                 read_size,
+                unsupported_parent_ledgers,
                 unanswered,
                 candidates,
             }) => {
@@ -1047,6 +1073,11 @@ impl Server {
                 if let Some(cause) = cause {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["cause"] = json!(cause);
+                    }
+                }
+                if let Some(ledgers) = unsupported_parent_ledgers {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["unsupported_parent_ledgers"] = json!(ledgers);
                     }
                 }
                 if let Some(size) = read_size {

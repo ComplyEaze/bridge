@@ -302,6 +302,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     // row-level content stays in the file: no reference, narration, label or
     // transaction date reaches the response
     let text = response.to_string();
+    // The account's local equality key (#865) is a fast hash of a low-entropy
+    // number, so it is kept off the wire like the number itself.
+    let digest = bridge_bank_statement::proposals::account_digest("00000000004321");
     for private in [
         PASSWORD,
         "612345678901",
@@ -312,6 +315,7 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
         "st-2026",
         "2026-08-01",
         "00000000004321",
+        digest.as_str(),
     ] {
         assert!(
             !text.contains(private),
@@ -334,6 +338,12 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     }
     let document: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(document["schema"], PROPOSALS_SCHEMA);
+    // The key is in the private file, so the absence above is not vacuous.
+    assert!(document["records"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|record| record["account_digest"] == digest.as_str()));
     let vouchers = document["vouchers"].as_array().unwrap();
     assert_eq!(vouchers.len(), 6);
     // exactly build_import_xml's voucher fields; no identity of our own

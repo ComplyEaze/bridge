@@ -929,7 +929,8 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             catalogue,
             None,
             &single_currency,
-            &ledger_binding, &Default::default(),
+            &ledger_binding,
+            &Default::default(),
         )
     };
     // Control: the captured catalogue holds no twin of any named ledger.
@@ -1017,7 +1018,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &catalogue,
         None,
         &single_currency,
-        &ledger_binding, &Default::default(),
+        &ledger_binding,
+        &Default::default(),
     )
     .expect_err("captured attributed Journal must block the queued native attempt");
     assert!(matches!(
@@ -1041,7 +1043,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &catalogue,
         None,
         &single_currency,
-        &ledger_binding, &Default::default(),
+        &ledger_binding,
+        &Default::default(),
     )
     .expect("paired captured source establishes absence of the new candidate");
 
@@ -1065,7 +1068,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &twinned,
         None,
         &single_currency,
-        &ledger_binding, &Default::default(),
+        &ledger_binding,
+        &Default::default(),
     )
     .expect_err("a folded twin added since approval must refuse the queued post");
     assert!(matches!(
@@ -1099,7 +1103,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             &catalogue,
             groups,
             &single_currency,
-            &ledger_binding, &Default::default(),
+            &ledger_binding,
+            &Default::default(),
         )
     };
     recheck(&payment, Some(&groups)).expect("the captured masters classify this Payment");

@@ -2205,6 +2205,9 @@ mod boundary_tests;
 #[path = "agent_import_multiplicity_tests.rs"]
 mod multiplicity_tests;
 
+#[path = "agent_import_statement_rows_tests.rs"]
+mod statement_rows_tests;
+
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
     verify_batch(line, &ImportReadSource::admit(rows.to_vec())?, &Default::default())
 }

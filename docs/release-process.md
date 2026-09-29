@@ -518,7 +518,8 @@ certificates and OS-warning bypass instructions are not acceptable substitutes.
 `site/` is a small static installer page. Its workflow is manual so publishing
 it remains an explicit maintainer action. Once GitHub Pages is configured for
 this repository, it resolves GitHub Release assets by exact release tag and
-labels prerelease downloads as unsigned previews. It does not proxy Tally,
+labels its downloads as unsigned previews, by tag name, whether or not GitHub
+marks the release a prerelease. It does not proxy Tally,
 create an account, or run a cloud relay.
 
 ## Release rhythm and notes
@@ -531,8 +532,11 @@ every note for them first, and for maintainers second.
 - Cut an `mcp-preview-*` build at most every two weeks, and only when both of
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts.
-- Mark the newest preview as the repository's latest release, so the
-  releases page never opens on an older line.
+- The workflow publishes each preview as a prerelease. Once its checks are
+  read, the maintainer marks the newest preview as the repository's latest
+  release (`gh release edit <tag> --prerelease=false --latest`), so the
+  releases page never opens on an older line. The install page accepts a
+  preview either way.
 - Once a month, add a "what changed" entry to `CHANGELOG.md`, even in a month
   without a build.
 

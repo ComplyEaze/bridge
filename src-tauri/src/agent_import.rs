@@ -886,17 +886,24 @@ impl Server {
             // Reuse the posting admission path to describe only a route that
             // this exact saved batch can take. A manual-only batch is still a
             // successful build.
-            let native_post_eligible = self.settings.writes_enabled
-                && post::admit_saved_voucher(
+            // Keep the refusal code: `post_import` returns this same code, and
+            // the guidance names it rather than guessing a reason (#866).
+            let post_voucher_limit = self.post_voucher_limit(post::PostScope::Vouchers);
+            let native_post_refusal = if self.settings.writes_enabled {
+                post::admit_saved_voucher(
                     &line,
                     &self.settings.endpoint,
                     post::PostScope::Vouchers,
-                    self.post_voucher_limit(post::PostScope::Vouchers),
+                    post_voucher_limit,
                 )
-                .is_ok();
+                .err()
+            } else {
+                None
+            };
             let (mut warnings, next_step) = build_import_guidance(
                 self.settings.writes_enabled,
-                native_post_eligible,
+                native_post_refusal.as_deref(),
+                post_voucher_limit,
                 renders_bank_shape(&line.vouchers),
                 line.vouchers.iter().any(|voucher| {
                     voucher
@@ -1800,9 +1807,39 @@ fn nonempty_company_field(value: &str) -> Result<String, String> {
         .ok_or_else(|| "company_identity_incomplete".to_string())
 }
 
+/// Why `post_import` would refuse a saved batch, for the build's warning. The
+/// code is the one `post_import` returns; the text only explains it. A code
+/// with no entry here keeps its name and a pointer to the same refusal.
+fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
+    let count = if voucher_limit > 1 {
+        format!("1 to {voucher_limit} vouchers")
+    } else {
+        "one voucher (the limit while batch posting is off)".to_string()
+    };
+    match code {
+        "import_post_requires_one_voucher" => format!(
+            "native posting takes {count}, each a Journal, Payment, Receipt or Contra, from a batch built by this version of Bridge"
+        ),
+        "import_post_batch_too_large" => format!(
+            "this batch has more vouchers than native posting takes at once ({voucher_limit})"
+        ),
+        "import_post_numbered_journal_unsupported" => {
+            "a voucher carries its own number, and native posting lets Tally assign it".to_string()
+        }
+        "import_review_layout_text" | "import_review_format_text" => {
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
+        }
+        "import_review_too_large" => {
+            "the approval text does not fit in one native dialog".to_string()
+        }
+        _ => "post_import refuses this batch for the same reason".to_string(),
+    }
+}
+
 fn build_import_guidance(
     writes_enabled: bool,
-    native_post_eligible: bool,
+    native_post_refusal: Option<&str>,
+    voucher_limit: usize,
     bank_types: bool,
     names_a_counterparty: bool,
     multi_entry_bank: bool,
@@ -1867,18 +1904,19 @@ fn build_import_guidance(
             .collect::<Vec<_>>())
     };
     let manual_import_next_step = "Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment";
-    if writes_enabled && native_post_eligible {
+    if writes_enabled && native_post_refusal.is_none() {
         (
             warnings(
                 "No import XML was sent to Tally. To post this saved batch, call post_import; it requires a separate native approval. If you import the file manually, call verify_import right after importing and do not call post_import for that batch.",
             ),
             "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt.",
         )
-    } else if writes_enabled {
+    } else if let Some(code) = native_post_refusal {
         (
-            warnings(
-                "No import XML was sent to Tally. This saved batch is not eligible for native posting because native posting requires one unnumbered Journal, Payment, Receipt or Contra with a reviewable preview. Import the written file manually, then use verify_import; do not call post_import for this batch.",
-            ),
+            warnings(&format!(
+                "No import XML was sent to Tally. This saved batch is not eligible for native posting: post_import would refuse it as {code} ({}). Import the written file manually, then use verify_import; do not call post_import for this batch.",
+                native_post_refusal_reason(code, voucher_limit),
+            )),
             manual_import_next_step,
         )
     } else {

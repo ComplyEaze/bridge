@@ -506,9 +506,16 @@ prefix and the `AlterID` span on the balance collection, on the master collectio
 with the same set; an exact-name filter (the must-match control, 1 row); and two parents joined
 with `OR`, including one whose name contains `&` (360 and 400 rows, each the union of its parts).
 Every request took 0.07 to 0.45 s. This is the prerequisite for splitting a read by several
-parents at once (#679). The empty result on the second book is still UNVERIFIED: the untested
-explanation is that those filters matched no ledger there, and no 1-row control was sent to that
-book.
+parents at once (#679).
+
+**The filter mechanism also works on the second book (PARTIAL, one real book of 9,451 ledgers,
+2026-09-29).** On the balance collection an exact-name filter for a name taken from that book's own
+catalogue returned exactly 1 row (the must-match control that was missing), and `$Parent = "a" OR
+$Parent = "b"` for two parents of 3 ledgers each returned 6 rows, 3 from each, every row bound to the
+selected company; both took under 0.11 s. So the earlier empty results on that book were not "the
+formula mechanism does not work there". Whether the name-range, `StringPart` and `AlterID` forms
+match rows on it is still UNVERIFIED: they were not re-sent, and the untested explanation is that
+the bounds they used matched no ledger.
 
 **A one-day voucher census at a far-future date was answered normally with zero vouchers
 (PARTIAL, one book, 2026-09-29).** On the second book a census for a day in the year 5042, the
@@ -517,8 +524,19 @@ day known to hold 282 vouchers returned all 282. It is UNVERIFIED that zero mean
 that day: a five-digit-year date literal may not parse to that date and match nothing, and a census cannot
 tell the two apart.
 
+**Tally honours a far-future `SVTODATE` on the balance collection; it does not clamp it (PARTIAL,
+one parent of 80 ledgers on the second book, 2026-09-29).** The same parent read as at 20260401,
+at 20260929 and at the year-5042 date returned the same 80 ledgers and the same opening balances
+each time, with closing balances that differ in 27 rows (first and second date), 42 (first and
+third) and 15 (second and third). If the far-future date were dropped or replaced by the reporting
+date the second and third reads would be identical, so it was applied as a later date. What that
+proves is only that an as-of balance read at such a date takes in whatever is dated after the
+reporting date. Whether the 15 rows moved because of a mistyped far-future voucher or because of
+legitimate later-dated ones is UNVERIFIED, as is a book whose stray voucher sits in another
+parent.
+
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
-or the cause of the empty filters on the second book. The largest single latency was 2.93 s on the synthetic
+or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 2.93 s on the synthetic
 book and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
 10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
 row cost seen here.

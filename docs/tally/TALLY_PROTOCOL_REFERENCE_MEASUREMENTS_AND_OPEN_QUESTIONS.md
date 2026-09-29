@@ -451,7 +451,7 @@ Reading ledgers and vouchers in Education waits for the Collection-based profile
 - whether Education accepts `CompanyListV1`, a custom report with no `$$` function that the
   live-read tool still sends.
 
-## 11e. Ledger master read sizes and part reads on a synthetic book — **PARTIAL**
+## 11e. Ledger master read sizes and part reads on two books — **PARTIAL**
 
 **PARTIAL, 2026-09-29.** One licensed TallyPrime 7.1 Silver book of 1,989 synthetic ledgers
 (`ALTMSTID` 2,197, one period, no vouchers), read by scripts, not by Bridge's read path. Every
@@ -477,7 +477,7 @@ size below is wire bytes: the responses are UTF-16LE, so the file size is the by
 - **The parts add up.** The union of 14 master parts by GUID equalled the catalogue's 1,989 ledgers,
   with none missing, none extra, none twice and no differing field.
 - **The whole book is the cost, not the count.** The count read (the catalogue) is about 38 percent
-  of the master read's bytes and 35 percent of its time on this book, which is why the read is
+  of the master read's bytes and 35 to 41 percent of its time on this book, which is why the read is
   admitted by a count and not by the mark alone once the mark is high enough to matter (#668).
 
 **A second book, PARTIAL, 2026-09-29 (one licensed 7.1 Silver book of 9,451 ledgers, 1,354
@@ -536,8 +536,8 @@ legitimate later-dated ones is UNVERIFIED, as is a book whose stray voucher sits
 parent.
 
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
-or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 2.93 s on the synthetic
-book and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
+or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 1.00 s on the synthetic
+book (the whole party-ledger master) and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
 10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
 row cost seen here.
 

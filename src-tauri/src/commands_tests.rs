@@ -704,7 +704,7 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
         anyhow::Error::new(Validation::TooLarge {
             master_alter_id: 9_500,
             counted_ledgers: Some(9_400),
-            estimated_bytes: 35_625_000,
+            estimated_bytes: 35_250_000,
             budget_bytes: 16_000_000,
         }),
         RuntimeReadEvidence::empty(),

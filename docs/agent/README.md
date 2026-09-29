@@ -94,8 +94,10 @@ Bridge's budget is refused before any master request (#637, #668). The refusal h
 `ledger_masters_too_large` and a `size` object: `master_alter_id`, `counted_ledgers`,
 `estimated_bytes` and `budget_bytes`. A company whose master-alteration mark puts the estimate over
 budget, but is at most 10,000, has its ledgers counted first with a balance-free catalogue read
-inside the read's own extent bracket, and is refused only when the count is over budget
-(`counted_ledgers` is that count). Above 10,000 the mark alone is refused and `counted_ledgers` is
+(a stable pair, bound to the company by name and GUID), and is refused only when the count is over
+budget (`counted_ledgers` is that count). The read's extent bracket still checks the book
+afterwards, so a book that grows between the count and the master read is refused, but only after
+that read was sent. Above 10,000 the mark alone is refused and `counted_ledgers` is
 null: the mark is an upper bound on ledgers, since every master raises it, so a company with fewer
 ledgers may be refused. `fields=basic` still reads it.
 When Bridge got no response it could read, the `cause` names why and the error also carries

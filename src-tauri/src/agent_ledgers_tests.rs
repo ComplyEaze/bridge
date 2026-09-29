@@ -1027,6 +1027,64 @@ mod through_the_tool {
         assert_eq!(error["cause"], "ledger_catalogue_identity_mismatch");
     }
 
+    /// A catalogue pair whose second read disagrees with its first is refused
+    /// on that drift before any master request is sent.
+    #[tokio::test]
+    async fn a_catalogue_that_changes_between_its_two_reads_is_refused_before_the_master_read() {
+        let mut plans = marked_compliance_plans(5_000, Vec::new(), None);
+        plans.extend([xml(catalogue(9)), status(), xml(catalogue(10)), status()]);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "party_ledger_catalogue_changed");
+    }
+
+    /// The catalogue pair that counted the ledgers is in the evidence of a
+    /// read that succeeds, not only of one refused: its two bodies are the
+    /// whole difference from the same book admitted by its mark.
+    #[tokio::test]
+    async fn a_counted_read_reports_the_catalogue_pair_in_its_evidence() {
+        let bytes = |response: &Value| {
+            response["structuredContent"]["evidence"]["bytes"]
+                .as_u64()
+                .unwrap()
+        };
+        let counted_plans = marked_compliance_plans(
+            5_000,
+            vec![catalogue(9), masters(), balances(), groups()],
+            Some(extent_with_master_mark(5_000)),
+        );
+        let (counted, _) = call(
+            counted_plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let admitted_plans = marked_compliance_plans(
+            4_266,
+            vec![masters(), balances(), groups()],
+            Some(extent_with_master_mark(4_266)),
+        );
+        let (admitted, _) = call(
+            admitted_plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        // UTF-16LE on the wire, with its two-byte byte-order mark.
+        let catalogue_wire = 2 + 2 * catalogue(9).encode_utf16().count() as u64;
+        assert_eq!(
+            bytes(&counted) - bytes(&admitted),
+            2 * catalogue_wire,
+            "the paired catalogue bodies are counted"
+        );
+        assert_ne!(
+            counted["structuredContent"]["evidence"]["request_sha256"],
+            admitted["structuredContent"]["evidence"]["request_sha256"]
+        );
+    }
+
     /// A mark exactly at the bound is admitted and read as it was before #637:
     /// the same three reads in the same order, and the same rows.
     #[tokio::test]

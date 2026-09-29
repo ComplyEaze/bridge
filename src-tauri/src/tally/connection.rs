@@ -195,15 +195,15 @@ impl PartyLedgerMasterSourceValidationError {
 /// to one master response (about 3.75 KB per ledger) overstates it, probably
 /// about twofold. PARTIAL: a synthetic book of 1,989 ledgers, the parties
 /// carrying every compliance field, read 2,875 bytes per ledger (5.7 MB,
-/// 0.9 s; 2026-09-29), so 3,750 stays a conservative bound, not a rate.
+/// 0.9 s; 2026-09-29), so 3,750 is a budget above that book's mean, not a bound
+/// on a row: party rows cost 3.2 to 3.3 KB there.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
 /// The largest estimated compliance master response Bridge will request
 /// (#637). UNVERIFIED: 0.8 MB/s is that book's 35.6 MB over about 44 s,
 /// averaged over more than one request, so 16 MB is about one 20 s request at
 /// that average, right at the deadline. A basic ledger read of about 22 MB
-/// completed on the same book in 7-11 s. To be replaced by a measurement on a
-/// synthetic large book (#668).
+/// completed on the same book in 7-11 s.
 const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
 
 /// Bytes one ledger is estimated to add to the balance-free ledger catalogue
@@ -211,7 +211,8 @@ const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
 /// book of 1,989 ledgers read 1,104 bytes per ledger (2.2 MB, 0.35 s;
 /// 2026-09-29), so 1,600 leaves about 45% for longer names. It bounds the
 /// mark, not the ledgers: past `budget / 1,600` = 10,000 the mark alone is
-/// refused, because a catalogue that large may itself be beyond one request.
+/// refused. That reach is Bridge's own choice, not a measured limit: a
+/// 9,451-ledger catalogue read 11.6 MB in 1.5 s.
 const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_600;
 
 /// A compliance master response estimate for a ledger count, or an upper
@@ -1308,14 +1309,17 @@ impl TallyClient {
     /// Reads the identity-bearing ledger master and the existing period-bound
     /// balance snapshot as one bracketed source for a customer workbook. The
     /// balance parser requires row GUID evidence for the selected company
-    /// before any `(name, parent)` join can attach money to a master.
+    /// before any `(name, parent)` join can attach money to a master. The second
+    /// value is the evidence of the catalogue pair that counted a marked book's
+    /// ledgers (#668), empty when the mark alone admitted the read.
     pub(crate) async fn fetch_party_ledger_master_source(
         &self,
         identity: &VerifiedCompanyIdentity,
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
-    ) -> anyhow::Result<PartyLedgerMasterSource> {
+    ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
+        let mut count_evidence = RuntimeReadEvidence::empty();
         let result = async {
             let opening_extent = self.fetch_company_book_extent(identity).await?;
             let ledger_currency_base = currency_assertion.ledger_currency_base().cloned();
@@ -1352,11 +1356,12 @@ impl TallyClient {
                     .await?;
                 let (catalogue_body, catalogue_bytes, catalogue_sha256) = catalogue_pair
                     .require_stable(PairedReadValidationError::PartyLedgerCatalogue)?;
-                evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+                count_evidence = RuntimeReadEvidence::paired(
                     &catalogue_request,
                     catalogue_sha256,
                     catalogue_bytes,
-                ));
+                );
+                evidence = evidence.clone().combine(count_evidence.clone());
                 let counted = parse_standard_ledger_catalog_response(
                     &catalogue_body,
                     identity.display_name(),
@@ -1545,7 +1550,7 @@ impl TallyClient {
                 ));
             }
             rows.sort_by(|left, right| left.name.cmp(&right.name).then(left.guid.cmp(&right.guid)));
-            Ok(PartyLedgerMasterSource {
+            let source = PartyLedgerMasterSource {
                 company: identity.display_name().to_string(),
                 company_guid: identity.company_guid().to_string(),
                 currency_assertion: currency.assertion,
@@ -1566,7 +1571,8 @@ impl TallyClient {
                 groups,
                 foreign_currency_ledgers_excluded,
                 mixed_currency_ledgers_excluded,
-            })
+            };
+            Ok((source, count_evidence))
         }
         .await;
         result.map_err(|error| crate::tally::runtime::with_read_evidence(error, evidence))

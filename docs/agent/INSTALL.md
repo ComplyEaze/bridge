@@ -40,9 +40,9 @@ actually on.
 
 ## Install and configure
 
-1. Double-click the `.mcpb` file, or drag it onto the Claude Desktop window. If
-   neither opens the install screen, use **Settings → Extensions → Advanced
-   settings → Install Extension…** and choose the file.
+1. In Claude Desktop, use **Settings → Extensions → Advanced settings →
+   Install Extension…** and choose the `.mcpb` file. Opening the file directly
+   may also work on your computer.
 2. Keep **Tally host** as `localhost`. Bridge accepts only a local loopback
    endpoint. On a Mac, Tally must already be available there through a local
    Windows VM or organization-approved local forwarding. A separate PC or a

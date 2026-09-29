@@ -496,6 +496,16 @@ notarization or Gatekeeper approval. These artifacts remain previews without
 publisher signing. Production signing defaults and the MCPB publication lane
 are unchanged.
 
+## Pull-request type labels
+
+`node scripts/next-version.mjs` proposes the next version from the type label of
+each merged pull request. The `PR labels` workflow therefore fails a pull
+request that does not carry exactly one of `type:feature`, `type:bug`,
+`type:rectify` or `type:chore`, so a missing label is fixed on the pull request
+and does not block a release later. Dependabot pull requests are skipped; their
+`dependencies` label is already classified. Whether the check is required to
+merge is a repository setting, not something this file decides.
+
 ## MCPB previews and the install page
 
 `.github/workflows/release-mcpb-preview.yml` is a manually dispatched,

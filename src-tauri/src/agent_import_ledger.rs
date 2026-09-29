@@ -140,18 +140,26 @@ pub(super) struct VerificationGeneration(usize);
 /// Every statement row the journal records, by the narration tag its voucher
 /// carries, with the company it was built for (#865). Read in the same pass as
 /// the snapshot, so a verification sees the rows of batches other than its own.
-pub(super) type StatementRows = BTreeMap<String, (String, StatementRowKey)>;
+pub(super) type StatementRows = BTreeMap<
+    String,
+    (
+        String,
+        StatementRowKey,
+        verification::VerificationFingerprint,
+    ),
+>;
 
 pub(super) fn note_statement_rows(rows: &mut StatementRows, batch: &ImportLedgerLine) {
     for voucher in &batch.vouchers {
-        if let Some(key) = batch
+        let recorded = batch
             .statement_rows
             .as_ref()
             .and_then(|recorded| recorded.get(&voucher.bridge_txn_id))
-        {
+            .zip(verification::recorded_fingerprint(voucher));
+        if let Some((key, fingerprint)) = recorded {
             rows.insert(
                 batch.attribution_tag(voucher),
-                (batch.company_guid.clone(), key.clone()),
+                (batch.company_guid.clone(), key.clone(), fingerprint),
             );
         }
     }

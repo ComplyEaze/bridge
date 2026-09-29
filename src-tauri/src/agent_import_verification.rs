@@ -118,7 +118,7 @@ pub(super) fn canonical_verification_amount(value: &str) -> Result<String, Strin
         .map_err(|_| "import_verification_amount_invalid".to_string())
 }
 
-type VerificationFingerprint = (Option<String>, Option<String>, Vec<String>);
+pub(super) type VerificationFingerprint = (Option<String>, Option<String>, Vec<String>);
 
 #[derive(Default)]
 struct VerificationCandidates {
@@ -138,6 +138,25 @@ impl VerificationCandidates {
         self.consumed |= self.remaining.remove(&index);
         self.after_mark.remove(&index);
     }
+}
+
+fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
+    (
+        normalized_date(&voucher.date).ok(),
+        Some(voucher.voucher_type.as_str().to_string()),
+        expected_entry_fingerprint(voucher),
+    )
+}
+
+/// The fingerprint `verify_batch` compares a built voucher by, for the journal
+/// record of its statement row (#865). `None` when an amount does not parse, so
+/// no row is recorded for it and it is never exempted.
+pub(super) fn recorded_fingerprint(voucher: &ImportVoucher) -> Option<VerificationFingerprint> {
+    let mut voucher = voucher.clone();
+    for entry in &mut voucher.entries {
+        entry.amount = canonical_verification_amount(&entry.amount).ok()?;
+    }
+    Some(expected_fingerprint(&voucher))
 }
 
 pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
@@ -172,7 +191,26 @@ fn recorded_statement_row<'a>(
     statement_rows
         .get(tag)
         .filter(|(company, _)| company.eq_ignore_ascii_case(company_guid))
-        .map(|(_, key)| key)
+        .map(|(_, key, _)| key)
+}
+
+/// The recorded statement row behind an observed voucher's tag, only while the
+/// voucher still is what was posted under it. A tag can be copied onto another
+/// voucher (Tally's duplicate action) and the copy re-dated outside every read
+/// window that would show two vouchers under one tag; its own fingerprint then
+/// differs from the recorded one, and it proves nothing about its row.
+fn observed_statement_row<'a>(
+    statement_rows: &'a ledger::StatementRows,
+    company_guid: &str,
+    tag: &str,
+    fingerprint: &VerificationFingerprint,
+) -> Option<&'a StatementRowKey> {
+    statement_rows
+        .get(tag)
+        .filter(|(company, _, recorded)| {
+            company.eq_ignore_ascii_case(company_guid) && recorded == fingerprint
+        })
+        .map(|(_, key, _)| key)
 }
 
 /// One statement row: the same non-empty file hash and the same non-empty
@@ -214,13 +252,7 @@ pub(super) fn verify_batch(
     let expected_fingerprints = line
         .vouchers
         .iter()
-        .map(|voucher| {
-            (
-                normalized_date(&voucher.date).ok(),
-                Some(voucher.voucher_type.as_str().to_string()),
-                expected_entry_fingerprint(voucher),
-            )
-        })
+        .map(expected_fingerprint)
         .collect::<Vec<VerificationFingerprint>>();
     let observed_fingerprints = observed
         .iter()
@@ -255,9 +287,14 @@ pub(super) fn verify_batch(
     // expected voucher of its fingerprint came from a different statement row
     // (#865). It is then no fallback candidate for any of them.
     let other_statement_row = |index: usize| -> bool {
-        let Some(theirs) = observed_tags[index]
-            .and_then(|tag| recorded_statement_row(statement_rows, &line.company_guid, tag))
-        else {
+        let Some(theirs) = observed_tags[index].and_then(|tag| {
+            observed_statement_row(
+                statement_rows,
+                &line.company_guid,
+                tag,
+                &observed_fingerprints[index],
+            )
+        }) else {
             return false;
         };
         // An expected voucher that is this very row means the row is already
@@ -424,10 +461,16 @@ pub(super) fn verify_batch(
         &observed_identities
             .iter()
             .zip(&observed_tags)
-            .filter_map(|(identity, tag)| {
+            .zip(&observed_fingerprints)
+            .filter_map(|((identity, tag), fingerprint)| {
                 Some((
                     identity.as_str(),
-                    recorded_statement_row(statement_rows, &line.company_guid, (*tag)?)?,
+                    observed_statement_row(
+                        statement_rows,
+                        &line.company_guid,
+                        (*tag)?,
+                        fingerprint,
+                    )?,
                 ))
             })
             .collect(),

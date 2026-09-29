@@ -457,7 +457,7 @@ fn a_recorded_company_guid_matches_in_any_letter_case() {
     earlier.company_guid = "abcdef00-0000-4000-8000-000000000001".into();
     later.company_guid = earlier.company_guid.clone();
     let mut rows = journal(&[&earlier, &later]);
-    for (company, _) in rows.values_mut() {
+    for (company, _, _) in rows.values_mut() {
         *company = company.to_uppercase();
     }
     assert_ne!(rows.values().next().unwrap().0, later.company_guid);
@@ -516,4 +516,71 @@ fn a_posted_pair_with_a_row_of_another_company_is_a_duplicate_set() {
     rows.get_mut("st-20260901-aaaa").unwrap().0 = OTHER_COMPANY.into();
     let result = verify(&second, vec![posted(&first, 1), posted(&second, 2)], &rows);
     assert!(!result["duplicates"].as_array().unwrap().is_empty());
+}
+
+/// `line` as a build for `date`, its one voucher and its window moved.
+fn on_day(mut line: ImportLedgerLine, date: &str) -> ImportLedgerLine {
+    line.vouchers[0].date = date.into();
+    line.date_from = date.into();
+    line.date_to = date.into();
+    line
+}
+
+/// Batch A posted the 900.00 row on day 1. The accountant duplicated that
+/// voucher in Tally and moved the copy to day 2, so it keeps A's tag, and batch
+/// B (day 2, the 800.00 row of the same file) reads only the copy: no tag is
+/// seen twice. The copy is no longer what was posted under the tag, so its
+/// recorded row proves nothing about it.
+fn redated_copy_of_a_posted_voucher() -> (ImportLedgerLine, ReadVoucher, ledger::StatementRows) {
+    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let later = on_day(
+        batch_v1(build_of("st-20260902-bbbb", Some(key("stmt-1", "800.00")))),
+        "20260902",
+    );
+    let mut copy = posted(&earlier, 1);
+    copy.date = Some("20260902".into());
+    let rows = journal(&[&earlier, &later]);
+    (later, copy, rows)
+}
+
+#[test]
+fn a_copied_tag_on_a_redated_voucher_is_not_exempted() {
+    let (later, copy, rows) = redated_copy_of_a_posted_voucher();
+    let result = verify(&later, vec![copy], &rows);
+    assert_eq!(status_of(&result), "matching_content_observed");
+    assert_eq!(
+        admission(&result),
+        Err("import_preexisting_identity".into())
+    );
+}
+
+#[test]
+fn a_copied_tag_on_a_redated_voucher_is_still_a_duplicate_of_the_posted_row() {
+    let (later, copy, rows) = redated_copy_of_a_posted_voucher();
+    let mut mine = posted(&later, 2);
+    mine.narration = later
+        .vouchers
+        .first()
+        .map(|voucher| format!("[BRIDGE:{}]", later.attribution_tag(voucher)));
+    let result = verify(&later, vec![copy, mine], &rows);
+    assert!(
+        !result["duplicates"].as_array().unwrap().is_empty(),
+        "{result}"
+    );
+}
+
+#[test]
+fn an_amendment_replaces_the_row_key_recorded_under_its_tag() {
+    let original = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let mut amendment = original.clone();
+    amendment.batch_id = "batch-amendment".into();
+    amendment.amends_batch_id = Some(original.batch_id.clone());
+    amendment.statement_rows = Some(BTreeMap::from([(
+        "st-20260901-aaaa".to_string(),
+        key("stmt-2", "700.00"),
+    )]));
+    let tag = original.attribution_tag(&original.vouchers[0]);
+    assert_eq!(tag, amendment.attribution_tag(&amendment.vouchers[0]));
+    let rows = journal(&[&original, &amendment]);
+    assert_eq!(rows[&tag].1, key("stmt-2", "700.00"));
 }

@@ -144,6 +144,83 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   assert.match(incomplete.stderr, /no installable mcp-preview release/);
 });
 
+// Runs the summary step's own shell in a shallow clone, as the deploy job's checkout is, with `gh`
+// replaced by a function that applies the step's real --jq filter to a fixture deployment list.
+function runSiteSummaryStep(run, { previous, changeSite }) {
+  const dir = mkdtempSync(join(tmpdir(), "bridge-site-summary-"));
+  const env = { PATH: process.env.PATH, HOME: dir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (cwd, ...args) => {
+    const result = spawnSync("git", args, { cwd, encoding: "utf8", env });
+    assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+  const origin = join(dir, "origin");
+  const seed = join(dir, "seed");
+  mkdirSync(seed);
+  git(seed, "init", "-q", "-b", "master");
+  mkdirSync(join(seed, "site"));
+  writeFileSync(join(seed, "site", "index.html"), "<p>one</p>\n");
+  git(seed, "add", ".");
+  git(seed, "commit", "-q", "-m", "first");
+  const first = git(seed, "rev-parse", "HEAD");
+  writeFileSync(join(seed, "README.md"), "outside site\n");
+  if (changeSite) writeFileSync(join(seed, "site", "index.html"), changeSite);
+  git(seed, "add", ".");
+  git(seed, "commit", "-q", "-m", "second");
+  git(dir, "clone", "-q", "--bare", seed, origin);
+  git(origin, "config", "uploadpack.allowAnySHA1InWant", "true");
+  const work = join(dir, "work");
+  git(dir, "clone", "-q", "--depth=1", `file://${origin}`, work);
+  const shas = { none: "", first, unknown: "0123456789abcdef0123456789abcdef01234567" };
+  const deployments = previous === "none" ? [] : [{ sha: shas[previous], created_at: "2026-09-27T19:02:44Z" }];
+  writeFileSync(join(dir, "deployments.json"), JSON.stringify(deployments));
+  writeFileSync(join(dir, "summary.md"), "");
+  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; jq -r "$4" "${dir}/deployments.json"; }\n${run}`;
+  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
+  const summary = readFileSync(join(dir, "summary.md"), "utf8");
+  rmSync(dir, { recursive: true, force: true });
+  return { status: result.status, stderr: result.stderr, summary, first };
+}
+
+test("the site summary step is informational, permitted to read deployments, and shows what would go live", async (t) => {
+  if (spawnSync("jq", ["--version"]).status !== 0) {
+    t.skip("jq is not installed on this host; the deploy runner has it");
+    return;
+  }
+  const page = await workflow("../.github/workflows/deploy-install-page.yml");
+  assert.equal(page.permissions.deployments, "read");
+  const summary = step(page.jobs.deploy, "Summarize site changes since the last deploy");
+  assert.equal(summary["continue-on-error"], true, "a failed summary must not stop the deploy");
+  assert.equal(summary.if, undefined);
+  const names = page.jobs.deploy.steps.map((candidate) => candidate.name ?? candidate.uses);
+  assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/deploy-pages@")), "the summary is written before the deploy");
+
+  const changed = runSiteSummaryStep(summary.run, { previous: "first", changeSite: "<p>two</p>\n" });
+  assert.equal(changed.status, 0, changed.stderr);
+  assert.match(changed.summary, /site\/index\.html/);
+  assert.match(changed.summary, /^-<p>one<\/p>$/m);
+  assert.match(changed.summary, /^\+<p>two<\/p>$/m);
+  assert.doesNotMatch(changed.summary, /outside site|README/, "only site/ is compared, in the file list and the diff");
+
+  const unchanged = runSiteSummaryStep(summary.run, { previous: "first" });
+  assert.equal(unchanged.status, 0, unchanged.stderr);
+  assert.match(unchanged.summary, /Nothing under `site\/` differs from /);
+  assert.doesNotMatch(unchanged.summary, /```diff/);
+
+  const none = runSiteSummaryStep(summary.run, { previous: "none" });
+  assert.equal(none.status, 0, none.stderr);
+  assert.match(none.summary, /No earlier deployment was found/);
+
+  const unfetchable = runSiteSummaryStep(summary.run, { previous: "unknown" });
+  assert.equal(unfetchable.status, 0, unfetchable.stderr);
+  assert.match(unfetchable.summary, /could not be fetched, so nothing was compared/);
+
+  const long = runSiteSummaryStep(summary.run, { previous: "first", changeSite: Array.from({ length: 400 }, (_, i) => `<p>line ${i}</p>`).join("\n") + "\n" });
+  assert.equal(long.status, 0, long.stderr);
+  assert.match(long.summary, /The diff continues past 300 lines/);
+  assert.doesNotMatch(long.summary, /line 399/);
+});
+
 test("publication workflows enforce their parsed trigger, dependency, branch, and platform controls", async () => {
   assertReleaseWorkflow(await workflow("../.github/workflows/release-mcpb-preview.yml"));
   assertInstallPageWorkflow(await workflow("../.github/workflows/deploy-install-page.yml"));

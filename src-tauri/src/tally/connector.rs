@@ -782,8 +782,10 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
     if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
         return match transport {
             TallyTransportError::EndpointInvalid { .. } => invalid_data("endpoint_invalid"),
+            // A wire-gate refusal (#697) sent nothing; its code says why.
             TallyTransportError::PolicyInvalid { .. }
-            | TallyTransportError::ClientInitializationFailed => TallyError::Unsupported {
+            | TallyTransportError::ClientInitializationFailed
+            | TallyTransportError::WireRefused { .. } => TallyError::Unsupported {
                 code: transport.safe_code().to_string(),
             },
             TallyTransportError::RequestTooLarge { .. } => {

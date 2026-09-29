@@ -360,6 +360,73 @@ fn recovery_failure_retains_the_saved_dispatch_response() {
 }
 
 #[test]
+fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
+    let response = dispatch_response("success", 1, 0);
+    let after = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "tally_endpoint_busy",
+    );
+    let error = &after["result"]["error"];
+    assert_eq!(error["code"], "tally_endpoint_busy");
+    assert_eq!(
+        error["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    assert_eq!(
+        error["next_step"],
+        "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
+    );
+    // Held back before any attempt was recorded: it says when to retry but
+    // offers no verify_import step.
+    let before =
+        reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
+    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    // An attempt that could not be observed: the verify_import step, worded
+    // without claiming a send.
+    let unknown = reconciliation_failure_payload("bridge-test", None, None, "tally_endpoint_busy");
+    assert_eq!(
+        unknown["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    let step = unknown["result"]["error"]["next_step"].as_str().unwrap();
+    assert!(step.contains("verify_import") && step.contains("could not be observed"));
+    assert!(!step.contains("already sent"));
+    // No other code gains the fields.
+    let other = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "verification_transport_failed",
+    );
+    assert!(other["result"]["error"].get("next_step").is_none());
+}
+
+/// A wire refusal replaces a generic failure code with the refusal's own, but
+/// never the code that tells the caller not to rebuild an unknown post.
+#[test]
+fn a_wire_refusal_never_replaces_the_unknown_post_outcome_code() {
+    let refused = || {
+        anyhow::Error::new(bridge_tally_transport::TallyTransportError::WireRefused {
+            refusal: bridge_tally_transport::WireRefusal::Busy,
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("import_dispatch_outcome_unknown", refused()).code,
+        "import_dispatch_outcome_unknown"
+    );
+    assert_eq!(
+        ToolFailure::from_runtime("status_probe_unavailable", refused()).code,
+        "tally_endpoint_busy"
+    );
+}
+
+#[test]
 fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncertain() {
     let directory = tempfile::tempdir().unwrap();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

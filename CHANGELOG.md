@@ -65,111 +65,6 @@ Each line names the pull requests it comes from.
 - The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
   (#805).
 
-### Removed
-
-- DSC (digital-signature certificate) hardware-token detection, certificate
-  extraction, and their AXAL sync path have been withdrawn from Bridge's
-  scope, along with the `pkcs11` and `cryptoki` dependencies that reached the
-  PKCS#11 driver. `pkcs11` 0.5.0 was unsound (RUSTSEC-2022-0034) and
-  unmaintained; the capability may be rebuilt properly later if needed. AXAL's
-  Tally and Documents integrations are unaffected.
-
-### Changed
-
-- `build_import_xml` now reports `live_evidence` as an array of
-  `{observation, report, voucher_types}` records rather than a single string,
-  and no longer emits `live_evidence_report`. The previous shape could name
-  only one source for a whole batch, so a Payment build cited a report that
-  records Payment being refused. A client branching on the old string value
-  needs updating; the accompanying voucher types make the provenance readable
-  without one.
-- Relicensed future Bridge distributions from the MIT License to the Apache
-  License, Version 2.0. The previously published `v0.1.0` release remains
-  available under the MIT License that accompanied that release.
-- Core snapshot canaries now authorize attempts through stable observed
-  sealed-profile execution evidence without claiming field support from an
-  incidental first-day dataset; snapshot rows are always re-fetched after the
-  durable run starts.
-- A probe that no longer returns the selected company now clears and
-  invalidates every company-scoped evidence, proof, mirror, diagnostic, and
-  snapshot view before installing the replacement probe, so its fresh review
-  remains usable without displaying stale company data.
-- Snapshot lifecycle probes no longer replace interactive setup-review state;
-  restart admission uses the exact sealed Core receipt, and ambiguous duplicate
-  live company identities fail before any snapshot read with their concrete
-  terminal proof reason preserved.
-- Snapshot recovery now durably replays backward-clock abandonment evidence,
-  enforces a 100,000-record aggregate hydration ceiling, and recovers an exact
-  already-committed receipt from compact hash-bound proof authority without
-  rehydrating canonical membership.
-
-### Added
-
-- Local import files may now carry Payment, Receipt and Contra vouchers as well
-  as Journals, so a bank statement can be expressed in the voucher types Tally
-  files it under. Each of the three is admitted only as two entries over two
-  distinct ledgers carrying neither a voucher number nor a reference. The side
-  that must hold money is refused unless that ledger's live group ancestry
-  reaches a reserved Bank Accounts or Cash-in-Hand identity — the two where a
-  captured ledger is observed sitting under a captured group. The counterparty
-  side must be established as holding no money: any money group there means the
-  voucher is really a Contra, and a ledger whose group ancestry cannot be
-  resolved is refused as well, because neither leg is admitted on an absence of
-  evidence. A build that names a
-  counterparty warns that its amount lands On Account. Native posting is
-  unchanged and still accepts only one unnumbered Journal.
-- A local-first Tally Truth Layer with capability passports, explicit truth
-  states, encrypted mirror evidence, resumable/adaptive snapshots, Proof of
-  Sync and Gap Map output, and a safer operator console. The migrations are
-  additive; rollback requires restoring the prior application and retaining
-  the encrypted database for forward recovery rather than deleting evidence.
-- Portable, bounded Tally protocol, canonicalization, transport, runtime,
-  compatibility, incremental-policy, qualification, observability, and
-  write-safety crates backed by a synthetic loopback protocol simulator.
-- Reviewed single-use setup authority, exact selected-read qualification, and
-  fail-closed compatibility manifests/runbooks. Live Education behavior and
-  every write capability remain unknown or disabled until exact reviewed
-  evidence exists.
-- Native Windows and macOS CI coverage for formatting, tests, builds, and
-  Clippy.
-- Repository-local Windows and macOS application icons.
-- Open-source contribution, security, review, and rectification guidance.
-- Reproducible Node and Rust toolchain baselines, installer smoke builds, and
-  complete lockfile-to-license-inventory checks.
-- Automated legal-resource inspection for Windows MSI/NSIS installers and the
-  staged and DMG-packaged macOS app bundles.
-
-### Security
-
-- SQLCipher/keyring-backed local Tally state, immutable proof/checkpoint
-  receipts, loopback-only proxy-free HTTP, bounded incremental decoding,
-  cancellation and lease enforcement, idempotent crash replay, and sealed
-  no-write qualification boundaries.
-- SQLCipher pool replacement connections now receive raw key bytes from
-  zeroizing storage without retaining a key-derived pragma string. Proof
-  contract v3 binds detailed record counts, and historical crash recovery no
-  longer depends on current checkpoint ownership.
-- File-backed snapshot ownership now uses per-run kernel advisory locks, so a
-  crash can be reclaimed after wall-clock rollback without allowing a live
-  owner to be stolen. Persisted/live company profiles correlate through an
-  opaque endpoint-scoped identity key, and macOS qualification reports
-  `ru_maxrss` in its native byte units.
-- Losing checkpoint compare-and-swap decisions terminalize as durable failed
-  proofs and close staging attempts instead of remaining falsely resumable;
-  unrelated checkpoint advances do not rewrite Failed or Cancelled outcomes.
-- Compatibility claims now require verified synthetic-fixture identity before
-  an explicit parsed Tally application rejection can establish `Unsupported`;
-  fixture, context, sentinel, parser, malformed-response, and transport
-  failures remain fail-closed observations rather than incompatibility claims.
-- Updated the XML parsing graph and removed unused Linux-only dialog
-  dependencies from the supported Windows and macOS build graph.
-- Updated the Tauri runtime to 2.11.5 and tauri-runtime-wry to 2.11.4.
-- HTTPS-only AXAL endpoints with redirect blocking, bounded responses, and
-  credential validation.
-- Safer DSC PIN transport and PKCS#11 library discovery without exposing
-  arbitrary native-library loading to the webview.
-- Bounded Tally and document responses with endpoint and upload validation.
-
 ## [0.3.0] - 2026-09-26
 
 ### In plain words: `mcp-preview-0.3.0` (26 Sep 2026), since `mcp-preview-0.2.0` (16 Sep 2026)
@@ -291,6 +186,117 @@ the pull requests it comes from, except where it names an issue.
 - How long Claude Desktop waits on one tool call is not measured (#703).
 - There is no tool to delete or undo a posted voucher, and a ledger that was
   replaced is not always noticed (#623).
+
+## [0.2.0] - 2026-09-16
+
+These are the detailed entries that were in this file when `mcp-preview-0.2.0`
+was published. They were written before the plain-words summaries began, and
+there is no summary for that build.
+
+### Removed
+
+- DSC (digital-signature certificate) hardware-token detection, certificate
+  extraction, and their AXAL sync path have been withdrawn from Bridge's
+  scope, along with the `pkcs11` and `cryptoki` dependencies that reached the
+  PKCS#11 driver. `pkcs11` 0.5.0 was unsound (RUSTSEC-2022-0034) and
+  unmaintained; the capability may be rebuilt properly later if needed. AXAL's
+  Tally and Documents integrations are unaffected.
+
+### Changed
+
+- `build_import_xml` now reports `live_evidence` as an array of
+  `{observation, report, voucher_types}` records rather than a single string,
+  and no longer emits `live_evidence_report`. The previous shape could name
+  only one source for a whole batch, so a Payment build cited a report that
+  records Payment being refused. A client branching on the old string value
+  needs updating; the accompanying voucher types make the provenance readable
+  without one.
+- Relicensed future Bridge distributions from the MIT License to the Apache
+  License, Version 2.0. The previously published `v0.1.0` release remains
+  available under the MIT License that accompanied that release.
+- Core snapshot canaries now authorize attempts through stable observed
+  sealed-profile execution evidence without claiming field support from an
+  incidental first-day dataset; snapshot rows are always re-fetched after the
+  durable run starts.
+- A probe that no longer returns the selected company now clears and
+  invalidates every company-scoped evidence, proof, mirror, diagnostic, and
+  snapshot view before installing the replacement probe, so its fresh review
+  remains usable without displaying stale company data.
+- Snapshot lifecycle probes no longer replace interactive setup-review state;
+  restart admission uses the exact sealed Core receipt, and ambiguous duplicate
+  live company identities fail before any snapshot read with their concrete
+  terminal proof reason preserved.
+- Snapshot recovery now durably replays backward-clock abandonment evidence,
+  enforces a 100,000-record aggregate hydration ceiling, and recovers an exact
+  already-committed receipt from compact hash-bound proof authority without
+  rehydrating canonical membership.
+
+### Added
+
+- Local import files may now carry Payment, Receipt and Contra vouchers as well
+  as Journals, so a bank statement can be expressed in the voucher types Tally
+  files it under. Each of the three is admitted only as two entries over two
+  distinct ledgers carrying neither a voucher number nor a reference. The side
+  that must hold money is refused unless that ledger's live group ancestry
+  reaches a reserved Bank Accounts or Cash-in-Hand identity — the two where a
+  captured ledger is observed sitting under a captured group. The counterparty
+  side must be established as holding no money: any money group there means the
+  voucher is really a Contra, and a ledger whose group ancestry cannot be
+  resolved is refused as well, because neither leg is admitted on an absence of
+  evidence. A build that names a
+  counterparty warns that its amount lands On Account. Native posting is
+  unchanged and still accepts only one unnumbered Journal.
+- A local-first Tally Truth Layer with capability passports, explicit truth
+  states, encrypted mirror evidence, resumable/adaptive snapshots, Proof of
+  Sync and Gap Map output, and a safer operator console. The migrations are
+  additive; rollback requires restoring the prior application and retaining
+  the encrypted database for forward recovery rather than deleting evidence.
+- Portable, bounded Tally protocol, canonicalization, transport, runtime,
+  compatibility, incremental-policy, qualification, observability, and
+  write-safety crates backed by a synthetic loopback protocol simulator.
+- Reviewed single-use setup authority, exact selected-read qualification, and
+  fail-closed compatibility manifests/runbooks. Live Education behavior and
+  every write capability remain unknown or disabled until exact reviewed
+  evidence exists.
+- Native Windows and macOS CI coverage for formatting, tests, builds, and
+  Clippy.
+- Repository-local Windows and macOS application icons.
+- Open-source contribution, security, review, and rectification guidance.
+- Reproducible Node and Rust toolchain baselines, installer smoke builds, and
+  complete lockfile-to-license-inventory checks.
+- Automated legal-resource inspection for Windows MSI/NSIS installers and the
+  staged and DMG-packaged macOS app bundles.
+
+### Security
+
+- SQLCipher/keyring-backed local Tally state, immutable proof/checkpoint
+  receipts, loopback-only proxy-free HTTP, bounded incremental decoding,
+  cancellation and lease enforcement, idempotent crash replay, and sealed
+  no-write qualification boundaries.
+- SQLCipher pool replacement connections now receive raw key bytes from
+  zeroizing storage without retaining a key-derived pragma string. Proof
+  contract v3 binds detailed record counts, and historical crash recovery no
+  longer depends on current checkpoint ownership.
+- File-backed snapshot ownership now uses per-run kernel advisory locks, so a
+  crash can be reclaimed after wall-clock rollback without allowing a live
+  owner to be stolen. Persisted/live company profiles correlate through an
+  opaque endpoint-scoped identity key, and macOS qualification reports
+  `ru_maxrss` in its native byte units.
+- Losing checkpoint compare-and-swap decisions terminalize as durable failed
+  proofs and close staging attempts instead of remaining falsely resumable;
+  unrelated checkpoint advances do not rewrite Failed or Cancelled outcomes.
+- Compatibility claims now require verified synthetic-fixture identity before
+  an explicit parsed Tally application rejection can establish `Unsupported`;
+  fixture, context, sentinel, parser, malformed-response, and transport
+  failures remain fail-closed observations rather than incompatibility claims.
+- Updated the XML parsing graph and removed unused Linux-only dialog
+  dependencies from the supported Windows and macOS build graph.
+- Updated the Tauri runtime to 2.11.5 and tauri-runtime-wry to 2.11.4.
+- HTTPS-only AXAL endpoints with redirect blocking, bounded responses, and
+  credential validation.
+- Safer DSC PIN transport and PKCS#11 library discovery without exposing
+  arbitrary native-library loading to the webview.
+- Bounded Tally and document responses with endpoint and upload validation.
 
 ## [0.1.0] - 2026-07-12
 

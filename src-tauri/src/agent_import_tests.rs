@@ -2394,6 +2394,25 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     }
 }
 
+/// The count rule in the warning follows the batch-posting setting (#866).
+#[test]
+fn refusal_reason_states_the_current_voucher_limit() {
+    let off = native_post_refusal_reason("import_post_requires_one_voucher", 1);
+    assert!(off.contains("one voucher (batch posting is off)"), "{off}");
+    let on = native_post_refusal_reason("import_post_requires_one_voucher", 50);
+    assert!(on.contains("1 to 50 vouchers"), "{on}");
+    assert!(!on.contains("batch posting is off"), "{on}");
+    let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
+    assert!(too_large.contains("(50)"), "{too_large}");
+    // An unlisted code keeps its own name in the warning and a neutral reason.
+    let (warnings, _) =
+        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+    assert!(warnings[0]
+        .as_str()
+        .unwrap()
+        .contains("refuse it as import_something_new"));
+}
+
 fn corroborate_observed_window(
     observed: &[ReadVoucher],
     corroboration: &[ReadVoucher],

@@ -359,6 +359,7 @@ impl ParentPartition {
             .flat_map(|(index, part)| part.parents.iter().map(move |parent| (parent, index)))
             .collect::<HashMap<_, _>>();
         let mut excluded = HashSet::new();
+        let mut complement_part = None;
         let complement_index = parts.len();
         if unsupported > 0 {
             if part_of.is_empty() {
@@ -392,7 +393,7 @@ impl ParentPartition {
             if bytes > limits.max_complement_formula_bytes {
                 return Err(ParentPartitionError::ComplementOverBudget);
             }
-            parts.push(complement);
+            complement_part = Some(complement);
         }
         let expected = rows_by_guid
             .into_iter()
@@ -412,6 +413,7 @@ impl ParentPartition {
                 (guid, row)
             })
             .collect();
+        parts.extend(complement_part);
         Ok(Self {
             parts,
             expected,

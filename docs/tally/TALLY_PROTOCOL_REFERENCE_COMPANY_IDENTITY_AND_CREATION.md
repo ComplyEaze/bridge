@@ -840,7 +840,7 @@ client book, 2026-09-28).**
 - **Read-back.** A vouchers read of that day no longer held the voucher. After a replacement Contra
   was created, the day's count was back to its count before the delete.
 - **Confidence.** PARTIAL by §9.14's convention: one voucher, one session, one client book, not
-  repeated. The counters and the read-back agree, but that is true of any single observation. The
+  repeated. The counters and the read-back agree, but only one voucher was read back. The
   source evidence does not give the deleted voucher's type.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.

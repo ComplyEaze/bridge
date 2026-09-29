@@ -263,16 +263,17 @@ So the two measurements cover different halves and neither covers the third case
   correction primitive for anyone targeting that environment.
 - **Stored state, licensed 7.1 Gold — confirmed via the UI (§9.12b).** The voucher was gone
   afterwards. No gateway response exists to corroborate it.
-- **Gateway on a licensed SKU — UNVERIFIED as first written (2026-09-25); see the note below**, on Gold and on the Silver/Journal profile this
-  section is about alike. §9.7 does not reach it because its baseline is Educational; §9.12b does
-  not reach it because a UI import returns nothing.
-  **Superseded for one case (2026-09-28):** a gateway `Delete` by the creation `REMOTEID` returned
-  `DELETED=1` on licensed Gold for one directly imported voucher (§9.12b, PARTIAL: one voucher).
-  §9.14's `DELETED=1` on a `REMOTEID` delete is separate and older: Silver, Journal, PARTIAL, and
-  not new here. Its Gold block records a same-`REMOTEID` upsert, not a delete.
+- **Gateway on a licensed SKU — UNVERIFIED when this was written (2026-09-25); now PARTIAL, once per
+  profile.** §9.7 does not reach it because its baseline is Educational, and §9.12b's first
+  measurement does not reach it because a UI import returns nothing. Two single observations exist:
+  - licensed Silver, Journal, `DELETED=1` on a `REMOTEID` delete (§9.14, PARTIAL: observed once);
+  - licensed Gold, a gateway `Delete` by the creation `REMOTEID` returned `DELETED=1` for one
+    directly imported voucher (§9.12b, 2026-09-28, PARTIAL: one voucher).
 
-Say which of the three you are standing on. "Delete works" is true in two of them and, apart from
-the single Gold voucher noted above, unproven in the one a licensed integration actually runs in.
+  §9.14's Gold block records a same-`REMOTEID` upsert, not a delete.
+
+Say which of the three you are standing on. "Delete works" is established in two of them and, in
+the one a licensed integration actually runs in, has one PARTIAL observation per profile.
 
 **Qualifying it on a new SKU or voucher type takes more than "read one voucher back".** A single
 read cannot tell *the original is gone* from *my read did not cover it*: an incomplete, failed or

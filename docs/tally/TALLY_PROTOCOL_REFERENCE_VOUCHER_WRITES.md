@@ -429,8 +429,9 @@ the `FETCH` list and looks at what arrives.
 > gateway import of Bridge-built Payment, Receipt and Contra files are both observed on Gold. Two
 > things are not:
 > - **Native posting.** `post_import` with its approval had not been observed on Gold, on Windows
->   or on Education when this correction was written (2026-09-25). Bridge's native post was later
->   captured on Gold on 2026-09-28 (§9.14's recorded-list item: one client book, a debug build).
+>   or on Education when this correction was written (2026-09-25). A native post (a batch with a
+>   recorded `dispatch_intent`) was later captured on Gold on 2026-09-28 (§9.14's recorded-list item:
+>   one client book, a debug build). The evidence for that item does not record the approval step.
 >   Windows and Education remain unobserved.
 > - **Reads at scale.** Reads of books of thousands of vouchers are the open failure in bridge#485.
 >

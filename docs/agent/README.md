@@ -68,8 +68,9 @@ Cursor uses the same server object in `.cursor/mcp.json`:
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `vouchers`,
-`voucher_presence`, `read_evidence`, and `egress_log`. For a command-line
+`ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
+`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
+`egress_log`. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -158,7 +159,9 @@ for the selected company's Trial Balance from 1 April to 31 March. The runtime
 requires freshly observed Licensed TallyPrime for this four-column report.
 Education mode is refused before report dispatch until this complete request
 has mode-specific live qualification. Dates before book start are refused.
-The monetary scope also requires one observed INR currency master.
+The monetary scope also requires an INR base currency. On a book with several
+Currency masters, the report covers the plain base-currency ledgers only and
+names the ledgers it leaves out; its totals are not expected to balance.
 
 Each opening, debit, credit and closing value is either
 `{"state":"present","value":"-7000.00"}` or `{"state":"present_empty"}`.
@@ -175,6 +178,70 @@ It may include dormant ledgers hidden by Tally's screen. Paired response,
 company, mode and extent checks detect observed changes, but do not prove an
 atomic snapshot or voucher-level reconciliation. Keep the company quiet during
 reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
+
+### Profit and Loss and Balance Sheet
+
+`profit_and_loss` and `balance_sheet` take the same `company_guid`, `from` and
+`to` as `trial_balance`, and read that Trial Balance under the same checks.
+Inside the same bracket they also read the group tree and Tally's own Balance
+Sheet for the window, and `profit_and_loss` reads Tally's own Profit and Loss
+too (#692).
+
+- **Lines.** Each ledger is classified by the reserved identity of its primary
+  group, the last group in its chain. That identity survives renaming.
+  - A P&L line is the window's debit plus credit movement.
+  - A Balance Sheet line is the closing balance at `to`.
+  - Signs follow the Trial Balance: a debit is negative, so a profit is positive.
+  - Each line's `amount` sums the amounts Tally returned and counts the empty
+    ones it left out.
+  - `lines` is null while the tool's result (`net_result`, or the Balance
+    Sheet's `carried`) is not established, so a derived line is never shown
+    as the statement. `balance_sheet_gate` and `tie_out` then show how each
+    of Tally's own lines compared.
+- **When a result is established.** Only when all of these hold:
+  - every ledger is classified; a ledger under a user-created primary group,
+    or with an incomplete chain, is listed in `unclassified`, and blocks the
+    results while it carries an amount;
+  - no Stock-in-Hand ledger carries an amount, since closing stock is not
+    derived from the Trial Balance;
+  - Tally's own Balance Sheet for the window, read in the same bracket, ties
+    line for line to the derived one (`balance_sheet_gate`). A line that
+    differs, a Tally line with an amount nothing derived matches, or a derived
+    line Tally does not show, refuses every result as
+    `tally_balance_sheet_differs`, with those lines named;
+  - the Profit & Loss A/c ledger is returned in the Trial Balance.
+- **Reasons** a result is `not_established`: `unclassified_ledger_carries_an_amount`,
+  `closing_stock_not_derivable_from_trial_balance`,
+  `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
+  gross and net `tally_profit_and_loss_differs`.
+- **Limits.**
+  - The gates are what catch what the Trial Balance cannot see, such as stock
+    valued from stock items. No inventory book has been measured; one is
+    expected to refuse.
+  - A book with more than one currency master is refused before the Trial
+    Balance is read (measured once on the lab's multi-currency book), so an
+    unadjusted forex difference (#683) never reaches the gate.
+  - A Tally line the derivation has no counterpart for, such as a heading with
+    an amount or a difference in opening balances, refuses the results rather
+    than being guessed at.
+  - Tally's own statements carry no company identity; the company, mode and
+    book-extent checks around the read are what bind them.
+  - The gate has been measured over one full year on one book and one month on
+    another. In that one-month window the book's one P&L ledger (sales) had a
+    Trial Balance covering the window only, and the year's earlier result sat
+    in the Profit & Loss A/c ledger's opening; the carried line includes both. A window spanning more
+    than one financial year is unmeasured.
+- **Gross and net** are the window's movement, which the Balance Sheet does
+  not pin: stock held at `from` and gone by `to` could pass it. So
+  `profit_and_loss` also reads Tally's own Profit and Loss and compares it in
+  `tie_out`. Gross and net are refused as `tally_profit_and_loss_differs`
+  unless it ties:
+  - no line differs, and no derived line with an amount is missing from it;
+  - no line of its with an amount is uncompared, except the `Cost of Sales :`
+    heading, spelled exactly so, while its amount is exactly the derived
+    Purchase Accounts plus Direct Expenses (the cost of sales without stock).
+    That allowance was observed once, on one book.
+  - An Opening or Closing Stock line refuses.
 
 ### Ledger-movement opening decision
 
@@ -234,6 +301,27 @@ setup commitment. Historical commitments without a tier retain their exact bytes
 If discovery rejects company identity fields, `tally_status` reports the profile
 refusal reason and partial evidence with the completed source commitments. A
 valid empty collection remains distinguishable from invalid discovery.
+
+### Foreign-currency composites in `vouchers`
+
+A foreign amount entered on a rupee ledger can be stored by Tally as a
+composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
+
+- **`vouchers` withholds that voucher.** It passes every date, ledger and
+  voucher-type check like any other, and is then listed in `withheld_vouchers`
+  instead of `items`. The listing gives its GUID, date, type, number and cause,
+  up to 100 vouchers, with an exact `withheld_total` that is the same on every
+  page.
+- **The result says so.** `state` is `partial` with `reason`
+  `vouchers_withheld`, `total` counts `items` only, and `coverage` says what
+  was left out.
+- **No amount is read from a composite.** Anything that is neither a plain
+  decimal nor an exact composite still refuses the whole window. So does a
+  composite whose foreign and base amounts carry opposite signs, unless the
+  foreign amount is zero: a voucher entry's two amounts share one sign.
+- **Every other voucher reader still refuses such a window** (for example
+  `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
+  voucher screen), because each of them sums, matches or verifies amounts.
 
 ## Voucher-file preparation and verification
 
@@ -355,11 +443,8 @@ licence mode has been qualified.
 
 ## Approved voucher posting
 
-**Voucher posting is off by default in the MCPB extension** while two known
-limits remain. The post names its company only by name, and Tally cannot bind an import to a company's GUID. Bridge confirms the company as its last request before the post, and afterwards reports which companies changed, but another loaded company renamed to, or loaded under, the exact same name in that moment would still receive the voucher
-([#574](https://github.com/lamemustafa/bridge/issues/574)). And Bridge cannot
-delete or roll back a voucher it has posted, so a wrong post must be corrected
-by hand in Tally ([#579](https://github.com/lamemustafa/bridge/issues/579)).
+**Voucher posting is off by default in the MCPB extension** while three known
+limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/lamemustafa/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/lamemustafa/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/lamemustafa/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/lamemustafa/bridge/issues/579), [#582](https://github.com/lamemustafa/bridge/pull/582)).
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/lamemustafa/bridge/issues/575), fixed).
 **Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for
@@ -426,7 +511,10 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    are not yet measured. A queue catalogue re-read that does not parse as this
    company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
-   again until it is corrected in Tally. Separately, the build records each ledger's GUID, and a
+   again until it is corrected in Tally. A queue re-read of the group collection
+   (for a Payment, Receipt or Contra) that does not parse refuses with
+   `group_export_invalid`, with the same `cause` the read before approval names,
+   and nothing is sent. Separately, the build records each ledger's GUID, and a
    post refuses any ledger now on another GUID (renamed and replaced, or deleted
    and recreated, since the build) with `import_masters_changed_since_build`,
    naming it. The name now means a different ledger: confirm the intended one
@@ -435,12 +523,22 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_batch_predates_ledger_binding`, before any Tally request; build it
    again. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
-   the post can be re-run. Rebuild only when `attempt_recorded` is `false`.
+   the post can be re-run. Checked under the admission lock as the attempt is
+   about to be recorded, a batch no longer in the journal, already attempted,
+   changed since approval, or whose REMOTEID the journal already records refuses
+   with `import_batch_not_found`, `import_already_attempted`,
+   `import_batch_changed` or `import_remote_id_reused`, and this post sends
+   nothing. Rebuild only when `attempt_recorded` is `false`.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the
-   side that must be bank or cash. Choose **Post voucher** on
-   macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
+   side that must be bank or cash. A batch's dialog shows the same company and
+   endpoint, and summarises the vouchers: their count, types and date range,
+   each ledger's totals, and the overall totals. It does not show any voucher's
+   own date, amounts, entries, narration or reference: equal ledger totals do
+   not prove each voucher is right, so check those before building the batch.
+   Choose **Post voucher** (for a batch,
+   **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
    **No**. Long or directionally ambiguous previews are refused; use the
    manual file workflow instead. A desktop session is required.
@@ -560,7 +658,26 @@ live-Tally compatibility claim:
 
 For Tally reads, request commitments hash the transmitted request body (UTF-16LE
 for XML; empty for the status GET), and response commitments hash encoded response
-bodies. Multiple sources combine their commitments in read order. `evidence.bytes`
+bodies. Multiple sources combine their commitments in read order.
+
+A `request_sha256` or `response_sha256` is therefore the hash of one request or
+response only where exactly one source was read. Wherever evidence covers more
+than one source, which includes the top-level `evidence` of most tools and named
+sub-evidence such as `verify_import`'s `mode_opening`, the field is a combined
+commitment: `sha256("<left>:<right>")` over the two lowercase hex digests, folded
+left to right in the order the tool's code combines them. No request on the wire
+has that hash. To check one against captured wire bytes, hash each captured body
+and fold the digests in that same order; probes and paired reads interleave, so
+the order is the code's, not the wire's. Not every request has its own digest in
+the result: on a lab capture of one `verify_import`, the company-mark and census
+requests were folded into commitments without being reported separately (#726).
+The runtime's own combination passes a side through unchanged when the other
+side's two digests are both empty, so runtime evidence that one source alone fed
+carries that request's own hash; the tool-level combination always hashes both
+sides. The result does not say which case produced a given value, so a digest
+that matches no captured request should be treated as a combination, and one
+that matches a captured request as that request.
+`evidence.bytes`
 counts committed response bodies, including both accepted bodies of a paired read;
 it excludes auxiliary health and identity guards and is not total network traffic.
 Status commits its status and company-discovery responses. Scoped agent reads use

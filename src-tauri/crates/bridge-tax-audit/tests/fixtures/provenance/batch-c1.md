@@ -59,13 +59,27 @@ The engine re-sync (#597) pinned the crate to `105b6c37`. Between `46324912` and
 reference's `tds_payees.py`, rules, adapters, config and binding are unchanged. Regenerating all
 fourteen goldens there changed only `book_invariants_evaluated`, which gains `POP-5`.
 
+## Re-pin at the reference's current head (Lane E2, 2026-09-27)
+
+Every golden here was regenerated at the reference engine (a private repository), commit
+`e2456bcf4f163cf770945e8620e715788db0ca46`, from an archive of its `tae/` and `selftest/` only, with
+the invocations above. Between `1038dc05` and that commit the reference's `tds_payees.py` gained
+the owner's Q1 and Q2 rules, the 25-Sep fall-back review and the s.194C(6) and s.194H gaps (its last
+change is `eac50b66`), and the port follows it (`src/tds_payees.rs`). `parity/python_golden.py` now
+calls the reference pack's own `_tds_payees`, so every input it passes reaches the golden as the pack
+passes it. The edge books above are unchanged; all fourteen goldens change. The five edge books this
+re-pin adds are recorded in `batch-tds-repin.md`.
+
 ## Rules vendored for this batch
 
 `rules/ay2026-27.s44ab.toml` gains `[s194c]`, `[s194i]` and `[deductor]` in full, and `[s194j]` as
 three blocks: its header, its three value lines, and `status` cut at its value. The cuts remove the
 table's header comment lines and the status line's trailing comment, which cite private research
 notes; nothing the port reads is cut. Every block is still a verbatim substring of the reference's
-rules file, whose SHA-256 is unchanged (`src/rules.rs`).
+rules file, whose SHA-256 is unchanged (`src/rules.rs`). At the re-pin, `[deductor]` is re-vendored
+from the reference's current head as its header and one block (the business and profession limits,
+`firm`, authority and status), and `[s194h]` and `[tds_rates].s194h_bp` are added; `src/rules.rs` and
+the rules file's own header record every block.
 
 ## Bytes
 
@@ -83,18 +97,18 @@ rules file, whose SHA-256 is unchanged (`src/rules.rs`).
 | `tds_payees_deductor_individual_unknown.json` | 1,603 | `c7bf6bf712b75a5db11f4299197e7cc4815d5c796912c3dcc661b5e212c17b6d` | `edge-books/tds_payees_deductor_individual_unknown.json` |
 | `tds_payees_goods_and_cash.json` | 4,594 | `6b46e256f74547810dd22c9e0bfd12650bc298792a930556144d6bf3370bc1b5` | `edge-books/tds_payees_goods_and_cash.json` |
 | `tds_payees_ledgers_unicode.json` | 4,051 | `e112bf6a4d9a47dd4ff0c14aad255fca89a06da80c49fb6e1bc6009537b7b313` | `edge-books/tds_payees_ledgers_unicode.json` |
-| `edge.tds_payees_194c.tds_payees.json` | 24,012 | `e2e085f6b59ac919773e31d9aeef12a48ff904567730709e0495a538e553927b` | `golden/edge.tds_payees_194c.tds_payees.json` |
-| `edge.tds_payees_194i.tds_payees.json` | 19,044 | `8dcb445e553f737a89fa40b2612a36eb593f0f401bcb1535baddab58c41b2e70` | `golden/edge.tds_payees_194i.tds_payees.json` |
-| `edge.tds_payees_194j.tds_payees.json` | 21,482 | `218e36a6234e7a01ef8c335c7b704cb263b92681b1cf67f44731934f5a68652d` | `golden/edge.tds_payees_194j.tds_payees.json` |
-| `edge.tds_payees_194j_default.tds_payees.json` | 18,742 | `cb919733cc488aeb24b7dd759c4a42d1a793ca4f54651af845d7fa9f371f467b` | `golden/edge.tds_payees_194j_default.tds_payees.json` |
-| `edge.tds_payees_deductor_capitalised.tds_payees.json` | 15,114 | `2bc7faf7ab54f2dfc9b1310712374fd362b3e9daa6e63062be9605dbd447165d` | `golden/edge.tds_payees_deductor_capitalised.tds_payees.json` |
-| `edge.tds_payees_deductor_firm.tds_payees.json` | 15,114 | `2bc7faf7ab54f2dfc9b1310712374fd362b3e9daa6e63062be9605dbd447165d` | `golden/edge.tds_payees_deductor_firm.tds_payees.json` |
-| `edge.tds_payees_deductor_huf_unknown.tds_payees.json` | 15,969 | `f5d8a0394e9a57016b9f76a7f88a3ef390f4333e204200fa8727521b83830c10` | `golden/edge.tds_payees_deductor_huf_unknown.tds_payees.json` |
-| `edge.tds_payees_deductor_individual_at_threshold.tds_payees.json` | 15,118 | `85c98d2bed6e21e5fcb5674d11d7a0fd691b856dd60ee1b83c89d3bc91e2d1bb` | `golden/edge.tds_payees_deductor_individual_at_threshold.tds_payees.json` |
-| `edge.tds_payees_deductor_individual_over.tds_payees.json` | 15,114 | `2bc7faf7ab54f2dfc9b1310712374fd362b3e9daa6e63062be9605dbd447165d` | `golden/edge.tds_payees_deductor_individual_over.tds_payees.json` |
-| `edge.tds_payees_deductor_individual_unknown.tds_payees.json` | 15,969 | `f5d8a0394e9a57016b9f76a7f88a3ef390f4333e204200fa8727521b83830c10` | `golden/edge.tds_payees_deductor_individual_unknown.tds_payees.json` |
-| `edge.tds_payees_goods_and_cash.tds_payees.json` | 20,931 | `125407225669716db1ffe4d28ffed0bd0435e7895e841a2478fad1b43a65dd7e` | `golden/edge.tds_payees_goods_and_cash.tds_payees.json` |
-| `edge.tds_payees_ledgers_unicode.tds_payees.json` | 23,577 | `b2712bfa9907e998723ef3233db80d8a8fca7bc878c35a3c6997940dbb746365` | `golden/edge.tds_payees_ledgers_unicode.tds_payees.json` |
-| `synthetic.tds_payees.json` | 16,534 | `cea197f1e517d056082a7f81f9713fac46394d06a1e4a45d17467c142e24d5e5` | `golden/synthetic.tds_payees.json` |
+| `edge.tds_payees_194c.tds_payees.json` | 31,133 | `fff5a3fa95cb2d01da65d2629de6dc3fb32ca6c2060f2e975d8df191b55dc028` | `golden/edge.tds_payees_194c.tds_payees.json` |
+| `edge.tds_payees_194i.tds_payees.json` | 21,588 | `a41e4cd212cf320171ea20c3a7ab7638755184d4fe8ce13f01034b0039eb79ae` | `golden/edge.tds_payees_194i.tds_payees.json` |
+| `edge.tds_payees_194j.tds_payees.json` | 24,013 | `6a1528c5d6a6a2655a9d264131543b3250fa3a424260fc9db9fea1348bc4b712` | `golden/edge.tds_payees_194j.tds_payees.json` |
+| `edge.tds_payees_194j_default.tds_payees.json` | 20,747 | `0d13035795574a112ce14195c7753739b4ec4ef61234a58b8464da46976735e3` | `golden/edge.tds_payees_194j_default.tds_payees.json` |
+| `edge.tds_payees_deductor_capitalised.tds_payees.json` | 15,119 | `b95621a9e660451e3527f70b6cae00d2400efac465c25831653a577c262c7dfb` | `golden/edge.tds_payees_deductor_capitalised.tds_payees.json` |
+| `edge.tds_payees_deductor_firm.tds_payees.json` | 15,119 | `b95621a9e660451e3527f70b6cae00d2400efac465c25831653a577c262c7dfb` | `golden/edge.tds_payees_deductor_firm.tds_payees.json` |
+| `edge.tds_payees_deductor_huf_unknown.tds_payees.json` | 16,225 | `9e92d01da935303a30879f50b45f806d6f5a16c5b0e5deee02b66798b5a356f6` | `golden/edge.tds_payees_deductor_huf_unknown.tds_payees.json` |
+| `edge.tds_payees_deductor_individual_at_threshold.tds_payees.json` | 16,225 | `9e92d01da935303a30879f50b45f806d6f5a16c5b0e5deee02b66798b5a356f6` | `golden/edge.tds_payees_deductor_individual_at_threshold.tds_payees.json` |
+| `edge.tds_payees_deductor_individual_over.tds_payees.json` | 15,119 | `b95621a9e660451e3527f70b6cae00d2400efac465c25831653a577c262c7dfb` | `golden/edge.tds_payees_deductor_individual_over.tds_payees.json` |
+| `edge.tds_payees_deductor_individual_unknown.tds_payees.json` | 16,225 | `9e92d01da935303a30879f50b45f806d6f5a16c5b0e5deee02b66798b5a356f6` | `golden/edge.tds_payees_deductor_individual_unknown.tds_payees.json` |
+| `edge.tds_payees_goods_and_cash.tds_payees.json` | 23,971 | `2596e8d5e7e708b51b1bd94bd25081d5370e74678467b86161b3a7687a1ec49a` | `golden/edge.tds_payees_goods_and_cash.tds_payees.json` |
+| `edge.tds_payees_ledgers_unicode.tds_payees.json` | 28,729 | `34cc49dddef8ba26488fd4737d7d39e0af7174eecbdab1e75f9a242b500fc344` | `golden/edge.tds_payees_ledgers_unicode.tds_payees.json` |
+| `synthetic.tds_payees.json` | 16,790 | `6b9328e058480754d52be66e24d2ef757c80864168635032f55af40fcf616c90` | `golden/synthetic.tds_payees.json` |
 | `tds_payees_mapping.json` | 3,511 | `27acd14da73229f8ed201a3fdad502912dc1ac1b8e3a2a1ee8c8c0f6d11cf774` | `edge-books/tds_payees_mapping.json` |
-| `edge.tds_payees_mapping.tds_payees.json` | 15,973 | `6274a8ff84cd3cb958389fb17ff07356f0a793659bacbc482ac0ffd93d946037` | `golden/edge.tds_payees_mapping.tds_payees.json` |
+| `edge.tds_payees_mapping.tds_payees.json` | 16,229 | `1399189dc1a2e956dcdd395e9dd4040c2ff2a3f6f0787e42b6f5e61a8add9e59` | `golden/edge.tds_payees_mapping.tds_payees.json` |

@@ -1,0 +1,362 @@
+{
+ "comment": "tds_payees clause 21(b): with no TDS seen, only the credits that attract TDS are listed (Carrier K: the aggregate crossed in June takes the April and May credits with it; Carrier L: only the credit over the single sum); with TDS seen every credit is listed, a bill whose own TDS month the challans show nothing deposited for by the due date in (ii)(B) (Tech T in June, its challan after the due date; Contractor S in September, none), and one under the section's rate as a short or mid deduction (Contractor S, a client recorded in Kerala); Form 26A held and not held; and the s.194C(6) question on the ledger marked as goods carriage.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-tds_payees_21b-000"
+  },
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_21b-001"
+  },
+  {
+   "name": "Hire Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_21b-002"
+  },
+  {
+   "name": "Technical Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_21b-003"
+  },
+  {
+   "name": "TDS Payable 194C",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-004"
+  },
+  {
+   "name": "TDS Payable 194J",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-005"
+  },
+  {
+   "name": "Carrier K",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-006"
+  },
+  {
+   "name": "Carrier L",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-007"
+  },
+  {
+   "name": "Tech T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-008"
+  },
+  {
+   "name": "Contractor S",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_21b-009"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carrier K",
+   "opening": 0,
+   "debit": 0,
+   "credit": 11500000,
+   "closing": -11500000
+  },
+  {
+   "ledger": "Carrier L",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4500000,
+   "closing": -4500000
+  },
+  {
+   "ledger": "Contractor S",
+   "opening": 0,
+   "debit": 0,
+   "credit": 19850000,
+   "closing": -19850000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 4500000,
+   "credit": 0,
+   "closing": 4500000
+  },
+  {
+   "ledger": "Hire Charges",
+   "opening": 0,
+   "debit": 31500000,
+   "credit": 0,
+   "closing": 31500000
+  },
+  {
+   "ledger": "TDS Payable 194C",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  },
+  {
+   "ledger": "TDS Payable 194J",
+   "opening": 0,
+   "debit": 0,
+   "credit": 140000,
+   "closing": -140000
+  },
+  {
+   "ledger": "Tech T",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6860000,
+   "closing": -6860000
+  },
+  {
+   "ledger": "Technical Fees",
+   "opening": 0,
+   "debit": 7000000,
+   "credit": 0,
+   "closing": 7000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "b01",
+   "date": "2025-04-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     2000000
+    ],
+    [
+     "Carrier K",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "b02",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Carrier K",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "b03",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     7000000
+    ],
+    [
+     "Carrier K",
+     -7000000
+    ]
+   ]
+  },
+  {
+   "guid": "b04",
+   "date": "2025-04-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     3500000
+    ],
+    [
+     "Carrier L",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "b05",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     1000000
+    ],
+    [
+     "Carrier L",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "b06",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Technical Fees",
+     6000000
+    ],
+    [
+     "Tech T",
+     -5880000
+    ],
+    [
+     "TDS Payable 194J",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "b07",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Technical Fees",
+     1000000
+    ],
+    [
+     "Tech T",
+     -980000
+    ],
+    [
+     "TDS Payable 194J",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "b08",
+   "date": "2025-08-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     10000000
+    ],
+    [
+     "Contractor S",
+     -9950000
+    ],
+    [
+     "TDS Payable 194C",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "b09",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Hire Charges",
+     10000000
+    ],
+    [
+     "Contractor S",
+     -9900000
+    ],
+    [
+     "TDS Payable 194C",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Freight": "194C",
+  "Hire Charges": "194C",
+  "Technical Fees": "194J"
+ },
+ "s194j_category_by_ledger": {
+  "Technical Fees": "technical"
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable 194C",
+  "TDS Payable 194J"
+ ],
+ "goods_carriage_ledgers": [
+  "Freight"
+ ],
+ "client_state": "  Kerala ",
+ "challans": [
+  {
+   "date": "2026-11-15",
+   "section": "194J",
+   "month": "2025-06",
+   "amount_paise": 120000
+  },
+  {
+   "date": "2025-08-07",
+   "section": "194J",
+   "month": "2025-07",
+   "amount_paise": 20000
+  },
+  {
+   "date": "2025-09-07",
+   "section": "194C",
+   "month": "2025-08",
+   "amount_paise": 50000
+  }
+ ],
+ "form_26a": [
+  {
+   "payee": "Carrier K",
+   "held": false
+  },
+  {
+   "payee": "Tech T",
+   "held": true
+  }
+ ]
+}

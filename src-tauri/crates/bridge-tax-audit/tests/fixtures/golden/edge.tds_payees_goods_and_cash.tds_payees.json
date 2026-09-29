@@ -31,6 +31,28 @@
       "evidence": []
     },
     {
+      "id": "tds_payees.194C_row_21b_a_194C_f81067e8_001",
+      "value": 3500000,
+      "unit": "paise",
+      "definition_sha256_16": "9ec67617418d33ce",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag f81067e8) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p01",
+          "label": "Payment p01 on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_f81067e8",
+      "value": 3500000,
+      "unit": "paise",
+      "definition_sha256_16": "2c478bb0618d73c5",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag f81067e8) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
       "id": "tds_payees.194C_row_credited_194C_f81067e8",
       "value": 3500100,
       "unit": "paise",
@@ -59,7 +81,7 @@
     },
     {
       "id": "tds_payees.194C_within_supplier_goods_invoices_total",
-      "value": -5900000,
+      "value": 4100000,
       "unit": "paise",
       "definition_sha256_16": "529536a7929105ee",
       "definition_text": "Sum of the 194C-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
@@ -87,6 +109,28 @@
       "unit": "count",
       "definition_sha256_16": "d5a067612ec55500",
       "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194I-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_row_21b_a_194I_72327f85_001",
+      "value": 6000000,
+      "unit": "paise",
+      "definition_sha256_16": "437d8e0419f74380",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 72327f85) under 194I, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p02",
+          "label": "Payment p02 on 2025-05-11"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194I_row_21b_a_total_194I_72327f85",
+      "value": 6000000,
+      "unit": "paise",
+      "definition_sha256_16": "2cca974a68625283",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 72327f85) listed there, summed. Each is its own item in clause 21(b); this total is not.",
       "evidence": []
     },
     {
@@ -121,7 +165,7 @@
     },
     {
       "id": "tds_payees.194I_within_supplier_goods_invoices_total",
-      "value": -19800000,
+      "value": 200000,
       "unit": "paise",
       "definition_sha256_16": "ef3b05505b746211",
       "definition_text": "Sum of the 194I-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
@@ -291,8 +335,8 @@
       "id": "tds_payees.deductor_status",
       "value": "unknown",
       "unit": "text",
-      "definition_sha256_16": "2536d022c30ff81e",
-      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
+      "definition_sha256_16": "f4ae0f27f28231f1",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194H/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
       "evidence": []
     },
     {
@@ -319,8 +363,16 @@
           "figure_id": "tds_payees.194C_row_credited_194C_f81067e8"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_f81067e8"
+        },
+        {
           "name": "max_single",
           "figure_id": "tds_payees.194C_row_max_single_194C_f81067e8"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_f81067e8_001"
         }
       ],
       "evidence": [
@@ -337,10 +389,11 @@
       ],
       "title_sha256_16": "0eb25ef0a73229b9",
       "title_text": "Cash/bank paid under a 194C-mapped expense, payee not identified, over the limit",
-      "limits_sha256_16": "aafb70cd9cf7d0f1",
+      "limits_sha256_16": "32c9c035379ebfa6",
       "limits_text": [
         "The credit line is a cash or bank ledger, not a named payee; the actual payee must be identified from narration, vouchers or the bank statement before any TDS conclusion can be drawn for this amount.",
-        "s.40(a)(ia) disallowance and its Form 26A relief cannot be assessed until the payee is known."
+        "s.40(a)(ia) disallowance and its Form 26A relief cannot be assessed until the payee is known.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "f040bdbbf725b2a9",
       "ask_client_text": [
@@ -361,12 +414,20 @@
           "figure_id": "tds_payees.194I_row_credited_194I_72327f85"
         },
         {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194I_row_21b_a_total_194I_72327f85"
+        },
+        {
           "name": "max_month",
           "figure_id": "tds_payees.194I_row_max_month_194I_72327f85"
         },
         {
           "name": "max_single",
           "figure_id": "tds_payees.194I_row_max_single_194I_72327f85"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194I_row_21b_a_194I_72327f85_001"
         }
       ],
       "evidence": [
@@ -378,10 +439,11 @@
       ],
       "title_sha256_16": "42c4c595cf71ceb5",
       "title_text": "Cash/bank paid under a 194I-mapped expense, payee not identified, over the limit",
-      "limits_sha256_16": "aafb70cd9cf7d0f1",
+      "limits_sha256_16": "32c9c035379ebfa6",
       "limits_text": [
         "The credit line is a cash or bank ledger, not a named payee; the actual payee must be identified from narration, vouchers or the bank statement before any TDS conclusion can be drawn for this amount.",
-        "s.40(a)(ia) disallowance and its Form 26A relief cannot be assessed until the payee is known."
+        "s.40(a)(ia) disallowance and its Form 26A relief cannot be assessed until the payee is known.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
       ],
       "ask_client_sha256_16": "f040bdbbf725b2a9",
       "ask_client_text": [
@@ -404,13 +466,13 @@
       "evidence": [],
       "title_sha256_16": "06119560fefe9404",
       "title_text": "Deductor status depends on previous-year turnover",
-      "limits_sha256_16": "e5850cc8f1e435fb",
+      "limits_sha256_16": "fe8897e0c776deb3",
       "limits_text": [
-        "An individual/HUF is a s.194A/194C/194-I/194J deductor only if the immediately preceding year's business turnover exceeded ₹1 crore; the current year's books alone cannot establish this."
+        "An individual/HUF is a s.194A/194C/194H/194-I/194J deductor only if the immediately preceding year's turnover from a business exceeded ₹1 crore, or its gross receipts from a profession exceeded ₹50 lakh (s.194A(1) proviso; s.194C Explanation (i)(l)(B)); whether the client carries on a business or a profession is not recorded; the current year's books alone cannot establish this."
       ],
-      "ask_client_sha256_16": "0f4f5d87be308771",
+      "ask_client_sha256_16": "6a59a8224649a5d2",
       "ask_client_text": [
-        "Confirm previous-year business turnover."
+        "Confirm previous-year turnover or gross receipts, and whether from a business or a profession."
       ]
     }
   ],

@@ -113,8 +113,15 @@ parse or pass Bridge's checks, or hit a local limit or fault that does not invol
 withdrawn call is `request_cancelled`.
 
 Like `remediation`, `cause`, `counts`, `size` and `endpoint` are omitted when `BRIDGE_AGENT_MAX_BYTES` is below
-4,096, so that the code always fits. Before a tool response is written, Bridge appends a metadata-only
-`response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`.
+4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+`response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
+hashes, counts and field paths, and one set of values: for a response that carries an error, its
+`error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
+dates, request counts, per-part dates, rows, bytes, AlterID spans, whether each part was served,
+milliseconds, and the kind of the request that failed; the last 64 parts listed and the rest
+counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
+timed out can be diagnosed without sending it again (bridge#799). The message and every other
+field are dropped; no row content, name or narration is kept.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery

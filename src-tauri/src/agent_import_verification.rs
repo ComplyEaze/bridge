@@ -260,16 +260,14 @@ pub(super) fn verify_batch(
         else {
             return false;
         };
-        // A tag seen on two observed vouchers is a copy, not an identity, and
-        // an expected voucher that is this very row means the row is already
-        // posted whatever it is now mapped to: neither is an exemption.
-        let tag = observed_tags[index];
-        if observed_tags.iter().filter(|other| **other == tag).count() > 1
-            || expected_markers.iter().any(|marker| {
-                recorded_statement_row(statement_rows, &line.company_guid, marker)
-                    .is_some_and(|ours| is_same_statement_row(ours, theirs))
-            })
-        {
+        // An expected voucher that is this very row means the row is already
+        // posted, whatever it is now mapped to: not an exemption. (A tag on two
+        // observed vouchers never reaches here: `ImportReadSource::admit`
+        // refuses it.)
+        if expected_markers.iter().any(|marker| {
+            recorded_statement_row(statement_rows, &line.company_guid, marker)
+                .is_some_and(|ours| is_same_statement_row(ours, theirs))
+        }) {
             return false;
         }
         let mut twins = expected_fingerprints

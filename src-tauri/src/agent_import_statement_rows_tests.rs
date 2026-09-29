@@ -437,31 +437,30 @@ fn a_rebuilt_batch_that_remaps_a_posted_row_is_still_refused() {
 }
 
 #[test]
-fn a_copied_narration_tag_is_not_a_row_identity() {
-    // The row was entered by hand by duplicating the posted voucher in Tally,
-    // so two observed vouchers carry one tag. The tag then proves nothing.
+fn a_copied_narration_tag_never_reaches_the_row_exemption() {
+    // A row entered by duplicating a posted voucher in Tally carries the same
+    // tag twice. The read source refuses that before any row key is consulted.
     let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
-    let later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
-    let rows = journal(&[&earlier, &later]);
     let original = posted(&earlier, 1);
     let mut copy = posted(&earlier, 2);
     copy.narration = original.narration.clone();
-    let result = verify(&later, vec![original, copy], &rows);
     assert_eq!(
-        admission(&result),
-        Err("import_preexisting_identity".into())
+        ImportReadSource::admit(vec![original, copy]).err(),
+        Some("import_verification_tag_ambiguous".into())
     );
 }
 
 #[test]
 fn a_recorded_company_guid_matches_in_any_letter_case() {
-    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
-    let later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    let mut earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let mut later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    earlier.company_guid = "abcdef00-0000-4000-8000-000000000001".into();
+    later.company_guid = earlier.company_guid.clone();
     let mut rows = journal(&[&earlier, &later]);
     for (company, _) in rows.values_mut() {
         *company = company.to_uppercase();
     }
-    assert_ne!(rows.values().next().unwrap().0, GUID);
+    assert_ne!(rows.values().next().unwrap().0, later.company_guid);
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
     assert_eq!(admission(&result), Ok(()));
 }

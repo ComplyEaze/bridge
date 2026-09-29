@@ -515,11 +515,15 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow is manual so publishing
-it remains an explicit maintainer action. Once GitHub Pages is configured for
-this repository, it resolves GitHub Release assets by exact release tag and
-labels prerelease downloads as unsigned previews. It does not proxy Tally,
-create an account, or run a cloud relay.
+`site/` is a small static installer page. Its workflow runs when a maintainer
+dispatches it, and again when a maintainer-dispatched preview publication
+finishes successfully, so the page's release snapshot follows the release
+without a second step. A release published with the workflow token starts no
+workflow of its own, which is why the follow-up is wired to the publication
+run. Once GitHub Pages is configured for this repository, the page offers a
+preview by its tag name and complete asset set, whether or not GitHub marks the
+release a prerelease, and labels every download as an unsigned preview. It does
+not proxy Tally, create an account, or run a cloud relay.
 
 ## Rollback
 

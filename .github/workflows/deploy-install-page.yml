@@ -2,6 +2,11 @@ name: Deploy Bridge install page
 
 on:
   workflow_dispatch:
+  # A successful preview publication redeploys the page, so its release snapshot is never a
+  # release behind. GITHUB_TOKEN-created releases start no workflow of their own.
+  workflow_run:
+    workflows: ["Publish MCPB preview release"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -14,7 +19,11 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: >-
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch))
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

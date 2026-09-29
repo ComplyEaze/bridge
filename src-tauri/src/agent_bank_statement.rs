@@ -589,12 +589,15 @@ pub(super) struct AnsweredCashLedger {
 }
 
 /// Where a voucher's statement row sits, kept in the import journal (#865):
-/// the account it came from, as a local equality key, and the running balance
-/// printed on the row. The journal is Bridge's own file; neither value is sent
-/// to Tally or returned in a tool response.
+/// the SHA-256 of the statement file it was read from, and the running balance
+/// printed on the row. A running balance is stable only within one statement:
+/// another export of the same account can order the day's rows differently, so
+/// two rows compare only when both came from the same file. The journal is
+/// Bridge's own file; neither value is sent to Tally or returned in a tool
+/// response.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub(super) struct StatementRowKey {
-    pub(super) account: String,
+    pub(super) statement: String,
     pub(super) balance: String,
 }
 
@@ -777,13 +780,14 @@ pub(super) fn resolve_import_arguments(
         }
         cash_ledgers.push(need);
     }
+    let statement = document["statement_sha256"].as_str();
     let row_keys = records
         .iter()
         .filter_map(|record| {
             Some((
                 record["bridge_txn_id"].as_str()?.to_string(),
                 StatementRowKey {
-                    account: record["account_digest"].as_str()?.to_string(),
+                    statement: statement?.to_string(),
                     balance: record["balance"].as_str()?.to_string(),
                 },
             ))

@@ -142,7 +142,7 @@ pub(super) struct VerificationGeneration(usize);
 /// the snapshot, so a verification sees the rows of batches other than its own.
 pub(super) type StatementRows = BTreeMap<String, (String, StatementRowKey)>;
 
-fn note_statement_rows(rows: &mut StatementRows, batch: &ImportLedgerLine) {
+pub(super) fn note_statement_rows(rows: &mut StatementRows, batch: &ImportLedgerLine) {
     for voucher in &batch.vouchers {
         if let Some(key) = batch
             .statement_rows

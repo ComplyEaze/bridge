@@ -148,13 +148,15 @@ pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerp
     )
 }
 
-/// Two statement rows are provably different when they are of one account and
-/// each printed a running balance, and the balances differ (#865). Anything
-/// less, a missing digest or balance, or another account, proves nothing, so
-/// the two stay indistinguishable and the duplicate guard keeps refusing.
+/// Two statement rows are provably different when they were read from one
+/// statement file and each printed a running balance, and the balances differ
+/// (#865). Anything less, a missing file hash or balance, or another file (the
+/// same account exported twice can order a day's rows differently, so its
+/// balances do not compare), proves nothing: the two stay indistinguishable and
+/// the duplicate guard keeps refusing.
 fn statement_rows_differ(a: &StatementRowKey, b: &StatementRowKey) -> bool {
-    !a.account.is_empty()
-        && a.account == b.account
+    !a.statement.is_empty()
+        && a.statement == b.statement
         && !a.balance.is_empty()
         && !b.balance.is_empty()
         && a.balance != b.balance

@@ -248,6 +248,23 @@ fn identical_same_day_payments_differ_by_their_running_balance() {
 }
 
 #[test]
+fn a_printed_balance_has_one_spelling() {
+    // "0990.00" and "990.00" are one number, and so are "-0.00" and "0.00": the
+    // journal compares balances as text (#865), so the record holds one form.
+    let printed = |cell: &str| {
+        let row = upi("01/08/26", "ALPHA", "111111111111", "10.00", "", cell);
+        let built = build(&[row], Bank::Hdfc, &Mapping::default(), &options("SUSP")).unwrap();
+        built.records[0].balance.clone()
+    };
+    assert_eq!(printed("0990.00"), Some("990.00".to_string()));
+    assert_eq!(printed("990.00"), Some("990.00".to_string()));
+    assert_eq!(printed("990"), Some("990.00".to_string()));
+    assert_eq!(printed("-0.00"), Some("0.00".to_string()));
+    assert_eq!(printed("0.00"), Some("0.00".to_string()));
+    assert_eq!(printed("-0990.50"), Some("-990.50".to_string()));
+}
+
+#[test]
 fn transaction_labels_bind_the_statement_account() {
     let alpha = upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00");
     let one = build(
@@ -419,7 +436,6 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
-        account_digest: String::new(),
         balance: None,
     }
 }

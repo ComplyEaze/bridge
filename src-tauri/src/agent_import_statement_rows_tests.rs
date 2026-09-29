@@ -1,31 +1,46 @@
-//! Two same-day, same-amount payments of one account are two statement rows,
+//! Two same-day, same-amount payments of one statement are two statement rows,
 //! not one voucher posted twice (#865). Each test asserts the verdict the
 //! admission reads, never a message substring.
 use super::*;
 
 const OTHER_COMPANY: &str = "00000000-0000-4000-8000-0000000000ff";
 
-fn key(account: &str, balance: &str) -> StatementRowKey {
+fn key(statement: &str, balance: &str) -> StatementRowKey {
     StatementRowKey {
-        account: account.into(),
+        statement: statement.into(),
         balance: balance.into(),
     }
 }
 
 /// A build of one payment whose statement row is `key`, or an inline one.
 fn build_of(txn: &str, row: Option<StatementRowKey>) -> ImportLedgerLine {
-    let mut voucher = payload().vouchers.remove(0);
-    voucher.bridge_txn_id = txn.into();
+    build_many(&[(txn, row)])
+}
+
+/// A build of one identical payment per entry, each with its own row key.
+fn build_many(rows: &[(&str, Option<StatementRowKey>)]) -> ImportLedgerLine {
+    let vouchers: Vec<ImportVoucher> = rows
+        .iter()
+        .map(|(txn, _)| {
+            let mut voucher = payload().vouchers.remove(0);
+            voucher.bridge_txn_id = (*txn).into();
+            voucher
+        })
+        .collect();
+    let keys: BTreeMap<String, StatementRowKey> = rows
+        .iter()
+        .filter_map(|(txn, row)| Some((txn.to_string(), row.clone()?)))
+        .collect();
     ImportLedgerLine {
         ledger_identities: None,
-        statement_rows: row.map(|row| BTreeMap::from([(txn.to_string(), row)])),
+        statement_rows: (!keys.is_empty()).then_some(keys),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
-        batch_id: format!("batch-{txn}"),
+        batch_id: format!("batch-{}", rows[0].0),
         company_guid: GUID.into(),
         company: None,
-        txn_ids: vec![txn.into()],
+        txn_ids: vouchers.iter().map(|v| v.bridge_txn_id.clone()).collect(),
         date_from: "20260901".into(),
         date_to: "20260901".into(),
         sha256: "hash".into(),
@@ -36,8 +51,15 @@ fn build_of(txn: &str, row: Option<StatementRowKey>) -> ImportLedgerLine {
             value: Some(10),
             master_value: Some(10),
         },
-        vouchers: vec![voucher],
+        vouchers,
     }
+}
+
+/// `line` as a build from a statement writes it: its tag is the batch identity,
+/// not the bare `bridge_txn_id`.
+fn batch_v1(mut line: ImportLedgerLine) -> ImportLedgerLine {
+    line.identity_scheme = Some(ImportIdentityScheme::BatchV1);
+    line
 }
 
 /// The voucher Tally holds after `line` posted, as a verification read shows it.
@@ -50,7 +72,7 @@ fn posted(line: &ImportLedgerLine, index: u64) -> ReadVoucher {
         alter_id: Some(20 + index),
         date: Some(normalized_date(&voucher.date).unwrap()),
         voucher_type: Some(voucher.voucher_type.as_str().into()),
-        narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
+        narration: Some(format!("[BRIDGE:{}]", line.attribution_tag(voucher))),
         voucher_number: None,
         cancelled: Some(false),
         optional: Some(false),
@@ -74,18 +96,7 @@ fn posted(line: &ImportLedgerLine, index: u64) -> ReadVoucher {
 fn journal(lines: &[&ImportLedgerLine]) -> ledger::StatementRows {
     let mut rows = ledger::StatementRows::new();
     for line in lines {
-        for voucher in &line.vouchers {
-            if let Some(row) = line
-                .statement_rows
-                .as_ref()
-                .and_then(|rows| rows.get(&voucher.bridge_txn_id))
-            {
-                rows.insert(
-                    line.attribution_tag(voucher),
-                    (line.company_guid.clone(), row.clone()),
-                );
-            }
-        }
+        ledger::note_statement_rows(&mut rows, line);
     }
     rows
 }
@@ -109,8 +120,8 @@ fn admission(result: &Value) -> Result<(), String> {
 
 #[test]
 fn a_twin_from_another_statement_row_does_not_block_the_next_batch() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let later = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let rows = journal(&[&earlier, &later]);
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
     assert_eq!(status_of(&result), "not_found");
@@ -119,8 +130,8 @@ fn a_twin_from_another_statement_row_does_not_block_the_next_batch() {
 
 #[test]
 fn the_same_statement_row_imported_again_is_still_refused() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let again = build_of("st-20260901-cccc", Some(key("acct-1", "900.00")));
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let again = build_of("st-20260901-cccc", Some(key("stmt-1", "900.00")));
     let rows = journal(&[&earlier, &again]);
     let result = verify(&again, vec![posted(&earlier, 1)], &rows);
     assert_eq!(status_of(&result), "matching_content_observed");
@@ -131,11 +142,12 @@ fn the_same_statement_row_imported_again_is_still_refused() {
 }
 
 #[test]
-fn a_twin_from_another_account_is_still_refused() {
-    // A Contra shows as a payment on one account and a receipt on the other,
-    // and a different account's balance proves nothing about the same row.
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let later = build_of("st-20260901-bbbb", Some(key("acct-2", "800.00")));
+fn a_twin_read_from_another_statement_file_is_still_refused() {
+    // A running balance depends on where a row sits in the day's order, and a
+    // second export of one account can order it differently: the same row can
+    // print two balances, so balances of two files prove nothing.
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-2", "800.00")));
     let rows = journal(&[&earlier, &later]);
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
     assert_eq!(status_of(&result), "matching_content_observed");
@@ -148,8 +160,8 @@ fn a_twin_from_another_account_is_still_refused() {
 #[test]
 fn a_statement_without_a_balance_column_is_still_refused() {
     for (earlier_balance, later_balance) in [("", "800.00"), ("900.00", ""), ("", "")] {
-        let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", earlier_balance)));
-        let later = build_of("st-20260901-bbbb", Some(key("acct-1", later_balance)));
+        let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", earlier_balance)));
+        let later = build_of("st-20260901-bbbb", Some(key("stmt-1", later_balance)));
         let rows = journal(&[&earlier, &later]);
         let result = verify(&later, vec![posted(&earlier, 1)], &rows);
         assert_eq!(
@@ -161,7 +173,7 @@ fn a_statement_without_a_balance_column_is_still_refused() {
 }
 
 #[test]
-fn an_account_with_no_digest_is_still_refused() {
+fn a_row_with_no_statement_hash_is_still_refused() {
     let earlier = build_of("st-20260901-aaaa", Some(key("", "900.00")));
     let later = build_of("st-20260901-bbbb", Some(key("", "800.00")));
     let rows = journal(&[&earlier, &later]);
@@ -174,7 +186,7 @@ fn an_account_with_no_digest_is_still_refused() {
 
 #[test]
 fn an_inline_batch_colliding_with_a_recorded_one_is_still_refused() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
     let inline = build_of("inline-1", None);
     let rows = journal(&[&earlier, &inline]);
     let result = verify(&inline, vec![posted(&earlier, 1)], &rows);
@@ -188,7 +200,7 @@ fn an_inline_batch_colliding_with_a_recorded_one_is_still_refused() {
 #[test]
 fn a_recorded_batch_colliding_with_an_inline_one_is_still_refused() {
     let inline = build_of("inline-1", None);
-    let later = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let rows = journal(&[&inline, &later]);
     let result = verify(&later, vec![posted(&inline, 1)], &rows);
     assert_eq!(
@@ -219,8 +231,8 @@ fn a_legacy_record_with_no_row_key_behaves_as_before() {
 
 #[test]
 fn a_row_recorded_for_another_company_proves_nothing_here() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let later = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let mut rows = journal(&[&earlier, &later]);
     rows.get_mut("st-20260901-aaaa").unwrap().0 = OTHER_COMPANY.into();
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
@@ -233,8 +245,8 @@ fn a_row_recorded_for_another_company_proves_nothing_here() {
 
 #[test]
 fn a_tag_the_journal_never_recorded_is_still_refused() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let later = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let rows = journal(&[&later]);
     let result = verify(&later, vec![posted(&earlier, 1)], &rows);
     assert_eq!(
@@ -245,8 +257,8 @@ fn a_tag_the_journal_never_recorded_is_still_refused() {
 
 #[test]
 fn both_rows_verify_after_both_are_posted_and_a_repeat_still_blocks() {
-    let first = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let second = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+    let first = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let second = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let rows = journal(&[&first, &second]);
     let both = || vec![posted(&first, 1), posted(&second, 2)];
     for line in [&first, &second] {
@@ -260,7 +272,7 @@ fn both_rows_verify_after_both_are_posted_and_a_repeat_still_blocks() {
     assert!(!unkeyed["duplicates"].as_array().unwrap().is_empty());
     assert_eq!(verification_status(&unkeyed, 1), "verification_incomplete");
     // A third voucher of the first row's key is a real duplicate of it.
-    let repeat = build_of("st-20260901-cccc", Some(key("acct-1", "900.00")));
+    let repeat = build_of("st-20260901-cccc", Some(key("stmt-1", "900.00")));
     let rows = journal(&[&first, &second, &repeat]);
     let mut observed = both();
     observed.push(posted(&repeat, 3));
@@ -270,31 +282,119 @@ fn both_rows_verify_after_both_are_posted_and_a_repeat_still_blocks() {
 }
 
 #[test]
-fn the_verification_result_never_carries_the_account_key_or_balance() {
-    let earlier = build_of("st-20260901-aaaa", Some(key("acctdigest0001", "900.00")));
-    let later = build_of("st-20260901-bbbb", Some(key("acctdigest0001", "800.00")));
+fn the_verification_result_never_carries_the_statement_key_or_balance() {
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmtsha256-0001", "900.00")));
+    let later = build_of("st-20260901-bbbb", Some(key("stmtsha256-0001", "800.00")));
     let rows = journal(&[&earlier, &later]);
     let observed = vec![posted(&earlier, 1), posted(&later, 2)];
     let result = verify(&later, observed, &rows).to_string();
-    for private in ["acctdigest0001", "900.00", "800.00"] {
+    for private in ["stmtsha256-0001", "900.00", "800.00"] {
         assert!(!result.contains(private), "{private} in {result}");
     }
 }
 
 #[test]
-fn the_journal_read_returns_every_batchs_rows_with_its_company() {
-    let first = build_of("st-20260901-aaaa", Some(key("acct-1", "900.00")));
-    let second = build_of("st-20260901-bbbb", Some(key("acct-1", "800.00")));
+fn a_batch_holding_a_new_row_and_a_repeat_is_still_refused() {
+    // The book holds a row printed 900.00. The next batch has a genuinely new
+    // row (800.00) and a re-import of the first (900.00): the new row must not
+    // clear the repeat, or the repeat posts twice.
+    let earlier = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let mixed = build_many(&[
+        ("st-20260901-bbbb", Some(key("stmt-1", "800.00"))),
+        ("st-20260901-cccc", Some(key("stmt-1", "900.00"))),
+    ]);
+    let rows = journal(&[&earlier, &mixed]);
+    let observed = ImportReadSource::admit(vec![posted(&earlier, 1)]).unwrap();
+    let result = verify_batch(&mixed, &observed, &rows).unwrap();
+    assert_eq!(
+        post::require_absent_verification_result(&result, 2),
+        Err("import_preexisting_identity".into())
+    );
+    // With only the new rows in the batch, the same twin does not block it.
+    let fresh = build_many(&[
+        ("st-20260901-bbbb", Some(key("stmt-1", "800.00"))),
+        ("st-20260901-dddd", Some(key("stmt-1", "700.00"))),
+    ]);
+    let rows = journal(&[&earlier, &fresh]);
+    let result = verify_batch(&fresh, &observed, &rows).unwrap();
+    assert_eq!(post::require_absent_verification_result(&result, 2), Ok(()));
+}
+
+#[test]
+fn a_group_with_one_unkeyed_voucher_is_still_a_duplicate() {
+    let first = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let second = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
     let inline = build_of("inline-1", None);
-    let mut bytes = Vec::new();
-    for line in [&first, &second, &inline] {
-        bytes.extend(serde_json::to_vec(line).unwrap());
-        bytes.push(b'\n');
+    let rows = journal(&[&first, &second, &inline]);
+    let observed = vec![posted(&first, 1), posted(&second, 2), posted(&inline, 3)];
+    let result = verify(&second, observed, &rows);
+    assert!(!result["duplicates"].as_array().unwrap().is_empty());
+    assert_eq!(verification_status(&result, 1), "verification_incomplete");
+}
+
+#[test]
+fn three_distinct_rows_all_verify() {
+    let first = build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00")));
+    let second = build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00")));
+    let third = build_of("st-20260901-cccc", Some(key("stmt-1", "700.00")));
+    let rows = journal(&[&first, &second, &third]);
+    let all = || vec![posted(&first, 1), posted(&second, 2), posted(&third, 3)];
+    for line in [&first, &second, &third] {
+        let result = verify(line, all(), &rows);
+        assert_eq!(status_of(&result), "posted_verified");
+        assert_eq!(result["duplicates"], json!([]));
     }
-    let snapshot = ledger::read_snapshot(std::io::Cursor::new(bytes), Some(&second.batch_id))
+}
+
+#[test]
+fn a_build_tagged_by_batch_identity_finds_its_recorded_row() {
+    let earlier = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let later = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    let tag = earlier.attribution_tag(&earlier.vouchers[0]);
+    assert_ne!(tag, "st-20260901-aaaa");
+    let rows = journal(&[&earlier, &later]);
+    assert!(rows.contains_key(&tag));
+    assert!(!rows.contains_key("st-20260901-aaaa"));
+    let result = verify(&later, vec![posted(&earlier, 1)], &rows);
+    assert_eq!(status_of(&result), "not_found");
+    assert_eq!(admission(&result), Ok(()));
+}
+
+#[test]
+fn the_journal_read_returns_every_batchs_rows_with_its_company() {
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: bridge_tally_transport::TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let first = batch_v1(build_of("st-20260901-aaaa", Some(key("stmt-1", "900.00"))));
+    let second = batch_v1(build_of("st-20260901-bbbb", Some(key("stmt-1", "800.00"))));
+    let inline = batch_v1(build_of("inline-1", None));
+    for line in [&first, &second, &inline] {
+        server.append_import_ledger(line).expect("saved batch");
+    }
+    let snapshot = server
+        .latest_import_snapshot(&second.batch_id)
         .unwrap()
         .unwrap();
-    assert_eq!(snapshot.statement_rows, journal(&[&first, &second]));
+    let first_tag = first.attribution_tag(&first.vouchers[0]);
+    let second_tag = second.attribution_tag(&second.vouchers[0]);
     assert_eq!(snapshot.statement_rows.len(), 2);
-    assert_eq!(snapshot.statement_rows["st-20260901-aaaa"].0, GUID);
+    assert_eq!(
+        snapshot.statement_rows[&first_tag],
+        (GUID.to_string(), key("stmt-1", "900.00"))
+    );
+    assert_eq!(
+        snapshot.statement_rows[&second_tag],
+        (GUID.to_string(), key("stmt-1", "800.00"))
+    );
 }

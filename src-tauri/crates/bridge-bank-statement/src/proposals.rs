@@ -145,12 +145,11 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
-    /// Which account the row came from, as [`account_digest`] keys it (#865).
-    pub account_digest: String,
-    /// The running balance printed on the row, as an exact two-place decimal;
-    /// `None` when the statement has no balance column or the cell is not an
-    /// amount. Two rows of one account with one date, side and amount differ in
-    /// this alone, so it is what tells a second same-day payment from a repeat.
+    /// The running balance printed on the row, as a canonical two-place
+    /// decimal (no leading zeros, no negative zero); `None` when the statement
+    /// has no balance column or the cell is not an amount. Two rows of one
+    /// statement with one date, side and amount differ in this alone, so it is
+    /// what tells a second same-day payment from a repeat (#865).
     pub balance: Option<String>,
 }
 
@@ -189,17 +188,19 @@ pub fn format_amount(value: &ExactDecimal) -> String {
     two_places(value.as_str())
 }
 
-/// A local equality key for an account, not a secret: an account number has too
-/// little entropy to hide behind a hash. It says only whether two records name
-/// the same account, and it stays in Bridge's own files: it is never sent to
-/// Tally and never returned in a tool response (#865).
-pub fn account_digest(account_number: &str) -> String {
-    let material = ["bridge.statement.account.v1", account_number].join("\0");
-    let digest = Sha256::digest(material.as_bytes());
-    digest[..8]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+/// A printed balance as one canonical string, so two spellings of one number
+/// ("0900.00", "900.00", "-0.00", "0.00") compare equal.
+fn canonical_balance(value: &ExactDecimal) -> String {
+    let text = format_amount(value);
+    let (negative, unsigned) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.as_str()),
+    };
+    let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, "00"));
+    let whole = whole.trim_start_matches('0');
+    let whole = if whole.is_empty() { "0" } else { whole };
+    let zero = whole == "0" && fraction.bytes().all(|byte| byte == b'0');
+    format!("{}{whole}.{fraction}", if negative && !zero { "-" } else { "" })
 }
 
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {
@@ -371,7 +372,7 @@ pub fn build(
         let printed_balance = balance(row.get(BALANCE), BALANCE, number)
             .ok()
             .flatten()
-            .map(|value| format_amount(&value));
+            .map(|value| canonical_balance(&value));
         let (amount, outward) = match (debit, credit) {
             (Some(_), Some(_)) => {
                 return Err(Refusal::at_row(
@@ -427,7 +428,6 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
-                        account_digest: account_digest(options.account_number),
                         balance: printed_balance,
                     });
                     continue;
@@ -472,7 +472,6 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
-                        account_digest: account_digest(options.account_number),
                         balance: printed_balance,
                     });
                     continue;
@@ -557,7 +556,6 @@ pub fn build(
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
-            account_digest: account_digest(options.account_number),
             balance: printed_balance,
         });
     }

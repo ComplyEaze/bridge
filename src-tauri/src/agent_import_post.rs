@@ -68,8 +68,13 @@ pub(in crate::agent) enum Entry {
     Fresh,
     /// The second pass of a call, from the top, to redeem the approval its
     /// own Join just found, keeping that call's evidence. It may only
-    /// redeem: it never asks, so it can never show a second dialog.
-    RedeemOnly { evidence: Evidence },
+    /// redeem: it never asks, so it can never show a second dialog. It also
+    /// keeps that call's start, so every budget in the second pass is
+    /// measured from the call and not from the pass.
+    RedeemOnly {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What a post's checked body came to: an answer, or an approval its Join
@@ -85,7 +90,10 @@ enum Step {
 /// pass (#725 slice 2.0). The passes run one after the other, never nested.
 pub(in crate::agent) enum Pass {
     Done(ToolOutcome),
-    Redeem { evidence: Evidence },
+    Redeem {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What waiting on a dialog came to.
@@ -428,11 +436,22 @@ impl Server {
             Pass::Done(outcome) => Ok(outcome),
             // At most one more pass: a redeem-only pass never joins, so it
             // never hands on another redeem.
-            Pass::Redeem { evidence } => {
+            Pass::Redeem {
+                evidence,
+                call_started,
+            } => {
                 #[cfg(test)]
                 let _ = BETWEEN_PASSES.try_with(|between| between());
                 match self
-                    .post_import_entry(args, expected_sha256, scope, Entry::RedeemOnly { evidence })
+                    .post_import_entry(
+                        args,
+                        expected_sha256,
+                        scope,
+                        Entry::RedeemOnly {
+                            evidence,
+                            call_started,
+                        },
+                    )
                     .await?
                 {
                     Pass::Done(outcome) => Ok(outcome),
@@ -452,11 +471,15 @@ impl Server {
         scope: PostScope,
         entry: Entry,
     ) -> Result<Pass, ToolFailure> {
-        let call_started = std::time::Instant::now();
-        let carried = match entry {
-            Entry::Fresh => None,
-            Entry::RedeemOnly { evidence } => Some(evidence),
+        let (carried, call_started) = match entry {
+            Entry::Fresh => (None, std::time::Instant::now()),
+            Entry::RedeemOnly {
+                evidence,
+                call_started,
+            } => (Some(evidence), call_started),
         };
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
@@ -1157,6 +1180,7 @@ impl Server {
             Ok(Step::Redeem) => {
                 return Ok(Pass::Redeem {
                     evidence: accumulated,
+                    call_started,
                 })
             }
             Ok(Step::Done(outcome)) => Ok(*outcome),
@@ -1805,6 +1829,8 @@ tokio::task_local! {
     /// Test-only: run between a call's two passes (#725 slice 2.0), as a
     /// cancel, an expiry or another route's post landing there would.
     pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Test-only: the start each pass of a post call took its budgets from.
+    pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
 }
 
 /// A fresh random REMOTEID for one native post.

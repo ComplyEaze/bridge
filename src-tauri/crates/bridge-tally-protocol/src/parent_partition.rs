@@ -372,7 +372,10 @@ impl ParentPartition {
                     ledgers: unsupported,
                 });
             }
-            let mut every_named = part_of.keys().map(|parent| (*parent).clone()).collect::<Vec<_>>();
+            let mut every_named = part_of
+                .keys()
+                .map(|parent| (*parent).clone())
+                .collect::<Vec<_>>();
             every_named.sort();
             excluded = every_named
                 .iter()

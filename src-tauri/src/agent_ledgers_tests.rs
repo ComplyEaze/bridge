@@ -1352,7 +1352,7 @@ mod through_the_tool {
     }
 
     /// A complement part that returns a ledger of a named part, as when the
-    /// exclusion was ignored, is refused rather than deduplicated.
+    /// exclusion was ignored, is refused as a repeat rather than deduplicated.
     #[tokio::test]
     async fn a_complement_part_that_carries_a_named_ledger_is_refused() {
         let (_, plans) = complement_book(3, |rows| {
@@ -1368,7 +1368,7 @@ mod through_the_tool {
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
         assert_eq!(requests, total, "the whole bracket is read before coverage");
-        assert_eq!(refusal(&response)["cause"], "parent_part_row_outside_parents");
+        assert_eq!(refusal(&response)["cause"], "parent_part_row_repeated");
     }
 
     /// A complement part that omits one of the unnameable ledgers is refused.

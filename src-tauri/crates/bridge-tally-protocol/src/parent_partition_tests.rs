@@ -178,7 +178,10 @@ fn a_book_whose_every_parent_is_unsupported_is_refused_with_the_count() {
         ("t2".into(), "guid-t2".into(), Some("tab\there".into())),
     ];
     let error = plan(&all, LIMITS).unwrap_err();
-    assert_eq!(error, ParentPartitionError::ParentNameUnsupported { ledgers: 2 });
+    assert_eq!(
+        error,
+        ParentPartitionError::ParentNameUnsupported { ledgers: 2 }
+    );
     assert_eq!(error.safe_code(), "parent_name_unsupported");
 }
 
@@ -198,7 +201,10 @@ fn a_complement_over_the_ledger_limit_is_refused_not_split() {
     );
 }
 
-fn with_unsupported(spec: &[(&str, u64)], unsupported: u64) -> Vec<(String, String, Option<String>)> {
+fn with_unsupported(
+    spec: &[(&str, u64)],
+    unsupported: u64,
+) -> Vec<(String, String, Option<String>)> {
     let mut all = rows(spec);
     for index in 0..unsupported {
         all.push((
@@ -243,7 +249,10 @@ fn the_complement_names_every_named_parent_in_not_chunks_applied_together() {
         .flat_map(|part| part.parents().iter())
         .collect::<HashSet<_>>();
     assert_eq!(named.len(), 7);
-    assert!(complement.parents().iter().all(|parent| named.contains(parent)));
+    assert!(complement
+        .parents()
+        .iter()
+        .all(|parent| named.contains(parent)));
 }
 
 #[test]
@@ -271,10 +280,16 @@ fn the_complement_part_is_the_last_part_and_a_named_part_has_one_formula() {
 fn complement_rows_are_accepted_by_guid_and_name_with_any_unexcluded_parent() {
     let partition = plan(&with_unsupported(&[("A", 1), ("B", 1)], 2), LIMITS).unwrap();
     let mut coverage = partition.coverage();
-    coverage.accept(0, "guid-A-0", "A-ledger-0", Some("A")).unwrap();
-    coverage.accept(0, "guid-B-0", "B-ledger-0", Some("B")).unwrap();
+    coverage
+        .accept(0, "guid-A-0", "A-ledger-0", Some("A"))
+        .unwrap();
+    coverage
+        .accept(0, "guid-B-0", "B-ledger-0", Some("B"))
+        .unwrap();
     coverage.accept(1, "guid-t0", "t0", None).unwrap();
-    coverage.accept(1, "guid-t1", "t1", Some("tab\there")).unwrap();
+    coverage
+        .accept(1, "guid-t1", "t1", Some("tab\there"))
+        .unwrap();
     coverage.finish().unwrap();
 }
 
@@ -291,7 +306,9 @@ fn a_complement_row_under_a_named_parent_or_in_the_wrong_part_is_refused() {
         ParentPartitionError::RowOutsideParts
     );
     assert_eq!(
-        coverage.accept(1, "guid-A-0", "A-ledger-0", Some("A")).unwrap_err(),
+        coverage
+            .accept(1, "guid-A-0", "A-ledger-0", Some("A"))
+            .unwrap_err(),
         ParentPartitionError::RowOutsideParts
     );
 }
@@ -300,7 +317,9 @@ fn a_complement_row_under_a_named_parent_or_in_the_wrong_part_is_refused() {
 fn a_missing_complement_row_fails_finish() {
     let partition = plan(&with_unsupported(&[("A", 1)], 2), LIMITS).unwrap();
     let mut coverage = partition.coverage();
-    coverage.accept(0, "guid-A-0", "A-ledger-0", Some("A")).unwrap();
+    coverage
+        .accept(0, "guid-A-0", "A-ledger-0", Some("A"))
+        .unwrap();
     coverage.accept(1, "guid-t0", "t0", None).unwrap();
     assert_eq!(
         coverage.finish().unwrap_err(),

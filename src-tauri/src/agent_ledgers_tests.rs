@@ -920,12 +920,14 @@ mod through_the_tool {
         plans
     }
 
-    /// A master mark whose estimate is over the budget refuses right after the
-    /// source's opening extent: no ledger, balance or group request is sent,
-    /// and the refusal names the mark as an upper bound, not a ledger count.
+    /// A master mark past what a catalogue read can bound within the budget
+    /// (10,000) refuses right after the source's opening extent, as before
+    /// #668: no catalogue, ledger, balance or group request is sent, and the
+    /// refusal names the mark as an upper bound and says no ledgers were
+    /// counted.
     #[tokio::test]
     async fn a_book_whose_master_mark_is_over_the_bound_is_refused_before_any_ledger_read() {
-        let plans = marked_compliance_plans(5_000, Vec::new(), None);
+        let plans = marked_compliance_plans(10_001, Vec::new(), None);
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
@@ -935,11 +937,94 @@ mod through_the_tool {
         assert_eq!(error["cause"], "ledger_masters_too_large");
         assert_eq!(
             error["size"],
-            json!({"master_alter_id": 5_000, "estimated_bytes": 18_750_000, "budget_bytes": 16_000_000})
+            json!({"master_alter_id": 10_001, "counted_ledgers": null, "estimated_bytes": 37_503_750, "budget_bytes": 16_000_000})
         );
         let remediation = error["remediation"].as_str().unwrap();
         assert!(remediation.contains("UPPER BOUND"), "{error}");
         assert!(remediation.contains("fields=basic"), "{error}");
+    }
+
+    /// The captured catalogue widened to `rows` ledgers: the nine captured
+    /// rows first, then copies of the first with a distinct name and GUID.
+    fn catalogue(rows: usize) -> String {
+        let captured = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        ));
+        if rows <= 9 {
+            return captured;
+        }
+        let first = captured.find("    <LEDGER ").unwrap();
+        let end = captured.find("</COLLECTION>").unwrap();
+        let template_end =
+            first + captured[first..].find("</LEDGER>").unwrap() + "</LEDGER>\n".len();
+        let template = &captured[first..template_end];
+        let mut widened = captured[..end].to_owned();
+        for i in 9..rows {
+            widened.push_str(
+                &template
+                    .replace("Bridge Nested Debtor WR4", &format!("Filler Ledger {i}"))
+                    .replace("-000000d5", &format!("-f{i:07x}")),
+            );
+        }
+        widened.push_str(&captured[end..]);
+        widened
+    }
+
+    /// A mark past the master bound but within the catalogue's reach is
+    /// counted first, and the count admits it: the catalogue pair, then the
+    /// same three reads in the same order, and the same rows as the unsized
+    /// read (#668).
+    #[tokio::test]
+    async fn a_book_whose_counted_ledgers_fit_is_read_though_its_mark_does_not() {
+        let plans = marked_compliance_plans(
+            5_000,
+            vec![catalogue(9), masters(), balances(), groups()],
+            Some(extent_with_master_mark(5_000)),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        let (unsized_response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        assert_eq!(items(&response), items(&unsized_response));
+    }
+
+    /// The same mark with a catalogue of 4,267 ledgers, one more than fit,
+    /// refuses right after the catalogue: no master request is sent, and the
+    /// refusal carries the count.
+    #[tokio::test]
+    async fn a_book_whose_counted_ledgers_are_over_the_bound_is_refused_before_the_master_read() {
+        let plans = marked_compliance_plans(5_000, vec![catalogue(4_267)], None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "ledger_masters_too_large");
+        assert_eq!(
+            error["size"],
+            json!({"master_alter_id": 5_000, "counted_ledgers": 4_267, "estimated_bytes": 16_001_250, "budget_bytes": 16_000_000})
+        );
+    }
+
+    /// A catalogue that names another company does not size this one: it is
+    /// refused on identity before any master request is sent.
+    #[tokio::test]
+    async fn a_count_from_another_company_is_refused_before_the_master_read() {
+        let other = catalogue(9).replace(GUID, "00000000-0000-0000-0000-000000000000");
+        let plans = marked_compliance_plans(5_000, vec![other], None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "ledger_catalogue_identity_mismatch");
     }
 
     /// A mark exactly at the bound is admitted and read as it was before #637:

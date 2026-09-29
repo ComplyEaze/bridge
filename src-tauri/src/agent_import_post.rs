@@ -991,7 +991,7 @@ impl Server {
                 // itself in `from_runtime`; it is not repeated as the cause.
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
-                    failure.cause = group.or(transport).filter(|cause| failure.code != *cause);
+                    failure.cause = refusal_cause(&failure.code, group, transport);
                 }
                 failure
             })?;
@@ -1245,6 +1245,16 @@ fn post_failure_outcome(
         company_guid: Some(guid.to_string()),
         truncated: false,
     }
+}
+/// The cause a failure adds to its code: none when it would only repeat the
+/// code, as a wire refusal's transport code does once `from_runtime` made it the
+/// code itself (#697).
+fn refusal_cause(
+    code: &str,
+    group: Option<&'static str>,
+    transport: Option<&'static str>,
+) -> Option<&'static str> {
+    group.or(transport).filter(|cause| code != *cause)
 }
 
 /// What a caller does when the port was busy for the readback after its own

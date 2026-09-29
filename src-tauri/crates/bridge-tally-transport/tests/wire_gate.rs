@@ -25,6 +25,7 @@ struct Record {
     attempts: AtomicUsize,
     acquisitions: AtomicUsize,
     pauses: AtomicUsize,
+    paused_for: Mutex<Vec<Duration>>,
     busy_first: AtomicUsize,
     always: Mutex<Option<WireRefusal>>,
 }
@@ -72,6 +73,7 @@ impl TallyWireGate for RecordingGate {
 
     fn pause(&self, delay: Duration) -> WirePause {
         self.0.pauses.fetch_add(1, Ordering::SeqCst);
+        self.0.paused_for.lock().unwrap().push(delay);
         Box::pin(tokio::time::sleep(delay))
     }
 }
@@ -347,6 +349,61 @@ async fn a_held_lock_is_spent_on_one_send() {
     transport.get_status_decoded().await.unwrap();
     assert_eq!(record.acquisitions.load(Ordering::SeqCst), 2);
     assert_eq!(simulator.finish().unwrap().len(), 2);
+}
+
+/// A lock taken ahead of a send stays held while that send is in flight: the
+/// response is delayed, and a probe from outside sees the lock still taken, so
+/// a guard dropped before the send fails here.
+#[tokio::test]
+async fn a_lock_taken_ahead_of_a_send_is_held_while_that_send_is_in_flight() {
+    let slow = Duration::from_millis(250);
+    let simulator =
+        SequenceSimulator::spawn(vec![xml().with_delivery(Delivery::SlowHeaders(slow))]).unwrap();
+    let (transport, record) = gated(&simulator, quick(0));
+    let held = transport.acquire_wire_lock().await.unwrap();
+    let probe = async {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        record.held.load(Ordering::SeqCst)
+    };
+    let (sent, during) = tokio::join!(held.post_xml_decoded("<ENVELOPE/>".into()), probe);
+    sent.unwrap();
+    assert_eq!(during, 1);
+    assert_eq!(record.held.load(Ordering::SeqCst), 0);
+    assert_eq!(simulator.finish().unwrap().len(), 1);
+}
+
+/// The last pause of a budget is clipped to what is left, so the pauses of an
+/// operation add up to its budget and no more, even when the pause length does
+/// not divide it.
+#[tokio::test]
+async fn the_last_pause_is_clipped_to_what_the_budget_has_left() {
+    let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
+    let policy = WireRetryPolicy::new(Duration::from_millis(2), Duration::from_millis(5)).unwrap();
+    let (transport, record) = gated(&simulator, policy);
+    *record.always.lock().unwrap() = Some(WireRefusal::Busy);
+    assert!(transport.get_status_decoded().await.is_err());
+    let paused = record.paused_for.lock().unwrap().clone();
+    assert_eq!(
+        paused,
+        vec![
+            Duration::from_millis(2),
+            Duration::from_millis(2),
+            Duration::from_millis(1)
+        ]
+    );
+}
+
+/// A budget asked for more than the ceiling gets the ceiling, however large.
+#[test]
+fn a_wait_budget_is_capped_at_the_ceiling() {
+    assert_eq!(
+        WireWaitBudget::new(WIRE_WAIT_MAX + Duration::from_secs(50)).remaining(),
+        WIRE_WAIT_MAX
+    );
+    assert_eq!(
+        WireWaitBudget::new(Duration::MAX).remaining(),
+        WIRE_WAIT_MAX
+    );
 }
 
 /// Taking the lock ahead of a send is one try: a taken lock is refused at once,

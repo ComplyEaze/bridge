@@ -712,3 +712,25 @@ async fn the_wire_lock_is_held_across_the_record_and_released_after_the_post() {
         .expect("the lock is released once the one send has been read");
     assert_eq!(simulator.finish().unwrap().len(), 33);
 }
+
+/// A pre-intent read refused by the wire gate stays the refusal, with its retry
+/// time and "nothing sent"; any other failed read is the typed unconfirmed
+/// refusal (#697).
+#[test]
+fn a_wire_refused_pre_intent_read_stays_the_wire_refusal() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError as Unconfirmed;
+    use bridge_tally_transport::WireRefusal;
+    let refused = anyhow::Error::new(TallyTransportError::WireRefused {
+        refusal: WireRefusal::Busy,
+    });
+    let kept = unconfirmed_unless_wire_refused(refused, Unconfirmed::MastersUnconfirmed);
+    assert_eq!(
+        crate::endpoint_wire::wire_refusal(&kept),
+        Some(WireRefusal::Busy)
+    );
+    assert!(!kept.chain().any(|cause| cause.is::<Unconfirmed>()));
+    let failed = anyhow::Error::new(TallyTransportError::ConnectionFailed);
+    let typed = unconfirmed_unless_wire_refused(failed, Unconfirmed::MastersUnconfirmed);
+    assert!(typed.chain().any(|cause| cause.is::<Unconfirmed>()));
+    assert_eq!(crate::endpoint_wire::wire_refusal(&typed), None);
+}

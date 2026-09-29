@@ -426,6 +426,27 @@ fn a_wire_refusal_never_replaces_the_unknown_post_outcome_code() {
     );
 }
 
+/// A cause is added only when it says something the code does not.
+#[test]
+fn a_failure_cause_never_repeats_its_own_code() {
+    assert_eq!(
+        refusal_cause("tally_endpoint_busy", None, Some("tally_endpoint_busy")),
+        None
+    );
+    assert_eq!(
+        refusal_cause(
+            "post_queue_read_failed",
+            None,
+            Some("tally_connection_failed")
+        ),
+        Some("tally_connection_failed")
+    );
+    assert_eq!(
+        refusal_cause("post_queue_read_failed", Some("group"), Some("other")),
+        Some("group")
+    );
+}
+
 /// The marks readback after a sent post draws on a wait budget of its own. A
 /// call whose admission reads have spent the shared budget would otherwise be
 /// refused as busy at once, and the refusal reads as an unconfirmed step: a

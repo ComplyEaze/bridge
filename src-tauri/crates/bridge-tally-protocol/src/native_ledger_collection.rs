@@ -309,7 +309,9 @@ fn parse_native_ledger_collection_with_evidence<T>(
     let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = configured_reader(sanitized.as_str());
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_answered = false;
     let mut collection_seen = false;
     let mut records = Vec::new();
     let mut identities = HashMap::<String, u64>::new();
@@ -324,11 +326,21 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 if path.is_empty() && name != b"ENVELOPE" {
                     anyhow::bail!("native ledger collection root was not ENVELOPE");
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
-                    if status_seen || read_required_text(&mut reader, element.name())? != "1" {
-                        anyhow::bail!("native ledger collection did not report success");
+                    if std::mem::replace(&mut status_seen, true) {
+                        anyhow::bail!("native ledger collection carried a second STATUS");
                     }
-                    status_seen = true;
+                    // An empty STATUS is no answer (bridge#717, #863): the
+                    // envelope's end refuses it, so a response cut off after
+                    // it still ends as unterminated.
+                    match read_optional_text(&mut reader, element.name())?.as_deref() {
+                        None => {}
+                        Some("1") => status_answered = true,
+                        Some(_) => anyhow::bail!("native ledger collection did not report success"),
+                    }
                     continue;
                 }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
@@ -395,7 +407,13 @@ fn parse_native_ledger_collection_with_evidence<T>(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
-                if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
+                // A self-closing STATUS is no answer, and is still a STATUS.
+                if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_seen, true) {
+                        anyhow::bail!("native ledger collection carried a second STATUS");
+                    }
+                } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION"
+                {
                     collection_seen = true;
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
                     && name == b"LEDGER"
@@ -411,8 +429,14 @@ fn parse_native_ledger_collection_with_evidence<T>(
     if !path.is_empty() {
         anyhow::bail!("native ledger collection ended before its root closed");
     }
-    if !status_seen {
-        anyhow::bail!("native ledger collection did not report success");
+    if !envelope_seen {
+        anyhow::bail!("native ledger collection had no ENVELOPE");
+    }
+    // A complete envelope with no STATUS, an empty one or a self-closing one is
+    // no answer, typed so a caller can tell it from Tally's failure answer
+    // (bridge#717, #863).
+    if !status_answered {
+        return Err(crate::NativeCollectionError::StatusAbsent.into());
     }
     if !collection_seen {
         anyhow::bail!("native ledger collection omitted BODY/DATA/COLLECTION");

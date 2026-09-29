@@ -435,10 +435,12 @@ struct Candidates {
 }
 
 /// A compliance read refused on its size before the master request was sent:
-/// the counted ledgers, the estimated response and the budget it exceeded.
+/// the master mark, the ledgers a catalogue counted (none when the mark alone
+/// was refused), the estimated response and the budget it exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
+    counted_ledgers: Option<u64>,
     estimated_bytes: u64,
     budget_bytes: u64,
 }
@@ -450,10 +452,12 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
         {
             crate::tally::connection::PartyLedgerMasterSourceValidationError::TooLarge {
                 master_alter_id,
+                counted_ledgers,
                 estimated_bytes,
                 budget_bytes,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
+                counted_ledgers: *counted_ledgers,
                 estimated_bytes: *estimated_bytes,
                 budget_bytes: *budget_bytes,
             }),
@@ -636,14 +640,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_masters_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) puts the estimated \
-             compliance response over Bridge's budget, so no ledger request was sent: a read \
-             of that size has left Tally's gateway unable to answer (#637). The mark is an \
-             UPPER BOUND on ledgers, since stock items, units and every other master raise it \
-             too, so a company with fewer ledgers may be refused. Call ledger_masters with \
-             fields=basic, which returns names, parents and opening balances without the \
-             compliance fields. Retrying this call refuses again. A `group` filter does not \
-             narrow the request, and a precise ledger count is pending (#668).",
+            "The estimated compliance response is over Bridge's budget, so no master request \
+             was sent: a read of that size has left Tally's gateway unable to answer (#637). \
+             When `size.counted_ledgers` is a number, Bridge counted that many ledgers with a \
+             catalogue read and refused on the count. When it is null, the company's \
+             master-alteration mark (`size.master_alter_id`) is too high to count within \
+             budget and was refused as it stands; the mark is an UPPER BOUND on ledgers, since \
+             stock items, units and every other master raise it too, so a company with fewer \
+             ledgers may be refused. Call ledger_masters with fields=basic, which returns \
+             names, parents and opening balances without the compliance fields. Retrying this \
+             call refuses again. A `group` filter does not narrow the request.",
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
@@ -1011,6 +1017,7 @@ impl Server {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["size"] = json!({
                             "master_alter_id": size.master_alter_id,
+                            "counted_ledgers": size.counted_ledgers,
                             "estimated_bytes": size.estimated_bytes,
                             "budget_bytes": size.budget_bytes,
                         });

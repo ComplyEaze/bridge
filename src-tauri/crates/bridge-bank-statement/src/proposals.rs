@@ -200,7 +200,10 @@ fn canonical_balance(value: &ExactDecimal) -> String {
     let whole = whole.trim_start_matches('0');
     let whole = if whole.is_empty() { "0" } else { whole };
     let zero = whole == "0" && fraction.bytes().all(|byte| byte == b'0');
-    format!("{}{whole}.{fraction}", if negative && !zero { "-" } else { "" })
+    format!(
+        "{}{whole}.{fraction}",
+        if negative && !zero { "-" } else { "" }
+    )
 }
 
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {

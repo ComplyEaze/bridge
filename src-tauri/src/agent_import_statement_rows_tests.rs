@@ -363,7 +363,7 @@ fn a_build_tagged_by_batch_identity_finds_its_recorded_row() {
 #[test]
 fn the_journal_read_returns_every_batchs_rows_with_its_company() {
     let directory = tempfile::tempdir().expect("temporary data directory");
-    let server = Server::new(super::super::Settings {
+    let server = Server::new(crate::agent::Settings {
         endpoint: bridge_tally_transport::TallyEndpointConfig {
             host: "127.0.0.1".into(),
             port: 9,
@@ -371,7 +371,7 @@ fn the_journal_read_returns_every_batchs_rows_with_its_company() {
         data_dir: directory.path().to_path_buf(),
         max_rows: 10,
         max_bytes: 200_000,
-        redaction: super::super::Redaction::None,
+        redaction: crate::agent::Redaction::None,
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,

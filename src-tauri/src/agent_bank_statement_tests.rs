@@ -336,9 +336,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
     assert_eq!(document["schema"], PROPOSALS_SCHEMA);
     // The statement file's hash is the journal's row key (#865). It is in the
     // private file, so its absence from the response above is not vacuous.
-    let statement = document["statement_sha256"].as_str().unwrap();
-    assert_eq!(statement.len(), 64);
-    assert!(!text.contains(statement), "{text}");
+    let statement_hash = document["statement_sha256"].as_str().unwrap();
+    assert_eq!(statement_hash.len(), 64);
+    assert!(!text.contains(statement_hash), "{text}");
     assert!(document["records"]
         .as_array()
         .unwrap()

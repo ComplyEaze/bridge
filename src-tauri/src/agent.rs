@@ -5,6 +5,7 @@ use crate::local_files::directory::{ensure_private_directory, DirectoryAdmission
 use crate::local_files::file as local_file;
 use crate::local_files::paths::default_data_dir;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 
 #[path = "agent_import.rs"]
 mod agent_import;
@@ -1700,15 +1701,6 @@ fn mask(value: &str) -> String {
         chars[chars.len() - 2],
         chars[chars.len() - 1]
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 pub async fn run_stdio() -> Result<(), String> {

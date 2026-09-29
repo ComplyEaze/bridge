@@ -835,12 +835,13 @@ afterwards. Whatever the export shows, the value you sent remains addressable.
 voucher).**
 - **The voucher.** It was first created by a direct gateway import with a client-supplied `REMOTEID`,
   not by Bridge's native post.
-- **The delete.** It used the same `VOUCHER` shape, with that creation `REMOTEID` and
+- **The delete.** It used a `VOUCHER` element with that creation `REMOTEID` and
   `ACTION="Delete"`. It returned `DELETED=1`, with every other counter 0.
 - **Read-back.** A vouchers read of that day no longer held the voucher. After a replacement Contra
   was created, the day's count was back to its count before the delete.
-- **Confidence.** One voucher, one session, one client book: **Confidence: PARTIAL** beyond it. The
-  deleted voucher's type was not recorded.
+- **Confidence.** VERIFIED for that one voucher, because the counters and the read-back were both
+  read. It is one voucher, one session, one client book: **Confidence: PARTIAL** beyond it. The
+  source evidence does not give the deleted voucher's type.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.
 The `Alter` failures on record (§9.6, and `IMPLEMENTATION_GUIDE.md` §3.1) came from an

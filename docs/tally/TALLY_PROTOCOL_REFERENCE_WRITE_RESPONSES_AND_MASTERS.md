@@ -228,7 +228,8 @@ and master ID), and only then record the type as qualified.
 > (`src-tauri/src/agent_import_amend.rs`) relies on the replacement and refuses type changes.
 >
 > **Still not measured:** a file imported through Tally's own Import menu rather than the gateway;
-> Gold, Education or any other release; bill allocations, inventory or tax entries; a voucher that
+> Education or any other release (Gold is measured for a same-`REMOTEID` upsert of Payment, Receipt and
+> Contra in §9.14); bill allocations, inventory or tax entries; a voucher that
 > is cancelled or optional; and an alteration made in Tally's UI between the two imports. The
 > `REMOTEID` attribute on readback returned Tally's own `<company GUID>-<id>`, as recorded above,
 > so the voucher is still located by its narration marker.
@@ -265,6 +266,9 @@ So the two measurements cover different halves and neither covers the third case
 - **Gateway on a licensed SKU — UNVERIFIED**, on Gold and on the Silver/Journal profile this
   section is about alike. §9.7 does not reach it because its baseline is Educational; §9.12b does
   not reach it because a UI import returns nothing.
+  **Superseded for one case (2026-09-28):** a gateway `Delete` by the creation `REMOTEID` returned
+  `DELETED=1` on licensed Gold for one directly imported voucher (§9.12b, PARTIAL beyond that
+  voucher); §9.14 also records a gateway `Delete` by `REMOTEID` (`DELETED=1`) and, in its Gold block, a same-`REMOTEID` upsert.
 
 Say which of the three you are standing on. "Delete works" is true in two of them and unproven in
 the one a licensed integration actually runs in.
@@ -747,7 +751,7 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 **Not measured:**
 - a name that matches **neither** twin exactly, only folding to both (e.g. mixed case without the CR LF): which twin Tally picks there is open;
 - twins made or edited in Tally's own screens;
-- Gold and Education.
+- the fold-twin behaviour on Gold and Education (the CR LF block below measures an encoding on Gold, not twins).
 
 Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
 

@@ -200,6 +200,21 @@ impl Server {
         }
     }
 
+    /// The marks readback after a sent post. It gets a wire wait of its own:
+    /// the admission reads may have spent the call's budget, and a marks read
+    /// refused as busy after a sent post would record a lasting doubt on a
+    /// clean batch (#697).
+    async fn read_marks_after_post(
+        &self,
+        request: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> anyhow::Result<String> {
+        crate::tally::runtime::with_operation_wire_budget(
+            self.runtime
+                .read_company_marks_once(self.tally_config(), request),
+        )
+        .await
+    }
+
     /// The company's masters across the post (#239). Only when the snapshots
     /// either side of the POST prove the target's master mark unchanged is
     /// nothing read. Otherwise (the mark moved, or either snapshot could not
@@ -1009,17 +1024,12 @@ impl Server {
             });
             // Where the voucher went (#574), read only once the journal write has
             // been attempted, so a slow or failed read delays nothing that records
-            // the post. A failed read is reported, never guessed. It gets a wire
-            // wait of its own: the admission reads may have spent the call's
-            // budget, and a marks read refused as busy after a sent post would
-            // record a lasting doubt on a clean batch (#697).
-            let marks_after = crate::tally::runtime::with_operation_wire_budget(
-                self.runtime
-                    .read_company_marks_once(self.tally_config(), company_marks_request.clone()),
-            )
-            .await
-            .ok()
-            .and_then(|marks| location::parse_all_company_marks(&marks).ok());
+            // the post. A failed read is reported, never guessed.
+            let marks_after = self
+                .read_marks_after_post(company_marks_request.clone())
+                .await
+                .ok()
+                .and_then(|marks| location::parse_all_company_marks(&marks).ok());
             post_location = Some(location::classify_post_location(
                 &location::parse_all_company_marks(&posted.company_marks_before)
                     .unwrap_or_default(),

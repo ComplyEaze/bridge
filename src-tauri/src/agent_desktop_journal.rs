@@ -69,12 +69,7 @@ impl DesktopJournalService {
             Err(failure) => {
                 // This Err boundary precedes approval/dispatch. It does not
                 // prove that unreadable history contains no earlier attempt.
-                // A wire-gate refusal (#697) is refused before the attempt is
-                // recorded: nothing was sent, and it is worth saying plainly.
-                let message = match failure.code.as_str() {
-                    "tally_endpoint_busy" => "Another Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
-                    _ => "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.",
-                };
+                let message = "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.";
                 let mut operation = DesktopJournalOperation::from_failure(failure, message);
                 operation.result["result"]["dispatch"] =
                     json!({"state":"admission_refused","resent":false});

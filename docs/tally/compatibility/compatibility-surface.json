@@ -455,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "fdad5099dd494dbeaf279b95c909e36a87525d4c6a3934ec286b083478411265"
+      "sha256": "c79ea388b5121cc06a0c67fd1f45dab6a7a76d8dbc61d45b69a53533cefb0a40"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -475,7 +475,7 @@
     },
     {
       "path": "src-tauri/src/agent_desktop_journal.rs",
-      "sha256": "399160732ce0a9f6e69f661848d7a2a2ad382419343c9c7d938dd6395418e542"
+      "sha256": "7c46b8e66bb506d39dd9c8d70fb25d23e3f52e7e6ac974eda5bc264cced6985b"
     },
     {
       "path": "src-tauri/src/agent_egress.rs",
@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "a69f765eaa5ed46ab4657ec0847874042237c33f9d47e1001f6ab61776240d02"
+      "sha256": "1690bf3e6fd80b6a6c11b7c0ae633e9b757f66ab323a41e515ad8b175eaa2cd9"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",

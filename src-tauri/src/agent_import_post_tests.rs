@@ -426,6 +426,55 @@ fn a_wire_refusal_never_replaces_the_unknown_post_outcome_code() {
     );
 }
 
+/// The marks readback after a sent post draws on a wait budget of its own. A
+/// call whose admission reads have spent the shared budget would otherwise be
+/// refused as busy at once, and the refusal reads as an unconfirmed step: a
+/// lasting doubt on a batch that posted cleanly (#697). The lock is never free
+/// here, so the wait itself is what is measured; nothing is sent.
+#[tokio::test]
+async fn the_marks_readback_after_a_post_waits_on_a_budget_of_its_own() {
+    use crate::endpoint_wire::{wire_refusal, FileWireGate};
+    use bridge_tally_transport::{TallyWireGate, WireRefusal, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let budget = Duration::from_millis(600);
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap());
+    let _other = FileWireGate::new(wire.root().clone(), endpoint.clone())
+        .try_acquire()
+        .unwrap();
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire);
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let busy = |result: anyhow::Result<String>| {
+        wire_refusal(&result.expect_err("the wire lock is held")) == Some(WireRefusal::Busy)
+    };
+    crate::tally::runtime::with_operation_wire_budget(async {
+        // The call's admission reads spend its whole budget.
+        let spent = server
+            .runtime
+            .read_company_marks_once(server.tally_config(), request())
+            .await;
+        assert!(busy(spent));
+        let started = Instant::now();
+        let after = server.read_marks_after_post(request()).await;
+        assert!(busy(after));
+        assert!(
+            started.elapsed() >= budget,
+            "the readback must wait on a fresh budget, not inherit the spent one"
+        );
+    })
+    .await;
+}
+
 #[test]
 fn endpoint_lease_contention_keeps_negative_post_and_cancellation_results_uncertain() {
     let directory = tempfile::tempdir().unwrap();

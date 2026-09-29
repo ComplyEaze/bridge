@@ -56,7 +56,11 @@
 #       seven rate lines; `s194h_bp` cut at its value (added for tds_payees); `s194a_bp` in full
 #       (added for loans_interest); and `status`. Excludes the header's comment lines and
 #       `authority`, which name the reference's own modules.
-#   18. [entity.firm], [entity.individual] and [entity.company] in full, and [entity.llp] as two
+#   18. [s40b_v] (added for partners_40b_194t, which quotes the slab and its authority) as two
+#       blocks: the header alone, then its four values, authority and `status` cut at its value.
+#       Excludes the header's comment lines and the status line's trailing comment, which name the
+#       reference's own review history.
+#   19. [entity.firm], [entity.individual] and [entity.company] in full, and [entity.llp] as two
 #       blocks (the header with `form` cut at its value, then its two values), excluding the comment
 #       after `form` (added for partners_40b_194t, which reads s40b_interest_rate_bp and s194t for the
 #       engagement's entity type).
@@ -194,6 +198,15 @@ threshold_other_than_securities_paise = 10_000_00  # payers other than bank, co-
 threshold_bank_paise = 50_000_00                    # bank, co-operative bank, post office (₹1,00,000 for senior citizens)
 authority = "s.194A(1), (3)(i), (3)(iii)"
 status = "VP"
+
+[s40b_v]
+
+first_slab_paise = 6_00_000_00
+floor_paise = 3_00_000_00
+first_slab_bp = 9000
+balance_bp = 6000
+authority = "s.40(b)(v) as amended by the Finance (No. 2) Act 2024, from AY 2025-26"
+status = "verified"
 
 [s194t]
 rate_bp = 1000

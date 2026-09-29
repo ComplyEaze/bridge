@@ -16,6 +16,7 @@ use bridge_tally_core::master_binding::{
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -62,14 +63,15 @@ use uuid::Uuid;
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
-    final_verification_status, parse_import_voucher_rows, parse_import_vouchers,
-    render_proof_markdown, verification_response_page, verification_status,
+    final_verification_status, mark_verification_names, parse_import_voucher_rows,
+    parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
     VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
     batch_duplicate_sets, duplicates, observed_fingerprint, observed_voucher_identity,
+    VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -892,17 +894,24 @@ impl Server {
             // Reuse the posting admission path to describe only a route that
             // this exact saved batch can take. A manual-only batch is still a
             // successful build.
-            let native_post_eligible = self.settings.writes_enabled
-                && post::admit_saved_voucher(
+            // Keep the refusal code: `post_import` returns this same code, and
+            // the guidance names it rather than guessing a reason (#866).
+            let post_voucher_limit = self.post_voucher_limit(post::PostScope::Vouchers);
+            let native_post_refusal = if self.settings.writes_enabled {
+                post::admit_saved_voucher(
                     &line,
                     &self.settings.endpoint,
                     post::PostScope::Vouchers,
-                    self.post_voucher_limit(post::PostScope::Vouchers),
+                    post_voucher_limit,
                 )
-                .is_ok();
+                .err()
+            } else {
+                None
+            };
             let (mut warnings, next_step) = build_import_guidance(
                 self.settings.writes_enabled,
-                native_post_eligible,
+                native_post_refusal.as_deref(),
+                post_voucher_limit,
                 renders_bank_shape(&line.vouchers),
                 line.vouchers.iter().any(|voucher| {
                     voucher
@@ -980,24 +989,22 @@ impl Server {
         // Page 1 is built from the bytes read back, not from memory, so the
         // page and the hash it names are the same file even if another
         // verification replaced it in between.
-        let proof: Value = serde_json::from_slice(&persisted).map_err(|_| {
-            ToolFailure::from("verification_proof_unreadable".to_string())
-                .with_prior_evidence(evidence.clone())
-        })?;
+        let (proof, page) = served_verification_page(&persisted, 0)
+            .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
         if proof["batch_id"] != batch_id {
             return Err(
                 ToolFailure::from("verification_proof_batch_mismatch".to_string())
                     .with_prior_evidence(evidence),
             );
         }
-        let page = verification_response_page(&proof, &sha256_hex(&persisted), 0);
         self.admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
         Ok(outcome)
     }
 
-    /// A later page of a verification, from its persisted proof only.
+    /// A later page of a verification, from its persisted proof only (see
+    /// [`served_verification_page`]).
     fn verify_import_page(
         &self,
         args: &Value,
@@ -1012,8 +1019,7 @@ impl Server {
         if sha256 != proof_sha256 {
             return Err("verification_proof_changed".to_string().into());
         }
-        let proof: Value = serde_json::from_slice(&persisted)
-            .map_err(|_| "verification_proof_unreadable".to_string())?;
+        let (proof, page) = served_verification_page(&persisted, offset)?;
         if proof["batch_id"] != batch_id
             || !proof["company"]["guid"]
                 .as_str()
@@ -1021,7 +1027,6 @@ impl Server {
         {
             return Err("verification_proof_batch_mismatch".to_string().into());
         }
-        let page = verification_response_page(&proof, &sha256, offset);
         self.admit_verification_page(&page)?;
         Ok(ToolOutcome {
             payload: json!({"company": proof["company"], "result": page}),
@@ -1289,6 +1294,8 @@ impl Server {
                 line.vouchers.len(),
             );
             payload["result"]["verification_status"] = json!(status.as_str());
+            // Marked before it is saved, so the proof holds the marks too.
+            mark_verification_names(&mut payload["result"]);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
             Ok(ToolOutcome {
                 payload,
@@ -1319,7 +1326,9 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let imports = self.imports_dir()?;
-        let mut local_proof = super::redact_value(proof.clone(), super::Redaction::None);
+        // Saved with its party-name marks, so a page served from it masks
+        // names as the response's redaction requires.
+        let mut local_proof = proof.clone();
         // The files record the verdict the ledger records, whatever the caller's
         // copy says, so the proof and the ledger status cannot disagree.
         local_proof["verification_status"] = json!(update.status);
@@ -1823,9 +1832,39 @@ fn nonempty_company_field(value: &str) -> Result<String, String> {
         .ok_or_else(|| "company_identity_incomplete".to_string())
 }
 
+/// Why `post_import` would refuse a saved batch, for the build's warning. The
+/// code is the one `post_import` returns; the text only explains it. A code
+/// with no entry here keeps its name and a pointer to the same refusal.
+fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
+    let count = if voucher_limit > 1 {
+        format!("1 to {voucher_limit} vouchers")
+    } else {
+        "one voucher (the limit while batch posting is off)".to_string()
+    };
+    match code {
+        "import_post_requires_one_voucher" => format!(
+            "native posting takes {count}, each a Journal, Payment, Receipt or Contra, from a batch built by this version of Bridge"
+        ),
+        "import_post_batch_too_large" => format!(
+            "this batch has more vouchers than native posting takes at once ({voucher_limit})"
+        ),
+        "import_post_numbered_journal_unsupported" => {
+            "a voucher carries its own number, and native posting lets Tally assign it".to_string()
+        }
+        "import_review_layout_text" | "import_review_format_text" => {
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
+        }
+        "import_review_too_large" => {
+            "the approval text does not fit in one native dialog".to_string()
+        }
+        _ => "post_import refuses this batch for the same reason".to_string(),
+    }
+}
+
 fn build_import_guidance(
     writes_enabled: bool,
-    native_post_eligible: bool,
+    native_post_refusal: Option<&str>,
+    voucher_limit: usize,
     bank_types: bool,
     names_a_counterparty: bool,
     multi_entry_bank: bool,
@@ -1890,18 +1929,19 @@ fn build_import_guidance(
             .collect::<Vec<_>>())
     };
     let manual_import_next_step = "Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment";
-    if writes_enabled && native_post_eligible {
+    if writes_enabled && native_post_refusal.is_none() {
         (
             warnings(
                 "No import XML was sent to Tally. To post this saved batch, call post_import; it requires a separate native approval. If you import the file manually, call verify_import right after importing and do not call post_import for that batch.",
             ),
             "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt.",
         )
-    } else if writes_enabled {
+    } else if let Some(code) = native_post_refusal {
         (
-            warnings(
-                "No import XML was sent to Tally. This saved batch is not eligible for native posting because native posting requires one unnumbered Journal, Payment, Receipt or Contra with a reviewable preview. Import the written file manually, then use verify_import; do not call post_import for this batch.",
-            ),
+            warnings(&format!(
+                "No import XML was sent to Tally. This saved batch is not eligible for native posting: post_import would refuse it as {code} ({}). Import the written file manually, then use verify_import; do not call post_import for this batch.",
+                native_post_refusal_reason(code, voucher_limit),
+            )),
             manual_import_next_step,
         )
     } else {
@@ -2332,8 +2372,11 @@ fn cash_bank_refusals(
 /// narration or reference would refuse a value nothing downstream would ever
 /// notice as changed, so `validate_payload` does not.
 ///
-/// The value is escaped as the writer escapes it, so a literal `&#4;` in it
-/// is text, not a reference, and is not refused.
+/// The value's five XML characters are escaped first (`quick_xml`'s escape),
+/// so a literal `&#4;` in it is text, not a reference, and is not refused.
+/// The writer (`xml_text::escape_text`) also writes CR and LF as `&#13;` and
+/// `&#10;`; this check does not apply that step, so it judges only the text
+/// itself, not the references the writer adds for a line ending.
 fn reads_back_as_other_text(value: &str) -> bool {
     matches!(
         bridge_tally_protocol::mark_forbidden_numeric_references(&quick_xml::escape::escape(value)),
@@ -2964,21 +3007,6 @@ pub(super) fn render_import_verification_in_span(
     format!("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"{span_filter}</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,REMOTEID,GUID,MASTERID,ALTERID,NARRATION,ISCANCELLED,ISOPTIONAL,ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,EFFECTIVEDATE</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>", xml_escape(company))
 }
 
-/// Escapes text for the import file. CR and LF are written as character
-/// references: raw, an XML reader folds CR LF to LF and the file would name a
-/// ledger the book does not hold. Only a ledger name ending in a line break can
-/// carry either here (bridge#626); every other field refuses control text.
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-        .replace('\r', "&#13;")
-        .replace('\n', "&#10;")
-}
-
 pub(super) fn local_evidence(label: &str) -> Evidence {
     Evidence {
         request_sha256: sha256_hex(label.as_bytes()),
@@ -3271,6 +3299,18 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
+
+/// A verification page as it is served, from the saved proof's bytes: the
+/// proof, with every ledger name marked so the response's redaction applies,
+/// and the page from `offset`. Page 1 and every later page are served
+/// through this, so they cannot differ in what they mark.
+fn served_verification_page(persisted: &[u8], offset: usize) -> Result<(Value, Value), String> {
+    let mut proof: Value = serde_json::from_slice(persisted)
+        .map_err(|_| "verification_proof_unreadable".to_string())?;
+    mark_verification_names(&mut proof);
+    let page = verification_response_page(&proof, &sha256_hex(persisted), offset);
+    Ok((proof, page))
+}
 
 #[cfg(test)]
 #[path = "agent_import_file_tests.rs"]

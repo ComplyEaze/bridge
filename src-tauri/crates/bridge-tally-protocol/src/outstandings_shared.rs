@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_read_profiles::ValidatedCompanyName;
+use crate::xml_text::escape_text as xml_escape;
 
 /// Whether a `BILLALLOCATIONS.LIST` row that carries no `BILLTYPE` is one of
 /// Tally's placeholder containers, and may be ignored.
@@ -710,15 +711,6 @@ fn render_company_book_extent_with_contract(
         company = xml_escape(company),
         fetch = fetch,
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

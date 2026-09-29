@@ -1,0 +1,436 @@
+{
+ "comment": "partners_40b_194t at the reference's current head: TDS on a partner's interest added back (A); an interest-and-remuneration voucher split exactly (A) and one that also credits the bank and debits the capital, not split and read net (B); an interest voucher that also debits the capital (B); vouchers on an interest ledger shared by two partners that touch no capital, one carrying TDS attributed to no one (A, B); interest over the allowable (C); remuneration whose TDS is shared with another credited party (C); a reversal against the gross s.194T base (C); a partner over the s.194T limit with no TDS line seen (D). s.40(b) is computed for no partner (the reference is list-only); each partner's reasons are listed.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Capital Account": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-partners_tds_mixed-000"
+  },
+  {
+   "name": "A Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_tds_mixed-001"
+  },
+  {
+   "name": "B Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_tds_mixed-002"
+  },
+  {
+   "name": "C Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_tds_mixed-003"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-004"
+  },
+  {
+   "name": "Remuneration A",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-005"
+  },
+  {
+   "name": "Remuneration B",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-006"
+  },
+  {
+   "name": "Interest C",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-007"
+  },
+  {
+   "name": "Remuneration C",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-008"
+  },
+  {
+   "name": "TDS Payable 194T",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_tds_mixed-009"
+  },
+  {
+   "name": "Sundry Payable X",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_tds_mixed-010"
+  },
+  {
+   "name": "D Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_tds_mixed-011"
+  },
+  {
+   "name": "Interest D",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_tds_mixed-012"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "A Capital",
+   "opening": -100000000,
+   "debit": 0,
+   "credit": 4230000,
+   "closing": -104230000
+  },
+  {
+   "ledger": "B Capital",
+   "opening": -50000000,
+   "debit": 150000,
+   "credit": 2700000,
+   "closing": -52550000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 200000000,
+   "debit": 0,
+   "credit": 440000,
+   "closing": 199560000
+  },
+  {
+   "ledger": "C Capital",
+   "opening": -20000000,
+   "debit": 500000,
+   "credit": 3900000,
+   "closing": -23400000
+  },
+  {
+   "ledger": "D Capital",
+   "opening": -30000000,
+   "debit": 0,
+   "credit": 2500000,
+   "closing": -32500000
+  },
+  {
+   "ledger": "Interest C",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 0,
+   "closing": 3000000
+  },
+  {
+   "ledger": "Interest D",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 0,
+   "closing": 2500000
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 2700000,
+   "credit": 0,
+   "closing": 2700000
+  },
+  {
+   "ledger": "Remuneration A",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 0,
+   "closing": 3000000
+  },
+  {
+   "ledger": "Remuneration B",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Remuneration C",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 500000,
+   "closing": 500000
+  },
+  {
+   "ledger": "Sundry Payable X",
+   "opening": 0,
+   "debit": 0,
+   "credit": 80000,
+   "closing": -80000
+  },
+  {
+   "ledger": "TDS Payable 194T",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "a2",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     1200000
+    ],
+    [
+     "A Capital",
+     -1080000
+    ],
+    [
+     "TDS Payable 194T",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "a3",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     500000
+    ],
+    [
+     "Remuneration A",
+     3000000
+    ],
+    [
+     "A Capital",
+     -3150000
+    ],
+    [
+     "TDS Payable 194T",
+     -350000
+    ]
+   ]
+  },
+  {
+   "guid": "b1",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     400000
+    ],
+    [
+     "Remuneration B",
+     2000000
+    ],
+    [
+     "B Capital",
+     -2400000
+    ],
+    [
+     "B Capital",
+     100000
+    ],
+    [
+     "Bank",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "b2",
+   "date": "2025-10-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     300000
+    ],
+    [
+     "B Capital",
+     -300000
+    ],
+    [
+     "B Capital",
+     50000
+    ],
+    [
+     "Bank",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "b3",
+   "date": "2025-11-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     200000
+    ],
+    [
+     "Bank",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "b4",
+   "date": "2025-12-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     100000
+    ],
+    [
+     "Bank",
+     -90000
+    ],
+    [
+     "TDS Payable 194T",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "c1",
+   "date": "2025-06-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest C",
+     3000000
+    ],
+    [
+     "C Capital",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "c2",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration C",
+     1000000
+    ],
+    [
+     "C Capital",
+     -900000
+    ],
+    [
+     "Sundry Payable X",
+     -80000
+    ],
+    [
+     "TDS Payable 194T",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "c3",
+   "date": "2026-01-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "C Capital",
+     500000
+    ],
+    [
+     "Remuneration C",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "d1",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest D",
+     2500000
+    ],
+    [
+     "D Capital",
+     -2500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "partners_40b_194t"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "pa": {
+   "capital_ledgers": [
+    "A Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Remuneration A"
+  },
+  "pb": {
+   "capital_ledgers": [
+    "B Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Remuneration B"
+  },
+  "pc": {
+   "capital_ledgers": [
+    "C Capital"
+   ],
+   "interest_ledger": "Interest C",
+   "remuneration_ledger": "Remuneration C"
+  },
+  "pd": {
+   "capital_ledgers": [
+    "D Capital"
+   ],
+   "interest_ledger": "Interest D"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable 194T"
+ ]
+}

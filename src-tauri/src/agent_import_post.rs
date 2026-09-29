@@ -1116,6 +1116,7 @@ impl Server {
                 }
                 if let Some(masters) = masters_verdict {
                     outcome.payload["result"]["masters_after_post"] = masters;
+                    mark_verification_names(&mut outcome.payload["result"]);
                 }
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
@@ -1307,6 +1308,23 @@ pub(super) fn finalize_previous_attempt_reconciliation(
     }
 }
 
+/// What a person does about a doubt across a post: one text, in each message
+/// that asks for it.
+macro_rules! masters_review {
+    () => {
+        "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event."
+    };
+}
+const MASTERS_REVIEW: &str = masters_review!();
+
+/// The message for a post whose ledgers no longer resolve to the masters
+/// approved. The ledgers are named in `masters_after_post.ledgers`, where the
+/// response's redaction reaches them, never in this text.
+pub(super) const CHANGED_MASTERS_MESSAGE: &str = concat!(
+    "Posted to Tally, but the ledgers in masters_after_post.ledgers no longer resolve to the master you approved. ",
+    masters_review!()
+);
+
 /// Whether the masters check across a post leaves doubt that the voucher went
 /// to the ledgers approved (#239), as the refusal code and plain message. Only
 /// an unchanged resolution, or a mark proven unmoved, admits: any other state,
@@ -1322,18 +1340,10 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
             .get("batch_step")
             .and_then(|step| batch_step_doubt(Some(step)));
     }
-    const REVIEW: &str = "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event.";
     Some(if state == "posted_under_changed_masters" {
-        let ledgers = masters["ledgers"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .collect::<Vec<_>>()
-            .join(", ");
         (
             "posted_under_changed_masters",
-            format!("Posted to Tally, but these ledgers no longer resolve to the master you approved: {ledgers}. {REVIEW}"),
+            CHANGED_MASTERS_MESSAGE.to_string(),
         )
     } else {
         let again = if state == super::MASTERS_CHECK_PENDING || state == "check_unavailable" {
@@ -1343,7 +1353,7 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
         };
         (
             "masters_after_post_unconfirmed",
-            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {REVIEW}"),
+            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {MASTERS_REVIEW}"),
         )
     })
 }
@@ -1602,29 +1612,28 @@ fn admit_build_binding(
 }
 
 /// How many changed ledgers a refusal names; the rest are counted.
-const REFUSAL_LEDGERS_NAMED: usize = 8;
+pub(super) const REFUSAL_LEDGERS_NAMED: usize = 8;
 
-/// Name the ledgers whose GUID changed since the build, in plain words, where
-/// no attempt is recorded.
+/// List the ledgers whose GUID changed since the build, each marked as a party
+/// name so the response's redaction applies, and, where no attempt is
+/// recorded, say in plain words what that means. The message refers to the
+/// list and names no ledger itself.
 fn name_changed_ledgers(payload: &mut Value, ledgers: &[String]) {
     let named = ledgers
         .iter()
         .take(REFUSAL_LEDGERS_NAMED)
-        .cloned()
+        .map(|ledger| party_name(ledger.clone()))
         .collect::<Vec<_>>();
     let error = &mut payload["result"]["error"];
     error["ledgers_changed"] = json!(named);
     error["ledgers_changed_total"] = json!(ledgers.len());
     if payload["result"]["attempt_recorded"] == json!(false) {
-        let mut list = named.join(", ");
-        if ledgers.len() > named.len() {
-            list.push_str(&format!(" and {} more", ledgers.len() - named.len()));
-        }
-        payload["result"]["error"]["message"] = json!(format!(
-            "A ledger this batch names is no longer the one it was built against ({list}): the \
-             name now belongs to a different ledger in Tally. Nothing was posted. Confirm which \
-             ledger you meant (it may now have another name) before building the batch again."
-        ));
+        payload["result"]["error"]["message"] = json!(
+            "A ledger this batch names (listed in error.ledgers_changed) is no longer the one it \
+             was built against: the name now belongs to a different ledger in Tally. Nothing was \
+             posted. Confirm which ledger you meant (it may now have another name) before \
+             building the batch again."
+        );
     }
 }
 

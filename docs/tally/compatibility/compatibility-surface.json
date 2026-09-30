@@ -451,7 +451,7 @@
     },
     {
       "path": "src-tauri/src/agent.rs",
-      "sha256": "28c1fdb70ae5860b7df1d4d96c0ff96965b7d318183b0e87138604be6a475d93"
+      "sha256": "8603b0eeca51323d2d70ddf180d04f4670d9cc3823841ad4475b2d76751801b8"
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",

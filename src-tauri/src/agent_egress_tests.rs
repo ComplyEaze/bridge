@@ -319,3 +319,66 @@ fn receipt_append_waits_until_all_shared_readers_release_the_file() {
         [r#"{"tool":"second"}"#, r#"{"tool":"first"}"#]
     );
 }
+
+/// Receipts carrying a full trail (about 11 KiB each) are read back by `egress_log`
+/// within its byte bound: complete lines, flagged truncated when the bound cut the
+/// tail, never an error.
+#[tokio::test]
+async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
+    use super::super::{Redaction, Server, Settings, TallyEndpointConfig};
+    use crate::request_trail::{RequestTrail, TRAIL_LAST};
+    use bridge_tally_transport::{SendKind, SendRecord};
+    use serde_json::{json, Value};
+    let directory = tempfile::tempdir().unwrap();
+    let trail = RequestTrail::default();
+    for index in 0..(TRAIL_LAST + 5) {
+        trail.push(SendRecord {
+            kind: SendKind::Post,
+            request_bytes: Some(700),
+            outcome: "answered",
+            response_bytes: Some(1_234),
+            held_ms: index as u64,
+        });
+    }
+    let snapshot = trail.snapshot().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for index in 0..40 {
+        let line =
+            json!({"record_type": "response_prepared", "index": index, "request_trail": snapshot})
+                .to_string();
+        append_egress_line(&path, &line).unwrap();
+    }
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 100,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    // The default read (20 receipts) of receipts that each carry a full trail
+    // fits the byte cap, and every line is complete.
+    let response = server.call_tool("egress_log", json!({})).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let records = response["structuredContent"]["result"]["records"]
+        .as_array()
+        .unwrap();
+    assert_eq!(records.len(), 20);
+    for line in records {
+        let parsed: Value = serde_json::from_str(line.as_str().unwrap()).unwrap();
+        assert_eq!(parsed["request_trail"]["sent"], TRAIL_LAST + 5);
+    }
+    // A much larger `limit` over such receipts exceeds the byte cap, and is then
+    // refused by its code, not cut mid-line (ask for fewer receipts).
+    let many = server.call_tool("egress_log", json!({"limit": 100})).await;
+    assert_eq!(many["isError"], true, "{many}");
+    assert_eq!(
+        many["structuredContent"]["error"]["code"], "agent_response_too_large",
+        "{many}"
+    );
+}

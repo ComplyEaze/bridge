@@ -1681,20 +1681,6 @@ fn largest_fit(
     (fit.expect("the smallest preview fits"), refusal)
 }
 
-/// `count` distinct names, each `base`, its own index as a letter, and its share
-/// of `pad` more `filler` characters.
-fn padded_names(count: usize, base: &str, filler: &str, pad: usize) -> Vec<String> {
-    (0..count)
-        .map(|index| {
-            format!(
-                "{base}{}{}",
-                char::from_u32(0x0915 + index as u32).expect("a Devanagari letter"),
-                filler.repeat(pad / count + usize::from(index < pad % count))
-            )
-        })
-        .collect()
-}
-
 /// A batch of two Payments over the same `parties` ledgers named by `names`, in
 /// the company `company`.
 fn payment_batch_with(names: &[String], company: &str) -> ImportLedgerLine {
@@ -1708,58 +1694,118 @@ fn payment_batch_with(names: &[String], company: &str) -> ImportLedgerLine {
     line
 }
 
-/// One Payment of seven entries whose text lines (entry names, narration and
-/// reference) all grow with `pad`, one character at a time.
-fn grown_payment(pad: usize) -> ImportLedgerLine {
-    let names = padded_names(9, "N", "N", pad);
-    let mut line = payment_with(6, |index| names[index].clone());
-    line.vouchers[0].narration = Some(names[7].clone());
-    line.vouchers[0].reference = Some(names[8].clone());
+/// The lengths of fields that grow together: `pad` more characters are dealt out
+/// round-robin from `start`, and each field stops at its own cap, so the total
+/// grows by one, or by nothing, per step.
+fn grown_lengths(pad: usize, start: usize, caps: &[usize]) -> Vec<usize> {
+    caps.iter()
+        .enumerate()
+        .map(|(field, cap)| {
+            (start + pad / caps.len() + usize::from(field < pad % caps.len())).min(*cap)
+        })
+        .collect()
+}
+
+/// The longest length, up to 200, at which `fits` still holds.
+fn widest(fits: impl Fn(usize) -> bool) -> usize {
+    (1..=200)
+        .take_while(|&length| fits(length))
+        .last()
+        .expect("fits at one character")
+}
+
+/// A name of `length` characters: a letter for `field`, so names differ, then
+/// `filler`.
+fn name_of(field: usize, length: usize, filler: &str) -> String {
+    format!(
+        "{}{}",
+        char::from_u32(0x0915 + field as u32).expect("a Devanagari letter"),
+        filler.repeat(length.saturating_sub(1))
+    )
+}
+
+/// One Payment of six parties and a balancing ledger in a company, whose every
+/// free-text field (the company, each entry's ledger, the narration and the
+/// reference) has the length `lengths` gives: company, six parties, the balancing
+/// ledger, narration, reference.
+fn payment_of(lengths: &[usize]) -> ImportLedgerLine {
+    let mut line = payment_with(6, |party| name_of(party, lengths[1 + party], "N"));
+    line.company.as_mut().unwrap().name = name_of(9, lengths[0], "N");
+    let voucher = &mut line.vouchers[0];
+    voucher.entries.last_mut().unwrap().ledger = name_of(6, lengths[7], "N");
+    voucher.narration = Some(name_of(7, lengths[8], "N"));
+    voucher.reference = Some(name_of(8, lengths[9], "N"));
     refresh_batch_sha256(&mut line);
     line
 }
 
-/// The dialog's character caps (1,600 for one voucher, 3,200 and 7,000 bytes for
-/// a batch) sit above what the line caps let a preview reach: 24 lines of at most
-/// 100 characters for one voucher, 40 for a batch, with the fixed lines short.
-/// Growing every free-text line to its width (entry names, narration, reference,
-/// the company name), the largest preview that fits stays under the character
-/// cap, so the characters branding added cannot push a fitting preview over it.
-/// The line caps are what refuse, loudly: the width and line tests above pin
-/// those at N and N+1. The sizes are measured, not derived: a change that lets a
+/// The single-voucher preview's 1,600-character cap is exact: with every field
+/// grown to its own width (the company and the balancing ledger as well as the
+/// parties, narration and reference), a preview of exactly 1,600 characters in 24
+/// lines fits and one more is refused. Branding the dialog text added characters
+/// to every preview, so a preview near the cap is refused loudly, never cut, and
+/// the boundary is pinned here.
+#[test]
+fn a_single_voucher_preview_fits_at_exactly_1600_characters_and_not_one_more() {
+    let (_, endpoint) = batch();
+    let fits = |lengths: &[usize]| admit_fresh_saved_voucher(&payment_of(lengths), &endpoint);
+    let caps: Vec<usize> = (0..10)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; 10];
+                lengths[field] = length;
+                fits(&lengths).is_ok()
+            })
+        })
+        .collect();
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 10 * 100);
+    assert_eq!(fit.chars().count(), 1_600, "{fit}");
+    assert_eq!(fit.lines().count(), 24, "{fit}");
+    assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+}
+
+/// The batch post preview's caps (3,200 characters, 7,000 bytes) against what 40
+/// lines allow, with the company, all 22 parties and the balancing ledger grown to
+/// their own width: ASCII names and three-byte names. At full width the preview
+/// still fits all 40 lines and is under both caps (3,123 characters, 6,725 bytes
+/// with three-byte names when measured), so the character and byte caps do not
+/// bind for it: the line caps do. Measured, not derived: a change that lets this
 /// preview grow past them fails here and needs its own boundary test.
 #[test]
-fn the_post_previews_stay_under_the_character_and_byte_caps_at_full_width() {
+fn the_batch_post_preview_at_full_width_against_its_caps() {
     let (_, endpoint) = batch();
-    let (single, refusal) = largest_fit(
-        |pad| admit_fresh_saved_voucher(&grown_payment(pad), &endpoint),
-        9 * 89,
-    );
-    // A name past the line width is what refuses, not a character cap.
-    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
-    assert_eq!(single.lines().count(), 24, "{single}");
-    assert!(
-        single.chars().count() < 1_600,
-        "{} characters",
-        single.chars().count()
-    );
-    for (filler, base) in [("N", "P"), ("न", "न")] {
-        let (batch, refusal) = largest_fit(
-            |pad| {
-                let names = padded_names(22, base, filler, pad);
-                let company = "C".repeat(60);
-                review_preview_with(&payment_batch_with(&names, &company), &endpoint, &[])
-            },
-            22 * 88,
-        );
-        assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
-        assert_eq!(batch.lines().count(), 40, "{batch}");
+    for filler in ["N", "न"] {
+        let fits = |lengths: &[usize]| {
+            // The company, 22 parties and the balancing ledger.
+            let names: Vec<String> = (0..22)
+                .map(|party| name_of(party, lengths[1 + party], filler))
+                .collect();
+            let mut line = payment_batch_with(&names, &name_of(24, lengths[0], filler));
+            for voucher in &mut line.vouchers {
+                voucher.entries.last_mut().unwrap().ledger = name_of(23, lengths[23], filler);
+            }
+            refresh_batch_sha256(&mut line);
+            review_preview_with(&line, &endpoint, &[])
+        };
+        let caps: Vec<usize> = (0..24)
+            .map(|field| {
+                widest(|length| {
+                    let mut lengths = vec![1; 24];
+                    lengths[field] = length;
+                    fits(&lengths).is_ok()
+                })
+            })
+            .collect();
+        let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+        assert_eq!(refusal, None, "every field at its width still fits");
+        assert_eq!(fit.lines().count(), 40, "{fit}");
         assert!(
-            batch.chars().count() < 3_200,
+            fit.chars().count() < 3_200,
             "{} characters",
-            batch.chars().count()
+            fit.chars().count()
         );
-        assert!(batch.len() < 7_000, "{} bytes", batch.len());
+        assert!(fit.len() < 7_000, "{} bytes", fit.len());
     }
 }
 

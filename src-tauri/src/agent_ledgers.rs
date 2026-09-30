@@ -285,6 +285,29 @@ fn currency_scope_frame(
     })
 }
 
+/// Adds to a listing's frame, when a census counted the book (#679), whether its
+/// count was checked against the company's own ledger count (#938): `matched`,
+/// `company_count_lower` (Tally's count is below the census's: the read went on)
+/// or `unavailable` (Tally's answer carried no count, so the check did not run).
+/// Nothing is added when no census ran.
+fn count_cross_check_frame(
+    frame: Value,
+    check: Option<crate::tally::connection::CountCrossCheck>,
+) -> Value {
+    let Some(check) = check else {
+        return frame;
+    };
+    let mut frame = match frame {
+        Value::Object(frame) => frame,
+        _ => serde_json::Map::new(),
+    };
+    frame.insert(
+        "ledger_count_cross_check".to_owned(),
+        json!({"status": check.code()}),
+    );
+    Value::Object(frame)
+}
+
 /// The caller's `as_of`, the date `party_gstin` is read as of (bridge#653);
 /// `None` leaves it to the Bridge host's date, taken where the rows are built.
 /// `as_of` selects only the GSTIN, so it is refused unless fields=compliance
@@ -703,9 +726,12 @@ impl Server {
                         row
                     })
                     .collect::<Vec<_>>();
-                let frame = currency_scope_frame(
-                    &listing.foreign_currency_ledgers_excluded,
-                    &listing.mixed_currency_ledgers_excluded,
+                let frame = count_cross_check_frame(
+                    currency_scope_frame(
+                        &listing.foreign_currency_ledgers_excluded,
+                        &listing.mixed_currency_ledgers_excluded,
+                    ),
+                    listing.count_cross_check,
                 );
                 (rows, Some(groups), listing.extent, listing.evidence, frame)
             }

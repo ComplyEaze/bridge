@@ -51,7 +51,8 @@ use bridge_tally_protocol::{
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
-        parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
+        parse_company_book_extent_v2, parse_company_ledger_count,
+        render_company_ledger_count_request, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
@@ -192,6 +193,21 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: LedgerCensusError,
     },
+    /// The company's own count of its ledgers (`NUMLEDGERS`, #938) is higher
+    /// than the census counted: the census missed ledgers (most likely the
+    /// company was closed and reopened while it ran, or a ledger was added
+    /// during the read), and a read sized from it would be sized too small.
+    /// Nothing was requested after the company-count read. Numbers only.
+    #[error("Tally's own ledger count is higher than the ledger census counted")]
+    LedgerCountCompanyDiffers { company: u64, census: u64 },
+    /// Tally's answer to the company ledger-count request (#938) was damaged,
+    /// named another company or none of the loaded ones, or held a count that
+    /// is not a plain number. Nothing was sized from it.
+    #[error("Tally's answer to the company ledger-count request failed validation")]
+    LedgerCountCompanyInvalid {
+        #[source]
+        source: OutstandingsError,
+    },
     /// A slice of the ledger census (#679) failed validation: another company,
     /// a damaged response, a foreign field, or a ledger seen twice within the
     /// slice. Nothing was sized from it.
@@ -261,6 +277,8 @@ impl PartyLedgerMasterSourceValidationError {
             Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
             Self::ParentPartResponseTooLarge { .. } => "parent_part_response_too_large",
             Self::LedgerSpan { source } => source.safe_code(),
+            Self::LedgerCountCompanyDiffers { .. } => "ledger_count_company_differs",
+            Self::LedgerCountCompanyInvalid { .. } => "ledger_count_company_invalid",
             Self::LedgerSpanSliceInvalid { source } => match source {
                 StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
                 StandardLedgerCatalogError::CompanyIdentityMismatch => {
@@ -463,6 +481,32 @@ fn compliance_estimate_unverified(count: u64) -> ComplianceEstimate {
         COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
         COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
     )
+}
+
+/// What the census's count was checked against (#938), kept so a reader can see
+/// whether the check ran. The company's own count never admits or sizes a read:
+/// it can only refuse a census that counted fewer ledgers than Tally says the
+/// company holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CountCrossCheck {
+    /// Tally's own count equals the census's.
+    Matched,
+    /// Tally's own count is below the census's: not the hazardous direction,
+    /// so the read goes on (the other direction is checked by the count against
+    /// the rows the read returns).
+    CompanyCountLower,
+    /// The company's answer carried no ledger count, so the check did not run.
+    Unavailable,
+}
+
+impl CountCrossCheck {
+    pub(crate) const fn code(self) -> &'static str {
+        match self {
+            Self::Matched => "matched",
+            Self::CompanyCountLower => "company_count_lower",
+            Self::Unavailable => "unavailable",
+        }
+    }
 }
 
 /// What one master-and-balance pair of a compliance read covers: the whole
@@ -1712,8 +1756,10 @@ impl TallyClient {
             // A census counts a book whose mark is past what its catalogue can
             // be read for (#679); its count admits the read like a catalogue's.
             let mut census_count = None;
+            // Whether the census's count was checked against the company's own.
+            let mut count_cross_check = None;
             if admission == ComplianceAdmission::CensusFirst {
-                let counted = self
+                let (census, cross_check) = self
                     .count_ledgers_by_span(
                         identity,
                         &opening_extent,
@@ -1721,8 +1767,9 @@ impl TallyClient {
                         &mut evidence,
                         &mut count_evidence,
                     )
-                    .await?
-                    .get();
+                    .await?;
+                let counted = census.get();
+                count_cross_check = Some(cross_check);
                 census_count = Some(counted);
                 if admit_compliance_master_read(master_mark, Some(counted))?
                     == ComplianceAdmission::InParts
@@ -1928,6 +1975,7 @@ impl TallyClient {
             }
             rows.sort_by(|left, right| left.name.cmp(&right.name).then(left.guid.cmp(&right.guid)));
             let source = PartyLedgerMasterSource {
+                count_cross_check,
                 company: identity.display_name().to_string(),
                 company_guid: identity.company_guid().to_string(),
                 currency_assertion: currency.assertion,
@@ -1961,7 +2009,8 @@ impl TallyClient {
     /// no slice is read twice. Stability of the book across the census is not
     /// proven here: the caller's opening and closing company extent, which
     /// carry the master mark and the company GUID, are the bracket (and the
-    /// extent is read again here, before the count is returned), and an empty
+    /// extent is read again here, before the count is returned, after Tally's
+    /// own count of the company's ledgers was read once and compared, #938), and an empty
     /// slice is the same body a closed or absent company answers with, so a
     /// census that found no ledger at all is refused rather than counted.
     /// Each slice whose answer was received in full is added to `evidence` and
@@ -1975,7 +2024,7 @@ impl TallyClient {
         master_mark: u64,
         evidence: &mut RuntimeReadEvidence,
         count_evidence: &mut RuntimeReadEvidence,
-    ) -> anyhow::Result<LedgerCount> {
+    ) -> anyhow::Result<(LedgerCount, CountCrossCheck)> {
         let plan = LedgerCensusPlan::new(master_mark, ledger_census_limits())
             .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
         let mut census = LedgerCensus::new(plan);
@@ -2008,19 +2057,61 @@ impl TallyClient {
         // A company closed, reopened or switched during the census answers the
         // remaining slices with the same empty body as a slice past every
         // ledger, so the count can be low, and the count sizes the next read.
-        // The extent (company GUID and marks) is read again before the count
-        // leaves this function, so no caller can use a count without it, and a
-        // change in either refuses the call. It does NOT catch a company closed
-        // and reopened with equal marks between the slices and this read: the
-        // count is then low and passes, and a whole read sized from it is sent
-        // before the count-versus-rows check refuses (#938 adds a cross-check
-        // against the company's own ledger count for exactly this).
+        // Two checks run before the count leaves this function, so no caller
+        // can use a count without them. Tally's own count of the company's
+        // ledgers is read and must not be higher than the census's: that is
+        // meant to catch a company closed and reopened with equal marks, which
+        // the extent cannot see (by reasoning: no live reproduction), and it
+        // also refuses a ledger added during the read (#938). Then the extent (company GUID and marks) is
+        // read again, and a change in either refuses the call.
+        let cross_check = self
+            .cross_check_census_count(identity, counted.get(), evidence, count_evidence)
+            .await?;
         if self.fetch_company_book_extent(identity).await? != *opening_extent {
             return Err(anyhow::Error::new(
                 PairedReadValidationError::PartyLedgerExtent,
             ));
         }
-        Ok(counted)
+        Ok((counted, cross_check))
+    }
+
+    /// Reads Tally's own count of the company's ledgers once and compares it
+    /// with the census's (#938). Refuse-only: a count higher than the census's
+    /// refuses the call; equal, lower, or absent never admits or sizes anything.
+    /// A response for another company, or a value that is not a plain integer,
+    /// is refused as any damaged answer is. The request is one read, not a
+    /// pair: the extent bracket around the census is what proves the book did
+    /// not move, and this count is compared, never relied on.
+    async fn cross_check_census_count(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        census: u64,
+        evidence: &mut RuntimeReadEvidence,
+        count_evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<CountCrossCheck> {
+        let request = render_company_ledger_count_request(identity.display_name());
+        let (body, bytes, sha256) = self.post_xml_with_encoded_bytes(request.clone()).await?;
+        let read = RuntimeReadEvidence::single(&request, sha256, bytes);
+        *evidence = evidence.clone().combine(read.clone());
+        *count_evidence = count_evidence.clone().combine(read);
+        let company =
+            parse_company_ledger_count(&body, identity.display_name(), identity.company_guid())
+                .map_err(|source| {
+                    PartyLedgerMasterSourceValidationError::LedgerCountCompanyInvalid { source }
+                })?;
+        Ok(match company.map(|count| count.get()) {
+            None => CountCrossCheck::Unavailable,
+            Some(company) if company > census => {
+                return Err(anyhow::Error::new(
+                    PartyLedgerMasterSourceValidationError::LedgerCountCompanyDiffers {
+                        company,
+                        census,
+                    },
+                ));
+            }
+            Some(company) if company == census => CountCrossCheck::Matched,
+            Some(_) => CountCrossCheck::CompanyCountLower,
+        })
     }
 
     /// One master-and-balance pair of a compliance ledger read: the whole book,

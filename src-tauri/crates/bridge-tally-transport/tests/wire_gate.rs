@@ -113,11 +113,13 @@ fn status() -> ScenarioPlan {
 fn the_retry_bound_never_exceeds_ten_seconds() {
     assert!(WireRetryPolicy::DEFAULT.total() <= WIRE_WAIT_MAX);
     assert_eq!(WIRE_WAIT_MAX, Duration::from_secs(10));
-    // The shipped values, named in the docs and the tool descriptions.
-    assert_eq!(WireRetryPolicy::DEFAULT.delay(), Duration::from_millis(500));
+    // The shipped values. The pause stays shorter than the gap between a
+    // sender's operations (#595 C6), and at most 180 of them fit the total, so
+    // the 1 s under the cap absorbs the timer's overrun.
+    assert_eq!(WireRetryPolicy::DEFAULT.delay(), Duration::from_millis(50));
     assert_eq!(
         WireRetryPolicy::DEFAULT.total(),
-        Duration::from_millis(9_500)
+        Duration::from_millis(9_000)
     );
     let half = Duration::from_millis(500);
     assert!(WireRetryPolicy::new(half, WIRE_WAIT_MAX).is_some());

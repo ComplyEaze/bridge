@@ -9,7 +9,7 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Instant;
-use tally_protocol_simulator::{Fixture, ScenarioPlan, SequenceSimulator, WireEncoding};
+use tally_protocol_simulator::{Delivery, Fixture, ScenarioPlan, SequenceSimulator, WireEncoding};
 
 const CHILD_ROOT: &str = "BRIDGE_WIRE_LOCK_TEST_ROOT";
 const CHILD_PORT: &str = "BRIDGE_WIRE_LOCK_TEST_PORT";
@@ -218,6 +218,128 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
     let started = Instant::now();
     assert!(busy(runtime.check_connection(endpoint.clone()).await));
     assert!(started.elapsed() >= budget);
+}
+
+/// #595 C6: how long after a sender's operation ends a second transport on the
+/// same lock file gets its one send in, while the sender runs `OPERATIONS`
+/// operations of six sends with `gap` between them (the request spacing).
+///
+/// Two transports with a gate each on one lock file contend like two processes:
+/// flock (and LockFileEx on Windows) conflicts between separate opens, even in
+/// one process. The stub endpoint holds every response for `HOLD`, so a
+/// send holds the lock for about that long. The waiter starts 10 ms into the
+/// sender's operation, so it finds the lock held, and its lag is measured from
+/// the end of that operation, less its own hold. Real time throughout: a lock
+/// and a socket do not run on a paused clock.
+fn waiter_lag_behind_a_sender(retry: WireRetryPolicy, gap: Duration) -> Vec<Duration> {
+    const OPERATIONS: usize = 10;
+    const SAMPLES: [usize; 4] = [1, 3, 5, 7];
+    const HOLD: Duration = Duration::from_millis(40);
+    // Held for the whole test: a forked child would keep these locks taken.
+    let _window = fork_window();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("coordination");
+    let plans =
+        vec![xml().with_delivery(Delivery::SlowHeaders(HOLD)); OPERATIONS * 6 + SAMPLES.len()];
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let endpoint = endpoint("127.0.0.1", simulator.address().port());
+    let sender = transport(&root, &endpoint, retry);
+    let waiter = transport(&root, &endpoint, retry);
+    // Start and end of each of the sender's operations.
+    let marks: std::sync::Arc<Mutex<Vec<(Instant, Option<Instant>)>>> = Default::default();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let lags = runtime.block_on(async {
+        let sending = async {
+            for _ in 0..OPERATIONS {
+                marks.lock().unwrap().push((Instant::now(), None));
+                for _ in 0..6 {
+                    sender
+                        .post_xml_decoded("<ENVELOPE/>".into())
+                        .await
+                        .expect("sender send");
+                }
+                marks.lock().unwrap().last_mut().unwrap().1 = Some(Instant::now());
+                tokio::time::sleep(gap).await;
+            }
+        };
+        let waiting = async {
+            let mut lags = Vec::new();
+            for index in SAMPLES {
+                let start = loop {
+                    let started = marks.lock().unwrap().get(index).map(|mark| mark.0);
+                    if let Some(started) = started {
+                        break started;
+                    }
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                };
+                tokio::time::sleep_until((start + Duration::from_millis(10)).into()).await;
+                waiter
+                    .post_xml_decoded("<ENVELOPE/>".into())
+                    .await
+                    .expect("waiter send");
+                let done = Instant::now();
+                let end = loop {
+                    let ended = marks.lock().unwrap()[index].1;
+                    if let Some(ended) = ended {
+                        break ended;
+                    }
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                };
+                lags.push(done.saturating_duration_since(end).saturating_sub(HOLD));
+            }
+            lags
+        };
+        tokio::join!(sending, waiting).1
+    });
+    drop(simulator);
+    lags
+}
+
+/// At the shipped poll a waiting send gets in within a poll and a half of the
+/// sender's operation ending, at the 250 ms gap a lower request spacing would
+/// leave. With the old 500 ms poll the same waiter lagged 240 ms or more here,
+/// and in the measured two-process run a median 2 s (#595 C6).
+#[test]
+fn a_waiting_send_follows_a_senders_250_ms_gap_closely_at_the_shipped_poll() {
+    let lags = waiter_lag_behind_a_sender(WireRetryPolicy::DEFAULT, Duration::from_millis(250));
+    assert!(
+        lags.iter().all(|lag| *lag < Duration::from_millis(150)),
+        "{lags:?}"
+    );
+}
+
+/// Characterisation of the old 500 ms / 9.5 s poll, not a gate: a waiter whose
+/// poll is longer than the sender's gap lags by more than the shipped poll
+/// allows. Real time, so it runs only on request.
+#[test]
+#[ignore = "characterisation of the old 500 ms poll; about 10 s of real time"]
+fn the_old_500_ms_poll_lags_behind_a_250_ms_gap() {
+    let old =
+        WireRetryPolicy::new(Duration::from_millis(500), Duration::from_millis(9_500)).unwrap();
+    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(250));
+    println!("old poll, 250 ms gap: {lags:?}");
+    assert!(
+        lags.iter().any(|lag| *lag >= Duration::from_millis(150)),
+        "{lags:?}"
+    );
+}
+
+/// The same old poll against the shipped 500 ms gap: a poll always finds a free
+/// moment within one cycle, which is why nothing showed at 500 ms.
+#[test]
+#[ignore = "characterisation of the old 500 ms poll; about 10 s of real time"]
+fn the_old_500_ms_poll_keeps_up_with_a_500_ms_gap() {
+    let old =
+        WireRetryPolicy::new(Duration::from_millis(500), Duration::from_millis(9_500)).unwrap();
+    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(500));
+    println!("old poll, 500 ms gap: {lags:?}");
+    assert!(
+        lags.iter().all(|lag| *lag < Duration::from_millis(400)),
+        "{lags:?}"
+    );
 }
 
 #[test]

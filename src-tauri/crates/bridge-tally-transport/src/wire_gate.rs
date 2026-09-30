@@ -104,13 +104,20 @@ pub struct WireRetryPolicy {
 }
 
 impl WireRetryPolicy {
-    /// 500 ms apart, 9.5 s per operation. The budget is charged each pause's
-    /// requested length; the 0.5 s under [`WIRE_WAIT_MAX`] absorbs a timer's
-    /// overrun of the at most 19 pauses, so the wall-clock wait stays within
-    /// 10 s.
+    /// 50 ms apart, 9 s per operation. The budget is charged each pause's
+    /// requested length; the 1 s under [`WIRE_WAIT_MAX`] absorbs a timer's
+    /// overrun of the at most 180 pauses (about 5 ms each, against about 26 ms
+    /// at the old 500 ms / 9.5 s), so the wall-clock wait stays within 10 s.
+    ///
+    /// The pause is shorter than the gap a sender leaves between operations
+    /// (the 500 ms request spacing, or less if that is ever lowered): a waiter
+    /// polling every 500 ms against a 250 ms gap kept landing on a held lock
+    /// and waited a median 2 s, against 0.1 s at a 500 ms gap (#595 C6). The
+    /// cost is about 20 open-and-try-lock calls a second for an operation that
+    /// is waiting.
     pub const DEFAULT: Self = Self {
-        delay: Duration::from_millis(500),
-        total: Duration::from_millis(9_500),
+        delay: Duration::from_millis(50),
+        total: Duration::from_millis(9_000),
     };
 
     /// `None` for a zero delay (a pause that charges nothing would never

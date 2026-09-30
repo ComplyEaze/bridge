@@ -5,7 +5,7 @@ and macOS. A smoke bundle is not a production release.
 
 ## Supported build baseline
 
-- Source release line: `0.2.x` under Apache-2.0
+- Source release line: 0.2.0 and later under Apache-2.0 (`v0.1.0` was MIT)
 - Node.js: supported 24.x releases (>=24.15.0); CI uses `.node-version`
 - pnpm: the exact `packageManager` version in `package.json`
 - Rust: the exact channel and components in `rust-toolchain.toml`

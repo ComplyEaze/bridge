@@ -617,6 +617,9 @@ disagree.
 
 - Each release gets an "In plain words" section above the detailed entries,
   written from the merged pull requests since the last build.
+- While the changes are unreleased, head the first part "What the next build
+  adds", so nothing unpublished reads as available. Rename it "What you can do
+  now" when the section becomes the release.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
@@ -635,8 +638,10 @@ disagree.
   published one. With no template, or one without the marker, the deploy uses
   a plain built-in page and never fails.
 - At cut time, in the pull request that bumps the version: rename the
-  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
-  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, change
+  its first part's heading from "What the next build adds" to "What you can do
+  now" and its "in source since" title to name the new build, and leave a fresh
+  `## [Unreleased]` above it. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read

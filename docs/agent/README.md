@@ -96,9 +96,14 @@ balance-free catalogue read (a stable pair, bound to the company by name and GUI
 parent groups are packed by ledger count into parts of at most 4,266 ledgers and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
-catalogue gave it; otherwise the whole call is refused and nothing partial is returned (causes
-`parent_part_rows_missing`, `parent_part_row_outside_parents`, `parent_part_row_not_in_catalogue`,
-`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). Ledgers under a parent group
+catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
+whose master comes back with a different ledger count than the catalogue holds under its parents
+ends the read after that master (`parent_part_row_count_differs`): its balance, any later part and
+the group read are never requested, but the master pair itself was sent, the complement's included.
+The other causes are `parent_part_rows_missing`, `parent_part_row_outside_parents`,
+`parent_part_row_not_in_catalogue`, `parent_part_row_differs_from_catalogue` and
+`parent_part_row_repeated`. A part whose answer passes the response limit ends the read with
+`parent_part_response_too_large`: Tally may have ignored its filter. Ledgers under a parent group
 whose name cannot sit in a filter, such as one with a control character, are read as one extra
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book

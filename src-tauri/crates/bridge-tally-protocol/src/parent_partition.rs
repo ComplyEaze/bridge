@@ -59,6 +59,11 @@ pub enum ParentPartitionError {
     TooManyParts { parts: u64 },
     /// The complement part's `NOT` formulas would exceed the request-size limit.
     ComplementOverBudget,
+    /// A part answered a different number of ledgers than the catalogue holds
+    /// under its parents. Checked as soon as the part's master is read, so a
+    /// filter that did not do what was asked ends the read after that master:
+    /// the part's balance and every later request are never sent.
+    PartRowCountDiffers,
     /// A part answered a row whose parent is not one of that part's parents.
     RowOutsideParts,
     /// A part answered a row the catalogue does not hold.
@@ -82,6 +87,7 @@ impl ParentPartitionError {
             Self::ParentOverBudget { .. } => "parent_over_budget",
             Self::TooManyParts { .. } => "parent_partition_too_many_parts",
             Self::ComplementOverBudget => "parent_complement_over_budget",
+            Self::PartRowCountDiffers => "parent_part_row_count_differs",
             Self::RowOutsideParts => "parent_part_row_outside_parents",
             Self::RowNotInCatalogue => "parent_part_row_not_in_catalogue",
             Self::RowDiffersFromCatalogue => "parent_part_row_differs_from_catalogue",
@@ -101,6 +107,9 @@ impl std::fmt::Display for ParentPartitionError {
             Self::TooManyParts { .. } => "the parent groups need more parts than allowed",
             Self::ComplementOverBudget => {
                 "the filter that reaches the remaining ledgers is larger than allowed"
+            }
+            Self::PartRowCountDiffers => {
+                "a part returned a different number of ledgers than the catalogue holds"
             }
             Self::RowOutsideParts => "a part returned a ledger outside its parent groups",
             Self::RowNotInCatalogue => "a part returned a ledger the catalogue does not hold",
@@ -238,6 +247,17 @@ impl ParentPart {
     /// The ledgers the catalogue holds under this part's parents.
     pub fn ledger_count(&self) -> u64 {
         self.ledger_count
+    }
+
+    /// Whether a master response of `rows` ledgers is the count the catalogue
+    /// holds under this part's parents. A filter Tally did not apply as asked
+    /// answers more or fewer, and the run must stop before the next request.
+    pub fn check_row_count(&self, rows: usize) -> Result<(), ParentPartitionError> {
+        if u64::try_from(rows) == Ok(self.ledger_count) {
+            Ok(())
+        } else {
+            Err(ParentPartitionError::PartRowCountDiffers)
+        }
     }
 
     /// The formulas the request adds. A named part has one,

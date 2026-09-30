@@ -777,7 +777,7 @@ fn a_filter_report_names_at_most_twenty_sub_groups_and_counts_them_all() {
 mod through_the_tool {
     use super::*;
     use tally_protocol_simulator::{
-        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
 
     const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -1202,25 +1202,89 @@ mod through_the_tool {
         error["cause"].as_str().unwrap().to_owned()
     }
 
+    /// The reads of a split book that end where Bridge must stop: the
+    /// catalogue, then each read in `reads`, and nothing after it. Fails if
+    /// Bridge sent a request past the refusal, and returns the cause.
+    async fn stops_after(rows: &[Generated], reads: Vec<String>) -> String {
+        let mut sequence = vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())];
+        sequence.extend(reads);
+        let plans = marked_compliance_plans(6_000, sequence, None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent past the refusal");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        error["cause"].as_str().unwrap().to_owned()
+    }
+
     /// A part that omits one of its parent's ledgers, as when a ledger was
-    /// deleted, or a filter was ignored in the wrong direction, is refused.
+    /// deleted, or a filter was ignored in the wrong direction, stops the read
+    /// right after its master: its balance and every later part are never
+    /// requested (#679).
     #[tokio::test]
-    async fn a_part_that_omits_a_ledger_of_its_parents_is_refused() {
+    async fn a_part_that_omits_a_ledger_of_its_parents_stops_the_read_after_its_master() {
         let rows = split_book();
         let mut short = under(&rows, &[BIG, NESTED]);
         short.pop();
-        let cause = split_refusal(part_reads(&short), part_reads(&under(&rows, &[OTHER]))).await;
-        assert_eq!(cause, "parent_part_rows_missing");
+        let cause = stops_after(&rows, vec![part_reads(&short).0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
     }
 
     /// A part that carries another part's ledger, as when Tally ignored the
-    /// filter, is refused rather than deduplicated.
+    /// filter, stops the read the same way rather than being deduplicated.
     #[tokio::test]
-    async fn a_part_that_carries_another_parts_ledger_is_refused() {
+    async fn a_part_that_carries_another_parts_ledger_stops_the_read_after_its_master() {
         let rows = split_book();
         let mut wide = under(&rows, &[BIG, NESTED]);
         wide.push(under(&rows, &[OTHER])[0]);
-        let cause = split_refusal(part_reads(&wide), part_reads(&under(&rows, &[OTHER]))).await;
+        let cause = stops_after(&rows, vec![part_reads(&wide).0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A part whose answer passes the response cap, as when Tally ignored its
+    /// filter and returned the whole book, is refused under its own cause, not
+    /// as a bare read failure, and nothing is sent after it (#679).
+    #[tokio::test]
+    async fn a_part_past_the_response_cap_is_refused_under_its_own_cause() {
+        let rows = split_book();
+        let mut plans = marked_compliance_plans(
+            6_000,
+            vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
+            None,
+        );
+        plans.push(
+            xml(part_reads(&under(&rows, &[BIG, NESTED])).0).with_framing(
+                ResponseFraming::DeclaredContentLength {
+                    bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+                },
+            ),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(
+            requests, total,
+            "a request was sent past the oversized answer"
+        );
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "parent_part_response_too_large");
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("parent_part_response_too_large").unwrap()
+        );
+    }
+
+    /// A part with the right number of ledgers, one of them another part's,
+    /// passes the count and is refused by coverage after the whole bracket.
+    #[tokio::test]
+    async fn a_part_that_swaps_in_another_parts_ledger_is_refused_by_coverage() {
+        let rows = split_book();
+        let mut swapped = under(&rows, &[BIG, NESTED]);
+        swapped.pop();
+        swapped.push(under(&rows, &[OTHER])[0]);
+        let cause = split_refusal(part_reads(&swapped), part_reads(&under(&rows, &[OTHER]))).await;
         assert_eq!(cause, "parent_part_row_outside_parents");
     }
 
@@ -1351,17 +1415,50 @@ mod through_the_tool {
         assert_eq!(response["structuredContent"]["result"]["total"], 4_303);
     }
 
-    /// A complement part that returns a ledger of a named part, as when the
-    /// exclusion was ignored, is refused as a repeat rather than deduplicated.
+    /// A named part that comes back short stops the read before the
+    /// complement is requested: the complement's filter is built on the same
+    /// assumption, so nothing more is sent to Tally (#679).
     #[tokio::test]
-    async fn a_complement_part_that_carries_a_named_ledger_is_refused() {
+    async fn a_short_named_part_stops_the_read_before_the_complement_is_sent() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut short = under(&rows, &[OTHER]);
+        short.pop();
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&short);
+        let cause = stops_after(&rows, vec![first.0, first.1, second.0]).await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A complement part that returns a ledger of a named part, as when the
+    /// exclusion was ignored, stops the read after its master.
+    #[tokio::test]
+    async fn a_complement_part_that_carries_a_named_ledger_stops_the_read() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut wide = under(&rows, &[ODD]);
+        wide.push(under(&rows, &[OTHER])[0]);
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&under(&rows, &[OTHER]));
+        let cause = stops_after(
+            &rows,
+            vec![first.0, first.1, second.0, second.1, part_reads(&wide).0],
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_count_differs");
+    }
+
+    /// A complement part that swaps one unnameable ledger for a named one has
+    /// the right count, so coverage refuses it as a repeat once the bracket is
+    /// read.
+    #[tokio::test]
+    async fn a_complement_part_that_swaps_in_a_named_ledger_is_refused_as_a_repeat() {
         let (_, plans) = complement_book(3, |rows| {
-            let mut wide = under(rows, &[ODD]);
-            wide.push(under(rows, &[OTHER])[0]);
+            let mut swapped = under(rows, &[ODD]);
+            swapped.pop();
+            swapped.push(under(rows, &[OTHER])[0]);
             [
                 part_reads(&under(rows, &[BIG, NESTED])),
                 part_reads(&under(rows, &[OTHER])),
-                part_reads(&wide),
+                part_reads(&swapped),
             ]
         });
         let total = plans.len();
@@ -1371,23 +1468,21 @@ mod through_the_tool {
         assert_eq!(refusal(&response)["cause"], "parent_part_row_repeated");
     }
 
-    /// A complement part that omits one of the unnameable ledgers is refused.
+    /// A complement part that omits one of the unnameable ledgers stops the
+    /// read after its master.
     #[tokio::test]
-    async fn a_complement_part_that_omits_a_ledger_is_refused() {
-        let (_, plans) = complement_book(3, |rows| {
-            let mut short = under(rows, &[ODD]);
-            short.pop();
-            [
-                part_reads(&under(rows, &[BIG, NESTED])),
-                part_reads(&under(rows, &[OTHER])),
-                part_reads(&short),
-            ]
-        });
-        let total = plans.len();
-        let (response, requests) =
-            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
-        assert_eq!(requests, total);
-        assert_eq!(refusal(&response)["cause"], "parent_part_rows_missing");
+    async fn a_complement_part_that_omits_a_ledger_stops_the_read() {
+        let (rows, _) = complement_book(3, complement_reads);
+        let mut short = under(&rows, &[ODD]);
+        short.pop();
+        let first = part_reads(&under(&rows, &[BIG, NESTED]));
+        let second = part_reads(&under(&rows, &[OTHER]));
+        let cause = stops_after(
+            &rows,
+            vec![first.0, first.1, second.0, second.1, part_reads(&short).0],
+        )
+        .await;
+        assert_eq!(cause, "parent_part_row_count_differs");
     }
 
     /// More unnameable ledgers than one read holds are refused right after
@@ -1836,7 +1931,7 @@ mod through_the_tool {
             json!({"company_guid":GUID,"as_of":"20260331"}),
             json!({"company_guid":GUID,"fields":"basic","as_of":"20260331"}),
         ] {
-            let (response, requests) = call_refused_before_any_request(args.clone()).await;
+            let (response, requests) = call(Vec::new(), args.clone()).await;
             assert_eq!(requests, 0, "{args}");
             let error = refusal(&response);
             assert_eq!(
@@ -1851,7 +1946,8 @@ mod through_the_tool {
 
     #[tokio::test]
     async fn an_impossible_as_of_date_is_refused_before_any_request() {
-        let (response, requests) = call_refused_before_any_request(
+        let (response, requests) = call(
+            Vec::new(),
             json!({"company_guid":GUID,"fields":"compliance","as_of":"20260231"}),
         )
         .await;
@@ -2400,42 +2496,18 @@ mod through_the_tool {
         call_with_max_bytes(plans, args, 200_000).await
     }
 
-    /// A call that should be refused before it sends anything. The simulator
-    /// needs at least one plan, so it holds one it serves only if a request is
-    /// sent; the requests Bridge actually sent are counted after a cancel,
-    /// whose wake-up connection carries no method.
-    async fn call_refused_before_any_request(args: Value) -> (Value, usize) {
-        let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
-        let directory = tempfile::tempdir().unwrap();
-        let server = Server::new(Settings {
-            endpoint: TallyEndpointConfig {
-                host: "127.0.0.1".into(),
-                port: simulator.address().port(),
-            },
-            data_dir: directory.path().into(),
-            max_rows: 500,
-            max_bytes: 200_000,
-            redaction: Redaction::None,
-            import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
-        });
-        let response = server.call_tool("ledger_masters", args).await;
-        simulator.cancel();
-        let requests = simulator
-            .finish()
-            .unwrap()
-            .into_iter()
-            .filter(|request| !request.method.is_empty())
-            .count();
-        (response, requests)
-    }
-
     async fn call_with_max_bytes(
         plans: Vec<ScenarioPlan>,
         args: Value,
         max_bytes: usize,
     ) -> (Value, usize) {
+        // The simulator stops serving when its plans run out, so a request
+        // past them would reach a closed port and never be counted. A last
+        // plan that is served only if such a request is sent lets the count
+        // go over `plans.len()`; the cancel's wake-up connection carries no
+        // method and is not counted.
+        let mut plans = plans;
+        plans.push(status());
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(Settings {
@@ -2452,7 +2524,13 @@ mod through_the_tool {
             batch_post_enabled: false,
         });
         let response = server.call_tool("ledger_masters", args).await;
-        let requests = simulator.finish().unwrap().len();
+        simulator.cancel();
+        let requests = simulator
+            .finish()
+            .unwrap()
+            .into_iter()
+            .filter(|request| !request.method.is_empty())
+            .count();
         (response, requests)
     }
 

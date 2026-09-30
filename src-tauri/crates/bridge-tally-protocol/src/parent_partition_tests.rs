@@ -199,6 +199,12 @@ fn a_complement_over_the_ledger_limit_is_refused_not_split() {
         plan(&all, LIMITS).unwrap_err(),
         ParentPartitionError::ParentOverBudget { ledgers: 11 }
     );
+    assert!(plan(&with_unsupported(&[("A", 1)], 10), LIMITS)
+        .unwrap()
+        .parts()
+        .last()
+        .unwrap()
+        .is_complement());
 }
 
 fn with_unsupported(
@@ -535,6 +541,7 @@ fn every_error_has_a_distinct_safe_code() {
         ParentPartitionError::ParentOverBudget { ledgers: 1 },
         ParentPartitionError::TooManyParts { parts: 1 },
         ParentPartitionError::ComplementOverBudget,
+        ParentPartitionError::PartRowCountDiffers,
         ParentPartitionError::RowOutsideParts,
         ParentPartitionError::RowNotInCatalogue,
         ParentPartitionError::RowDiffersFromCatalogue,
@@ -544,4 +551,22 @@ fn every_error_has_a_distinct_safe_code() {
     .map(ParentPartitionError::safe_code);
     let unique = codes.iter().collect::<HashSet<_>>();
     assert_eq!(unique.len(), codes.len());
+}
+
+#[test]
+fn a_part_accepts_only_its_catalogue_row_count() {
+    let partition = plan(&rows(&[("A", 2)]), LIMITS).unwrap();
+    let part = &partition.parts()[0];
+    assert_eq!(part.check_row_count(2), Ok(()));
+    for wrong in [0, 1, 3] {
+        assert_eq!(
+            part.check_row_count(wrong),
+            Err(ParentPartitionError::PartRowCountDiffers),
+            "{wrong}"
+        );
+    }
+    assert_eq!(
+        ParentPartitionError::PartRowCountDiffers.safe_code(),
+        "parent_part_row_count_differs"
+    );
 }

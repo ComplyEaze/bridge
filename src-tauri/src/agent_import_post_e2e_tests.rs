@@ -780,6 +780,49 @@ async fn a_batch_post_records_its_step_verdict_before_the_readback() {
     );
 }
 
+/// A batch post whose marks readback fails records the cause with the step
+/// doubt (#884), in the result and in the durable file; the verdict stays a
+/// doubt either way.
+#[tokio::test]
+async fn a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt() {
+    for (readback, cause) in [
+        (None, "response_encoding_invalid"),
+        (Some(xml(created_one())), "marks_readback_unparsed"),
+    ] {
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.extend(readback);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = batch_server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch_of_two(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["post_location"]["after_read_failure"], cause,
+            "{response}"
+        );
+        assert_eq!(
+            result["post_location"]["state"], "after_snapshot_unavailable",
+            "{response}"
+        );
+        let imports = server.imports_dir().unwrap();
+        let doubt: Value = serde_json::from_slice(
+            &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(doubt["state"], "unmatched", "{doubt}");
+        assert_eq!(doubt["cause"], cause, "{doubt}");
+        assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
+    }
+}
+
 /// With batch posting off, a batch of two is refused before any request.
 #[tokio::test]
 async fn a_batch_is_refused_while_batch_posting_is_off() {
@@ -3200,6 +3243,30 @@ async fn a_failed_readback_after_a_doubted_post_still_carries_the_doubt() {
         masters_check_of(&server, BATCH),
         result["masters_after_post"]
     );
+}
+
+/// Only a busy wire lock earns the marks readback its retry (#884): a read
+/// that failed on the wire is asked once, so the retry never doubles a send
+/// Tally already answered badly.
+#[tokio::test]
+async fn a_marks_readback_that_failed_for_another_reason_is_sent_once() {
+    // No readback is scripted: a status answers it, so it fails. A second
+    // one is there to be consumed by a retry that must not happen.
+    let simulator = SequenceSimulator::spawn(with_sentinel(vec![status()])).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let request = crate::tally::agent_read_request::AgentReadRequest::parse(
+        super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+    )
+    .unwrap();
+    let result = server
+        .read_marks_after_post(request, std::time::Instant::now())
+        .await;
+    assert!(
+        result.is_err(),
+        "the sentinel must fail the read: {result:?}"
+    );
+    assert_eq!(sent(simulator).len(), 1);
 }
 
 /// A verdict replaces a pending check; an observed doubt outranks any later

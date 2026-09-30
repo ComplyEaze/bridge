@@ -884,7 +884,10 @@ been removed. Gross exposure is not net money due.
 Bills Receivable and Bills Payable reports scope them, not the type of party, and
 those reports carry no bill type. A customer's advance, or a credit note raised to
 a customer, appears under `payable`; a supplier's advance, or a debit note raised
-to a supplier, appears under `receivable`. An open bill's `kind` is therefore a
+to a supplier, appears under `receivable`. That holds for an advance or a note
+kept as its own bill: an on-account advance goes to `unallocated` instead, and a
+credit note set against an open invoice reduces that invoice. It was measured on one
+synthetic book (TallyPrime Silver 7.1). An open bill's `kind` is therefore a
 direction, not "owed by a customer" or "owed to a supplier": with a 50,000
 supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
 `payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction

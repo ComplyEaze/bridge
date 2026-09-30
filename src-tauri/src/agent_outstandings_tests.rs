@@ -448,6 +448,10 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
         "not the type of party",
         "a customer's advance or a credit note raised to a customer appears under payable",
         "a supplier's advance or a debit note raised to a supplier under receivable",
+        "That holds for an advance or a note kept as its own bill",
+        "an on-account advance goes to the unallocated figure instead",
+        "a credit note set against an open invoice reduces that invoice",
+        "Measured on one synthetic book (TallyPrime Silver 7.1)",
         "Read a bill's `kind` as a direction",
         "net into one figure",
     ] {

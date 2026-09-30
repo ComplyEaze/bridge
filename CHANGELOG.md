@@ -54,8 +54,6 @@ Each line names the pull requests it comes from.
   covers (#755, #769, #809, #813, #831).
 - Tally's own error text on a rejected line is read safely, including text
   with an `&` in it (#763).
-- The desktop app's documents upload skips unchanged copies of the
-  party-statement batches it wrote (#847).
 
 **Also in source**
 
@@ -64,6 +62,17 @@ Each line names the pull requests it comes from.
   #744, #788).
 - The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
   (#805).
+
+**Removed**
+
+- The desktop app's unfinished document-sync feature is gone: the AXAL
+  sign-in, the code that scanned a folder and uploaded the files you chose to
+  ComplyEaze cloud storage, and the two hidden screens for them. No Bridge tool
+  could reach them, and no navigation led to them. After this change the only
+  network client in Bridge's own code connects to Tally on your own computer, and
+  the CI egress gate fails if a reqwest or hyper client appears elsewhere in the
+  app or in Bridge's other crates. The feature can be rebuilt from the git history if it
+  is needed again (#PR).
 
 ## [0.3.0] - 2026-09-26
 

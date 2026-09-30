@@ -119,10 +119,6 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 ///   pinned file.
 ///
 /// What leaves the machine, and the record of it:
-/// - `documents.rs` -- which storage URLs customer documents may be uploaded
-///   to, and the file checks made before an upload.
-/// - `axal.rs` -- which AXAL API origins may receive credentialed requests,
-///   and that its API client follows no redirects.
 /// - `agent_protocol.rs` -- the MCP response loop, which records an egress
 ///   receipt for a tool response before writing it and decides what is sent
 ///   when recording fails.
@@ -339,15 +335,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // party is a cash withdrawal or deposit, which answers a person may give for
 // one, which need a ledger and which Bridge refuses; a defect there could post
 // a cash line to a ledger nobody chose.
-// `src-tauri/src/export_registry.rs` (bridge#833) records the files Bridge
-// exports from Tally data (bulk party statements so far), and the documents
-// uploader skips a file whose hash it holds; a defect there uploads a
-// client's exported statements from a folder the user syncs.
 // `bridge-tally-protocol/src/xml_text.rs` (bridge#832) is the one escaper every
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value
 // break out of the element it belongs to.
-pub const MAX_SURFACE_FILES: usize = 291;
+pub const MAX_SURFACE_FILES: usize = 288;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

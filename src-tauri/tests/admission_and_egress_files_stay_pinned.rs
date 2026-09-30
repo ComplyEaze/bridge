@@ -18,7 +18,7 @@ const SURFACE: &str = include_str!("../../docs/tally/compatibility/compatibility
 /// (bridge#416). The reason for each is recorded beside `MAX_SURFACE_FILES` in
 /// `tools/bridge-tally-compatibility/src/lib.rs`; it is not repeated here, so
 /// the two cannot drift apart.
-const ADMISSION_AND_EGRESS: [&str; 14] = [
+const ADMISSION_AND_EGRESS: [&str; 12] = [
     "src-tauri/crates/bridge-tally-protocol/src/group_ancestry.rs",
     "src-tauri/src/agent_company.rs",
     "src-tauri/src/agent_delivery.rs",
@@ -28,8 +28,6 @@ const ADMISSION_AND_EGRESS: [&str; 14] = [
     "src-tauri/src/agent_import_persistence.rs",
     "src-tauri/src/agent_import_post.rs",
     "src-tauri/src/agent_protocol.rs",
-    "src-tauri/src/axal.rs",
-    "src-tauri/src/documents.rs",
     "src-tauri/src/endpoint_coordination.rs",
     "src-tauri/src/tally/approved_import.rs",
     "src-tauri/src/tally/runtime_control.rs",

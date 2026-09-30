@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Locks in the README's central privacy promise (README.md, 'What it does not do'):
+// Bridge reads Tally over a local connection and hands what it reads to the
+// assistant you are talking to; nothing in the Tally path sends it to a
+// server of ours.
 //
-//   "Your Tally data is never uploaded. Bridge reads it over a local
-//   connection and hands it to the assistant you are talking to; nothing in
-//   the Tally path sends it to a server of ours."
+// Bridge's own code has one network client: the loopback Tally transport. An
+// earlier unfinished document-upload feature and AXAL sign-in (axal.rs,
+// documents.rs) were removed, so this gate now allows only the Tally
+// connection files to name an HTTP client in the app crate's source, and only
+// the app crate and the Tally transport to depend on one. It checks where
+// network code may live; it does not by itself prove that no data leaves the
+// machine.
 //
-// and the separation promise for the upload-capable parts of the app
-// (README.md, 'One part of the app does upload'):
-//
-//   "Bridge also contains a document feature that uploads files you choose
-//   to ComplyEaze cloud storage, and an AXAL sign-in. Those are separate and
-//   user-initiated, and share no code with the Tally path described here"
-//
-// Before this gate, both sentences were prose: nothing stopped a new
-// `reqwest` call site from landing anywhere in the tree, including inside
-// the Tally read/write path itself.
+// Before this gate, the promise was prose: nothing stopped a new `reqwest`
+// call site from landing anywhere in the tree, including inside the Tally
+// read/write path itself.
 //
 // Two checks, deliberately different in what they can see:
 //
@@ -26,10 +26,9 @@
 //    compile-time property -- cargo will not link a crate against reqwest
 //    unless its Cargo.toml says so -- but it only sees crate boundaries. It
 //    cannot see what a crate that *is* allowed to depend on reqwest
-//    (`bridge`, the app crate, which legitimately needs it for
-//    axal.rs/documents.rs -- see the note above APP_CRATE: both ship in the
-//    extension binary too, not only in the desktop app) does with that
-//    dependency inside its own files. It follows normal, build and dev
+//    (`bridge`, the app crate, which needs it for the Tally connection
+//    wrapper -- see the note above APP_CRATE) does with that dependency
+//    inside its own files. It follows normal, build and dev
 //    edges alike: a dev- or build-dependency on reqwest in a crate outside
 //    the allow-list is refused too, since a test double or build script
 //    that can open a connection is still egress from a developer's machine.
@@ -90,19 +89,16 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 // declare reqwest *directly*, not which crates reach it transitively.
 const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 
-// `bridge` is the app crate. It legitimately depends on reqwest directly for
-// two things that are NOT the Tally path: axal.rs (AXAL sign-in / cloud
-// storage) and documents.rs (the document upload feature). The README paragraph
-// 'One part of the app does upload' names both explicitly as the parts of the
-// app that DO upload.
+// `bridge` is the app crate. It depends on reqwest directly for one thing
+// only: the Tally connection wrapper (src/tally/connection.rs), which reaches
+// Tally itself over loopback through bridge-tally-transport. It has no other
+// network destination.
 //
-// Do not read "app crate" as "Tauri only". Both modules are declared
-// unconditionally in lib.rs, with no cfg(feature) gate; src/bin/bridge_mcp.rs
-// links bridge_lib; and scripts/package-mcpb.mjs ships bridge_mcp as the
-// extension binary. So this reqwest edge is compiled into the artifact a user
-// installs, not just into the desktop app. The honest claim is "present and
-// unreachable from the agent surface", not "absent" -- and "unreachable" is
-// what source check 2 below exists to keep true.
+// Do not read "app crate" as "Tauri only". src/bin/bridge_mcp.rs links
+// bridge_lib, and scripts/package-mcpb.mjs ships bridge_mcp as the extension
+// binary, so this reqwest edge is compiled into the artifact a user installs,
+// not just into the desktop app. Source check 2 below keeps it confined to the
+// Tally connection files.
 //
 // The standard this gate is modelled on is the Tally transport's own loopback
 // guard, which is stronger than a file allow-list: `endpoint_url` special-cases
@@ -231,11 +227,6 @@ for (const workspace of workspaces) {
 // silently in either direction -- same shape as
 // admission_and_egress_files_stay_pinned.rs's pin check.
 const APP_CRATE_HTTP_ALLOW_LIST = new Set([
-  // AXAL sign-in and document upload: the two features the README paragraph
-  // 'One part of the app does upload' names as the parts of the app that DO
-  // upload, on purpose, user-initiated.
-  "src-tauri/src/axal.rs",
-  "src-tauri/src/documents.rs",
   // The Tally HTTP transport wrapper: reqwest is used here, but only to
   // reach Tally itself over loopback (bridge-tally-transport's
   // `canonical_loopback_origin` rejects any other host before a request is
@@ -285,10 +276,9 @@ if (unlistedCallSites.length) {
   egressViolations.push(
     "src-tauri/src: found an outbound HTTP client or raw socket construction outside the pinned " +
       `allow-list (${[...APP_CRATE_HTTP_ALLOW_LIST].sort().join(", ")}): ${unlistedCallSites.join(", ")}. ` +
-      'This falsifies the README promise "nothing in the Tally path sends it to a server of ours" ' +
-      "(README.md, 'What it does not do') unless the new call site is one of the app's already-documented upload " +
-      "features (README.md, 'One part of the app does upload'). If it is, add it to APP_CRATE_HTTP_ALLOW_LIST in " +
-      "scripts/check-tally-egress-boundary.mjs with a reviewed reason; if it is not, it does not belong.",
+      "Bridge's only network destination is the local Tally (README.md, 'What it does not do'). A new call site " +
+      "belongs here only if it reaches Tally itself over loopback: add it to APP_CRATE_HTTP_ALLOW_LIST in " +
+      "scripts/check-tally-egress-boundary.mjs with a reviewed reason; otherwise it does not belong.",
   );
 }
 if (staleAllowListEntries.length) {
@@ -301,9 +291,8 @@ if (staleAllowListEntries.length) {
 
 if (egressViolations.length) {
   throw new Error(
-    "Tally-path egress boundary violated -- this protects the README promise " +
-      '"Your Tally data is never uploaded ... nothing in the Tally path sends it to a server of ours" ' +
-      "(README.md, 'What it does not do'):\n" +
+    "Tally-path egress boundary violated -- this protects the README promise that nothing in the Tally path " +
+      "sends Tally data to a server of ours (README.md, 'What it does not do'):\n" +
       egressViolations.map((violation) => `- ${violation}`).join("\n"),
   );
 }

@@ -415,7 +415,12 @@ licence mode, or manually imported file, and only an unnumbered single-voucher
    `Receipt` and `Contra` **both fields are refused** — neither element's fate
    has been observed on those types, and the bank's own reference belongs in
    the narration, which survives. A payload carrying one is rejected before any
-   live read.
+   live read. A batch that is not an amendment and holds a row another batch of
+   the company already sent to Tally, or that a readback found posted, is
+   refused here as `import_txn_already_posted` (described under approved voucher
+   posting) and no file is written: a hand import of that file would post the
+   row again. An amendment alters vouchers in place and adds none, so it is not
+   checked.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a
@@ -544,8 +549,8 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_txn_already_posted` (below), where a rebuilt row is refused again.
    A batch holding a row that another batch of the same company already sent to
    Tally, or that a readback found posted, refuses with
-   `import_txn_already_posted`, both before the approval dialog and again under
-   the lock (#876). Two vouchers are the same row when they share a
+   `import_txn_already_posted` at build, before the approval dialog and again
+   under the lock (#876). Two vouchers are the same row when they share a
    transaction id and either the id is the `st-YYYYMMDD-<16 hex>` form a
    bank-statement build derives (it survives a change of ledger) or their date
    and amounts agree. Do not rebuild the row: verify the
@@ -553,8 +558,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    when the journal was busy for the lookup; then verify the company's recent
    batches). For an overlapping statement, rebuild without the rows already
    posted. The refusal is never lifted by Bridge: if Tally rejected the earlier
-   batch and the voucher is not in Tally, the user enters it in Tally, or
-   imports by hand the file of the batch that carries the corrected row.
+   batch and the voucher is not in Tally, the user enters it in Tally.
    Limits: a
    batch imported by hand through Tally's Import menu counts only after
    `verify_import` has recorded `posted_verified` for the whole batch, so one
@@ -565,7 +569,13 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
    of the same statement (other amount formatting or narration wrapping) derives
    different ids and is not seen; two Bridge installs on one company keep
-   separate journals.
+   separate journals. The check at build is a point in time: a batch posted
+   natively after this one was built sees it only as built, so a file already
+   written can still be imported by hand after that post, and two hand imports
+   of one file are not seen at all. A build that is an amendment is not checked,
+   and a row that no earlier batch holds by id is not seen. An overlapping
+   statement that shares a boundary date with a posted one cannot be rebuilt
+   without that date's other rows, so those go in by hand in Tally.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the

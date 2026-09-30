@@ -723,6 +723,33 @@ impl Server {
                 Some(_) => Some(self.amendment_lineage_while_admitted(&payload)?),
                 None => None,
             };
+            // A row another batch of this company already sent to Tally is not
+            // written out again, or a hand import of this file would post it a
+            // second time (#876). An amendment alters vouchers in place and adds
+            // none, so it is exempt. The refusal carries the blocking batch: an
+            // agent told only "already posted" rebuilds or hunts for it.
+            if lineage.is_none() {
+                if let Some(blocking) = self.import_vouchers_already_posted_while_admitted(
+                    &canonical_batch_guid(&payload.company_guid),
+                    &payload.vouchers,
+                )? {
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"error": {
+                            "code":"import_txn_already_posted",
+                            "message":"No file was written: another batch of this company already sent, or was found to have posted, a row of this batch.",
+                            "blocking_batch_id":blocking,
+                            "next_step":BUILD_TXN_ALREADY_POSTED_NEXT_STEP
+                        }}}),
+                        evidence: Evidence {
+                            state: "partial",
+                            reason_code: Some("import_txn_already_posted".to_string()),
+                            ..accumulated.clone()
+                        },
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
+                }
+            }
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
             let (_, repeated_catalogue_evidence) =
@@ -1632,6 +1659,19 @@ impl Server {
         }
     }
 
+    /// The batch, already sent or found posted, that holds a row of a build's
+    /// `vouchers`.
+    fn import_vouchers_already_posted_while_admitted(
+        &self,
+        company_guid: &str,
+        vouchers: &[ImportVoucher],
+    ) -> Result<Option<String>, String> {
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::vouchers_already_posted(reader, company_guid, None, vouchers),
+            None => Ok(None),
+        }
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,
@@ -1693,6 +1733,11 @@ impl Server {
 }
 
 const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; not yet for an edit made in Tally's own screens). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those Bridge advises adding after an import, are expected to be lost; that loss, and what happens to a reference, were not measured directly. An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra; an import through Tally's own Import menu was not measured.";
+
+/// Why no file was written for a row another batch already sent (#876), and what
+/// to do instead. It never offers a hand import of this row: that is the second
+/// post the refusal exists to stop.
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, the row is in the books: build again without that row, and never import a file that carries it. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
 
 const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. Bridge does not post amendments (post_import refuses them), so import the written file by hand, promptly, then use verify_import; do not call post_import for this batch.";
 

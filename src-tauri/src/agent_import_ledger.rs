@@ -340,8 +340,24 @@ pub(super) fn rows_already_posted(
     reader: impl BufRead,
     batch: &ImportLedgerLine,
 ) -> Result<Option<String>, String> {
+    vouchers_already_posted(
+        reader,
+        &batch.company_guid,
+        Some(&batch.batch_id),
+        &batch.vouchers,
+    )
+}
+
+/// The same check for vouchers not yet in a batch (a build), where no batch id
+/// of their own exists to skip.
+pub(super) fn vouchers_already_posted(
+    reader: impl BufRead,
+    company_guid: &str,
+    own_batch_id: Option<&str>,
+    vouchers: &[ImportVoucher],
+) -> Result<Option<String>, String> {
     let mut wanted: BTreeMap<&str, Vec<Option<RowShape>>> = BTreeMap::new();
-    for voucher in &batch.vouchers {
+    for voucher in vouchers {
         wanted
             .entry(voucher.bridge_txn_id.as_str())
             .or_default()
@@ -350,8 +366,8 @@ pub(super) fn rows_already_posted(
     let mut holds_a_row = BTreeSet::new();
     let mut sent_or_found = BTreeSet::new();
     scan_records(reader, |record, _| match record {
-        Record::Batch(other) if other.batch_id != batch.batch_id => {
-            let same_row = other.company_guid.eq_ignore_ascii_case(&batch.company_guid)
+        Record::Batch(other) if Some(other.batch_id.as_str()) != own_batch_id => {
+            let same_row = other.company_guid.eq_ignore_ascii_case(company_guid)
                 && other.vouchers.iter().any(|voucher| {
                     wanted
                         .get(voucher.bridge_txn_id.as_str())

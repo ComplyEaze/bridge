@@ -1755,15 +1755,11 @@ fn the_post_previews_stay_under_the_character_and_byte_caps_at_full_width() {
         assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
         assert_eq!(batch.lines().count(), 40, "{batch}");
         assert!(
-            batch.chars().count() < BATCH_REVIEW_MAX_CHARS,
+            batch.chars().count() < 3_200,
             "{} characters",
             batch.chars().count()
         );
-        assert!(
-            batch.len() < BATCH_REVIEW_MAX_BYTES,
-            "{} bytes",
-            batch.len()
-        );
+        assert!(batch.len() < 7_000, "{} bytes", batch.len());
     }
 }
 

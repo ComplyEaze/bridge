@@ -921,10 +921,7 @@ fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
     let (fit, refusal) = largest_fit(|pad| batch_review_grown(pad, "न", "न"), 26 * 88);
     assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
     let bytes = fit.len();
-    assert!(
-        bytes <= post::BATCH_REVIEW_MAX_BYTES && bytes + 3 > post::BATCH_REVIEW_MAX_BYTES,
-        "{bytes} bytes"
-    );
+    assert!(bytes <= 7_000 && bytes + 3 > 7_000, "{bytes} bytes");
     assert!(
         fit.chars().count() < 3_200,
         "{} characters",

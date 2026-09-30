@@ -78,11 +78,36 @@ function assertReleaseWorkflow(release) {
   assert.deepEqual(download.with, { pattern: "mcpb-preview-*", path: "release-assets", "merge-multiple": true });
   assert.deepEqual(Object.keys(check).sort(), ["env", "name", "run", "shell"], "the digest check sets nothing else");
   assert.deepEqual(check.env, { RELEASE_TAG: "${{ inputs.release_tag }}" });
-  assert.match(check.run, /set -euo pipefail/);
-  assert.match(check.run, /sha256sum "\$asset"/);
-  assert.match(check.run, /jq -r \.sha256 "\$asset\.provenance\.json"/);
-  assert.match(check.run, /"\$actual" != "\$listed" \|\| "\$actual" != "\$recorded"/);
-  assert.match(check.run, /exit 1/);
+  // The digest check is pinned line by line: an early `exit 0`, a single platform, or a digest
+  // taken from the wrong place would each leave the job green and the check switched off.
+  assert.deepEqual(
+    check.run.trim().split("\n").map((line) => line.trim()),
+    [
+      "set -euo pipefail",
+      "for platform in windows-x64 macos-arm64; do",
+      'asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"',
+      'test -f "$asset"',
+      `actual="$(sha256sum "$asset" | cut -d' ' -f1)"`,
+      `listed="$(cut -d' ' -f1 "$asset.sha256")"`,
+      'recorded="$(jq -r .sha256 "$asset.provenance.json")"',
+      'source_sha="$(jq -r .source_sha "$asset.provenance.json")"',
+      'if [[ "$actual" != "$listed" || "$actual" != "$recorded" ]]; then',
+      'echo "digest mismatch for $asset: file $actual, .sha256 $listed, provenance $recorded"',
+      "exit 1",
+      "fi",
+      'if [[ "$source_sha" != "$GITHUB_SHA" ]]; then',
+      'echo "provenance names commit $source_sha, not this run\'s $GITHUB_SHA"',
+      "exit 1",
+      "fi",
+      "done",
+    ],
+  );
+  assert.deepEqual(
+    Object.keys(attestJob).sort(),
+    ["name", "needs", "permissions", "runs-on", "steps", "timeout-minutes"],
+    "the attest job sets no env, container, strategy, defaults or services",
+  );
+  assert.equal(attestJob["runs-on"], "ubuntu-latest", "the attest job runs on a GitHub-hosted runner");
   assert.match(attest.uses, /^actions\/attest@[0-9a-f]{40}$/, "the attestation action is pinned by full commit SHA");
   assert.deepEqual(Object.keys(attest).sort(), ["name", "uses", "with"], "the attestation step sets nothing else");
   assert.deepEqual(Object.keys(attest.with), ["subject-path"], "no other attestation input is set");

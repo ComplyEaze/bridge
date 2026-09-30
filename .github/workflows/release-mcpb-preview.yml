@@ -128,9 +128,10 @@ jobs:
   # The only job that can mint an identity token. It runs no repository code and installs nothing:
   # it downloads the two archives the package jobs built, checks each against the digest the
   # package job wrote beside it, and attests them. The package jobs, which run dependency build
-  # scripts, hold contents: read only. The attestation records which workflow run and commit
-  # produced these bytes. It is not a code signature, no client checks it yet, and it does not
-  # show the code is safe.
+  # scripts, hold contents: read only. The digest check catches a mismatched or damaged download,
+  # not a package job that wrote a matching set; the attestation vouches for this run's output
+  # (which workflow run and commit produced these bytes), not for what the archive contains. It is
+  # not a code signature, no client checks it yet, and it does not show the code is safe.
   attest:
     name: Attest the built archives
     needs: package
@@ -158,8 +159,13 @@ jobs:
             actual="$(sha256sum "$asset" | cut -d' ' -f1)"
             listed="$(cut -d' ' -f1 "$asset.sha256")"
             recorded="$(jq -r .sha256 "$asset.provenance.json")"
+            source_sha="$(jq -r .source_sha "$asset.provenance.json")"
             if [[ "$actual" != "$listed" || "$actual" != "$recorded" ]]; then
               echo "digest mismatch for $asset: file $actual, .sha256 $listed, provenance $recorded"
+              exit 1
+            fi
+            if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
+              echo "provenance names commit $source_sha, not this run's $GITHUB_SHA"
               exit 1
             fi
           done

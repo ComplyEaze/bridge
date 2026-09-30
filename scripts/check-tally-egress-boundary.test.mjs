@@ -161,6 +161,7 @@ function sandbox(extra = {}) {
   const dir = realpathSync(mkdtempSync(join(bin, "repo-")));
   const files = {
     "src-tauri/clippy.toml": readFileSync(join(root, "src-tauri/clippy.toml"), "utf8"),
+    "src-tauri/build.rs": readFileSync(join(root, "src-tauri/build.rs"), "utf8"),
     "src-tauri/Cargo.lock": '[[package]]\nname = "reqwest"\n',
     "tools/Cargo.lock": '[[package]]\nname = "reqwest"\n',
     "package.json": "{}\n",
@@ -196,7 +197,26 @@ test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, 
 
 test("a clippy cfg in src-tauri Rust is refused with its line", { skip }, () => {
   const result = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(clippy))]\nfn hidden() {}\n" }).run();
-  assertRefused(result, "src-tauri/src/lib.rs:2 names clippy outside a lint path");
+  assertRefused(result, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently");
+});
+
+test("a cfg the census run compiles differently from the shipped build is refused", { skip }, () => {
+  for (const cfg of ["#[cfg(not(dev))]", "#[cfg_attr(dev, allow(dead_code))]", "#[cfg(not(debug_assertions))]", "if cfg!(debug_assertions) {"]) {
+    const result = sandbox({ "src-tauri/src/lib.rs": `fn ok() {}\n${cfg}\nfn hidden() {}\n` }).run();
+    assertRefused(result, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently from the shipped build");
+  }
+  // A feature that only contains the word, and a plain cfg, stay legal.
+  const legal = sandbox({ "src-tauri/src/lib.rs": '#[cfg(target_os = "macos")]\nfn ok() {}\n#[cfg(feature = "voucher-scan")]\nfn also_ok() {}\n' }).run();
+  assert.equal(legal.status, 0, legal.stderr);
+});
+
+test("a tracked cargo config is refused", { skip }, () => {
+  assertRefused(sandbox({ ".cargo/config.toml": "[alias]\nclippy = \"true\"\n" }).run(), ".cargo/config.toml is a cargo config");
+});
+
+test("an edit to src-tauri/build.rs without its digest is refused", { skip }, () => {
+  const result = sandbox({ "src-tauri/build.rs": 'fn main() {\n    println!("cargo:rustc-cfg=dev");\n    tauri_build::build()\n}\n' }).run();
+  assertRefused(result, "src-tauri/build.rs changed; check it sets no cfg or environment for the census run");
 });
 
 test("a second clippy.toml under src-tauri is refused", { skip }, () => {

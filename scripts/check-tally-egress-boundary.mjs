@@ -69,12 +69,16 @@
 //    concern, and the CSP does not govern a top-level navigation.
 //  - The census sees only code its clippy run compiles: the shipped targets
 //    (`--lib --bins`, release profile) with default features, on Windows and
-//    macOS. Not seen: code under `cfg(not(clippy))` (no clippy-based check can
-//    see it; the plain `clippy` cfg forms are refused, others are not); a
-//    build.rs that assembles CLIPPY_CONF_DIR or CLIPPY_ARGS instead of naming
-//    them; features the run does not enable (voucher-scan and the calibration
-//    harness, neither of which ships); Linux-only code; debug-only code; and
-//    tests, examples and benches, which do not ship.
+//    macOS (arm64 only; an x86_64 macOS build ships). Not seen: code under a cfg
+//    the run compiles differently from the shipped build (`clippy`, `dev`,
+//    `debug_assertions`: lines naming them are refused, a cfg assembled some
+//    other way is not); a build.rs or cargo config that redirects the run
+//    (the tracked build.rs is pinned by digest and no cargo config may be
+//    tracked); features the run does not enable (voucher-scan and the
+//    calibration harness, neither of which ships); Linux-only code; and tests,
+//    examples and benches, which do not ship.
+//  - A pin is (file, method, count): removing one reviewed call and adding
+//    another of the same method in the same file passes; only the diff shows it.
 //  - Removing or narrowing the census step in ci.yml is not detected here.
 //    ci.yml is a compatibility-pinned file, so an edit to it is a resealed,
 //    reviewed change.
@@ -99,28 +103,22 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 // Check 2: a clippy census of the egress lints, and the settings that keep it honest.
 // ---------------------------------------------------------------------------
 
-// src-tauri/clippy.toml lists the egress actions as `disallowed-methods` (sending an HTTP request,
-// opening or binding a socket, a DNS lookup, spawning a process, building a webview window) and
-// `disallowed-types`. A lint fires however the client or socket was obtained (an alias, a helper,
-// a returned value), which a text scan cannot see. A reviewed call site carries
-// `#[expect(clippy::disallowed_methods, reason = "...")]`, and CI's clippy steps deny warnings.
+// CI's native job writes clippy's JSON to a file (see ci.yml) and calls
+//     node scripts/check-tally-egress-boundary.mjs --census FILE OS [PINS]
+// The census counts the egress-lint firings per file and method and requires an exact two-way
+// match with the reviewed list for that OS: a new firing, a firing that stopped, a build that did
+// not finish and an empty file all fail. The pinned counts are nonzero, so a run whose lints never
+// fired cannot pass as clean. Each `--force-warn` was tried against clippy-driver 1.96.0: it still
+// fires under an attribute, a group allow, `--cap-lints allow`, `-A` and a `[lints.clippy]` table.
 //
-// What a source scan cannot settle is whether such an exemption sits where it was reviewed, so CI
-// asks rustc instead. The native job runs clippy over the shipped targets with the two lints
-// forced to warn, which no attribute, group allow, `--cap-lints`, `-A` or lint table can turn off
-// (each was tried against clippy-driver 1.96.0), writes the JSON messages to a file, and calls
-//     node scripts/check-tally-egress-boundary.mjs --census FILE OS
-// That counts what fired per file and method and requires an exact two-way match with
-// the reviewed list for that OS: a new firing, a firing that stopped, a build that did not finish
-// and an empty file all fail. The pinned counts are nonzero, so a run whose lints never fired
-// cannot pass as clean.
-//
-// scripts/tally-egress-census.json lists, per OS, [file, method, count] for each reviewed call site.
-// The entries come from a real run's output, never typed in by hand: a run that disagrees prints the
-// list it observed, and a reviewer confirms each entry before copying it there.
+// scripts/tally-egress-census.json lists, per OS, [file, method, count] for each reviewed call
+// site. The entries come from a real run's output, never typed in by hand: a run that disagrees
+// prints the list it observed, and a reviewer confirms each entry before copying it there.
 const CENSUS_PINS = `${root}scripts/tally-egress-census.json`;
 
-// The message rustc prints for the two lints names the method or type in backticks.
+// The two lints the census counts, and the message rustc prints for them, which names the method or
+// type in backticks.
+const EGRESS_LINTS = ["clippy::disallowed_methods", "clippy::disallowed_types"];
 const FIRING = /^use of a disallowed (?:method|type) `([^`]+)`/;
 
 // Where a firing is reported: the outermost macro expansion site of the primary span, as a path
@@ -152,7 +150,7 @@ function censusViolations(text, os, pins) {
       return [`clippy output line ${index + 1} is not JSON: ${JSON.stringify(line.slice(0, 80))}`];
     }
     if (entry.reason === "build-finished") finished.push(entry.success);
-    if (entry.reason !== "compiler-message" || !entry.message?.code?.code?.startsWith("clippy::disallowed_")) continue;
+    if (entry.reason !== "compiler-message" || !EGRESS_LINTS.includes(entry.message?.code?.code)) continue;
     const method = entry.message.message.match(FIRING)?.[1];
     const file = firingFile(entry.message);
     if (!method || !file) return [`an egress lint message could not be read: ${JSON.stringify(entry.message.message.slice(0, 120))}`];
@@ -365,6 +363,16 @@ for (const path of tracked) {
   if (/(?:^|\/)\.?clippy\.toml$/.test(path) && path.startsWith("src-tauri/") && path !== "src-tauri/clippy.toml") {
     egressViolations.push(`${path} would replace src-tauri/clippy.toml's egress lints for its crate`);
   }
+  // A cargo config can alias `clippy`, wrap rustc or set the environment of the census run.
+  if (/(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(path)) {
+    egressViolations.push(`${path} is a cargo config; it could redirect the census run, so none is tracked`);
+  }
+}
+// build.rs can set a cfg or an environment variable for the crate it builds; it is one line today.
+const BUILD_SCRIPT_DIGEST = "487059eaf8a947b80f20a9aacac038a5047b2ad69d2401b827376c67d6fe847f";
+const buildScript = createHash("sha256").update(readFileSync(`${root}src-tauri/build.rs`)).digest("hex");
+if (buildScript !== BUILD_SCRIPT_DIGEST) {
+  egressViolations.push(`src-tauri/build.rs changed; check it sets no cfg or environment for the census run, then set BUILD_SCRIPT_DIGEST to ${buildScript}`);
 }
 // A plain substring in any tracked text file but this gate and its test. `git grep` exits 1 for no
 // match; any other failure means nothing was read.
@@ -380,12 +388,16 @@ if (settings.error || (settings.status !== 0 && settings.status !== 1)) {
 for (const path of settings.stdout.split("\n").filter(Boolean)) {
   egressViolations.push(`${path} names CLIPPY_CONF_DIR or CLIPPY_ARGS, which can point clippy away from src-tauri/clippy.toml`);
 }
-// Code under a `clippy` cfg is invisible to the census: it only ever compiles under clippy. A
-// comment line is skipped; a trailing comment or a string that says the word is a loud false alarm.
-for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs"))) {
+// Code the census run does not compile is not seen: code under a `clippy` cfg (it only ever
+// compiles under clippy, so the run that would see it skips it), under `dev` (tauri-build sets it
+// unless the shipped `custom-protocol` feature is on) or under `debug_assertions`. A comment line
+// is skipped; a trailing comment or a string that says the word is a loud false alarm.
+// Integration tests (a tests/ directory) are separate crates the census run never compiles.
+for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs") && !/\/tests\//.test(name))) {
   for (const [index, line] of readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).entries()) {
-    if (!/^\s*\/\//.test(line) && /\bclippy\b(?!\s*::)/.test(line)) {
-      egressViolations.push(`${path}:${index + 1} names clippy outside a lint path; code under a clippy cfg is not seen by the census`);
+    if (/^\s*\/\//.test(line)) continue;
+    if (/\bclippy\b(?!\s*::)/.test(line) || (/\bcfg/.test(line) && /\b(?:dev|debug_assertions)\b/.test(line))) {
+      egressViolations.push(`${path}:${index + 1} names a cfg the census run compiles differently from the shipped build (clippy, dev, debug_assertions)`);
     }
   }
 }

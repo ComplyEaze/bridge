@@ -267,11 +267,11 @@ async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
     // window it did not honour (and changes the request, so the order is not asserted).
     let (response, _) = run(recorded_plans(), ("20250910", "20250910")).await;
     assert_eq!(response["isError"], true, "{response}");
-    assert_ne!(
+    assert!(
         response["structuredContent"]["result"]
             .get("items")
-            .is_some(),
-        true
+            .is_none(),
+        "no row is released for a window that was not the one asked for: {response}"
     );
 }
 

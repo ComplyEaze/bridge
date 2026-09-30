@@ -185,10 +185,11 @@ impl TallyRuntime {
                         }
                         bracket_verified_company_identity(&client, &identity).await?;
                         let extent = client.fetch_company_book_extent(&identity).await?;
-                        // A refusal of what came back is held until the closing
-                        // extent is read: a book that moved mid-read is reported
-                        // as moved, not as whatever its new rows broke.
-                        let rows: anyhow::Result<MastersRows> = match kind {
+                        // A response Bridge cannot read refuses at once. Only a
+                        // broken size premise is held until the closing extent
+                        // is read: a book that moved mid-read is reported as
+                        // moved, not as the rows its new masters added.
+                        let held: Result<MastersRows, MastersReadError> = match kind {
                             MastersKind::Native(native) => {
                                 let mark = extent
                                     .master_alter_id_high_water()
@@ -207,12 +208,10 @@ impl TallyRuntime {
                                 evidence = evidence
                                     .clone()
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                parse_native_masters(native, &xml, identity.company_guid())
-                                    .map_err(anyhow::Error::from)
-                                    .and_then(|masters| {
-                                        check_masters_premise(&masters.rows, mark, bytes, limit)?;
-                                        Ok(MastersRows::Native(masters))
-                                    })
+                                let masters =
+                                    parse_native_masters(native, &xml, identity.company_guid())?;
+                                check_masters_premise(&masters.rows, mark, bytes, limit)
+                                    .map(|()| MastersRows::Native(masters))
                             }
                             // The group snapshot as the statements read it: no
                             // size admission of its own.
@@ -226,16 +225,17 @@ impl TallyRuntime {
                                 evidence = evidence
                                     .clone()
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                parse_native_group_snapshot(&xml, identity.company_guid())
-                                    .map(MastersRows::Groups)
-                                    .map_err(anyhow::Error::from)
+                                Ok(MastersRows::Groups(parse_native_group_snapshot(
+                                    &xml,
+                                    identity.company_guid(),
+                                )?))
                             }
                         };
                         let closing_extent = client.fetch_company_book_extent(&identity).await?;
                         if closing_extent != extent {
                             return Err(PairedReadValidationError::MastersExtent.into());
                         }
-                        let rows = rows?;
+                        let rows = held?;
                         bracket_verified_company_identity(&client, &identity).await?;
                         evidence = evidence
                             .clone()

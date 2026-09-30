@@ -297,6 +297,10 @@ fn the_tool_definition_admits_only_the_five_kinds_and_states_the_size_limits() {
     );
     assert!(description.contains("masters_too_large"));
     assert!(description.contains("Education mode is refused"));
+    // What `mask_parties` masks, and why the rest is not masked.
+    assert!(description.contains("godown and stock-group names and their parents are masked"));
+    assert!(description.contains("configuration labels, not counterparties"));
+    assert!(description.contains("masters_voucher_types_empty"));
 }
 
 #[tokio::test]
@@ -542,12 +546,12 @@ async fn a_parser_refusal_surfaces_as_the_tool_error_with_its_masters_cause() {
     let absent = format!("{}{}", &captured[..start], &captured[end..]);
     let mut plans = through_opening_extent(14, MARK);
     pair(&mut plans, xml(absent));
-    pair(&mut plans, xml(extents(14, MARK)));
     let one = OneServer::spawn(plans);
     let refused = one.call(args("godowns", 0, 500, None)).await;
     assert_eq!(error(&refused)["code"], "masters_read_failed");
     assert_eq!(error(&refused)["cause"], "masters_collection_absent");
-    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4);
+    // Refused at once: no closing extent, identity or mode read follows.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4);
 }
 
 #[tokio::test]
@@ -563,20 +567,155 @@ async fn a_kind_with_no_master_is_an_empty_page() {
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
+/// The capture with its last `PARENT` (the last row's) set to `parent`, which
+/// is user text and not Tally's reserved root.
+fn with_last_parent(text: &str, parent: &str) -> String {
+    let root = "&#4; Primary</PARENT>";
+    let at = text.rfind(root).expect("a root parent");
+    format!(
+        "{}{parent}</PARENT>{}",
+        &text[..at],
+        &text[at + root.len()..]
+    )
+}
+
+fn names_and_parents(page: &Value) -> Vec<(String, Value)> {
+    page["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            (
+                row["name"].as_str().unwrap().to_string(),
+                row["parent"].clone(),
+            )
+        })
+        .collect()
+}
+
 #[tokio::test]
-async fn master_names_are_not_masked_under_mask_parties() {
-    // They are not party names: a masked read returns them as they are.
-    let one = OneServer::spawn_with(
-        first_page_plans(capture("godowns"), 14),
-        Redaction::MaskParties,
-    );
+async fn godown_names_and_parents_are_masked_and_voucher_type_names_are_not() {
+    // One masking server, two reads: the godown names are masked (the positive
+    // control that masking is on), and the voucher-type names on the same
+    // server are not.
+    let godowns = with_last_parent(&capture("godowns"), "Factory Floor");
+    let mut plans = first_page_plans(godowns, 14);
+    plans.extend(first_page_plans(capture("voucher_types"), 14));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+
     let response = one.call(args("godowns", 0, 500, None)).await;
+    let page = result(&response);
+    let masked_root = json!("\u{fffd}#4; Primary");
+    assert_eq!(
+        names_and_parents(page),
+        [
+            (mask("Factory Floor"), masked_root.clone()),
+            (mask("Main Location"), json!(mask("Factory Floor"))),
+        ]
+    );
+    // A mask that kept the plain text would pass the above if `mask` did.
+    assert_ne!(mask("Factory Floor"), "Factory Floor");
+    assert!(!response.to_string().contains("Factory Floor"));
+    assert!(!response.to_string().contains("Main Location"));
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line.as_str().unwrap().contains("are masked")));
+
+    let response = one.call(args("voucher_types", 0, 500, None)).await;
+    let page = result(&response);
+    let names = names_and_parents(page);
+    assert_eq!(names.len(), 26);
+    assert_eq!(names[0], ("Attendance".to_string(), json!("Attendance")));
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("not masked by mask_parties")));
+    assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn stock_group_names_and_parents_are_masked_and_unit_names_are_not() {
+    let groups = with_last_parent(&capture("stock_groups"), "Packaging");
+    let mut plans = first_page_plans(groups, 14);
+    plans.extend(first_page_plans(capture("units"), 14));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+
+    let response = one.call(args("stock_groups", 0, 500, None)).await;
+    let masked_root = json!("\u{fffd}#4; Primary");
+    assert_eq!(
+        names_and_parents(result(&response)),
+        [
+            (mask("Finished Kits"), masked_root.clone()),
+            (mask("Packaging"), masked_root),
+            (mask("Raw Chemicals"), json!(mask("Packaging"))),
+        ]
+    );
+    for plain in ["Finished Kits", "Packaging", "Raw Chemicals"] {
+        assert!(!response.to_string().contains(plain), "{plain}");
+    }
+
+    let response = one.call(args("units", 0, 500, None)).await;
     let names = result(&response)["masters"]
         .as_array()
         .unwrap()
         .iter()
         .map(|row| row["name"].as_str().unwrap().to_string())
         .collect::<Vec<_>>();
-    assert_eq!(names, ["Factory Floor", "Main Location"]);
+    assert!(names.contains(&"Kgs".to_string()), "{names:?}");
+    assert_eq!(names.len(), 4);
+    assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn masked_godown_rows_are_held_marked_and_not_masked_without_mask_parties() {
+    // Under no redaction the marker is materialised: the same names as plain text.
+    let godowns = with_last_parent(&capture("godowns"), "Factory Floor");
+    let one = OneServer::spawn(first_page_plans(godowns, 14));
+    let response = one.call(args("godowns", 0, 500, None)).await;
+    assert_eq!(
+        names_and_parents(result(&response)),
+        [
+            ("Factory Floor".to_string(), json!("\u{fffd}#4; Primary")),
+            ("Main Location".to_string(), json!("Factory Floor")),
+        ]
+    );
+    assert!(!response.to_string().contains(PARTY_NAME_MARKER));
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn account_group_names_are_not_masked() {
+    let one = OneServer::spawn_with(first_page_plans(groups(), 14), Redaction::MaskParties);
+    let response = one.call(args("groups", 0, 500, None)).await;
+    let names = result(&response)["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["name"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert!(names.contains(&"Bank Accounts".to_string()));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_voucher_type_answer_with_no_rows_is_refused_with_its_cause() {
+    let captured = capture("voucher_types");
+    let start = captured.find("<COLLECTION").unwrap();
+    let open_end = start + captured[start..].find('>').unwrap() + 1;
+    let close = captured.find("</COLLECTION>").unwrap();
+    let empty = format!("{}{}", &captured[..open_end], &captured[close..]);
+    let mut plans = through_opening_extent(14, MARK);
+    pair(&mut plans, xml(empty));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args("voucher_types", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed");
+    assert_eq!(error(&refused)["cause"], "masters_voucher_types_empty");
+    // Refused at once: no closing extent, identity or mode read.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4);
 }

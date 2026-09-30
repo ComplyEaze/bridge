@@ -212,6 +212,31 @@ fn the_premise_checks_refuse_each_way_a_response_can_outgrow_its_mark() {
     );
 }
 
+#[test]
+fn rows_equal_to_the_mark_are_admitted_and_one_more_row_than_the_mark_refuses() {
+    let mut rows = parse_native_masters(
+        NativeMasterKind::Godowns,
+        &capture(NativeMasterKind::Godowns),
+        GUID,
+    )
+    .unwrap()
+    .rows;
+    assert_eq!(rows.len(), 2);
+    // Distinct AlterIDs at or under both marks below, so only the row count
+    // differs between them.
+    rows[0].alter_id = 1;
+    rows[1].alter_id = 2;
+    // Two rows, a mark of two: admitted (the count equals the mark).
+    assert!(check_masters_premise(&rows, 2, 0, u64::MAX).is_ok());
+    // Two rows, a mark of one: the count is one over the mark.
+    assert!(matches!(
+        check_masters_premise(&rows, 1, 0, u64::MAX),
+        Err(MastersReadError::PremiseViolated(
+            "masters_rows_exceed_master_mark"
+        ))
+    ));
+}
+
 #[tokio::test]
 async fn every_kind_replays_through_every_bracket_at_its_admission_edge() {
     for kind in NativeMasterKind::ALL {
@@ -366,7 +391,10 @@ async fn a_response_with_no_collection_is_the_parsers_typed_refusal() {
     let start = captured.find("<COLLECTION").unwrap();
     let end = captured.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
     let absent = format!("{}{}", &captured[..start], &captured[end..]);
-    let plans = through_closing_extent(extents(), absent, extents());
+    // No closing extent is provided: a response Bridge cannot read refuses at
+    // once, and a sequence that expected one would never finish.
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(absent));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
     let error = result.err().expect("refused");
@@ -374,9 +402,35 @@ async fn a_response_with_no_collection_is_the_parsers_typed_refusal() {
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::CollectionAbsent)
     );
-    // Held until the closing extent is read, which is where the book's
-    // movement is judged first: 15 requests, the collection's refusal kept.
-    assert_eq!(dispatched, 15);
+    // Mode probe and identity (3), opening extent (4), the collection pair (4).
+    assert_eq!(dispatched, 11);
+    // The completed collection read is kept as evidence.
+    let evidence = &error.downcast_ref::<RuntimeReadFailure>().unwrap().evidence;
+    assert!(!evidence.response_sha256.is_empty());
+}
+
+#[tokio::test]
+async fn a_voucher_type_answer_with_no_rows_is_refused_at_once() {
+    // The captured voucher-type response with its rows removed: a present,
+    // empty collection, which is an answer for units and no answer for voucher
+    // types (every company has predefined ones).
+    let captured = capture(NativeMasterKind::VoucherTypes);
+    let open_end = captured.find("<COLLECTION").unwrap();
+    let open_end = open_end + captured[open_end..].find('>').unwrap() + 1;
+    let close = captured.find("</COLLECTION>").unwrap();
+    let empty = format!("{}{}", &captured[..open_end], &captured[close..]);
+    assert!(!empty.contains("<VOUCHERTYPE "));
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(empty));
+    let (result, dispatched) =
+        run(plans, MastersKind::Native(NativeMasterKind::VoucherTypes)).await;
+
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::VoucherTypesEmpty)
+    );
+    assert_eq!(dispatched, 11);
 }
 
 #[tokio::test]
@@ -427,7 +481,8 @@ async fn a_row_longer_than_the_assumed_worst_row_is_the_parsers_typed_refusal() 
         &format!("<FILLER>{filler}</FILLER></GODOWN>"),
         2,
     );
-    let plans = through_closing_extent(extents(), long_row, extents());
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, GODOWNS_KIND).await;
 
     let error = result.err().expect("refused");
@@ -435,7 +490,8 @@ async fn a_row_longer_than_the_assumed_worst_row_is_the_parsers_typed_refusal() 
         cause::<NativeMastersError>(&error),
         Some(&NativeMastersError::RowExceedsBound)
     );
-    assert_eq!(dispatched, 15);
+    // Refused at once, with no closing extent read.
+    assert_eq!(dispatched, 11);
 }
 
 #[test]

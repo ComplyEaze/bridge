@@ -362,9 +362,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // `src-tauri/src/tally/runtime_masters.rs` (each with its tests) and
 // `src-tauri/src/agent_masters.rs` (bridge#724 masters read) parse Tally's
 // voucher-type, godown, unit and stock-group collections, bind every row to the
-// selected company, refuse a book whose master mark bounds a response past the
-// budget before any request, and present the rows; a defect there returns another
-// company's masters, or sends a read one response cannot carry.
+// selected company, and present the rows. A book whose master mark bounds a
+// response past the budget is refused before any request for godowns, units and
+// stock groups only; voucher types are checked after the read and groups not at
+// all. A defect there returns another company's masters, or sends a read one
+// response cannot carry.
 pub const MAX_SURFACE_FILES: usize = 297;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;

@@ -42,9 +42,11 @@ impl Server {
                             .with_prior_evidence(prior.clone())
                     })?;
                 let rows = match &read.rows {
-                    MastersRows::Native(masters) => {
-                        masters.rows.iter().map(native_row).collect::<Vec<_>>()
-                    }
+                    MastersRows::Native(masters) => masters
+                        .rows
+                        .iter()
+                        .map(|row| native_row(row, marks_party_text(kind)))
+                        .collect::<Vec<_>>(),
                     MastersRows::Groups(groups) => groups
                         .iter()
                         .map(|group| {
@@ -85,7 +87,11 @@ impl Server {
         let mut limitations = vec![
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
-            "Master names are not masked by mask_parties: they are not party names",
+            if marks_party_text(kind) {
+                "Under mask_parties, godown and stock-group names and parents are masked, because a job-work godown or a supplier-named stock group can carry a party's name; Tally's reserved root as a parent is left as it is"
+            } else {
+                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown and stock-group names are masked)"
+            },
         ];
         match kind {
             MastersKind::Native(NativeMasterKind::VoucherTypes) => limitations.extend([
@@ -120,14 +126,39 @@ impl Server {
     }
 }
 
+/// Whether `mask_parties` masks this kind's names and parents. Godown and
+/// stock-group names are free text a user types, and a job-work godown or a
+/// supplier-named stock group can carry a party's name, so they go out under
+/// the party-name marker. Voucher-type and unit names are Tally configuration
+/// labels, and account groups are read from the group snapshot as the group
+/// tree is: none of these is marked.
+const fn marks_party_text(kind: MastersKind) -> bool {
+    matches!(
+        kind,
+        MastersKind::Native(NativeMasterKind::Godowns | NativeMasterKind::StockGroups)
+    )
+}
+
 /// One native row as the tool returns it: the fields every kind has, then its
-/// kind's own. `parent` is null where it does not apply or is absent.
-fn native_row(row: &NativeMasterRow) -> Value {
+/// kind's own. `parent` is null where it does not apply or is absent. With
+/// `mark_party_text`, `name` and `parent` carry the party-name marker; Tally's
+/// reserved root as a parent is a fixed string, not user text, and stays plain.
+fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
     let mut json = json!({
         "name": row.name, "guid": row.guid,
         "master_id": row.master_id, "alter_id": row.alter_id,
         "parent": row.parent,
     });
+    if mark_party_text {
+        mark_party_field(&mut json, "name");
+        if !row
+            .parent
+            .as_deref()
+            .is_some_and(bridge_tally_protocol::is_tally_reserved_root)
+        {
+            mark_party_field(&mut json, "parent");
+        }
+    }
     match &row.detail {
         NativeMasterDetail::Plain => {}
         NativeMasterDetail::VoucherType {

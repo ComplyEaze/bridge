@@ -238,9 +238,10 @@ mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
 1,160 for stock groups; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes`). Retrying refuses again. The two stock-heavy client books
-measured had marks of about 100,000 and 300,000 (protocol reference §12a.12),
-so books like them refuse these three kinds. `voucher_types` and `groups` have no size check
+`limit_bytes`). Retrying refuses again. Any book whose master mark is above
+those figures refuses these three kinds, which is most live books; the two
+stock-heavy client books measured had marks of about 100,000 and 300,000
+(protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read, and groups that of the group read `profit_and_loss` and `balance_sheet`
 make.
@@ -253,8 +254,10 @@ both reads) are checked against the mark and the admitted size: more rows
 than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
-(`masters_extent_changed`). A response Bridge
-cannot read refuses with a `masters_*` cause.
+(`masters_extent_changed`). A response Bridge cannot read refuses at once with
+a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
+answer with no rows refuses as `masters_voucher_types_empty`, because every
+company has predefined voucher types; the other kinds may answer with none.
 
 Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
 (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
@@ -268,9 +271,14 @@ rows are not checked against it. The completeness of the voucher-type list is
 unverified: absence from it is not evidence that a voucher type is absent from
 the book. The size bound rests on assumed limits (128
 characters a name, four aliases a master) that no capture has measured; a row
-that breaks them refuses the read as `masters_row_exceeds_bound`. Master names
-are not masked by `mask_parties`: they are not party names. No counts or hints
-(the company's `NUM*` fields), stock items or writes are part of this tool.
+that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
+hints (the company's `NUM*` fields), stock items or writes are part of this tool.
+
+Under `mask_parties`, godown and stock-group names and their `parent` values
+are masked like a party name, because a job-work godown or a supplier-named
+stock group can carry a party's name; Tally's reserved root as a parent is a
+fixed marker and is left as it is. Voucher-type, unit and account-group names
+are not masked: they are configuration labels, not counterparties.
 
 ### Profit and Loss and Balance Sheet
 

@@ -984,6 +984,152 @@ fn text_outside_the_fields_refuses() {
     }
 }
 
+/// Only XML whitespace may sit between elements: a no-break space or another
+/// Unicode space is text, which `str::trim` would have hidden.
+#[test]
+fn only_xml_whitespace_may_sit_between_elements() {
+    let kind = NativeMasterKind::Godowns;
+    let row = "<GODOWN NAME=\"Factory Floor\"";
+    let parent = "<PARENT TYPE=\"String\">&#4; Primary</PARENT>";
+    for (from, label) in [(row, "under the collection"), (parent, "under a row")] {
+        for space in [" ", "\t", "\r", "\n", " \t\r\n"] {
+            let parsed = parse(kind, &edited(kind, from, &format!("{space}{from}")));
+            assert_eq!(
+                parsed.map(|masters| masters.rows.len()),
+                Ok(captured_rows(kind)),
+                "{space:?} {label}"
+            );
+        }
+        for not_xml_whitespace in ["\u{a0}", "\u{2003}", "\u{3000}", " \u{a0} "] {
+            assert_eq!(
+                parse(
+                    kind,
+                    &edited(kind, from, &format!("{not_xml_whitespace}{from}"))
+                ),
+                Err(NativeMastersError::Malformed("masters_unexpected_text")),
+                "{not_xml_whitespace:?} {label}"
+            );
+        }
+    }
+}
+
+/// Every company has predefined voucher types, so a present, empty voucher-type
+/// collection is refused; the other kinds may answer with none.
+#[test]
+fn a_voucher_type_collection_with_no_rows_is_refused_and_the_other_kinds_may_be_empty() {
+    let kind = NativeMasterKind::VoucherTypes;
+    let text = response(kind);
+    let (start, open_end, end) = collection_span(&text);
+    let closing = end - "</COLLECTION>".len();
+    let emptied = [
+        // The captured opening and closing tags, every row removed.
+        format!("{}{}", &text[..open_end], &text[closing..]),
+        format!("{}<COLLECTION/>{}", &text[..start], &text[end..]),
+    ];
+    for empty in emptied {
+        assert!(!empty.contains("<VOUCHERTYPE "));
+        assert_eq!(
+            parse(kind, &empty),
+            Err(NativeMastersError::VoucherTypesEmpty)
+        );
+    }
+    assert_eq!(
+        NativeMastersError::VoucherTypesEmpty.code(),
+        "masters_voucher_types_empty"
+    );
+    // The unedited capture still reads, and the other kinds still answer empty.
+    assert_eq!(parse(kind, &text).unwrap().rows.len(), captured_rows(kind));
+    for other in [NativeMasterKind::Units, NativeMasterKind::StockGroups] {
+        assert_eq!(
+            parse_native_masters(other, &reads_lab_response(other), READS_LAB_COMPANY),
+            Ok(NativeMasters { rows: Vec::new() }),
+            "{other:?}"
+        );
+    }
+    let godowns = response(NativeMasterKind::Godowns);
+    let (start, _, end) = collection_span(&godowns);
+    assert_eq!(
+        parse(
+            NativeMasterKind::Godowns,
+            &format!("{}<COLLECTION/>{}", &godowns[..start], &godowns[end..])
+        ),
+        Ok(NativeMasters { rows: Vec::new() })
+    );
+}
+
+/// The stable code of each unreadable field, spelled out: a renamed label, or
+/// one that fell through to the bare code, would break a caller that keys on it.
+#[test]
+fn every_unreadable_field_answers_with_its_own_code() {
+    let godowns = NativeMasterKind::Godowns;
+    let vouchers = NativeMasterKind::VoucherTypes;
+    let units = NativeMasterKind::Units;
+    let cases = [
+        (
+            godowns,
+            edited(
+                godowns,
+                "<MASTERID TYPE=\"Number\"> 212</MASTERID>",
+                "<MASTERID TYPE=\"Number\"> twelve</MASTERID>",
+            ),
+            "masters_row_field_invalid:master_id",
+        ),
+        (
+            godowns,
+            edited(
+                godowns,
+                "<ALTERID TYPE=\"Number\"> 213</ALTERID>",
+                "<ALTERID TYPE=\"Number\">-213</ALTERID>",
+            ),
+            "masters_row_field_invalid:alter_id",
+        ),
+        (
+            vouchers,
+            edited(
+                vouchers,
+                "<ISACTIVE TYPE=\"Logical\">No</ISACTIVE>",
+                "<ISACTIVE TYPE=\"Logical\">Maybe</ISACTIVE>",
+            ),
+            "masters_row_field_invalid:is_active",
+        ),
+        (
+            vouchers,
+            edited(
+                vouchers,
+                "<ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL>",
+                "<ISOPTIONAL TYPE=\"Logical\">Maybe</ISOPTIONAL>",
+            ),
+            "masters_row_field_invalid:is_optional",
+        ),
+        (
+            units,
+            edited(
+                units,
+                "<DECIMALPLACES TYPE=\"Number\">0</DECIMALPLACES>",
+                "<DECIMALPLACES TYPE=\"Number\">many</DECIMALPLACES>",
+            ),
+            "masters_row_field_invalid:decimal_places",
+        ),
+        (
+            units,
+            edited(
+                units,
+                "<ISSIMPLEUNIT TYPE=\"Logical\">Yes</ISSIMPLEUNIT>",
+                "<ISSIMPLEUNIT TYPE=\"Logical\">Sometimes</ISSIMPLEUNIT>",
+            ),
+            "masters_row_field_invalid:is_simple_unit",
+        ),
+    ];
+    for (kind, text, code) in cases {
+        let refused = parse(kind, &text).expect_err(code);
+        assert!(
+            matches!(refused, NativeMastersError::RowFieldInvalid(_)),
+            "{code}: {refused:?}"
+        );
+        assert_eq!(refused.code(), code);
+    }
+}
+
 /// One edit of captured text per refusal, each with its exact variant.
 #[test]
 fn every_refusal_branch_answers_with_its_exact_variant() {

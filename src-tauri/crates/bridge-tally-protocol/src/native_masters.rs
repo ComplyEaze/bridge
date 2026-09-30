@@ -224,6 +224,9 @@ pub enum NativeMastersError {
     DuplicateName,
     /// A name or alias count over the assumed bounds.
     RowExceedsBound,
+    /// A present, empty `COLLECTION` for voucher types. Every company has
+    /// predefined voucher types, so none is no answer, not a zero-row one.
+    VoucherTypesEmpty,
 }
 
 impl NativeMastersError {
@@ -250,6 +253,7 @@ impl NativeMastersError {
             Self::DuplicateGuid => "masters_row_duplicate_guid",
             Self::DuplicateName => "masters_row_duplicate_name",
             Self::RowExceedsBound => "masters_row_exceeds_bound",
+            Self::VoucherTypesEmpty => "masters_voucher_types_empty",
         }
     }
 }
@@ -405,18 +409,26 @@ pub fn parse_native_masters(
     }
     match collections {
         0 => Err(NativeMastersError::CollectionAbsent),
+        // Every company has predefined voucher types, so a voucher-type answer
+        // with no row is anomalous. The other kinds may legitimately have none
+        // (a zero-row unit and stock-group answer was captured live).
+        1 if rows.is_empty() && kind == NativeMasterKind::VoucherTypes => {
+            Err(NativeMastersError::VoucherTypesEmpty)
+        }
         1 => Ok(NativeMasters { rows }),
         _ => Err(NativeMastersError::Malformed("masters_collection_repeated")),
     }
 }
 
 /// Text directly under the collection, or under a row outside its fields, is
-/// not part of the closed shape: only whitespace may sit between elements.
+/// not part of the closed shape: only XML whitespace (space, tab, carriage
+/// return, line feed) may sit between elements. `str::trim` is not that set: it
+/// also drops U+00A0 and other Unicode spaces, which are text.
 fn refuse_stray_text(text: &BytesText<'_>) -> Result<(), NativeMastersError> {
     let decoded = text
         .decode()
         .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_encoding"))?;
-    if decoded.trim().is_empty() {
+    if decoded.trim_matches([' ', '\t', '\r', '\n']).is_empty() {
         Ok(())
     } else {
         Err(NativeMastersError::Malformed("masters_unexpected_text"))

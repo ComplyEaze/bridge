@@ -52,8 +52,10 @@
 //    Beside it, static checks keep the configuration in place: the digest of
 //    clippy.toml, no second clippy.toml, no CLIPPY_CONF_DIR or CLIPPY_ARGS in
 //    any tracked file, no cargo config, every build.rs under src-tauri pinned
-//    by digest and no build script under another name, and no line naming a
-//    cfg the run compiles differently from the shipped build.
+//    by digest and no `build =` key in a src-tauri Cargo.toml, and no line
+//    of src-tauri Rust naming `clippy` (outside a lint path), `debug_assertions`,
+//    `panic =` or `dev` as a cfg list item, which the run compiles differently
+//    from the shipped build.
 //
 // 3. A deny-list of network-capable crates and Tauri plugins, read from both
 //    Cargo.lock files and the JS manifests.
@@ -75,11 +77,14 @@
 //    features, on Windows and macOS (arm64 only; scripts/package-mcpb.mjs lists
 //    an x86_64 macOS target the census never lints, although README.md says
 //    Intel Macs are unsupported). Not seen: code under a cfg the run compiles
-//    differently from the shipped build (lines naming `clippy`, `dev`,
-//    `debug_assertions` or `panic =` are refused; a cfg spelled some other way,
-//    or a profile difference not named, is not); features the run does not enable (voucher-scan, the
-//    calibration harness, lab-writes and bridge-tally-protocol's evidence
-//    features); Linux-only code; path dependencies that are not workspace
+//    differently from the shipped build (a line naming one of those words is
+//    refused, as the static half says above; a cfg spelled some other way, or
+//    a profile difference not named, is not); a file the token rule does not
+//    read, pulled in with `#[path]` or `include!` from outside src-tauri or as
+//    a non-`.rs` file; features the shipped build turns on that the run does
+//    not (tauri.conf.json's build features, `tauri build --features`); other
+//    features the run does not enable (voucher-scan, the calibration harness,
+//    lab-writes and bridge-tally-protocol's evidence features); Linux-only code; path dependencies that are not workspace
 //    members (clippy does not lint them; measured); and tests, examples and
 //    benches, which do not ship. Measured on a two-file crate: a listed call
 //    made by a dependency's own `macro_rules!` macro fires and is attributed to
@@ -396,11 +401,11 @@ if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
 }
 const tracked = trackedFiles();
 for (const path of tracked) {
-  if (/(?:^|\/)\.?clippy\.toml$/.test(path) && path.startsWith("src-tauri/") && path !== "src-tauri/clippy.toml") {
+  if (/(?:^|\/)\.?clippy\.toml$/i.test(path) && path.startsWith("src-tauri/") && path !== "src-tauri/clippy.toml") {
     egressViolations.push(`${path} would replace src-tauri/clippy.toml's egress lints for its crate`);
   }
   // A cargo config can alias `clippy`, wrap rustc or set the environment of the census run.
-  if (/(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(path)) {
+  if (/(?:^|\/)\.cargo\/config(?:\.toml)?$/i.test(path)) {
     egressViolations.push(`${path} is a cargo config; it could redirect the census run, so none is tracked`);
   }
 }
@@ -438,15 +443,17 @@ for (const path of settings.stdout.split("\n").filter(Boolean)) {
 // cfg. A source scan cannot parse an attribute soundly (a `]` in a string, a comment or a macro
 // that builds it defeats one), so no attribute is parsed: the words are refused in any tracked
 // src-tauri Rust line that is not a `//` comment, tests included, since a test file can be pulled
-// into shipped code with `#[path]`. `dev` is common in prose and paths (`/dev/null`, a
+// into shipped code with `#[path]`; only the `.rs` files under src-tauri are read. `dev` is common in prose and paths (`/dev/null`, a
 // dev-dependency), so it counts only as a list item (`(dev)`, `, dev,`) or alone on a line; the
 // others count anywhere. The cost is loud false alarms (a block comment or a string that says a
 // word). The one file that names them in strings is src-tauri/tests/approval_seam_gate.rs, whose
-// inputs to another scanner they are.
+// inputs to another scanner they are: only its lines of exactly that form are skipped.
 const DIFFERS = /\bclippy\b(?!\s*::)|\bdebug_assertions\b|\bpanic\s*=|[(,]\s*dev\s*[),]|^\s*dev\s*[,)]*\s*$/;
 const NAMES_THEM_IN_STRINGS = "src-tauri/tests/approval_seam_gate.rs";
-for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs") && name !== NAMES_THEM_IN_STRINGS)) {
+const STRING_INPUT = /^\s*"#\[cfg\(not\(debug_assertions\)\)\]\\n[^"]*",$/;
+for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs"))) {
   for (const [index, line] of readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).entries()) {
+    if (path === NAMES_THEM_IN_STRINGS && STRING_INPUT.test(line)) continue;
     if (!/^\s*\/\//.test(line) && DIFFERS.test(line)) {
       egressViolations.push(`${path}:${index + 1} names clippy, dev, debug_assertions or a panic cfg, which the census run compiles differently from the shipped build`);
     }
@@ -454,7 +461,7 @@ for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && nam
 }
 // A build script under another name (`build = "setup.rs"`) escapes the digest pins above.
 for (const path of tracked.filter((name) => /^src-tauri\/(?:.*\/)?Cargo\.toml$/.test(name))) {
-  if (/^\s*build\s*=/m.test(readFileSync(`${root}${path}`, "utf8"))) {
+  if (/(?:^|[\s{,.])["']?build["']?\s*=/m.test(readFileSync(`${root}${path}`, "utf8"))) {
     egressViolations.push(`${path} sets a build script by name; only the default build.rs, pinned by digest above, is allowed`);
   }
 }

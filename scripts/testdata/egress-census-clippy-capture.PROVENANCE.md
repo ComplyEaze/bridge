@@ -67,3 +67,16 @@ this crate and toolchain, not for the workspace):
 | `#![allow(warnings)]` and `#![allow(clippy::style)]` at the top of `src/lib.rs` | 4 |
 | a passing `cargo clippy -- -D warnings` first (only the `#[expect]`ed call remains), then the census run, same profile | 1 (the run re-linted and reported) |
 | the same, with `--release` on the census run | 1 |
+
+## Measurements on the workspace (not committed as captures)
+
+Run on 2026-09-30 with clippy 1.96.0 on macOS (arm64), on this repository's `src-tauri` workspace
+(confidence: verified for this tree and toolchain, macOS only):
+
+- `cargo clippy --workspace --lib --bins --message-format=json -- --force-warn clippy::disallowed_methods
+  --force-warn clippy::disallowed_types` reported 15 firings in 7 places (the macOS list), and every one
+  is a reviewed `#[expect]` site in the source. No message was located in `clippy.toml`.
+- After a passing `cargo clippy --workspace --all-targets -- -D warnings -A clippy::pedantic`, the same census
+  run re-linted (24 s) and reported the same 15 firings.
+- A `pub fn` under `#[allow(clippy::all, warnings)]` in the app crate that called `std::process::Command::new`
+  was reported (1 more firing), so the census refused it; the file was restored afterwards.

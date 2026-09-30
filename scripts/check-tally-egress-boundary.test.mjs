@@ -229,12 +229,16 @@ test("a line naming a cfg the census run compiles differently is refused, howeve
   // A tests/ file is scanned too: it can be pulled into shipped code with #[path].
   const helper = sandbox({ "src-tauri/tests/helper.rs": "#[cfg(not(debug_assertions))]\nfn hidden() {}\n" }).run();
   assertRefused(helper, "src-tauri/tests/helper.rs:1 " + DIFFERENT);
-  // The one file that holds the words in strings is exempt by name; a comment line is skipped.
+  // The one file that holds the words in strings is exempt only on lines of exactly that form, so a
+  // real cfg or call put in it (and pulled in with #[path]) is still refused; a comment line is skipped.
+  const string = '            "#[cfg(not(debug_assertions))]\\nuse confirm as approve;",\n';
   const exempt = sandbox({
-    "src-tauri/tests/approval_seam_gate.rs": '"#[cfg(not(debug_assertions))]"\n',
+    "src-tauri/tests/approval_seam_gate.rs": string,
     "src-tauri/src/lib.rs": "// #[cfg(not(dev))] is only a comment here\nfn ok() {}\n",
   }).run();
   assert.equal(exempt.status, 0, exempt.stderr);
+  const pulledIn = sandbox({ "src-tauri/tests/approval_seam_gate.rs": `${string}#[cfg(not(clippy))]\nfn hidden() {}\n` }).run();
+  assertRefused(pulledIn, "src-tauri/tests/approval_seam_gate.rs:2 " + DIFFERENT);
   // Plain cfgs stay legal, and so does prose that says `dev` (a path, a dev-dependency, a script name).
   const legal = sandbox({
     "src-tauri/src/lib.rs":
@@ -244,9 +248,19 @@ test("a line naming a cfg the census run compiles differently is refused, howeve
   assert.equal(legal.status, 0, legal.stderr);
 });
 
-test("a build script under another name is refused", { skip }, () => {
-  const result = sandbox({ "src-tauri/crates/x/Cargo.toml": '[package]\nname = "x"\nbuild = "setup.rs"\n' }).run();
-  assertRefused(result, "src-tauri/crates/x/Cargo.toml sets a build script by name");
+test("a build script under another name is refused, in any spelling of the key", { skip }, () => {
+  for (const toml of ['[package]\nname = "x"\nbuild = "setup.rs"\n', '[package]\n"build" = "setup.rs"\n', 'package.build = "setup.rs"\n', 'package = { name = "x", build = "setup.rs" }\n']) {
+    const result = sandbox({ "src-tauri/crates/x/Cargo.toml": toml }).run();
+    assertRefused(result, "src-tauri/crates/x/Cargo.toml sets a build script by name");
+  }
+  // A build-dependency is not a build script.
+  const legal = sandbox({ "src-tauri/crates/x/Cargo.toml": '[build-dependencies]\ntauri-build = { version = "2" }\n' }).run();
+  assert.equal(legal.status, 0, legal.stderr);
+});
+
+test("a differently-cased clippy.toml or cargo config is refused", { skip }, () => {
+  assertRefused(sandbox({ "src-tauri/crates/x/Clippy.toml": "disallowed-methods = []\n" }).run(), "src-tauri/crates/x/Clippy.toml would replace");
+  assertRefused(sandbox({ ".cargo/Config.toml": "[env]\n" }).run(), ".cargo/Config.toml is a cargo config");
 });
 
 test("a tracked cargo config is refused", { skip }, () => {

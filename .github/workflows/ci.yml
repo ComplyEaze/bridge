@@ -431,7 +431,7 @@ jobs:
           --all-targets -- --test-threads=1
       - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
       # The Tally-path egress census (scripts/check-tally-egress-boundary.mjs, check 2). The
-      # two egress lints are forced to warn, which no attribute, group allow, -A or lint table
+      # two egress lints are forced to warn, which no group allow, -A or lint table (measured)
       # can silence, over the shipped targets. The messages go to a file first, so a failed run
       # cannot read as "nothing found", and the census requires that what fired match the
       # reviewed call sites for this OS exactly, so a run that silences the lints (RUSTFLAGS

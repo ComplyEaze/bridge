@@ -1,0 +1,54 @@
+M04 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M03 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M02 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M01 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M05 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M06 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_stale_balances_41_1.rs::a_changed_value_is_reported, tests/parity_stale_balances_41_1.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M07 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M08 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M10 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive
+M09 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M11 killed (full) by 5: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M12 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M14 killed (full) by 6: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_short_period_window_starts_before_the_period, tests/module_invariants_batch1.rs::edge_ledger_scrutiny_thirty_percent_and_the_windows_first_day_are_inclusive, tests/parity_ledger_scrutiny.rs::a_changed_value_is_reported, tests/parity_ledger_scrutiny.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M13 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M15 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M16 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M17 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M18 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M19 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M20 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M23 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M21 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M22 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M24 killed (full) by 2: src/lib.rs::support::tests::exceptions_keep_their_character_and_everything_else_maps_as_rust_does, tests/edge_books.rs::every_edge_book_matches_the_reference
+M25 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::edge_cash_book_narrations_and_expense_credits
+M26 killed (full) by 1: tests/edge_books.rs::every_edge_book_matches_the_reference
+M28 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M27 killed (full) by 4: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/parity_cash_book_integrity.rs::a_changed_value_is_reported, tests/parity_cash_book_integrity.rs::synthetic_read_matches_the_python_golden, tests/registry.rs::every_registered_test_matches_its_synthetic_golden
+M29 killed (full) by 1: tests/consumer_rules.rs::a_voucher_narration_is_read_and_stripped
+M30 killed (full) by 2: tests/edge_books.rs::every_edge_book_matches_the_reference, tests/module_invariants_batch1.rs::lsc1_fires_when_the_walk_exceeds_the_tb_debit_by_more_than_a_rupee
+
+30 of 30 killed
+
+warning: 20 killed by fewer than 2 tests (a lower bound in killers-first mode):
+  M01 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M02 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M03 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M04 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M05 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M07 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M09 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M12 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M13 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M15 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M16 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M17 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M18 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M19 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M20 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M21 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M22 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M23 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M26 (full): tests/edge_books.rs::every_edge_book_matches_the_reference
+  M29 (full): tests/consumer_rules.rs::a_voucher_narration_is_read_and_stripped

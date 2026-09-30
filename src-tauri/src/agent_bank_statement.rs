@@ -1,5 +1,6 @@
-//! `parse_bank_statement`: a local, read-only capability that turns a
-//! password-protected bank-statement PDF into voucher proposals.
+//! `parse_bank_statement`: a local capability that turns a password-protected
+//! bank-statement PDF into voucher proposals. It reads the statement and writes
+//! the proposals to a new private file; it never contacts Tally.
 //!
 //! **What may leave the machine is decided here.** The statement's rows are
 //! a client's banking record, and a tool result reaches the AI conversation.

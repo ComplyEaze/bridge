@@ -455,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "3c6ee302119fa6231cba1cdd8c6c92ee10fe4b8cc1599e6b6236f8ab28a3d42e"
+      "sha256": "314b055b38b1363f3c46acc602a2209325bdb7e2127e8d12f73c620088900563"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",

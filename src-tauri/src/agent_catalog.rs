@@ -314,7 +314,7 @@ fn lab_tools_env_enabled() -> bool {
 pub(super) const READ_RECEIPT_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
 const BUILD_IMPORT_SENTENCE: &str = "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally.";
 const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally.";
-const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's vouchers from Tally, then replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally.";
+const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally.";
 const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally.";
 
 /// What a shipped (non-lab) tool does beyond answering, which decides its MCP

@@ -456,8 +456,28 @@ class MergeGateControls(unittest.TestCase):
     def test_unknown_uuid_is_indeterminate(self):
         self.assert_indeterminate("privacy-uuid-indeterminate", "without exact current-head fixture provenance")
 
-    def test_binary_addition_without_attestation_blocks(self):
-        self.assert_blocked("binary-missing-attestation", "require matching --binary-review-sha and --independent-review-sha")
+    def test_binary_addition_without_attestation_blocks_and_names_the_path(self):
+        result = self.assert_blocked("binary-missing-attestation", "require matching --binary-review-sha and --independent-review-sha")
+        self.assertIn("first 8 at most: docs/new.png", result.stdout)
+
+    def test_a_privacy_hit_in_added_text_is_located_by_file_and_new_line_without_its_value(self):
+        result = self.assert_blocked("digit-run-in-payload", "unexplained long digit run")
+        self.assertIn("at docs/example.md:5: privacy scan found 0 identifier shape(s) and 1 unexplained long digit run(s)", result.stdout)
+        self.assertNotIn("12345" + "678901", result.stdout + result.stderr)
+        self.assertNotIn("harmless", result.stdout)
+
+    def test_a_privacy_hit_in_pr_metadata_is_located_by_source_and_line(self):
+        result = self.assert_blocked("privacy-email-blocker", "customer email shape")
+        self.assertIn("at pr-title:1: privacy scan found 1 customer email shape(s)", result.stdout)
+        self.assertNotIn("company" + ".test", result.stdout)
+
+    def test_a_merge_commit_conflict_comment_block_after_the_trailer_is_not_a_customer_address(self):
+        self.assert_pass("merge-commit-conflict-comment-block", "review evidence names the current head")
+
+    def test_an_address_inside_the_conflict_comment_block_still_blocks(self):
+        result = self.assert_blocked("merge-commit-conflict-block-customer-address", "customer email shape")
+        self.assertIn("at commit-message-1:", result.stdout)
+        self.assertNotIn("company" + ".test", result.stdout)
 
     def test_binary_addition_with_attestation_passes(self):
         self.assert_pass(
@@ -722,6 +742,92 @@ class PrivacyScannerFindingsPR335(unittest.TestCase):
         self.assert_not_blocked(
             '{"api_key":"your_api_key","client_secret":"replace_me_client_secret"}'
         )
+
+
+def load_diff_module():
+    spec = importlib.util.spec_from_file_location("merge_gate_diff", ROOT / "scripts" / "merge_gate_diff.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
+    """Where the scan's hits are (never the values), and a merge commit's conflict comment block."""
+
+    AGENT = "noreply" + "@" + "anthropic.com"
+    # Built from parts: this file is scanned by the gate it tests.
+    CUSTOMER = "person" + "@" + "customer.test"
+    RUN = "12345" + "678901"
+    IDENTIFIER = "98765" + "43210"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def redacted(self, message):
+        return self.privacy.redact_public_agent_attribution_trailer(message)
+
+    def emails(self, message):
+        return self.privacy.customer_email_count(self.redacted(message))
+
+    def test_the_trailer_before_a_git_conflict_comment_block_is_still_the_terminal_trailer(self):
+        message = "Merge master\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"
+        self.assertEqual(self.emails(message), 0)
+        self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
+        crlf = message.replace("\n", "\r\n")
+        self.assertEqual(self.emails(crlf), 0)
+
+    def test_an_address_inside_or_after_the_comment_block_is_still_counted(self):
+        inside = "Merge\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# Conflicts:\n# " + self.CUSTOMER
+        self.assertEqual(self.emails(inside), 1)
+        agent_in_block = "Merge\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# note <" + self.AGENT + ">"
+        self.assertEqual(self.emails(agent_in_block), 1)
+        trailer_after_block = "Merge\n\n# Conflicts:\n#\ta\n\nCo-Authored-By: Claude <" + self.AGENT + ">"
+        self.assertEqual(self.emails(trailer_after_block), 0, "a terminal trailer is unchanged behaviour")
+        not_a_trailer = "Merge\n\nnote: see <" + self.AGENT + ">\n\n# Conflicts:\n#\ta"
+        self.assertEqual(self.emails(not_a_trailer), 1)
+
+    def test_explain_reports_location_and_categories_but_never_a_value(self):
+        document = {
+            "sources": [
+                {"label": "pr-title", "text": "a fine title"},
+                {"label": "commit-message-2", "text": "fine\nmail " + self.CUSTOMER + " now"},
+            ],
+            "added": [
+                {"path": "docs/a.md", "line": 7, "text": "synthetic " + self.RUN + " run"},
+                {"path": "docs/a.md", "line": 8, "text": "nothing here"},
+                {"path": "docs/account-" + self.IDENTIFIER + ".md", "line": 0, "text": "docs/account-" + self.IDENTIFIER + ".md"},
+            ],
+        }
+        result = self.privacy.explain(document, HEAD)
+        wheres = [hit["where"] for hit in result["hits"]]
+        self.assertEqual(wheres, ["commit-message-2:2", "docs/a.md:7", "docs/account-<identifier>.md"])
+        rendered = repr(result)
+        for value in (self.CUSTOMER, self.RUN, self.IDENTIFIER, "fine"):
+            self.assertNotIn(value, rendered)
+        self.assertEqual(result["truncated"], 0)
+
+    def test_explain_is_capped_and_counts_the_rest(self):
+        added = [{"path": "f.md", "line": n, "text": "synthetic " + self.RUN} for n in range(1, 61)]
+        result = self.privacy.explain({"sources": [], "added": added}, HEAD)
+        self.assertEqual((len(result["hits"]), result["truncated"]), (50, 10))
+
+    def test_explain_cli_refuses_malformed_input(self):
+        for bad in ('{"sources": 1, "added": []}', '{"sources": [], "added": [{"path": "a", "line": true, "text": "x"}]}', "not json"):
+            result = subprocess.run(
+                ["python3", str(PRIVACY_MODULE_PATH), "--head", HEAD, "--explain"],
+                input=bad, capture_output=True, text=True,
+            )
+            self.assertNotEqual(result.returncode, 0, bad)
+
+    def test_the_diff_parser_gives_each_added_line_its_new_file_line_number(self):
+        diff = (
+            "diff --git a/a.txt b/a.txt\nindex 1..2 100644\n--- a/a.txt\n+++ b/a.txt\n"
+            "@@ -1,3 +1,5 @@\n keep\n+added one\n keep2\n+added two\n-gone\n+added three\n\\ No newline at end of file\n"
+            "@@ -40,2 +42,3 @@\n ctx\n\n+tail\n"
+        )
+        parsed = load_diff_module().parse(diff.split("\n"))
+        self.assertEqual(parsed["added_payload"], ["added one", "added two", "added three", "tail"])
+        self.assertEqual(parsed["added_locations"], [["a.txt", 2], ["a.txt", 4], ["a.txt", 5], ["a.txt", 44]])
 
 
 if __name__ == "__main__":

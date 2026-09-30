@@ -8,7 +8,7 @@ The developer configuration below remains for supported client integrations.
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
 parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the two limits under *Approved voucher posting* below;
+off by default because of the three limits under *Approved voucher posting* below;
 the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
 separate native approval for each new attempt. Command-line installations
 retain explicit environment switches.
@@ -70,7 +70,8 @@ The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `masters`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, and `egress_log`. For a command-line
+`read_evidence`, and `egress_log`. (`masters`, `profit_and_loss` and
+`balance_sheet` are in source but not in the 0.3.0 release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -487,8 +488,10 @@ The four rest on different observations, and each build reports its own in
   Account, and a build that names a counterparty warns so.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file, and only an unnumbered single-voucher
-`Journal` batch is eligible for native posting.
+licence mode, or manually imported file. In the MCPB extension an unnumbered
+Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
+per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
+that turns that on.
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -564,7 +567,8 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal dispatch. Unsupported:
+selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
 not live-Tally qualification or a claim that every Tally configuration or
@@ -738,7 +742,9 @@ its separate checks cannot lock out Tally UI edits or other importers. Concurren
 external changes are outside this preview's validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
-approval. If dispatch has already begun, cancellation cannot undo Tally's
+approval. (The tool call itself returns "approval pending" after about 40 seconds
+and the dialog stays open (for up to the two minutes); calling `post_import`
+again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.

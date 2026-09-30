@@ -5,7 +5,7 @@ and macOS. A smoke bundle is not a production release.
 
 ## Supported build baseline
 
-- Source release line: `0.2.x` under Apache-2.0
+- Source release line: 0.2.0 and later under Apache-2.0 (`v0.1.0` was MIT)
 - Node.js: supported 24.x releases (>=24.15.0); CI uses `.node-version`
 - pnpm: the exact `packageManager` version in `package.json`
 - Rust: the exact channel and components in `rust-toolchain.toml`
@@ -410,6 +410,56 @@ corepack pnpm run license:all
    archive, which the preview release notes state.
 8. Confirm the `Dependency security` workflow passes and GitHub reports no open
    Dependabot or secret-scanning alerts.
+
+## Merge gate: privacy scan and binary attestations
+
+`scripts/merge-gate.sh` scans the PR title, body, every commit message, the
+author and committer names, the changed file names and every added line for
+developer-home paths, PEM envelopes, credentials, customer email addresses,
+UUIDs without provenance, identifier shapes (PAN, GSTIN, mobile numbers) and long
+digit runs. The scan counts what it finds and never prints a value.
+
+**Finding the line.** When the scan blocks or is indeterminate the gate also
+prints `at <where>: <categories>` for up to 50 lines, where `<where>` is `pr-title:1`,
+`pr-body:<line>`, `commit-message-<n>:<line>`, `commit-identity-names:<line>`, a changed
+file name, or `<file>:<new-file line>` for an added line. It reports the location and
+the classifier's own counts and never the matched text or an excerpt, so the output
+is safe to paste. Open the file at that line to decide whether it is synthetic.
+"No single line reproduces the privacy finding" means the hit needs several lines
+together (a number split over lines) or comes from the PR text as a whole.
+Synthetic test data still trips the shapes: any ten digits starting 6 to 9 reads as an
+identifier and any run of eleven or more digits as a long digit run, however obviously
+fake. The gate has no allowlist by
+design; write the synthetic value in a form the shapes do not match (letters in it,
+a shorter run, grouped digits), or have the merger read the listed lines and merge on
+that reading.
+
+**Merge commits.** A merge made with conflicts carries git's own comment block
+(`# Conflicts:` and `#<TAB>path` lines) after the `Co-Authored-By` trailer. The gate
+treats that trailing block as outside the trailer footer, so the public agent address
+before it is still redacted; an address placed inside the block is still counted. Even
+so, strip the block from a merge commit message (or edit it with `git commit`) so it
+carries no noise.
+
+**Binary files.** Git shows a file it reads as binary (a NUL byte, so every UTF-16
+fixture, images, archives) as `Binary files differ` or a `GIT binary patch`, with no
+text to scan. The gate cannot read those bytes, so it holds the PR until a human
+attests: the merger runs
+`scripts/merge-gate.sh <PR> --binary-review-sha <head> --independent-review-sha <head>`
+with the full 40-hex head SHA. The two flags are an operator's statement, never read
+from the PR body or from a comment, and each must equal the head the gate is running
+on, so a later push invalidates them.
+- `--binary-review-sha`: the merger states that they read every binary addition or
+  change (the bytes, not the file name), its ownership and licence, and its NOTICE
+  obligation. For a captured fixture this means its `PROVENANCE` entry matches the
+  bytes (`scripts/check-fixture-provenance.mjs`) and the capture is synthetic.
+- `--independent-review-sha`: a second person, who is not the author, states the same
+  reading of the same head.
+A review or comment by a reviewer (V4 included) is evidence for the merger, not the
+attestation: the gate does not look at comments for these flags. The gate lists the
+first eight binary paths in its message so the merger knows what to read. Letting a
+named review comment carry the attestation, as the acknowledgement review does, would
+be a separate change to the gate.
 
 ## Signing and publication
 

@@ -176,10 +176,9 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         }
         Ok(_) => {}
     }
-    // The folder itself may be reached through a symlink the person made (a
-    // data folder moved to another disk): follow that one, and only that one.
-    let resolved = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
-    let root = resolved.as_path();
+    // The folder itself may be a symlink the person made (a data folder moved
+    // to another disk): `read_dir` and the joins below follow that one, and only
+    // that one, because every entry inside is looked at without following.
     scan_directory(
         &mut report,
         root,

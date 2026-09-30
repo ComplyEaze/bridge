@@ -1300,7 +1300,7 @@ impl Server {
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "egress_log" => self.egress_log(args).map_err(Into::into),
-            "local_data_report" => self.local_data_report(args).map_err(Into::into),
+            "local_data_report" => self.local_data_report().map_err(Into::into),
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -1355,10 +1355,7 @@ impl Server {
     /// import journal is settled. Reads only Bridge's own data folder and names
     /// no path: the result enters the AI conversation. The call is logged in the
     /// egress log like any tool call.
-    fn local_data_report(&self, args: &Value) -> Result<ToolOutcome, String> {
-        if args.as_object().is_some_and(|object| !object.is_empty()) {
-            return Err("argument_schema_invalid".to_string());
-        }
+    fn local_data_report(&self) -> Result<ToolOutcome, String> {
         let payload = agent_import::local_data::tool_payload(&self.settings.data_dir);
         let evidence = Evidence {
             request_sha256: sha256_hex(b"local_data_report"),

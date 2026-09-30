@@ -123,14 +123,23 @@ balance-free catalogue read (a stable pair, bound to the company by name and GUI
 parent groups are packed by ledger count into parts of at most 4,266 ledgers and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
-catalogue gave it; otherwise the whole call is refused and nothing partial is returned (causes
-`parent_part_rows_missing`, `parent_part_row_outside_parents`, `parent_part_row_not_in_catalogue`,
-`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). A book that cannot be split
-is refused before any master request: one parent group over 4,266 ledgers (`parent_over_budget`),
-more than 12 parts (`parent_partition_too_many_parts`), a ledger with no parent
-(`ledger_without_parent`), a parent name that cannot sit in a filter, such as one with a control
-character (`parent_name_unsupported`, which carries `unsupported_parent_ledgers`, the number of
-ledgers under such names and no name) or a repeated ledger GUID
+catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
+whose master comes back with a different ledger count than the catalogue holds under its parents
+ends the read after that master (`parent_part_row_count_differs`): its balance, any later part and
+the group read are never requested, but the master pair itself was sent, the complement's included.
+The other causes are `parent_part_rows_missing`, `parent_part_row_outside_parents`,
+`parent_part_row_not_in_catalogue`, `parent_part_row_differs_from_catalogue` and
+`parent_part_row_repeated`. A part whose answer passes the response limit ends the read with
+`parent_part_response_too_large`: Tally may have ignored its filter. Ledgers under a parent group
+whose name cannot sit in a filter, such as one with a control character, are read as one extra
+last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
+parents per formula, all applied together), and the same coverage proof applies to it. A book
+that cannot be split is refused before any master request: one parent group, or the ledgers
+under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 12 named parts
+(`parent_partition_too_many_parts`), a complement filter over 256 KiB
+(`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
+ledger under an unnameable parent name (`parent_name_unsupported`, which carries
+`unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
 count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
 refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`
@@ -376,8 +385,9 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 
 ## Voucher-file preparation and verification
 
-The MCPB extension exposes `verify_import` by default as a read-only recovery
-tool, and `build_import_xml` by default because it always sets
+The MCPB extension exposes `verify_import` by default as a recovery tool (it
+reads Tally, saves local proof files and writes nothing to Tally), and
+`build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
 Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
@@ -454,7 +464,12 @@ licence mode, or manually imported file, and only an unnumbered single-voucher
    `Receipt` and `Contra` **both fields are refused** — neither element's fate
    has been observed on those types, and the bank's own reference belongs in
    the narration, which survives. A payload carrying one is rejected before any
-   live read.
+   live read. A batch that is not an amendment and holds a row another batch of
+   the company already sent to Tally, or that a readback found posted, is
+   refused here as `import_txn_already_posted` (described under approved voucher
+   posting) and no file is written: a hand import of that file would post the
+   row again. An amendment alters vouchers in place and adds none, so it is not
+   checked.
 4. In Tally, with the intended company open, use **Gateway of Tally → Import →
    Vouchers** to import the file. Bridge does not dispatch this manual step.
    Alternatively, use the separately approved MCP voucher posting (or, for a
@@ -579,7 +594,50 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    changed since approval, or whose REMOTEID the journal already records refuses
    with `import_batch_not_found`, `import_already_attempted`,
    `import_batch_changed` or `import_remote_id_reused`, and this post sends
-   nothing. Rebuild only when `attempt_recorded` is `false`.
+   nothing. Rebuild only when `attempt_recorded` is `false`, except after
+   `import_txn_already_posted` (below), where a rebuilt row is refused again.
+   A batch holding a row that another batch of the same company already sent to
+   Tally, or that a readback found posted, refuses with
+   `import_txn_already_posted` at build, before the approval dialog and again
+   under the lock (#876). Two vouchers are the same row when they share a
+   transaction id and either the id is the `st-YYYYMMDD-<16 hex>` form a
+   bank-statement build derives (it survives a change of ledger) or their date
+   and amounts agree. Do not rebuild the row (except as the exit for a repeated hand-typed id below says): verify the
+   earlier batch, which the error's `blocking_batch_id` names (it can be absent
+   when the journal was busy for the lookup; then verify the company's recent
+   batches). For an overlapping statement, rebuild without the rows already
+   posted. The refusal is never lifted by Bridge: if Tally rejected the earlier
+   batch and the voucher is not in Tally, the user enters it in Tally.
+   Limits: a
+   batch imported by hand through Tally's Import menu counts only after
+   `verify_import` has recorded `posted_verified` for the whole batch, so one
+   whose readback is divergent or incomplete does not count; a
+   batch that was sent and failed also blocks a rebuild of the same row; a
+   rebuild that renames a hand-typed transaction id, or keeps it and changes
+   the date or amounts, is not seen, and a hand-typed id in the
+   `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
+   of the same statement (other amount formatting or narration wrapping) derives
+   different ids and is not seen; a hand-typed id reused for a genuinely
+   different event is refused too. The next step is advice, not a control: the
+   agent does not decide whether the refused row is the same transaction as the
+   posted voucher or a second real one that shares its id, date and amounts. It
+   asks the user to open the existing voucher in Tally, compare, and say which.
+   If it is the same and its ledger or narration is wrong, the posted voucher is
+   corrected in Tally (or amended, for a batch imported by hand); if it is a
+   second real transaction, it is rebuilt under a new id. Bridge does not check
+   that answer (for a `posted_verified` voucher `verify_import` returns no date,
+   amounts, ledgers or narration), and nothing binds it to the rebuild. A statement row that is re-entered inline
+   under any other id, including a `st-` id with a suffix, is a hand-typed id
+   and is not seen; two Bridge installs on one company keep separate
+   journals. The check at build is a point in time: a batch posted
+   natively after this one was built sees it only as built, so a file already
+   written can still be imported by hand after that post, and two hand imports
+   of one file are not seen at all. A build that is an amendment is not checked,
+   and a row that no earlier batch holds by id is not seen. A proposals file is
+   built whole, so an overlapping statement is rebuilt without the posted rows
+   only by parsing it again with a narrower `from` and `to`; those are whole
+   days, so a day that holds both a posted row and an unposted one is left out
+   whole and its unposted rows are entered in Tally.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the
@@ -841,7 +899,7 @@ sent directly as Tally's upsert key. Reused labels in independent batches theref
 have different wire identities, so rebuilding after losing the batch journal
 creates a new identity and does not deduplicate the business event.
 
-**An unknown outcome requires read-only reconciliation for every voucher type.**
+**An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not
 re-import or rebuild the same business event, including a `Journal`. The
 controlled repeat observation returned `CREATED=0, ALTERED=1` and left one

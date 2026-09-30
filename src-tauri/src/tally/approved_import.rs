@@ -453,6 +453,8 @@ pub(crate) enum UnderLockRefusal {
     RemoteIdReused,
     #[error("import_batch_changed")]
     BatchChanged,
+    #[error("import_txn_already_posted")]
+    TxnAlreadyPosted,
 }
 
 impl UnderLockRefusal {
@@ -462,6 +464,7 @@ impl UnderLockRefusal {
             Self::AlreadyAttempted => "import_already_attempted",
             Self::RemoteIdReused => "import_remote_id_reused",
             Self::BatchChanged => "import_batch_changed",
+            Self::TxnAlreadyPosted => "import_txn_already_posted",
         }
     }
 }
@@ -766,6 +769,10 @@ pub(crate) mod test_seam {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = directory.join(format!("stub-{}", NEXT.fetch_add(1, Ordering::Relaxed)));
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "test only: writes a stub executable through sh"
+        )]
         let mut writer = std::process::Command::new("sh")
             .arg("-c")
             .arg("cat > \"$1\" && chmod 755 \"$1\"")
@@ -1193,6 +1200,10 @@ async fn nonce_bound_dialog(
     preview: &str,
 ) -> Result<DialogAnswer, DialogFailure> {
     let nonce = uuid::Uuid::new_v4().to_string();
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the native approval dialog helper, a local executable reached over stdin and stdout, not the network"
+    )]
     let mut child = tokio::process::Command::new(executable)
         .arg(mode)
         .stdin(Stdio::piped())

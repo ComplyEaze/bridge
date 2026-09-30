@@ -377,6 +377,105 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     })
 }
 
+/// A voucher's date and its entries as (amount, is debit), sorted, so two
+/// vouchers compare equal whatever order their ledgers were listed in and
+/// whichever ledgers they name. `None` when an amount cannot be read, which a
+/// caller treats as a match.
+type RowShape = (String, Vec<(String, bool)>);
+
+fn row_shape(voucher: &ImportVoucher) -> Option<RowShape> {
+    let mut entries = voucher
+        .entries
+        .iter()
+        .map(|entry| {
+            Some((
+                super::verification::canonical_verification_amount(&entry.amount).ok()?,
+                matches!(entry.side, EntrySide::Dr),
+            ))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    entries.sort();
+    Some((voucher.date.clone(), entries))
+}
+
+/// The id of another batch of the same company that Bridge sent to Tally (a
+/// dispatch intent) or that a readback found posted (`posted_verified`) and that
+/// holds a voucher `batch` would post again (#876); the first in id order.
+///
+/// Two vouchers are the same row when they share a transaction id and either
+/// the id has the form a bank-statement build derives, which hashes the row's
+/// date, amounts, running balance and narration and so survives a change of
+/// ledger, or their date and amounts agree. Order of the two batches does not
+/// matter: a batch built earlier but dispatched later still counts. A batch
+/// that was only built, or whose journal record was replaced by one without the
+/// row, does not. The batch's own id is never matched. The whole journal is
+/// admitted on the way, as for every other read.
+pub(super) fn rows_already_posted(
+    reader: impl BufRead,
+    batch: &ImportLedgerLine,
+) -> Result<Option<String>, String> {
+    vouchers_already_posted(
+        reader,
+        &batch.company_guid,
+        Some(&batch.batch_id),
+        &batch.vouchers,
+    )
+}
+
+/// The same check for vouchers not yet in a batch (a build), where no batch id
+/// of their own exists to skip.
+pub(super) fn vouchers_already_posted(
+    reader: impl BufRead,
+    company_guid: &str,
+    own_batch_id: Option<&str>,
+    vouchers: &[ImportVoucher],
+) -> Result<Option<String>, String> {
+    let mut wanted: BTreeMap<&str, Vec<Option<RowShape>>> = BTreeMap::new();
+    for voucher in vouchers {
+        wanted
+            .entry(voucher.bridge_txn_id.as_str())
+            .or_default()
+            .push(row_shape(voucher));
+    }
+    let mut holds_a_row = BTreeSet::new();
+    let mut sent_or_found = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(other) if Some(other.batch_id.as_str()) != own_batch_id => {
+            let same_row = other.company_guid.eq_ignore_ascii_case(company_guid)
+                && other.vouchers.iter().any(|voucher| {
+                    wanted
+                        .get(voucher.bridge_txn_id.as_str())
+                        .is_some_and(|shapes| {
+                            bridge_bank_statement::proposals::is_statement_txn_id(
+                                &voucher.bridge_txn_id,
+                            ) || row_shape(voucher).is_none_or(|shape| {
+                                shapes
+                                    .iter()
+                                    .any(|wanted| wanted.as_ref().is_none_or(|w| *w == shape))
+                            })
+                        })
+                });
+            if same_row {
+                holds_a_row.insert(other.batch_id.clone());
+            } else {
+                holds_a_row.remove(&other.batch_id);
+            }
+            if other.status == "posted_verified" {
+                sent_or_found.insert(other.batch_id.clone());
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent)
+                || update.status == "posted_verified"
+            {
+                sent_or_found.insert(update.batch_id.clone());
+            }
+        }
+        Record::Batch(_) => {}
+    })?;
+    Ok(holds_a_row.intersection(&sent_or_found).next().cloned())
+}
+
 fn scan_records(
     mut reader: impl BufRead,
     mut visit: impl FnMut(Record, VerificationGeneration),

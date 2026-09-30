@@ -332,6 +332,7 @@ fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
             max_ledgers_per_part: 100,
             max_parents_per_part: 100,
             max_parts: 1,
+            max_complement_formula_bytes: 10_000,
         },
     )
     .unwrap();
@@ -388,4 +389,40 @@ fn the_reserved_root_part_carries_tallys_own_root_literal() {
     let xml = render_party_ledger_master_request_for_parents("Co", &export, &one_part(&[&root]));
     assert!(xml.contains(r#"NAME="BridgeParentPart">$Parent = "&#4; Primary"</SYSTEM>"#));
     assert!(!xml.contains('\u{fffd}'));
+}
+
+/// bridge#679: the complement part lists every `NOT` formula in one `FILTERS`
+/// element, so the filters apply together.
+#[test]
+fn the_complement_part_request_lists_each_not_formula_in_one_filters_element() {
+    use crate::parent_partition::{ParentObservation, ParentPartition, PartitionLimits};
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let rows = [
+        ("l0", "g0", ParentObservation::Named("A")),
+        ("l1", "g1", ParentObservation::Named("B & C")),
+        ("l2", "g2", ParentObservation::Named("D")),
+        ("l3", "g3", ParentObservation::Unsupported),
+    ];
+    let partition = ParentPartition::plan(
+        rows,
+        PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 2,
+            max_parts: 4,
+            max_complement_formula_bytes: 10_000,
+        },
+    )
+    .unwrap();
+    let complement = partition.parts().last().unwrap();
+    assert!(complement.is_complement());
+    let xml = render_party_ledger_master_request_for_parents("Co", &export, complement);
+    assert_eq!(xml.matches("<SYSTEM ").count(), 2);
+    assert!(xml.contains(
+        r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeNot0">NOT ($Parent = "A" OR $Parent = "B &amp; C")</SYSTEM><SYSTEM TYPE="Formulae" NAME="BridgeNot1">NOT ($Parent = "D")</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
+    ));
+    assert_eq!(xml.matches("<FILTERS>").count(), 1);
+    assert!(xml.contains("<FILTERS>BridgeNot0,BridgeNot1</FILTERS></COLLECTION></TDLMESSAGE>"));
 }

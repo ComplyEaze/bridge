@@ -78,6 +78,128 @@ fn published_pattern_inventory_preserves_the_admitted_wire_shapes() {
 }
 
 #[test]
+fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
+    // The expectations are written out here, not derived from `ToolEffect::of`,
+    // so a wrong classification cannot pass by agreeing with itself. An absent
+    // annotation reads to a host as "not read-only, destructive, open-world", so
+    // a new tool must be added to `ToolEffect::of` and to this table to be
+    // published.
+    const READ_TOOLS: &[&str] = &[
+        "tally_status",
+        "list_companies",
+        "voucher_schema",
+        "validate_masters",
+        "outstandings",
+        "ledger_masters",
+        "ledger_movement",
+        "trial_balance",
+        "profit_and_loss",
+        "balance_sheet",
+        "vouchers",
+        "voucher_presence",
+        "changed_since",
+        "read_evidence",
+        "egress_log",
+        "local_data_report",
+    ];
+    // The exact sentence each description ends with, written out here so an edit
+    // to the catalogue's constants cannot pass by agreeing with itself.
+    const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
+    // Local writers: (name, destructive, the exact sentence).
+    const LOCAL_WRITERS: &[(&str, bool, &str)] = &[
+        // Fresh batch id and file each call: additive.
+        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally."),
+        // A new file each call: additive.
+        ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally."),
+        // A newer verification replaces the saved proof.
+        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
+        // It verifies the batch twice, so it replaces the proof as well.
+        ("acknowledge_post_review", true, "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
+    ];
+    let definitions = registered_tool_definitions(true, true);
+    let published: Vec<&str> = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .filter(|name| !name.starts_with("lab_"))
+        .collect();
+    let mut expected: Vec<&str> = READ_TOOLS.to_vec();
+    expected.extend(LOCAL_WRITERS.iter().map(|(name, _, _)| *name));
+    expected.push("post_import");
+    let mut published_sorted = published.clone();
+    published_sorted.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(
+        published_sorted, expected,
+        "the published tools and this table must list the same names"
+    );
+    let annotation = |tool: &Value, hint: &str| tool["annotations"][hint].clone();
+    for tool in definitions.as_array().unwrap() {
+        let name = tool["name"].as_str().unwrap();
+        if name.starts_with("lab_") {
+            continue;
+        }
+        assert!(
+            ToolEffect::of(name).is_some(),
+            "{name} is published without a ToolEffect"
+        );
+        let description = tool["description"].as_str().unwrap();
+        for hint in [
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        ] {
+            assert!(annotation(tool, hint).is_boolean(), "{name} lacks {hint}");
+        }
+        // Bridge talks only to the loopback Tally and a local folder, and no
+        // tool repeats without effect: each read adds receipt lines.
+        assert_eq!(annotation(tool, "openWorldHint"), json!(false), "{name}");
+        assert_eq!(annotation(tool, "idempotentHint"), json!(false), "{name}");
+        if READ_TOOLS.contains(&name) {
+            assert_eq!(annotation(tool, "readOnlyHint"), json!(true), "{name}");
+            assert_eq!(annotation(tool, "destructiveHint"), json!(false), "{name}");
+            assert!(description.ends_with(READ_SENTENCE), "{name}");
+            assert_eq!(description.matches(READ_SENTENCE).count(), 1, "{name}");
+            assert!(
+                description.len() > READ_SENTENCE.len() + 40,
+                "{name} lost its own description"
+            );
+        } else if let Some((_, destructive, sentence)) =
+            LOCAL_WRITERS.iter().find(|(writer, _, _)| *writer == name)
+        {
+            assert_eq!(annotation(tool, "readOnlyHint"), json!(false), "{name}");
+            assert_eq!(
+                annotation(tool, "destructiveHint"),
+                json!(*destructive),
+                "{name}"
+            );
+            assert!(
+                description.ends_with(sentence),
+                "{name} must end: {sentence}"
+            );
+            assert_eq!(description.matches(sentence).count(), 1, "{name}");
+            assert!(
+                description.len() > sentence.len() + 40,
+                "{name} lost its own description"
+            );
+            assert!(!description.contains(READ_SENTENCE), "{name}");
+        } else {
+            // post_import: its own long description says it posts to Tally, and it
+            // takes no appended sentence.
+            assert_eq!(name, "post_import");
+            assert_eq!(annotation(tool, "readOnlyHint"), json!(false), "{name}");
+            assert_eq!(annotation(tool, "destructiveHint"), json!(true), "{name}");
+            assert!(!description.contains(READ_SENTENCE), "{name}");
+            for (_, _, sentence) in LOCAL_WRITERS {
+                assert!(!description.contains(sentence), "{name}");
+            }
+        }
+    }
+}
+
+#[test]
 fn every_pattern_admission_reads_is_one_it_recognizes() {
     // validate_string_bounds refuses any pattern outside the recognized
     // vocabulary, so a published pattern missing from it refuses every value.

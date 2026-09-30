@@ -62,8 +62,9 @@ Not yet code-signed; your computer may warn you before opening it.
 ## What has been run against a real TallyPrime
 
 Each line below is recorded in the repository or on the linked issue or pull
-request, on licensed TallyPrime Silver 7.1 and synthetic companies unless
-stated. The [MCP guide](./docs/agent/README.md) and
+request, unless marked as reported by the owner. Each ran on licensed
+TallyPrime Silver 7.1 and synthetic companies unless stated. The
+[MCP guide](./docs/agent/README.md) and
 [ADR 0004](./docs/adr/0004-tally-write-safety.md) hold the full record.
 
 - Reads: 27 checks on an unpublished macOS arm64 build (PR #228), recorded in

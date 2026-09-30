@@ -603,7 +603,7 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_window.rs",
-      "sha256": "4852786a931fa5d08b8f8307302980ad41cce11dbcbf8b20924cd30df8f1c352"
+      "sha256": "b2b283bf9afc42a43cc69126501e711c230a284d12e19417d86f0bc73fb98eed"
     },
     {
       "path": "src-tauri/src/agent_vouchers.rs",

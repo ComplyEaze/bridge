@@ -1374,12 +1374,16 @@ impl TallyClient {
     /// balance parser requires row GUID evidence for the selected company
     /// before any `(name, parent)` join can attach money to a master. The second
     /// value is the evidence of the catalogue pair that counted a marked book's
-    /// ledgers (#668), empty when the mark alone admitted the read.
+    /// ledgers (#668), empty when the mark alone admitted the read. `today` is
+    /// the host's calendar date: the balance snapshot ends no later than it
+    /// (the next admissible boundary at or after), whatever the extent's last
+    /// voucher date says (#875).
     pub(crate) async fn fetch_party_ledger_master_source(
         &self,
         identity: &VerifiedCompanyIdentity,
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        today: &bridge_tally_core::TallyDate,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
         let mut count_evidence = RuntimeReadEvidence::empty();
@@ -1407,6 +1411,7 @@ impl TallyClient {
                 boundary_profile,
                 opening_extent.books_from().clone(),
                 opening_extent.last_voucher_date().clone(),
+                today,
             )
             .map_err(|_| {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
@@ -1623,6 +1628,7 @@ impl TallyClient {
                 // the date Tally was actually asked to honor, not merely the last
                 // voucher date used by the identity/master read.
                 to: balance_period.to().clone(),
+                last_voucher_date: opening_extent.last_voucher_date().clone(),
                 rows,
                 request_sha256,
                 master_response_sha256,
@@ -2108,16 +2114,26 @@ fn party_ledger_master_balance_period(
     boundary_profile: DateBoundaryProfile,
     books_from: bridge_tally_core::TallyDate,
     last_voucher_date: bridge_tally_core::TallyDate,
+    today: &bridge_tally_core::TallyDate,
 ) -> Result<
     NativeLedgerSnapshotPeriod,
     bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError,
 > {
+    // A voucher saved under a mistyped far-future date makes the extent's last
+    // voucher date that date, and Tally applies a far-future `SVTODATE` as given
+    // (protocol reference 11e), so the closing balance would take in everything
+    // up to it. The snapshot therefore ends no later than the host's today, like
+    // the outstandings read; the source keeps the last voucher date so the
+    // workbook can say a later-dated voucher exists. A host clock before
+    // `books_from` (a book for a coming year) falls back to `books_from`, never
+    // an inverted period.
+    let reference = last_voucher_date.min(today.clone()).max(books_from.clone());
     // This workbook must be safe when a capability profile is not cached.
     // The strict Education boundary set is the known common admissible set;
-    // choosing the next such date includes the final voucher rather than
-    // silently requesting a refused boundary or shrinking the period.
+    // choosing the next such date includes the reference rather than silently
+    // requesting a refused boundary or shrinking the period.
     let closing_boundary = DateBoundaryProfile::EducationRestricted
-        .earliest_boundary_at_or_after(&last_voucher_date)
+        .earliest_boundary_at_or_after(&reference)
         .ok_or(
             bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriodError::UnsupportedBoundary,
         )?;

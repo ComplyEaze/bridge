@@ -54,6 +54,7 @@ fn source() -> PartyLedgerMasterSource {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -171,6 +172,7 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20250401").unwrap(),
         to: TallyDate::parse("20260331").unwrap(),
+        last_voucher_date: TallyDate::parse("20260331").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "def766e42d0e36b4b73d7a176fa0ad08d1a7467e301000650fb5ba9a2ae06f29"
@@ -253,4 +255,21 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         source.rows[entry.row_index].name == "BRIDGE MFLAB CREDITOR DEBIT BALANCE"
             && entry.reason.contains("opposite polarity")
     }));
+}
+
+#[test]
+fn a_later_dated_voucher_note_names_both_dates_and_claims_neither_count_nor_cause() {
+    let mut later = source();
+    later.to = TallyDate::parse("20261001").unwrap();
+    later.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    assert_eq!(
+        later.later_dated_vouchers_note().as_deref(),
+        Some("Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.")
+    );
+    // On or before the snapshot's end there is nothing to say.
+    for last in ["20260731", "20260401"] {
+        let mut source = source();
+        source.last_voucher_date = TallyDate::parse(last).unwrap();
+        assert_eq!(source.later_dated_vouchers_note(), None, "{last}");
+    }
 }

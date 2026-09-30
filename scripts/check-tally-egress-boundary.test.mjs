@@ -78,11 +78,11 @@ before(() => {
 });
 after(() => rmSync(bin, { recursive: true, force: true }));
 
-function runGate(trees, env = {}) {
+function runGate(trees, env = {}, args = []) {
   const dir = mkdtempSync(join(bin, "trees-"));
   for (const [key, lines] of Object.entries(trees)) writeFileSync(join(dir, `${key}.out`), lines.map((l) => `${l}\n`).join(""));
   rmSync(join(bin, "cargo.calls"), { force: true });
-  const result = spawnSync(process.execPath, [gate], {
+  const result = spawnSync(process.execPath, [gate, ...args], {
     cwd: root,
     encoding: "utf8",
     env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, TREES: dir, ...env },
@@ -170,7 +170,7 @@ test("the transport losing its shipped reqwest edge is reported", { skip }, () =
   );
 });
 
-// Check 2 over a tree the row plants, through BRIDGE_EGRESS_APP_SOURCE_ROOT.
+// Check 2 over a tree the row plants, through the gate's --app-source-root argument.
 function plant(files) {
   const dir = mkdtempSync(join(bin, "src-"));
   for (const [name, text] of Object.entries(files)) {
@@ -186,30 +186,39 @@ const ALLOWED = {
 };
 
 test("control: a planted tree whose only HTTP mentions are the allow-listed files passes check 2", { skip }, () => {
-  const result = runGate(TODAY, { BRIDGE_EGRESS_APP_SOURCE_ROOT: plant(ALLOWED) });
+  const result = runGate(TODAY, {}, ["--app-source-root", plant(ALLOWED)]);
   assert.equal(result.status, 0, result.stderr);
 });
 
 test("a planted call site in an unlisted app file is refused", { skip }, () => {
-  const result = runGate(TODAY, {
-    BRIDGE_EGRESS_APP_SOURCE_ROOT: plant({ ...ALLOWED, "planted.rs": "fn go() { let _ = reqwest::get(\"https://example.invalid\"); }\n" }),
-  });
+  const result = runGate(TODAY, {}, ["--app-source-root", plant({ ...ALLOWED, "planted.rs": "fn go() { let _ = reqwest::get(\"https://example.invalid\"); }\n" })]);
   assertRefused(result, "outside the pinned allow-list");
   assert.ok(result.stderr.includes("src-tauri/src/planted.rs"), result.stderr);
 });
 
 test("a raw socket in an unlisted app file is refused", { skip }, () => {
-  const result = runGate(TODAY, {
-    BRIDGE_EGRESS_APP_SOURCE_ROOT: plant({ ...ALLOWED, "socket.rs": "fn go() { let _ = std::net::TcpStream::connect(\"127.0.0.1:1\"); }\n" }),
-  });
+  const result = runGate(TODAY, {}, ["--app-source-root", plant({ ...ALLOWED, "socket.rs": "fn go() { let _ = std::net::TcpStream::connect(\"127.0.0.1:1\"); }\n" })]);
   assertRefused(result, "outside the pinned allow-list");
   assert.ok(result.stderr.includes("src-tauri/src/socket.rs"), result.stderr);
 });
 
 test("an allow-listed file that no longer names an HTTP client is reported as stale", { skip }, () => {
-  const result = runGate(TODAY, {
-    BRIDGE_EGRESS_APP_SOURCE_ROOT: plant({ ...ALLOWED, "tally/connection_tests.rs": "// nothing to see\n" }),
-  });
+  const result = runGate(TODAY, {}, ["--app-source-root", plant({ ...ALLOWED, "tally/connection_tests.rs": "// nothing to see\n" })]);
   assertRefused(result, "allow-listed file(s) no longer contain an outbound HTTP client");
   assert.ok(result.stderr.includes("src-tauri/src/tally/connection_tests.rs"), result.stderr);
 });
+
+// The source scan can be pointed elsewhere only by the argument above. An
+// environment variable, as a CI job could set, must not redirect it.
+test("an environment variable cannot point the source scan at another tree", { skip }, () => {
+  const violating = plant({ ...ALLOWED, "planted.rs": "fn go() { let _ = reqwest::get(\"https://example.invalid\"); }\n" });
+  const result = runGate(TODAY, { BRIDGE_EGRESS_APP_SOURCE_ROOT: violating, CI: "true" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
+});
+
+test("--app-source-root without a directory fails instead of scanning nothing", { skip }, () => {
+  const result = runGate(TODAY, {}, ["--app-source-root"]);
+  assertRefused(result, "--app-source-root needs a directory");
+});
+

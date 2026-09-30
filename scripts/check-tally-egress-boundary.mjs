@@ -298,9 +298,15 @@ function rustFiles(directory) {
   return files;
 }
 
-// Only the gate's own test sets BRIDGE_EGRESS_APP_SOURCE_ROOT, to scan a planted tree.
+// Only the gate's own test passes `--app-source-root <dir>`, to scan a planted
+// tree. It is an argument, not an environment variable, so nothing in a CI
+// environment can point the scan elsewhere.
+const rootFlag = process.argv.indexOf("--app-source-root");
+if (rootFlag !== -1 && process.argv[rootFlag + 1] === undefined) {
+  throw new Error("--app-source-root needs a directory");
+}
 const appCrateSourceRoot = (
-  process.env.BRIDGE_EGRESS_APP_SOURCE_ROOT ?? fileURLToPath(new URL("../src-tauri/src", import.meta.url))
+  rootFlag !== -1 ? process.argv[rootFlag + 1] : fileURLToPath(new URL("../src-tauri/src", import.meta.url))
 ).replaceAll("\\", "/");
 const filesWithForbiddenPatterns = new Set();
 for (const path of rustFiles(appCrateSourceRoot)) {

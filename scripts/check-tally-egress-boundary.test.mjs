@@ -309,6 +309,29 @@ test("an empty file, a non-JSON line and an unreadable lint message are refused"
   assertCensusRefused(census(unreadable), "an egress lint message could not be read");
 });
 
+test("paths as cargo prints them on Windows, below a crates/ member, or absolute, name the same repository files", () => {
+  const withOther = (path) => captured().replaceAll('"file_name":"src/other.rs"', `"file_name":${JSON.stringify(path)}`);
+  const other = (file) => ({ macOS: [CAPTURE_PINS.macOS[0], CAPTURE_PINS.macOS[1], [file, "std::process::Command::new", 1]] });
+  const cases = [
+    ["crates\\x\\src\\other.rs", "src-tauri/crates/x/src/other.rs"],
+    ["crates/x/src/other.rs", "src-tauri/crates/x/src/other.rs"],
+    [`${root}/src-tauri/src/other.rs`, "src-tauri/src/other.rs"],
+  ];
+  for (const [printed, file] of cases) {
+    assert.notEqual(withOther(printed), captured(), "the capture names src/other.rs");
+    const result = census(withOther(printed), "macOS", other(file));
+    assert.equal(result.status, 0, `${printed}: ${result.stderr}`);
+  }
+});
+
+test("a second build-finished line and a different lint code are refused", () => {
+  const finishedLine = captured().split("\n").find((line) => line.includes('"build-finished"'));
+  assertCensusRefused(census(`${captured()}${finishedLine}\n`), "(build-finished: [true,true])");
+  const renamed = captured().replaceAll('"code":"clippy::disallowed_methods"', '"code":"clippy::disallowed_names"');
+  assert.notEqual(renamed, captured(), "the capture has lint codes to change");
+  assertCensusRefused(census(renamed), "0 egress-lint firing(s) of std::process::Command::new, 2 reviewed");
+});
+
 test("an OS with no reviewed list is refused", () => {
   assertCensusRefused(census(captured(), "Linux"), 'no reviewed census for runner OS "Linux"');
   assertCensusRefused(census(captured(), "macOS", { macOS: [] }), 'no reviewed census for runner OS "macOS"');

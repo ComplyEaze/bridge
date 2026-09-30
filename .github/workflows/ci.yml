@@ -431,16 +431,17 @@ jobs:
           --all-targets -- --test-threads=1
       - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
       # The Tally-path egress census (scripts/check-tally-egress-boundary.mjs, check 2). The
-      # two egress lints are forced to warn, which no attribute, group allow, --cap-lints or lint
-      # table can silence, over the shipped targets in the release profile. The messages go to a
-      # file first, so a failed run cannot read as "nothing found", and the census requires that
-      # what fired match the reviewed call sites for this OS exactly. Its own profile keeps cargo
-      # from replaying the diagnostics of the step above. To roll back, delete this step; the
-      # static half of the gate still runs in the portable job.
+      # two egress lints are forced to warn, which no attribute, group allow, -A or lint table
+      # can silence, over the shipped targets. The messages go to a file first, so a failed run
+      # cannot read as "nothing found", and the census requires that what fired match the
+      # reviewed call sites for this OS exactly, so a run that silences the lints (RUSTFLAGS
+      # --cap-lints allow does) fails too. Measured with clippy 1.96.0: after a passing
+      # `-D warnings` step, this run re-lints the workspace crates and reports the firings. To
+      # roll back, delete this step; the static half of the gate still runs in the portable job.
       - name: Census the Tally-path egress lints
         shell: bash
         run: |
-          cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --release --message-format=json -- --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
+          cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
           node scripts/check-tally-egress-boundary.mjs --census "$RUNNER_TEMP/egress-census.jsonl" "$RUNNER_OS"
       # The legacy voucher-scan runtime and the manual Unit A calibration harness
       # are non-default features, so the workspace steps above never compile

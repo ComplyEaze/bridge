@@ -45,10 +45,10 @@
 //    text scan cannot see. A reviewed call site carries
 //    `#[expect(clippy::disallowed_methods, reason = "...")]`. CI's native job
 //    then runs clippy over the shipped targets with the two egress lints forced
-//    to warn, which no attribute, group allow, `--cap-lints`, `-A` or lint table
-//    can turn off, and this script (`--census FILE OS`) requires that what fired
-//    match scripts/tally-egress-census.json exactly, per OS. rustc measures what fires, so no
-//    syntax can hide a call. Beside it, static checks keep the configuration in
+//    to warn, which no attribute, group allow, `-A` or lint table can turn off,
+//    and this script (`--census FILE OS`) requires that what fired match
+//    scripts/tally-egress-census.json exactly, per OS. rustc measures what
+//    fires, so no syntax can hide a call. Beside it, static checks keep the configuration in
 //    place: the digest of clippy.toml, no second clippy.toml, no CLIPPY_CONF_DIR
 //    or CLIPPY_ARGS in any tracked file, no `clippy` cfg in src-tauri Rust.
 //
@@ -68,7 +68,7 @@
 //    linted; what the page's own script can reach is the webview CSP's
 //    concern, and the CSP does not govern a top-level navigation.
 //  - The census sees only code its clippy run compiles: the shipped targets
-//    (`--lib --bins`, release profile) with default features, on Windows and
+//    (`--lib --bins`, dev profile) with default features, on Windows and
 //    macOS (arm64 only; an x86_64 macOS build ships). Not seen: code under a cfg
 //    the run compiles differently from the shipped build (`clippy`, `dev`,
 //    `debug_assertions`: lines naming them are refused, a cfg assembled some
@@ -108,8 +108,10 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 // The census counts the egress-lint firings per file and method and requires an exact two-way
 // match with the reviewed list for that OS: a new firing, a firing that stopped, a build that did
 // not finish and an empty file all fail. The pinned counts are nonzero, so a run whose lints never
-// fired cannot pass as clean. Each `--force-warn` was tried against clippy-driver 1.96.0: it still
-// fires under an attribute, a group allow, `--cap-lints allow`, `-A` and a `[lints.clippy]` table.
+// fired cannot pass as clean. Measured on a two-file crate with clippy-driver 1.96.0, `--force-warn`
+// still fires under `#[allow(clippy::all)]`, `#![allow(warnings)]`, `-A clippy::all` and a
+// `[lints.clippy] all = "allow"` table, and is silenced by RUSTFLAGS `--cap-lints allow`; that run
+// reports nothing, which the nonzero pins refuse.
 //
 // scripts/tally-egress-census.json lists, per OS, [file, method, count] for each reviewed call
 // site. The entries come from a real run's output, never typed in by hand: a run that disagrees
@@ -134,10 +136,7 @@ function firingFile(message) {
 }
 
 function censusViolations(text, os, pins) {
-  const expected = pins[os];
-  if (!Array.isArray(expected) || expected.length === 0) {
-    return [`no reviewed census for runner OS ${JSON.stringify(os)}; add one from a real run`];
-  }
+  const expected = Array.isArray(pins[os]) ? pins[os] : [];
   const lines = text.split(/\r?\n/).filter((line) => line !== "");
   if (lines.length === 0) return ["the clippy output is empty: the lints did not run"];
   const finished = [];
@@ -158,6 +157,9 @@ function censusViolations(text, os, pins) {
     seen.set(key, (seen.get(key) ?? 0) + 1);
   }
   const violations = [];
+  // An empty list would let a run that fired nothing pass, so it is a failure that still prints
+  // what this run observed, for the review that fills the list.
+  if (expected.length === 0) violations.push(`no reviewed census for runner OS ${JSON.stringify(os)}; add one from a real run`);
   if (finished.length !== 1 || finished[0] !== true) {
     violations.push(`clippy did not report exactly one successful build (build-finished: ${JSON.stringify(finished)})`);
   }

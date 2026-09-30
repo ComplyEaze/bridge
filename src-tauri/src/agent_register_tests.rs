@@ -49,7 +49,8 @@ fn captured_rows() -> Vec<Value> {
 }
 
 fn captured_index() -> MasterIndex {
-    MasterIndex::build(captured_masters().iter(), &captured_groups(), Vec::new()).expect("masters index")
+    MasterIndex::build(captured_masters().iter(), &captured_groups(), Vec::new())
+        .expect("masters index")
 }
 
 fn row_on<'a>(rows: &'a [Value], date: &str) -> &'a Value {
@@ -98,7 +99,10 @@ fn an_intra_state_purchase_carries_tax_per_entry_on_recognised_heads() {
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "complete");
     assert_eq!(row["party"], "SYN Supplier Intra (M2)");
-    assert!(row.get("reference").is_none(), "absent, never an empty string");
+    assert!(
+        row.get("reference").is_none(),
+        "absent, never an empty string"
+    );
     assert_eq!(row["tax_in_books"][0]["ledger"], "Input CGST");
     assert_eq!(row["tax_in_books"][0]["head"], "cgst");
     assert_eq!(row["tax_in_books"][0]["amount"], "-900.00");
@@ -255,7 +259,12 @@ fn a_ledger_whose_group_cannot_be_resolved_is_named_not_classified() {
         .into_iter()
         .filter(|group| group.name != "Duties & Taxes")
         .collect();
-    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups), Vec::new()).unwrap();
+    let index = MasterIndex::build(
+        captured_masters().iter(),
+        &GroupIndex::build(groups),
+        Vec::new(),
+    )
+    .unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     // No ledger is placed under Duties & Taxes, so nothing is in the register, and the
     // vouchers that touch the unplaced ledgers are named rather than silently absent.
@@ -325,8 +334,9 @@ fn two_listings_of_the_same_masters_are_equal_and_a_changed_head_is_not() {
         .find(|record| record.ledger.name == "Input IGST")
         .unwrap()
         .ledger
-        .parent =
-        bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned("Indirect Expenses".to_string());
+        .parent = bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned(
+        "Indirect Expenses".to_string(),
+    );
     let moved = MasterIndex::build(reparented.iter(), &captured_groups(), Vec::new()).unwrap();
     assert_ne!(first, moved, "a re-parented ledger is drift");
 }
@@ -339,4 +349,114 @@ fn a_repeated_ledger_name_refuses_as_drift() {
         MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()),
         Err("ledger_snapshot_drifted".to_string())
     );
+}
+
+#[test]
+fn a_voucher_touching_a_ledger_the_compliance_read_set_aside_refuses_with_its_own_code() {
+    // The compliance read leaves out ledgers kept in another currency; a voucher that names
+    // one cannot be classified and must not fall into "drift" or "other".
+    let masters: Vec<_> = captured_masters()
+        .into_iter()
+        .filter(|record| record.ledger.name != "Input CGST")
+        .collect();
+    let index = MasterIndex::build(
+        masters.iter(),
+        &captured_groups(),
+        vec!["Input CGST".to_string()],
+    )
+    .unwrap();
+    assert_eq!(
+        classify_register(&index, &captured_rows()),
+        Err("register_ledger_currency_excluded".to_string())
+    );
+    // Without the exclusion the same absence is drift.
+    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    assert_eq!(
+        classify_register(&index, &captured_rows()),
+        Err("ledger_snapshot_drifted".to_string())
+    );
+}
+
+#[test]
+fn a_side_list_carries_its_exact_total_and_at_most_the_cap() {
+    let items: Vec<Value> = (0..MAX_LISTED_SIDE_ITEMS + 50)
+        .map(|number| json!({"n": number}))
+        .collect();
+    let bounded = bounded_list(&items);
+    assert_eq!(bounded["total"], MAX_LISTED_SIDE_ITEMS + 50);
+    assert_eq!(
+        bounded["listed"].as_array().unwrap().len(),
+        MAX_LISTED_SIDE_ITEMS
+    );
+    assert_eq!(bounded["listed_truncated"], true);
+    assert_eq!(bounded["listed"][0]["n"], 0);
+    let small = bounded_list(&items[..3]);
+    assert_eq!(small["total"], 3);
+    assert_eq!(small["listed_truncated"], false);
+}
+
+#[test]
+fn party_names_are_marked_for_redaction_but_tax_ledger_names_are_not() {
+    let row = mark_register_row(json!({
+        "party": "Customer One",
+        "tax_in_books": [{"ledger": "Input CGST"}],
+        "party_entries": [{"ledger": "Customer One"}],
+        "other_entries": [{"ledger": "Supplier Two"}],
+    }));
+    assert_eq!(row["tax_in_books"][0]["ledger"], "Input CGST");
+    let redacted = redact_value(row, Redaction::MaskParties);
+    let text = redacted.to_string();
+    assert!(
+        !text.contains("Customer One") && !text.contains("Supplier Two"),
+        "{text}"
+    );
+    assert!(text.contains("Input CGST"), "{text}");
+}
+
+#[test]
+fn a_register_voucher_with_an_unplaced_purchase_ledger_is_returned_flagged_not_complete() {
+    // Without Purchase Accounts in the group collection the purchase ledgers cannot be placed.
+    // The voucher still touches Duties & Taxes, so it stays in the register, says so, and lists
+    // the entry with the reason it could not be placed.
+    let xml = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml"
+    ));
+    let groups: Vec<_> = parse_native_group_snapshot(&xml, COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .filter(|group| group.name != "Purchase Accounts")
+        .collect();
+    let index = MasterIndex::build(
+        captured_masters().iter(),
+        &GroupIndex::build(groups),
+        Vec::new(),
+    )
+    .unwrap();
+    let page = classify_register(&index, &captured_rows()).unwrap();
+    let row = row_on(&page.rows, "20250903");
+    assert_eq!(row["status"], "has_unresolved_group");
+    assert_eq!(
+        ledgers(&row["entries_on_ledgers_with_unresolved_group"]),
+        ["Purchase - Goods"]
+    );
+    assert_eq!(
+        row["entries_on_ledgers_with_unresolved_group"][0]["ancestry_gap"],
+        "group_absent"
+    );
+    assert!(row["taxable_entries"].as_array().unwrap().is_empty());
+    assert_eq!(ledgers(&row["tax_in_books"]), ["Input CGST", "Input SGST"]);
+}
+
+#[test]
+fn a_side_list_of_exactly_the_cap_is_not_truncated() {
+    let items: Vec<Value> = (0..MAX_LISTED_SIDE_ITEMS)
+        .map(|n| json!({"n": n}))
+        .collect();
+    let bounded = bounded_list(&items);
+    assert_eq!(bounded["total"], MAX_LISTED_SIDE_ITEMS);
+    assert_eq!(
+        bounded["listed"].as_array().unwrap().len(),
+        MAX_LISTED_SIDE_ITEMS
+    );
+    assert_eq!(bounded["listed_truncated"], false);
 }

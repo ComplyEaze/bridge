@@ -2491,9 +2491,10 @@ fn only_present_rows_are_named_and_a_clean_result_names_none() {
         {"bridge_txn_id":"t1","status":"not_found"},
         {"bridge_txn_id":"t2","status":"not_attributable","marker":"accounting_fingerprint"},
         {"bridge_txn_id":"t3","status":"duplicate_fingerprint","matches":2},
+        {"bridge_txn_id":"t4","status":"matching_content_observed","marker":"accounting_fingerprint"},
         {"status":"posted_verified"},
     ]});
-    assert_eq!(present_txn_ids(&result), ["t2", "t3"]);
+    assert_eq!(present_txn_ids(&result), ["t2", "t3", "t4"]);
     assert!(
         present_txn_ids(&json!({"vouchers":[{"bridge_txn_id":"t1","status":"not_found"}]}))
             .is_empty()
@@ -2503,7 +2504,14 @@ fn only_present_rows_are_named_and_a_clean_result_names_none() {
     let mut payload = json!({"result":{"error":{"code":"import_preexisting_identity"}}});
     name_preexisting_rows(&mut payload, &[]);
     assert!(payload["result"]["error"].get("next_step").is_none());
+    // An unobserved attempt's generic message would say never to rebuild it.
+    payload["result"]["error"]["message"] =
+        json!("The saved batch requires reconciliation. never rebuild it to retry.");
     name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()]);
+    assert!(payload["result"]["error"]["message"]
+        .as_str()
+        .unwrap()
+        .starts_with("Nothing was sent"));
     assert_eq!(
         payload["result"]["error"]["preexisting_txn_ids"],
         json!(["t2", "t3"])

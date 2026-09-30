@@ -1239,8 +1239,8 @@ impl Server {
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
                 }
-                // Withheld on a tiny response budget, as `cause` is, so it cannot
-                // turn a refusal into the oversize answer.
+                // Withheld under the remediation budget, as `cause` is. That is
+                // not a guarantee against the oversize answer just above it.
                 if let Some(ids) = preexisting_txn_ids {
                     if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
                         name_preexisting_rows(&mut outcome.payload, &ids);
@@ -1609,7 +1609,7 @@ fn present_txn_ids(result: &Value) -> Vec<String> {
 
 /// What to do when a batch's rows are already in the book, or look like rows
 /// that are (#901). It names no amount, ledger or narration.
-const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, ledgers and amount match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open each matching voucher and confirm it is a regular voucher (not optional, cancelled or post-dated) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If it is not there, or is a different row that only looks the same, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and Bridge checks the book again; if the voucher is there it refuses again, and if it is not it posts. Only for a genuinely different transaction that shares the fingerprint of a voucher you have opened and confirmed, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
 
 /// Name the rows of the batch that are already in the book, with the way on.
 fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
@@ -1619,6 +1619,13 @@ fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
     let error = &mut payload["result"]["error"];
     error["preexisting_txn_ids"] = json!(txn_ids);
     error["next_step"] = json!(PREEXISTING_ROWS_NEXT_STEP);
+    // Set only at the check before the dialog, where nothing was sent, so the
+    // generic "never rebuild it to retry" of an unobserved attempt would
+    // contradict the step.
+    error["message"] = json!(
+        "Nothing was sent: rows of this batch already match vouchers in the book. \
+         See error.next_step."
+    );
 }
 
 /// The aim check on the snapshot the queue read last before the POST (#574).

@@ -3511,6 +3511,11 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
     let step = error["next_step"].as_str().unwrap();
     assert!(step.contains("preexisting_txn_ids"), "{step}");
     assert!(step.contains("on whole days"), "{step}");
+    assert!(step.contains("do not enter the row by hand"), "{step}");
+    assert!(
+        step.contains("build the batch again and Bridge checks the book again"),
+        "{step}"
+    );
     assert_eq!(
         refused["structuredContent"]["result"]["attempt_recorded"], false,
         "{refused}"

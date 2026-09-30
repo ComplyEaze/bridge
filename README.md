@@ -11,11 +11,12 @@ at a time, after you approve each one.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/latest) (26 September 2026)<!-- /managed:current-release -->,
-for Windows x64 and Apple Silicon Macs. We test each release before we
-publish it, but our tests cannot cover every Tally edition, set of books or
-setting. The release check confirms only that each package launches and lists
-its tools; what has and has not been tried is listed under *What has been run
-against a real TallyPrime* below.
+for Windows x64 and Apple Silicon Macs. We check each release before we
+publish it: the release check confirms that each package launches, lists its
+tools and parses a synthetic encrypted bank statement. It does not run against
+TallyPrime, and nothing we can run covers every
+Tally edition, set of books or setting. What has been run against a real
+TallyPrime, and what has not, is listed below.
 [Install it](./docs/agent/INSTALL.md) · [What changed](./CHANGELOG.md) ·
 [Security and privacy](./docs/security-and-privacy.md)
 
@@ -45,10 +46,17 @@ Not yet code-signed; your computer may warn you before opening it.
   separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
-  landed. Three known limits remain: read *Before you turn on posting* first.
-- **Tool calls leave receipts** in a log on your computer: the company
-  touched, and a fingerprint of what was asked and of what came back, written
-  whether the call succeeds or is refused.
+  landed. Three known limits remain: ComplyEaze Bridge cannot undo a posted
+  voucher (you correct it in Tally); a company renamed to, or loaded under, the
+  target company's name (or one differing only in case or spacing) just after
+  its last check could still receive the voucher, if it has the voucher's
+  ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
+  and a ledger renamed and replaced in that same moment could receive the
+  entry, and not every such change is noticed. Read *Before you turn on
+  posting* first.
+- **Tool calls leave receipts** in a log on your computer: the company's Tally
+  identifier, and a fingerprint of what was asked and of what came back,
+  written whether the call succeeds or is refused.
 - **Open source** under Apache-2.0.
 
 ## What has been run against a real TallyPrime
@@ -65,19 +73,22 @@ stated. The [MCP guide](./docs/agent/README.md) and
   does not name the Tally release or licence tier). Not every read has its own
   recorded live run.
 - Posting one Journal, on a development build from 22 September 2026
-  (issue #579), and a Payment, a Contra and two Receipts (one of three
-  entries) with the approval dialog on macOS (PR #600), each read back as
-  posted. These builds predate the release published on 26 September 2026
-  (version 0.3.0).
-- One native post on licensed TallyPrime Gold 7.1, on 28 September 2026, on a
-  development build and one book; its approval step was not recorded
-  ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE.md)).
+  ([issue #579](https://github.com/lamemustafa/bridge/issues/579#issuecomment-5773745569)),
+  and a Payment, a Contra and two Receipts (one of three entries) with the
+  approval dialog on macOS ([PR #600](https://github.com/lamemustafa/bridge/pull/600#issuecomment-5781144386)),
+  each read back as posted. These builds predate the release published on
+  26 September 2026 (version 0.3.0).
+- Native posts of ten batches on licensed TallyPrime Gold 7.1, in one session
+  on 28 September 2026, on a development build and one client book (the import
+  request was captured for nine of them); their approval step was not recorded
+  ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
 
 Not yet run by us in a controlled test: the published package itself against a
-live TallyPrime; the approval window on Windows; posting on TallyPrime
-Education; posting on TallyPrime Gold with its approval step recorded. Each
-release package is built and launched, and its tool list checked, on hosted
-CI runners for Windows x64 and Apple Silicon Mac.
+live TallyPrime; any ComplyEaze Bridge build running on Windows, including
+the approval window; posting on TallyPrime Education; posting on TallyPrime
+Gold with its approval step recorded. Each release package is built and
+launched, its tool list checked and a synthetic encrypted bank statement
+parsed, on hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 
@@ -108,7 +119,7 @@ them, through an AI assistant such as Claude Desktop.
   biggest cause of an import being rejected wholesale when it is skipped.
 - **Records what it did.** Every tool call Bridge runs — read or write, and
   whether it succeeds or is refused — appends a receipt to a log on your own
-  machine, naming the company it touched and fingerprinting what was asked and
+  machine, identifying the company it touched and fingerprinting what was asked and
   what came back. Reads keep those fingerprints as evidence alongside. A
   prepared batch records the local endpoint it was built for, and a native posting
   is refused if that endpoint has changed since; that is a safety check kept in
@@ -159,10 +170,11 @@ With writing on:
 
 ## The desktop app
 
-**The desktop source also contains a document-upload feature and an AXAL
-sign-in** that no published build exposes and that is being removed
-([#914](https://github.com/lamemustafa/bridge/pull/914)). No tool of
-the extension reaches them, and no desktop installer is published. See
+**The extension is built from the same source library as the desktop app,
+which still contains a document-upload feature and an AXAL sign-in.** No
+published build exposes them and no tool of the extension reaches them. They
+are being removed ([#914](https://github.com/lamemustafa/bridge/pull/914)).
+No desktop installer is published. See
 [Security and privacy](./docs/security-and-privacy.md).
 
 A folder you choose to sync can also hold files Bridge exported from Tally,

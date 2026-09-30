@@ -4,15 +4,16 @@
 
 | Version | Security status |
 | --- | --- |
-| `master` | Receives security fixes first |
-| <!-- managed:latest-preview -->[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/latest) (26 September 2026)<!-- /managed:latest-preview -->, the latest published release | Security fixes ship in the next release |
+| `master` | Fixes, if made, land here first |
+| <!-- managed:latest-preview -->[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/latest) (26 September 2026)<!-- /managed:latest-preview -->, the latest published release | A fix, if we make one, ships as a new release |
 | Earlier releases | Superseded; install the latest release |
 | `v0.1.0` | Historical bootstrap release; unsupported |
 
 ComplyEaze Bridge is published as MCPB packages on GitHub Releases
-(`mcp-preview-*` tags). It is still being developed. Each package has a
-SHA-256 checksum and a provenance record naming the source commit it was built
-from. There is no code-signed or notarized release, and the desktop application
+(`mcp-preview-*` tags). It is still being developed. If we fix a security
+issue, the fix will be in a new release; we are not obliged to make one. Each
+package has a SHA-256 checksum and a provenance record naming the source commit
+it was built from. There is no code-signed or notarized release, and the desktop application
 has no published installer. CI bundle artifacts are smoke evidence and must not
 be presented as a signed production release.
 

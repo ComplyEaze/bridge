@@ -33,14 +33,14 @@ ComplyEaze Bridge tool can approve it.
   amounts, to the AI provider you use, as it sends the rest of the
   conversation. ComplyEaze Bridge can mask party names or drop narration
   (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting), but neither
-  removes amounts.
+  removes amounts. The default is `none`: nothing is masked unless you choose it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
-  it. The extension's tools reach only the Tally transport. The desktop source
-  also contains a document-upload feature and an AXAL sign-in that no
-  published build exposes and that is being removed
-  ([#914](https://github.com/lamemustafa/bridge/pull/914)); no tool of the extension
-  reaches them (see section 3).
+  it. The extension's tools reach only the Tally transport. The extension is
+  built from the same source library as the desktop app, which still contains a
+  document-upload feature and an AXAL sign-in. No published build exposes them,
+  and no tool of the extension reaches them (see section 3). They are being
+  removed ([#914](https://github.com/lamemustafa/bridge/pull/914)).
 
 ## 3. Which network destinations can it contact?
 
@@ -112,9 +112,10 @@ in CI, and everything is open source, but that is not an external review.
 
 The package declares only a command to run and its settings. In its source we
 found no service, driver, scheduled task, registry key, launch agent or
-listening port. It reads and writes files only in its data folder and in files
-named in a tool call (often by the assistant), such as a bank statement. Its
-one extra process is a second copy of itself that shows the approval window.
+listening port. It writes files only in its data folder. It also reads files
+named in a tool call (often by the assistant), such as a bank statement and its
+password file. Its one extra process is a second copy of itself that shows the
+approval window.
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,
 and a check of a machine before and after installing and running it.

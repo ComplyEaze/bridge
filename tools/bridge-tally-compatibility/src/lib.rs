@@ -217,6 +217,10 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// ran a legacy schema no caller opened, the second named import actions no
 /// builder used.
 ///
+/// Lowered to 288 when `axal.rs`, `documents.rs` and `export_registry.rs` were
+/// deleted with the unfinished document-upload feature (bridge#912). The raise
+/// to 232 above names the first two, which no longer exist.
+///
 /// The raise to 262 binds thirteen test files because a directory rule requires
 /// it, not because of what they decide. Each `src-tauri/src/reports`
 /// file kept its tests in an inline `#[cfg(test)]` module, so editing a test

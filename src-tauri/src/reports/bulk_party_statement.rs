@@ -422,7 +422,7 @@ fn safe_party_slug(party: &str) -> String {
 /// a pre-existing file can be silently overwritten. The name is reserved
 /// empty, and the bytes go to a hidden staging file beside it, synced, then
 /// renamed over the reservation: a crash leaves an empty file or a hidden
-/// one, never a half-written statement.
+/// one.
 fn write_unique_file(
     destination: &Path,
     stem: &str,
@@ -466,7 +466,7 @@ fn write_unique_file(
 }
 
 /// The hidden name a statement is written under before it is renamed into
-/// place. It starts with a dot, so a file browser does not list it.
+/// place. It starts with a dot, which hides it on macOS and Linux.
 fn staging_name(name: &str) -> String {
     format!(".{name}.{}.partial", Uuid::new_v4())
 }

@@ -2,12 +2,11 @@
 //!
 //! These are pure primitives: an exact decimal, a validated Tally date, and the
 //! shared error. They live below `bridge-tally-core` deliberately.
-//! `bridge-tally-core` also carries delivery/destination capability
-//! (`AxalTallyGateway`, `DestinationAdapter`), and the sealed read-only
-//! `bridge-tally-live-read` controller is forbidden from reaching that surface
-//! by `scripts/check-tally-live-read-boundary.mjs`. Keeping the value types
-//! here lets `bridge-tally-protocol` use them without dragging write capability
-//! into the read path.
+//! `bridge-tally-core` once carried delivery/destination capability, and the
+//! sealed read-only `bridge-tally-live-read` controller is still forbidden from
+//! reaching that crate by `scripts/check-tally-live-read-boundary.mjs`. Keeping
+//! the value types here lets `bridge-tally-protocol` use them without dragging
+//! core's write-side surface into the read path.
 
 use serde::{Deserialize, Deserializer, Serialize};
 

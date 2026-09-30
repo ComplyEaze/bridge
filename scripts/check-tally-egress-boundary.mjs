@@ -8,8 +8,9 @@
 // Bridge's own code has one network client: the loopback Tally transport. An
 // earlier unfinished document-upload feature and AXAL sign-in (axal.rs,
 // documents.rs) were removed, so this gate now allows only the Tally
-// connection files to name an HTTP client in the app crate's source, and only
-// the app crate and the Tally transport to depend on one. It checks where
+// connection files (test helpers) to name an HTTP client in the app crate's
+// source, and only the app crate (as a dev-dependency) and the Tally transport
+// to depend on one. It checks where
 // network code may live; it does not by itself prove that no data leaves the
 // machine.
 //
@@ -89,10 +90,12 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 // declare reqwest *directly*, not which crates reach it transitively.
 const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 
-// `bridge` is the app crate. It depends on reqwest directly for one thing
-// only: the Tally connection wrapper (src/tally/connection.rs), which reaches
-// Tally itself over loopback through bridge-tally-transport. It has no other
-// network destination.
+// `bridge` is the app crate. It names reqwest only in test helpers for the
+// Tally connection wrapper (under cfg(test) in src/tally/connection.rs, and in
+// src/tally/connection_tests.rs), so it declares reqwest as a dev-dependency.
+// Every real request to Tally goes through bridge-tally-transport, which
+// reaches Tally itself over loopback. The app crate has no other network
+// destination.
 //
 // Do not read "app crate" as "Tauri only". src/bin/bridge_mcp.rs links
 // bridge_lib, and scripts/package-mcpb.mjs ships bridge_mcp as the extension
@@ -227,10 +230,11 @@ for (const workspace of workspaces) {
 // silently in either direction -- same shape as
 // admission_and_egress_files_stay_pinned.rs's pin check.
 const APP_CRATE_HTTP_ALLOW_LIST = new Set([
-  // The Tally HTTP transport wrapper: reqwest is used here, but only to
-  // reach Tally itself over loopback (bridge-tally-transport's
-  // `canonical_loopback_origin` rejects any other host before a request is
-  // ever built). Its test file constructs the same client for test doubles.
+  // The Tally connection wrapper and its tests: reqwest is named here only in
+  // test helpers (cfg(test) code and the test file), which build clients for
+  // test doubles. Production requests to Tally go through
+  // bridge-tally-transport, whose `canonical_loopback_origin` rejects any
+  // non-loopback host before a request is ever built.
   "src-tauri/src/tally/connection.rs",
   "src-tauri/src/tally/connection_tests.rs",
 ]);

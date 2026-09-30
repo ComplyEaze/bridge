@@ -65,14 +65,18 @@ Each line names the pull requests it comes from.
 
 **Removed**
 
-- The desktop app's unfinished document-sync feature is gone: the AXAL
-  sign-in, the code that scanned a folder and uploaded the files you chose to
-  ComplyEaze cloud storage, and the two hidden screens for them. No Bridge tool
-  could reach them, and no navigation led to them. After this change the only
-  network client in Bridge's own code connects to Tally on your own computer, and
-  the CI egress gate fails if a reqwest or hyper client appears elsewhere in the
-  app or in Bridge's other crates. The feature can be rebuilt from the git history if it
-  is needed again (#PR).
+- The unfinished document-sync feature is gone from the source, and so from
+  both the desktop app and the binary the Claude Desktop extension runs: the
+  AXAL sign-in, the code that scanned a folder and uploaded the files you chose
+  to ComplyEaze cloud storage, and the two hidden screens for them. No Bridge
+  tool could reach them, and no navigation led to them. After this change the
+  only network client in Bridge's own code connects to Tally on your own
+  computer. The CI egress gate fails if a first-party crate other than the Tally
+  transport and the app crate depends on reqwest or hyper, or if reqwest, hyper
+  or a raw socket is named in the app's source outside the Tally connection
+  files. The unused delivery types in the portable core crate (no network code)
+  went with it. The feature can be rebuilt from the git history if it is needed
+  again (#PR).
 
 ## [0.3.0] - 2026-09-26
 

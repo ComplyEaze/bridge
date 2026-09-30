@@ -49,3 +49,19 @@ the census reports the expansion site.
 
 What it does not show: paths on Windows, a workspace member below a `crates/` directory, or any of
 the other methods in `src-tauri/clippy.toml`. The census tests derive no such variants from it.
+
+## Measurements on the same crate (not committed as captures)
+
+Run on 2026-09-30 with clippy 1.96.0 on macOS (arm64), each in a fresh copy of the crate, counting
+`clippy::disallowed_methods` messages in `--message-format=json` output (confidence: verified for
+this crate and toolchain, not for the workspace):
+
+| Change to the run | Firings |
+| --- | --- |
+| none (the capture above) | 4 |
+| `RUSTFLAGS=--cap-lints allow` | 0 (no compiler message of any kind) |
+| `-A clippy::all -A warnings` before the `--force-warn` flags | 4 |
+| `[lints.clippy] all = "allow"` in Cargo.toml | 4 |
+| `#![allow(warnings)]` and `#![allow(clippy::style)]` at the top of `src/lib.rs` | 4 |
+| a passing `cargo clippy -- -D warnings` first (only the `#[expect]`ed call remains), then the census run, same profile | 1 (the run re-linted and reported) |
+| the same, with `--release` on the census run | 1 |

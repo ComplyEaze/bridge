@@ -64,12 +64,13 @@ const todayTrees = (root) => {
     TODAY[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
     TODAY[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
     TODAY[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
+    TODAY[`${workspace}.tower`] = ["tower v0.5.3", reqwest, "tower-http v0.6.11"];
   }
   return TODAY;
 };
 const TODAY = todayTrees(root);
 const EVERY_CALL = ["src-tauri", "tools"].flatMap((workspace) =>
-  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service"].map((name) => `${workspace}.${name}`),
+  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].map((name) => `${workspace}.${name}`),
 );
 
 let bin;
@@ -201,10 +202,18 @@ test("a clippy cfg in src-tauri Rust is refused with its line", { skip }, () => 
 });
 
 test("a cfg the census run compiles differently from the shipped build is refused", { skip }, () => {
-  for (const cfg of ["#[cfg(not(dev))]", "#[cfg_attr(dev, allow(dead_code))]", "#[cfg(not(debug_assertions))]", "if cfg!(debug_assertions) {"]) {
+  for (const cfg of ["#[cfg(not(dev))]", "#[cfg_attr(dev, allow(dead_code))]", "#[cfg(not(debug_assertions))]", "if cfg!(debug_assertions) {", '#[cfg(panic = "abort")]']) {
     const result = sandbox({ "src-tauri/src/lib.rs": `fn ok() {}\n${cfg}\nfn hidden() {}\n` }).run();
     assertRefused(result, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently from the shipped build");
   }
+  // An attribute split over lines is read as one.
+  const split = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(\n    debug_assertions\n))]\nfn hidden() {}\n" }).run();
+  assertRefused(split, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently");
+  // A tests/ module inside src/ ships with the crate, an integration test does not.
+  const inSrc = sandbox({ "src-tauri/src/x/tests/y.rs": "#[cfg(not(debug_assertions))]\nfn hidden() {}\n" }).run();
+  assertRefused(inSrc, "src-tauri/src/x/tests/y.rs:1 names a cfg the census run compiles differently");
+  const integration = sandbox({ "src-tauri/tests/y.rs": "#[cfg(not(debug_assertions))]\nfn fine() {}\n" }).run();
+  assert.equal(integration.status, 0, integration.stderr);
   // A feature that only contains the word, and a plain cfg, stay legal.
   const legal = sandbox({ "src-tauri/src/lib.rs": '#[cfg(target_os = "macos")]\nfn ok() {}\n#[cfg(feature = "voucher-scan")]\nfn also_ok() {}\n' }).run();
   assert.equal(legal.status, 0, legal.stderr);
@@ -214,9 +223,14 @@ test("a tracked cargo config is refused", { skip }, () => {
   assertRefused(sandbox({ ".cargo/config.toml": "[alias]\nclippy = \"true\"\n" }).run(), ".cargo/config.toml is a cargo config");
 });
 
+test("a new build script under src-tauri is refused until it is pinned", { skip }, () => {
+  const result = sandbox({ "src-tauri/crates/x/build.rs": 'fn main() {\n    println!("cargo:rustc-cfg=shipping");\n}\n' }).run();
+  assertRefused(result, "src-tauri/crates/x/build.rs is new or changed; check it sets no cfg or environment for the census run");
+});
+
 test("an edit to src-tauri/build.rs without its digest is refused", { skip }, () => {
   const result = sandbox({ "src-tauri/build.rs": 'fn main() {\n    println!("cargo:rustc-cfg=dev");\n    tauri_build::build()\n}\n' }).run();
-  assertRefused(result, "src-tauri/build.rs changed; check it sets no cfg or environment for the census run");
+  assertRefused(result, "src-tauri/build.rs is new or changed; check it sets no cfg or environment for the census run");
 });
 
 test("a second clippy.toml under src-tauri is refused", { skip }, () => {
@@ -330,6 +344,21 @@ test("a second build-finished line and a different lint code are refused", () =>
   const renamed = captured().replaceAll('"code":"clippy::disallowed_methods"', '"code":"clippy::disallowed_names"');
   assert.notEqual(renamed, captured(), "the capture has lint codes to change");
   assertCensusRefused(census(renamed), "0 egress-lint firing(s) of std::process::Command::new, 2 reviewed");
+});
+
+test("a list that could match a silent run is refused: a zero count, a repeated key, a malformed row", () => {
+  const silent = captured()
+    .split("\n")
+    .filter((line) => !line.includes("disallowed"))
+    .join("\n");
+  assert.ok(silent.includes("build-finished"), "the silent run still finished");
+  const zero = { macOS: [["src-tauri/src/x.rs", "std::net::TcpStream::connect", 0]] };
+  assertCensusRefused(census(silent, "macOS", zero), "a reviewed entry is not [file, method, count of at least 1]");
+  const repeated = { macOS: [["a.rs", "m::f", 1], ["a.rs", "m::f", 2]] };
+  assertCensusRefused(census(captured(), "macOS", repeated), "a reviewed entry is repeated: a.rs m::f");
+  assertCensusRefused(census(captured(), "macOS", { macOS: [["a.rs", 5, 1]] }), "a reviewed entry is not [file, method, count of at least 1]");
+  // The same silent run against the real list is refused too, because nothing fired.
+  assertCensusRefused(census(silent), "0 egress-lint firing(s) of std::process::Command::new, 2 reviewed");
 });
 
 test("an OS with no reviewed list is refused", () => {

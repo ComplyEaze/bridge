@@ -58,6 +58,7 @@ type LoadResult =
       tally_as_of_yyyymmdd?: string;
       foreign_currency_ledger_name?: string;
       foreign_currency_ledgers_excluded?: Array<ExcludedCurrencyLedger>;
+      base_currency_ledgers_mixed_excluded?: Array<string>;
     };
 
 type Entry = {
@@ -304,6 +305,7 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
           tallyAsOf: entry.result.state === "partial" ? entry.result.tally_as_of_yyyymmdd : undefined,
           foreignCurrencyLedgerName: entry.result.state === "partial" ? entry.result.foreign_currency_ledger_name : undefined,
           excludedLedgers: entry.result.state === "partial" ? entry.result.foreign_currency_ledgers_excluded : undefined,
+          mixedLedgers: entry.result.state === "partial" ? entry.result.base_currency_ledgers_mixed_excluded : undefined,
           receivable: complete ? amountOf(complete.report.receivable_total) : null,
           overdue: complete ? amountOf(complete.report.ageing.days_90_plus) : null,
           unallocated: complete ? amountOf(complete.unallocated_total) : null,
@@ -413,6 +415,7 @@ export function AllClientsScreen({ config, companies, onOpenCompany, onBack, liv
         row.tallyAsOf,
         row.foreignCurrencyLedgerName,
         row.excludedLedgers,
+        row.mixedLedgers,
       )
       : null;
     return (

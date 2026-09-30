@@ -89,12 +89,17 @@ A read whose two paired halves differ, because the book changed while Bridge was
 carries `native_report_pair_changed`. A voucher-window part that is not admitted
 (`voucher_window_part_not_admitted`) names why, and a census disagreement also carries
 `counts`, the rows the part `returned` against the rows the census `counted`.
-A compliance ledger read (`ledger_masters fields=compliance`) that its company's master-alteration
-mark cannot bound within Bridge's response budget is refused before any ledger request (#637). The
-refusal has cause `ledger_masters_too_large` and a `size` object: `master_alter_id`,
-`estimated_bytes` and `budget_bytes`. The mark is an upper bound on ledgers, since every master
-raises it, so a company with fewer ledgers may be refused. `fields=basic` still reads it, and a
-precise count is pending (#668).
+A compliance ledger read (`ledger_masters fields=compliance`) whose estimated response is over
+Bridge's budget is refused before any master request (#637, #668). The refusal has cause
+`ledger_masters_too_large` and a `size` object: `master_alter_id`, `counted_ledgers`,
+`estimated_bytes` and `budget_bytes`. A company whose master-alteration mark puts the estimate over
+budget, but is at most 10,000, has its ledgers counted first with a balance-free catalogue read
+(a stable pair, bound to the company by name and GUID), and is refused only when the count is over
+budget (`counted_ledgers` is that count). The read's extent bracket still checks the book
+afterwards, so a book that grows between the count and the master read is refused, but only after
+that read was sent. Above 10,000 the mark alone is refused and `counted_ledgers` is
+null: the mark is an upper bound on ledgers, since every master raises it, so a company with fewer
+ledgers may be refused. `fields=basic` still reads it.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
@@ -113,8 +118,15 @@ parse or pass Bridge's checks, or hit a local limit or fault that does not invol
 withdrawn call is `request_cancelled`.
 
 Like `remediation`, `cause`, `counts`, `size` and `endpoint` are omitted when `BRIDGE_AGENT_MAX_BYTES` is below
-4,096, so that the code always fits. Before a tool response is written, Bridge appends a metadata-only
-`response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`.
+4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+`response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
+hashes, counts and field paths, and one set of values: for a response that carries an error, its
+`error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
+dates, request counts, per-part dates, rows, bytes, AlterID spans, whether each part was served,
+milliseconds, and the kind of the request that failed; the last 64 parts listed and the rest
+counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
+timed out can be diagnosed without sending it again (bridge#799). The message and every other
+field are dropped; no row content, name or narration is kept.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery
@@ -159,7 +171,9 @@ for the selected company's Trial Balance from 1 April to 31 March. The runtime
 requires freshly observed Licensed TallyPrime for this four-column report.
 Education mode is refused before report dispatch until this complete request
 has mode-specific live qualification. Dates before book start are refused.
-The monetary scope also requires one observed INR currency master.
+The monetary scope also requires an INR base currency. On a book with several
+Currency masters, the report covers the plain base-currency ledgers only and
+names the ledgers it leaves out; its totals are not expected to balance.
 
 Each opening, debit, credit and closing value is either
 `{"state":"present","value":"-7000.00"}` or `{"state":"present_empty"}`.

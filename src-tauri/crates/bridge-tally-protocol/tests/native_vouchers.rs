@@ -171,14 +171,65 @@ fn a_voucher_type_list_with_a_repeated_status_is_malformed() {
     );
 }
 
+/// A missing, self-closing or empty STATUS is no answer: its own class, apart
+/// from Tally's failure answer and from broken XML (bridge#717).
 #[test]
-fn a_voucher_type_list_without_a_status_did_not_succeed() {
-    let silent = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", "", 1);
-    assert_ne!(silent, VOUCHER_TYPES);
-    assert_eq!(
-        voucher_type_refusal(&silent, COMPANY_GUID),
-        NativeCollectionError::NotSuccess
-    );
+fn a_voucher_type_list_without_a_status_answer_is_status_absent() {
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, VOUCHER_TYPES);
+        assert_eq!(
+            voucher_type_refusal(&silent, COMPANY_GUID),
+            NativeCollectionError::StatusAbsent,
+            "{absent:?}"
+        );
+        // Cut off after it, the response is malformed, not absent.
+        let cut = VOUCHER_TYPES.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            voucher_type_refusal(&silent[..cut], COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            voucher_type_refusal(empty, COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "{empty:?}"
+        );
+    }
+}
+
+#[test]
+fn a_voucher_list_without_a_status_answer_is_status_absent() {
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = VOUCHERS.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, VOUCHERS);
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&silent, COMPANY_GUID)
+                .expect_err("a voucher list without a STATUS answer is refused"),
+            NativeCollectionError::StatusAbsent,
+            "{absent:?}"
+        );
+        // Cut off after it, the response is malformed, not absent.
+        let cut = VOUCHERS.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&silent[..cut], COMPANY_GUID)
+                .expect_err("a cut-off voucher list is refused"),
+            NativeCollectionError::MalformedResponse,
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(empty, COMPANY_GUID)
+                .expect_err("an empty body is refused"),
+            NativeCollectionError::MalformedResponse,
+            "{empty:?}"
+        );
+    }
 }
 
 #[test]
@@ -248,6 +299,7 @@ fn native_collection_causes_are_distinct_and_name_no_row() {
     let codes = [
         NativeCollectionError::MalformedResponse,
         NativeCollectionError::NotSuccess,
+        NativeCollectionError::StatusAbsent,
         NativeCollectionError::RowUnusable,
         NativeCollectionError::CompanyIdentityMismatch,
         NativeCollectionError::BoundsViolation,
@@ -261,4 +313,47 @@ fn native_collection_causes_are_distinct_and_name_no_row() {
             && code
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte == b'_')));
+}
+
+/// A self-closing STATUS after a real one is a second STATUS, the response's
+/// shape, not an absent answer (bridge#717).
+#[test]
+fn a_self_closing_status_after_a_real_one_is_malformed() {
+    let doubled = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", "<STATUS>1</STATUS><STATUS/>", 1);
+    assert_ne!(doubled, VOUCHER_TYPES);
+    assert_eq!(
+        voucher_type_refusal(&doubled, COMPANY_GUID),
+        NativeCollectionError::MalformedResponse
+    );
+}
+
+/// A second STATUS, empty, self-closing or full and in either order, is the
+/// response's shape in both lists, never an answer (bridge#717). An empty or
+/// self-closing STATUS is recorded, so a real one after it is still second.
+#[test]
+fn a_second_status_in_either_order_is_malformed_in_both_lists() {
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS></STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS/><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let voucher_types = VOUCHER_TYPES.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_ne!(voucher_types, VOUCHER_TYPES);
+        assert_eq!(
+            voucher_type_refusal(&voucher_types, COMPANY_GUID),
+            NativeCollectionError::MalformedResponse,
+            "voucher types {repeated:?}"
+        );
+        let vouchers = VOUCHERS.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_ne!(vouchers, VOUCHERS);
+        assert_eq!(
+            parse_native_voucher_source_records_with_evidence(&vouchers, COMPANY_GUID)
+                .expect_err("a voucher list with a second STATUS is refused"),
+            NativeCollectionError::MalformedResponse,
+            "vouchers {repeated:?}"
+        );
+    }
 }

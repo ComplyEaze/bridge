@@ -10,8 +10,8 @@
       "id": "partners_40b_194t.allowable_interest_a83e6c31",
       "value": 600000,
       "unit": "paise",
-      "definition_sha256_16": "d5a2f3424d8ac222",
-      "definition_text": "s.40(b) allowable interest for partner (tag a83e6c31): simple interest at 1200 bp on the capital balance walked day by day (opening TB balance, then every population voucher line on the capital ledger(s) other than an interest/remuneration credit, changing the balance ON its date), actual days / 365, a debit (negative) capital day contributing zero.",
+      "definition_sha256_16": "1534b1547060d6a2",
+      "definition_text": "s.40(b) allowable interest for partner (tag a83e6c31): simple interest at 1200 bp on the capital balance walked day by day (opening TB balance, then every population voucher line on the capital ledger(s) other than an interest/remuneration credit, changing the balance ON its date), actual days / 365, a debit (negative) capital day contributing zero. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -24,8 +24,8 @@
       "id": "partners_40b_194t.allowable_interest_d0893259",
       "value": 300164,
       "unit": "paise",
-      "definition_sha256_16": "d36164927e303976",
-      "definition_text": "s.40(b) allowable interest for partner (tag d0893259): simple interest at 1200 bp on the capital balance walked day by day (opening TB balance, then every population voucher line on the capital ledger(s) other than an interest/remuneration credit, changing the balance ON its date), actual days / 365, a debit (negative) capital day contributing zero.",
+      "definition_sha256_16": "280b63850313448f",
+      "definition_text": "s.40(b) allowable interest for partner (tag d0893259): simple interest at 1200 bp on the capital balance walked day by day (opening TB balance, then every population voucher line on the capital ledger(s) other than an interest/remuneration credit, changing the balance ON its date), actual days / 365, a debit (negative) capital day contributing zero. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so). No remuneration ledger is configured for this partner: remuneration credits, if any, are read as capital; configure the remuneration ledger.",
       "evidence": [
         {
           "kind": "ledger",
@@ -38,8 +38,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_360day_a83e6c31",
       "value": 608333,
       "unit": "paise",
-      "definition_sha256_16": "e9aebafd1faaff47",
-      "definition_text": "Same daily-balance walk for partner (tag a83e6c31), but actual days / 360.",
+      "definition_sha256_16": "e5e001987eac1770",
+      "definition_text": "Same daily-balance walk for partner (tag a83e6c31), but actual days / 360. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -52,8 +52,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_360day_d0893259",
       "value": 304333,
       "unit": "paise",
-      "definition_sha256_16": "ad94a4ca9938ce8d",
-      "definition_text": "Same daily-balance walk for partner (tag d0893259), but actual days / 360.",
+      "definition_sha256_16": "db65e261aaa0c027",
+      "definition_text": "Same daily-balance walk for partner (tag d0893259), but actual days / 360. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -66,8 +66,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_no_reduction_a83e6c31",
       "value": 600000,
       "unit": "paise",
-      "definition_sha256_16": "0c33e8cb28659142",
-      "definition_text": "s.40(b) interest for partner (tag a83e6c31) as if capital were never reduced by a withdrawal or transfer (every debit line on the capital ledger(s) skipped; a credit/increase line, e.g. capital introduced, still applied).",
+      "definition_sha256_16": "7fe05dc1662129bf",
+      "definition_text": "s.40(b) interest for partner (tag a83e6c31) as if capital were never reduced by a withdrawal or transfer (every debit line on the capital ledger(s) skipped; a credit/increase line, e.g. capital introduced, still applied). Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -80,8 +80,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_no_reduction_d0893259",
       "value": 300164,
       "unit": "paise",
-      "definition_sha256_16": "4f0f03e4e9994f62",
-      "definition_text": "s.40(b) interest for partner (tag d0893259) as if capital were never reduced by a withdrawal or transfer (every debit line on the capital ledger(s) skipped; a credit/increase line, e.g. capital introduced, still applied).",
+      "definition_sha256_16": "5bf6bbf4c27c1d81",
+      "definition_text": "s.40(b) interest for partner (tag d0893259) as if capital were never reduced by a withdrawal or transfer (every debit line on the capital ledger(s) skipped; a credit/increase line, e.g. capital introduced, still applied). Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -94,8 +94,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_opening_only_a83e6c31",
       "value": 600000,
       "unit": "paise",
-      "definition_sha256_16": "5c1923d4c831757f",
-      "definition_text": "s.40(b) interest for partner (tag a83e6c31) as if the capital balance stayed at its opening value for the whole year (no intra-year voucher line applied at all).",
+      "definition_sha256_16": "8b271977730ab7be",
+      "definition_text": "s.40(b) interest for partner (tag a83e6c31) as if the capital balance stayed at its opening value for the whole year (no intra-year voucher line applied at all). Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -108,8 +108,8 @@
       "id": "partners_40b_194t.allowable_interest_sensitivity_opening_only_d0893259",
       "value": 120000,
       "unit": "paise",
-      "definition_sha256_16": "58338b51b4e628b4",
-      "definition_text": "s.40(b) interest for partner (tag d0893259) as if the capital balance stayed at its opening value for the whole year (no intra-year voucher line applied at all).",
+      "definition_sha256_16": "9354983b16d0fb9a",
+      "definition_text": "s.40(b) interest for partner (tag d0893259) as if the capital balance stayed at its opening value for the whole year (no intra-year voucher line applied at all). Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "ledger",
@@ -158,16 +158,16 @@
       "id": "partners_40b_194t.interest_credited_a83e6c31",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "0bac2b0fb06a5ba6",
-      "definition_text": "Interest actually credited to partner (tag a83e6c31)'s capital ledger(s), in a voucher also carrying a line on their interest_ledger.",
+      "definition_sha256_16": "c72adfce62a9b9b9",
+      "definition_text": "Interest actually credited to partner (tag a83e6c31)'s capital ledger(s), in a voucher also carrying a line on their interest_ledger. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.interest_credited_d0893259",
       "value": 5000000,
       "unit": "paise",
-      "definition_sha256_16": "51a789863adcd061",
-      "definition_text": "Interest actually credited to partner (tag d0893259)'s capital ledger(s), in a voucher also carrying a line on their interest_ledger.",
+      "definition_sha256_16": "142d6bc36d3a7008",
+      "definition_text": "Interest actually credited to partner (tag d0893259)'s capital ledger(s), in a voucher also carrying a line on their interest_ledger. Not usable for s.40(b): s.40(b) is not computed for this partner (see the finding that says so).",
       "evidence": [
         {
           "kind": "voucher",
@@ -210,16 +210,16 @@
       "id": "partners_40b_194t.s194t_amount_credited_a83e6c31",
       "value": 2000000,
       "unit": "paise",
-      "definition_sha256_16": "90fde207b3c2eac9",
-      "definition_text": "Interest + remuneration credited to partner (tag a83e6c31) in the year -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
+      "definition_sha256_16": "b2424efe22c6eb4c",
+      "definition_text": "Interest + remuneration credited to partner (tag a83e6c31) in the year, gross: each voucher's net credit to the partner, a reversal lowering nothing -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner). It may be wrong in either direction: see this partner's s.194T question.",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_amount_credited_d0893259",
       "value": 5000000,
       "unit": "paise",
-      "definition_sha256_16": "3a5632523f4f84f2",
-      "definition_text": "Interest + remuneration credited to partner (tag d0893259) in the year -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner).",
+      "definition_sha256_16": "90866ed6745aed98",
+      "definition_text": "Interest + remuneration credited to partner (tag d0893259) in the year, gross: each voucher's net credit to the partner, a reversal lowering nothing -- the s.194T base (salary, remuneration, commission, bonus and interest to a partner). It may be wrong in either direction: see this partner's s.194T question.",
       "evidence": []
     },
     {
@@ -248,42 +248,26 @@
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_a83e6c31",
-      "value": "no",
+      "value": "not judged",
       "unit": "text",
-      "definition_sha256_16": "e829e35d78b4b360",
-      "definition_text": "Whether a line under 'Duties & Taxes' with 'tds' in its name appears in the voucher(s) crediting partner (tag a83e6c31)'s interest/remuneration.",
+      "definition_sha256_16": "7936a37eb46dd32d",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag a83e6c31)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
       "id": "partners_40b_194t.s194t_tds_ledger_seen_d0893259",
-      "value": "no",
+      "value": "not judged",
       "unit": "text",
-      "definition_sha256_16": "52439c4f1597c90f",
-      "definition_text": "Whether a line under 'Duties & Taxes' with 'tds' in its name appears in the voucher(s) crediting partner (tag d0893259)'s interest/remuneration.",
+      "definition_sha256_16": "25a8b08f9e63bbed",
+      "definition_text": "Whether a line on a ledger the client's statutory dues classify as TDS payable appears on a voucher touching partner (tag d0893259)'s capital, interest or remuneration ledgers (\"not judged\" when none is classified, or when the only such lines are on a ledger shared by partners, on a voucher whose TDS is not booked against partners' capitals alone).",
       "evidence": []
     },
     {
-      "id": "partners_40b_194t.s40b_excess_a83e6c31",
-      "value": 0,
-      "unit": "paise",
-      "definition_sha256_16": "b10cce937b4cc544",
-      "definition_text": "interest_credited_a83e6c31 minus allowable_interest_a83e6c31, floor 0.",
-      "evidence": []
-    },
-    {
-      "id": "partners_40b_194t.s40b_excess_d0893259",
-      "value": 4699836,
-      "unit": "paise",
-      "definition_sha256_16": "83b7cf293884c4b8",
-      "definition_text": "interest_credited_d0893259 minus allowable_interest_d0893259, floor 0.",
-      "evidence": []
-    },
-    {
-      "id": "partners_40b_194t.s40b_excess_total",
-      "value": 4699836,
-      "unit": "paise",
-      "definition_sha256_16": "dd25f8d7cf65d3b9",
-      "definition_text": "Sum of s40b_excess_<partner> across all partners.",
+      "id": "partners_40b_194t.s40b_excess_total_not_computed",
+      "value": "not computed: s.40(b) is not computed for 2 partner(s)",
+      "unit": "text",
+      "definition_sha256_16": "6b7a97430a10cf1e",
+      "definition_text": "The sum of the s.40(b) excess across the firm's partners is not stated: it would leave out the partners whose excess is not computed (their s40b_not_computed findings), or no partner is configured (see that question). Where a partner's excess is computed, it is that partner's own figure.",
       "evidence": []
     }
   ],
@@ -330,16 +314,68 @@
           "figure_id": "partners_40b_194t.remuneration_credited_a83e6c31"
         }
       ],
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "pl-03",
+          "label": "Journal pl-03 on 2026-03-31"
+        }
+      ],
       "title_sha256_16": "da183c8c78892b0b",
       "title_text": "Remuneration to working partners: the s.40(b)(v) limit depends on book profit, not computed here",
-      "limits_sha256_16": "5ccb7d5428506b19",
+      "limits_sha256_16": "6e7558f69d60bbe2",
       "limits_text": [
-        "The s.40(b)(v) remuneration ceiling is a slab on 'book profit' (s.28-44D profit plus remuneration debited, per Explanation 3), which this test does not compute; whether remuneration is authorised and quantified by the deed, and from what date, is a deed reading, not a books fact."
+        "The s.40(b)(v) remuneration ceiling is a slab on 'book profit' (s.28-44D profit plus remuneration debited, per Explanation 3), which this test does not compute; whether remuneration is authorised and quantified by the deed, and from what date, is a deed reading, not a books fact.",
+        "The s.40(b)(v) ceiling (s.40(b)(v) as amended by the Finance (No. 2) Act 2024, from AY 2025-26): on the first ₹6 lakh of book profit (or a loss), ₹3 lakh or 90% of the book profit, whichever is more; on the balance, 60%. It applies to the firm's book profit, which this test does not compute, so no limit is stated here.",
+        "Partner (tag a83e6c31): 1 remuneration voucher(s) also credit a ledger this test does not read (Journal pl-03 on 2026-03-31): remuneration_credited_a83e6c31 may be net of it. If that ledger is TDS on this partner's remuneration alone, classify it as TDS payable in the client's statutory dues."
       ],
       "ask_client_sha256_16": "bad8e2b6aaefd75b",
       "ask_client_text": [
         "Provide the computation of book profit under s.40(b) Explanation 3, and the deed clause authorising and quantifying remuneration."
+      ]
+    },
+    {
+      "id": "partners_40b_194t/s194t/a83e6c31",
+      "clauses": [
+        "s.194T",
+        "3CD-34(a)",
+        "3CD-34(c)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "partners_40b_194t.s194t_amount_credited_a83e6c31"
+        },
+        {
+          "name": "tds_expected",
+          "figure_id": "partners_40b_194t.s194t_tds_expected_a83e6c31"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "pl-03",
+          "label": "Journal pl-03 on 2026-03-31"
+        }
+      ],
+      "title_sha256_16": "0f61cab15d332298",
+      "title_text": "Payments/credits to a partner whose s.194T base is not read exactly: whether TDS was deducted is not judged",
+      "limits_sha256_16": "e21c397c42cc154c",
+      "limits_text": [
+        "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
+        "1 interest or remuneration voucher(s) also credit a ledger this test does not read (Journal pl-03 on 2026-03-31): the partner may be credited net of it, so this base may be understated.",
+        "No interest ledger is configured for this partner, so interest credited to its capital is not in this base, which may therefore be understated.",
+        "1 voucher(s) touching this partner are not read exactly (Journal pl-03 on 2026-03-31): this base may be wrong in either direction.",
+        "This base (₹20,000) is under the s.194T threshold (₹20,000) as read, but it may be wrong (above), so whether it crosses the threshold is not computed.",
+        "The s.194T rate/limit used here (rate 1000 bp, limit 2000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule.",
+        "The client's statutory dues classify no ledger as TDS payable, so TDS on the partner's vouchers cannot be seen."
+      ],
+      "ask_client_sha256_16": "bc25a006eb146deb",
+      "ask_client_text": [
+        "The partner's interest and remuneration for the year, and the TDS deducted on each.",
+        "Confirm the firm's TAN and whether TDS under s.194T was deposited (this is not visible from the books shown here if it went through a ledger not captured in touched_vouchers).",
+        "If not deducted, confirm whether Form 26A relief is available (partner returned the income, tax paid)."
       ]
     },
     {
@@ -367,56 +403,77 @@
           "label": "Journal pl-02 on 2026-03-31"
         }
       ],
-      "title_sha256_16": "d1f70c4ae426e9e2",
-      "title_text": "Payments/credits to a partner over the s.194T threshold with no TDS ledger line seen",
-      "limits_sha256_16": "29a6959b01a5f8b2",
+      "title_sha256_16": "1ad7ff747629b977",
+      "title_text": "Payments/credits to a partner over the s.194T threshold: whether TDS was deducted is not judged",
+      "limits_sha256_16": "32ee6802e705dee7",
       "limits_text": [
         "Books only: TAN registration, challans filed and any Form 26A route are not visible from vouchers.",
-        "The s.194T rate/limit used here (rate 1000 bp, limit 2000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule."
+        "The s.194T rate/limit used here (rate 1000 bp, limit 2000000 paise) is a local prototype default (status=\"confirm\"), pending confirmation in the rules table -- not yet a verified rule.",
+        "The client's statutory dues classify no ledger as TDS payable, so TDS on the partner's vouchers cannot be seen."
       ],
-      "ask_client_sha256_16": "6a80444f273c484e",
+      "ask_client_sha256_16": "bc25a006eb146deb",
       "ask_client_text": [
+        "The partner's interest and remuneration for the year, and the TDS deducted on each.",
         "Confirm the firm's TAN and whether TDS under s.194T was deposited (this is not visible from the books shown here if it went through a ledger not captured in touched_vouchers).",
         "If not deducted, confirm whether Form 26A relief is available (partner returned the income, tax paid)."
       ]
     },
     {
-      "id": "partners_40b_194t/s40b_excess/d0893259",
+      "id": "partners_40b_194t/s40b_not_computed/a83e6c31",
       "clauses": [
         "s.40(b)",
         "3CD-21(c)"
       ],
       "confidence": "judgement_required",
-      "facts": [
-        {
-          "name": "allowable",
-          "figure_id": "partners_40b_194t.allowable_interest_d0893259"
-        },
-        {
-          "name": "credited",
-          "figure_id": "partners_40b_194t.interest_credited_d0893259"
-        },
-        {
-          "name": "excess",
-          "figure_id": "partners_40b_194t.s40b_excess_d0893259"
-        }
-      ],
+      "facts": [],
       "evidence": [
         {
+          "kind": "ledger",
+          "id": "B Capital",
+          "label": ""
+        },
+        {
           "kind": "voucher",
-          "id": "pl-02",
-          "label": "Journal pl-02 on 2026-03-31"
+          "id": "pl-03",
+          "label": "Journal pl-03 on 2026-03-31"
         }
       ],
-      "title_sha256_16": "fd7312a75d65b7af",
-      "title_text": "Interest credited to a partner exceeds the s.40(b) allowable amount",
-      "limits_sha256_16": "8416e26677bc8f5a",
+      "title_sha256_16": "ef9340d663756398",
+      "title_text": "s.40(b) not computed for partner (tag a83e6c31): its interest credited cannot be read exactly; the CA computes it",
+      "limits_sha256_16": "cdd37a2a3d5342f4",
       "limits_text": [
-        "No deed was available; the excess shown uses the statutory cap as the assumed authorised rate -- confirm the deed's actual rate and terms before relying on this figure."
+        "This test computes the s.40(b) excess for no partner: its reading of a partner's interest from the books can miss or misread some bookings (another partner's interest or remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, the capital accounts and the interest credited. What this test could see is named below, and the interest credited and allowable-interest figures are working figures only.",
+        "No interest ledger is configured for this partner, so interest credited to its capital cannot be told from capital introduced: the capital walk reads every credit to it as capital, except remuneration on a configured remuneration ledger, and no interest credited is counted. If the deed authorises no interest on capital, the configuration can record that ([partners.deed] no_interest_authorised).",
+        "1 voucher(s) on this partner's capital are not of the plain shape this test reads exactly (Journal pl-03 on 2026-03-31): this partner's own interest or remuneration ledger debited, its own capital credited, and TDS on a ledger classified as TDS payable, balanced. Each carries a line this test does not read as plain, so the interest counted may be wrong in either direction.",
+        "This test reads only that plain shape. Correct bookings of other shapes are not computed here either: a year-end journal crediting several partners at once, a reversal or correction, interest on per-partner ledgers in one journal, one TDS line for several partners, TDS booked through the capital, or a round-off. The CA computes the excess from the vouchers named.",
+        "No s.40(b) excess is stated for this partner, and none is listed in clause 21(c). Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
       ],
-      "ask_client_sha256_16": "1595229f4492f1b1",
+      "ask_client_sha256_16": "70db58e811970543",
       "ask_client_text": [
-        "Confirm the deed's authorised interest rate and the capital base it applies to."
+        "The s.40(b) computation for this partner: the deed's authorised interest rate, the capital balances through the year, and the interest credited.",
+        "The partner's interest for the year, with the interest and remuneration in each voucher named here and the TDS on each.",
+        "The ledger that carries this partner's interest."
+      ]
+    },
+    {
+      "id": "partners_40b_194t/s40b_not_computed/d0893259",
+      "clauses": [
+        "s.40(b)",
+        "3CD-21(c)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [],
+      "evidence": [],
+      "title_sha256_16": "061defb57387433c",
+      "title_text": "s.40(b) not computed for partner (tag d0893259): this test computes the excess for no partner; the CA computes it",
+      "limits_sha256_16": "37933fb1b33d0230",
+      "limits_text": [
+        "This test computes the s.40(b) excess for no partner: its reading of a partner's interest from the books can miss or misread some bookings (another partner's interest or remuneration ledger crediting this partner's capital, or a ledger configured in two roles), so no excess it computed would be safe to list in clause 21(c). The CA computes the excess from the deed, the capital accounts and the interest credited. What this test could see is named below, and the interest credited and allowable-interest figures are working figures only.",
+        "No s.40(b) excess is stated for this partner, and none is listed in clause 21(c). Its interest credited and allowable-interest figures are marked not usable for s.40(b)."
+      ],
+      "ask_client_sha256_16": "57266766c532aa2f",
+      "ask_client_text": [
+        "The s.40(b) computation for this partner: the deed's authorised interest rate, the capital balances through the year, and the interest credited."
       ]
     }
   ],

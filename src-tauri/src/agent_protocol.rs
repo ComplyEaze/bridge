@@ -101,7 +101,10 @@ where
                         let outcome = await_read(
                             crate::tally::runtime::TOOL_CANCELLATION.scope(
                                 cancellation.clone(),
-                                server.call_tool_response(name, arguments.clone()),
+                                // One wire-lock wait budget for the whole call (#697).
+                                crate::tally::runtime::with_operation_wire_budget(
+                                    server.call_tool_response(name, arguments.clone()),
+                                ),
                             ),
                             InFlightRead {
                                 id: id.as_ref().expect("tool requests have IDs"),
@@ -491,7 +494,10 @@ where
     await_post(
         Box::pin(crate::tally::runtime::TOOL_CANCELLATION.scope(
             cancellation.clone(),
-            server.call_tool_response("post_import", args.clone()),
+            // One wire-lock wait budget for the whole call (#697).
+            crate::tally::runtime::with_operation_wire_budget(
+                server.call_tool_response("post_import", args.clone()),
+            ),
         )),
         PostRequest {
             id,

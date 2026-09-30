@@ -40,12 +40,14 @@ use super::all_clients::{
     ClientGroupLabelMigrationPreparationError,
 };
 use super::{
-    company_sweep_result, establish_inr_currency, first_calendar_day_canary_window,
-    party_ledger_master_currency_admission_error, party_ledger_master_runtime_command_error,
-    portable_export_file_name, reconcile_review_cleanup, reviewed_probe_commitment_sha256,
-    tally_command_error, tally_runtime_command_error, verify_observed_company_tuple_from_companies,
-    write_unique_download, CompanySweepFailure, OutstandingsRequest, PersistedTallyCompany,
-    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity,
+    company_sweep_result, first_calendar_day_canary_window,
+    party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
+    party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
+    party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
+    reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
+    verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
+    OutstandingsRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
+    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
 };
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
 // path cannot be constructed portably. The import must carry the same gate as
@@ -53,8 +55,8 @@ use super::{
 #[cfg(unix)]
 use super::require_utf8_destination;
 use crate::tally::{
-    ConnectionStatus, OutstandingsCurrencyAssertion, OutstandingsLoadResult, TallyCompany,
-    TallyLedger, TallyProbeResult, TallyProduct,
+    ConnectionStatus, OutstandingsLoadResult, TallyCompany, TallyLedger, TallyProbeResult,
+    TallyProduct,
 };
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
@@ -211,38 +213,32 @@ fn require_utf8_destination_rejects_non_utf8_paths_instead_of_rewriting_them() {
     assert!(error.to_lowercase().contains("unicode"));
 }
 
+/// bridge#551 (601c): the desktop request carries no currency assertion;
+/// Tally's own currency read decides. A request from an older screen that
+/// still sends one, of any value, parses, and the value cannot reach the
+/// read: the request type has no field for it.
 #[test]
-fn outstandings_accepts_only_an_explicit_inr_currency_assertion() {
-    let accepted: OutstandingsRequest = serde_json::from_value(serde_json::json!({
-        "config": { "host": "127.0.0.1", "port": 9000 },
-        "selected_company": {
-            "display_name": "Synthetic Company",
-            "company_guid": "synthetic-guid",
-            "company_number": "100001",
-            "books_from_yyyymmdd": "20260401"
-        },
-        "currency_assertion": "INR"
-    }))
-    .expect("INR is the one supported explicit assertion");
-    assert_eq!(
-        accepted.currency_assertion,
-        Some(OutstandingsCurrencyAssertion::Inr)
-    );
-
-    let rejected = serde_json::from_value::<OutstandingsRequest>(serde_json::json!({
-        "config": { "host": "127.0.0.1", "port": 9000 },
-        "selected_company": {
-            "display_name": "Synthetic Company",
-            "company_guid": "synthetic-guid",
-            "company_number": "100001",
-            "books_from_yyyymmdd": "20260401"
-        },
-        "currency_assertion": "USD"
-    }));
-    assert!(
-        rejected.is_err(),
-        "unsupported currencies must not start a scan"
-    );
+fn an_outstandings_request_carries_no_currency_assertion() {
+    for assertion in [None, Some("INR"), Some("USD")] {
+        let mut request = serde_json::json!({
+            "config": { "host": "127.0.0.1", "port": 9000 },
+            "selected_company": {
+                "display_name": "Synthetic Company",
+                "company_guid": "synthetic-guid",
+                "company_number": "100001",
+                "books_from_yyyymmdd": "20260401"
+            }
+        });
+        if let Some(assertion) = assertion {
+            request["currency_assertion"] = serde_json::json!(assertion);
+        }
+        let parsed: OutstandingsRequest = serde_json::from_value(request)
+            .expect("a request parses without or with a stale field");
+        assert_eq!(
+            parsed.selected_company.company_guid, "synthetic-guid",
+            "{assertion:?}"
+        );
+    }
 }
 
 #[test]
@@ -315,36 +311,6 @@ fn company_sweep_preserves_a_company_listing_transport_reason() {
         OutstandingsLoadResult::Partial { reason, .. }
             if reason.reason_code == "endpoint_unreachable"
     ));
-}
-
-#[test]
-fn the_workbook_inr_admission_names_undetermined_base_currency() {
-    assert_eq!(
-        establish_inr_currency(2, false).err(),
-        Some("company_base_currency_undetermined"),
-        "several currency masters do not identify the company's base currency"
-    );
-    assert_eq!(
-        establish_inr_currency(2, true).err(),
-        Some("company_base_currency_undetermined"),
-        "the parser's INR flag is not authoritative when several currency masters exist"
-    );
-    assert_eq!(
-        establish_inr_currency(1, false).err(),
-        Some("company_base_currency_not_inr"),
-        "one non-Indian currency identifies an unsupported base currency"
-    );
-    assert_eq!(establish_inr_currency(1, true).err(), None);
-    assert_eq!(
-        establish_inr_currency(1, true),
-        Ok(OutstandingsCurrencyAssertion::Inr),
-        "the backend boundary receives a typed INR admission only after the probe established one INR master"
-    );
-    assert_eq!(
-        establish_inr_currency(0, false).err(),
-        Some("company_currency_probe_failed"),
-        "an impossible empty collection remains fail-closed"
-    );
 }
 
 #[test]
@@ -737,7 +703,8 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
     let too_large = party_ledger_master_runtime_command_error(with_read_evidence(
         anyhow::Error::new(Validation::TooLarge {
             master_alter_id: 9_500,
-            estimated_bytes: 35_625_000,
+            counted_ledgers: Some(9_400),
+            estimated_bytes: 35_250_000,
             budget_bytes: 16_000_000,
         }),
         RuntimeReadEvidence::empty(),
@@ -752,4 +719,55 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
         RuntimeReadEvidence::empty(),
     ));
     assert_eq!(other.code, "response_validation_failed");
+}
+
+/// bridge#551: the desktop party/ledger export withholds a workbook that would
+/// leave ledgers out, naming them: foreign-currency ledgers, and rupee ledgers
+/// with a composite balance, each under its own code.
+#[test]
+fn party_master_export_withholds_and_names_the_ledgers_it_would_leave_out() {
+    let foreign = (1..=FOREIGN_LEDGERS_NAMED + 2)
+        .map(
+            |index| bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger {
+                ledger: format!("Synthetic FX Debtor {index}"),
+                currency: "$".to_string(),
+            },
+        )
+        .collect::<Vec<_>>();
+    let error = party_ledger_master_foreign_currency_error(&foreign);
+    assert_eq!(error.code, "party_ledger_master_foreign_currency_ledgers");
+    assert!(
+        error.message.contains("Synthetic FX Debtor 1 ($)"),
+        "{}",
+        error.message
+    );
+    assert!(error.message.contains(" and 2 more"), "{}", error.message);
+
+    let mixed = vec!["Synthetic Party".to_string(), "Synthetic Sales".to_string()];
+    let error = party_ledger_master_mixed_currency_error(&mixed);
+    assert_eq!(error.code, "party_ledger_master_mixed_currency_ledgers");
+    assert!(
+        error.message.contains("Synthetic Party, Synthetic Sales"),
+        "{}",
+        error.message
+    );
+    assert!(!error.message.contains(" more"), "{}", error.message);
+    assert!(
+        error.remediation.contains("Do not retry"),
+        "{}",
+        error.remediation
+    );
+
+    // The export's decision: any set-aside ledger withholds the workbook.
+    assert!(party_ledger_master_withheld(&[], &[]).is_ok());
+    assert_eq!(
+        party_ledger_master_withheld(&[], &mixed).unwrap_err().code,
+        "party_ledger_master_mixed_currency_ledgers"
+    );
+    assert_eq!(
+        party_ledger_master_withheld(&foreign, &mixed)
+            .unwrap_err()
+            .code,
+        "party_ledger_master_foreign_currency_ledgers"
+    );
 }

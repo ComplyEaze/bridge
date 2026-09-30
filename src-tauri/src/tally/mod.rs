@@ -26,10 +26,10 @@ pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CachedProbeReservation, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
-    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason,
-    OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport,
-    UnallocatedParty,
+    CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
+    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
+    OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
+    TallyTelemetryPreviewExport, UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
 

@@ -2,6 +2,7 @@ use super::{
     ConnectionStatus, TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity,
 };
 use super::{TallyProbeResult, TallyVoucher};
+use crate::endpoint_wire::WireGateConfig;
 use crate::observability::BodyBytesObservation;
 use crate::reports::party_ledger_master::PartyLedgerMasterSource;
 use crate::tally::connection::canonical_loopback_origin;
@@ -48,7 +49,7 @@ use bridge_tally_protocol::{
     parse_companies_from_collection, parse_native_ledger_source_records_with_evidence,
     xml_read_profiles::ReadOnlyProfile,
 };
-use bridge_tally_transport::TallyTransportError;
+use bridge_tally_transport::{TallyTransportError, WireWaitBudget};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -63,8 +64,13 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;
-pub(crate) use trial_balance::TrialBalanceReadError;
-pub use trial_balance::{StatementsRead, TrialBalancePeriod, TrialBalanceRead};
+pub(crate) use trial_balance::{
+    base_currency_ledgers_only_label, TrialBalanceCurrencyScope, TrialBalanceReadError,
+    BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
+};
+pub use trial_balance::{
+    StatementsRead, TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead,
+};
 
 #[cfg(test)]
 #[path = "runtime_trial_balance_tests.rs"]
@@ -559,6 +565,10 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
             TallyTransportError::ConnectionFailed => AuditPartFailureKind::Unreachable,
+            // Held back by the endpoint's wire gate (#697): nothing was sent.
+            TallyTransportError::WireRefused { refusal } => {
+                AuditPartFailureKind::NotSent(refusal.safe_code())
+            }
             other => AuditPartFailureKind::Other(other.safe_code()),
         }
     } else if error
@@ -708,6 +718,59 @@ tokio::task_local! {
     pub(crate) static TOOL_CANCELLATION: CancellationToken;
 }
 
+tokio::task_local! {
+    /// One user-level operation's wait for the endpoint wire lock (#697 item
+    /// (a)): one MCP tool call, or a desktop command that scopes it (the ones
+    /// in `commands.rs` that call `with_operation_wire_budget`), whose host
+    /// gives up after about 60 s. Every runtime operation run in this task
+    /// draws on the one budget the first of them creates, so the call waits at
+    /// most `WireRetryPolicy::total` in all, however many runtime operations
+    /// it makes. A task without it (a spawned snapshot run, a test, and the
+    /// desktop commands that do not scope it) gives each runtime operation a
+    /// budget of its own: still bounded, never unbounded, but not one budget
+    /// for the whole command.
+    static OPERATION_WIRE_BUDGET: std::sync::OnceLock<WireWaitBudget>;
+}
+
+/// Run `operation`, one MCP tool call or one desktop command, under one wire
+/// lock wait budget shared by every runtime operation it makes in this task.
+///
+/// The operation is boxed: a tool call's state machine is large, and scoped
+/// inline it grew the MCP loop's future past a 2 MiB test thread's stack (and
+/// would past Windows' 1 MiB main thread's; see `run_post`).
+pub(crate) async fn with_operation_wire_budget<F: Future>(operation: F) -> F::Output {
+    OPERATION_WIRE_BUDGET
+        .scope(std::sync::OnceLock::new(), Box::pin(operation))
+        .await
+}
+
+/// As [`with_operation_wire_budget`], with the shared wait budget already
+/// set to `total` (capped at `WIRE_WAIT_MAX`) rather than the policy's own.
+pub(crate) async fn with_operation_wire_budget_of<F: Future>(
+    total: std::time::Duration,
+    operation: F,
+) -> F::Output {
+    let budget = std::sync::OnceLock::new();
+    let _ = budget.set(WireWaitBudget::new(total));
+    OPERATION_WIRE_BUDGET
+        .scope(budget, Box::pin(operation))
+        .await
+}
+
+/// A failed pre-intent read as the typed admission refusal, with the transport
+/// failure as context (a context value is not reachable by `downcast_ref`). A
+/// wire refusal stays the error itself: it says the port was busy, with a
+/// retry time, and nothing was sent.
+fn unconfirmed_unless_wire_refused(
+    error: anyhow::Error,
+    unconfirmed: super::approved_import::ApprovedImportAdmissionError,
+) -> anyhow::Error {
+    if crate::endpoint_wire::wire_refusal(&error).is_some() {
+        return error;
+    }
+    anyhow::Error::new(unconfirmed).context(format!("{error:#}"))
+}
+
 /// The tool call was withdrawn before this operation started; nothing was sent.
 #[derive(Debug, thiserror::Error)]
 #[error("request_cancelled")]
@@ -809,6 +872,91 @@ pub(crate) enum CompanyIdentityBracketError {
 /// Re-enumerate the complete identity immediately before or after a scoped
 /// read. Tally accepts a company name as the scope selector, so the GUID alone
 /// is not a sufficient witness when company names differ only by presentation.
+/// The company's Currency masters, and its base among them when Tally
+/// identifies one (bridge#551): the plain read, and, only for a book with
+/// several masters, the `ORIGINALNAME` re-read (which must return the same
+/// masters) and the Company collection's `CURRENCYNAME`. Each read is paired.
+/// The caller brackets it with the identity and extent reads.
+pub(crate) async fn read_classified_currency(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    evidence: &mut RuntimeReadEvidence,
+) -> anyhow::Result<(
+    usize,
+    Option<bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency>,
+)> {
+    let paired_read = |request: String, stability| async move {
+        let body = client.fetch_native_report_paired(request.clone()).await?;
+        let (body, encoded_bytes, encoded_sha256) = body.require_stable(stability)?;
+        anyhow::Ok((
+            body,
+            RuntimeReadEvidence::paired(&request, encoded_sha256, encoded_bytes),
+        ))
+    };
+    let (body, read) = paired_read(
+        render_company_currency_request(identity.display_name()),
+        PairedReadValidationError::CurrencyMaster,
+    )
+    .await?;
+    *evidence = evidence.clone().combine(read);
+    let masters = parse_currency_master_list(&body)?;
+    let count = masters.count();
+    let identified = if count > 1 {
+        identify_base_among_several(client, identity, evidence, masters).await?
+    } else {
+        masters.identify_base(None)
+    };
+    Ok((count, identified))
+}
+
+/// The base among a company's several Currency masters, when Tally identifies
+/// one: the `ORIGINALNAME` re-read, which must return the same masters, and
+/// the Company collection's `CURRENCYNAME` (bridge#551). Each read is paired.
+pub(crate) async fn identify_base_among_several(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    evidence: &mut RuntimeReadEvidence,
+    masters: bridge_tally_protocol::native_outstandings::CurrencyMasters,
+) -> anyhow::Result<Option<bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency>> {
+    let paired_read = |request: String, stability| async move {
+        let body = client.fetch_native_report_paired(request.clone()).await?;
+        let (body, encoded_bytes, encoded_sha256) = body.require_stable(stability)?;
+        anyhow::Ok((
+            body,
+            RuntimeReadEvidence::paired(&request, encoded_sha256, encoded_bytes),
+        ))
+    };
+    let (with_original_names, company_currency_name) = {
+        let (body, read) = paired_read(
+            render_company_currency_request_with_originalname(identity.display_name()),
+            PairedReadValidationError::CurrencyMaster,
+        )
+        .await?;
+        *evidence = evidence.clone().combine(read);
+        let with_original_names = parse_currency_master_list(&body)?;
+        // The re-read must return the masters the plain read did; only then
+        // does its ORIGINALNAME describe them.
+        if !with_original_names.same_masters_as(&masters) {
+            return Err(anyhow::Error::new(
+                PairedReadValidationError::CurrencyMaster,
+            ));
+        }
+        let (body, read) = paired_read(
+            render_company_base_currency_request(identity.display_name()),
+            PairedReadValidationError::CompanyCurrencyName,
+        )
+        .await?;
+        *evidence = evidence.clone().combine(read);
+        (
+            with_original_names,
+            parse_company_currency_name(&body, identity.company_guid())?,
+        )
+    };
+    // The base is identified among the re-read masters, whose ORIGINALNAME the
+    // company's CURRENCYNAME names.
+    Ok(with_original_names.identify_base(Some(company_currency_name.as_str())))
+}
+
 async fn bracket_verified_company_identity(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
@@ -918,10 +1066,9 @@ pub enum CircuitState {
     HalfOpen,
 }
 
-/// A typed INR admission for a monetary document. Outstandings may receive an
-/// explicit operator assertion, while the party/ledger export constructs this
-/// only after the existing Tally currency probe establishes one INR master.
-/// No other currency can reach an INR formatter.
+/// A typed INR admission for a monetary document, constructed only after
+/// Tally's own currency read establishes an INR base (bridge#551: no operator
+/// assertion remains). No other currency can reach an INR formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub enum OutstandingsCurrencyAssertion {
     #[serde(rename = "INR")]
@@ -929,9 +1076,9 @@ pub enum OutstandingsCurrencyAssertion {
 }
 
 /// An INR admission that is inseparable from the company extent observed
-/// during the currency read. Party/ledger masters, MCP outstandings, the
-/// desktop single-company outstandings read (bridge#604, carrying the
-/// operator's assertion) and the all-companies sweep consume this witness.
+/// during the currency read. Party/ledger masters and the single-master
+/// paths consume it; the outstandings reads wrap it in a classified witness
+/// ([`ClassifiedCurrencyWitness`]).
 #[derive(Debug, Clone)]
 pub(crate) struct PartyLedgerMasterCurrencyAssertion {
     assertion: OutstandingsCurrencyAssertion,
@@ -950,6 +1097,14 @@ pub(crate) struct PartyLedgerMasterCurrency {
 }
 
 impl PartyLedgerMasterCurrencyAssertion {
+    /// The base Currency master's NAME each ledger's own currency is compared
+    /// with, where one was read.
+    pub(crate) fn ledger_currency_base(
+        &self,
+    ) -> Option<&bridge_tally_protocol::native_outstandings::BaseCurrencyName> {
+        self.base.as_ref()
+    }
+
     /// Releases the INR assertion only when the monetary master read opens on
     /// the exact company extent that the existing currency probe observed.
     pub(crate) fn require_opening_extent(
@@ -981,8 +1136,8 @@ pub(crate) struct ClassifiedCurrencyWitness(PartyLedgerMasterCurrencyAssertion, 
 
 /// Proof that a result was read under a [`ClassifiedCurrencyWitness`], which
 /// [`OutstandingsLoadResult::BaseCurrencyLedgersOnly`] must carry: only
-/// `admit_inr_classified` mints one, so a single-master witness (the
-/// desktop's operator assertion) cannot produce that result by construction.
+/// `admit_inr_classified` mints one, so a single-master witness cannot
+/// produce that result by construction.
 /// A classified witness on a book with one master cannot either: its base
 /// refuses a ledger in another currency in `classify_ledger_currencies`. Its
 /// field is private to this module and its test and child modules.
@@ -990,8 +1145,7 @@ pub(crate) struct ClassifiedCurrencyWitness(PartyLedgerMasterCurrencyAssertion, 
 pub struct ClassifiedBase(());
 
 /// The currency witness an outstandings read runs under: a single master's
-/// (MCP's `admit_inr` paths' shape, and the desktop's operator assertion via
-/// `bind_single_master_assertion`), or a classified base's.
+/// (`admit_inr`'s shape), or a classified base's.
 #[derive(Debug, Clone)]
 pub(crate) enum OutstandingsCurrencyWitness {
     SingleMaster(PartyLedgerMasterCurrencyAssertion),
@@ -1007,6 +1161,16 @@ impl From<PartyLedgerMasterCurrencyAssertion> for OutstandingsCurrencyWitness {
 impl From<ClassifiedCurrencyWitness> for OutstandingsCurrencyWitness {
     fn from(witness: ClassifiedCurrencyWitness) -> Self {
         Self::Classified(witness)
+    }
+}
+
+impl ClassifiedCurrencyWitness {
+    /// The assertion the compliance source reads under (bridge#551). That
+    /// source compares every ledger's own currency with this base before it
+    /// parses a balance, and leaves a foreign ledger out by name, so it is a
+    /// path that does compare; see this type's doc.
+    pub(crate) fn into_compliance_assertion(self) -> PartyLedgerMasterCurrencyAssertion {
+        self.0
     }
 }
 
@@ -1040,29 +1204,6 @@ pub(crate) struct ClassifiedCompanyCurrencyRead {
 impl ClassifiedCompanyCurrencyRead {
     pub(crate) fn evidence(&self) -> RuntimeReadEvidence {
         self.evidence.clone()
-    }
-
-    pub(crate) fn currency_count(&self) -> usize {
-        self.currency_count
-    }
-
-    /// The desktop operator's assertion for a book with exactly one master
-    /// (bridge#604's interim, which bridge#551 601c removes), bound to this
-    /// read's extent and to that master as the base. `None` for any other
-    /// count (a book with several masters is admitted only by
-    /// [`Self::admit_inr_classified`]), and when the master's NAME is blank,
-    /// which the currency parser already refuses.
-    pub(crate) fn bind_single_master_assertion(
-        self,
-        assertion: OutstandingsCurrencyAssertion,
-    ) -> Option<PartyLedgerMasterCurrencyAssertion> {
-        let identified = self.identified.filter(|_| self.currency_count == 1)?;
-        Some(PartyLedgerMasterCurrencyAssertion {
-            assertion,
-            decimal_places: identified.decimal_places(),
-            currency_read_extent: self.extent,
-            base: Some(identified.base().clone()),
-        })
     }
 
     /// INR for the identified base, by its mailing name; the codes are
@@ -1124,12 +1265,18 @@ struct LedgerOpeningRead {
     groups: Option<Vec<bridge_tally_protocol::TallyNamedMaster>>,
 }
 
-/// The compliance ledger records, the group collection read with them, and
-/// the book extent the whole read was pinned under.
+/// The compliance ledger records, the group collection read with them, the
+/// ledgers set aside by currency (bridge#551), and the book extent the whole
+/// read was pinned under (#630).
 #[derive(Debug)]
 pub(crate) struct PartyLedgerMasterListing {
     pub(crate) records: Vec<bridge_tally_protocol::PartyLedgerMasterRecord>,
     pub(crate) groups: Vec<bridge_tally_protocol::TallyNamedMaster>,
+    /// Ledgers kept in another currency, set aside by name.
+    pub(crate) foreign_currency_ledgers_excluded:
+        Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
+    /// Base-currency ledgers set aside because a balance is a currency composite.
+    pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
     /// The master request's SVFROMDATE (the admitted BOOKSFROM).
     pub(crate) opening_as_of: TallyDate,
     pub(crate) extent: CompanyBookExtent,
@@ -1240,22 +1387,87 @@ pub enum OutstandingsLoadResult {
         reason: OutstandingsPartialReason,
         synced_at_unix_ms: i64,
     },
-    /// Some ledgers are kept in another currency and were left out, with
-    /// their bills (bridge#551). A partial result: `base_currency_ledgers`
-    /// describes the base-currency ledgers only, and no figure for the whole
-    /// book exists. Reason `foreign_currency_ledgers_excluded`. Only a read
-    /// under a classified witness can build it, since it carries that
-    /// witness's [`ClassifiedBase`].
+    /// Some ledgers were left out with their bills: ledgers kept in another
+    /// currency (bridge#551), base-currency ledgers with a value Tally wrote
+    /// as a currency composite (bridge#642), or both. A partial result:
+    /// `base_currency_ledgers` describes the plain base-currency ledgers only,
+    /// and no figure for the whole book exists. Its reasons are derived from
+    /// `exclusions`, never stored. Only a read under a classified witness can
+    /// build it, since it carries that witness's [`ClassifiedBase`].
     #[serde(rename = "partial")]
     BaseCurrencyLedgersOnly {
         #[serde(skip)]
         classified: ClassifiedBase,
         #[serde(flatten)]
-        reason: OutstandingsPartialReason,
+        exclusions: CurrencyExclusions,
         synced_at_unix_ms: i64,
-        foreign_currency_ledgers_excluded: Vec<ForeignCurrencyLedger>,
         base_currency_ledgers: Box<BaseCurrencyLedgersOutstandings>,
     },
+}
+
+/// The ledgers an outstandings read set aside by currency, never both empty:
+/// [`Self::new`] refuses that, so a result carrying one is partial by
+/// construction. Every reason is derived from which list is non-empty, so no
+/// reason can disagree with the lists (bridge#642).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyExclusions {
+    foreign: Vec<ForeignCurrencyLedger>,
+    mixed: Vec<String>,
+}
+
+impl CurrencyExclusions {
+    /// The one reason every such result carries, whatever it set aside.
+    pub const PARTIAL_REASON: &'static str = "currency_ledgers_excluded";
+
+    /// `None` when nothing was set aside: the figures then describe the whole
+    /// book and the result is complete.
+    pub fn new(foreign: Vec<ForeignCurrencyLedger>, mixed: Vec<String>) -> Option<Self> {
+        (!foreign.is_empty() || !mixed.is_empty()).then_some(Self { foreign, mixed })
+    }
+
+    /// Ledgers kept in another currency, in read order.
+    pub fn foreign(&self) -> &[ForeignCurrencyLedger] {
+        &self.foreign
+    }
+
+    /// Base-currency ledgers with a composite value, in read order.
+    pub fn mixed(&self) -> &[String] {
+        &self.mixed
+    }
+
+    /// What was set aside, each code present exactly when its list is
+    /// non-empty; foreign first. Never empty.
+    pub fn partial_reasons(&self) -> Vec<&'static str> {
+        let mut reasons = Vec::with_capacity(2);
+        if !self.foreign.is_empty() {
+            reasons.push("foreign_currency_ledgers_excluded");
+        }
+        if !self.mixed.is_empty() {
+            reasons.push("mixed_currency_ledgers_excluded");
+        }
+        reasons
+    }
+
+    /// The evidence log's reason: the derived codes joined by `+`.
+    pub fn evidence_reason(&self) -> String {
+        self.partial_reasons().join("+")
+    }
+
+    pub fn into_parts(self) -> (Vec<ForeignCurrencyLedger>, Vec<String>) {
+        (self.foreign, self.mixed)
+    }
+}
+
+impl Serialize for CurrencyExclusions {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("CurrencyExclusions", 4)?;
+        state.serialize_field("reason_code", Self::PARTIAL_REASON)?;
+        state.serialize_field("partial_reasons", &self.partial_reasons())?;
+        state.serialize_field("foreign_currency_ledgers_excluded", &self.foreign)?;
+        state.serialize_field("base_currency_ledgers_mixed_excluded", &self.mixed)?;
+        state.end()
+    }
 }
 
 /// The figures of [`OutstandingsLoadResult::Complete`] over the base-currency
@@ -1679,12 +1891,15 @@ pub(crate) fn inr_witness_for_tests(
 
 /// Every bill row whose party is a foreign-currency ledger left out
 /// (bridge#551).
-fn without_foreign_parties(
+fn without_excluded_parties(
     rows: Vec<NativeBillRow>,
     foreign: &[ForeignCurrencyLedger],
+    mixed: &[String],
 ) -> Vec<NativeBillRow> {
     rows.into_iter()
-        .filter(|row| !foreign.iter().any(|ledger| ledger.ledger == row.party))
+        .filter(|row| {
+            !foreign.iter().any(|ledger| ledger.ledger == row.party) && !mixed.contains(&row.party)
+        })
         .collect()
 }
 
@@ -1846,6 +2061,7 @@ fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
             | TallyTransportError::UnsupportedContentEncoding => {
                 "segment_response_encoding_invalid"
             }
+            TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
         };
     }
     let deadline_exceeded = error.chain().any(|cause| {
@@ -1976,11 +2192,15 @@ struct TallySession {
 }
 
 impl TallySession {
-    fn new(endpoint: EndpointKey, config: TallyConfig) -> anyhow::Result<Self> {
+    fn new(
+        endpoint: EndpointKey,
+        config: TallyConfig,
+        wire: &WireGateConfig,
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::new(config)?,
+            client: TallyClient::with_wire(config, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -1994,11 +2214,12 @@ impl TallySession {
         endpoint: EndpointKey,
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::with_transport_policy(config, policy)?,
+            client: TallyClient::with_transport_policy(config, policy, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2169,6 +2390,9 @@ pub struct TallyRuntime {
     unallocated_balance_coverage: Option<QualifiedUnallocatedBalanceCoverage>,
     #[cfg(feature = "voucher-scan")]
     outstandings_boundary_profile_override: Option<DateBoundaryProfile>,
+    /// The per-port wire lock every session's client gates its sends on
+    /// (`endpoint_wire`).
+    wire: WireGateConfig,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
 }
@@ -2291,6 +2515,7 @@ impl Default for TallyRuntime {
             unallocated_balance_coverage: None,
             #[cfg(feature = "voucher-scan")]
             outstandings_boundary_profile_override: None,
+            wire: WireGateConfig::default(),
             #[cfg(test)]
             transport_policy: None,
         }
@@ -2329,6 +2554,19 @@ impl TallyRuntime {
             transport_policy: Some(policy),
             ..Self::default()
         }
+    }
+
+    /// Share `wire`'s root (another runtime's, or a test's), or shorten its
+    /// retry bound. Only before the first request: a session keeps the gate it
+    /// was built with.
+    #[cfg(test)]
+    pub(crate) fn with_wire_gate_config(mut self, wire: WireGateConfig) -> Self {
+        self.wire = wire;
+        self
+    }
+
+    pub(crate) fn wire_gate_config(&self) -> &WireGateConfig {
+        &self.wire
     }
 
     /// Manual-only admission for the ignored Billwise Lab reconciliation
@@ -2376,11 +2614,13 @@ impl TallyRuntime {
         }
         #[cfg(test)]
         let session = Arc::new(match self.transport_policy {
-            Some(policy) => TallySession::with_transport_policy(endpoint.clone(), config, policy)?,
-            None => TallySession::new(endpoint.clone(), config)?,
+            Some(policy) => {
+                TallySession::with_transport_policy(endpoint.clone(), config, policy, &self.wire)?
+            }
+            None => TallySession::new(endpoint.clone(), config, &self.wire)?,
         });
         #[cfg(not(test))]
-        let session = Arc::new(TallySession::new(endpoint.clone(), config)?);
+        let session = Arc::new(TallySession::new(endpoint.clone(), config, &self.wire)?);
         sessions.insert(
             endpoint,
             SessionSlot {
@@ -2428,7 +2668,14 @@ impl TallyRuntime {
         }
         let session = self.session(config)?;
         let request = session.begin_request()?;
-        let client = session.client.clone();
+        // One wire-lock wait budget (#697 item (a)) for every send of every
+        // attempt below, shared with every other runtime operation of the
+        // enclosing tool call or desktop command when it scoped one.
+        let fresh = || WireWaitBudget::new(self.wire.retry().total());
+        let budget = OPERATION_WIRE_BUDGET
+            .try_with(|shared| shared.get_or_init(fresh).clone())
+            .unwrap_or_else(|_| fresh());
+        let client = session.client.for_operation(budget);
         let endpoint = EndpointIdentity::new(session.endpoint.as_str().to_string())
             .map_err(anyhow::Error::new)?;
         let effective_cancellation = request.cancellation.child_token();
@@ -2973,7 +3220,7 @@ impl TallyRuntime {
                             observe_read_boundary(&client).await?;
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
-                        let source = client
+                        let (source, count_evidence) = client
                             .fetch_party_ledger_master_source(
                                 &identity,
                                 boundary_profile,
@@ -2981,7 +3228,8 @@ impl TallyRuntime {
                             )
                             .await?;
                         evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone());
+                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
+                                .combine(count_evidence);
                         bracket_verified_company_identity(&client, &identity).await?;
                         let closing_evidence =
                             confirm_read_boundary(&client, boundary_profile).await?;
@@ -3013,26 +3261,34 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
     ) -> anyhow::Result<PartyLedgerMasterListing> {
+        // The classified read admits a book with several Currency masters
+        // when Tally identifies an INR base (bridge#551); the source then
+        // leaves foreign ledgers out by name.
         let currency_read = self
-            .detect_base_currency_with_extent(config.clone(), identity)
+            .detect_classified_base_currency_with_extent(config.clone(), identity)
             .await?;
-        let currency_evidence = currency_read.evidence.clone();
+        let currency_evidence = currency_read.evidence();
         // The source refuses unless its opening extent equals this one, and
         // its closing extent its opening one, so this is the extent the whole
         // compliance read was pinned under (#630).
         let extent = currency_read.extent.clone();
-        let assertion = currency_read.admit_inr().map_err(|code| {
-            with_read_evidence(
-                anyhow::Error::new(CurrencyAdmissionRefusal(code)),
-                currency_evidence.clone(),
-            )
-        })?;
+        let assertion = currency_read
+            .admit_inr_classified()
+            .map_err(|code| {
+                with_read_evidence(
+                    anyhow::Error::new(CurrencyAdmissionRefusal(code)),
+                    currency_evidence.clone(),
+                )
+            })?
+            .into_compliance_assertion();
         let (source, source_evidence) = self
             .fetch_party_ledger_master_source_with_evidence(config, identity, assertion)
             .await
             .map_err(|error| with_read_evidence(error, currency_evidence.clone()))?;
         let evidence = currency_evidence.combine(source_evidence);
         let groups = source.groups.clone();
+        let foreign = source.foreign_currency_ledgers_excluded.clone();
+        let mixed = source.mixed_currency_ledgers_excluded.clone();
         // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
         let opening_as_of = source.from.clone();
         let records = source
@@ -3051,6 +3307,8 @@ impl TallyRuntime {
         Ok(PartyLedgerMasterListing {
             records,
             groups,
+            foreign_currency_ledgers_excluded: foreign,
+            mixed_currency_ledgers_excluded: mixed,
             opening_as_of,
             extent,
             evidence,
@@ -3548,10 +3806,10 @@ impl TallyRuntime {
                             .await
                             .map_err(|error| {
                                 with_read_evidence(
-                                    anyhow::Error::new(
+                                    unconfirmed_unless_wire_refused(
+                                        error,
                                         super::approved_import::ApprovedImportAdmissionError::MastersUnconfirmed,
-                                    )
-                                    .context(format!("{error:#}")),
+                                    ),
                                     admission_evidence.clone(),
                                 )
                             })?;
@@ -3642,10 +3900,10 @@ impl TallyRuntime {
                         // nothing was sent, never an unknown outcome.
                         let before_marks = client.post_xml_raw(marks_xml.clone()).await.map_err(|error| {
                             with_read_evidence(
-                                anyhow::Error::new(
+                                unconfirmed_unless_wire_refused(
+                                    error,
                                     super::approved_import::ApprovedImportAdmissionError::CompanyScopeUnconfirmed,
-                                )
-                                .context(format!("{error:#}")),
+                                ),
                                 admission_evidence.clone(),
                             )
                         })?;
@@ -3682,6 +3940,22 @@ impl TallyRuntime {
                             None => marked,
                         }
                     })?;
+                    // The wire lock for the one import send is taken before its
+                    // attempt is recorded (#697), tried once and never waited for:
+                    // a wait here would sit between the aim marks read above and
+                    // the attempt's record, after which the approval could no
+                    // longer be trusted. A taken lock refuses the post here:
+                    // nothing recorded, nothing sent. Held, it covers the record
+                    // (a local disk write that waits on no other process) and is
+                    // spent on the one send.
+                    let wire = client.acquire_wire().await.map_err(|refused| {
+                        with_read_evidence(
+                            anyhow::Error::from(super::approved_import::PreIntentQueueRefusal {
+                                source: refused,
+                            }),
+                            admission_evidence.clone(),
+                        )
+                    })?;
                     before_dispatch().map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
@@ -3694,7 +3968,7 @@ impl TallyRuntime {
                         with_read_evidence(error, admission_evidence.clone())
                     })?;
                     let mut response_evidence = RuntimeReadEvidence::empty();
-                    let body = client
+                    let body = wire
                         .post_probe_xml(xml, &mut response_evidence)
                         .await
                         .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -3767,17 +4041,14 @@ impl TallyRuntime {
         .await
     }
 
-    /// The desktop single-company outstandings read, under the INR assertion
-    /// the screen sends: settled by Tally's own currency read, or confirmed by
-    /// the operator for a book with one Currency master that Tally does not
-    /// name INR (bridge#604). It reads the masters itself (the classified
-    /// read, bridge#551), whatever the screen read before:
-    /// - one master: the assertion stands, bound to the extent the currency
-    ///   read observed, as the agent read binds its witness;
-    /// - several masters: read only when the company names an INR base, and
-    ///   then its foreign-currency ledgers are left out and the result is the
-    ///   base-currency-ledgers-only partial; otherwise refused before any bill;
-    /// - none (the probe read no master): refused before any bill.
+    /// The desktop single-company outstandings read (bridge#551). It reads
+    /// the Currency masters itself (the classified read), whatever the screen
+    /// read before, and admits a book only when Tally names its base INR: the
+    /// only master, or among several the one the company names, by its mailing
+    /// name. Anything else is refused before any bill. There is no operator
+    /// override: bridge#604's "This company uses INR" confirmation is removed.
+    /// With several masters, foreign-currency ledgers are left out and the
+    /// result is the base-currency-ledgers-only partial.
     ///
     /// A book that changed since that read is the same retryable partial as
     /// one that changed during the outstandings read.
@@ -3786,34 +4057,24 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         as_of: TallyDate,
-        currency_assertion: Option<OutstandingsCurrencyAssertion>,
         ageing_anchor: OutstandingsAgeingAnchor,
     ) -> anyhow::Result<OutstandingsLoadResult> {
-        let currency = self
+        let witness = match self
             .detect_classified_base_currency_with_extent(config.clone(), identity)
-            .await?;
-        let witness: OutstandingsCurrencyWitness = match currency.currency_count() {
-            0 => return Ok(partial_result("company_currency_probe_failed")),
-            // An assertion binds only when the screen sent one (Tally named
-            // INR, or the operator confirmed it); without one the master's
-            // mailing name decides, as for several masters.
-            1 => match currency_assertion {
-                Some(assertion) => match currency.bind_single_master_assertion(assertion) {
-                    Some(witness) => witness.into(),
-                    None => return Ok(partial_result("company_base_currency_undetermined")),
-                },
-                None => match currency.admit_inr_classified() {
-                    Ok(witness) => witness.into(),
-                    Err(code) => return Ok(partial_result(code)),
-                },
-            },
-            _ => match currency.admit_inr_classified() {
-                Ok(witness) => witness.into(),
-                Err(code) => return Ok(partial_result(code)),
-            },
+            .await?
+            .admit_inr_classified()
+        {
+            Ok(witness) => witness,
+            Err(code) => return Ok(partial_result(code)),
         };
-        self.fetch_outstandings_under_witness(config, identity, as_of, witness, ageing_anchor)
-            .await
+        self.fetch_outstandings_under_witness(
+            config,
+            identity,
+            as_of,
+            witness.into(),
+            ageing_anchor,
+        )
+        .await
     }
 
     /// Outstandings under a witness the caller has already admitted: the
@@ -3854,8 +4115,8 @@ impl TallyRuntime {
         }
     }
 
-    /// MCP monetary reads require the observed currency's company extent;
-    /// the desktop operator assertion cannot be supplied through this entry point.
+    /// MCP monetary reads require the observed currency's company extent,
+    /// bound into the witness this entry point takes.
     pub(crate) async fn fetch_agent_outstandings_with_evidence(
         &self,
         config: TallyConfig,
@@ -4097,12 +4358,41 @@ impl TallyRuntime {
                                 return Ok((partial, read_evidence.clone()));
                             }
                         };
+                        // A book with one Currency master holds no composite
+                        // legitimately. Its read keeps the refusal it had
+                        // before bridge#642, at the same point and naming the
+                        // ledger, rather than setting the ledger aside. This is
+                        // decided by the base's master count, not the witness
+                        // kind: production reads a one-master book through the
+                        // classified witness too. A base that is not known
+                        // refuses as one master does.
+                        let one_master = currency_witness
+                            .assertion()
+                            .base
+                            .as_ref()
+                            .is_none_or(|base| base.is_single_master());
+                        if one_master {
+                            if let Some(ledger) = snapshot.mixed.first() {
+                                return Ok((
+                                    partial_result(
+                                        OutstandingsPartialReason::foreign_currency_ledger_balance(
+                                            ledger.clone(),
+                                        ),
+                                    ),
+                                    read_evidence.clone(),
+                                ));
+                            }
+                        }
                         // A foreign ledger's bills are plain amounts that are
-                        // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d): they
-                        // leave every figure, the statement rows included.
+                        // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d), and a
+                        // mixed ledger's are rupee amounts behind a balance
+                        // that was never read (bridge#642): both leave every
+                        // figure, the statement rows included.
                         let foreign = snapshot.foreign;
-                        let receivable_rows = without_foreign_parties(receivable_rows, &foreign);
-                        let payable_rows = without_foreign_parties(payable_rows, &foreign);
+                        let mixed = snapshot.mixed;
+                        let receivable_rows =
+                            without_excluded_parties(receivable_rows, &foreign, &mixed);
+                        let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
                         let ledger_rows = snapshot.base;
                         let group_rows =
                             parse_native_group_snapshot(&group_body, expected_company_guid)?;
@@ -4122,6 +4412,7 @@ impl TallyRuntime {
                                 groups: NativeGroupSnapshot::Complete(&group_rows),
                             },
                             &foreign,
+                            &mixed,
                             ageing_anchor.native_anchor(),
                             &as_of,
                             total_bytes,
@@ -4139,11 +4430,15 @@ impl TallyRuntime {
                         );
                         let statement_unallocated_by_party =
                             all_unallocated_parties(&result.residuals);
-                        if !result.foreign_currency_ledgers_excluded.is_empty() {
+                        if let Some(exclusions) = CurrencyExclusions::new(
+                            result.foreign_currency_ledgers_excluded,
+                            result.mixed_currency_ledgers_excluded,
+                        ) {
                             // A single-master base refuses a ledger in another
-                            // currency before this point (classify_ledger_currencies);
-                            // without a classified witness this result cannot be
-                            // built, so it refuses here too.
+                            // currency before this point (classify_ledger_currencies),
+                            // and a composite value above; without a classified
+                            // witness this result cannot be built, so it refuses
+                            // here too.
                             let Some(classified) = currency_witness.classified_base() else {
                                 return Ok((
                                     partial_result("ledger_currency_base_unmatched"),
@@ -4153,12 +4448,8 @@ impl TallyRuntime {
                             return Ok((
                                 OutstandingsLoadResult::BaseCurrencyLedgersOnly {
                                     classified,
-                                    reason: OutstandingsPartialReason::code(
-                                        "foreign_currency_ledgers_excluded",
-                                    ),
+                                    exclusions,
                                     synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
-                                    foreign_currency_ledgers_excluded: result
-                                        .foreign_currency_ledgers_excluded,
                                     base_currency_ledgers: Box::new(
                                         BaseCurrencyLedgersOutstandings {
                                             report: result.report,
@@ -4230,15 +4521,6 @@ impl TallyRuntime {
 
     /// Runs the existing currency probe while retaining its stable company
     /// extent for the party/ledger master document boundary.
-    pub(crate) async fn detect_party_ledger_master_currency(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<CompanyCurrencyRead> {
-        self.detect_base_currency_with_extent(config, identity)
-            .await
-    }
-
     pub(crate) async fn detect_base_currency_with_extent(
         &self,
         config: TallyConfig,
@@ -4312,58 +4594,8 @@ impl TallyRuntime {
                     let result = async {
                         bracket_verified_company_identity(&client, &identity).await?;
                         let extent = client.fetch_company_book_extent(&identity).await?;
-                        let paired_read = |request: String, stability| {
-                            let client = &client;
-                            async move {
-                                let body =
-                                    client.fetch_native_report_paired(request.clone()).await?;
-                                let (body, encoded_bytes, encoded_sha256) =
-                                    body.require_stable(stability)?;
-                                anyhow::Ok((
-                                    body,
-                                    RuntimeReadEvidence::paired(
-                                        &request,
-                                        encoded_sha256,
-                                        encoded_bytes,
-                                    ),
-                                ))
-                            }
-                        };
-                        let (body, read) = paired_read(
-                            render_company_currency_request(identity.display_name()),
-                            PairedReadValidationError::CurrencyMaster,
-                        )
-                        .await?;
-                        evidence = read;
-                        let mut masters = parse_currency_master_list(&body)?;
-                        let company_currency_name = if masters.count() > 1 {
-                            let (body, read) = paired_read(
-                                render_company_currency_request_with_originalname(
-                                    identity.display_name(),
-                                ),
-                                PairedReadValidationError::CurrencyMaster,
-                            )
-                            .await?;
-                            evidence = evidence.clone().combine(read);
-                            let with_original_names = parse_currency_master_list(&body)?;
-                            // The re-read must return the masters the plain read
-                            // did; only then does its ORIGINALNAME describe them.
-                            if !with_original_names.same_masters_as(&masters) {
-                                return Err(anyhow::Error::new(
-                                    PairedReadValidationError::CurrencyMaster,
-                                ));
-                            }
-                            masters = with_original_names;
-                            let (body, read) = paired_read(
-                                render_company_base_currency_request(identity.display_name()),
-                                PairedReadValidationError::CompanyCurrencyName,
-                            )
-                            .await?;
-                            evidence = evidence.clone().combine(read);
-                            Some(parse_company_currency_name(&body, identity.company_guid())?)
-                        } else {
-                            None
-                        };
+                        let (currency_count, identified) =
+                            read_classified_currency(&client, &identity, &mut evidence).await?;
                         let closing_extent = client.fetch_company_book_extent(&identity).await?;
                         if closing_extent != extent {
                             return Err(anyhow::Error::new(
@@ -4372,8 +4604,8 @@ impl TallyRuntime {
                         }
                         bracket_verified_company_identity(&client, &identity).await?;
                         Ok(ClassifiedCompanyCurrencyRead {
-                            currency_count: masters.count(),
-                            identified: masters.identify_base(company_currency_name.as_deref()),
+                            currency_count,
+                            identified,
                             extent,
                             evidence: evidence.clone(),
                         })
@@ -4412,13 +4644,7 @@ impl TallyRuntime {
         // Tally data was read".
         let Some(segment_policy) = self.outstandings_segment_policy else {
             return self
-                .fetch_operator_outstandings(
-                    config,
-                    identity,
-                    as_of,
-                    Some(currency_assertion),
-                    ageing_anchor,
-                )
+                .fetch_operator_outstandings(config, identity, as_of, ageing_anchor)
                 .await;
         };
         let Some(_coverage) = self.unallocated_balance_coverage.as_ref() else {
@@ -5015,7 +5241,11 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         Some(
             TallyTransportError::EndpointInvalid { .. }
             | TallyTransportError::PolicyInvalid { .. }
-            | TallyTransportError::ClientInitializationFailed,
+            | TallyTransportError::ClientInitializationFailed
+            // A wire-gate refusal sent nothing: it is neither retried by the
+            // read policy (the gate already waited its bound) nor a transport
+            // failure for the circuit breaker.
+            | TallyTransportError::WireRefused { .. },
         ) => ReadFailureClass::Validation,
         None => ReadFailureClass::Validation,
     }

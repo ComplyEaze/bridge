@@ -2,16 +2,17 @@
 //! rules table.
 //!
 //! Provenance: `rules/ay2026-27.s44ab.toml` holds byte-for-byte verbatim blocks of the
-//! reference implementation's own AY 2026-27 rules file -- `[meta]` through the end of `[s44ab]`,
+//! reference implementation's own AY 2026-27 rules file -- `[meta]`, then `[s44ab]` as two blocks,
 //! then `[s40a3]` in full, then the first three lines of `[s269st]`, then `[s269ss_269t]`'s first
-//! three lines and its two lender-type lists with their status lines,
+//! three lines, its two lender-type lists with their status lines and the accepted-loans list,
 //! then `[depreciation]` in full with its three `[depreciation.blocks.<key>]` sub-tables, then
 //! `[due_dates]` as three blocks (header, the three dates, `status`), then `[ledger_scrutiny]` in
-//! full, then `[s194c]`, `[s194i]` and `[deductor]` in full and `[s194j]` as three blocks
+//! full, then `[s194c]` and `[s194i]` in full, `[s194h]` and `[deductor]` as blocks cut clear of
+//! their comments, and `[s194j]` as three blocks
 //! (header, its three value lines, `status`), then `[s43b_h]` in full, then `[s43b]` and
 //! `[s36_1_va]` as blocks cut clear of their comments, then `[s194a]` with `status` cut at its value,
 //! then `[s194t]`, `[s201_1a]`, `[s206c_7]` and `[tds_rates]` as blocks cut clear of their comments
-//! and the four `[entity.<type>]` tables in full --
+//! and the four `[entity.<type>]` tables (`[entity.llp]` cut clear of a comment) --
 //! under a header explaining why each block stops where it does (see the file itself). The
 //! source file had sha256 [`SOURCE_SHA256`] when it was read at reference commit
 //! [`SOURCE_COMMIT`]. The local parity example re-checks, against a local copy of the reference
@@ -27,10 +28,10 @@ use crate::error::{AuditError, Result};
 
 pub const VENDORED: &str = include_str!("../rules/ay2026-27.s44ab.toml");
 pub const VENDORED_SHA256: &str =
-    "d56eeaf270501bf0dbb012ea9f26530f259e24840bf5c324cd24c5b8ea0485be";
+    "5485e9512b502cb0bcc4c10ed267fef32281d9e10acb0d87a4a55d153e633ec5";
 pub const SOURCE_PATH: &str = "the reference Python implementation's AY 2026-27 rules file";
-pub const SOURCE_SHA256: &str = "8a6ec80cd5d19da34392e93024dc9a43a98982b09fb457c662f627174acedf2d";
-pub const SOURCE_COMMIT: &str = "dd376ed014d922a1e2b12052763af36a565402ec";
+pub const SOURCE_SHA256: &str = "6a95baa80420c044f466320c92898240f7e6c292182fbffbe086207d87113857";
+pub const SOURCE_COMMIT: &str = "e2456bcf4f163cf770945e8620e715788db0ca46";
 
 /// The rule values the ported tests read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,9 +84,16 @@ pub struct Rules {
     pub s194c: Option<S194c>,
     /// `tds_payees`: `[s194i].per_month_per_payee_paise`; `None` without `[s194i]`.
     pub s194i_per_month_per_payee_paise: Option<i64>,
-    /// `tds_payees`: `[deductor].individual_huf_prev_year_turnover_paise`; `None` without
-    /// `[deductor]`.
+    /// `tds_payees`: `[deductor].individual_huf_prev_year_turnover_paise` (from a business);
+    /// `None` without `[deductor]`.
     pub deductor_individual_huf_prev_year_turnover_paise: Option<i64>,
+    /// `tds_payees`: `[deductor].individual_huf_prev_year_receipts_profession_paise` (gross receipts
+    /// from a profession); `None` without the key, which `tds_payees` then refuses for an
+    /// individual or HUF with a turnover given, as the reference's lookup raises.
+    pub deductor_individual_huf_prev_year_receipts_profession_paise: Option<i64>,
+    /// `tds_payees`: `[s194h].aggregate_paise`; `None` without `[s194h]`, which `tds_payees` refuses
+    /// only when a ledger is mapped to 194H, as the reference does.
+    pub s194h_aggregate_paise: Option<i64>,
     /// `tds_payees`: `[s194j].aggregate_paise`. `None` without `[s194j]`, which the test does not
     /// refuse: it falls back to its own default, as the reference does.
     pub s194j_aggregate_paise: Option<i64>,
@@ -99,6 +107,13 @@ pub struct Rules {
     /// `loans_interest`: `[s269ss_269t].reporting_exempt_lender_types`, the narrower Clause 31
     /// reporting exemption. `None` when absent, defaulted by the test as above.
     pub s269ss_269t_reporting_exempt_lender_types: Option<Vec<String>>,
+    /// `partners_40b_194t`: `[s40b_v]`, the remuneration slab it quotes (never a computed limit).
+    /// `None` without the table; the test then says the rules hold no slab.
+    pub s40b_v: Option<S40bV>,
+    /// `loans_interest`: `[s269ss_269t].reporting_exempt_lender_types_accepted`, Clause
+    /// 31(a)/(b)'s own note (loans taken or accepted), `None` when absent (the test then uses its
+    /// default).
+    pub s269ss_269t_reporting_exempt_lender_types_accepted: Option<Vec<String>>,
     /// `partners_40b_194t`: `[s194t]`. `None` without the table; the test then uses its own
     /// prototype default and says so, as the reference does.
     pub s194t: Option<S194t>,
@@ -112,6 +127,16 @@ pub struct Rules {
     /// `[entity.<type>]`, keyed by entity type. `None` when the rules carry no `[entity]` table
     /// at all: every lookup then refuses, as the reference's `self["entity"]` raises.
     pub entity: Option<BTreeMap<String, EntityRules>>,
+}
+
+/// `[s40b_v]`: s.40(b)(v)'s remuneration slab.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct S40bV {
+    pub first_slab_paise: i64,
+    pub floor_paise: i64,
+    pub first_slab_bp: i64,
+    pub balance_bp: i64,
+    pub authority: String,
 }
 
 /// `[s194t]`: TDS on payments to partners.
@@ -148,6 +173,10 @@ pub struct TdsRates {
     pub s194i_plant_machinery_bp: i64,
     pub s194j_professional_bp: i64,
     pub s194j_technical_bp: i64,
+    /// `s194h_bp`: `None` when absent, as the reference's `tds_rates.get("s194h_bp")` reads it.
+    pub s194h_bp: Option<i64>,
+    /// `s194a_bp`: `None` when absent (`loans_interest` then does not judge coverage).
+    pub s194a_bp: Option<i64>,
 }
 
 /// One `[entity.<type>]` table: the keys a ported test reads, each absent when the table omits
@@ -344,6 +373,19 @@ impl Rules {
             deductor_individual_huf_prev_year_turnover_paise: optional("deductor")
                 .map(|t| int_in(t, "deductor", "individual_huf_prev_year_turnover_paise"))
                 .transpose()?,
+            deductor_individual_huf_prev_year_receipts_profession_paise: optional("deductor")
+                .filter(|t| t.contains_key("individual_huf_prev_year_receipts_profession_paise"))
+                .map(|t| {
+                    int_in(
+                        t,
+                        "deductor",
+                        "individual_huf_prev_year_receipts_profession_paise",
+                    )
+                })
+                .transpose()?,
+            s194h_aggregate_paise: optional("s194h")
+                .map(|t| int_in(t, "s194h", "aggregate_paise"))
+                .transpose()?,
             s194j_aggregate_paise: optional("s194j")
                 .map(|t| int_in(t, "s194j", "aggregate_paise"))
                 .transpose()?,
@@ -365,6 +407,27 @@ impl Rules {
             s269ss_269t_reporting_exempt_lender_types: s269ss_269t
                 .contains_key("reporting_exempt_lender_types")
                 .then(|| strings_in(s269ss_269t, "s269ss_269t", "reporting_exempt_lender_types"))
+                .transpose()?,
+            s40b_v: optional("s40b_v")
+                .map(|t| -> Result<S40bV> {
+                    Ok(S40bV {
+                        first_slab_paise: int_in(t, "s40b_v", "first_slab_paise")?,
+                        floor_paise: int_in(t, "s40b_v", "floor_paise")?,
+                        first_slab_bp: int_in(t, "s40b_v", "first_slab_bp")?,
+                        balance_bp: int_in(t, "s40b_v", "balance_bp")?,
+                        authority: str_in(t, "s40b_v", "authority")?,
+                    })
+                })
+                .transpose()?,
+            s269ss_269t_reporting_exempt_lender_types_accepted: s269ss_269t
+                .contains_key("reporting_exempt_lender_types_accepted")
+                .then(|| {
+                    strings_in(
+                        s269ss_269t,
+                        "s269ss_269t",
+                        "reporting_exempt_lender_types_accepted",
+                    )
+                })
                 .transpose()?,
             s194t: optional("s194t")
                 .map(|t| -> Result<S194t> {
@@ -406,6 +469,14 @@ impl Rules {
                         )?,
                         s194j_professional_bp: int_in(t, "tds_rates", "s194j_professional_bp")?,
                         s194j_technical_bp: int_in(t, "tds_rates", "s194j_technical_bp")?,
+                        s194h_bp: t
+                            .contains_key("s194h_bp")
+                            .then(|| int_in(t, "tds_rates", "s194h_bp"))
+                            .transpose()?,
+                        s194a_bp: t
+                            .contains_key("s194a_bp")
+                            .then(|| int_in(t, "tds_rates", "s194a_bp"))
+                            .transpose()?,
                     })
                 })
                 .transpose()?,
@@ -583,6 +654,12 @@ mod tests {
             Some(1_000_000_000)
         );
         assert_eq!(rules.s194j_aggregate_paise, Some(5_000_000));
+        assert_eq!(
+            rules.deductor_individual_huf_prev_year_receipts_profession_paise,
+            Some(500_000_000)
+        );
+        assert_eq!(rules.s194h_aggregate_paise, Some(2_000_000));
+        assert_eq!(rules.tds_rates.unwrap().s194h_bp, Some(200));
     }
 
     #[test]
@@ -591,11 +668,17 @@ mod tests {
         assert_eq!(
             rules.s194a,
             Some(S194a {
-                exempt_lender_types: vec![
-                    "bank".to_string(),
-                    "cooperative_bank".to_string(),
-                    "insurer".to_string()
-                ],
+                exempt_lender_types: [
+                    "bank",
+                    "cooperative_bank",
+                    "financial_corporation",
+                    "lic",
+                    "uti",
+                    "insurer",
+                    "notified_institution"
+                ]
+                .map(str::to_string)
+                .to_vec(),
                 threshold_other_than_securities_paise: 1_000_000,
             })
         );
@@ -619,6 +702,12 @@ mod tests {
                 "bank",
                 "statutory_corporation"
             ]
+        );
+        assert_eq!(
+            rules
+                .s269ss_269t_reporting_exempt_lender_types_accepted
+                .unwrap(),
+            ["government_company", "bank", "statutory_corporation"]
         );
     }
 
@@ -652,6 +741,8 @@ mod tests {
                 s194i_plant_machinery_bp: 200,
                 s194j_professional_bp: 1000,
                 s194j_technical_bp: 200,
+                s194h_bp: Some(200),
+                s194a_bp: Some(1000),
             })
         );
     }
@@ -661,6 +752,17 @@ mod tests {
     #[test]
     fn vendored_rules_carry_the_partners_values() {
         let rules = Rules::vendored().unwrap();
+        assert_eq!(
+            rules.s40b_v,
+            Some(S40bV {
+                first_slab_paise: 60_000_000,
+                floor_paise: 30_000_000,
+                first_slab_bp: 9000,
+                balance_bp: 6000,
+                authority: "s.40(b)(v) as amended by the Finance (No. 2) Act 2024, from AY 2025-26"
+                    .to_string(),
+            })
+        );
         assert_eq!(
             rules.s194t,
             Some(S194t {
@@ -693,7 +795,13 @@ mod tests {
     /// parse, never read as truthy.
     #[test]
     fn entity_rules_fail_closed() {
-        let without: String = VENDORED
+        // `[entity.llp]` is vendored as two blocks; joined here so each `[entity.*]` table is one.
+        let vendored = VENDORED.replace(
+            "[entity.llp]\nform = \"3CB\"\n\ns40b",
+            "[entity.llp]\nform = \"3CB\"\ns40b",
+        );
+        assert_ne!(vendored, VENDORED);
+        let without: String = vendored
             .split("\n\n")
             .filter(|block| !block.starts_with("[entity."))
             .collect::<Vec<_>>()
@@ -701,11 +809,11 @@ mod tests {
         let rules = Rules::parse(&without).unwrap();
         assert!(rules.s40b_interest_rate_bp("firm").is_err());
         assert!(rules.s194t_applies("firm").is_err());
-        let wrong = VENDORED.replace(
+        let wrong = vendored.replace(
             "[entity.llp]\nform = \"3CB\"\ns40b_interest_rate_bp = 1200\ns194t = true",
             "[entity.llp]\ns194t = 1",
         );
-        assert_ne!(wrong, VENDORED);
+        assert_ne!(wrong, vendored);
         assert!(Rules::parse(&wrong).is_err());
     }
 

@@ -24,6 +24,15 @@ impl Server {
                 .read_movement_ledgers(&identity, opening_date.clone())
                 .await?;
             evidence = combine_evidence(evidence.clone(), ledger_evidence);
+            // The named ledger is resolved against the first catalogue, before
+            // any voucher is read: a misspelt name refuses here, not after the
+            // whole window has been read twice. The corroborating catalogue
+            // below still has to agree before anything is returned.
+            let selected = optional_string(args, "ledger")?
+                .map(|name| {
+                    resolve_ledger_name(ledgers.iter().map(|ledger| ledger.name.as_str()), &name)
+                })
+                .transpose()?;
             let opening_read = self
                 .read_movement_vouchers(
                     &identity,
@@ -77,11 +86,6 @@ impl Server {
                 return Err("voucher_snapshot_drifted".to_string().into());
             }
             validate_movement_snapshot(&ledgers, &corroborating_ledgers, &vouchers)?;
-            let selected = optional_string(args, "ledger")?
-                .map(|name| {
-                    resolve_ledger_name(ledgers.iter().map(|ledger| ledger.name.as_str()), &name)
-                })
-                .transpose()?;
             let mut movement =
                 BTreeMap::<String, (Option<String>, Option<String>, String, String, usize)>::new();
             for ledger in ledgers {
@@ -187,7 +191,17 @@ impl Server {
             .runtime
             .fetch_ledger_opening_at_with_evidence(self.tally_config(), identity, from)
             .await
-            .map_err(|error| ToolFailure::from_runtime("ledger_movement_read_failed", error))?;
+            .map_err(|error| {
+                // A catalogue that outlived its deadline or the response cap says
+                // which, beside the operation's own code (`code` keeps naming
+                // what failed).
+                let cause = window_too_large_code(&error);
+                let mut failure = ToolFailure::from_runtime("ledger_movement_read_failed", error);
+                if failure.cause.is_none() {
+                    failure.cause = cause;
+                }
+                failure
+            })?;
         Ok((ledgers, evidence_from_runtime_read(evidence)))
     }
 

@@ -535,7 +535,7 @@
     },
     {
       "path": "src-tauri/src/agent_movement.rs",
-      "sha256": "89fdeefbb007e7b360bcec0fef7831700098ae96ab46f2ac10a7c5046571b98e"
+      "sha256": "f48701c90f7b2a7b3c298c97b2cadccbe4315f695e24b235f818667eb6239953"
     },
     {
       "path": "src-tauri/src/agent_movement_math.rs",
@@ -959,7 +959,7 @@
     },
     {
       "path": "src-tauri/src/tally/runtime.rs",
-      "sha256": "5ea68af509f31a30e6e6e6e344c3ea94db98ea954e38f522dd966802b15bac26"
+      "sha256": "8617af90dd8f50d717adf5a790d30b0c10ba9e93fdfe50161cace4b04077970c"
     },
     {
       "path": "src-tauri/src/tally/runtime_control.rs",

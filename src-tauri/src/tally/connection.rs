@@ -194,9 +194,9 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         source: LedgerCensusError,
     },
     /// The company's own count of its ledgers (`NUMLEDGERS`, #938) is higher
-    /// than the census counted: the census missed ledgers (most likely the
-    /// company was closed and reopened while it ran, or a ledger was added
-    /// during the read), and a read sized from it would be sized too small.
+    /// than the census counted: the census missed ledgers (a ledger was added
+    /// during the read or, by reasoning only, the company was closed and
+    /// reopened while it ran), and a read sized from it would be sized too small.
     /// Nothing was requested after the company-count read. Numbers only.
     #[error("Tally's own ledger count is higher than the ledger census counted")]
     LedgerCountCompanyDiffers { company: u64, census: u64 },

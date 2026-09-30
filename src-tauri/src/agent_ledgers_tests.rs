@@ -1782,7 +1782,7 @@ mod through_the_tool {
         // Tally's own count of the ledgers agrees with the census's.
         let counted: usize = slices
             .iter()
-            .map(|body| body.matches("<LEDGER ").count())
+            .map(|body| body.matches("<LEDGER NAME=\"").count())
             .sum();
         census_plans_counted(
             mark,
@@ -2008,22 +2008,25 @@ mod through_the_tool {
     #[tokio::test]
     async fn a_census_below_the_companys_own_ledger_count_is_refused_before_anything_is_sized() {
         let mark = 102_161_u64;
-        let plans = census_plans_to_the_count(
-            mark,
-            census_bodies(mark, GUID, &[(24, 0..9)]),
-            company_count_body(Some("20")),
-        );
-        let total = plans.len();
-        let (response, requests) =
-            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
-        assert_eq!(requests, total, "a request was sent after the count read");
-        let error = refusal(&response);
-        assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "ledger_count_company_differs");
-        assert_eq!(
-            error["remediation"],
-            crate::agent::refusal_remediation("ledger_count_company_differs").unwrap()
-        );
+        // The census holds nine ledgers: ten is the smallest higher count.
+        for company in ["10", "20"] {
+            let plans = census_plans_to_the_count(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                company_count_body(Some(company)),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "ledger_count_company_differs");
+            assert_eq!(
+                error["remediation"],
+                crate::agent::refusal_remediation("ledger_count_company_differs").unwrap()
+            );
+        }
     }
 
     /// The company-count read is accounted in the evidence even when it refuses
@@ -2084,6 +2087,53 @@ mod through_the_tool {
         }
         assert_ne!(sizes[0], sizes[1]);
         assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+    }
+
+    /// A transport failure on the company-count read (here an answer past the
+    /// response cap) is not a damaged answer: it keeps its own cause and nothing
+    /// is sent after it.
+    #[tokio::test]
+    async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
+        let mark = 102_161_u64;
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(
+            census_bodies(mark, GUID, &[(24, 0..9)])
+                .into_iter()
+                .map(xml),
+        );
+        plans.push(xml(company_count_body(Some("9"))).with_framing(
+            ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            },
+        ));
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent after the count read");
+        assert_eq!(response["isError"], true, "{response}");
+        for other in [
+            "ledger_count_company_invalid",
+            "ledger_count_company_differs",
+        ] {
+            assert_ne!(refusal(&response)["cause"], other);
+        }
+    }
+
+    /// The cross-check flag is added to a result whatever the frame was, and a
+    /// read with no census leaves the frame as it was.
+    #[test]
+    fn the_cross_check_flag_joins_an_object_frame_and_replaces_any_other() {
+        use crate::tally::connection::CountCrossCheck;
+        let flag = json!({"status": "matched"});
+        let joined = count_cross_check_frame(json!({"rows": 3}), Some(CountCrossCheck::Matched));
+        assert_eq!(joined["rows"], 3);
+        assert_eq!(joined["ledger_count_cross_check"], flag);
+        for other in [json!(null), json!([1, 2]), json!("text")] {
+            let framed = count_cross_check_frame(other, Some(CountCrossCheck::Matched));
+            assert_eq!(framed, json!({"ledger_count_cross_check": flag}));
+        }
+        let untouched = json!({"rows": 3});
+        assert_eq!(count_cross_check_frame(untouched.clone(), None), untouched);
     }
 
     /// A count the company does not give, or gives in a form that is not a plain
@@ -2166,8 +2216,9 @@ mod through_the_tool {
     /// The refusal comes from the extent alone whatever the slices held; the
     /// three positions keep a partial count (5, 10 and 15 ledgers against the
     /// nine master rows) from being read as a match. A company closed and
-    /// reopened with equal marks is not caught here: its low count meets the
-    /// count-versus-master-rows test above, after the master pair is sent.
+    /// reopened with equal marks is not caught by the extent. Tally's own count
+    /// of the ledgers (#938) is meant to catch it (by reasoning, no live
+    /// reproduction), before the extent is read again.
     #[tokio::test]
     async fn a_book_that_changes_during_the_census_is_refused_before_the_next_read_is_sized() {
         let mark = 102_161_u64;

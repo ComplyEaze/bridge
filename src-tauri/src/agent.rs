@@ -723,10 +723,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "ledger_count_company_differs" => Some(
             "Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
-             company's ledgers is higher than that census found: the census missed ledgers, most \
-             likely because the company was closed and reopened while it ran, or a ledger was \
-             added during the read, and a read sized from the low count would have been sized \
-             too small. No master was requested. Retry once with the company left alone and \
+             company's ledgers is higher than that census found: the census missed ledgers, either \
+             because a ledger was added during the read or (reasoned, not reproduced) because \
+             the company was closed and reopened while it ran, and a read sized from the low \
+             count would have been sized too small. No master was requested. Retry once with the company left alone and \
              nobody editing it in Tally. A repeat means the census and Tally's count disagree \
              about this book: call ledger_masters with fields=basic instead."
         ),

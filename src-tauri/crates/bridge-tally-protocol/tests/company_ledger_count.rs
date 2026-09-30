@@ -181,8 +181,14 @@ fn two_rows_for_one_company_are_ambiguous() {
 #[test]
 fn a_failed_or_damaged_answer_is_never_read_as_unavailable() {
     let body = capture();
-    assert!(parse(&damaged(&body, "<STATUS>1</STATUS>", "<STATUS>0</STATUS>")).is_err());
-    assert!(parse(&body[..body.len() / 2]).is_err());
-    assert!(parse("").is_err());
-    assert!(parse(&damaged(&body, "</ENVELOPE>", "")).is_err());
+    assert_eq!(
+        parse(&damaged(&body, "<STATUS>1</STATUS>", "<STATUS>0</STATUS>")),
+        Err(OutstandingsError::InvalidResponse(
+            "tally_status_not_success"
+        ))
+    );
+    let truncated = Err(OutstandingsError::InvalidResponse("response_truncated"));
+    assert_eq!(parse(&body[..body.len() / 2]), truncated);
+    assert_eq!(parse(""), truncated);
+    assert_eq!(parse(&damaged(&body, "</ENVELOPE>", "")), truncated);
 }

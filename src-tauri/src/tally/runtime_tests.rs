@@ -64,6 +64,7 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").expect("source from"),
         to: TallyDate::parse("20260731").expect("source to"),
+        last_voucher_date: TallyDate::parse("20260731").expect("source to"),
         rows: Vec::new(),
         request_sha256: "0".repeat(64),
         master_response_sha256: master_response_sha256.to_string(),

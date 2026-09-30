@@ -33,7 +33,7 @@ test("the script exits 0 on a good set and 1 on a bad one, and fails closed on u
 
 test("the workflow runs on pull_request with the label names passed by environment, not spliced into the shell", () => {
   const flow = parseDocument(readFileSync(new URL("../.github/workflows/pr-labels.yml", import.meta.url), "utf8")).toJS();
-  assert.deepEqual(Object.keys(flow.on), ["pull_request"], "not pull_request_target");
+  assert.deepEqual(Object.keys(flow.on), ["pull_request", "merge_group"], "not pull_request_target");
   assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled"]);
   assert.deepEqual(flow.permissions, { contents: "read" });
   const job = flow.jobs["type-label"];

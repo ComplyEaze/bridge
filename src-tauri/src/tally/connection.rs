@@ -50,7 +50,7 @@ use bridge_tally_protocol::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
-    parent_partition::{ParentPartition, ParentPartitionError, PartitionLimits},
+    parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
@@ -177,6 +177,15 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
     /// Tally did not report one in its extent, so no part was requested.
     #[error("Tally did not report the voucher high-water a multi-part ledger read needs")]
     VoucherWitnessAbsent,
+    /// A parent part's answer passed the transport's response cap (#679):
+    /// more than the catalogue can account for under the part's parents,
+    /// possibly because Tally did not apply the part's filter. The transport
+    /// error stays in the chain.
+    #[error("Tally answered a parent part beyond Bridge's response limit")]
+    ParentPartResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
 }
 
 impl PartyLedgerMasterSourceValidationError {
@@ -203,7 +212,36 @@ impl PartyLedgerMasterSourceValidationError {
             Self::LedgerCountInvalid { source } => source.safe_code(),
             Self::ParentPartition { source } => source.safe_code(),
             Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
+            Self::ParentPartResponseTooLarge { .. } => "parent_part_response_too_large",
         }
+    }
+}
+
+/// Names a parent part's read that ran past the response cap as such, so the
+/// caller learns the part's filter was probably ignored; a whole-book read has
+/// no filter to blame and any other failure is left as it came.
+fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -> anyhow::Error {
+    let over_the_cap = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(TallyTransportError::ResponseTooLarge { .. })
+        )
+    });
+    if part.is_some() && over_the_cap {
+        // The read evidence a failed pair carries must stay the chain's root,
+        // where the caller's `with_read_evidence` merges it.
+        let completed = error
+            .downcast_ref::<super::runtime::RuntimeReadFailure>()
+            .map(|failure| failure.evidence.clone());
+        let named = anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::ParentPartResponseTooLarge { source: error },
+        );
+        match completed {
+            Some(evidence) => with_read_evidence(named, evidence),
+            None => named,
+        }
+    } else {
+        error
     }
 }
 
@@ -264,6 +302,12 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
+/// Most bytes of `NOT` formula text the complement part's request may carry
+/// (#679). UNVERIFIED: Bridge's own bound. One live probe sent 54 KB of
+/// request for 1,354 parents; the 12-part, 200-parents-per-part limits already
+/// cap the parents at 2,400, so this is a backstop against very long names.
+const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
+
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
@@ -273,6 +317,7 @@ fn parent_partition_limits() -> PartitionLimits {
             / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
         max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
         max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
+        max_complement_formula_bytes: PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED,
     }
 }
 
@@ -1560,12 +1605,15 @@ impl TallyClient {
                 .collect::<Vec<_>>();
             let request_sha256 = party_ledger_request_commitment(&committed_requests);
             let mut reads = Vec::with_capacity(part_requests.len());
-            for (master_request, balance_request) in &part_requests {
+            for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
                 reads.push(
                     self.read_party_ledger_master_part(
                         identity,
                         master_request,
                         balance_request,
+                        partition
+                            .as_ref()
+                            .map(|partition| &partition.parts()[index]),
                         ledger_currency_base.as_ref(),
                         &mut evidence,
                     )
@@ -1687,12 +1735,14 @@ impl TallyClient {
         identity: &VerifiedCompanyIdentity,
         master_request: &str,
         balance_request: &str,
+        part: Option<&ParentPart>,
         ledger_currency_base: Option<&BaseCurrencyName>,
         evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<PartyLedgerMasterPartRead> {
         let master_pair = self
             .fetch_native_report_paired(master_request.to_owned())
-            .await?;
+            .await
+            .map_err(|error| parent_part_response_error(part, error))?;
         let (master_body, master_response_bytes, master_response_sha256) =
             master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
@@ -1711,9 +1761,20 @@ impl TallyClient {
                 PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
             ));
         }
+        // A part that came back short or long means Tally did not apply its
+        // filter as asked. Its master pair is already sent, the complement's
+        // too; this keeps back its balance and every later request, the next
+        // part's among them, whose filter rests on the same assumption.
+        if let Some(part) = part {
+            part.check_row_count(structure.records.len())
+                .map_err(
+                    |source| PartyLedgerMasterSourceValidationError::ParentPartition { source },
+                )?;
+        }
         let balance_pair = self
             .fetch_native_report_paired(balance_request.to_owned())
-            .await?;
+            .await
+            .map_err(|error| parent_part_response_error(part, error))?;
         let (balance_body, balance_response_bytes, balance_response_sha256) =
             balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(

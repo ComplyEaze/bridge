@@ -1,4 +1,8 @@
 //! Local durable-state and MCP cancellation tests; no Tally responses are invented.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use std::io::Write;
 use std::{

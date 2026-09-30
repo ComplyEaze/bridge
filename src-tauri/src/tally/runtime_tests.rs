@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
 use crate::tally::TallyProduct;

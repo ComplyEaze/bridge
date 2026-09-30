@@ -484,6 +484,8 @@ async fn a_book_too_large_for_a_whole_read_is_refused_with_its_size() {
     assert_eq!(refusal["size"]["master_alter_id"], mark);
     assert_eq!(refusal["size"]["limit_bytes"], 16_000_000);
     assert!(refusal["size"]["estimated_bytes"].as_u64().unwrap() > 16_000_000);
+    // The largest mark a godown read is admitted at: one below this refusal.
+    assert_eq!(refusal["size"]["limit_master_alter_id"], mark - 1);
     assert!(refusal["remediation"]
         .as_str()
         .unwrap()

@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
+const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
 const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
 const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;
 const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;

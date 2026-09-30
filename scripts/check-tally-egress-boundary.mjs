@@ -38,17 +38,19 @@
 //    drops out, a missing root line, a failed `cargo` or an unparseable line
 //    all fail, so "nothing found" cannot stand in for "nothing was read".
 //
-// 2. Clippy lints, kept honest. src-tauri/clippy.toml refuses the egress
-//    actions everywhere in the src-tauri workspace: sending an HTTP request,
-//    opening or binding a socket, a DNS lookup, spawning a process, building a
-//    webview window. A lint fires however the client or socket was obtained,
-//    which a text scan cannot see. A reviewed call site carries
-//    `#[expect(clippy::disallowed_methods, reason = "...")]`; this gate allows
-//    that exemption only in a pinned set of files (each with its exact count,
-//    in that one form) and in test-only code. It refuses the ways it knows to
-//    turn the lints off: a lint-group or renamed-lint allow, a lint table, an
-//    `-A`/`--cap-lints` flag or CLIPPY_CONF_DIR in a workflow or Cargo config,
-//    another clippy.toml, or an edit to clippy.toml without updating its digest.
+// 2. A clippy census. src-tauri/clippy.toml refuses the egress actions
+//    everywhere in the src-tauri workspace: sending an HTTP request, opening
+//    or binding a socket, a DNS lookup, spawning a process, building a webview
+//    window. A lint fires however the client or socket was obtained, which a
+//    text scan cannot see. A reviewed call site carries
+//    `#[expect(clippy::disallowed_methods, reason = "...")]`. CI's native job
+//    then runs clippy over the shipped targets with the two egress lints forced
+//    to warn, which no attribute, group allow, `--cap-lints`, `-A` or lint table
+//    can turn off, and this script (`--census FILE OS`) requires that what fired
+//    match scripts/tally-egress-census.json exactly, per OS. rustc measures what fires, so no
+//    syntax can hide a call. Beside it, static checks keep the configuration in
+//    place: the digest of clippy.toml, no second clippy.toml, no CLIPPY_CONF_DIR
+//    or CLIPPY_ARGS in any tracked file, no `clippy` cfg in src-tauri Rust.
 //
 // 3. A deny-list of network-capable crates and Tauri plugins, read from both
 //    Cargo.lock files and the JS manifests.
@@ -65,13 +67,19 @@
 //    that. The Rust calls that navigate the webview or run script in it are
 //    linted; what the page's own script can reach is the webview CSP's
 //    concern, and the CSP does not govern a top-level navigation.
-//  - The declaration scan reads ordinary `mod` lines and `#[path]`/`include!`
-//    forms. A declaration written some other way (an attribute on the same
-//    line, a `cfg_attr` path, a macro-built attribute) is not seen.
+//  - The census sees only code its clippy run compiles: the shipped targets
+//    (`--lib --bins`, release profile) with default features, on Windows and
+//    macOS. Not seen: code under `cfg(not(clippy))` (no clippy-based check can
+//    see it; the plain `clippy` cfg forms are refused, others are not); a
+//    build.rs that assembles CLIPPY_CONF_DIR or CLIPPY_ARGS instead of naming
+//    them; features the run does not enable (voucher-scan and the calibration
+//    harness, neither of which ships); Linux-only code; debug-only code; and
+//    tests, examples and benches, which do not ship.
+//  - Removing or narrowing the census step in ci.yml is not detected here.
+//    ci.yml is a compatibility-pinned file, so an edit to it is a resealed,
+//    reviewed change.
 //  - On Windows, opening a UNC or WebDAV path through std::fs reaches the
 //    network; no method list can tell such a path from a local one.
-//  - A lint fires only in code a CI clippy step compiles: a cfg branch or
-//    feature CI never builds (another OS, lab-writes) is not linted.
 //  - Dropping `-D warnings` from a CI clippy step, or narrowing what it
 //    covers, is not detected here.
 //  - tools/ is outside the lints: its binaries do not ship. The cargo-tree half
@@ -86,6 +94,102 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+
+// ---------------------------------------------------------------------------
+// Check 2: a clippy census of the egress lints, and the settings that keep it honest.
+// ---------------------------------------------------------------------------
+
+// src-tauri/clippy.toml lists the egress actions as `disallowed-methods` (sending an HTTP request,
+// opening or binding a socket, a DNS lookup, spawning a process, building a webview window) and
+// `disallowed-types`. A lint fires however the client or socket was obtained (an alias, a helper,
+// a returned value), which a text scan cannot see. A reviewed call site carries
+// `#[expect(clippy::disallowed_methods, reason = "...")]`, and CI's clippy steps deny warnings.
+//
+// What a source scan cannot settle is whether such an exemption sits where it was reviewed, so CI
+// asks rustc instead. The native job runs clippy over the shipped targets with the two lints
+// forced to warn, which no attribute, group allow, `--cap-lints`, `-A` or lint table can turn off
+// (each was tried against clippy-driver 1.96.0), writes the JSON messages to a file, and calls
+//     node scripts/check-tally-egress-boundary.mjs --census FILE OS
+// That counts what fired per file and method and requires an exact two-way match with
+// the reviewed list for that OS: a new firing, a firing that stopped, a build that did not finish
+// and an empty file all fail. The pinned counts are nonzero, so a run whose lints never fired
+// cannot pass as clean.
+//
+// scripts/tally-egress-census.json lists, per OS, [file, method, count] for each reviewed call site.
+// The entries come from a real run's output, never typed in by hand: a run that disagrees prints the
+// list it observed, and a reviewer confirms each entry before copying it there.
+const CENSUS_PINS = `${root}scripts/tally-egress-census.json`;
+
+// The message rustc prints for the two lints names the method or type in backticks.
+const FIRING = /^use of a disallowed (?:method|type) `([^`]+)`/;
+
+// Where a firing is reported: the outermost macro expansion site of the primary span, as a path
+// from the repository root. cargo reports paths from the workspace root (src-tauri/), or absolute
+// for a path outside it.
+function firingFile(message) {
+  let span = message.spans.find((candidate) => candidate.is_primary);
+  while (span?.expansion?.span) span = span.expansion.span;
+  if (!span) return null;
+  const name = span.file_name.replaceAll("\\", "/");
+  const relative = name.startsWith(root.replaceAll("\\", "/")) ? name.slice(root.length) : `src-tauri/${name}`;
+  return posix.normalize(relative);
+}
+
+function censusViolations(text, os, pins) {
+  const expected = pins[os];
+  if (!Array.isArray(expected) || expected.length === 0) {
+    return [`no reviewed census for runner OS ${JSON.stringify(os)}; add one from a real run`];
+  }
+  const lines = text.split(/\r?\n/).filter((line) => line !== "");
+  if (lines.length === 0) return ["the clippy output is empty: the lints did not run"];
+  const finished = [];
+  const seen = new Map();
+  for (const [index, line] of lines.entries()) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      return [`clippy output line ${index + 1} is not JSON: ${JSON.stringify(line.slice(0, 80))}`];
+    }
+    if (entry.reason === "build-finished") finished.push(entry.success);
+    if (entry.reason !== "compiler-message" || !entry.message?.code?.code?.startsWith("clippy::disallowed_")) continue;
+    const method = entry.message.message.match(FIRING)?.[1];
+    const file = firingFile(entry.message);
+    if (!method || !file) return [`an egress lint message could not be read: ${JSON.stringify(entry.message.message.slice(0, 120))}`];
+    const key = `${file}\t${method}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  }
+  const violations = [];
+  if (finished.length !== 1 || finished[0] !== true) {
+    violations.push(`clippy did not report exactly one successful build (build-finished: ${JSON.stringify(finished)})`);
+  }
+  const pinned = new Map(expected.map(([file, method, count]) => [`${file}\t${method}`, count]));
+  for (const key of new Set([...seen.keys(), ...pinned.keys()])) {
+    const [file, method] = key.split("\t");
+    const found = seen.get(key) ?? 0;
+    const reviewed = pinned.get(key) ?? 0;
+    if (found !== reviewed) violations.push(`${file}: ${found} egress-lint firing(s) of ${method}, ${reviewed} reviewed`);
+  }
+  if (violations.length) {
+    const observed = [...seen].map(([key, count]) => `    [${JSON.stringify(key.split("\t")[0])}, ${JSON.stringify(key.split("\t")[1])}, ${count}],`);
+    violations.push(`observed for ${os}, to be reviewed and pinned in scripts/tally-egress-census.json:\n${observed.join("\n")}`);
+  }
+  return violations;
+}
+
+const censusFlag = process.argv.indexOf("--census");
+if (censusFlag !== -1) {
+  const [file, os, pinsFile = CENSUS_PINS] = process.argv.slice(censusFlag + 1);
+  if (!file || !os) throw new Error("usage: check-tally-egress-boundary.mjs --census <clippy-json-file> <runner-os> [pins-file]");
+  const pins = JSON.parse(readFileSync(pinsFile, "utf8"));
+  const violations = censusViolations(readFileSync(file, "utf8"), os, pins);
+  if (violations.length) {
+    throw new Error(`Tally-path egress census failed (${os}):\n${violations.map((violation) => `- ${violation}`).join("\n")}`);
+  }
+  const total = pins[os].reduce((sum, [, , count]) => sum + count, 0);
+  console.log(`Tally-path egress census matches for ${os}: ${total} reviewed firing(s) in ${pins[os].length} place(s), and no other.`);
+  process.exit(0);
+}
 
 // ---------------------------------------------------------------------------
 // Check 1: which first-party crates may directly depend on an outbound HTTP
@@ -238,44 +342,8 @@ for (const workspace of workspaces) {
 }
 
 // ---------------------------------------------------------------------------
-// Check 2: clippy refuses egress anywhere in the src-tauri workspace;
-// this keeps the exemptions where they were reviewed.
+// Check 2, static half: the settings that keep the census honest.
 // ---------------------------------------------------------------------------
-
-// src-tauri/clippy.toml lists the egress actions as `disallowed-methods` (sending an HTTP request,
-// opening or binding a socket, a DNS lookup, spawning a process) and `disallowed-types`, and CI's
-// clippy runs deny warnings. A reviewed site carries
-// `#[expect(clippy::disallowed_methods, reason = "...")]`. A lint fires however the client or
-// socket was obtained (an alias, a helper, a returned value), which a text scan could not see.
-// What is left to check is where those exemptions may appear, and that nothing turns the lints off.
-
-// Every production file allowed to hold an exemption, with exactly how many `clippy::disallowed_*`
-// mentions it has. A new exemption, even in a listed file, changes a count and must be reviewed here.
-const EGRESS_EXEMPTIONS = new Map([
-  // AXAL sign-in and document upload: the two parts of the app the README names as uploading
-  // ('One part of the app does upload'), on purpose and user-initiated.
-  ["src-tauri/src/axal.rs", 2],
-  ["src-tauri/src/documents.rs", 4],
-  // The loopback-only Tally transport: canonical_loopback_origin rejects any other host before
-  // a request is built.
-  ["src-tauri/crates/bridge-tally-transport/src/lib.rs", 4],
-  // Revealing an exported file in the OS file manager, and the native approval dialog helper.
-  ["src-tauri/src/commands.rs", 3],
-  ["src-tauri/src/tally/approved_import.rs", 2],
-  // The synthetic Tally server (a dev-dependency only; it never ships).
-  ["src-tauri/crates/tally-protocol-simulator/src/server.rs", 3],
-]);
-
-// Any mention of the egress lints, however spaced or line-broken, the lints' old singular names
-// included (they still work through `renamed_and_removed_lints`).
-const MENTION = /clippy\s*::\s*(?:r#)?disallowed_(?:method|type)s?\b/g;
-// The one form a reviewed production site may use: an outer `#[expect(..., reason = ...)]`, which
-// covers the statement or item it sits on and fails when that site stops needing it.
-const REVIEWED = /#\[\s*expect\s*\(\s*clippy\s*::\s*disallowed_(?:methods|types)\s*,\s*reason\s*=/g;
-// Lint groups that would silence the egress lints wholesale: an attribute only (`cfg_attr`
-// included), not a method call such as `.expect("warnings")`.
-const LINT_ESCAPE =
-  /#!?\[[^\]]*\b(?:allow|expect)\s*\([^)\]]*\b(?:warnings|clippy\s*::\s*(?:all|style)|renamed_and_removed_lints)\b/;
 
 function trackedFiles() {
   const result = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8", windowsHide: true });
@@ -285,103 +353,40 @@ function trackedFiles() {
   return result.stdout.split("\0").filter(Boolean);
 }
 
-// A file is test-only when Cargo builds it only for tests (under a crate's tests/ directory, and
-// declared or included by nothing), or when its one declaration is a module line carrying exactly `#[cfg(test)]`, or
-// `#[cfg(all(test, ...))]` with `test` as its first condition. A second declaration, or an
-// `include!` of the file anywhere, makes it production.
-function isTestOnly(path, rustSources) {
-  // Where a plain `mod name;` for this file would be written: name/mod.rs belongs to the directory above.
-  let moduleDirectory = posix.dirname(path);
-  let moduleName = posix.basename(path, ".rs");
-  if (moduleName === "mod") {
-    moduleName = posix.basename(moduleDirectory);
-    moduleDirectory = posix.dirname(moduleDirectory);
-  }
-  const declarations = [];
-  for (const [candidate, lines] of rustSources) {
-    const text = lines.join("\n");
-    const candidateDirectory = posix.dirname(candidate);
-    const candidateStem = posix.basename(candidate, ".rs");
-    const modules = /((?:^[ \t]*#\[[^\n]*\][ \t]*\n)*)^[ \t]*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/gm;
-    for (const [, attributeLines, name] of text.matchAll(modules)) {
-      const attributes = attributeLines.split("\n").map((line) => line.trim()).filter(Boolean);
-      const pathAttribute = attributes.map((attribute) => attribute.match(/^#\[path\s*=\s*"([^"]+)"\]$/)?.[1]).find(Boolean);
-      const declares = pathAttribute
-        ? posix.normalize(`${candidateDirectory}/${pathAttribute}`) === path
-        : name === moduleName &&
-          ((["mod", "lib", "main"].includes(candidateStem) && candidateDirectory === moduleDirectory) ||
-            `${candidateDirectory}/${candidateStem}` === moduleDirectory);
-      if (declares) declarations.push(attributes);
-    }
-    for (const [, included] of text.matchAll(/\binclude(?:_str|_bytes)?!\s*\(\s*"([^"]+)"/g)) {
-      if (posix.normalize(`${candidateDirectory}/${included}`) === path) declarations.push([]);
-    }
-  }
-  // An integration test is its own crate root: test-only only while nothing else pulls it in.
-  if (/^src-tauri\/(?:crates\/[^/]+\/)?tests\//.test(path)) return declarations.length === 0;
-  return (
-    declarations.length === 1 &&
-    declarations[0].some((attribute) => attribute === "#[cfg(test)]" || /^#\[cfg\(all\(test,/.test(attribute))
-  );
-}
-
-const tracked = trackedFiles();
-const rustSources = new Map(
-  tracked
-    .filter((path) => path.startsWith("src-tauri/") && path.endsWith(".rs"))
-    .map((path) => [path, readFileSync(`${root}${path}`, "utf8").split(/\r?\n/)]),
-);
-for (const [path, lines] of rustSources) {
-  const text = lines.join("\n");
-  if (LINT_ESCAPE.test(text)) {
-    egressViolations.push(`${path} silences a lint group that includes the egress lints (warnings, clippy::all, clippy::style) or re-enables their old names (renamed_and_removed_lints)`);
-  }
-  const count = text.match(MENTION)?.length ?? 0;
-  if (EGRESS_EXEMPTIONS.has(path)) {
-    const reviewed = text.match(REVIEWED)?.length ?? 0;
-    if (count !== reviewed) {
-      egressViolations.push(
-        `${path} mentions the egress lints ${count - reviewed} time(s) outside an outer #[expect(..., reason = ...)]; ` +
-          "a reviewed file exempts one statement or item at a time, and only that way",
-      );
-    } else if (reviewed !== EGRESS_EXEMPTIONS.get(path)) {
-      egressViolations.push(
-        `${path} has ${reviewed} egress-lint exemption(s), not the ${EGRESS_EXEMPTIONS.get(path)} reviewed; ` +
-          "review each call site, then update EGRESS_EXEMPTIONS in scripts/check-tally-egress-boundary.mjs",
-      );
-    }
-  } else if (count && !isTestOnly(path, rustSources)) {
-    egressViolations.push(
-      `${path} exempts itself from the egress lints but is neither a reviewed egress file nor test-only. ` +
-        'This falsifies the README promise "nothing in the Tally path sends it to a server of ours" unless ' +
-        "the call site is one of the app's documented upload features; if it is, add it to EGRESS_EXEMPTIONS.",
-    );
-  }
-}
-for (const path of EGRESS_EXEMPTIONS.keys()) {
-  if (!rustSources.has(path)) egressViolations.push(`EGRESS_EXEMPTIONS names ${path}, which is not a tracked file`);
-}
-
-// The lint configuration itself. Clippy reads the nearest clippy.toml, so a second one under
-// src-tauri would replace these lists for its crate; a lint table, a CI flag or CLIPPY_CONF_DIR could
-// switch them off.
+// Clippy reads the nearest clippy.toml, so a second one under src-tauri would replace these lists
+// for its crate, and CLIPPY_CONF_DIR would point it elsewhere. An edit to the lists needs review.
 const CLIPPY_CONFIG_DIGEST = "9e77707784b1a70a2a69a95137c300afc41012f14ff25aab7f4a680cfa45083e";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
 }
+const tracked = trackedFiles();
 for (const path of tracked) {
   if (/(?:^|\/)\.?clippy\.toml$/.test(path) && path.startsWith("src-tauri/") && path !== "src-tauri/clippy.toml") {
     egressViolations.push(`${path} would replace src-tauri/clippy.toml's egress lints for its crate`);
   }
-  const buildInput =
-    /^\.github\//.test(path) || /(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(path) || /^src-tauri\/(?:.*\/)?Cargo\.toml$/.test(path);
-  if (!buildInput) continue;
-  const text = readFileSync(`${root}${path}`, "utf8");
-  const buildEscape =
-    /disallowed[_-](?:methods?|types?)|CLIPPY_CONF_DIR|renamed_and_removed_lints|--cap-lints|-A\s*(?:warnings|clippy\s*::\s*(?:all|style))\b/;
-  if (buildEscape.test(text) || (path.endsWith("Cargo.toml") && /^\s*(?:all|style|warnings)\s*=/m.test(text))) {
-    egressViolations.push(`${path} configures the egress lints or a group containing them; only src-tauri/clippy.toml may`);
+}
+// A plain substring in any tracked text file but this gate and its test. `git grep` exits 1 for no
+// match; any other failure means nothing was read.
+const settings = spawnSync(
+  "git",
+  ["-C", root, "grep", "-l", "-I", "-F", "-e", "CLIPPY_CONF_DIR", "-e", "CLIPPY_ARGS", "--", ".",
+    ":!scripts/check-tally-egress-boundary.mjs", ":!scripts/check-tally-egress-boundary.test.mjs"],
+  { encoding: "utf8", windowsHide: true },
+);
+if (settings.error || (settings.status !== 0 && settings.status !== 1)) {
+  throw new Error(`git grep for the clippy settings failed: ${settings.error?.message ?? settings.stderr}`);
+}
+for (const path of settings.stdout.split("\n").filter(Boolean)) {
+  egressViolations.push(`${path} names CLIPPY_CONF_DIR or CLIPPY_ARGS, which can point clippy away from src-tauri/clippy.toml`);
+}
+// Code under a `clippy` cfg is invisible to the census: it only ever compiles under clippy. A
+// comment line is skipped; a trailing comment or a string that says the word is a loud false alarm.
+for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs"))) {
+  for (const [index, line] of readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).entries()) {
+    if (!/^\s*\/\//.test(line) && /\bclippy\b(?!\s*::)/.test(line)) {
+      egressViolations.push(`${path}:${index + 1} names clippy outside a lint path; code under a clippy cfg is not seen by the census`);
+    }
   }
 }
 
@@ -419,6 +424,6 @@ if (egressViolations.length) {
 }
 
 console.log(
-  "Tally-path egress boundary is sealed: reqwest/hyper are confined to the pinned crates, egress-lint " +
-    `exemptions to ${EGRESS_EXEMPTIONS.size} reviewed files and test-only code, and no denied crate or plugin is present.`,
+  "Tally-path egress boundary is sealed: reqwest/hyper are confined to the pinned crates, the clippy " +
+    "configuration is unchanged, and no denied crate or plugin is present. The clippy census runs in the native job (--census).",
 );

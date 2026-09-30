@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-// Drives the egress gate's cargo-tree check with a stand-in `cargo` on PATH.
-// The first row is the control: the same stand-in, given the trees cargo
-// prints today, must pass, so each failing row fails on its tree and not on
-// the stand-in. Check 2 (the source scan) runs against the real tree
-// throughout.
+// Drives the egress gate in three ways. The cargo-tree check runs with a stand-in `cargo` on PATH
+// and the first row is its control: the trees cargo prints today must pass, so each failing row
+// fails on its tree and not on the stand-in. The static half of check 2 runs against the real
+// tree there, and against a small git repository of its own where a row needs a bad file. The
+// census runs on a clippy capture: the output of a real clippy run over a small crate, so what
+// is counted is a real message and not one this repository wrote.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -40,29 +41,33 @@ exit "\${STAND_IN_EXIT:-0}"
 `;
 
 // As printed by `cargo tree --invert --depth 1 --prefix none --format {p}
-// --target all` on 2026-09-26.
-const TODAY = {
-  "src-tauri.reqwest": [
-    "reqwest v0.13.5",
-    `bridge v0.2.0 (${root}/src-tauri)`,
-    `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`,
-    "tauri v2.11.5",
-  ],
-  "src-tauri.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.5"],
-  "tools.reqwest": [
-    "reqwest v0.13.4",
-    `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`,
-  ],
-  "tools.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.4"],
+// --target all` on 2026-09-26, with the repository root substituted.
+const todayTrees = (root) => {
+  const TODAY = {
+    "src-tauri.reqwest": [
+      "reqwest v0.13.5",
+      `bridge v0.2.0 (${root}/src-tauri)`,
+      `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`,
+      "tauri v2.11.5",
+    ],
+    "src-tauri.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.5"],
+    "tools.reqwest": [
+      "reqwest v0.13.4",
+      `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`,
+    ],
+    "tools.hyper": ["hyper v1.11.0", "hyper-rustls v0.27.9", "hyper-util v0.1.20", "reqwest v0.13.4"],
+  };
+  // The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
+  for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"], ["tools", "reqwest v0.13.4"]]) {
+    TODAY[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
+    TODAY[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
+    TODAY[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
+    TODAY[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
+    TODAY[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
+  }
+  return TODAY;
 };
-// The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
-for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"], ["tools", "reqwest v0.13.4"]]) {
-  TODAY[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
-  TODAY[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
-  TODAY[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
-  TODAY[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
-  TODAY[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
-}
+const TODAY = todayTrees(root);
 const EVERY_CALL = ["src-tauri", "tools"].flatMap((workspace) =>
   ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service"].map((name) => `${workspace}.${name}`),
 );
@@ -75,12 +80,12 @@ before(() => {
 });
 after(() => rmSync(bin, { recursive: true, force: true }));
 
-function runGate(trees, env = {}) {
+function runGate(trees, env = {}, gateFile = gate, cwd = root) {
   const dir = mkdtempSync(join(bin, "trees-"));
   for (const [key, lines] of Object.entries(trees)) writeFileSync(join(dir, `${key}.out`), lines.map((l) => `${l}\n`).join(""));
   rmSync(join(bin, "cargo.calls"), { force: true });
-  const result = spawnSync(process.execPath, [gate], {
-    cwd: root,
+  const result = spawnSync(process.execPath, [gateFile], {
+    cwd,
     encoding: "utf8",
     env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, TREES: dir, ...env },
   });
@@ -145,4 +150,158 @@ test("a first-party crate depending on a lower-level network crate is refused", 
 test("an unparseable line fails instead of being skipped", { skip }, () => {
   const result = runGate({ ...TODAY, "tools.reqwest": [...TODAY["tools.reqwest"], "warning: something else"] });
   assertRefused(result, 'dependency tree for reqwest (tools/Cargo.toml) printed an unparseable line: "warning: something else"');
+});
+
+// ---------------------------------------------------------------------------
+// The static half of check 2, run in a small git repository of its own so a row can plant a bad
+// file. The gate finds its root from its own location, so it is copied into the repository.
+// ---------------------------------------------------------------------------
+
+function sandbox(extra = {}) {
+  const dir = realpathSync(mkdtempSync(join(bin, "repo-")));
+  const files = {
+    "src-tauri/clippy.toml": readFileSync(join(root, "src-tauri/clippy.toml"), "utf8"),
+    "src-tauri/Cargo.lock": '[[package]]\nname = "reqwest"\n',
+    "tools/Cargo.lock": '[[package]]\nname = "reqwest"\n',
+    "package.json": "{}\n",
+    "pnpm-lock.yaml": "lockfileVersion: 9\n",
+    "src-tauri/src/lib.rs": '// clippy is only a word in this comment\n#[expect(clippy::disallowed_methods, reason = "reviewed")]\nfn send() {}\n',
+    ...extra,
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  }
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  copyFileSync(gate, join(dir, "scripts/check-tally-egress-boundary.mjs"));
+  const git = spawnSync("git", ["init", "-q"], { cwd: dir });
+  assert.equal(git.status, 0, String(git.stderr));
+  const add = spawnSync("git", ["add", "-A"], { cwd: dir });
+  assert.equal(add.status, 0, String(add.stderr));
+  return { dir, run: (env) => runGate(todayTrees(dir), env, join(dir, "scripts/check-tally-egress-boundary.mjs"), dir) };
+}
+
+test("static control: a clean repository passes, and a comment naming clippy is not refused", { skip }, () => {
+  const result = sandbox().run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
+});
+
+test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, () => {
+  for (const name of ["CLIPPY_CONF_DIR", "CLIPPY_ARGS"]) {
+    const result = sandbox({ ".github/workflows/x.yml": `env:\n  ${name}: elsewhere\n` }).run();
+    assertRefused(result, `.github/workflows/x.yml names CLIPPY_CONF_DIR or CLIPPY_ARGS`);
+  }
+});
+
+test("a clippy cfg in src-tauri Rust is refused with its line", { skip }, () => {
+  const result = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(clippy))]\nfn hidden() {}\n" }).run();
+  assertRefused(result, "src-tauri/src/lib.rs:2 names clippy outside a lint path");
+});
+
+test("a second clippy.toml under src-tauri is refused", { skip }, () => {
+  const result = sandbox({ "src-tauri/crates/x/clippy.toml": "disallowed-methods = []\n" }).run();
+  assertRefused(result, "src-tauri/crates/x/clippy.toml would replace src-tauri/clippy.toml's egress lints");
+});
+
+test("an edit to src-tauri/clippy.toml without its digest is refused", { skip }, () => {
+  const original = readFileSync(join(root, "src-tauri/clippy.toml"), "utf8");
+  const result = sandbox({ "src-tauri/clippy.toml": `${original}\n# an edit\n` }).run();
+  assertRefused(result, "src-tauri/clippy.toml changed; review its egress lists");
+});
+
+// ---------------------------------------------------------------------------
+// The census, on a clippy capture. The capture is the JSON output of a real
+// `cargo clippy --message-format=json -- --force-warn clippy::disallowed_methods` over a small
+// crate (scripts/testdata/egress-census-clippy-capture.PROVENANCE.md): one plain call, one under
+// `#[expect]`, one under `#[allow(clippy::all)]` and one made by a macro that another file calls.
+// ---------------------------------------------------------------------------
+
+const captureFile = join(root, "scripts/testdata/egress-census-clippy-capture.jsonl");
+let captureText;
+const captured = () => (captureText ??= readFileSync(captureFile, "utf8"));
+// What the capture holds, as the census reports it (paths are relative to the crate).
+const CAPTURE_PINS = {
+  macOS: [
+    ["src-tauri/src/lib.rs", "std::process::Command::new", 2],
+    ["src-tauri/src/lib.rs", "std::net::TcpStream::connect", 1],
+    ["src-tauri/src/other.rs", "std::process::Command::new", 1],
+  ],
+};
+
+function census(capture, os = "macOS", pins = CAPTURE_PINS) {
+  const dir = mkdtempSync(join(bin, "census-"));
+  writeFileSync(join(dir, "capture.jsonl"), capture);
+  writeFileSync(join(dir, "pins.json"), JSON.stringify(pins));
+  return spawnSync(process.execPath, [gate, "--census", join(dir, "capture.jsonl"), os, join(dir, "pins.json")], {
+    cwd: root,
+    encoding: "utf8",
+  });
+}
+
+function assertCensusRefused(result, message) {
+  assert.notEqual(result.status, 0, `census passed:\n${result.stdout}`);
+  assert.ok(result.stderr.includes(message), `expected ${JSON.stringify(message)} in:\n${result.stderr}`);
+  assert.ok(!result.stdout.includes("census matches"), result.stdout);
+}
+
+test("census control: the capture matches the reviewed list exactly", () => {
+  const result = census(captured());
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /census matches for macOS: 4 reviewed firing\(s\) in 3 place\(s\)/);
+});
+
+test("a firing the list does not hold is refused, and the observed list is printed for review", () => {
+  const pins = { macOS: CAPTURE_PINS.macOS.slice(0, 2) };
+  const result = census(captured(), "macOS", pins);
+  assertCensusRefused(result, "src-tauri/src/other.rs: 1 egress-lint firing(s) of std::process::Command::new, 0 reviewed");
+  assert.ok(result.stderr.includes('["src-tauri/src/other.rs", "std::process::Command::new", 1]'), result.stderr);
+});
+
+test("a reviewed firing that no longer fires is refused", () => {
+  const pins = { macOS: [...CAPTURE_PINS.macOS, ["src-tauri/src/gone.rs", "std::net::UdpSocket::bind", 1]] };
+  assertCensusRefused(census(captured(), "macOS", pins), "src-tauri/src/gone.rs: 0 egress-lint firing(s) of std::net::UdpSocket::bind, 1 reviewed");
+});
+
+test("a changed count is refused in both directions", () => {
+  for (const [count, message] of [
+    [1, "src-tauri/src/lib.rs: 2 egress-lint firing(s) of std::process::Command::new, 1 reviewed"],
+    [3, "src-tauri/src/lib.rs: 2 egress-lint firing(s) of std::process::Command::new, 3 reviewed"],
+  ]) {
+    const pins = { macOS: [["src-tauri/src/lib.rs", "std::process::Command::new", count], ...CAPTURE_PINS.macOS.slice(1)] };
+    assertCensusRefused(census(captured(), "macOS", pins), message);
+  }
+});
+
+test("a build that did not finish successfully is refused, however the lines look", () => {
+  const failed = captured().replace('"success":true', '"success":false');
+  assert.notEqual(failed, captured(), "the capture has a build-finished line to change");
+  assertCensusRefused(census(failed), "clippy did not report exactly one successful build (build-finished: [false])");
+  const withoutFinish = captured().split("\n").filter((line) => !line.includes('"build-finished"')).join("\n");
+  assertCensusRefused(census(withoutFinish), "clippy did not report exactly one successful build (build-finished: [])");
+});
+
+test("an empty file, a non-JSON line and an unreadable lint message are refused", () => {
+  assertCensusRefused(census(""), "the clippy output is empty: the lints did not run");
+  assertCensusRefused(census(`${captured()}Compiling something\n`), "is not JSON");
+  const unreadable = captured().replaceAll("use of a disallowed method", "use of an unusual method");
+  assert.notEqual(unreadable, captured(), "the capture has a firing message to change");
+  assertCensusRefused(census(unreadable), "an egress lint message could not be read");
+});
+
+test("an OS with no reviewed list is refused", () => {
+  assertCensusRefused(census(captured(), "Linux"), 'no reviewed census for runner OS "Linux"');
+  assertCensusRefused(census(captured(), "macOS", { macOS: [] }), 'no reviewed census for runner OS "macOS"');
+});
+
+test("the committed lists name real files and cover both native OSes", () => {
+  const pins = JSON.parse(readFileSync(join(root, "scripts/tally-egress-census.json"), "utf8"));
+  for (const os of ["macOS", "Windows"]) {
+    assert.ok(Array.isArray(pins[os]) && pins[os].length > 0, `${os} has reviewed firings`);
+    for (const [file, method, count] of pins[os]) {
+      assert.ok(existsSync(join(root, file)), `${os}: ${file} is a file`);
+      assert.ok(typeof method === "string" && method.includes("::"), `${os}: ${method} is a path`);
+      assert.ok(Number.isInteger(count) && count > 0, `${os}: ${file} count`);
+    }
+  }
 });

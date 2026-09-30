@@ -328,7 +328,7 @@ async function main() {
   if (process.argv.includes("--apply")) {
     writeVersions(result.next);
     console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md`);
-    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: run scripts/reseal.sh, then commit.");
+    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: the pull request that commits them needs an acknowledgement file (see docs/release-process.md).");
   }
 }
 

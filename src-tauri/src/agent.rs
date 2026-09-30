@@ -369,6 +369,8 @@ struct EgressContext {
     tool: String,
     args_sha256: String,
     company_guid: Option<String>,
+    /// What each Tally send of the call was and how it ended (#918).
+    request_trail: Option<Value>,
 }
 
 struct ToolResponse {
@@ -1103,8 +1105,12 @@ impl Server {
 
     async fn call_tool_response(&self, name: &str, args: Value) -> ToolResponse {
         let started = Utc::now();
-        let result = self.tool_payload(name, &args).await;
-        self.finish_tool_response(name, &args, started, result)
+        let (result, request_trail) =
+            crate::request_trail::with_request_trail(Box::pin(self.tool_payload(name, &args)))
+                .await;
+        let mut response = self.finish_tool_response(name, &args, started, result);
+        response.egress.request_trail = request_trail;
+        response
     }
 
     fn finish_tool_response(
@@ -1296,6 +1302,7 @@ impl Server {
                             tool: name.to_string(),
                             args_sha256,
                             company_guid,
+                            request_trail: None,
                         },
                     };
                 }
@@ -1321,6 +1328,7 @@ impl Server {
                     tool: name.to_string(),
                     args_sha256,
                     company_guid,
+                    request_trail: None,
                 },
             };
         }
@@ -1332,6 +1340,7 @@ impl Server {
                 tool: name.to_string(),
                 args_sha256,
                 company_guid,
+                request_trail: None,
             },
         }
     }

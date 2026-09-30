@@ -3368,9 +3368,9 @@ fn book_observation_labels_are_bounded() {
 /// This contract's two production files are pinned in the compatibility
 /// surface, and there is a way for that to stop being true **silently**.
 ///
-/// Resolving a surface conflict by taking the base side — which is the only
-/// correct way to resolve a generated artifact — drops the entries a branch
-/// *adds*, because `rehash-surface` updates hashes and never adds paths. The
+/// Resolving a surface conflict by taking the base side — the way a generated
+/// artifact used to be resolved, and still a tempting one — drops the entries a
+/// branch *adds*, because nothing regenerates the authored pin list. The
 /// compatibility gate does not catch it: its bound is
 /// `MAX_SURFACE_FILES - files.len() <= RESERVED_SURFACE_FILES`, which asserts
 /// there is no unreviewed *headroom* rather than that the cap matches the

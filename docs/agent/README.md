@@ -171,6 +171,17 @@ milliseconds, and the kind of the request that failed; the last 64 parts listed 
 counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
 timed out can be diagnosed without sending it again (bridge#799). The message and every other
 field are dropped; no row content, name or narration is kept.
+A call that sent requests to Tally also keeps a `request_trail` in that record (bridge#918): for
+each of the last 32 sends (the rest counted, and so are the sends that failed), its place in the
+call, its kind (`post` or `status`), the request's size, an outcome code (`answered`, the transport
+error's code, or `send_abandoned` when a cancelled call dropped it), the response's size, and the
+milliseconds the send held the endpoint's lock, so a failed read says which request failed. It
+holds no request or response body, name or value, and no hash of either (a request names the
+company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
+exact size remains, so it shows a company name's length to a reader who holds the request template.
+A request that cannot be built (over the size cap) sends nothing and leaves no record, and a call
+cancelled before its post was dispatched leaves no trail in its receipt. To match a failure with
+`read_evidence`, use the place in the call and the receipt's time.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery

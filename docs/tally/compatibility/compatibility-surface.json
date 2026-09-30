@@ -687,6 +687,12 @@
       "path": "src-tauri/src/reports/trial_balance_xlsx_tests.rs"
     },
     {
+      "path": "src-tauri/src/request_trail.rs"
+    },
+    {
+      "path": "src-tauri/src/request_trail_tests.rs"
+    },
+    {
       "path": "src-tauri/src/source_draft.rs"
     },
     {

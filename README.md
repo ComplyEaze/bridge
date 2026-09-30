@@ -84,11 +84,12 @@ stated. The [MCP guide](./docs/agent/README.md) and
   ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
 
 Not yet run by us in a controlled test: the published package itself against a
-live TallyPrime; any ComplyEaze Bridge build running on Windows, including
-the approval window; posting on TallyPrime Education; posting on TallyPrime
-Gold with its approval step recorded. Each release package is built and
-launched, its tool list checked and a synthetic encrypted bank statement
-parsed, on hosted CI runners for Windows x64 and Apple Silicon Mac.
+live TallyPrime; any ComplyEaze Bridge build running on Windows against a live
+TallyPrime, including the approval window; posting on TallyPrime Education;
+posting on TallyPrime Gold with its approval step recorded. Each release
+package is built and launched, its tool list checked and a synthetic encrypted
+bank statement parsed, on hosted CI runners for Windows x64 and Apple Silicon
+Mac.
 
 ## Not in the latest release
 

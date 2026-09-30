@@ -33,8 +33,11 @@ destination contract.
   disabled so a local response cannot redirect Bridge to another host.
 - The local endpoint is capability-verified, not cryptographically
   authenticated. Another local process may impersonate the configured port.
-- Delivery to AXAL or another destination requires an explicit, versioned
-  adapter contract. The repository does not invent or guess remote endpoints.
+- Bridge sends no Tally data to any remote server of its own; it hands data
+  only to the local assistant you are talking to and to files you export.
+  Delivering it to another destination would need an explicit, versioned
+  adapter contract and its own review; the repository does not invent or guess
+  remote endpoints.
 
 ## Diagnostics and deletion
 

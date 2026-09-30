@@ -33,6 +33,10 @@
 //    edges alike: a dev- or build-dependency on reqwest in a crate outside
 //    the allow-list is refused too, since a test double or build script
 //    that can open a connection is still egress from a developer's machine.
+//    The tree is read twice: over every edge kind, and over normal and build
+//    edges only, which are the ones that go into what a user installs. The
+//    app crate is pinned out of the second set, so moving reqwest from its
+//    [dev-dependencies] back into [dependencies] is refused.
 //    It resolves every target platform, so a Windows- or macOS-only
 //    dependency is seen from the Linux CI job. The sets are pinned exactly and the tree must be seen: a crate that
 //    drops out, a missing root line, a failed `cargo` or an unparseable line
@@ -114,7 +118,16 @@ const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 // it. Where a future control can be written that way, prefer it to a list.
 const APP_CRATE = "bridge";
 
-function directDependents(manifestPath, packageName) {
+// The edge kinds read from `cargo tree`. Every edge, dev included, is pinned
+// so that a test double that can open a connection is still refused; the
+// shipped edges (normal and build) are pinned separately, because those are the
+// ones that go into the artifacts a user installs (a build edge only runs at
+// build time, but it is refused all the same). A dependency that is
+// dev-only today must not be able to move into [dependencies] unnoticed.
+const ALL_EDGES = "normal,build,dev";
+const SHIPPED_EDGES = "normal,build";
+
+function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
   const result = spawnSync(
     "cargo",
     [
@@ -128,7 +141,7 @@ function directDependents(manifestPath, packageName) {
       "--depth",
       "1",
       "--edges",
-      "normal,build,dev",
+      edges,
       // Every platform, not only the host: CI runs on Linux, and a
       // `[target.'cfg(windows)'.dependencies]` edge is otherwise invisible.
       "--target",
@@ -185,16 +198,22 @@ function directDependents(manifestPath, packageName) {
 // reqwest only through the transport; hyper is reqwest's own transport, and
 // a first-party crate using it directly would build an HTTP client that
 // bypasses reqwest and bridge-tally-transport's loopback check entirely.
+//
+// `expected` is read over every edge kind; `shipped` over normal and build edges
+// only. The app crate names reqwest only in test helpers, so it appears in the
+// first and not the second.
 const workspaces = [
   {
     label: "src-tauri",
     manifestPath: "src-tauri/Cargo.toml",
     expected: { reqwest: [APP_CRATE, TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
+    shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
   },
   {
     label: "tools",
     manifestPath: "tools/Cargo.toml",
     expected: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
+    shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [] },
   },
 ];
 
@@ -217,6 +236,24 @@ for (const workspace of workspaces) {
         `${workspace.label}: pinned crate(s) no longer show a direct ${packageName} dependency: ` +
           `${lost.join(", ")}. Either the tree was not read in full or the dependency moved; narrow the ` +
           "pinned set in scripts/check-tally-egress-boundary.mjs only after confirming which.",
+      );
+    }
+    // The same question over the edges that ship. A crate that is dev-only
+    // above must not gain a normal or build edge.
+    const shippedExpected = [...workspace.shipped[packageName]].sort();
+    const shippedActual = directDependents(workspace.manifestPath, packageName, SHIPPED_EDGES);
+    const shippedGained = shippedActual.filter((name) => !shippedExpected.includes(name));
+    const shippedLost = shippedExpected.filter((name) => !shippedActual.includes(name));
+    if (shippedGained.length) {
+      egressViolations.push(
+        `${workspace.label}: crate(s) gained a direct ${packageName} dependency on a normal or build edge outside ` +
+          `the pinned shipped set (${shippedExpected.join(", ") || "none"}): ${shippedGained.join(", ")}`,
+      );
+    }
+    if (shippedLost.length) {
+      egressViolations.push(
+        `${workspace.label}: pinned crate(s) no longer show a direct ${packageName} dependency on a normal or build ` +
+          `edge: ${shippedLost.join(", ")}. Either the tree was not read in full or the dependency moved.`,
       );
     }
   }
@@ -261,7 +298,10 @@ function rustFiles(directory) {
   return files;
 }
 
-const appCrateSourceRoot = fileURLToPath(new URL("../src-tauri/src", import.meta.url)).replaceAll("\\", "/");
+// Only the gate's own test sets BRIDGE_EGRESS_APP_SOURCE_ROOT, to scan a planted tree.
+const appCrateSourceRoot = (
+  process.env.BRIDGE_EGRESS_APP_SOURCE_ROOT ?? fileURLToPath(new URL("../src-tauri/src", import.meta.url))
+).replaceAll("\\", "/");
 const filesWithForbiddenPatterns = new Set();
 for (const path of rustFiles(appCrateSourceRoot)) {
   const relativePath = `src-tauri/src${path.slice(appCrateSourceRoot.length)}`;

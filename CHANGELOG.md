@@ -72,9 +72,10 @@ Each line names the pull requests it comes from.
   tool could reach them, and no navigation led to them. After this change the
   only network client in Bridge's own code connects to Tally on your own
   computer. The CI egress gate fails if a first-party crate other than the Tally
-  transport and the app crate depends on reqwest, if any first-party crate
-  depends on hyper, or if reqwest, hyper or a raw socket call is named in the
-  app's source outside the Tally connection files. The unused delivery types in the portable core crate (no network code)
+  transport depends on reqwest in its shipped dependencies (the app crate keeps
+  it only as a dev-dependency), if any first-party crate depends on hyper, or
+  if reqwest, hyper or a raw socket call is named in the app's source outside
+  the Tally connection files. The unused delivery types in the portable core crate (no network code)
   went with it. The feature can be rebuilt from the git history if it is needed
   again (#914).
 

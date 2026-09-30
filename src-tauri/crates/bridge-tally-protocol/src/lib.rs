@@ -59,6 +59,7 @@ pub mod outstandings;
 /// `outstandings` would break the always-on native path. See the module docs
 /// for why this is scoped the way it is.
 pub mod outstandings_shared;
+pub mod parent_partition;
 mod standard_ledger_catalog;
 mod text_encoding;
 mod tolerant_xml;

@@ -12,8 +12,8 @@ use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, group_counterparties, selfcheck, Build, BuildOptions, Disposition, Side,
-    StatementRecord, VoucherType,
+    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Disposition,
+    Side, StatementRecord, VoucherType,
 };
 use common::*;
 
@@ -146,6 +146,34 @@ fn build_treatments() {
     assert!(regex::Regex::new(r"^[A-Za-z0-9_-]{1,64}$")
         .unwrap()
         .is_match(&proposals[0].bridge_txn_id));
+    for proposal in &proposals {
+        assert!(
+            is_statement_txn_id(&proposal.bridge_txn_id),
+            "{}",
+            proposal.bridge_txn_id
+        );
+    }
+}
+
+/// A caller of `is_statement_txn_id` refuses on the id alone (#876), so it
+/// must not accept a label an agent types.
+#[test]
+fn only_an_id_of_the_statement_derived_form_is_recognised() {
+    assert!(is_statement_txn_id("st-20260901-0123456789abcdef"));
+    for no in [
+        "",
+        "t1",
+        "st-20260901-0123456789ABCDEF",
+        "st-20260901-0123456789abcde",
+        "st-20260901-0123456789abcdef0",
+        "st-2026090-0123456789abcdef",
+        "st-2026090a-0123456789abcdef",
+        "ST-20260901-0123456789abcdef",
+        "xst-20260901-0123456789abcdef",
+        "st-20260901-0123456789abcdef ",
+    ] {
+        assert!(!is_statement_txn_id(no), "{no}");
+    }
 }
 
 #[test]

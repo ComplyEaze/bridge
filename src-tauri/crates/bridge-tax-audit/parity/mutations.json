@@ -6700,8 +6700,8 @@
   "by": "author",
   "what": "partners: the TDS side read unsigned",
   "file": "src/partners_40b_194t.rs",
-  "from": "i128::from(l.amount_paise) * tds < 0 && !tds_ledgers.contains(&l.ledger)",
-  "to": "l.amount_paise != 0 && !tds_ledgers.contains(&l.ledger)"
+  "from": "i128::from(l.amount_paise).signum() * tds.signum() < 0\n                        && !tds_ledgers.contains(&l.ledger)\n                })\n                .map(|l| l.ledger.as_str())",
+  "to": "l.amount_paise != 0\n                        && !tds_ledgers.contains(&l.ledger)\n                })\n                .map(|l| l.ledger.as_str())"
  },
  {
   "id": "PR-58",

@@ -73,6 +73,24 @@ const CLASSES: [&str; 10] = [
 ];
 
 impl Report {
+    /// Why this report is not a complete account, when it is not: whatever it
+    /// could not read is never shown as empty or absent, and this says so.
+    pub(super) fn incomplete_reason(&self) -> Option<&'static str> {
+        if self.root == Root::Unreadable {
+            Some("data_folder_unreadable")
+        } else if matches!(self.journal, Journal::NotRead(_)) {
+            Some("journal_not_read")
+        } else if !self.folders_not_read.is_empty() {
+            Some("folder_not_listed")
+        } else if self.unreadable > 0 {
+            Some("entries_not_read")
+        } else if self.entry_cap_reached {
+            Some("entry_cap_reached")
+        } else {
+            None
+        }
+    }
+
     fn account(&mut self, class: &'static str, path: &Path) {
         match fs::symlink_metadata(path) {
             Ok(metadata) if metadata.is_file() => {
@@ -194,6 +212,7 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         }
         Err(_) => {
             report.root = Root::Unreadable;
+            report.journal = Journal::NotRead(DATA_FOLDER_UNREADABLE);
             return report;
         }
         Ok(_) => {}
@@ -227,7 +246,10 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
     ];
     for (name, class) in subfolders {
         let dir = root.join(name);
-        if !is_link(&dir) {
+        if is_link(&dir) {
+            // Counted as a link above, and not entered: its class is unseen.
+            report.folders_not_read.push(name);
+        } else {
             scan_directory(&mut report, name, &dir, class, &[], ENTRY_CAP);
         }
     }
@@ -241,7 +263,11 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         .chain([root.join("native-dispatch-leases")])
     {
         let canonical = fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
-        if !is_link(&candidate) && !leases.contains(&canonical) {
+        if is_link(&candidate) {
+            if !report.folders_not_read.contains(&"lock_folder") {
+                report.folders_not_read.push("lock_folder");
+            }
+        } else if !leases.contains(&canonical) {
             leases.push(canonical);
         }
     }
@@ -259,9 +285,13 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
     report
 }
 
+/// The data folder could not be listed, so the journal was not looked for.
+const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
 /// The journal could not be opened (no permission, a link, another owner).
 const JOURNAL_UNREADABLE: &str = "journal_unreadable";
-/// The journal was opened but reading it failed, twice.
+/// The journal was opened but could not be read as a journal, twice: an I/O
+/// error, text that is not UTF-8, or a record refused for its content (a
+/// duplicate dispatch, an oversized record).
 const JOURNAL_READ_FAILED: &str = "journal_read_failed";
 /// The journal's records are refused as invalid, twice, 100 ms apart: a write
 /// in progress would have finished by then.
@@ -352,6 +382,7 @@ pub(super) fn to_json(
         "special_files_not_counted": report.special_files,
         "folders_that_could_not_be_listed": report.folders_not_read,
         "entry_cap_reached": report.entry_cap_reached,
+        "incomplete_reason": report.incomplete_reason(),
         "other_directories_not_entered": report.other_directories,
         "interrupted_write_folders": report.interrupted_writes,
         "entries_that_could_not_be_read": report.unreadable,
@@ -368,14 +399,15 @@ pub(super) fn to_json(
 }
 
 /// The `local_data_report` tool's payload for `root`: no path, and no file of the
-/// folder is changed (the call itself is logged like any tool call).
-/// The coordination folder is the default one.
-pub(in crate::agent) fn tool_payload(root: &Path) -> serde_json::Value {
+/// folder is changed (the call itself is logged like any tool call). With it,
+/// why the report is incomplete, if it is. The coordination folder is the
+/// default one.
+pub(in crate::agent) fn tool_payload(root: &Path) -> (serde_json::Value, Option<&'static str>) {
     let coordination = crate::local_files::paths::default_dispatch_coordination_dir();
-    to_json(
-        &build(root, coordination.as_deref()),
-        SystemTime::now(),
-        None,
+    let report = build(root, coordination.as_deref());
+    (
+        to_json(&report, SystemTime::now(), None),
+        report.incomplete_reason(),
     )
 }
 
@@ -414,11 +446,7 @@ fn exit_status(report: &Report, printed: bool) -> i32 {
         1
     } else if report.root == Root::Unreadable {
         2
-    } else if matches!(report.journal, Journal::NotRead(_))
-        || report.unreadable > 0
-        || !report.folders_not_read.is_empty()
-        || report.entry_cap_reached
-    {
+    } else if report.incomplete_reason().is_some() {
         3
     } else {
         0

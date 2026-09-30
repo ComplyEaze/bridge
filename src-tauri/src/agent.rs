@@ -1375,15 +1375,21 @@ impl Server {
     /// lease-lock folder, and names no path: the result enters the AI conversation. The call is logged in the
     /// egress log like any tool call.
     fn local_data_report(&self) -> Result<ToolOutcome, String> {
-        let payload = agent_import::local_data::tool_payload(&self.settings.data_dir);
+        let (payload, incomplete) = agent_import::local_data::tool_payload(&self.settings.data_dir);
         let evidence = Evidence {
             request_sha256: sha256_hex(b"local_data_report"),
             response_sha256: sha256_json(&payload),
             bytes: 0,
-            state: "complete",
+            // A report that could not read part of what it reports on says so
+            // in its evidence too, not only in its body.
+            state: if incomplete.is_some() {
+                "partial"
+            } else {
+                "complete"
+            },
             read_at: None,
             duration_ms: None,
-            reason_code: None,
+            reason_code: incomplete.map(str::to_string),
         };
         Ok(ToolOutcome {
             payload: json!({"result": payload}),

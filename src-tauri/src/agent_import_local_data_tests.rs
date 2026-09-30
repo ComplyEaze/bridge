@@ -113,6 +113,12 @@ fn a_symlink_is_counted_and_never_followed() {
         report.links, 2,
         "the symlinked file and the symlinked directory"
     );
+    assert_eq!(
+        report.folders_not_read,
+        ["bank-statements"],
+        "a linked folder is not entered, so its class is unseen, and says so"
+    );
+    assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
     assert_eq!(*class(&report, "import_files"), Class::default());
     // A symlinked directory is not entered: its contents are not counted.
     assert_eq!(*class(&report, "bank_statements"), Class::default());
@@ -405,6 +411,7 @@ fn a_half_written_last_line_is_read_again_once() {
 
 /// A folder that exists but cannot be listed is named, not read as empty. A file
 /// where the folder should be fails the listing on any user.
+#[cfg(unix)]
 #[test]
 fn a_folder_that_cannot_be_listed_is_named_and_not_read_as_empty() {
     let directory = tempfile::tempdir().unwrap();
@@ -420,6 +427,62 @@ fn a_folder_that_cannot_be_listed_is_named_and_not_read_as_empty() {
         serde_json::json!(["imports"])
     );
     assert_eq!(json["entry_cap_reached"], false);
+    assert_eq!(json["incomplete_reason"], "folder_not_listed");
+}
+
+/// A data folder that cannot be listed says the journal was not looked for,
+/// not that it is absent. A file where the folder should be fails the listing
+/// on any user (ENOTDIR).
+#[cfg(unix)]
+#[test]
+fn an_unlistable_data_folder_does_not_read_as_an_absent_journal() {
+    let directory = tempfile::tempdir().unwrap();
+    let not_a_folder = directory.path().join("Bridge");
+    fs::write(&not_a_folder, b"x").unwrap();
+    let report = build(&not_a_folder, None);
+    assert_eq!(report.root, Root::Unreadable);
+    assert_eq!(report.journal, Journal::NotRead(DATA_FOLDER_UNREADABLE));
+    let json = to_json(&report, SystemTime::now(), None);
+    assert_eq!(json["journal"]["state"], "not_read");
+    assert_eq!(json["incomplete_reason"], "data_folder_unreadable");
+}
+
+/// Text that is not UTF-8 is an I/O-class failure, read twice before it is
+/// reported as `journal_read_failed`.
+#[test]
+fn a_journal_that_cannot_be_read_as_text_is_read_again_and_reported() {
+    let directory = tempfile::tempdir().unwrap();
+    write(
+        &directory.path().join("agent-import-ledger.jsonl"),
+        b"\xff\xfe\n",
+    );
+    let mut retried = false;
+    let result = read_journal(directory.path(), || retried = true);
+    assert_eq!(result, Journal::NotRead(JOURNAL_READ_FAILED));
+    assert!(retried);
+}
+
+/// Every reason a report is incomplete is named, and a complete one names none.
+#[test]
+fn a_complete_report_has_no_reason_and_each_gap_has_its_own() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), None);
+    assert_eq!(report.incomplete_reason(), None);
+    assert!(to_json(&report, SystemTime::now(), None)["incomplete_reason"].is_null());
+    report.entry_cap_reached = true;
+    assert_eq!(report.incomplete_reason(), Some("entry_cap_reached"));
+    assert_eq!(
+        to_json(&report, SystemTime::now(), None)["entry_cap_reached"],
+        true
+    );
+    report.unreadable = 1;
+    assert_eq!(report.incomplete_reason(), Some("entries_not_read"));
+    report.folders_not_read.push("lab");
+    assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
+    report.journal = Journal::NotRead(JOURNAL_INVALID);
+    assert_eq!(report.incomplete_reason(), Some("journal_not_read"));
+    report.root = Root::Unreadable;
+    assert_eq!(report.incomplete_reason(), Some("data_folder_unreadable"));
 }
 
 /// Sockets, pipes and devices are counted apart from symlinks.
@@ -482,4 +545,41 @@ fn a_folder_past_the_entry_cap_is_reported_as_capped() {
     );
     assert!(report.entry_cap_reached);
     assert_eq!(class(&report, "lab").files, 2);
+}
+
+/// The tool's evidence says `partial` when the report could not read part of what
+/// it reports on, and `complete` when it read all of it.
+#[tokio::test]
+async fn the_tool_evidence_is_partial_when_a_folder_could_not_be_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(&root.join("imports"), b"not a folder");
+    let server = server_over(root);
+    let response = server
+        .call_tool("local_data_report", serde_json::json!({}))
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let evidence = &response["structuredContent"]["evidence"];
+    assert_eq!(evidence["state"], "partial", "{response}");
+    assert_eq!(evidence["reason_code"], "folder_not_listed");
+    assert_eq!(
+        response["structuredContent"]["result"]["incomplete_reason"],
+        "folder_not_listed"
+    );
+}
+
+/// A lease-lock folder that is a symlink is not entered, and the report says its
+/// locks were not seen, once, however many candidates point at it.
+#[cfg(unix)]
+#[test]
+fn a_linked_lock_folder_is_named_as_not_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(&outside.path().join("a.lock"), b"");
+    std::os::unix::fs::symlink(outside.path(), root.join("native-dispatch-leases")).unwrap();
+    let report = build(root, Some(root));
+    assert_eq!(report.folders_not_read, ["lock_folder"]);
+    assert_eq!(class(&report, "locks").files, 0, "the link is not followed");
+    assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
 }

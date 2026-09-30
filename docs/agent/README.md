@@ -93,8 +93,11 @@ folder (the desktop app's other settings, its mirror database and logs); it also
 lists the per-user folder of dispatch lease locks (names, sizes and times only).
 Its own call is logged in the egress log like any tool call. On the command
 line the exit status is 0 for a complete report, 2 when the folder cannot be
-read, 3 when the report is incomplete (journal not read, or an entry or folder
-that could not be read) and 1 when it could not be printed. The journal and the
+read, 3 when the report is incomplete (journal not read, an entry or folder
+that could not be read or listed, or a folder past the 100,000-entry listing cap:
+the report's `incomplete_reason` says which, and the tool's evidence is then
+`partial`), 1 when it could not be printed, and, for a malformed command line
+only, 2 with a usage line. The journal and the
 `imports/` folder are Bridge's memory of what it
 already sent to Tally: archive the whole folder by moving it, never delete
 them piecemeal. For a command-line

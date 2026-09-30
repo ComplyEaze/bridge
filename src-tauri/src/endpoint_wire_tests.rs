@@ -1,6 +1,10 @@
 //! The file wire lock against another process: the child is this test binary
 //! re-invoked with an environment variable, never an executable written for
 //! the test.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use bridge_tally_transport::{TallyHttpTransport, TallyTransportError};
 use std::fs;

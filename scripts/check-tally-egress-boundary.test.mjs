@@ -361,6 +361,31 @@ test("a list that could match a silent run is refused: a zero count, a repeated 
   assertCensusRefused(census(silent), "0 egress-lint firing(s) of std::process::Command::new, 2 reviewed");
 });
 
+// A second real capture (scripts/testdata/egress-census-probe-capture.PROVENANCE.md, same file as
+// the first): a listed call made by a dependency's own macro, a listed type, a listed path with a
+// typo, and a non-member path dependency's own call, which clippy does not lint at all.
+const probeFile = join(root, "scripts/testdata/egress-census-probe-capture.jsonl");
+const PROBE_PINS = {
+  macOS: [
+    ["src-tauri/src/lib.rs", "std::process::Command::new", 1],
+    ["src-tauri/src/lib.rs", "std::net::TcpListener", 1],
+    ["src-tauri/clippy.toml", "std::process::Commnad::new", 1],
+  ],
+};
+// The capture's clippy.toml is an absolute path outside this repository, as cargo prints it.
+const probe = () => readFileSync(probeFile, "utf8").replaceAll("/work/probe2/main/clippy.toml", `${root}/src-tauri/clippy.toml`);
+
+test("a dependency's macro, a listed type and a listed path that resolves to nothing are counted", () => {
+  const result = census(probe(), "macOS", PROBE_PINS);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /3 reviewed firing\(s\) in 3 place\(s\)/);
+  // The path with a typo is what a review would otherwise never see: nothing fires for it.
+  const without = { macOS: PROBE_PINS.macOS.slice(0, 2) };
+  assertCensusRefused(census(probe(), "macOS", without), "src-tauri/clippy.toml: 1 listed path(s) that resolve to nothing of std::process::Commnad::new, 0 reviewed");
+  // The dependency's own (non-member) call is not reported by clippy, so it is not in the capture.
+  assert.ok(!probe().includes("nonmember_call"), "the capture holds no message for the non-member call");
+});
+
 test("an OS with no reviewed list is refused", () => {
   assertCensusRefused(census(captured(), "Linux"), 'no reviewed census for runner OS "Linux"');
   assertCensusRefused(census(captured(), "macOS", { macOS: [] }), 'no reviewed census for runner OS "macOS"');

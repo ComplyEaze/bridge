@@ -435,10 +435,10 @@ jobs:
       # can silence, over the shipped targets. The messages go to a file first, so a failed run
       # cannot read as "nothing found", and the census requires that what fired match the
       # reviewed call sites for this OS exactly, so a run that silences the lints (RUSTFLAGS
-      # --cap-lints allow does) fails too. Measured with clippy 1.96.0 on a two-file crate only:
-      # after a passing `-D warnings` step this run re-lints and reports the firings. If it ever
-      # did not, the firings would be zero and the census would fail loudly. To roll back, delete
-      # this step; the static half of the gate still runs in the portable job.
+      # --cap-lints allow does) fails too. Measured with clippy 1.96.0 on macOS, on a two-file crate
+      # and on this workspace: after a passing `-D warnings` step this run re-lints and reports the
+      # firings. If it ever did not, the firings would be zero and the census would fail loudly. To
+      # roll back, delete this step; the static half of the gate still runs in the portable job.
       - name: Census the Tally-path egress lints
         shell: bash
         run: |

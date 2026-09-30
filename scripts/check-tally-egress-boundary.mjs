@@ -78,10 +78,12 @@
 //    not named, is not); features the run does not enable (voucher-scan, the
 //    calibration harness, lab-writes and bridge-tally-protocol's evidence
 //    features); Linux-only code; path dependencies that are not workspace
-//    members; and tests, examples and benches, which do not ship. Whether a
-//    listed method fires when a dependency's own macro calls it, and whether a
-//    typo in a listed path is reported at all, were not measured (the census
-//    ignores every message that is not an egress-lint firing).
+//    members (clippy does not lint them; measured); and tests, examples and
+//    benches, which do not ship. Measured on a two-file crate: a listed call
+//    made by a dependency's own `macro_rules!` macro fires and is attributed to
+//    its call site, and a typo in a listed path is reported as a warning located
+//    in clippy.toml, which the census counts. A proc-macro's expansion was not
+//    measured.
 //  - Egress routes that name no listed method: a direct dependency on `tower`
 //    is refused, but reqwest's `blocking` client and any other crate's send
 //    method are outside the lists. tauri.conf.json (the app's windows and its
@@ -129,20 +131,23 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const CENSUS_PINS = `${root}scripts/tally-egress-census.json`;
 
 // The two lints the census counts, and the message rustc prints for them, which names the method or
-// type in backticks.
+// type in backticks. A listed path that resolves to nothing (a typo, or a function this OS's crate
+// lacks) is reported as a warning located in clippy.toml, and would otherwise silently disable its
+// entry, so those are counted as well.
 const EGRESS_LINTS = ["clippy::disallowed_methods", "clippy::disallowed_types"];
 const FIRING = /^use of a disallowed (?:method|type) `([^`]+)`/;
+const UNREACHABLE = /^`([^`]+)` does not refer to a reachable /;
 
 // Where a firing is reported: the outermost macro expansion site of the primary span, as a path
 // from the repository root. cargo reports paths from the workspace root (src-tauri/), or absolute
-// for a path outside it.
+// (clippy.toml, a path outside the workspace).
 function firingFile(message) {
   let span = message.spans.find((candidate) => candidate.is_primary);
   while (span?.expansion?.span) span = span.expansion.span;
   if (!span) return null;
   const name = span.file_name.replaceAll("\\", "/");
-  const relative = name.startsWith(root.replaceAll("\\", "/")) ? name.slice(root.length) : `src-tauri/${name}`;
-  return posix.normalize(relative);
+  if (name.startsWith(root.replaceAll("\\", "/"))) return posix.normalize(name.slice(root.length));
+  return /^(?:[A-Za-z]:)?\//.test(name) ? name : posix.normalize(`src-tauri/${name}`);
 }
 
 function censusViolations(text, os, pins) {
@@ -169,10 +174,14 @@ function censusViolations(text, os, pins) {
       return [`clippy output line ${index + 1} is not JSON: ${JSON.stringify(line.slice(0, 80))}`];
     }
     if (entry.reason === "build-finished") finished.push(entry.success);
-    if (entry.reason !== "compiler-message" || !EGRESS_LINTS.includes(entry.message?.code?.code)) continue;
-    const method = entry.message.message.match(FIRING)?.[1];
+    if (entry.reason !== "compiler-message") continue;
+    const listed = EGRESS_LINTS.includes(entry.message?.code?.code);
+    const unreachable = UNREACHABLE.test(entry.message?.message ?? "");
+    if (!listed && !unreachable) continue;
+    const method = entry.message.message.match(listed ? FIRING : UNREACHABLE)?.[1];
     const file = firingFile(entry.message);
     if (!method || !file) return [`an egress lint message could not be read: ${JSON.stringify(entry.message.message.slice(0, 120))}`];
+    if (!listed && !file.endsWith("/clippy.toml")) continue;
     const key = `${file}\t${method}`;
     seen.set(key, (seen.get(key) ?? 0) + 1);
   }
@@ -188,7 +197,8 @@ function censusViolations(text, os, pins) {
     const [file, method] = key.split("\t");
     const found = seen.get(key) ?? 0;
     const reviewed = pinned.get(key) ?? 0;
-    if (found !== reviewed) violations.push(`${file}: ${found} egress-lint firing(s) of ${method}, ${reviewed} reviewed`);
+    const what = file.endsWith("/clippy.toml") ? "listed path(s) that resolve to nothing" : "egress-lint firing(s)";
+    if (found !== reviewed) violations.push(`${file}: ${found} ${what} of ${method}, ${reviewed} reviewed`);
   }
   if (violations.length) {
     const observed = [...seen].map(([key, count]) => `    [${JSON.stringify(key.split("\t")[0])}, ${JSON.stringify(key.split("\t")[1])}, ${count}],`);

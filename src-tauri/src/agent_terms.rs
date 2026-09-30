@@ -12,8 +12,11 @@
 //! that line cannot be written the server refuses too, the same fail-closed rule the receipt log
 //! has. Nothing here is sent anywhere.
 //!
-//! This is a consent record, not a security boundary: anyone who runs `bridge_mcp` by hand can set
-//! the variable, and doing so is their act. `Server::new` (tests and the desktop app's local
+//! This is a local record that the gate opened, not a security boundary and not proof of who
+//! accepted, when they ticked the box or which text they saw: anyone who runs `bridge_mcp` by hand
+//! can set the variable, and doing so is their act. It is written when the server starts, not at
+//! the tick; two servers starting together can each append a line for the same version. A
+//! hand-set `true` names no version, so it also opens the gate for a later terms version. `Server::new` (tests and the desktop app's local
 //! views, which never dispatch an MCP tool) stays open; only `Server::for_mcp`, which
 //! `run_stdio` uses, builds a server that answers an MCP client.
 use super::egress::{append_egress_line, read_egress_tail};

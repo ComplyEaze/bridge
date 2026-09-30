@@ -635,17 +635,17 @@ const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
         "terms_not_accepted" => Some(
-            "ComplyEaze Bridge is off until you accept its Terms of Use. Read the Terms of Use \
-             linked in the ComplyEaze Bridge extension settings and turn on \"I accept the \
-             ComplyEaze Bridge Terms of Use\" there (a source build sets BRIDGE_TERMS_ACCEPTED \
-             to true instead), then restart Claude or start a new chat so Bridge starts again. \
-             Nothing was read from Tally.",
+            "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
+             them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
+             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             there, then quit Claude completely and reopen it so Bridge starts again. Nothing \
+             was read from Tally.",
         ),
         "terms_record_unavailable" => Some(
             "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
              folder, so it is off although the Terms of Use are accepted. Check that the folder \
              can be written; if the file is damaged, move it aside and Bridge will record your \
-             acceptance again. Then restart Claude or start a new chat. Nothing was read from \
+             acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
         ),
         "empty_book_first_import" => Some(

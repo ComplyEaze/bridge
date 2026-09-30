@@ -55,7 +55,7 @@ actually on.
    HTTP setting.
 4. Read the Terms of Use linked in the extension settings, then turn on **I
    accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge refuses
-   every request and says so in the chat; it reads nothing from Tally.
+   every tool call and the assistant reports why; it reads nothing from Tally.
 5. Save the extension settings and restart Claude Desktop if its tools are not
    visible. In a new chat, use **Connectors** to confirm Bridge is connected.
 

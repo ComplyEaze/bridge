@@ -292,8 +292,12 @@ def smoke(archive, repository):
         refused = [json.loads(line) for line in refused_output.splitlines()]
         require([reply.get("id") for reply in refused] == [1, 2, 3], "terms_refusal_response_ids")
         require(bool(refused[1]["result"]["tools"]), "terms_refusal_hid_the_tool_list")
-        require(refused[2]["result"]["structuredContent"]["result"]["error"]["code"] == "terms_not_accepted",
-                "terms_refusal_missing")
+        refusal = refused[2]["result"]
+        require(refusal.get("isError") is True
+                and refusal.get("structuredContent", {}).get("result", {}).get("error", {}).get("code")
+                == "terms_not_accepted", "terms_refusal_missing")
+        require(not (Path(temporary) / "data-refused" / "terms-acceptance.jsonl").exists(),
+                "terms_recorded_without_acceptance")
         environment["BRIDGE_TERMS_ACCEPTED"] = "true"
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {

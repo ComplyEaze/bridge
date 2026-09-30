@@ -1045,10 +1045,11 @@ async fn a_rebuild_of_a_row_a_posted_batch_holds_is_refused_at_build() {
     let server = simulated_server(directory.path(), simulator.address().port());
     seed_original(&server);
     assert_build_refused_for_a_row_already_sent(&server, &remapped_rebuild()).await;
-    // Refused under the admission lock, before the mark and preflight reads.
+    // Refused under the admission lock: only the reads that precede it were
+    // answered, not the mark, the repeated catalogue or the preflight.
     let received = simulator.received();
     simulator.cancel();
-    assert!(received > 0 && received < 25, "{received}");
+    assert_eq!(received, 12, "requests answered before the row check");
 }
 
 #[tokio::test]
@@ -1085,8 +1086,16 @@ async fn a_statement_row_id_blocks_a_rebuild_whose_legs_changed() {
     {
         voucher["bridge_txn_id"] = json!(id);
     }
-    for entry in input["vouchers"][0]["entries"].as_array_mut().unwrap() {
-        entry["amount"] = json!("13.00");
+    // Every voucher's amounts change, so only the statement id can match.
+    for (voucher, amount) in input["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip(["13.00", "8.00"])
+    {
+        for entry in voucher["entries"].as_array_mut().unwrap() {
+            entry["amount"] = json!(amount);
+        }
     }
     assert_build_refused_for_a_row_already_sent(&server, &input).await;
     simulator.cancel();

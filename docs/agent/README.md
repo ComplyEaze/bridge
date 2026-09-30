@@ -573,9 +573,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    natively after this one was built sees it only as built, so a file already
    written can still be imported by hand after that post, and two hand imports
    of one file are not seen at all. A build that is an amendment is not checked,
-   and a row that no earlier batch holds by id is not seen. An overlapping
-   statement that shares a boundary date with a posted one cannot be rebuilt
-   without that date's other rows, so those go in by hand in Tally.
+   and a row that no earlier batch holds by id is not seen. A proposals file is
+   built whole, so an overlapping statement is rebuilt without the posted rows
+   only by parsing it again with a narrower `from` and `to`; those are whole
+   days, so a day that holds both a posted row and an unposted one is left out
+   whole and its unposted rows are entered in Tally.
 2. Call `post_import` with the original `company_guid` and `batch_id`.
 3. Review the native dialog's company, endpoint, date, numbering, reference,
    narration, every debit/credit entry, and totals; for a bank voucher, also the

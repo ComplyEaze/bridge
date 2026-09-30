@@ -352,17 +352,26 @@ fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
         .filter(|row| {
             matches!(
                 &row.record.fields.gst_duty_head,
-                GstDutyHeadObservation::Recognized { head: GstDutyHead::SgstUtgst, .. }
+                GstDutyHeadObservation::Recognized {
+                    head: GstDutyHead::SgstUtgst,
+                    ..
+                }
             )
         })
         .collect();
-    assert_eq!(sgst_utgst_rows.len(), 2, "the probe ledger and the batch ledger");
+    assert_eq!(
+        sgst_utgst_rows.len(),
+        2,
+        "the probe ledger and the batch ledger"
+    );
     for row in sgst_utgst_rows {
-        assert_eq!(row.record.ledger.parent.returned_text(), Some("Duties & Taxes"));
+        assert_eq!(
+            row.record.ledger.parent.returned_text(),
+            Some("Duties & Taxes")
+        );
         assert_eq!(row.record.fields.tax_type.returned_text(), Some("GST"));
     }
-    assert!(captured_live_ledger_masters_with_sgst_utgst()
-        .contains(">SGST/UTGST</GSTDUTYHEAD>"));
+    assert!(captured_live_ledger_masters_with_sgst_utgst().contains(">SGST/UTGST</GSTDUTYHEAD>"));
 
     // The serialised wire shape a caller of ledger_masters sees.
     let wire = serde_json::to_value(&GstDutyHeadObservation::Recognized {

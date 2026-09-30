@@ -199,7 +199,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/proposals.rs",
-      "sha256": "6eb8cf19ce2aff1c8eff55e065ec78c7c58c0721ccc854294447e87026cc010e"
+      "sha256": "8db91c43e76ac66941206867a4146b72e62ddbe8ff387f683100f87fa06db63a"
     },
     {
       "path": "src-tauri/crates/bridge-bank-statement/src/text.rs",
@@ -455,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "79de7f76d9561f5369635038a20483268c30ce77f7671fb80992f5930d0da086"
+      "sha256": "2fa651bb064adb1fe0ac92152442a0187ae9dd35dfaa77b17189938bb825ac46"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -483,7 +483,7 @@
     },
     {
       "path": "src-tauri/src/agent_import.rs",
-      "sha256": "5181729566c891ebacfd4df7a1ad116bb932846da7d41c11fc78c688d4c1e477"
+      "sha256": "60f72df91bde7e3a2b2e202cb60086da30f6358aaa175e05756330319f42d1d9"
     },
     {
       "path": "src-tauri/src/agent_import_ack.rs",
@@ -507,7 +507,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_ledger.rs",
-      "sha256": "8dfc737a744428d08352836e66374d39e6c4e27c6997f7c45eaef26211bc9638"
+      "sha256": "249617a05fafc84b708a0cda9cc894852d96f918879b15cf3423cd33f8785ee6"
     },
     {
       "path": "src-tauri/src/agent_import_persistence.rs",
@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "4ce6ae1966c9db91bc5a51e285fbcc58f30baa43c180194630b468d335a7f5df"
+      "sha256": "ba7f76f0dcb2b2fb9423e8aa9eea54caf14a76c3e069433ba16804d4847a7a08"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",
@@ -927,7 +927,7 @@
     },
     {
       "path": "src-tauri/src/tally/approved_import.rs",
-      "sha256": "bb577c86111c20e82313c5f4b2982ea4cb10fbafadad0253d89413e6cb6edf9f"
+      "sha256": "c62f0266e7a8cbcd1ff8acf5590c32527a84c0d69ca02df874b55dc590664037"
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs",

@@ -14,7 +14,7 @@ production release.
 ## Reporting a vulnerability
 
 Do not open a public issue for a suspected vulnerability or credential leak.
-Use [GitHub private vulnerability reporting](https://github.com/lamemustafa/bridge/security/advisories/new).
+Use [GitHub private vulnerability reporting](https://github.com/ComplyEaze/bridge/security/advisories/new).
 If that channel is temporarily unavailable, do not disclose the vulnerability
 in a public issue; wait for the private channel to be restored.
 

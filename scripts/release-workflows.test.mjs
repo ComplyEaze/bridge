@@ -462,6 +462,6 @@ test("unsigned preview notes state the host-validation scope and remaining gaps"
   assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains outstanding/);
   assert.match(notes, /Intel Mac is not qualified/);
   // The attestation line is scoped: where and by what a file was built, never a signature or a safety claim.
-  assert.match(notes, /gh attestation verify <file>\.mcpb --repo lamemustafa\/bridge --signer-workflow\s+lamemustafa\/bridge\/\.github\/workflows\/release-mcpb-preview\.yml --source-ref\s+refs\/heads\/master --deny-self-hosted-runners/);
+  assert.match(notes, /gh attestation verify <file>\.mcpb --repo ComplyEaze\/bridge --signer-workflow\s+ComplyEaze\/bridge\/\.github\/workflows\/release-mcpb-preview\.yml --source-ref\s+refs\/heads\/master --deny-self-hosted-runners/);
   assert.match(notes, /It is not a code\s+signature and does not show the code is safe\./);
 });

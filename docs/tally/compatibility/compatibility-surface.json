@@ -367,7 +367,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs",
-      "sha256": "58bf5ffef1e877e9c68fa5e1551e56b3fb6b893b76ebd437ac6d03e909814863"
+      "sha256": "5d0071b3f29318b3106b690825a8c9fae3b474c67f6c61a077e8c25dc427af17"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs",
@@ -807,11 +807,11 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master.rs",
-      "sha256": "da5f010d8420a66cb4c72992f4e73262d92d062c57d02652f6225543c06852d6"
+      "sha256": "fac41255935a2f76c5e392e94cef17c8ebdce014e6b836f1ce97724b638e940a"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_tests.rs",
-      "sha256": "e1e019ae7d2e52e547b5660bba1071b20d2006e0cbd42fd4c2f51bc8d5bda4c2"
+      "sha256": "21a00f5d64d7422efe42834e53bc1d76bab485485c4b9aa90667372e69d71363"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx.rs",
@@ -819,7 +819,7 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx_tests.rs",
-      "sha256": "4cf1c4a081d55e6f95a3d701b668d93e20c66399e4c29d334174a176c8bc0c64"
+      "sha256": "7714933f66bf089c25d9de65c5a9d6ea66561038203ee4f954ce50701c84032a"
     },
     {
       "path": "src-tauri/src/reports/party_statement.rs",

@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::{
     authorize_selected_paths, clean_etag, hash_file, prepare_upload_snapshot,
     resolve_scanned_files, scan_documents, validate_presign_mapping, validate_upload_url,

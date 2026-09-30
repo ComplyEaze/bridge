@@ -98,8 +98,10 @@ fi
 
 # This command encodes Bridge-specific master workflow and surface policy.
 # An arbitrary repository's passing checks cannot qualify that contract.
-if [ "$REPO" != "lamemustafa/bridge" ]; then
-  echo "unsupported repository: this gate implements lamemustafa/bridge policy" >&2
+# Two names: the repository moved from the lamemustafa account to the ComplyEaze
+# organization, and the old name stays valid as a redirect, so both are accepted.
+if [ "$REPO" != "lamemustafa/bridge" ] && [ "$REPO" != "ComplyEaze/bridge" ]; then
+  echo "unsupported repository: this gate implements the Bridge policy (lamemustafa/bridge or ComplyEaze/bridge)" >&2
   exit 2
 fi
 

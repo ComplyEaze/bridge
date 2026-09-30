@@ -1236,3 +1236,41 @@ fn a_schema_1_surface_or_matrix_is_refused() {
         invalid("support_manifest_invalid")
     );
 }
+
+#[test]
+fn an_attestation_review_url_may_use_either_repository_owner_but_no_other() {
+    let surface = CompatibilitySurfaceManifest {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files: vec![SurfaceFile {
+            path: "surface.txt".to_string(),
+            sha256: SHA.to_string(),
+        }],
+    };
+    let receipt = receipt_for(
+        &surface.digest().unwrap(),
+        ProductFamily::TallyPrimeEditLog,
+        TallyMode::Education,
+    );
+    let signing = SigningKey::from_bytes(&[7_u8; 32]);
+    let mut value = attestation(&receipt, &surface, &signing);
+    for accepted in [
+        "https://github.com/lamemustafa/bridge/pull/1",
+        "https://github.com/ComplyEaze/bridge/pull/1",
+    ] {
+        value.review_url = accepted.to_string();
+        assert!(value.validate_shape().is_ok(), "{accepted}");
+    }
+    for refused in [
+        "https://github.com/someone-else/bridge/pull/1",
+        "https://github.com/ComplyEaze/bridge-other/pull/1",
+        "https://github.com/complyeaze/bridge/pull/1",
+        "http://github.com/ComplyEaze/bridge/pull/1",
+    ] {
+        value.review_url = refused.to_string();
+        assert_eq!(
+            value.validate_shape().unwrap_err(),
+            invalid("review_url_invalid"),
+            "{refused}"
+        );
+    }
+}

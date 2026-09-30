@@ -43,8 +43,10 @@ disallowed-methods = [
   { path = "tauri::webview::WebviewWindowBuilder::new", reason = "the app's windows come from tauri.conf.json, not from code" },
   { path = "tauri::webview::Webview::navigate", reason = "webview navigation is egress" },
   { path = "tauri::webview::Webview::eval", reason = "script in the webview can reach the network" },
-  # Process and socket calls through the FFI crates this workspace already depends on. The
-  # Windows paths resolve only where windows-sys is built.
+  # Process and socket calls through the FFI crates this workspace already depends on.
+  # The first Windows run reported the libc and windows_sys paths below as resolving to
+  # nothing there, so they are inert on Windows (scripts/tally-egress-census.json pins them as
+  # such, and the gate refuses their names in src-tauri Rust).
   { path = "libc::execve", reason = "a spawned process is egress" },
   { path = "libc::execv", reason = "a spawned process is egress" },
   { path = "libc::execvp", reason = "a spawned process is egress" },

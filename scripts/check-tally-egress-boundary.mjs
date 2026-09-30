@@ -94,10 +94,12 @@
 //  - Nine listed FFI paths are inert on Windows: the first Windows run reported
 //    libc::posix_spawn, posix_spawnp and getaddrinfo and windows-sys's
 //    ShellExecuteW, ShellExecuteA, ShellExecuteExW, CreateProcessW,
-//    CreateProcessA and WinExec as resolving to nothing (windows-sys is a
-//    dependency of the app crate with the Shell and Threading features, and the
-//    cause is unmeasured). The census pins them as inert, so they are not seen
-//    firing; the static half refuses those function names in src-tauri Rust.
+//    CreateProcessA and WinExec as resolving to nothing. The libc ones are
+//    expected (libc is a unix-only dependency). The six windows-sys ones are
+//    unexplained: windows-sys is a dependency of the app crate with the Shell
+//    and Threading features. They rest on one run. The census pins them as
+//    inert, so they are not seen firing; the static half refuses those function
+//    names (and execv, execvp, execve) in src-tauri Rust.
 //  - Egress routes that name no listed method: a direct dependency on `tower`
 //    is refused, but reqwest's `blocking` client and any other crate's send
 //    method are outside the lists. tauri.conf.json (the app's windows and its
@@ -404,7 +406,7 @@ function trackedFiles() {
 
 // Clippy reads the nearest clippy.toml, so a second one under src-tauri would replace these lists
 // for its crate, and CLIPPY_CONF_DIR would point it elsewhere. An edit to the lists needs review.
-const CLIPPY_CONFIG_DIGEST = "ba818f6bb021a34108bc505a6090ffc96655ec4e160eac7937c48652ed993a29";
+const CLIPPY_CONFIG_DIGEST = "b0545bfeb20c2ef9881c497470e927c746e7a57714ca1c9088b8ca707e7c144f";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
@@ -474,7 +476,7 @@ for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && nam
       egressViolations.push(`${path}:${index + 1} names clippy, dev, debug_assertions or a panic cfg, which the census run compiles differently from the shipped build`);
     }
     if (FFI_EGRESS.test(line)) {
-      egressViolations.push(`${path}:${index + 1} names an FFI process or network function that the lints cannot see on Windows (its listed path does not resolve there)`);
+      egressViolations.push(`${path}:${index + 1} names an FFI process or network function; on Windows the lints cannot see it (its listed path does not resolve there)`);
     }
   }
 }

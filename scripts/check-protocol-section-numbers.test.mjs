@@ -80,14 +80,13 @@ const upstream = join(root, "upstream");
 const work = join(root, "work");
 const DOC = "docs/tally/TALLY_PROTOCOL_REFERENCE.md";
 const SURFACE = "docs/tally/compatibility/compatibility-surface.json";
-const TEST_SHA256 = "0".repeat(64);
 const writeSurface = (repository, paths) => {
   mkdirSync(dirname(join(repository, SURFACE)), { recursive: true });
   writeFileSync(
     join(repository, SURFACE),
     JSON.stringify({
-      schema_version: 2,
-      files: paths.map((path) => ({ path, sha256: TEST_SHA256 })),
+      schema_version: 3,
+      files: paths.map((path) => ({ path })),
     }),
   );
 };
@@ -763,8 +762,8 @@ for (const [name, example] of [
   writeFileSync(
     join(work, SURFACE),
     JSON.stringify({
-      schema_version: 2,
-      files: [{ path: DOC }],
+      schema_version: 3,
+      files: [{ path: 5 }],
     }),
   );
   out = runGate();

@@ -24,6 +24,7 @@ fn receipt_for(directory: &Path, response: &Value) -> Value {
                 tool: "outstandings".into(),
                 args_sha256: sha256_json(&json!({})),
                 company_guid: None,
+                request_trail: None,
             },
             response,
             &wire,

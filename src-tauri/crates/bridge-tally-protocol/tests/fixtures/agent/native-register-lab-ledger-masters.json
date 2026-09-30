@@ -1,0 +1,20 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver response to Bridge ledger_masters fields=compliance request (List of Ledgers with TAXTYPE and GSTDUTYHEAD), from the disposable BRIDGE GST RECON LAB book, recorded by a serial read-only relay between bridge_mcp and the gateway: the response body exactly as Tally sent it (HTTP head removed)",
+  "observed_date": "2026-10-01",
+  "observed_at": "2026-10-01T01:54+05:30",
+  "executor": "Claude Sonnet 5.5 (Lane M2) under the lab owner's seeding ruling relayed by the orchestrator",
+  "binary": "bridge_mcp debug build WITH the lab-writes feature (writes disabled at run time) of master edfb2e4e, sha256 c3f9660eea21b1e4e200bf4c934e200b107baf82da5b98310bfc51921dd89930",
+  "relay": "copy of a serial read-only allowlist relay, widened by three request IDs, the voucher-class predicates and the two voucher-window formula shapes Bridge's own builders emit; sha256 5f36ad420afd060546c09e148507c696c90e70a8901fdb03a5548057e9dbbde2; forwarding to 127.0.0.1:9001 only",
+  "request_sha256_utf8": "936678c7880de5a049819d06b79bfbc85a10ef92b932b8cde4435521dbaadfb7",
+  "request_bytes_on_wire": 1744,
+  "fixture_bytes": 82482,
+  "fixture_sha256": "a090a1b0db1ec247ffa13989ae1b755e9b908072c0a01119791e21d4adbfe62e",
+  "source_response_bytes": 82482,
+  "source_response_sha256": "a090a1b0db1ec247ffa13989ae1b755e9b908072c0a01119791e21d4adbfe62e",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": "none (the body is byte-identical to the gateway response; only the HTTP head was removed)",
+  "contents": "ledger master export: 41 ledgers, among them the synthetic register-lab ledgers",
+  "how_the_data_was_made": "the ledgers and vouchers were created by raw Import Data Create messages into the disposable lab book (one batch of ledgers, one probe voucher, one batch of seven vouchers) minutes before this read; each was read back through Bridge and matched what was sent. Purchase vouchers carry a party ledger; two carry a REFERENCE; no GSTIN, no REFERENCEDATE, no cancelled, optional or post-dated voucher.",
+  "provenance_limit": "One instance (TallyPrime 7.1 Silver, one synthetic book, one month). It backs how Tally returns these vouchers and masters for the purchase register tests; it does not show how a UI-typed purchase looks, nor any GSTIN, REFERENCEDATE or status-flag shape.",
+  "sensitivity_review": "Disposable synthetic lab book; creditor names are synthetic (SYN ...) or the lab book's existing synthetic names; no customer data or credentials; scanned against the client-name list and for local paths (0 hits)."
+}

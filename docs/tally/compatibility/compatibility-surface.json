@@ -447,6 +447,10 @@
       "path": "src-tauri/src/agent_receipt_fields.rs"
     },
     {
+      "path": "src-tauri/src/agent_register.rs",
+      "reason": "Decides which vouchers the purchase register lists and how each entry's tax is classified from the master's GST duty head, so a change to it changes what a client is shown as tax in books."
+    },
+    {
       "path": "src-tauri/src/agent_responses.rs"
     },
     {

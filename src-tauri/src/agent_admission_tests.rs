@@ -93,6 +93,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "outstandings",
         "ledger_masters",
         "ledger_movement",
+        "purchase_register",
         "trial_balance",
         "profit_and_loss",
         "balance_sheet",

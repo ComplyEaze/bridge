@@ -54,6 +54,8 @@ mod vouchers;
 use outstandings::*;
 #[path = "agent_movement.rs"]
 mod movement;
+#[path = "agent_register.rs"]
+mod register;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -651,6 +653,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              base-currency ledgers and names the ones it leaves out (#551). The basic read \
              and ledger_movement do not support it yet (#716). Retrying this read refuses \
              again.",
+        ),
+        "register_ledger_currency_excluded" => Some(
+            "A voucher in this window touches a ledger that the compliance read of the ledger \
+             masters set aside because it is kept in another currency (or its balance is a \
+             currency composite), so purchase_register cannot classify the voucher and refuses \
+             the whole window rather than leave it out. Narrow from and to so the window holds \
+             no such voucher, or read it with `vouchers`. Retrying the same window refuses \
+             again.",
+        ),
+        "register_master_mark_unavailable" => Some(
+            "Tally did not report the company's master-alteration mark, which purchase_register \
+             needs to bind the ledger masters to the voucher window. It cannot be answered \
+             from this book as Tally reports it; `ledger_masters` with fields=compliance and \
+             `vouchers` still read it separately.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
@@ -1381,6 +1397,7 @@ impl Server {
             "changed_since" => self.changed_since(args).await,
             "outstandings" => self.outstandings(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
+            "purchase_register" => self.purchase_register(args).await,
             "trial_balance" => self.trial_balance(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "balance_sheet" => self.balance_sheet(args).await,

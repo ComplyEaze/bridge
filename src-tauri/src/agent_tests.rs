@@ -616,6 +616,12 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
+            "purchase_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
+        ),
+        (
             "trial_balance",
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
@@ -638,7 +644,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
     ]);
-    assert_eq!(samples.len(), 17);
+    assert_eq!(samples.len(), 18);
     for (tool, sample) in samples {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);

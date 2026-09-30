@@ -1207,7 +1207,8 @@ impl Server {
         };
         // A refused redemption withdraws the approval it was to use (#725): a
         // later call asks the person again. One taken by this call has already
-        // lapsed; another call's, or a dialog, is left as it is.
+        // lapsed; a dialog still open or declined, one a call waits on, and another
+        // batch's hold are left as they are.
         if scope == PostScope::Vouchers && operation.is_err() {
             self.post_approvals
                 .revoke_unredeemed(batch_id, "post_refused_before_intent");

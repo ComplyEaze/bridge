@@ -2215,3 +2215,28 @@ async fn until_answered_in(approvals: &PostApprovals, batch_id: &str) {
     .await
     .expect("the held dialog's answer was stamped");
 }
+
+/// The redeem-only pass inherits the early refusal (#857): a journal that lost
+/// the batch between the passes refuses the second pass before its checks, and
+/// the approval it was to redeem lapses instead of keeping the slot.
+#[tokio::test]
+async fn a_batch_lost_between_the_passes_does_not_strand_its_approval() {
+    let (answer, line, directory, server, scripted) = two_pass_call_with(|server, _| {
+        let journal = server.settings.data_dir.join("agent-import-ledger.jsonl");
+        std::sync::Arc::new(move || std::fs::write(&journal, b"").unwrap())
+    })
+    .await;
+    assert_eq!(
+        result(&answer)["error"]["code"],
+        "import_batch_not_found",
+        "{answer}"
+    );
+    assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
+    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}

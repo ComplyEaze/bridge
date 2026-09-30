@@ -18,6 +18,13 @@ pub const SURFACE_SCHEMA_VERSION: u16 = 2;
 pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 2;
 pub const TRUST_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const ATTESTATION_SCHEMA_VERSION: u16 = 1;
+/// The review URL of an attestation must point at this repository: it is part of the signed bytes.
+/// The repository moved from the lamemustafa account to the ComplyEaze organization; GitHub keeps
+/// the old name as a permanent redirect, so a URL under either name is accepted.
+pub const REVIEW_URL_PREFIXES: [&str; 2] = [
+    "https://github.com/lamemustafa/bridge/",
+    "https://github.com/ComplyEaze/bridge/",
+];
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// Capacity deliberately reserved for one small cohesive surface change.
 pub const RESERVED_SURFACE_FILES: usize = 15;
@@ -1235,9 +1242,9 @@ impl ReviewedEvidenceAttestation {
         if self.reviewed_at_unix_ms <= 0 || self.expires_at_unix_ms <= self.reviewed_at_unix_ms {
             return Err(invalid("attestation_time_invalid"));
         }
-        if !self
-            .review_url
-            .starts_with("https://github.com/lamemustafa/bridge/")
+        if !REVIEW_URL_PREFIXES
+            .iter()
+            .any(|prefix| self.review_url.starts_with(prefix))
             || self.review_url.len() > 256
             || self.review_url.chars().any(char::is_control)
         {

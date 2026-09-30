@@ -193,7 +193,8 @@ line; orphan or duplicate anchor IDs are refused. Setext section headings are no
 the split reference. Literal HTML examples must use fenced blocks or same-line paired inline
 code; indented and multiline inline-code HTML examples are outside this gate’s admitted format.
 The index and every declared part are compatibility-pinned sources, so follow
-`docs/release-process.md` after edits. A build rule goes into `IMPLEMENTATION_GUIDE.md`;
+`docs/release-process.md` after edits (a pull request that changes a pinned file adds an
+acknowledgement file; there is no reseal step). A build rule goes into `IMPLEMENTATION_GUIDE.md`;
 a plan change goes into the plan with a dated deviation note. A
 finding that exists only in a conversation is lost. If code encodes a non-obvious external
 behaviour, the comment cites the reference section rather than restating it.

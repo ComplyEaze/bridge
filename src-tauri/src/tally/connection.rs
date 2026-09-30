@@ -37,6 +37,10 @@ use bridge_tally_protocol::outstandings::{
     WitnessPairVerification,
 };
 use bridge_tally_protocol::{
+    ledger_census::{
+        render_ledger_census_slice_request, CensusLimits, LedgerCensus, LedgerCensusError,
+        LedgerCensusPlan, LedgerCount,
+    },
     native_outstandings::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
@@ -50,15 +54,15 @@ use bridge_tally_protocol::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
         DateBoundaryProfile, OutstandingsError,
     },
-    parent_partition::{ParentPartition, ParentPartitionError, PartitionLimits},
+    parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_native_ledger_source_records_with_evidence,
+    parse_ledger_census_slice, parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_native_voucher_source_records_with_evidence,
     parse_standard_ledger_catalog, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
-    TallyTextEncoding,
+    TallyTextEncoding, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 use bridge_tally_transport::{
     canonical_loopback_origin as transport_canonical_origin, TallyEndpointConfig,
@@ -143,16 +147,18 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: anyhow::Error,
     },
-    /// The catalogue that would count a book's ledgers before its master read
-    /// (#668) is estimated beyond the transport's response cap, so nothing was
-    /// sent after the opening extent: the company's master-alteration mark, an
-    /// upper bound on its ledgers, times the catalogue's bytes per ledger is
-    /// over the limit. Numbers only.
+    /// The company's master-alteration mark, an upper bound on its ledgers, is
+    /// past the largest mark the census counts (#679), and the catalogue that
+    /// would count the ledgers instead is estimated beyond the transport's
+    /// response cap, so nothing was sent after the opening extent: the mark
+    /// times the catalogue's bytes per ledger is over the limit. Numbers only.
     #[error("Tally ledger catalogue is estimated beyond Bridge's response limit")]
     CatalogueTooLarge {
         master_alter_id: u64,
         estimated_bytes: u64,
         limit_bytes: u64,
+        /// The largest master mark the census can count.
+        mark_limit: u64,
     },
     /// The ledger catalogue that counts a marked book's ledgers before its
     /// master read (#668) failed validation: another company, a damaged
@@ -177,6 +183,56 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
     /// Tally did not report one in its extent, so no part was requested.
     #[error("Tally did not report the voucher high-water a multi-part ledger read needs")]
     VoucherWitnessAbsent,
+    /// The ledger census (#679), which counts a book whose master mark is past
+    /// what its catalogue can be read for, refused: a slice held more rows than
+    /// its span, one ledger was seen twice, no ledger was found, or the
+    /// census stopped early. Nothing was sized from it.
+    #[error("Tally ledger census could not count the book's ledgers")]
+    LedgerSpan {
+        #[source]
+        source: LedgerCensusError,
+    },
+    /// A slice of the ledger census (#679) failed validation: another company,
+    /// a damaged response, a foreign field, or a ledger seen twice within the
+    /// slice. Nothing was sized from it.
+    #[error("Tally ledger census slice failed validation")]
+    LedgerSpanSliceInvalid {
+        #[source]
+        source: StandardLedgerCatalogError,
+    },
+    /// One slice of the ledger census answered past the transport's response
+    /// cap (#679), more than the slice's span can account for: Tally may have
+    /// ignored the slice's filter. The transport drops the connection with the
+    /// rest of the response unread. Nothing after that response was sent.
+    #[error("Tally ledger census slice answered past Bridge's response limit")]
+    LedgerSpanSliceResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
+    /// Two counts of one book's ledgers disagreed (#679): the census, or the
+    /// catalogue that counted them, against the ledgers the master read
+    /// returned or against each other. The book changed under the read, or
+    /// Tally answered one of them wrongly; nothing is released. Numbers only.
+    #[error("Tally ledger counts disagreed")]
+    LedgerCountDiffers { expected: u64, observed: u64 },
+    /// The census counted ledgers the whole read cannot hold and the catalogue
+    /// that would name their parents is estimated beyond Bridge's response
+    /// limit (#679), so nothing was sent after the census. Numbers only.
+    #[error("Tally ledger catalogue for the counted ledgers is beyond Bridge's response limit")]
+    CountedCatalogueTooLarge {
+        ledgers: u64,
+        estimated_bytes: u64,
+        limit_bytes: u64,
+    },
+    /// A parent part's answer passed the transport's response cap (#679):
+    /// more than the catalogue can account for under the part's parents,
+    /// possibly because Tally did not apply the part's filter. The transport
+    /// error stays in the chain.
+    #[error("Tally answered a parent part beyond Bridge's response limit")]
+    ParentPartResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
 }
 
 impl PartyLedgerMasterSourceValidationError {
@@ -203,7 +259,49 @@ impl PartyLedgerMasterSourceValidationError {
             Self::LedgerCountInvalid { source } => source.safe_code(),
             Self::ParentPartition { source } => source.safe_code(),
             Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
+            Self::ParentPartResponseTooLarge { .. } => "parent_part_response_too_large",
+            Self::LedgerSpan { source } => source.safe_code(),
+            Self::LedgerSpanSliceInvalid { source } => match source {
+                StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
+                StandardLedgerCatalogError::CompanyIdentityMismatch => {
+                    "ledger_span_identity_mismatch"
+                }
+                StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                StandardLedgerCatalogError::MalformedResponse
+                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+            },
+            Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
+            Self::LedgerCountDiffers { .. } => "ledger_count_differs",
+            Self::CountedCatalogueTooLarge { .. } => "ledger_count_catalogue_too_large",
         }
+    }
+}
+
+/// Names a parent part's read that ran past the response cap as such, so the
+/// caller learns the part's filter was probably ignored; a whole-book read has
+/// no filter to blame and any other failure is left as it came.
+fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -> anyhow::Error {
+    let over_the_cap = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(TallyTransportError::ResponseTooLarge { .. })
+        )
+    });
+    if part.is_some() && over_the_cap {
+        // The read evidence a failed pair carries must stay the chain's root,
+        // where the caller's `with_read_evidence` merges it.
+        let completed = error
+            .downcast_ref::<super::runtime::RuntimeReadFailure>()
+            .map(|failure| failure.evidence.clone());
+        let named = anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::ParentPartResponseTooLarge { source: error },
+        );
+        match completed {
+            Some(evidence) => with_read_evidence(named, evidence),
+            None => named,
+        }
+    } else {
+        error
     }
 }
 
@@ -244,6 +342,61 @@ const LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL: u64 = 1_400;
 /// own choice. At 1,400 bytes per unit of mark it admits a mark of 22,857.
 const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 
+/// AlterIDs one census slice spans (#679), hence the most ledgers it may
+/// return. UNVERIFIED as a size bound: chosen so that a slice of ledgers with
+/// the longest name Bridge assumes fits [`COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED`]
+/// (asserted by a test), which is about half the transport's cap. Measured at
+/// 800, 1,000, 4,000 and 8,000 wide, on three books (section 11e, PARTIAL).
+const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
+
+/// Most slices one census makes (#679): Bridge's own bound on the serial
+/// requests a census may spend, not a measured limit. With the slice width it
+/// admits a master mark of 400,000, so a book whose mark is above that is
+/// refused before anything is sent after the extent.
+const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
+
+/// Characters of a GUID-only census row that do not depend on the ledger's
+/// name, counting the row's separators: 391 in the committed eight-row capture
+/// (a row is 2 x name + about 390 characters). An earlier run whose rows are not
+/// committed averaged 846 bytes a row, 423 characters, with names whose length
+/// was not recorded. 415 is above the capture's figure, so a change that
+/// lowered it below the capture fails a test; it is a margin, not a
+/// measurement. PARTIAL: one capture, and no row with aliases.
+const LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL: u64 = 415;
+
+/// The longest ledger name (in characters) a census row is assumed to carry.
+/// UNVERIFIED: the longest name observed on any book is 88 characters (#917
+/// tracks measuring it); Tally's own limit is not known to be lower. A ledger
+/// with aliases carries each alias in the row too, which this does not bound.
+const LEDGER_CENSUS_NAME_CHARS_UNVERIFIED: u64 = 128;
+
+/// The bytes of the largest census row assumed: the row's fixed characters plus
+/// the name twice, each character at most six characters when escaped
+/// (`&#NNN;`), all in UTF-16 (2 bytes a character).
+const fn ledger_census_worst_row_bytes() -> u64 {
+    2 * (LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL + 12 * LEDGER_CENSUS_NAME_CHARS_UNVERIFIED)
+}
+
+// A full slice of the longest names assumed fits the budget the master read is
+// held to (#679): raising the width or the assumed name length past it does not
+// compile.
+const _: () = assert!(
+    LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * ledger_census_worst_row_bytes()
+        <= COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+);
+
+fn ledger_census_limits() -> CensusLimits {
+    CensusLimits {
+        slice_width: LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED,
+        max_slices: LEDGER_CENSUS_MAX_SLICES_UNVERIFIED,
+    }
+}
+
+/// The largest master mark a census covers.
+const fn ledger_census_mark_limit() -> u64 {
+    LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * LEDGER_CENSUS_MAX_SLICES_UNVERIFIED as u64
+}
+
 /// Most immediate parent groups one part's `$Parent = "A" OR $Parent = "B"`
 /// formula names (#679). Measured on a synthetic book of 4,339 ledgers: an `OR`
 /// of 1, 8, 50 and 200 parents answered in 0.1 to 0.6 s with every row
@@ -264,6 +417,12 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
+/// Most bytes of `NOT` formula text the complement part's request may carry
+/// (#679). UNVERIFIED: Bridge's own bound. One live probe sent 54 KB of
+/// request for 1,354 parents; the 12-part, 200-parents-per-part limits already
+/// cap the parents at 2,400, so this is a backstop against very long names.
+const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
+
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
@@ -273,6 +432,7 @@ fn parent_partition_limits() -> PartitionLimits {
             / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
         max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
         max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
+        max_complement_formula_bytes: PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED,
     }
 }
 
@@ -305,6 +465,15 @@ fn compliance_estimate_unverified(count: u64) -> ComplianceEstimate {
     )
 }
 
+/// What one master-and-balance pair of a compliance read covers: the whole
+/// book, with the number of ledgers a count already said it holds (#679), or
+/// one parent part, whose own ledger count is checked instead.
+#[derive(Clone, Copy)]
+enum PartyLedgerRead<'a> {
+    Whole { expected_ledgers: Option<u64> },
+    Part(&'a ParentPart),
+}
+
 /// What sizing a compliance master read decided before any ledger request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ComplianceAdmission {
@@ -312,6 +481,10 @@ enum ComplianceAdmission {
     /// The mark does not fit whole but its catalogue can be read: count the
     /// ledgers, then admit again with the count (#668).
     CountFirst,
+    /// The mark is past what the catalogue can be read for, but within what
+    /// the census covers: count the ledgers by AlterID span (#679), then admit
+    /// again with the count.
+    CensusFirst,
     /// The counted ledgers do not fit one read: read them in parts by parent
     /// group (#679).
     InParts,
@@ -325,7 +498,8 @@ enum ComplianceAdmission {
 /// opening extent; the extent read already fails closed without it,
 /// `require_master_witness`) stands in: it fits, or the catalogue that counts
 /// the book fits the transport ([`ComplianceAdmission::CountFirst`]), or the
-/// read is refused before anything is sent after the extent.
+/// census can count it by AlterID span ([`ComplianceAdmission::CensusFirst`]),
+/// or the read is refused before anything is sent after the extent.
 ///
 /// The mark is an UPPER BOUND on ledgers, not a count: every master of every
 /// type (stock items, units, groups and the rest) raises it, and so does every
@@ -335,7 +509,10 @@ enum ComplianceAdmission {
 /// and a ledger capture (8 small lab companies, 6-88 ledgers against marks of
 /// 213-328, not captured at the same moment; and a synthetic book of 1,989
 /// ledgers against a mark of 2,197), which is not a proof. If the assumption
-/// is ever false, a book this admits is read as it was before #637.
+/// is ever false, a book this admits is read as it was before #637, and the
+/// census (which covers `(0, mark]` only) undercounts: the count is compared
+/// with the ledgers the read returns, and a difference is refused
+/// (`ledger_count_differs`).
 fn admit_compliance_master_read(
     master_alter_id: u64,
     counted: Option<u64>,
@@ -354,11 +531,59 @@ fn admit_compliance_master_read(
     if catalogue.fits {
         return Ok(ComplianceAdmission::CountFirst);
     }
+    if master_alter_id <= ledger_census_mark_limit() {
+        return Ok(ComplianceAdmission::CensusFirst);
+    }
     Err(PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
         master_alter_id,
         estimated_bytes: catalogue.estimated_bytes,
         limit_bytes: LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+        mark_limit: ledger_census_mark_limit(),
     })
+}
+
+/// Whether the catalogue that names a counted book's parents fits the
+/// transport (#679): the census counted more ledgers than one read holds, so
+/// the parts are planned from the named catalogue, and that catalogue is bounded
+/// by the count instead of by the mark. A refusal here sends nothing more.
+fn admit_counted_catalogue(ledgers: u64) -> Result<(), PartyLedgerMasterSourceValidationError> {
+    let catalogue = compliance_estimate(
+        ledgers,
+        LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL,
+        LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+    );
+    if catalogue.fits {
+        return Ok(());
+    }
+    Err(
+        PartyLedgerMasterSourceValidationError::CountedCatalogueTooLarge {
+            ledgers,
+            estimated_bytes: catalogue.estimated_bytes,
+            limit_bytes: LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED,
+        },
+    )
+}
+
+/// Names a census slice's read that ran past the response cap as such, so the
+/// caller learns the slice's filter was probably ignored: a slice holds at most
+/// its width in ledgers, far under the cap. Any other failure is left as it
+/// came.
+fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
+    let over_the_cap = error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(TallyTransportError::ResponseTooLarge { .. })
+        )
+    });
+    if over_the_cap {
+        anyhow::Error::new(
+            PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge {
+                source: error,
+            },
+        )
+    } else {
+        error
+    }
 }
 
 /// A paired or bracketed read observed movement in the endpoint's data. This
@@ -746,7 +971,8 @@ impl TallyClient {
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
         let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry());
+            .with_wire_gate(wire.gate_for(&config), wire.retry())
+            .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             config,
             http,
@@ -779,7 +1005,8 @@ impl TallyClient {
             builder,
         )
         .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry());
+        .with_wire_gate(wire.gate_for(&config), wire.retry())
+        .with_send_observer(crate::request_trail::observer());
         Self {
             config,
             http,
@@ -796,7 +1023,8 @@ impl TallyClient {
     ) -> anyhow::Result<Self> {
         let http =
             TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry());
+                .with_wire_gate(wire.gate_for(&config), wire.retry())
+                .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             config,
             http,
@@ -1434,8 +1662,9 @@ impl TallyClient {
     /// balance snapshot as one bracketed source for a customer workbook. The
     /// balance parser requires row GUID evidence for the selected company
     /// before any `(name, parent)` join can attach money to a master. The second
-    /// value is the evidence of the catalogue pair that counted a marked book's
-    /// ledgers (#668), empty when the mark alone admitted the read. `today` is
+    /// value is the evidence of the reads that counted a marked book's ledgers:
+    /// the catalogue pair (#668), the census's slices (#679), or both, empty
+    /// when the mark alone admitted the read. `today` is
     /// the host's calendar date: the balance snapshot ends no later than it
     /// (the next admissible boundary at or after), whatever the extent's last
     /// voucher date says (#875).
@@ -1478,7 +1707,36 @@ impl TallyClient {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
             })?;
             let mut partition = None;
-            if admission == ComplianceAdmission::CountFirst {
+            // How many ledgers the whole read must return, once a count says.
+            let mut expected_ledgers = None;
+            // A census counts a book whose mark is past what its catalogue can
+            // be read for (#679); its count admits the read like a catalogue's.
+            let mut census_count = None;
+            if admission == ComplianceAdmission::CensusFirst {
+                let counted = self
+                    .count_ledgers_by_span(
+                        identity,
+                        &opening_extent,
+                        master_mark,
+                        &mut evidence,
+                        &mut count_evidence,
+                    )
+                    .await?
+                    .get();
+                census_count = Some(counted);
+                if admit_compliance_master_read(master_mark, Some(counted))?
+                    == ComplianceAdmission::InParts
+                {
+                    // Their parents are named by the catalogue, which the
+                    // count now bounds.
+                    admit_counted_catalogue(counted)?;
+                } else {
+                    expected_ledgers = Some(counted);
+                }
+            }
+            if admission == ComplianceAdmission::CountFirst
+                || (census_count.is_some() && expected_ledgers.is_none())
+            {
                 let catalogue_request =
                     render_standard_ledger_catalog_request(identity.display_name())?;
                 let catalogue_pair = self
@@ -1486,12 +1744,13 @@ impl TallyClient {
                     .await?;
                 let (catalogue_body, catalogue_bytes, catalogue_sha256) = catalogue_pair
                     .require_stable(PairedReadValidationError::PartyLedgerCatalogue)?;
-                count_evidence = RuntimeReadEvidence::paired(
+                let catalogue_read = RuntimeReadEvidence::paired(
                     &catalogue_request,
                     catalogue_sha256,
                     catalogue_bytes,
                 );
-                evidence = evidence.clone().combine(count_evidence.clone());
+                count_evidence = count_evidence.clone().combine(catalogue_read.clone());
+                evidence = evidence.clone().combine(catalogue_read);
                 let catalogue = parse_standard_ledger_catalog_response(
                     &catalogue_body,
                     identity.display_name(),
@@ -1501,6 +1760,18 @@ impl TallyClient {
                     PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source }
                 })?;
                 let counted = catalogue.names().count() as u64;
+                // Two counts of one book, taken by different requests: they
+                // agree, or one of them is wrong.
+                if let Some(census) = census_count {
+                    if census != counted {
+                        return Err(anyhow::Error::new(
+                            PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                                expected: census,
+                                observed: counted,
+                            },
+                        ));
+                    }
+                }
                 // A count the whole read cannot fit is read as parts by parent
                 // group (#679); the catalogue that counted the book also
                 // names each ledger's parent, so nothing more is asked first.
@@ -1526,6 +1797,8 @@ impl TallyClient {
                         ));
                     }
                     partition = Some(planned);
+                } else {
+                    expected_ledgers = Some(counted);
                 }
             }
             let group_request = render_native_group_snapshot_request(identity.display_name());
@@ -1560,12 +1833,16 @@ impl TallyClient {
                 .collect::<Vec<_>>();
             let request_sha256 = party_ledger_request_commitment(&committed_requests);
             let mut reads = Vec::with_capacity(part_requests.len());
-            for (master_request, balance_request) in &part_requests {
+            for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
                 reads.push(
                     self.read_party_ledger_master_part(
                         identity,
                         master_request,
                         balance_request,
+                        match &partition {
+                            Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
+                            None => PartyLedgerRead::Whole { expected_ledgers },
+                        },
                         ledger_currency_base.as_ref(),
                         &mut evidence,
                     )
@@ -1679,6 +1956,73 @@ impl TallyClient {
         result.map_err(|error| crate::tally::runtime::with_read_evidence(error, evidence))
     }
 
+    /// Counts a marked book's ledgers by AlterID span (#679): one single read
+    /// per slice of `(0, mark]`, each asking for the ledgers' GUIDs only, and
+    /// no slice is read twice. Stability of the book across the census is not
+    /// proven here: the caller's opening and closing company extent, which
+    /// carry the master mark and the company GUID, are the bracket (and the
+    /// extent is read again here, before the count is returned), and an empty
+    /// slice is the same body a closed or absent company answers with, so a
+    /// census that found no ledger at all is refused rather than counted.
+    /// Each slice whose answer was received in full is added to `evidence` and
+    /// to `count_evidence` as it completes, so a refusal still accounts for
+    /// what was received; a slice whose request failed, or whose answer passed
+    /// the response cap, adds nothing.
+    async fn count_ledgers_by_span(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        opening_extent: &CompanyBookExtent,
+        master_mark: u64,
+        evidence: &mut RuntimeReadEvidence,
+        count_evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<LedgerCount> {
+        let plan = LedgerCensusPlan::new(master_mark, ledger_census_limits())
+            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        let mut census = LedgerCensus::new(plan);
+        while let Some(slice) = census.next_slice() {
+            let request = render_ledger_census_slice_request(identity.display_name(), &slice);
+            let (body, bytes, sha256) = self
+                .post_xml_with_encoded_bytes(request.clone())
+                .await
+                .map_err(ledger_span_response_error)?;
+            let read = RuntimeReadEvidence::single(&request, sha256, bytes);
+            *evidence = evidence.clone().combine(read.clone());
+            *count_evidence = count_evidence.clone().combine(read);
+            // The parser only bounds what it will hold; the slice's span is
+            // enforced once, by the census, under its own typed refusal.
+            let guids = parse_ledger_census_slice(
+                &body,
+                identity.company_guid(),
+                MAX_STANDARD_LEDGER_IDENTITY_ROWS as u64,
+            )
+            .map_err(|source| {
+                PartyLedgerMasterSourceValidationError::LedgerSpanSliceInvalid { source }
+            })?;
+            census
+                .accept(guids)
+                .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        }
+        let counted = census
+            .finish()
+            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        // A company closed, reopened or switched during the census answers the
+        // remaining slices with the same empty body as a slice past every
+        // ledger, so the count can be low, and the count sizes the next read.
+        // The extent (company GUID and marks) is read again before the count
+        // leaves this function, so no caller can use a count without it, and a
+        // change in either refuses the call. It does NOT catch a company closed
+        // and reopened with equal marks between the slices and this read: the
+        // count is then low and passes, and a whole read sized from it is sent
+        // before the count-versus-rows check refuses (#938 adds a cross-check
+        // against the company's own ledger count for exactly this).
+        if self.fetch_company_book_extent(identity).await? != *opening_extent {
+            return Err(anyhow::Error::new(
+                PairedReadValidationError::PartyLedgerExtent,
+            ));
+        }
+        Ok(counted)
+    }
+
     /// One master-and-balance pair of a compliance ledger read: the whole book,
     /// or one parent part of it (#679). Each response is checked against the
     /// selected company and classified before any other request is sent.
@@ -1687,12 +2031,18 @@ impl TallyClient {
         identity: &VerifiedCompanyIdentity,
         master_request: &str,
         balance_request: &str,
+        scope: PartyLedgerRead<'_>,
         ledger_currency_base: Option<&BaseCurrencyName>,
         evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<PartyLedgerMasterPartRead> {
+        let part = match scope {
+            PartyLedgerRead::Part(part) => Some(part),
+            PartyLedgerRead::Whole { .. } => None,
+        };
         let master_pair = self
             .fetch_native_report_paired(master_request.to_owned())
-            .await?;
+            .await
+            .map_err(|error| parent_part_response_error(part, error))?;
         let (master_body, master_response_bytes, master_response_sha256) =
             master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
@@ -1711,9 +2061,35 @@ impl TallyClient {
                 PartyLedgerMasterSourceValidationError::DuplicateMasterIdentity,
             ));
         }
+        // A part that came back short or long means Tally did not apply its
+        // filter as asked. Its master pair is already sent, the complement's
+        // too; this keeps back its balance and every later request, the next
+        // part's among them, whose filter rests on the same assumption.
+        if let Some(part) = part {
+            part.check_row_count(structure.records.len())
+                .map_err(
+                    |source| PartyLedgerMasterSourceValidationError::ParentPartition { source },
+                )?;
+        } else if let PartyLedgerRead::Whole {
+            expected_ledgers: Some(expected),
+        } = scope
+        {
+            // A whole read after a count: the count was taken by another
+            // request, and the master read returns the same collection.
+            let observed = structure.records.len() as u64;
+            if observed != expected {
+                return Err(anyhow::Error::new(
+                    PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                        expected,
+                        observed,
+                    },
+                ));
+            }
+        }
         let balance_pair = self
             .fetch_native_report_paired(balance_request.to_owned())
-            .await?;
+            .await
+            .map_err(|error| parent_part_response_error(part, error))?;
         let (balance_body, balance_response_bytes, balance_response_sha256) =
             balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(

@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 #[tokio::test]
 async fn capability_probe_preserves_captured_release_and_exclusive_license_tier() {
     let capture = include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml");
@@ -1862,17 +1866,22 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
 }
 
 /// A mark whose master estimate fits is admitted with no count read; any more
-/// is counted first, up to the largest mark whose catalogue fits the response
-/// limit, and past that it is refused before anything is sent, naming the mark
-/// (#637, #668, #679). The limits are the constants' own quotients, so a
+/// is counted first, by the catalogue up to the largest mark whose catalogue
+/// fits the response limit, by the census up to the largest mark it covers, and
+/// past that it is refused before anything is sent, naming the mark (#637,
+/// #668, #679). The limits are the constants' own quotients and products, so a
 /// changed constant moves them and the test still pins each side of each.
 #[test]
-fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catalogue() {
+fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses() {
     let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
         / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
     let count_limit = super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
         / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
-    assert_eq!((master_limit, count_limit), (4_266, 22_857));
+    let census_limit = super::ledger_census_mark_limit();
+    assert_eq!(
+        (master_limit, count_limit, census_limit),
+        (4_266, 22_857, 400_000)
+    );
     assert_eq!(
         super::admit_compliance_master_read(master_limit, None).unwrap(),
         super::ComplianceAdmission::Admitted
@@ -1884,12 +1893,20 @@ fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catal
             "mark {mark}"
         );
     }
-    for mark in [count_limit + 1, 1_000_000] {
+    for mark in [count_limit + 1, 102_161, census_limit] {
+        assert_eq!(
+            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::ComplianceAdmission::CensusFirst,
+            "mark {mark}"
+        );
+    }
+    for mark in [census_limit + 1, 1_000_000] {
         match super::admit_compliance_master_read(mark, None) {
             Err(super::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
                 estimated_bytes,
                 limit_bytes,
+                mark_limit,
             }) => {
                 assert_eq!(master_alter_id, mark);
                 assert_eq!(
@@ -1900,10 +1917,107 @@ fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catal
                     limit_bytes,
                     super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
                 );
+                assert_eq!(mark_limit, census_limit);
             }
             other => panic!("expected a catalogue refusal on the mark, got {other:?}"),
         }
     }
+}
+
+/// A census count admits a read like a catalogue's: whole when it fits one read,
+/// in parts when it does not, whatever the mark (#679). The catalogue that then
+/// names the parents is bounded by the count, at the catalogue limit.
+#[test]
+fn a_census_count_admits_the_read_and_bounds_the_catalogue_that_names_its_parents() {
+    let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+        / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
+    let count_limit = super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+        / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
+    // A real book: 864 ledgers under a mark of 102,161.
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(864)).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(master_limit)).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(master_limit + 1)).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    super::admit_counted_catalogue(count_limit).expect("a count at the catalogue limit fits");
+    match super::admit_counted_catalogue(count_limit + 1) {
+        Err(super::PartyLedgerMasterSourceValidationError::CountedCatalogueTooLarge {
+            ledgers,
+            estimated_bytes,
+            limit_bytes,
+        }) => {
+            assert_eq!(ledgers, count_limit + 1);
+            assert_eq!(
+                estimated_bytes,
+                (count_limit + 1) * super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL
+            );
+            assert_eq!(
+                limit_bytes,
+                super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+            );
+        }
+        other => panic!("expected a refusal on the counted catalogue, got {other:?}"),
+    }
+}
+
+/// A census slice of ledgers with the longest name Bridge assumes fits the
+/// budget the master read is held to, and that budget sits under the
+/// transport's cap (#679). The slice width is chosen by this product: raise the
+/// width or the assumed name length past the budget and this fails before any
+/// request could be sent. The fixed part of a row (415 characters) is a margin
+/// above the committed capture's 391, checked below, and the name terms are
+/// assumptions.
+#[test]
+fn a_census_slice_of_the_longest_assumed_names_fits_the_response_budget() {
+    let worst_row = super::ledger_census_worst_row_bytes();
+    assert_eq!(worst_row, 3_902);
+    let slice = super::LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * worst_row;
+    assert!(
+        slice <= super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
+        "{slice} bytes"
+    );
+    assert!(
+        slice * 2 <= bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64,
+        "a full slice must sit at least twice under the transport cap"
+    );
+    // The fixed characters of a row are at least what the committed live capture
+    // shows (its row minus two copies of its name), so lowering the constant
+    // below a real row fails here.
+    let capture = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/ledger-census-slice-eight-rows.utf16le.xml"
+    );
+    let text = String::from_utf16(
+        &capture
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let start = text.find("<COLLECTION").unwrap();
+    let inner =
+        &text[start + text[start..].find('>').unwrap() + 1..text.find("</COLLECTION>").unwrap()];
+    let rows = inner.matches("<LEDGER ").count();
+    let name_chars: usize = inner
+        .split("<NAME>")
+        .skip(1)
+        .map(|part| part.find("</NAME>").unwrap())
+        .sum();
+    assert_eq!(rows, 8);
+    let fixed_per_row = (inner.len() - 2 * name_chars).div_ceil(rows) as u64;
+    assert_eq!(fixed_per_row, 391);
+    assert!(fixed_per_row <= super::LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL);
+    // The census covers the largest mark in whole slices of that width.
+    assert_eq!(
+        super::ledger_census_limits().slice_width * super::ledger_census_limits().max_slices as u64,
+        super::ledger_census_mark_limit()
+    );
 }
 
 /// The catalogue is bounded before it is sent because a response past the
@@ -2001,6 +2115,100 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
         parents += part.parents().len();
     }
     assert_eq!((ledgers, parents), (rows.len() as u64, 1_353));
+}
+
+/// The complement part is planned when the catalogue's own count of the
+/// ledgers it must reach is at most the ledgers one part may hold; one more is
+/// refused by the plan, before any master request is built (#679).
+#[test]
+fn a_complement_at_the_ledger_limit_is_planned_and_one_more_is_refused() {
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, ParentPartitionError,
+    };
+    let limits = super::parent_partition_limits();
+    let plan = |odd: u64| {
+        let mut rows = vec![("Named".to_owned(), "guid-named".to_owned(), Some("P"))];
+        for index in 0..odd {
+            rows.push((format!("Odd {index}"), format!("guid-odd-{index}"), None));
+        }
+        ParentPartition::plan(
+            rows.iter().map(|(name, guid, parent)| {
+                (
+                    name.as_str(),
+                    guid.as_str(),
+                    parent.map_or(ParentObservation::Unsupported, ParentObservation::Named),
+                )
+            }),
+            limits,
+        )
+    };
+    let at_limit = plan(limits.max_ledgers_per_part).unwrap();
+    let complement = at_limit.parts().last().unwrap();
+    assert!(complement.is_complement());
+    assert_eq!(complement.ledger_count(), limits.max_ledgers_per_part);
+    assert_eq!(
+        plan(limits.max_ledgers_per_part + 1).unwrap_err(),
+        ParentPartitionError::ParentOverBudget {
+            ledgers: limits.max_ledgers_per_part + 1
+        }
+    );
+}
+
+/// Only a parent part's answer past the response cap is named as one: a
+/// whole-book read has no filter to blame, and another transport failure keeps
+/// its own name. The transport error stays in the chain (#679).
+#[test]
+fn only_a_parent_parts_oversized_response_is_named_as_one() {
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
+    let partition = ParentPartition::plan(
+        [("Ledger", "guid", ParentObservation::Named("P"))],
+        super::parent_partition_limits(),
+    )
+    .unwrap();
+    let part = partition.parts().first();
+    let too_large = || {
+        anyhow::Error::new(super::TallyTransportError::ResponseTooLarge {
+            limit: 1,
+            declared_by_peer: true,
+        })
+    };
+    let named = super::parent_part_response_error(part, too_large());
+    assert!(matches!(
+        named.downcast_ref::<super::PartyLedgerMasterSourceValidationError>(),
+        Some(super::PartyLedgerMasterSourceValidationError::ParentPartResponseTooLarge { .. })
+    ));
+    assert!(named.chain().any(|cause| matches!(
+        cause.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::ResponseTooLarge { .. })
+    )));
+    let whole = super::parent_part_response_error(None, too_large());
+    assert!(matches!(
+        whole.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::ResponseTooLarge { .. })
+    ));
+    // A pair that failed on its second response carries the first one's
+    // evidence at the root; naming the error keeps it there for the caller's
+    // merge.
+    let failed_pair = super::with_read_evidence(
+        too_large(),
+        super::RuntimeReadEvidence::single("request", "sha".into(), 10),
+    );
+    let merged = super::with_read_evidence(
+        super::parent_part_response_error(part, failed_pair),
+        super::RuntimeReadEvidence::single("earlier", "sha-earlier".into(), 5),
+    );
+    let failure = merged
+        .downcast_ref::<crate::tally::runtime::RuntimeReadFailure>()
+        .unwrap();
+    assert_eq!(failure.evidence.bytes, 15);
+    let timed_out = super::parent_part_response_error(
+        part,
+        anyhow::Error::new(super::TallyTransportError::RequestTimedOut),
+    );
+    assert!(matches!(
+        timed_out.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::RequestTimedOut)
+    ));
 }
 
 /// A parent-partition refusal surfaces under its own safe code, so an agent

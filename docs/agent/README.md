@@ -8,7 +8,7 @@ The developer configuration below remains for supported client integrations.
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
 parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the two limits under *Approved voucher posting* below;
+off by default because of the three limits under *Approved voucher posting* below;
 the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
 separate native approval for each new attempt. Command-line installations
 retain explicit environment switches.
@@ -70,7 +70,8 @@ The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
 `balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. For a command-line
+`egress_log`. (`profit_and_loss` and `balance_sheet` are in source but not in
+the 0.3.0 release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -96,22 +97,42 @@ balance-free catalogue read (a stable pair, bound to the company by name and GUI
 parent groups are packed by ledger count into parts of at most 4,266 ledgers and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
-catalogue gave it; otherwise the whole call is refused and nothing partial is returned (causes
-`parent_part_rows_missing`, `parent_part_row_outside_parents`, `parent_part_row_not_in_catalogue`,
-`parent_part_row_differs_from_catalogue`, `parent_part_row_repeated`). A book that cannot be split
-is refused before any master request: one parent group over 4,266 ledgers (`parent_over_budget`),
-more than 12 parts (`parent_partition_too_many_parts`), a ledger with no parent
-(`ledger_without_parent`), a parent name that cannot sit in a filter, such as one with a control
-character (`parent_name_unsupported`, which carries `unsupported_parent_ledgers`, the number of
-ledgers under such names and no name) or a repeated ledger GUID
+catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
+whose master comes back with a different ledger count than the catalogue holds under its parents
+ends the read after that master (`parent_part_row_count_differs`): its balance, any later part and
+the group read are never requested, but the master pair itself was sent, the complement's included.
+The other causes are `parent_part_rows_missing`, `parent_part_row_outside_parents`,
+`parent_part_row_not_in_catalogue`, `parent_part_row_differs_from_catalogue` and
+`parent_part_row_repeated`. A part whose answer passes the response limit ends the read with
+`parent_part_response_too_large`: Tally may have ignored its filter. Ledgers under a parent group
+whose name cannot sit in a filter, such as one with a control character, are read as one extra
+last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
+parents per formula, all applied together), and the same coverage proof applies to it. A book
+that cannot be split is refused before any master request: one parent group, or the ledgers
+under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 12 named parts
+(`parent_partition_too_many_parts`), a complement filter over 256 KiB
+(`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
+ledger under an unnameable parent name (`parent_name_unsupported`, which carries
+`unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
-count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
-refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`
-object (`master_alter_id`, `estimated_bytes`, `limit_bytes`): the catalogue that would count the
-book could pass the transport's response cap, and a response past the cap is cut off mid-read. The
-mark is an upper bound on ledgers, since every master raises it, so a company with fewer ledgers
-may be refused. The limits are unverified against a live Tally beyond a two-parent filter;
-`fields=basic` still reads any of these books.
+count and the last read is refused, but only after those reads were sent. A mark above 22,857 has
+its ledgers counted by AlterID span instead of by catalogue (#679): one read per slice of at most
+4,000 AlterIDs over `(0, mark]`, each asking for the ledgers' GUIDs only and made once, not paired,
+so a mark of 316,028 is 80 requests of about 0.15 s each. The census is bounded by the same extent
+bracket as every other read. A slice holding more ledgers than its span (`ledger_span_slice_over_bound`),
+a GUID seen twice (`ledger_span_duplicate_identity`), no ledger at all (`ledger_span_census_empty`:
+an empty slice is the answer a closed or absent company gives too) or a slice past the response
+limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
+read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
+would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
+`size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
+census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
+estimated past `limit_bytes`; a response past the transport's cap is cut off mid-read. The mark is an upper bound on ledgers, since every master raises it, so a
+company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
+two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
+these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
@@ -139,6 +160,17 @@ milliseconds, and the kind of the request that failed; the last 64 parts listed 
 counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
 timed out can be diagnosed without sending it again (bridge#799). The message and every other
 field are dropped; no row content, name or narration is kept.
+A call that sent requests to Tally also keeps a `request_trail` in that record (bridge#918): for
+each of the last 32 sends (the rest counted, and so are the sends that failed), its place in the
+call, its kind (`post` or `status`), the request's size, an outcome code (`answered`, the transport
+error's code, or `send_abandoned` when a cancelled call dropped it), the response's size, and the
+milliseconds the send held the endpoint's lock, so a failed read says which request failed. It
+holds no request or response body, name or value, and no hash of either (a request names the
+company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
+exact size remains, so it shows a company name's length to a reader who holds the request template.
+A request that cannot be built (over the size cap) sends nothing and leaves no record, and a call
+cancelled before its post was dispatched leaves no trail in its receipt. To match a failure with
+`read_evidence`, use the place in the call and the receipt's time.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery
@@ -349,8 +381,9 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 
 ## Voucher-file preparation and verification
 
-The MCPB extension exposes `verify_import` by default as a read-only recovery
-tool, and `build_import_xml` by default because it always sets
+The MCPB extension exposes `verify_import` by default as a recovery tool (it
+reads Tally, saves local proof files and writes nothing to Tally), and
+`build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
 Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
@@ -387,8 +420,10 @@ The four rest on different observations, and each build reports its own in
   Account, and a build that names a counterparty warns so.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file, and only an unnumbered single-voucher
-`Journal` batch is eligible for native posting.
+licence mode, or manually imported file. In the MCPB extension an unnumbered
+Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
+per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
+that turns that on.
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -464,7 +499,8 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal dispatch. Unsupported:
+selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
 not live-Tally qualification or a claim that every Tally configuration or
@@ -638,7 +674,9 @@ its separate checks cannot lock out Tally UI edits or other importers. Concurren
 external changes are outside this preview's validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
-approval. If dispatch has already begun, cancellation cannot undo Tally's
+approval. (The tool call itself returns "approval pending" after about 40 seconds
+and the dialog stays open (for up to the two minutes); calling `post_import`
+again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.
@@ -862,7 +900,7 @@ sent directly as Tally's upsert key. Reused labels in independent batches theref
 have different wire identities, so rebuilding after losing the batch journal
 creates a new identity and does not deduplicate the business event.
 
-**An unknown outcome requires read-only reconciliation for every voucher type.**
+**An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not
 re-import or rebuild the same business event, including a `Journal`. The
 controlled repeat observation returned `CREATED=0, ALTERED=1` and left one

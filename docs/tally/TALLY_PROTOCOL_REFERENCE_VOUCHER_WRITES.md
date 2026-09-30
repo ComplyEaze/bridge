@@ -583,19 +583,19 @@ response, and its cause is **UNVERIFIED**; nothing is recorded about it here.
 TallyPrime 7.1 Gold, one client book, 2026-09-28).**
 - **What was sent.** The request shape was §9.13's, with the same `REMOTEID` a voucher was created
   with, `ACTION="Create"`, and only the `NARRATION` changed. It was byte-identical to Bridge's own
-  native request apart from `NARRATION`: a renderer reproduced 258 of 258 captured native vouchers
-  exactly.
+  native request apart from `NARRATION`: a renderer reproduced every one of the captured native vouchers
+  (about 260) exactly.
 - **Pilot.** One Payment returned `ALTERED=1`, `CREATED=0`. A vouchers read of that day showed the
   same GUID, the same `VOUCHERNUMBER`, the same amounts and an unchanged day total. Only `NARRATION`
   and `ALTERID` had changed.
-- **Then 307 more** Payment, Receipt and Contra vouchers, in 13 requests, each returned `ALTERED` equal to
+- **Then about 300 more** Payment, Receipt and Contra vouchers, in 13 requests, each returned `ALTERED` equal to
   its voucher count and `CREATED=0`.
-- **Read-back.** A full vouchers read of the window (1,958 vouchers, paged) found each of the 308
-  target vouchers once. Their type, amounts, cancelled and optional flags were unchanged, and none
+- **Read-back.** A full vouchers read of the window (about 2,000 vouchers, paged) found each of the
+  roughly 300 target vouchers once. Their type, amounts, cancelled and optional flags were unchanged, and none
   still carried the narration tag the upsert removed.
 - **What it extends.** It extends the Journal-on-Silver upsert above to Payment, Receipt and Contra
   on Gold, for a narration change only. A changed amount, ledger or date was not sent, and
   neither was a repeat run on a second book.
-- **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because 308
+- **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because about 300
   vouchers were read back in full. It is still one session on one client book, not repeated on a
   second, so treat it as **Confidence: PARTIAL** beyond that book.

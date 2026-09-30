@@ -340,15 +340,15 @@ client book, 2026-09-28).**
   after the rename. The textual diff held only the name, `ALTERID` and the company's ledger counter.
   Opening balance, parent, GUID and `MASTERID` were unchanged. `ledger_movement` showed the ledger's
   vouchers still attached.
-- **Then 122 more ledgers** returned `ALTERED` equal to each request's count. Two groups were each
+- **Then about 120 more ledgers** returned `ALTERED` equal to each request's count. Two groups were each
   piloted with the same Object diff.
-- **Re-read.** A compliance `ledger_masters` read of all 699 ledgers found the count unchanged and
+- **Re-read.** A compliance `ledger_masters` read of all the book's ledgers (about 700) found the count unchanged and
   every renamed ledger under its new name. Parent, opening balance and GSTIN fields had 0 changes.
 - **Scope.** The GUID was diffed only for the pilot ledger and the two piloted groups, and it was
-  unchanged (§12a.9 observed the same for a rename in Tally's screens). The other 122 ledgers were
+  unchanged (§12a.9 observed the same for a rename in Tally's screens). The other renamed ledgers (about 120) were
   counted and re-read for parent, opening balance and GSTIN, not for GUID. Aliases and a rename that
   collides with an existing name were not measured.
-- **Confidence.** VERIFIED because the pilot was diffed before and after and 122 more were counted;
+- **Confidence.** VERIFIED because the pilot was diffed before and after and about 120 more were counted;
   still one session on one client book, so **Confidence: PARTIAL** beyond it.
 
 ### 9.4a A partial ledger `Alter` preserves the omitted Party GSTIN

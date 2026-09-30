@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::{
     api_client, bind_workspace, credential_sessions, credentials_for_session, endpoint,
     endpoint_with_allowed_origins, purge_expired_credential_sessions, revoke_credential_session,

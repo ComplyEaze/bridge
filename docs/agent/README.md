@@ -869,6 +869,19 @@ and payable fields kept separate. `totals.scope` is `open_bills_only`.
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
 been removed. Gross exposure is not net money due.
 
+`receivable` and `payable` follow the sign of each bill's balance, as Tally's own
+Bills Receivable and Bills Payable reports scope them, not the type of party, and
+those reports carry no bill type. A customer's advance, or a credit note raised to
+a customer, appears under `payable`; a supplier's advance, or a debit note raised
+to a supplier, appears under `receivable`. An open bill's `kind` is therefore a
+direction, not "owed by a customer" or "owed to a supplier": with a 50,000
+supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
+`payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
+of an `unallocated` amount is the sign of the party's net unallocated balance, so
+an on-account receipt and an on-account payment on one party net into one figure.
+Separating advances, credit and debit notes and on-account amounts by their
+voucher's bill type is tracked in #945.
+
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted
 as `posted_verified`. Verification entry differences are structured objects;

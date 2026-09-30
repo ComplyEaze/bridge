@@ -3,7 +3,7 @@
   "files": [
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "0110d8c6c08ae3950d015721d7b224003162a6ba2465f743c3b246f51110231d"
+      "sha256": "e6a80939cf7170f3af996bd146214839fbe2817b1bc6f79bac887ff6e3f46a84"
     },
     {
       "path": ".github/workflows/dependency-security-scheduled.yml",
@@ -415,7 +415,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/src/lib.rs",
-      "sha256": "16ce5390ecdacd27795b2b8e7e08a49a4ecc5b90a48ab9fe1254c60735b6f2c4"
+      "sha256": "70c7faad27421dc82f865f698773cac2cea9b04e297bc68d6c8ff7cc5d55e5c1"
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/src/wire_gate.rs",
@@ -443,11 +443,11 @@
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/src/server.rs",
-      "sha256": "9cb678bf368028d6402efc17c2da9a96cdab1c379a05f89277ad0e5798e37101"
+      "sha256": "17c13eee6dbed66ed549bafc6a926f8360c7056c7af7bbdad36553a285e2c567"
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs",
-      "sha256": "311b01097edc118f233d1a7ecdc26ab02b73ef97fe024b52277cecfcf2c438dc"
+      "sha256": "b56ec3f8983960545de65e93d233bf20506a60b31d50870a849f6578105bcc96"
     },
     {
       "path": "src-tauri/src/agent.rs",
@@ -611,11 +611,11 @@
     },
     {
       "path": "src-tauri/src/axal.rs",
-      "sha256": "8c5d7b1460261b079b8424d398d10f7f4f0bdc3d97964410245c68f6839a5eb1"
+      "sha256": "4295055536d595aa5f63c5f65593ab5a67ae6c57a7185b25f2e79b02f707a94b"
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "ddb4adb47481415632f8662790ebe3057ed10b53e50b4e9246aaf8e1024d5dfd"
+      "sha256": "9f203f26e422b7b804300171cc248c5a907ed84e573c6d6d9397406d1933d5e1"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -747,7 +747,7 @@
     },
     {
       "path": "src-tauri/src/documents.rs",
-      "sha256": "ba965c6de1d3df4d4863312c4e45a0c3f49e52c57853227feba8a15993c72fcd"
+      "sha256": "8f9f83807b42acd4470cc2af32aa7445e950899b73d86434e75e15b2ef9911f9"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs",
@@ -931,7 +931,7 @@
     },
     {
       "path": "src-tauri/src/tally/approved_import.rs",
-      "sha256": "c62f0266e7a8cbcd1ff8acf5590c32527a84c0d69ca02df874b55dc590664037"
+      "sha256": "30bd3f5d02e1176ebf6dd3f047bfcd912e9fc685a76c16ecb6e553a91dcd8647"
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs",

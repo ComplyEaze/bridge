@@ -742,7 +742,9 @@ impl WindowReadLimits {
     /// so it is sized against the whole transport cap (twice the budget), not
     /// the half-budget that absorbs the error in an estimated data part. Its
     /// only uncertainty is the per-row figure: 4 KiB is assumed against 2.42 to
-    /// 2.72 KB measured live (§11c.5), so a full census is about 22 MB.
+    /// 2.72 KB measured live on earlier books (§11c.5) and about 3.27 KB on a
+    /// book with a mark of about 1.03M (#899), so a full census is about 22 to
+    /// 27 MB of the 33.5 MB cap, about 1.25x headroom on the heaviest row seen.
     pub(super) fn census_capacity(self) -> u64 {
         vouchers_per_read(
             self.budget_bytes.saturating_mul(2),

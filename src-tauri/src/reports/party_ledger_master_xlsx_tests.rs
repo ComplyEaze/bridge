@@ -382,7 +382,7 @@ fn a_later_dated_voucher_is_said_beside_the_balance_date_and_in_the_read_period(
     source.to = TallyDate::parse("20261001").unwrap();
     source.last_voucher_date = TallyDate::parse("50261231").unwrap();
     let text = workbook_text(source);
-    let note = "Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook.";
+    let note = "Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first date Tally accepts on or after this computer's date, or at the start of the books if that is later; if this computer's date is wrong, correct it and export again.";
     // Once on the ledger sheet (beside the date), once in the Schedule III read period.
     assert_eq!(text.matches(note).count(), 2, "{text}");
     assert!(text.contains(&format!(

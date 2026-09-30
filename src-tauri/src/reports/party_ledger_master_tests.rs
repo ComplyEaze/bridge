@@ -264,7 +264,7 @@ fn a_later_dated_voucher_note_names_both_dates_and_claims_neither_count_nor_caus
     later.last_voucher_date = TallyDate::parse("50261231").unwrap();
     assert_eq!(
         later.later_dated_vouchers_note().as_deref(),
-        Some("Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook.")
+        Some("Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first date Tally accepts on or after this computer's date, or at the start of the books if that is later; if this computer's date is wrong, correct it and export again.")
     );
     // On or before the snapshot's end there is nothing to say.
     for last in ["20260731", "20260401"] {

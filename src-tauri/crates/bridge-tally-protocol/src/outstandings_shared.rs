@@ -138,7 +138,9 @@ impl DateBoundaryProfile {
 
     /// The earliest calendar date on or after `limit` that this profile
     /// accepts. A closing snapshot must never be silently moved *before* the
-    /// last voucher it is meant to include.
+    /// last voucher it is meant to include. The party-master snapshot (#875)
+    /// now ends at the host's today when a voucher is dated later, and says so
+    /// in its workbook, so it is not silent there.
     pub fn earliest_boundary_at_or_after(self, limit: &TallyDate) -> Option<TallyDate> {
         let mut candidate = limit.clone();
         // An Education-restricted boundary is at most 30 calendar days away.

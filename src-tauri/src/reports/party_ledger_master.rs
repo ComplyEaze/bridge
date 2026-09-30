@@ -30,8 +30,9 @@ pub(crate) struct PartyLedgerMasterSource {
     pub(crate) from: TallyDate,
     pub(crate) to: TallyDate,
     /// The extent's last voucher date when the read was pinned. It is after
-    /// `to` only when the balance snapshot was ended at the host's today
-    /// because the book holds a later-dated voucher (#875).
+    /// `to` only when the balance snapshot was ended at the host's today, or at
+    /// the start of the books when the host's date is earlier, because the book
+    /// holds a later-dated voucher (#875).
     pub(crate) last_voucher_date: TallyDate,
     pub(crate) rows: Vec<PartyLedgerMasterRow>,
     /// Ordered master/balance/group request body commitments (UTF-16LE on wire).
@@ -64,7 +65,7 @@ impl PartyLedgerMasterSource {
     pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
         (self.last_voucher_date > self.to).then(|| {
             format!(
-                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook.",
+                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first date Tally accepts on or after this computer's date, or at the start of the books if that is later; if this computer's date is wrong, correct it and export again.",
                 self.to.as_str(),
                 self.last_voucher_date.as_str()
             )

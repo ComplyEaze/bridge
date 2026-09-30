@@ -314,6 +314,9 @@ async fn party_source_ends_its_balance_snapshot_at_the_hosts_today_when_a_vouche
     // and its books begin 20260401. The clock is injected, never read.
     for (today, to, later_dated) in [
         ("20260815", "20260831", true),
+        // A host clock before the books begin: a one-day snapshot from the
+        // start of the books, with the later-dated note.
+        ("20260301", "20260401", true),
         ("20260907", "20261001", false),
         ("20990101", "20261001", false),
     ] {

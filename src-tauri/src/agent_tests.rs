@@ -222,6 +222,71 @@ fn voucher_company_name_is_validated_and_xml_escaped_without_a_tdl_literal() {
     );
 }
 
+/// The decoded, unescaped text of the first `SVCURRENTCOMPANY` element in
+/// `xml`. Panics if `xml` does not parse as well-formed XML, or has no such
+/// element -- neither should ever happen for a request built from
+/// `bridge_tally_protocol::xml_text::escape_text`.
+fn decoded_svcurrentcompany(xml: &str) -> String {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    loop {
+        match reader
+            .read_event()
+            .expect("request must be well-formed XML")
+        {
+            quick_xml::events::Event::Start(event)
+                if event.name().as_ref() == b"SVCURRENTCOMPANY" =>
+            {
+                let raw = reader
+                    .read_text(event.name())
+                    .expect("SVCURRENTCOMPANY must have a matching close tag");
+                let decoded = raw.decode().expect("text must decode as UTF-8");
+                return quick_xml::escape::unescape(&decoded)
+                    .expect("text must unescape")
+                    .into_owned();
+            }
+            quick_xml::events::Event::Eof => {
+                panic!("request has no SVCURRENTCOMPANY element:\n{xml}")
+            }
+            _ => {}
+        }
+    }
+}
+
+/// One table-driven check, across the app crate's two remaining request
+/// families (`tdl_engine` and `agent_read_profiles`'s windowed voucher
+/// requests), that a company name carrying every reserved XML character
+/// round-trips through `escape_text` unchanged (bridge#832): the rendered
+/// request parses as well-formed XML and `SVCURRENTCOMPANY` decodes back to
+/// exactly the raw name.
+#[test]
+fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
+    const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
+    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
+    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
+    let requests: Vec<(&str, String)> = vec![
+        (
+            "tally::tdl_engine::ledgers_request",
+            crate::tally::tdl_engine::ledgers_request(NAME),
+        ),
+        (
+            "tally::tdl_engine::ledger_period_balances_request",
+            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
+        ),
+        (
+            "agent_read_profiles::render_agent_vouchers",
+            render_agent_vouchers(NAME, "20260901", "20260902", None)
+                .expect("company name is a valid XML value"),
+        ),
+    ];
+    for (label, request) in requests {
+        assert_eq!(
+            decoded_svcurrentcompany(&request),
+            NAME,
+            "{label} did not round-trip the company name byte for byte"
+        );
+    }
+}
+
 #[test]
 fn the_audit_voucher_part_is_the_agent_window_shape_with_its_own_fetch() {
     use bridge_tally_protocol::xml_read_profiles::{

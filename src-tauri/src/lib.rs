@@ -7,6 +7,7 @@ pub mod commands;
 pub mod db;
 pub mod documents;
 pub(crate) mod endpoint_coordination;
+pub(crate) mod endpoint_wire;
 pub mod export_registry;
 pub mod gst;
 pub(crate) mod local_files;

@@ -515,11 +515,155 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow is manual so publishing
-it remains an explicit maintainer action. Once GitHub Pages is configured for
-this repository, it resolves GitHub Release assets by exact release tag and
-labels prerelease downloads as unsigned previews. It does not proxy Tally,
-create an account, or run a cloud relay.
+`site/` is a small static installer page. Its workflow runs when a maintainer
+dispatches it, and again when a maintainer-dispatched preview publication in
+this repository finishes successfully, so the page's release snapshot follows
+the release without a second step. The job requires the publication run's event
+and repository, because the trigger matches a workflow by name only. A release
+published with the workflow token starts no workflow of its own, which is why
+the follow-up is wired to the publication run. A successful publication also
+deploys any `site/` change already merged to the default branch but not yet
+deployed, so text on the default branch is text that goes live.
+Once GitHub Pages is configured for this repository, the page offers a
+preview by its tag name and complete asset set, whether or not GitHub marks the
+release a prerelease, and labels every download as an unsigned preview. It does
+not proxy Tally, create an account, or run a cloud relay.
+
+## Release rhythm and notes
+
+A release is how a CA, an accountant or a developer learns what changed. Write
+every note for them first, and for maintainers second.
+
+**Rhythm**
+
+- Cut an `mcp-preview-*` build at most every two weeks, and only when both of
+  these hold: at least one user-visible change has landed, and CI is green on
+  both hosts.
+- The workflow publishes each preview as a prerelease. Once its checks are
+  read, the maintainer marks the newest preview as the repository's latest
+  release (`gh release edit <tag> --prerelease=false --latest`), so the
+  releases page never opens on an older line. The install page accepts a
+  preview either way.
+- Once a month, add a "what changed" entry to `CHANGELOG.md`, even in a month
+  without a build.
+
+**Choosing the version**
+
+SemVer 2.0.0 defines major, minor and patch only from 1.0.0. Before that,
+"anything MAY change at any time" (rule 4), and its FAQ suggests a minor bump
+for each release. Within that freedom, this project's own convention keeps a
+patch for a fix-only release:
+
+| What merged since the last release | Before 1.0.0 | From 1.0.0 |
+| --- | --- | --- |
+| Something an existing user relies on was removed or changed (label `breaking`) | minor (0.3.0 → 0.4.0) | major |
+| A new capability (`type:feature`, `enhancement`) | minor | minor |
+| Only fixes, rectifications or maintenance (`type:bug`, `type:rectify`, `bug`, `type:chore`, `dependencies`, `github_actions`, `infra`) | patch (0.3.0 → 0.3.1) | patch |
+| Documentation only (`documentation`) | no release | no release |
+
+`node scripts/next-version.mjs` proposes the version:
+- It reads the pull requests squash-merged since the last `mcp-preview-*` or
+  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+  `HEAD` would count an unmerged working branch's commits as direct pushes).
+  It refuses when `origin/master` here is not origin's current master, or when
+  the version files here differ from that commit's, so a stale branch cannot
+  propose a bump twice. Run `git fetch --tags origin` first.
+- It classifies each by its own labels together with the labels of the issues
+  it closes, the highest kind winning.
+- It refuses, and names them, while any pull request is unclassified. Expect
+  this: many merged pull requests carry no classifying label and close no
+  labelled issue. Label them, or choose the level yourself with `--level`,
+  which the output records and warns about when it is lower than the labels
+  imply. `--level` cannot release nothing.
+- It refuses an unknown flag, a repeated flag, a stray argument, and the
+  `--level=minor` form (write `--level minor`), rather than ignoring them. A `gh` failure or a
+  60-second stall ends the run with one line naming the command.
+- It refuses when the version files already differ from the last release tag,
+  which is the state after a version pull request merges and before its tag
+  exists.
+
+`--apply` writes the version to `package.json`, `packaging/mcpb/manifest.json`,
+`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the `bridge` entry in
+`src-tauri/Cargo.lock`, and the README sentence naming the current version.
+It checks every file first and writes none if one fails. Then:
+
+1. Run `scripts/reseal.sh`, because three of those files are pinned.
+2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
+3. Commit, and open the version pull request.
+4. After it merges, dispatch the preview release with the matching tag.
+
+`scripts/check-license-metadata.mjs` fails CI when the five version files
+disagree.
+
+**Every release note has four parts, in this order**
+
+1. **What you can do now.** Plain sentences a CA would say, one per change.
+   Each line names its pull requests.
+2. **Safer or fixed.** Refusals, safety checks and bug fixes, described by
+   what the user sees.
+3. **Known limits.** Name what still does not work, and link the issue.
+4. **All changes.** GitHub's generated list, grouped by the existing `type:*`
+   labels through `.github/release.yml`. The publish workflow appends it; do
+   not paste it by hand.
+
+   On the release page the written parts come first, then the standard
+   unsigned-preview text, then this generated list.
+
+**`CHANGELOG.md`**
+
+- Each release gets an "In plain words" section above the detailed entries,
+  written from the merged pull requests since the last build.
+- Keep the detailed entries as they are. They serve maintainers and
+  integrators.
+- `CHANGELOG.md` is the one source for the notes. The publish workflow takes
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
+  puts it above the unsigned-preview text, and appends GitHub's list. The
+  install page's "What changed" page renders the same file when the install
+  page is deployed, so a changelog edit reaches the site with the next
+  deploy, not when the file changes.
+  Neither step can stop a release or a deploy; each warns and falls back, so a
+  missing section shows as a warning in the run, not as a failed release.
+- The page's look belongs to a tracked template, `site/changelog.template.html`,
+  which holds the line `<!-- changelog -->` exactly once. The generator puts a
+  version index and the sections there and writes `site/changelog.html`, which
+  is ignored by git and never edited by hand. Each section has an `id` (`v0-3-0`,
+  or `unreleased`), a `data-version`, and `data-latest="true"` on the newest
+  published one. With no template, or one without the marker, the deploy uses
+  a plain built-in page and never fails.
+- At cut time, in the pull request that bumps the version: rename the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
+  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  release carries the `[Unreleased]` text instead (with a warning), which may
+  describe changes that build does not have, so read the release body; if that
+  is empty too, only the standard text and GitHub's list. Headings must read
+  `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
+  closed, or another level-two heading, is reported as a warning in the run.
+- The install page shows this file's headings, paragraphs and bullets, so a
+  claim added here is a claim on the public site. Fenced code is left out, and
+  tables and quotes show as plain text. Escape nothing by hand: the renderer
+  escapes all text and links only `https://` addresses and `#123` issue
+  numbers.
+
+**Writing rules for notes, the install page and posts**
+
+- Say "ComplyEaze Bridge" at first mention.
+- Name the build that each capability sentence describes. The install page,
+  the README and the repository description must agree with the newest
+  published build.
+- Make no accuracy claim without a published method and result.
+- Never say "signed" or "production" about an unsigned preview (see *Signing
+  and publication*).
+- Put no customer, company or client names, no local paths, and no
+  private-repository references in any note.
+- Before publishing, check the text for AI-writing patterns and unclear
+  phrasing. Offline prose linters such as `write-good` help. Keep an exact
+  safety or capability claim even where a linter flags it.
+
+**When a listing exists**
+
+- If the MCP registry or another directory lists the build, update that
+  listing's version and SHA-256 in the same release. A listing that points at
+  an older package is a stale claim.
 
 ## Rollback
 

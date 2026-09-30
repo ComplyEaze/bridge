@@ -96,7 +96,7 @@ test("notes fall back from the version section to a non-empty Unreleased to noth
   assert.deepEqual(pickNotes(emptyUnreleased, "mcp-preview-0.5.0"), { mode: "none", body: "" });
   const emptyOwn = parseChangelog("## [0.5.0] - 2026-10-01\n\n## [Unreleased]\n\nNext words.\n");
   assert.equal(pickNotes(emptyOwn, "mcp-preview-0.5.0").mode, "unreleased");
-  assert.throws(() => pickNotes(sections, "v0.1.0"), /not an mcp-preview tag/);
+  assert.throws(() => pickNotes(sections, "v0.1.0"), /not a release tag/);
   assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n"), "Footer.\n");
   assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n"), "Body\n\n---\n\nFooter.\n");
 });

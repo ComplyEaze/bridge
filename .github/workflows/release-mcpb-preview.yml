@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Immutable preview tag, for example mcp-preview-0.2.1"
+        description: "Immutable release tag, for example mcp-v0.4.0 (the older mcp-preview-0.2.1 form is also accepted)"
         required: true
         type: string
 
@@ -182,6 +182,18 @@ jobs:
             echo "refusing to replace existing release assets for $RELEASE_TAG"
             exit 1
           fi
+
+          # Immutability is per version, not per tag string: a version already released under
+          # the other tag form is not released again.
+          version="${RELEASE_TAG#mcp-preview-}"
+          version="${version#mcp-v}"
+          for other in "mcp-preview-$version" "mcp-v$version"; do
+            [[ "$other" == "$RELEASE_TAG" ]] && continue
+            if [[ -n "$(git ls-remote --tags origin "refs/tags/$other")" ]]; then
+              echo "refusing to publish: version $version already has the tag $other"
+              exit 1
+            fi
+          done
 
           resolve_preview_tag_commit() {
             local tag_ref_file tag_sha peeled_sha ref_sha ref

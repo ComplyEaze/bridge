@@ -158,7 +158,7 @@ for (const [source, job, expected, digest] of [
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
   ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],
-  ["release-mcpb-preview.yml", releaseWorkflow, "cf1da8bf810c3134d781b2b95e08803b9c1e58b48d20992931ec17660bd73c42"],
+  ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
   const jobs = lines.findIndex((line) => line.replace(/\r$/, "") === "jobs:");

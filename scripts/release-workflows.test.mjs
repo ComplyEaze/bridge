@@ -70,6 +70,9 @@ function assertReleaseWorkflow(release) {
   assert.equal(releaseStep.env.GH_REPO, "${{ github.repository }}");
   assert.match(releaseStep.run, /gh release create/);
   assert.match(releaseStep.run, /refusing to replace existing release assets/);
+  assert.match(releaseStep.run, /for other in "mcp-preview-\$version" "mcp-v\$version"; do/);
+  assert.match(releaseStep.run, /git ls-remote --tags origin "refs\/tags\/\$other"/);
+  assert.match(releaseStep.run, /refusing to publish: version \$version already has the tag \$other/);
   assert.match(releaseStep.run, /git ls-remote --tags origin "refs\/tags\/\$RELEASE_TAG" "refs\/tags\/\$RELEASE_TAG\^\{\}"/);
   assert.match(releaseStep.run, /\$\{peeled_sha:-\$tag_sha\}/);
   assert.match(releaseStep.run, /could not verify whether \$RELEASE_TAG already exists; refusing to publish/);
@@ -141,7 +144,7 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   // A preview missing one checksum would deploy a page with no download, so it is refused too.
   const incomplete = runSnapshotStep(run, [release("mcp-preview-0.3.0", false, files("mcp-preview-0.3.0").slice(0, 3))]);
   assert.equal(incomplete.status, 1);
-  assert.match(incomplete.stderr, /no installable mcp-preview release/);
+  assert.match(incomplete.stderr, /no installable release/);
 });
 
 // Runs the summary step's own shell in a shallow clone, as the deploy job's checkout is, with `gh`

@@ -8,8 +8,7 @@ is the icon. Always use the supplied files; never retype the name or set the "y"
 
 - **Clear space:** keep empty space on every side at least the height of the lowercase "o" (the
   x-height) of the wordmark as used. For the icon, keep 1/8 of the tile width clear.
-- **Minimum size, screen:** the lockup at 16 px cap height (the site header uses 22–24 px total
-  height); the wordmark alone at 80 px wide; the icon at 16 px, using only `favicon.svg` or the
+- **Minimum size, screen:** the lockup at 16 px cap height; the wordmark alone at 80 px wide; the icon at 16 px, using only `favicon.svg` or the
   16 px slot of the `.ico` (drawn on the pixel grid). Below 32 px, never use the auto-scaled tile.
 - **Minimum size, print:** the lockup at 25 mm wide; the icon at 6 mm.
 
@@ -29,11 +28,11 @@ is the icon. Always use the supplied files; never retype the name or set the "y"
 | Supporting (not the mark) | taglines and rules on banners and social previews | `#465867` / `#d0d7de` (light), `#c9d2ec` / `#1c2d78` (cobalt dark), `#ead7c4` (red) | text only |
 
 The pencil red `#b3261e` is the only red used for the tick. It is ΔE2000 11.5 from Tally's legacy red
-`#ED1C24`; the site's older tick red `#e03a2f` is only 2.6 away, so it is not used in the mark.
+`#ED1C24`; brighter reds such as `#e03a2f` sit within ΔE2000 3 of it, so they are not used in the mark.
 
 ## Do
 
-- Use the SVG masters in `brand/svg/`; the PNGs for places that can't take SVG.
+- Use the SVG masters in `docs/brand/svg/`.
 - Keep the tick the same colour as the word, except the pencil-red tick on the red world's cream page.
 - Write the name as "ComplyEaze Bridge" in text; never bare "Bridge".
 - Mention TallyPrime and Claude only in plain text ("for TallyPrime", "works with Claude"), never inside the mark.
@@ -41,7 +40,7 @@ The pencil red `#b3261e` is the only red used for the tick. It is ΔE2000 11.5 f
 ## Don't
 
 - **The tick never breaks out of its tile**, and it is never enlarged, rotated or detached from the word.
-- **No saffron or green ticks**, no upside-down tick, and never set the mark next to "CA" (ICAI's CA logo uses a tick).
+- **No saffron or green ticks**, no upside-down tick, and never set the mark next to "CA".
 - No finding-flag colours (yellow, pink, green, orange, violet, cyan) anywhere in the mark; no gold.
 - No stretching, outlines, shadows, gradients, glows or effects; no other typefaces for the wordmark.
 - No separate cut or gap in the y (the "cut" variant is retired), no round-ended tick (retired).
@@ -64,5 +63,6 @@ are rendered from these SVGs and added where each surface is wired up.
 ## Type and licence
 
 The letters are **Outfit** (SIL Open Font License 1.1, © The Outfit Project Authors), converted to
-outlines; the tick-y is drawn geometrically for this mark. Drawn by Claude (Anthropic) for the owner in
-September 2026 from free, open-licensed fonts only; no stock art and no AI image generator was used.
+outlines; the tick-y is drawn geometrically for this mark.
+
+ComplyEaze™ and ComplyEaze Bridge™, and the related logos and visual identity, are trade marks of SPMS Comply Eaze Solutions LLP (ComplyEaze). The Apache License 2.0 does not grant any right to use them (section 6 of the license); see TRADEMARKS.md. The logo and icon files — docs/brand/, src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are not licensed under Apache-2.0: all rights in them are reserved. They are included so that official builds carry the ComplyEaze Bridge identity. A fork or modified build must replace them and use a different name.

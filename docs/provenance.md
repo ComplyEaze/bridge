@@ -29,22 +29,24 @@ contain customer data in release artifacts.
 - `scripts/capture-package-log.py` and its test are project-authored CI
   diagnostic tooling contributed under Apache-2.0; no upstream implementation
   is copied into them.
-- `src-tauri/app-icon.svg` is the project-authored source icon contributed by
-  the repository owner under Apache-2.0. It is the ComplyEaze Bridge mark: the
-  "y" of ComplyEaze drawn as an auditor's tick, on a cobalt tile. It was drawn
-  geometrically for the owner in September 2026; no stock artwork and no AI
-  image generator was used.
-- Raster, ICO, and ICNS files under `src-tauri/icons/` are generated derivatives
-  of that vector source and carry the same project license. The 16 px entries
-  of `icon.ico` and `icon.icns` are rendered from `docs/brand/svg/favicon.svg`,
-  the same mark drawn on the 16 px grid.
-- `docs/brand/svg/` holds the brand masters (wordmark, lockups, icon tiles and
-  favicons), contributed by the repository owner under Apache-2.0. Their letters
-  are the Outfit typeface (Copyright 2021 The Outfit Project Authors, SIL Open
-  Font License 1.1) converted to outlines; no font file is distributed.
-  Apache-2.0 grants no trademark rights (section 6): the ComplyEaze and
-  ComplyEaze Bridge names and marks remain the owner's, and
-  `docs/brand/README.md` states how they may be used.
+- `src-tauri/app-icon.svg`, the files under `src-tauri/icons/` and the brand
+  masters under `docs/brand/` are the ComplyEaze Bridge logo and icons: the "y"
+  of ComplyEaze drawn as an auditor's tick. They were drawn as SVG code by
+  Claude (Anthropic) for ComplyEaze on 30 September 2026; no stock artwork was
+  used. The letters are the Outfit typeface (Copyright 2021 The Outfit Project
+  Authors, SIL Open Font License 1.1) converted to outlines; no font file is
+  distributed. The raster, ICO and ICNS files under `src-tauri/icons/` are
+  rendered from `src-tauri/app-icon.svg`, except the 16 px entries of
+  `icon.ico` and `icon.icns`, which are rendered from
+  `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid).
+  ComplyEaze™ and ComplyEaze Bridge™, and the related logos and visual
+  identity, are trade marks of SPMS Comply Eaze Solutions LLP (ComplyEaze). The
+  Apache License 2.0 does not grant any right to use them (section 6 of the
+  license); see TRADEMARKS.md. The logo and icon files — docs/brand/,
+  src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are
+  not licensed under Apache-2.0: all rights in them are reserved. They are
+  included so that official builds carry the ComplyEaze Bridge identity. A fork
+  or modified build must replace them and use a different name.
 - Tally XML and JSON files under `src-tauri/crates/tally-protocol-simulator/`
   and `src-tauri/crates/bridge-tally-protocol/tests/fixtures/` are
   project-authored synthetic interoperability fixtures contributed under

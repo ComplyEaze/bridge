@@ -647,7 +647,7 @@ no row, and refuses a name no type carries (ASCII case ignored) as `unknown_vouc
 
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
-**Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters.** Captured from
+**Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from
 `List of Ledgers` with `FETCH … TAXTYPE, GSTDUTYHEAD`, retained as
 `tests/fixtures/agent/native-ledger-masters-duty-heads.utf16le.xml`. A second capture of the same
 book (2026-09-30, 36 ledger masters, after one probe ledger and seven more duty ledgers were
@@ -662,22 +662,23 @@ the binary, the relay and the times.
 | `CGST` | central tax |
 | `IGST` | integrated tax |
 | `State Tax` | state tax — **NOT** `SGST` |
-| `SGST/UTGST` | state or union-territory tax, as a second spelling of the state head |
+| `SGST/UTGST` | state or union-territory tax; its relation to `State Tax` is not established |
 | `UT Tax` | union-territory tax |
 | `Cess` | cess |
 
-`SGST` never appears. The state head is spelled `State Tax` or `SGST/UTGST`, which is why the set
-is enumerated rather than pattern-matched, and why an unrecognised spelling is surfaced with its
-raw value instead of being normalised into a neighbour. The two state spellings are two heads
-(`state_tax` and `sgst_utgst` in the tool's JSON): no capture shows they are the same head, and
-folding one into the other would hide which spelling a book uses.
+`SGST` never appears. Two spellings that name a state-side head have been measured, `State Tax`
+and `SGST/UTGST`, which is why the set is enumerated rather than pattern-matched, and why an
+unrecognised spelling is surfaced with its raw value instead of being normalised into a neighbour.
+They are two heads (`state_tax` and `sgst_utgst` in the tool's JSON): no capture shows they are the
+same head, and folding one into the other would hide which spelling a book uses.
 
 **`SGST/UTGST` was measured on 2026-09-30 by writing it.** A raw `ACTION="Create"` master import of
-one ledger under Duties & Taxes with `TAXTYPE` `GST` and `GSTDUTYHEAD` literally `SGST/UTGST`
-returned `CREATED=1 ERRORS=0`, and the read through Bridge returned `SGST/UTGST` verbatim with
-`TAXTYPE` `GST`. The value had been absent from the candidate list measured on 2026-09-12 (which
-tried `SGST` and six other spellings, all silently dropped). Not established: whether Tally's own
-screens offer that spelling, or which books carry it.
+one ledger under Duties & Taxes with `TAXTYPE` `GST` and `GSTDUTYHEAD` literally `SGST/UTGST` was
+answered `CREATED=1 ERRORS=0` (recorded in the session log, not retained here). The read-back is
+what this repository retains: the second capture returns `SGST/UTGST` verbatim with `TAXTYPE` `GST`
+on two ledgers. The value was not among the spellings tried on 2026-09-12 (`SGST` and six others,
+all silently dropped; recorded in the lane's notes, not retained here). Not established: whether
+Tally's own screens offer that spelling, or which books carry it.
 
 **`TAXTYPE` qualifies the head and the two can contradict.** Four states, and all four are
 distinguishable only because both fields are read:

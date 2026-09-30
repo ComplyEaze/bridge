@@ -638,9 +638,8 @@ impl Server {
             let before = self.verify_import_for_post(args).await?;
             accumulated = combine_evidence(accumulated.clone(), before.evidence);
             require_absent_verification_result(&before.payload["result"], line.vouchers.len())
-                .map_err(|code| {
+                .inspect_err(|_| {
                     preexisting_txn_ids = Some(present_txn_ids(&before.payload["result"]));
-                    code
                 })?;
             let payload = ImportPayload {
                 company_guid: line.company_guid.clone(),
@@ -1240,8 +1239,12 @@ impl Server {
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
                 }
+                // Withheld on a tiny response budget, as `cause` is, so it cannot
+                // turn a refusal into the oversize answer.
                 if let Some(ids) = preexisting_txn_ids {
-                    name_preexisting_rows(&mut outcome.payload, &ids);
+                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                        name_preexisting_rows(&mut outcome.payload, &ids);
+                    }
                 }
                 if let Some(ledgers) = ledgers_changed {
                     name_changed_ledgers(&mut outcome.payload, &ledgers);
@@ -1606,7 +1609,7 @@ fn present_txn_ids(result: &Value) -> Vec<String> {
 
 /// What to do when a batch's rows are already in the book, or look like rows
 /// that are (#901). It names no amount, ledger or narration.
-const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each match a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Confirm from the statement whether each is a different bank row. If it is the same row it is already in the book: leave it out. If it is a different row that only looks the same (two same-day payments of one amount to one ledger), leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, ledgers and amount match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open each matching voucher and confirm it is a regular voucher (not optional, cancelled or post-dated) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If it is not there, or is a different row that only looks the same, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
 
 /// Name the rows of the batch that are already in the book, with the way on.
 fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {

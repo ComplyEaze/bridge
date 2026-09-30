@@ -533,15 +533,19 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    (it may be under a new name) with `validate_masters` before building again.
    A batch built before this record existed is refused with
    `import_batch_predates_ledger_binding`, before any Tally request; build it
-   again. Before approval, the post reads the book and refuses a batch with
+   again. The post reads the book before anything is sent and refuses a batch with
    `import_preexisting_identity` when any of its vouchers already matches a
    voucher in the book that it did not post (an earlier batch's twin, or one
    entered by hand). `error.preexisting_txn_ids` names those rows; nothing is
-   sent and no attempt is recorded. Confirm from the statement whether each is
-   a different bank row; leave it out, enter a different one in Tally by hand,
-   and build the other rows again so they post. Cut inline batches on whole
-   days, so same-day rows of one amount are not split across batches. The same
-   refusal inside the queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
+   sent and no attempt is recorded. Rows with the same date, ledgers and amount
+   match the same voucher, so count the vouchers in Tally rather than reading
+   every listed row as booked. Open each matching voucher, confirm it is a
+   regular one (not optional, cancelled or post-dated) and the same bank row,
+   and leave the row out; a different row that only looks the same is entered
+   in Tally by hand. Build the other rows again so they post, and cut inline
+   batches on whole days so same-day rows of one amount are not split across
+   batches. The same refusal inside the queue, after approval, carries no
+   list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
    the post can be re-run. Checked under the admission lock as the attempt is
    about to be recorded, a batch no longer in the journal, already attempted,

@@ -98,6 +98,7 @@ test("every host manifest launches its bundled binary and maps user settings to 
     // preparation and bank-statement parsing stay on.
     assert.equal(manifest.user_config.enable_writes.default, false);
     assert.deepEqual(manifest.server.mcp_config.env, {
+      BRIDGE_TERMS_ACCEPTED: "${user_config.accept_terms_2026_10}",
       BRIDGE_TALLY_HOST: "${user_config.host}",
       BRIDGE_TALLY_PORT: "${user_config.port}",
       BRIDGE_AGENT_REDACTION: "${user_config.redaction}",

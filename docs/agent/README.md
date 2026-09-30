@@ -19,6 +19,17 @@ Build and run it with Rust 1.96:
 rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
 ```
 
+Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
+(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
+is on, Bridge appends a line per terms version (version, time, source) to
+`terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
+can each add one), and refuses if that file cannot be read or written. This is a local
+record that the gate opened, not a security boundary and not proof of who accepted, when
+they ticked the box, or which text they saw. A value of `true` set by hand names no
+version, so it also opens the gate for a later terms version: re-read the Terms whenever
+the version changes.
+
 Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
@@ -54,16 +65,17 @@ Claude Desktop example:
   "mcpServers": {
     "bridge-tally": {
       "command": "/absolute/path/to/bridge_mcp",
-      "env": {"BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
+      "env": {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
     }
   }
 }
 ```
 
-Cursor uses the same server object in `.cursor/mcp.json`:
+Cursor uses the same server object in `.cursor/mcp.json`, with the same
+`BRIDGE_TERMS_ACCEPTED` setting:
 
 ```json
-{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp"}}}
+{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
 The ordinary default tools are `tally_status`, `list_companies`,

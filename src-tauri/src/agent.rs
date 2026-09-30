@@ -87,6 +87,8 @@ use movement_math::*;
 #[path = "agent_egress.rs"]
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
+#[path = "agent_terms.rs"]
+mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -393,6 +395,10 @@ struct Server {
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
+    /// The Terms-of-Use gate. Open for tests and the desktop app's local views; the server that
+    /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
+    /// accepted the Terms (see `agent_terms.rs`).
+    terms: terms::TermsGate,
 }
 
 struct ToolOutcome {
@@ -635,6 +641,20 @@ const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "terms_not_accepted" => Some(
+            "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
+             them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
+             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             there, then quit Claude completely and reopen it so Bridge starts again. Nothing \
+             was read from Tally.",
+        ),
+        "terms_record_unavailable" => Some(
+            "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
+             folder, so it is off although the Terms of Use are accepted. Check that the folder \
+             can be written; if the file is damaged, move it aside and Bridge will record your \
+             acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
+             Tally.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
              mark and Bridge has no \"before\" to attribute an import against. Record one \
@@ -1008,7 +1028,22 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             post_approvals,
+            terms: terms::TermsGate::NotRequired,
         }
+    }
+
+    /// The server that answers an MCP client: every tool refuses until the user has accepted the
+    /// Terms of Use (`BRIDGE_TERMS_ACCEPTED`). `run_stdio` is its only production caller.
+    fn for_mcp(settings: Settings) -> Self {
+        let accepted = env::var(terms::TERMS_ENV).ok();
+        Self::for_mcp_with(settings, accepted.as_deref())
+    }
+
+    fn for_mcp_with(settings: Settings, accepted: Option<&str>) -> Self {
+        let terms = terms::TermsGate::for_mcp(accepted, &settings.data_dir);
+        let mut server = Self::new(settings);
+        server.terms = terms;
+        server
     }
 
     fn tally_config(&self) -> TallyConfig {
@@ -1320,6 +1355,11 @@ impl Server {
     }
 
     async fn tool_payload(&self, name: &str, args: &Value) -> Result<ToolOutcome, ToolFailure> {
+        // First, before any argument or Tally request: every tool refuses until the Terms of Use
+        // are accepted.
+        if let Some(code) = self.terms.refusal() {
+            return Err(code.to_string().into());
+        }
         if name == "changed_since" {
             return Err("changed_since_unqualified".to_string().into());
         }
@@ -1883,7 +1923,7 @@ fn mask(value: &str) -> String {
 }
 
 pub async fn run_stdio() -> Result<(), String> {
-    let server = Server::new(Settings::from_env()?);
+    let server = Server::for_mcp(Settings::from_env()?);
     let stdin = BufReader::new(tokio::io::stdin());
     let mut stdout = tokio::io::stdout();
     serve_stdio(server, stdin, &mut stdout).await

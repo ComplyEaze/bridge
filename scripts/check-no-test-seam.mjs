@@ -109,9 +109,14 @@ export function tauriBuildExecutables(environment = process.env, sourceRoot = ro
 export function testHarnessExecutable(release, sourceRoot = root) {
   const argumentsList = [
     "test", "--locked", "--no-run", "--lib", "--message-format=json",
-    "--manifest-path", resolve(sourceRoot, "src-tauri", "Cargo.toml"), "-p", "bridge",
+    "--manifest-path", resolve(sourceRoot, "src-tauri", "Cargo.toml"),
   ];
-  if (release) argumentsList.push("--release");
+  // A `-p bridge` build resolves features differently from the `--workspace` build the
+  // native job has just made, and recompiles the tauri stack. The debug path selects the
+  // workspace so it reuses that build; the release path keeps `-p bridge`, whose
+  // release dependencies are what bundle-smoke's cache holds.
+  if (release) argumentsList.push("-p", "bridge", "--release");
+  else argumentsList.push("--workspace");
   const build = spawnSync("cargo", argumentsList, {
     cwd: sourceRoot,
     encoding: "utf8",

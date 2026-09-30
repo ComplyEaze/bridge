@@ -127,7 +127,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "85fdd243e10222a6e10dabffa5e5ef0a765a3d8ca00469bdfc382c91dd9928d4"],
+  ], "5aa5833f20dbad2db212b3bba8e7cf575037e599095fed05960daec289dbf434"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",

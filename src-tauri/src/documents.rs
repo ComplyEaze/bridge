@@ -508,7 +508,7 @@ fn display_name(path: &Path) -> String {
         .to_string()
 }
 
-pub async fn sync_documents(
+pub(crate) async fn sync_documents(
     request: SyncDocumentsRequest,
 ) -> anyhow::Result<SyncDocumentsResponse> {
     let credentials = credentials_for_session(
@@ -853,6 +853,10 @@ async fn request_presigned_urls(
         "timestamp": chrono::Utc::now().timestamp_millis(),
     });
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "document upload: files the user chose, sent to ComplyEaze cloud storage, one of the two uploading features the README names"
+    )]
     let response = client
         .post(endpoint(
             credentials.base_url.as_deref(),
@@ -874,6 +878,10 @@ async fn upload_single_file(
     let url = validate_upload_url(url)?;
     let disk_file = prepare_upload_snapshot(file).await?;
     let body = reqwest::Body::wrap_stream(ReaderStream::new(disk_file));
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "document upload: files the user chose, sent to ComplyEaze cloud storage, one of the two uploading features the README names"
+    )]
     let response = client
         .put(url)
         .header("content-type", &file.mime_type)
@@ -952,6 +960,10 @@ async fn upload_file_part(
     let mut disk_file = snapshot.try_clone().await?;
     disk_file.seek(SeekFrom::Start(offset)).await?;
     let body = reqwest::Body::wrap_stream(ReaderStream::new(disk_file.take(part.expected_size)));
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "document upload: files the user chose, sent to ComplyEaze cloud storage, one of the two uploading features the README names"
+    )]
     let response = client
         .put(url)
         .header("content-type", "application/octet-stream")
@@ -1031,6 +1043,10 @@ async fn confirm_batch_upload(
         "timestamp": chrono::Utc::now().timestamp_millis(),
     });
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "document upload: files the user chose, sent to ComplyEaze cloud storage, one of the two uploading features the README names"
+    )]
     let response = client
         .post(endpoint(
             credentials.base_url.as_deref(),

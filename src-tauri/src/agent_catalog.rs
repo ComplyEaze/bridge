@@ -306,6 +306,74 @@ fn lab_tools_env_enabled() -> bool {
     false
 }
 
+/// Appended to every read tool's description. Each response, read or write,
+/// appends one metadata-only receipt to the local egress log before it is sent
+/// (`agent_delivery.rs`); the receipt holds fingerprints and counts, never rows.
+/// So a read changes nothing in Tally and nothing the user acts on, but it is
+/// not free of a local write, and the description says so.
+pub(super) const READ_RECEIPT_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
+const BUILD_IMPORT_SENTENCE: &str = "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally.";
+const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally.";
+const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally.";
+const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally.";
+
+/// What a shipped (non-lab) tool does beyond answering, which decides its MCP
+/// annotations. A host reads an absent annotation as "not read-only,
+/// destructive, open-world", so every shipped tool is classified here and a test
+/// requires it. An artifact that changes what a later tool does, admits or
+/// authorises (a prepared import file, parsed proposals, proof files, a verified
+/// baseline, an acknowledgement) is a write; the per-call receipt is audit
+/// metadata no tool decides on, and is not.
+/// Every tool talks only to the loopback Tally and the local folder, so none is
+/// open-world.
+#[derive(Clone, Copy)]
+pub(super) enum ToolEffect {
+    Read,
+    /// Writes a local file the user or a later tool relies on, adding new files
+    /// only; nothing to Tally. The sentence is appended to the description.
+    LocalWrite(&'static str),
+    /// As `LocalWrite`, but it also replaces a file it wrote earlier (a newer
+    /// verification replaces the batch's saved proof), so the MCP definition of
+    /// "additive updates only" does not hold and it is marked destructive.
+    LocalRewrite(&'static str),
+    /// Posts one voucher into Tally after the native approval.
+    TallyPost,
+}
+
+impl ToolEffect {
+    pub(super) fn of(name: &str) -> Option<Self> {
+        Some(match name {
+            "tally_status" | "list_companies" | "voucher_schema" | "validate_masters"
+            | "outstandings" | "ledger_masters" | "ledger_movement" | "trial_balance"
+            | "profit_and_loss" | "balance_sheet" | "vouchers" | "voucher_presence"
+            | "changed_since" | "read_evidence" | "egress_log" => Self::Read,
+            "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
+            "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
+            "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
+            "acknowledge_post_review" => Self::LocalRewrite(ACKNOWLEDGE_SENTENCE),
+            "post_import" => Self::TallyPost,
+            _ => return None,
+        })
+    }
+
+    fn annotations(self) -> Value {
+        match self {
+            Self::Read => {
+                json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::LocalWrite(_) => {
+                json!({"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::LocalRewrite(_) => {
+                json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::TallyPost => {
+                json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
+            }
+        }
+    }
+}
+
 // Retain the internal schema while bounded change enumeration is unqualified.
 pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
@@ -340,9 +408,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
     Value::Array(
         names
             .into_iter()
-            // Verification is a read-only recovery capability. Keep it
-            // available when Journal generation/posting is disabled so an
-            // uncertain saved batch can still be checked safely.
+            // Verification is a recovery capability: it reads Tally and saves local
+            // proof files, and writes nothing to Tally. Keep it available when
+            // Journal generation/posting is disabled so an uncertain saved batch
+            // can still be checked safely.
             // Parsing a statement only prepares an import, and its summary
             // carries counterparty names, so it is opted into with imports.
             .filter(|name| {
@@ -403,7 +472,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1},"direction":{"type":"string","enum":["receivable","payable","both"],"default":"both"},"as_of":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"ageing_basis":{"type":"string","enum":["bill_date","due_date"],"default":"due_date"},"top":{"type":"integer","minimum":1,"default":25},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"default":500}}}),
                     ),
                     "ledger_masters" => (
-                        "Return verified ledger masters with monetary fields on a freshly observed supported product/mode; compliance includes paired party-master observations. With fields=compliance, each ledger also carries `ancestry`: its resolved group chain (`chain`, nearest ancestor first, each hop's own `name` and `reserved_name`), `complete` (true only if the chain was resolved all the way to the reserved account root), and `gap` (null when complete, else why resolution stopped: no_parent, group_absent, group_name_repeated, reserved_name_missing, cycle or exhausted). A `reserved_name` beginning with U+FFFD `#4;` is a Tally reserved value (Tally writes it as `&#4;`); `U+FFFD#4; Primary` is the account root, distinct from a group a user named Primary. An incomplete chain is never padded or guessed -- `chain` is exactly what was resolved and no more, and a caller must check `complete` before treating it as exhaustive; rows read with fields=basic carry no `ancestry`. `group` filters by group name; `group_scope` controls what it matches against -- \"immediate\" (default, unchanged) matches only the ledger's own parent and does NOT include ledgers filed under sub-groups of `group`; use `group_scope: ancestry` for the whole subtree. \"ancestry\" also matches any group in its resolved chain (e.g. a ledger under `Bank OD A/c` matches a `group_scope: ancestry` filter for `Loans (Liability)`), with either fields value. A gap in a ledger's chain never counts as an ancestry-scope match. Any `group` filter reads the group collection (with fields=basic that is one added paired group read; without `group` nothing is added), and the result then carries `group_filter`: `excluded_subgroup_ledgers` (`count` of ledgers left out because they sit under a sub-group of `group` -- always 0 under ancestry scope -- with `group_count` and up to 20 of those sub-group names in `groups`) and `unresolved_ancestry_ledgers` (ledgers not returned whose chain stops before reaching `group`, so Bridge cannot say whether they belong under it; the count covers the whole book, so a gap anywhere, even in a subtree unrelated to `group`, is counted). With fields=compliance, `party_gstin` is a snapshot: the GSTIN in force on `party_gstin_as_of`, which is the optional `as_of` argument (YYYYMMDD or YYYY-MM-DD) when given and the Bridge host's date otherwise. Pass `as_of` to read an FY-end GSTIN such as 20260331; without fields=compliance it is refused as ledger_masters_as_of_requires_compliance. The GSTIN comes from the ledger's dated registration history, or from the flat GSTIN field only when that history is empty or was not returned; an empty flat field names no GSTIN. `party_gstin_status` names the source: in_force, flat_field, no_gstin_in_force (a history with no GSTIN on that date; `party_gstin_registration_type` then says whether that entry is registered or not), or not_reported. history_unreadable fails closed: the history came back undated, misdated, malformed, repeated or contradictory, so party_gstin is null and the flat field is not used. `party_gstin_flat` is always the flat field as read, and `gstin_sources_disagree` is true when it names a GSTIN that the in-force history entry does not; Bridge reports both rather than choosing. For another date, such as a transaction's, pass it as `as_of` or read the dated entries in `compliance.gst_registrations`. A `fields=compliance` read of a company whose master-alteration mark (an upper bound on its ledgers: every master raises it) puts the estimated response over Bridge's budget has its ledgers counted first. A count that fits is read whole; a count that does not is read in parts, one filtered read per set of parent groups, and every ledger the catalogue named must come back exactly once or the whole call is refused (causes `parent_over_budget`, `parent_partition_too_many_parts`, `ledger_without_parent`, `parent_name_unsupported` (with `unsupported_parent_ledgers`, the count of ledgers whose parent group name a filter cannot carry), `parent_partition_duplicate_ledger_identity` and the `parent_part_*` coverage causes). A mark above 22,857 is refused before any ledger read, with cause `ledger_catalogue_too_large` and `size` (`master_alter_id`, `estimated_bytes`, `limit_bytes`), and a company with fewer ledgers may be refused. Retrying an over-size refusal refuses again, and `fields=basic` still reads it. With fields=compliance, a book with several Currency masters is read through the base Tally identifies: its plain base-currency ledgers are returned with `ledgers_scope` base_currency_ledgers_only, and the ledgers kept in another currency (`foreign_currency_ledgers_excluded`) and the base-currency ledgers whose balances Tally shows in another currency (`base_currency_ledgers_mixed_excluded`) are named, never read. A first page (offset 0) always reads Tally fresh and holds that read in memory; a later page (offset > 0) is served from it while the company's book extent, including ALTMSTID and ALTVCHID, is unchanged, and costs one small extent read instead of a whole re-read. Each result reports `snapshot` (`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`). Pass the first page's `snapshot_id` on later pages to have the call refused with `listing_snapshot_changed` (cause `book_changed_since_first_page` or `snapshot_not_held`) instead of continuing from a different read. With fields=compliance, repeat the first page's `as_of` on later pages: a snapshot serves only pages read as of the same date, so a later page without it (or across midnight) reads fresh, or is refused when it names the snapshot. A change that moves neither mark is not seen: whether a regroup, an edit made in Tally's own screens or a deletion moves them is unmeasured, so a later page can be up to 10 minutes old after such a change.",
+                        "Return verified ledger masters with monetary fields on a freshly observed supported product/mode; compliance includes paired party-master observations. With fields=compliance, each ledger also carries `ancestry`: its resolved group chain (`chain`, nearest ancestor first, each hop's own `name` and `reserved_name`), `complete` (true only if the chain was resolved all the way to the reserved account root), and `gap` (null when complete, else why resolution stopped: no_parent, group_absent, group_name_repeated, reserved_name_missing, cycle or exhausted). A `reserved_name` beginning with U+FFFD `#4;` is a Tally reserved value (Tally writes it as `&#4;`); `U+FFFD#4; Primary` is the account root, distinct from a group a user named Primary. An incomplete chain is never padded or guessed -- `chain` is exactly what was resolved and no more, and a caller must check `complete` before treating it as exhaustive; rows read with fields=basic carry no `ancestry`. `group` filters by group name; `group_scope` controls what it matches against -- \"immediate\" (default, unchanged) matches only the ledger's own parent and does NOT include ledgers filed under sub-groups of `group`; use `group_scope: ancestry` for the whole subtree. \"ancestry\" also matches any group in its resolved chain (e.g. a ledger under `Bank OD A/c` matches a `group_scope: ancestry` filter for `Loans (Liability)`), with either fields value. A gap in a ledger's chain never counts as an ancestry-scope match. Any `group` filter reads the group collection (with fields=basic that is one added paired group read; without `group` nothing is added), and the result then carries `group_filter`: `excluded_subgroup_ledgers` (`count` of ledgers left out because they sit under a sub-group of `group` -- always 0 under ancestry scope -- with `group_count` and up to 20 of those sub-group names in `groups`) and `unresolved_ancestry_ledgers` (ledgers not returned whose chain stops before reaching `group`, so Bridge cannot say whether they belong under it; the count covers the whole book, so a gap anywhere, even in a subtree unrelated to `group`, is counted). With fields=compliance, `party_gstin` is a snapshot: the GSTIN in force on `party_gstin_as_of`, which is the optional `as_of` argument (YYYYMMDD or YYYY-MM-DD) when given and the Bridge host's date otherwise. Pass `as_of` to read an FY-end GSTIN such as 20260331; without fields=compliance it is refused as ledger_masters_as_of_requires_compliance. The GSTIN comes from the ledger's dated registration history, or from the flat GSTIN field only when that history is empty or was not returned; an empty flat field names no GSTIN. `party_gstin_status` names the source: in_force, flat_field, no_gstin_in_force (a history with no GSTIN on that date; `party_gstin_registration_type` then says whether that entry is registered or not), or not_reported. history_unreadable fails closed: the history came back undated, misdated, malformed, repeated or contradictory, so party_gstin is null and the flat field is not used. `party_gstin_flat` is always the flat field as read, and `gstin_sources_disagree` is true when it names a GSTIN that the in-force history entry does not; Bridge reports both rather than choosing. For another date, such as a transaction's, pass it as `as_of` or read the dated entries in `compliance.gst_registrations`. A `fields=compliance` read of a company whose master-alteration mark (an upper bound on its ledgers: every master raises it) puts the estimated response over Bridge's budget has its ledgers counted first. A count that fits is read whole; a count that does not is read in parts, one filtered read per set of parent groups, and every ledger the catalogue named must come back exactly once or the whole call is refused (causes `parent_over_budget`, `parent_partition_too_many_parts`, `parent_complement_over_budget`, `ledger_without_parent`, `parent_name_unsupported` (with `unsupported_parent_ledgers`, the count of ledgers when every ledger's parent group name is one a filter cannot carry; a book with only some such ledgers reads them as a complement part), `parent_partition_duplicate_ledger_identity`, the `parent_part_*` coverage causes and `parent_part_response_too_large`). A mark above 22,857 is refused before any ledger read, with cause `ledger_catalogue_too_large` and `size` (`master_alter_id`, `estimated_bytes`, `limit_bytes`), and a company with fewer ledgers may be refused. Retrying an over-size refusal refuses again, and `fields=basic` still reads it. With fields=compliance, a book with several Currency masters is read through the base Tally identifies: its plain base-currency ledgers are returned with `ledgers_scope` base_currency_ledgers_only, and the ledgers kept in another currency (`foreign_currency_ledgers_excluded`) and the base-currency ledgers whose balances Tally shows in another currency (`base_currency_ledgers_mixed_excluded`) are named, never read. A first page (offset 0) always reads Tally fresh and holds that read in memory; a later page (offset > 0) is served from it while the company's book extent, including ALTMSTID and ALTVCHID, is unchanged, and costs one small extent read instead of a whole re-read. Each result reports `snapshot` (`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`). Pass the first page's `snapshot_id` on later pages to have the call refused with `listing_snapshot_changed` (cause `book_changed_since_first_page` or `snapshot_not_held`) instead of continuing from a different read. With fields=compliance, repeat the first page's `as_of` on later pages: a snapshot serves only pages read as of the same date, so a later page without it (or across midnight) reads fresh, or is refused when it names the snapshot. A change that moves neither mark is not seen: whether a regroup, an edit made in Tally's own screens or a deletion moves them is unmeasured, so a later page can be up to 10 minutes old after such a change.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1},"group":{"type":"string"},"group_scope":{"type":"string","enum":["immediate","ancestry"],"default":"immediate"},"fields":{"type":"string","enum":["basic","compliance"],"default":"basic"},"as_of":{"type":"string","pattern":DATE_WIRE_PATTERN},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"default":500},"snapshot_id":{"type":"string","minLength":1}}}),
                     ),
                     "ledger_movement" => (
@@ -463,16 +532,17 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object", "additionalProperties": false}),
                     ),
                 };
+                let effect = ToolEffect::of(name);
+                let description = match effect {
+                    Some(ToolEffect::Read) => format!("{description} {READ_RECEIPT_SENTENCE}"),
+                    Some(ToolEffect::LocalWrite(sentence) | ToolEffect::LocalRewrite(sentence)) => {
+                        format!("{description} {sentence}")
+                    }
+                    Some(ToolEffect::TallyPost) | None => description.to_string(),
+                };
                 let mut tool = json!({"name": name, "description": description, "inputSchema": input_schema});
-                if name == "post_import" {
-                    tool["annotations"] = json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":true});
-                }
-                if name == "acknowledge_post_review" {
-                    // It writes one local record and nothing to Tally.
-                    tool["annotations"] = json!({"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true});
-                }
-                if name == "parse_bank_statement" {
-                    tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false});
+                if let Some(effect) = effect {
+                    tool["annotations"] = effect.annotations();
                 }
                 if name == "lab_read_inventory" {
                     tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true});

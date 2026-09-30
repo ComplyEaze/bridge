@@ -673,10 +673,25 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "parent_over_budget" | "parent_partition_too_many_parts" => Some(
             "This book has more ledgers than one compliance read may carry, so Bridge reads it \
              as parts by immediate parent group, and it cannot be split that way: either one \
-             group holds more ledgers than a part may (Bridge does not split a group), or the \
-             groups need more parts than Bridge will send. No master was requested. Call \
+             group holds more ledgers than a part may, or the ledgers under parent groups whose \
+             names a filter cannot carry, read together as one last part, are more than a part \
+             may hold (Bridge splits neither), or the groups need more parts than Bridge will \
+             send. No master was requested. Call \
              ledger_masters with fields=basic, which returns names, parents and opening \
              balances without the compliance fields. Retrying this call refuses again.",
+        ),
+        "parent_part_response_too_large" => Some(
+            "This book is read as parts by parent group, and one part's answer was larger than \
+             Bridge's response limit, more than the catalogue can account for under that \
+             part's groups: Tally may have ignored the part's filter. Bridge sent nothing \
+             after that response and released nothing. Retrying is expected to refuse again; call \
+             ledger_masters with fields=basic.",
+        ),
+        "parent_complement_over_budget" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but reaching the ledgers under parent groups whose names a filter cannot \
+             carry needs a filter larger than Bridge will send. No master was requested. Call \
+             ledger_masters with fields=basic. Retrying this call refuses again.",
         ),
         "parent_partition_voucher_witness_absent" => Some(
             "This book is too large for one compliance read, so Bridge reads it as several \
@@ -688,11 +703,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         "parent_name_unsupported" => Some(
             "This book is too large for one compliance read and Bridge reads it by parent \
-             group, but `unsupported_parent_ledgers` of its ledgers sit under a parent group \
-             whose name a filter cannot carry (a quotation mark, a control character, an empty \
-             name or an unexpected replacement character), so no filter can name them. No \
-             master was requested. Call ledger_masters with fields=basic. Retrying this call \
-             refuses again.",
+             group, but all `unsupported_parent_ledgers` of its ledgers sit under parent \
+             groups whose names a filter cannot carry (a quotation mark, a control character, \
+             an empty name or an unexpected replacement character), so there is no named \
+             group to read them apart from. No master was requested. Call ledger_masters with \
+             fields=basic. Retrying this call refuses again.",
         ),
         "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
             "This book is too large for one compliance read and Bridge reads it by parent \
@@ -700,7 +715,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              ledger identity. No master was requested. Call ledger_masters with fields=basic. \
              Retrying this call refuses again.",
         ),
-        "parent_part_row_outside_parents"
+        "parent_part_row_count_differs"
+        | "parent_part_row_outside_parents"
         | "parent_part_row_not_in_catalogue"
         | "parent_part_row_differs_from_catalogue"
         | "parent_part_row_repeated"
@@ -708,7 +724,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "The parts of this parent-group read did not add up to the ledger catalogue that \
              planned them, so Bridge released nothing: a part returned a ledger it should not \
              have, returned one twice, or missed one, or a ledger's name or group differs \
-             between the catalogue and the part. A ledger added, renamed, moved or deleted \
+             between the catalogue and the part. A part whose master came back with a different \
+             ledger count ends the read after that master: its balance, any later part and the \
+             group read are never requested, though the master was sent, including for the last \
+             part, the one that reads ledgers under parent names a filter cannot carry. A ledger added, renamed, moved or deleted \
              during the read can cause it; retry once while the book is quiet. A repeat means \
              Tally's filtered read and its catalogue disagree about this book: call \
              ledger_masters with fields=basic instead.",

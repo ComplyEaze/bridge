@@ -324,6 +324,151 @@ pub fn parse_standard_ledger_catalog(
     )
 }
 
+/// The ledger GUIDs of one slice of the census (`crate::ledger_census`): the
+/// response to [`crate::ledger_census::render_ledger_census_slice_request`].
+/// A row carries the ledger's GUID and the company's GUID and nothing else that
+/// is read (its name arrives in the row's attribute and in `LANGUAGENAME.LIST`
+/// whatever is fetched, and is skipped here: only the count matters). A row
+/// holding any other field is refused, so a response that is not the slice
+/// that was asked for cannot be counted.
+///
+/// `max_rows` bounds what the parser will hold ([`StandardLedgerCatalogError::BoundsViolation`]
+/// past it); it is not the slice's span. AlterIDs are distinct, so a slice
+/// `(after, through]` holds at most `through - after` ledgers, and the census
+/// (`crate::ledger_census::LedgerCensus::accept`) refuses a slice holding more.
+/// No rows is a well-formed answer (a slice past every ledger); the census
+/// decides what an empty count means.
+pub fn parse_ledger_census_slice(
+    xml: &str,
+    expected_company_guid: &str,
+    max_rows: u64,
+) -> Result<Vec<String>, StandardLedgerCatalogError> {
+    let marked = crate::mark_forbidden_numeric_references(xml);
+    let xml = marked.as_ref();
+    validate_export_response(xml).map_err(|_| StandardLedgerCatalogError::MalformedResponse)?;
+    let expected_company_guid = normalized_standard_company_guid(expected_company_guid)
+        .map_err(|_| StandardLedgerCatalogError::BoundsViolation)?;
+    let mut reader = configured_reader(xml);
+    let mut path = Vec::<Vec<u8>>::new();
+    let mut guids = Vec::<String>::new();
+    let mut seen = HashSet::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?
+        {
+            Event::Start(element)
+                if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
+            {
+                if guids.len() as u64 >= max_rows {
+                    return Err(StandardLedgerCatalogError::BoundsViolation);
+                }
+                let row = parse_ledger_census_row(&mut reader, &element).map_err(|error| {
+                    error
+                        .downcast_ref::<StandardLedgerCatalogError>()
+                        .copied()
+                        .unwrap_or(StandardLedgerCatalogError::MalformedResponse)
+                })?;
+                if !row
+                    .company_guid
+                    .eq_ignore_ascii_case(&expected_company_guid)
+                {
+                    return Err(StandardLedgerCatalogError::CompanyIdentityMismatch);
+                }
+                let guid = row.ledger_guid.to_ascii_lowercase();
+                if !seen.insert(guid.clone()) {
+                    return Err(StandardLedgerCatalogError::DuplicateIdentity);
+                }
+                guids.push(guid);
+            }
+            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
+                return Err(StandardLedgerCatalogError::MalformedResponse);
+            }
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+                .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?,
+            Event::Eof => break,
+            _ => {}
+        }
+    }
+    if path.is_empty() {
+        Ok(guids)
+    } else {
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    }
+}
+
+struct LedgerCensusRow {
+    company_guid: String,
+    ledger_guid: String,
+}
+
+fn parse_ledger_census_row(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<LedgerCensusRow> {
+    validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
+    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let mut company_guid = None;
+    let mut ledger_guid = None;
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                let child_name = child.name().as_ref().to_ascii_uppercase();
+                match child_name.as_slice() {
+                    b"NAME" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        skip_standard_ledger_identity_child(reader, child_name)?;
+                    }
+                    b"LANGUAGENAME.LIST" => {
+                        skip_standard_ledger_identity_child(reader, child_name)?
+                    }
+                    b"BRIDGECOMPANYGUID" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        set_bootstrap_context_once(
+                            &mut company_guid,
+                            normalized_standard_company_guid(&read_required_text(
+                                reader,
+                                child.name(),
+                            )?)?,
+                            "company GUID",
+                        )?;
+                    }
+                    b"GUID" => {
+                        validate_only_attributes(&child, &[b"TYPE"])?;
+                        if ledger_guid
+                            .replace(normalized_standard_value(
+                                &read_required_text(reader, child.name())?,
+                                "ledger GUID",
+                            )?)
+                            .is_some()
+                        {
+                            anyhow::bail!("ledger census row repeated ledger GUID");
+                        }
+                    }
+                    _ => anyhow::bail!("ledger census row contained an unexpected field"),
+                }
+            }
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
+            Event::Empty(_) => anyhow::bail!("ledger census row contained an empty field"),
+            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+                anyhow::bail!("ledger census row contained unexpected text")
+            }
+            Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
+                anyhow::bail!("ledger census row contained a forbidden XML construct")
+            }
+            Event::Eof => anyhow::bail!("ledger census row ended before closing"),
+            _ => {}
+        }
+    }
+    Ok(LedgerCensusRow {
+        company_guid: company_guid
+            .ok_or_else(|| anyhow::anyhow!("ledger census row omitted computed company GUID"))?,
+        ledger_guid: ledger_guid
+            .ok_or_else(|| anyhow::anyhow!("ledger census row omitted ledger GUID"))?,
+    })
+}
+
 struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
     guid: String,

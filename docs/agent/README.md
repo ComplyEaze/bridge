@@ -114,13 +114,24 @@ under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 1
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
 `unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
-count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
-refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`
-object (`master_alter_id`, `estimated_bytes`, `limit_bytes`): the catalogue that would count the
-book could pass the transport's response cap, and a response past the cap is cut off mid-read. The
-mark is an upper bound on ledgers, since every master raises it, so a company with fewer ledgers
-may be refused. The limits are unverified against a live Tally beyond a two-parent filter;
-`fields=basic` still reads any of these books.
+count and the last read is refused, but only after those reads were sent. A mark above 22,857 has
+its ledgers counted by AlterID span instead of by catalogue (#679): one read per slice of at most
+4,000 AlterIDs over `(0, mark]`, each asking for the ledgers' GUIDs only and made once, not paired,
+so a mark of 316,028 is 80 requests of about 0.15 s each. The census is bounded by the same extent
+bracket as every other read. A slice holding more ledgers than its span (`ledger_span_slice_over_bound`),
+a GUID seen twice (`ledger_span_duplicate_identity`), no ledger at all (`ledger_span_census_empty`:
+an empty slice is the answer a closed or absent company gives too) or a slice past the response
+limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
+read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
+would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
+`size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
+census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
+estimated past `limit_bytes`; a response past the transport's cap is cut off mid-read. The mark is an upper bound on ledgers, since every master raises it, so a
+company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
+two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
+these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only

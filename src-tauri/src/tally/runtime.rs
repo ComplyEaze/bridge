@@ -1608,6 +1608,12 @@ fn all_unallocated_parties(
                 } else {
                     ExposureDirection::Payable
                 },
+                opening_balance: residual.opening_balance.clone(),
+                composition: Some(if residual.bill_wise_on {
+                    UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+                } else {
+                    UnallocatedComposition::NotBillWiseLedger
+                }),
             })
         })
         .collect::<Vec<_>>();
@@ -1681,11 +1687,38 @@ impl OutstandingsAgeingAnchor {
     }
 }
 
+/// What the data Bridge holds can say about an unallocated amount, without
+/// reading vouchers. It is deliberately NOT "on account": on a bill-wise ledger
+/// the amount is the net of on-account entries and of any opening balance not
+/// allocated to a reference, and only voucher rows tell those apart (#945).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnallocatedComposition {
+    /// The ledger's bill-wise flag is off: it keeps no bills, so what it carries
+    /// has no bill reference. (The label follows the flag alone; it does not
+    /// claim the residual is the ledger's whole balance.)
+    NotBillWiseLedger,
+    /// The residual of a bill-wise ledger after its named bills: on-account
+    /// entries, an opening balance not allocated to a reference, notes with no
+    /// reference and anything else are not separated.
+    BillWiseLedgerComponentsNotSeparated,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnallocatedParty {
     pub party: String,
     pub amount: ExactDecimal,
     pub direction: ExposureDirection,
+    /// The ledger's own opening balance as of the start of the books, shown and
+    /// never interpreted. `None` when Tally sent none (an empty element is
+    /// unknown, not zero) or the row was not built from a ledger snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_balance: Option<ExactDecimal>,
+    /// What the ledger's bill-wise flag says about the amount; it also carries
+    /// that flag (`NotBillWiseLedger` is flag off), so the two cannot disagree.
+    /// `None` for a row not built from a ledger snapshot (older saved rows).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<UnallocatedComposition>,
 }
 
 fn partial_result(reason: impl Into<OutstandingsPartialReason>) -> OutstandingsLoadResult {
@@ -4174,9 +4207,10 @@ impl TallyRuntime {
     /// live 2026-08-07), which the Collection path does not -- that path
     /// silently substitutes whichever company is loaded.
     ///
-    /// The bills reports alone are **not** complete: unallocated "on account"
-    /// balances carry no bill reference and appear in neither report. The
-    /// ledger snapshot recovers them exactly, as
+    /// The bills reports alone are **not** complete: unallocated amounts (on
+    /// account, or all of a bill-less ledger's balance) carry no bill reference
+    /// and appear in neither report. The ledger snapshot recovers them
+    /// exactly, as
     /// `CLOSINGBALANCE - sum(BILLCL)` per party -- measured to 0.00 to the
     /// paisa on every bill-carrying party of both a bill-dominated book (6 of
     /// 10 parties exact, residual Rs 1,05,000) and an on-account-dominated one

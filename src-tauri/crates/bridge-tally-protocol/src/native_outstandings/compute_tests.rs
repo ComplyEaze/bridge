@@ -20,6 +20,7 @@ fn reserved_root_policy_matches_canonical_window_for_marker_carrying_parents() {
             parent: Some("Sundry Debtors".to_string()),
             closing_balance: Some(ExactDecimal::zero()),
             opening_balance: ExactDecimal::zero(),
+            opening_balance_observed: Some(ExactDecimal::zero()),
             bill_wise_on: false,
             currency_name: None,
         }];
@@ -43,6 +44,7 @@ fn reserved_root_policy_matches_canonical_window_for_marker_carrying_parents() {
             parent: Some(parent),
             closing_balance: Some(ExactDecimal::zero()),
             opening_balance: ExactDecimal::zero(),
+            opening_balance_observed: Some(ExactDecimal::zero()),
             bill_wise_on: false,
             currency_name: None,
         }];

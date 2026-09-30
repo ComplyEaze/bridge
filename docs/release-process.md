@@ -45,10 +45,12 @@ pinned file's bytes differed from its stored hash. Nothing stored remains to
 compare, so that job can no longer fail on a changed pinned file. On a pull request,
 while the check is report-only, a change merged without `scripts/merge-gate.sh`
 reaches master with every check green. What restores the after-the-fact tripwire: a
-push to master is checked like a pull request and is never report-only. The landed
-commit (`HEAD^1..HEAD`, one squashed pull request, attributed by the `(#N)` in its
-subject) must carry exactly the acknowledgement its pinned changes need, and the
-master run goes red if it does not. This covers the base race: `merge-gate.sh` reads
+push to master is checked like a pull request and is never report-only. Every
+first-parent commit the push landed (`before..HEAD`, `before` from the event payload;
+each one a squashed pull request, attributed by the `(#N)` in its subject) must carry
+exactly the acknowledgement its pinned changes need, and the master run goes red if
+any does not. A push whose `before` is missing, new or not an ancestor of HEAD (a
+force-push) cannot be verified and fails. This covers the base race: `merge-gate.sh` reads
 the pin list when it runs but the merge binds only the head, so another pull request
 that pins a file after this one was gated lets an unacknowledged change land; the
 master run then fails instead of nobody noticing. It does not stop the merge, and a
@@ -130,9 +132,10 @@ looked at in the review.
   - `merge_group` (once a merge queue exists): checks each first-parent commit in
     `base_sha..head_sha` against its own acknowledgement, and fails closed when a
     commit cannot be attributed to one pull request.
-  - `push` (master): the landed commit is checked like a pull request, `HEAD^1..HEAD`
-    attributed by the `(#N)` in its subject, and a failure is never report-only. It
-    also validates that every file in the acknowledgements directory is well formed.
+  - `push` (master): every first-parent commit in `before..HEAD` is checked like a
+    pull request, each attributed by the `(#N)` in its subject, and a failure is never
+    report-only; a missing, all-zero or non-ancestor `before` fails closed. It also
+    validates that every file in the acknowledgements directory is well formed.
   - `workflow_dispatch`: only the acknowledgements directory is validated.
   The checker runs from the pull request's own tree, so a pull request could weaken
   it; that is why the script and `ci.yml` are pinned, which makes the change

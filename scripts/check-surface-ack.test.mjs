@@ -295,7 +295,7 @@ function makeRepo() {
 
 function cli(dir, args, env = {}) {
   const clean = { ...process.env };
-  for (const k of ["PR_NUMBER", "PR_HEAD_SHA", "MERGE_GROUP_BASE_SHA", "GITHUB_SHA", "GITHUB_REF"]) delete clean[k];
+  for (const k of ["PR_NUMBER", "PR_HEAD_SHA", "MERGE_GROUP_BASE_SHA", "GITHUB_SHA", "GITHUB_REF", "GITHUB_EVENT_PATH", "GITHUB_EVENT_NAME"]) delete clean[k];
   return spawnSync(process.execPath, [script, ...args], { cwd: dir, env: { ...clean, ...env }, encoding: "utf8" });
 }
 
@@ -551,42 +551,77 @@ test("workflow_dispatch only validates that the acks directory is well formed", 
   assert.equal(cli(makeRepo().dir, ["--mode", "workflow_dispatch"]).status, 1, "a directory that is not a git repository or has no commits fails closed");
 });
 
-test("push mode checks the landed commit like a pull request and is never report-only", () => {
+test("push mode checks every first-parent commit the push landed, like a pull request, and is never report-only", () => {
   const r = prRepo();
+  const tip = () => r.sh("rev-parse", "HEAD");
+  // `before` is the tip before the commits under test; it comes from --base or the event payload.
+  const push = (before, extra = [], env = {}) => cli(r.dir, ["--mode", "push", "--base", before, ...extra], env);
+  let before = tip();
   // A pinned change with its ack, named by the squash subject.
   r.write("a.txt", "changed\n");
   r.ackFile(7, ["a.txt"]);
   r.commit("Change a (#7)");
-  const ok = cli(r.dir, ["--mode", "push"]);
+  const ok = push(before);
   assert.equal(ok.status, 0, ok.stdout);
-  assert.match(ok.stdout, /\[push HEAD\^1\.\.HEAD\] touched pinned files \(1: a\.txt\)/);
+  assert.match(ok.stdout, /\[push [0-9a-f]{12}\] touched pinned files \(1: a\.txt\)/);
   // The base race: another pull request pinned b.txt after this one was gated, and this one
   // edited b.txt with no ack. Every check at gate time was green; the master run must be red.
+  before = tip();
   r.write("b.txt", "changed\n");
   r.commit("Change b (#9)");
-  const race = cli(r.dir, ["--mode", "push"]);
+  const race = push(before);
   assert.equal(race.status, 1);
   assert.match(race.stdout, /exactly one ack must be added; found 0/);
-  assert.equal(cli(r.dir, ["--mode", "push", "--report-only"]).status, 1, "report-only does not soften a landed commit");
-  assert.doesNotMatch(cli(r.dir, ["--mode", "push", "--report-only"]).stdout, /::warning/);
-  // A commit that cannot be attributed to a pull request, with a pinned change, fails closed.
+  assert.equal(push(before, ["--report-only"]).status, 1, "report-only does not soften a landed commit");
+  assert.doesNotMatch(push(before, ["--report-only"]).stdout, /::warning/);
+  // Several commits in one push: the unacknowledged one is not the tip, and is still found.
   r.write("b.txt", "again\n");
+  r.ackFile(10, ["b.txt"]);
+  r.commit("Change b with its ack (#10)");
+  const several = push(before);
+  assert.equal(several.status, 1, "an unacknowledged commit below the tip is not hidden by an acknowledged tip");
+  assert.match(several.stdout, /exactly one ack must be added; found 0/);
+  // A commit that cannot be attributed to a pull request, with a pinned change, fails closed.
+  before = tip();
+  r.write("b.txt", "third\n");
   r.commit("direct push with no number");
-  assert.match(cli(r.dir, ["--mode", "push"]).stdout, /pull request number is not known/);
+  assert.match(push(before).stdout, /pull request number is not known/);
   // An unpinned change needs neither an ack nor a number.
+  before = tip();
   r.write("other.txt", "changed\n");
   r.commit("unpinned change");
-  assert.equal(cli(r.dir, ["--mode", "push"]).status, 0);
-  // A landed commit with a malformed ack, or a stray ack, is red too.
+  assert.equal(push(before).status, 0);
+  // A landed commit with a stray ack is red too.
+  before = tip();
   r.write(`${ACK_DIR}pr-12.txt`, "b.txt\nreviewer: octocat\n");
   r.commit("stray ack (#12)");
-  assert.match(cli(r.dir, ["--mode", "push"]).stdout, /ack was added but no pinned path changed/);
-  // A repository with one commit has no HEAD^1: fails closed, as does a directory with no commits.
+  assert.match(push(before).stdout, /ack was added but no pinned path changed/);
+  // `before` comes from the event payload when --base is not given.
+  const event = join(tmpdir(), `surface-ack-event-${process.pid}.json`);
+  tmpDirs.push(event);
+  writeFileSync(event, JSON.stringify({ before }));
+  assert.match(cli(r.dir, ["--mode", "push"], { GITHUB_EVENT_PATH: event }).stdout, /ack was added but no pinned path changed/);
+  // A missing, unreadable, new-branch (all zeros) or non-ancestor `before` cannot be verified.
+  for (const bad of [undefined, "0".repeat(40), "f".repeat(40), "not-a-sha"]) {
+    writeFileSync(event, JSON.stringify(bad === undefined ? {} : { before: bad }));
+    const refused = cli(r.dir, ["--mode", "push"], { GITHUB_EVENT_PATH: event });
+    assert.equal(refused.status, 1, `before ${bad}`);
+    assert.match(refused.stdout, /no usable "before"|not an ancestor/);
+  }
+  assert.equal(cli(r.dir, ["--mode", "push"]).status, 1, "no payload and no --base");
+  // A force-push: `before` is a commit that is not an ancestor of HEAD.
+  r.sh("switch", "-q", "-c", "rewritten", "HEAD~2");
+  r.write("other.txt", "rewritten\n");
+  r.commit("rewritten (#13)");
+  const forced = push(before);
+  assert.equal(forced.status, 1);
+  assert.match(forced.stdout, /not an ancestor of HEAD/);
+  // A repository with one commit has no parent: fails closed, as does a directory with no commits.
   const one = makeRepo();
   one.surface([{ path: "a.txt" }]);
   one.write("a.txt", "a\n");
-  one.commit("only (#1)");
-  assert.equal(cli(one.dir, ["--mode", "push"]).status, 1);
+  const first = one.commit("only (#1)");
+  assert.equal(cli(one.dir, ["--mode", "push", "--base", first]).status, 1);
   assert.equal(cli(makeRepo().dir, ["--mode", "push"]).status, 1);
 });
 

@@ -10,12 +10,15 @@
 //
 // Exit 0: pass, or --report-only (prints "WOULD FAIL: ..."). Exit 1: a rule failed, or git could
 // not answer (fail closed). Exit 2: bad command-line usage.
-// A `push` event (master) is the one mode --report-only does not soften: the commit that landed is
-// checked like a pull request, HEAD^1..HEAD attributed by the `(#N)` in its subject (each squash
-// commit is one pull request), and an unacknowledged pinned change turns the master run red. That
+// A `push` event (master) is the one mode --report-only does not soften: every first-parent commit
+// the push landed (`before..HEAD`, `before` from the event payload or --base) is checked like a pull
+// request, each attributed by the `(#N)` in its subject (each squash commit is one pull request),
+// and an unacknowledged pinned change turns the master run red. A push whose `before` is missing,
+// new (all zeros) or not an ancestor of HEAD (a force-push) cannot be verified and fails. That
 // is the after-the-fact tripwire the stored hashes used to give; merge-gate.sh reads the base when
 // it runs but the merge binds only the head, so a base that moved in between is caught here.
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json";
@@ -265,17 +268,42 @@ function mergeGroup(opts, env) {
   }
 }
 
-// push (master): the commit that landed is one squashed pull request, named by `(#N)` (or
-// "Merge pull request #N") in its subject. Same rules as a pull request, and never report-only.
-function pushedCommit() {
+// push (master): every first-parent commit from the event's `before` to HEAD is one squashed pull
+// request, named by `(#N)` (or "Merge pull request #N") in its subject. Same rules as a pull
+// request, and never report-only. Checking only the tip would let several commits land in one push
+// with only the last one looked at.
+function pushedCommits(opts, env) {
   try {
-    const subject = git("log", "-1", "--format=%s", "HEAD", "--").trim();
-    const named = /\(#([1-9][0-9]*)\)$/.exec(subject) ?? /^Merge pull request #([1-9][0-9]*)\b/.exec(subject);
-    git("rev-parse", "--verify", "HEAD^1");
-    const number = named ? Number(named[1]) : NaN;
-    return { ...evaluate("push HEAD^1..HEAD", "HEAD^1", "HEAD", number), strict: true };
+    let before = opts.base;
+    if (!before) {
+      try {
+        before = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, "utf8")).before;
+      } catch {
+        before = undefined;
+      }
+    }
+    if (!/^[0-9a-f]{40,64}$/.test(before ?? "") || /^0+$/.test(before)) {
+      throw new Error(`the push has no usable "before" commit (${JSON.stringify(before ?? null)}): a new branch or a missing event payload cannot be verified`);
+    }
+    try {
+      git("merge-base", "--is-ancestor", before, "HEAD");
+    } catch {
+      throw new Error(`before ${before} is not an ancestor of HEAD (a force-push, rewritten history or an unknown commit): cannot verify what landed`);
+    }
+    const commits = git("rev-list", "--first-parent", "--reverse", `${before}..HEAD`, "--").split("\n").filter(Boolean);
+    if (commits.length === 0) throw new Error(`no commits in ${before}..HEAD, nothing can be verified`);
+    return commits.map((sha) => {
+      const label = `push ${sha.slice(0, 12)}`;
+      try {
+        const subject = git("log", "-1", "--format=%s", sha, "--").trim();
+        const named = /\(#([1-9][0-9]*)\)$/.exec(subject) ?? /^Merge pull request #([1-9][0-9]*)\b/.exec(subject);
+        return { ...evaluate(label, `${sha}^1`, sha, named ? Number(named[1]) : NaN), strict: true };
+      } catch (error) {
+        return { ...failure(label, error), strict: true };
+      }
+    });
   } catch (error) {
-    return { ...failure("push HEAD^1..HEAD", error), strict: true };
+    return [{ ...failure("push", error), strict: true }];
   }
 }
 
@@ -322,7 +350,7 @@ export function main(argv, env) {
   }
   const results =
     { pull_request: pullRequest, merge_group: mergeGroup }[opts.mode]?.(opts, env) ??
-    (opts.mode === "push" && env.GITHUB_EVENT_NAME !== "workflow_dispatch" ? [pushedCommit(), ...acksDirectory()] : acksDirectory());
+    (opts.mode === "push" && env.GITHUB_EVENT_NAME !== "workflow_dispatch" ? [...pushedCommits(opts, env), ...acksDirectory()] : acksDirectory());
   for (const r of results) {
     const list = r.touched.length ? `${r.touched.length}: ${r.touched.join(", ")}` : "none";
     console.log(`[${r.label}] touched pinned files (${list})`);

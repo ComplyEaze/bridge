@@ -40,6 +40,13 @@ impl BaseCurrencyName {
         &self.name
     }
 
+    /// Whether the book keeps exactly one Currency master. A composite value
+    /// on one of its ledgers is then a refusal, not a ledger to set aside
+    /// (bridge#642).
+    pub fn is_single_master(&self) -> bool {
+        self.single_master
+    }
+
     /// A base among several masters, for tests that classify without a
     /// currency read ([`CurrencyMasters::identify_base`] is the production
     /// constructor).

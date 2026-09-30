@@ -73,3 +73,15 @@ fn parent_list_request_refuses_unknown_fields_and_maps_expired_captures() {
     assert_eq!(expired.code, "trial_balance_capture_expired");
     assert!(expired.remediation.contains("Refresh the report"));
 }
+
+/// bridge#709: the desktop response carries the scope statement exactly when
+/// the read covers a several-currency book's base-currency ledgers only.
+#[test]
+fn the_scope_statement_accompanies_only_a_base_ledgers_only_read() {
+    use crate::reports::trial_balance_xlsx::tests::{captured_read, several_currency_read};
+    assert_eq!(scope_limitation(&captured_read()), None);
+    assert_eq!(
+        scope_limitation(&several_currency_read()),
+        Some(crate::tally::runtime::BASE_CURRENCY_LEDGERS_ONLY_LIMITATION)
+    );
+}

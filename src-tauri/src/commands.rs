@@ -31,16 +31,16 @@ use crate::sync::snapshot::{
     SqliteSnapshotStateStore,
 };
 use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
-use crate::tally::runtime::TallyRuntimeControlError;
+use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
 };
 pub use crate::tally::VerifiedCompanyIdentity;
 use crate::tally::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, ConnectionStatus,
-    EndpointKey, OutstandingsCurrencyAssertion, OutstandingsLoadResult, RuntimeTallyConnector,
-    SelectedReadScopeEvidence, TallyCompany, TallyConfig, TallyRuntime, TallySessionSnapshot,
-    TallyTelemetryPreviewExport, VerifiedCompanyIdentityError,
+    EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, SelectedReadScopeEvidence,
+    TallyCompany, TallyConfig, TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport,
+    VerifiedCompanyIdentityError,
 };
 use bridge_tally_core::{
     CapabilityFeatureId, CapabilityPackId, CapabilityState, CompanyRef as CoreCompanyRef,
@@ -124,7 +124,34 @@ fn desktop_journal_command_error(
 #[path = "commands_native_ledger_tests.rs"]
 mod native_ledger_tests;
 
+/// The desktop's words for a send the endpoint wire gate held back (#697).
+/// Nothing was sent in either case.
+fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> TallyCommandError {
+    use bridge_tally_transport::WireRefusal;
+    match refusal {
+        WireRefusal::Busy => tally_command_error(
+            "tally_endpoint_busy",
+            "Operation",
+            "Another Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
+            "safe",
+            false,
+            "Try again in a few seconds. Nothing was sent to Tally.",
+        ),
+        WireRefusal::Unavailable => tally_command_error(
+            "tally_endpoint_lock_unavailable",
+            "Operation",
+            "Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
+            "after_change",
+            false,
+            "Check that Bridge's Application Support folder is available and writable, then try again.",
+        ),
+    }
+}
+
 fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
+    if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error) {
+        return wire_refusal_command_error(refusal);
+    }
     if error.chain().any(|cause| {
         cause
             .downcast_ref::<PartyLedgerMasterSourceValidationError>()
@@ -317,10 +344,10 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
         return tally_command_error(
             "ledger_masters_too_large",
             "Response size",
-            "Bridge withheld the party/ledger master: this company's master-alteration mark puts the compliance read over the size Bridge will request, because a read of that size has left Tally unable to answer. The mark is an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No ledger was requested.",
+            "Bridge withheld the party/ledger master: the compliance read is over the size Bridge will request, because a read of that size has left Tally unable to answer. Bridge sized it by the ledgers a catalogue read counted, or, when the company's master-alteration mark was too high to count within budget, by the mark itself, an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
             "after_change",
             false,
-            "Do not retry the unchanged export: it refuses again. A precise ledger count is pending (bridge#668).",
+            "Do not retry the unchanged export: it refuses again.",
         );
     }
     let mut mapped = tally_runtime_command_error(error);
@@ -1344,8 +1371,9 @@ pub async fn start_tally_core_snapshot(
 
     // Persist only the profile produced by the exact canary used for this run. A prior generic
     // endpoint probe intentionally cannot authorize a pack snapshot.
-    let canary = connector
-        .probe()
+    // One wire-lock wait budget for this command's reads (#697); the run it
+    // starts below is a spawned task, whose operations have their own.
+    let canary = with_operation_wire_budget(connector.probe())
         .await
         .map_err(|_| "The read-only Core Accounting canary could not complete".to_string())?;
     if !canary.reachable
@@ -1702,12 +1730,6 @@ pub struct CompanyRequest {
 pub struct OutstandingsRequest {
     pub config: TallyConfig,
     pub selected_company: SelectedCompanyIdentity,
-    /// Sent only when Tally named the company's one Currency master INR or
-    /// the operator confirmed it (bridge#604). Absent for a book the screen
-    /// leaves to the backend (several masters, bridge#551): with one master
-    /// the backend then admits only by the master's mailing name.
-    #[serde(default)]
-    pub currency_assertion: Option<OutstandingsCurrencyAssertion>,
     /// An explicit operator-selected date when present. Omission preserves
     /// today's date for existing callers and licensed Tally users.
     #[serde(default)]
@@ -1860,20 +1882,34 @@ pub async fn export_party_ledger_master(
     request: CompanyRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<String, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
+}
+
+async fn export_party_ledger_master_once(
+    app: tauri::AppHandle,
+    request: CompanyRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<String, TallyCommandError> {
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
-    let currency_read = runtime
-        .detect_party_ledger_master_currency(request.config.clone(), &identity)
+    // The classified read admits a book with several Currency masters when
+    // Tally identifies an INR base (bridge#551).
+    let currency_assertion = runtime
+        .detect_classified_base_currency_with_extent(request.config.clone(), &identity)
         .await
-        .map_err(party_ledger_master_runtime_command_error)?;
-    let currency_assertion =
-        establish_inr_currency(currency_read.currency_count(), currency_read.is_inr())
-            .map_err(party_ledger_master_currency_admission_error)?;
-    let currency_assertion = currency_read.bind_party_ledger_master_assertion(currency_assertion);
+        .map_err(party_ledger_master_runtime_command_error)?
+        .admit_inr_classified()
+        .map_err(party_ledger_master_currency_admission_error)?
+        .into_compliance_assertion();
     let source = runtime
         .fetch_party_ledger_master_source(request.config, &identity, currency_assertion)
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
+    party_ledger_master_withheld(
+        &source.foreign_currency_ledgers_excluded,
+        &source.mixed_currency_ledgers_excluded,
+    )?;
     let workbook = build_party_ledger_master_workbook(source)
         .map_err(|_| {
             party_ledger_master_local_export_error(
@@ -1913,6 +1949,14 @@ pub async fn export_party_ledger_master(
 /// operation validates the complete requested window before filtering.
 #[tauri::command]
 pub async fn fetch_selected_ledger_entries(
+    request: SelectedLedgerEntriesRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<serde_json::Value, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(fetch_selected_ledger_entries_once(request, runtime)).await
+}
+
+async fn fetch_selected_ledger_entries_once(
     request: SelectedLedgerEntriesRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<serde_json::Value, TallyCommandError> {
@@ -1993,12 +2037,13 @@ pub async fn fetch_tally_outstandings(
     working_paper_exports: State<'_, WorkingPaperExportStore>,
     party_statement_sources: State<'_, PartyStatementSourceStore>,
 ) -> Result<FetchOutstandingsResponse, TallyCommandError> {
-    read_screen_outstandings(
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(read_screen_outstandings(
         request,
         &runtime,
         &working_paper_exports,
         &party_statement_sources,
-    )
+    ))
     .await
 }
 
@@ -2026,13 +2071,7 @@ pub(crate) async fn read_screen_outstandings(
     let identity =
         verify_observed_company_tuple(runtime, &request.config, &request.selected_company).await?;
     let result = runtime
-        .fetch_operator_outstandings(
-            request.config,
-            &identity,
-            as_of,
-            request.currency_assertion,
-            request.ageing_anchor,
-        )
+        .fetch_operator_outstandings(request.config, &identity, as_of, request.ageing_anchor)
         .await
         .map_err(tally_runtime_command_error)?;
     let (working_paper_source, source_unavailable_reason_code) =
@@ -2124,22 +2163,77 @@ pub(crate) enum CompanySweepFailure {
     OutstandingsRead,
 }
 
-/// The INR admission rule of the party/ledger workbook boundary. A workbook can obtain this typed value
-/// only after `detect_base_currency` has read Tally's own Currency masters.
-fn establish_inr_currency(
-    currency_count: usize,
-    is_inr: bool,
-) -> Result<OutstandingsCurrencyAssertion, &'static str> {
-    if currency_count > 1 {
-        return Err("company_base_currency_undetermined");
+/// At most this many foreign-currency ledgers are named in a desktop refusal.
+const FOREIGN_LEDGERS_NAMED: usize = 5;
+
+/// The party/ledger workbook withheld because the company keeps ledgers in a
+/// currency other than its base (bridge#551), naming them.
+fn party_ledger_master_foreign_currency_error(
+    foreign: &[bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger],
+) -> TallyCommandError {
+    let named = foreign
+        .iter()
+        .take(FOREIGN_LEDGERS_NAMED)
+        .map(|ledger| format!("{} ({})", ledger.ledger, ledger.currency))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let more = foreign.len().saturating_sub(FOREIGN_LEDGERS_NAMED);
+    let more = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    tally_command_error(
+        "party_ledger_master_foreign_currency_ledgers",
+        "Currency admission",
+        format!(
+            "Bridge withheld the party/ledger master: this company keeps ledgers in a currency other than its base currency ({named}{more}). A workbook without them would not describe the whole book, and their balances are not rupees."
+        ),
+        "after_change",
+        false,
+        "Do not retry the unchanged export. The agent connection's ledger_masters reads the base-currency ledgers and names the ones it leaves out.",
+    )
+}
+
+/// A workbook that silently omits ledgers is worse than none: the desktop
+/// withholds it and names the ledgers a several-currency read set aside, those
+/// kept in another currency first (bridge#551).
+fn party_ledger_master_withheld(
+    foreign: &[bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger],
+    mixed: &[String],
+) -> Result<(), TallyCommandError> {
+    if !foreign.is_empty() {
+        return Err(party_ledger_master_foreign_currency_error(foreign));
     }
-    if currency_count == 1 && !is_inr {
-        return Err("company_base_currency_not_inr");
+    if !mixed.is_empty() {
+        return Err(party_ledger_master_mixed_currency_error(mixed));
     }
-    if currency_count == 1 {
-        return Ok(OutstandingsCurrencyAssertion::Inr);
-    }
-    Err("company_currency_probe_failed")
+    Ok(())
+}
+
+fn party_ledger_master_mixed_currency_error(mixed: &[String]) -> TallyCommandError {
+    let named = mixed
+        .iter()
+        .take(FOREIGN_LEDGERS_NAMED)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let more = mixed.len().saturating_sub(FOREIGN_LEDGERS_NAMED);
+    let more = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    tally_command_error(
+        "party_ledger_master_mixed_currency_ledgers",
+        "Currency admission",
+        format!(
+            "Bridge withheld the party/ledger master: some base-currency ledgers hold balances Tally shows in another currency ({named}{more}). A workbook without them would not describe the whole book, and Bridge does not read those balances."
+        ),
+        "after_change",
+        false,
+        "Do not retry the unchanged export. The agent connection's ledger_masters reads the plain base-currency ledgers and names the ones it leaves out.",
+    )
 }
 
 /// One company of the sweep: its own classified currency read, the INR
@@ -2194,6 +2288,17 @@ pub(crate) async fn sweep_company_outstandings(
 /// hide the nine that read cleanly.
 #[tauri::command]
 pub async fn fetch_tally_outstandings_all_companies(
+    request: AllCompaniesOutstandingsRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
+    // One wire-lock wait budget for the whole sweep (#697).
+    with_operation_wire_budget(fetch_tally_outstandings_all_companies_once(
+        request, runtime,
+    ))
+    .await
+}
+
+async fn fetch_tally_outstandings_all_companies_once(
     request: AllCompaniesOutstandingsRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
@@ -2332,9 +2437,13 @@ pub async fn desktop_post_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::post_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::post_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]
@@ -2342,9 +2451,13 @@ pub async fn desktop_reconcile_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::reconcile_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::reconcile_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]

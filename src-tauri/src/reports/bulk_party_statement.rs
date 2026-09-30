@@ -234,6 +234,18 @@ pub fn write_bulk_party_statements_with_ageing_anchor<Render>(
 where
     Render: for<'statement> Fn(&'statement PartyStatement) -> Result<Vec<u8>, String>,
 {
+    write_recorded_bulk_party_statements(request, &crate::export_registry::record)
+}
+
+/// The batch writer, with the export registry's `record` passed in so that
+/// tests can watch when it is called (bridge#833).
+fn write_recorded_bulk_party_statements<Render>(
+    request: BulkPartyStatementRequest<'_, Render>,
+    record: &dyn Fn(&[u8]) -> Result<(), String>,
+) -> Result<BulkPartyStatementResult, String>
+where
+    Render: for<'statement> Fn(&'statement PartyStatement) -> Result<Vec<u8>, String>,
+{
     let BulkPartyStatementRequest {
         destination,
         company,
@@ -297,6 +309,16 @@ where
             "statement-{}-{as_of_yyyymmdd}",
             safe_party_slug(&statement.party)
         );
+        // Recorded before it is written, so the documents uploader never finds
+        // a statement Bridge wrote that it does not know (bridge#833).
+        if record(&bytes).is_err() {
+            failures.push(StatementFailure {
+                party,
+                code: StatementFailureCode::Write,
+                reason: UNRECORDED_EXPORT.to_string(),
+            });
+            continue;
+        }
         match write_unique_file(destination, &stem, format, &bytes) {
             Ok(path) => written.push(WrittenStatement {
                 party,
@@ -322,6 +344,7 @@ where
     };
     let manifest_bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| format!("Bridge could not build the statement manifest: {error}"))?;
+    record(&manifest_bytes).map_err(|_| UNRECORDED_EXPORT.to_string())?;
     let manifest_path = write_unique_file(
         destination,
         &format!("statement-manifest-{as_of_yyyymmdd}"),
@@ -417,9 +440,18 @@ fn safe_party_slug(party: &str) -> String {
     }
 }
 
+/// Why a statement or manifest was not written: Bridge could not record it as
+/// its own export, and an unrecorded one could later be uploaded from a synced
+/// folder (bridge#833).
+const UNRECORDED_EXPORT: &str =
+    "Bridge could not record this file as its own export, so it did not write it.";
+
 /// Creates a previously unused filename. `create_new` closes the race between
 /// candidate selection and writing, so neither a same-run slug collision nor
-/// a pre-existing file can be silently overwritten.
+/// a pre-existing file can be silently overwritten. The name is reserved
+/// empty, and the bytes go to a hidden staging file beside it, synced, then
+/// renamed over the reservation: a crash leaves an empty file or a hidden
+/// one, and the documents scan uploads neither (bridge#833).
 fn write_unique_file(
     destination: &Path,
     stem: &str,
@@ -435,14 +467,25 @@ fn write_unique_file(
         } else {
             format!("-{sequence}")
         };
-        let path = destination.join(format!("{stem}{suffix}.{extension}"));
-        let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
-            Ok(file) => file,
+        let name = format!("{stem}{suffix}.{extension}");
+        let path = destination.join(&name);
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(_reserved) => {}
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(unwritable_destination_reason(&path, &error)),
-        };
-        if let Err(error) = file.write_all(bytes) {
-            drop(file);
+        }
+        let staged = destination.join(staging_name(&name));
+        let written = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&staged)
+            .and_then(|mut file| {
+                file.write_all(bytes)?;
+                file.sync_all()
+            })
+            .and_then(|()| rename_with_retries(&staged, &path));
+        if let Err(error) = written {
+            let _ = fs::remove_file(&staged);
             let _ = fs::remove_file(&path);
             return Err(unwritable_destination_reason(&path, &error));
         }
@@ -450,6 +493,31 @@ fn write_unique_file(
     }
     Err("Bridge could not find an unused statement filename after 10,000 attempts.".to_string())
 }
+
+/// The hidden name a statement is written under before it is renamed into
+/// place. It starts with a dot, which the documents scan never lists
+/// (bridge#833).
+pub(crate) fn staging_name(name: &str) -> String {
+    format!(".{name}.{}.partial", Uuid::new_v4())
+}
+
+/// `fs::rename`, tried a few times: on Windows a virus scanner, the indexer
+/// or a sync client can hold a just-written file open for a moment, and the
+/// rename then fails although nothing is wrong (bridge#833).
+fn rename_with_retries(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 1;
+    loop {
+        match fs::rename(from, to) {
+            Err(_) if attempt < RENAME_ATTEMPTS => {
+                std::thread::sleep(Duration::from_millis(100 * attempt));
+                attempt += 1;
+            }
+            result => return result,
+        }
+    }
+}
+
+const RENAME_ATTEMPTS: u64 = 5;
 
 /// Logs the full write diagnostic -- including the local filesystem path,
 /// which can embed the operator's OS username -- to Bridge's own log, then

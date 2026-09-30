@@ -562,6 +562,15 @@ impl TallyConnector for RuntimeTallyConnector {
         let validation_company_guid = expected_company_guid.clone();
         let validation_from = expected_from.clone();
         let validation_to = expected_to.clone();
+        // Fail closed: `from`/`to` feed a quoted `<SET>"..."</SET>` TDL
+        // literal in `ledger_period_balances_request`, where XML escaping
+        // cannot protect the argument (Tally decodes `&quot;` back to a
+        // literal `"` before the formula runs). Requiring a validated
+        // `TallyDate` here -- exactly 8 ASCII digits -- closes that off at
+        // the boundary instead of relying on every caller of this connector
+        // having validated the window already (bridge#832).
+        let request_from = TallyDate::parse(expected_from)?;
+        let request_to = TallyDate::parse(expected_to)?;
         let (identity, education) = self.verify_snapshot_identity_observing_mode().await?;
         // The period report is a custom report whose TDL Education answers with
         // a blocking dialog on the Tally screen (bridge#45). Either this
@@ -581,8 +590,8 @@ impl TallyConnector for RuntimeTallyConnector {
             .post_xml_validated(
                 tdl_engine::ledger_period_balances_request(
                     &self.company.display_name,
-                    &expected_from,
-                    &expected_to,
+                    &request_from,
+                    &request_to,
                 ),
                 move |xml| {
                     parse_ledger_period_balance_report(xml).is_ok_and(|parsed| {
@@ -773,8 +782,10 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
     if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
         return match transport {
             TallyTransportError::EndpointInvalid { .. } => invalid_data("endpoint_invalid"),
+            // A wire-gate refusal (#697) sent nothing; its code says why.
             TallyTransportError::PolicyInvalid { .. }
-            | TallyTransportError::ClientInitializationFailed => TallyError::Unsupported {
+            | TallyTransportError::ClientInitializationFailed
+            | TallyTransportError::WireRefused { .. } => TallyError::Unsupported {
                 code: transport.safe_code().to_string(),
             },
             TallyTransportError::RequestTooLarge { .. } => {

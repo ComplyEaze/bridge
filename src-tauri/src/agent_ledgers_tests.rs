@@ -920,12 +920,14 @@ mod through_the_tool {
         plans
     }
 
-    /// A master mark whose estimate is over the budget refuses right after the
-    /// source's opening extent: no ledger, balance or group request is sent,
-    /// and the refusal names the mark as an upper bound, not a ledger count.
+    /// A master mark past what a catalogue read can bound within the budget
+    /// (10,000) refuses right after the source's opening extent, as before
+    /// #668: no catalogue, ledger, balance or group request is sent, and the
+    /// refusal names the mark as an upper bound and says no ledgers were
+    /// counted.
     #[tokio::test]
     async fn a_book_whose_master_mark_is_over_the_bound_is_refused_before_any_ledger_read() {
-        let plans = marked_compliance_plans(5_000, Vec::new(), None);
+        let plans = marked_compliance_plans(10_001, Vec::new(), None);
         let total = plans.len();
         let (response, requests) =
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
@@ -935,11 +937,152 @@ mod through_the_tool {
         assert_eq!(error["cause"], "ledger_masters_too_large");
         assert_eq!(
             error["size"],
-            json!({"master_alter_id": 5_000, "estimated_bytes": 18_750_000, "budget_bytes": 16_000_000})
+            json!({"master_alter_id": 10_001, "counted_ledgers": null, "estimated_bytes": 37_503_750, "budget_bytes": 16_000_000})
         );
         let remediation = error["remediation"].as_str().unwrap();
         assert!(remediation.contains("UPPER BOUND"), "{error}");
         assert!(remediation.contains("fields=basic"), "{error}");
+    }
+
+    /// The captured catalogue widened to `rows` ledgers: the nine captured
+    /// rows first, then copies of the first with a distinct name and GUID.
+    fn catalogue(rows: usize) -> String {
+        let captured = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+        ));
+        if rows <= 9 {
+            return captured;
+        }
+        let first = captured.find("    <LEDGER ").unwrap();
+        let end = captured.find("</COLLECTION>").unwrap();
+        let template_end =
+            first + captured[first..].find("</LEDGER>").unwrap() + "</LEDGER>\n".len();
+        let template = &captured[first..template_end];
+        let mut widened = captured[..end].to_owned();
+        for i in 9..rows {
+            widened.push_str(
+                &template
+                    .replace("Bridge Nested Debtor WR4", &format!("Filler Ledger {i}"))
+                    .replace("-000000d5", &format!("-f{i:07x}")),
+            );
+        }
+        widened.push_str(&captured[end..]);
+        widened
+    }
+
+    /// A mark past the master bound but within the catalogue's reach is
+    /// counted first, and the count admits it: the catalogue pair, then the
+    /// same three reads in the same order, and the same rows as the unsized
+    /// read (#668).
+    #[tokio::test]
+    async fn a_book_whose_counted_ledgers_fit_is_read_though_its_mark_does_not() {
+        let plans = marked_compliance_plans(
+            5_000,
+            vec![catalogue(9), masters(), balances(), groups()],
+            Some(extent_with_master_mark(5_000)),
+        );
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total);
+        let (unsized_response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        assert_eq!(items(&response), items(&unsized_response));
+    }
+
+    /// The same mark with a catalogue of 4,267 ledgers, one more than fit,
+    /// refuses right after the catalogue: no master request is sent, and the
+    /// refusal carries the count.
+    #[tokio::test]
+    async fn a_book_whose_counted_ledgers_are_over_the_bound_is_refused_before_the_master_read() {
+        let plans = marked_compliance_plans(5_000, vec![catalogue(4_267)], None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "ledger_masters_too_large");
+        assert_eq!(
+            error["size"],
+            json!({"master_alter_id": 5_000, "counted_ledgers": 4_267, "estimated_bytes": 16_001_250, "budget_bytes": 16_000_000})
+        );
+    }
+
+    /// A catalogue that names another company does not size this one: it is
+    /// refused on identity before any master request is sent.
+    #[tokio::test]
+    async fn a_count_from_another_company_is_refused_before_the_master_read() {
+        let other = catalogue(9).replace(GUID, "00000000-0000-0000-0000-000000000000");
+        let plans = marked_compliance_plans(5_000, vec![other], None);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "ledger_catalogue_identity_mismatch");
+    }
+
+    /// A catalogue pair whose second read disagrees with its first is refused
+    /// on that drift before any master request is sent.
+    #[tokio::test]
+    async fn a_catalogue_that_changes_between_its_two_reads_is_refused_before_the_master_read() {
+        let mut plans = marked_compliance_plans(5_000, Vec::new(), None);
+        plans.extend([xml(catalogue(9)), status(), xml(catalogue(10)), status()]);
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "nothing is sent after the catalogue pair");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed");
+        assert_eq!(error["cause"], "party_ledger_catalogue_changed");
+    }
+
+    /// The catalogue pair that counted the ledgers is in the evidence of a
+    /// read that succeeds, not only of one refused: its two bodies are the
+    /// whole difference from the same book admitted by its mark.
+    #[tokio::test]
+    async fn a_counted_read_reports_the_catalogue_pair_in_its_evidence() {
+        let bytes = |response: &Value| {
+            response["structuredContent"]["evidence"]["bytes"]
+                .as_u64()
+                .unwrap()
+        };
+        let counted_plans = marked_compliance_plans(
+            5_000,
+            vec![catalogue(9), masters(), balances(), groups()],
+            Some(extent_with_master_mark(5_000)),
+        );
+        let (counted, _) = call(
+            counted_plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let admitted_plans = marked_compliance_plans(
+            4_266,
+            vec![masters(), balances(), groups()],
+            Some(extent_with_master_mark(4_266)),
+        );
+        let (admitted, _) = call(
+            admitted_plans,
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        // UTF-16LE on the wire, with its two-byte byte-order mark.
+        let catalogue_wire = 2 + 2 * catalogue(9).encode_utf16().count() as u64;
+        assert_eq!(
+            bytes(&counted) - bytes(&admitted),
+            2 * catalogue_wire,
+            "the paired catalogue bodies are counted"
+        );
+        assert_ne!(
+            counted["structuredContent"]["evidence"]["request_sha256"],
+            admitted["structuredContent"]["evidence"]["request_sha256"]
+        );
     }
 
     /// A mark exactly at the bound is admitted and read as it was before #637:
@@ -1838,17 +1981,23 @@ mod through_the_tool {
         (response, requests)
     }
 
-    /// Identity, then the extent-bracketed currency read that returns the
-    /// captured two-Currency-master response (protocol reference §9.10a.1).
-    fn multi_currency_plans() -> Vec<ScenarioPlan> {
+    /// Identity, then the extent-bracketed currency read of a book with one
+    /// Currency master whose mailing name is not INR: the captured modern INR
+    /// response with only `MAILINGNAME` changed. Admission refuses it before
+    /// any master read. A book with several masters is no longer a refusal
+    /// case (bridge#551): the classified read goes on to identify its base.
+    fn foreign_base_currency_plans() -> Vec<ScenarioPlan> {
         let company = xml(companies());
         let extent = xml(include_str!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
         )
         .to_owned());
-        let currency = xml(captured(include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
-        )));
+        let inr = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+        ));
+        let from = "<MAILINGNAME TYPE=\"String\">INR</MAILINGNAME>";
+        assert_eq!(inr.matches(from).count(), 1);
+        let currency = xml(inr.replace(from, "<MAILINGNAME TYPE=\"String\">USD</MAILINGNAME>"));
         let mut plans = identity_plans();
         plans.push(company.clone());
         pair(&mut plans, extent.clone());
@@ -1887,13 +2036,13 @@ mod through_the_tool {
     #[tokio::test]
     async fn currency_refusal_names_its_cause_beside_the_operation_code() {
         let (response, _) = call(
-            multi_currency_plans(),
+            foreign_base_currency_plans(),
             json!({"company_guid":GUID,"fields":"compliance"}),
         )
         .await;
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed");
-        assert_eq!(error["cause"], "company_base_currency_undetermined");
+        assert_eq!(error["cause"], "company_base_currency_not_inr");
     }
 
     #[tokio::test]
@@ -1929,16 +2078,13 @@ mod through_the_tool {
         // Control: the same refusal carries a cause at the default budget, so
         // its absence below is the budget rule and not a missing cause.
         let (response, _) = call(
-            multi_currency_plans(),
+            foreign_base_currency_plans(),
             json!({"company_guid":GUID,"fields":"compliance"}),
         )
         .await;
-        assert_eq!(
-            refusal(&response)["cause"],
-            "company_base_currency_undetermined"
-        );
+        assert_eq!(refusal(&response)["cause"], "company_base_currency_not_inr");
         let (response, _) = call_with_max_bytes(
-            multi_currency_plans(),
+            foreign_base_currency_plans(),
             json!({"company_guid":GUID,"fields":"compliance"}),
             REMEDIATION_MIN_RESPONSE_BUDGET - 1,
         )
@@ -2094,6 +2240,176 @@ mod through_the_tool {
         let error = refusal(&response);
         assert_eq!(error["code"], "ledger_export_invalid");
         assert_eq!(error["cause"], "native_ledger_group_changed");
+    }
+
+    /// bridge#551: the compliance source checks the master response as soon
+    /// as it is read, so a master that repeats a ledger's identity is refused
+    /// before the balance request is sent. The captured master with its second
+    /// ledger block repeated, and nothing else changed.
+    #[tokio::test]
+    async fn a_repeated_master_identity_is_refused_before_the_balance_read() {
+        let forex = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+        let companies = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+        )));
+        let extent = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+        )));
+        let fixture = |bytes: &[u8]| xml(captured(bytes));
+        let master = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/compliance_master_forex_live.utf16le.xml"
+        ));
+        let start = master.match_indices("<LEDGER NAME=").nth(1).unwrap().0;
+        let end = start + master[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let repeated = format!(
+            "{}{}{}",
+            &master[..end],
+            &master[start..end],
+            &master[end..]
+        );
+        let mut plans = Vec::new();
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.push(companies.clone());
+        plans.extend([status(), companies.clone(), companies.clone()]);
+        pair(&mut plans, extent);
+        pair(&mut plans, xml(repeated));
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let response = one
+            .call(json!({"company_guid":forex,"fields":"compliance"}))
+            .await;
+        assert_eq!(one.requests(), total, "{response}");
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed", "{error}");
+        assert_eq!(error["cause"], "duplicate_master_identity", "{error}");
+    }
+
+    /// bridge#551, through the tool on the several-currency book's captures:
+    /// the compliance read admits it through the classified base, returns its
+    /// plain rupee ledgers only, and names the three dollar ledgers and the
+    /// three rupee ledgers with a composite balance that it left out. The
+    /// extent, master, balance and group responses are one moment of the book
+    /// (FOREX_601D_CAPTURE_PROVENANCE); the currency and Company reads are the
+    /// committed 22 Sep captures, from before the C1 voucher, which added no
+    /// Currency master.
+    #[tokio::test]
+    async fn a_several_currency_book_returns_its_base_ledgers_and_names_the_rest() {
+        let forex = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+        let companies = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+        )));
+        let extent = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+        )));
+        let fixture = |bytes: &[u8]| xml(captured(bytes));
+        let mut plans = Vec::new();
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.push(companies.clone());
+        plans.extend([status(), companies.clone(), companies.clone()]);
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/compliance_master_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/balance_snapshot_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/group_snapshot_forex_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.extend([companies.clone(), status(), companies.clone()]);
+        // A second page is served from the first page's snapshot: identity,
+        // then the bracketed extent pair only.
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent);
+        plans.push(companies);
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let page = |offset: usize| json!({"company_guid":forex,"fields":"compliance","limit":2,"offset":offset});
+        let first = one.call(page(0)).await;
+        let second = one.call(page(2)).await;
+        assert_eq!(one.requests(), total);
+        let dollar = ["BRIDGE FX DEBTOR A", "FX USD Debtor 01", "FX USD Debtor 02"];
+        let mut names = Vec::new();
+        for response in [&first, &second] {
+            let result = &response["structuredContent"]["result"];
+            names.extend(
+                items(response)
+                    .iter()
+                    .map(|row| row["name"].as_str().unwrap().to_string()),
+            );
+            assert_eq!(result["total"], 4);
+            assert_eq!(result["ledgers_scope"], "base_currency_ledgers_only");
+            // Rupee ledgers a dollar entry touched carry composite balances:
+            // set aside by name, never read.
+            let mixed = &result["base_currency_ledgers_mixed_excluded"];
+            assert_eq!(mixed["count"], 3);
+            assert_eq!(mixed["reason"], "mixed_currency_movement");
+            assert_eq!(
+                mixed["ledgers"],
+                json!(["FX Party 01", "FX Sales", "Profit & Loss A/c"])
+            );
+            let excluded = &result["foreign_currency_ledgers_excluded"];
+            assert_eq!(excluded["count"], 3);
+            let mut listed = excluded["ledgers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|ledger| {
+                    assert_eq!(ledger["currency"], "$");
+                    ledger["ledger"].as_str().unwrap().to_string()
+                })
+                .collect::<Vec<_>>();
+            listed.sort();
+            assert_eq!(listed, dollar);
+            // The composite opening on a dollar ledger is never read or shown.
+            assert!(!response.to_string().contains(" @ "), "{response}");
+        }
+        assert_eq!(
+            names,
+            ["BRIDGE INR DEBTOR A", "Cash", "FX Party 02", "FX Party 03"]
+        );
+        assert_eq!(
+            second["structuredContent"]["result"]["snapshot"]["reused"],
+            true
+        );
     }
 
     /// A basic read of a book holding a foreign-currency opening is refused as
@@ -2521,6 +2837,36 @@ mod through_the_tool {
             "request_cancelled"
         );
         assert_eq!(result["structuredContent"]["evidence"]["state"], "partial");
+    }
+
+    /// A tool call, served over MCP, fits the 2 MiB a test thread gets by
+    /// default, held here whatever `RUST_MIN_STACK` says (#697). A debug build
+    /// has no room to spare: measured, the call needed about 1.75 MiB, and a
+    /// stack overflow aborts the whole test binary rather than failing one
+    /// test. Any change that makes a tool call's future larger has to box it
+    /// (see `with_operation_wire_budget`) before this passes again.
+    #[test]
+    fn a_tool_call_fits_a_two_mib_stack() {
+        const STACK: usize = 2 * 1024 * 1024;
+        std::thread::Builder::new()
+            .stack_size(STACK)
+            .spawn(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        let (response, requests) = serve_ledger_masters_then(&[
+                            r#"{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}"#,
+                        ])
+                        .await;
+                        assert_eq!(requests, identity_plans().len(), "{response}");
+                        assert_eq!(response["result"]["isError"], true, "{response}");
+                    });
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[tokio::test]

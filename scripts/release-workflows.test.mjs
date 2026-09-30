@@ -8,6 +8,8 @@ import test from "node:test";
 import { parseDocument } from "yaml";
 
 const defaultBranchGuard = "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)";
+// The install page also redeploys after a successful preview publication, from the default branch only.
+const installPageGuard = `${defaultBranchGuard} && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == github.event.repository.default_branch))`;
 
 async function workflow(path) {
   const source = await readFile(new URL(path, import.meta.url), "utf8");
@@ -79,10 +81,11 @@ function assertReleaseWorkflow(release) {
 }
 
 function assertInstallPageWorkflow(page) {
-  assertWorkflowDispatch(page, "install page workflow");
+  assert.deepEqual(Object.keys(page.on), ["workflow_dispatch", "workflow_run"], "install page workflow must be manual or follow a preview publication");
+  assert.deepEqual(page.on.workflow_run, { workflows: ["Publish MCPB preview release"], types: ["completed"] });
   const deploy = page.jobs.deploy;
   assert.ok(deploy, "install page deployment job must be present");
-  assert.equal(deploy.if, defaultBranchGuard, "Pages deployment must be gated to the default branch");
+  assert.equal(deploy.if, installPageGuard, "Pages deployment must be gated to the default branch and to a successful publication");
   assert.equal(deploy["continue-on-error"], undefined, "Pages deployment must not continue after failure");
   const upload = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   const publish = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/deploy-pages@"));
@@ -99,12 +102,15 @@ function assertInstallPageWorkflow(page) {
 
 // Runs the snapshot step's own shell with `gh` replaced by a function that applies the step's
 // real --jq filter to fixture JSON, so the draft filter and the empty guard are exercised, not matched.
+// Each release is its own page, as `gh api --paginate` would print them, so the step must collect
+// every page into one list.
 function runSnapshotStep(run, releases) {
   const dir = mkdtempSync(join(tmpdir(), "bridge-snapshot-"));
   mkdirSync(join(dir, "site"));
   copyFileSync(new URL("../site/release-catalog.mjs", import.meta.url), join(dir, "site", "release-catalog.mjs"));
-  writeFileSync(join(dir, "fixture.json"), JSON.stringify(releases));
-  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; jq "$4" fixture.json; }\n${run}`;
+  const pages = releases.length ? releases.map((release) => [release]) : [[]];
+  pages.forEach((page, index) => writeFileSync(join(dir, `page-${String(index).padStart(3, "0")}.json`), JSON.stringify(page)));
+  const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; for page in page-*.json; do jq -c "$5" "$page"; done; }\n${run}`;
   const result = spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8", env: { ...process.env, REPOSITORY: "example/bridge" } });
   const written = existsSync(join(dir, "site", "releases.json")) ? readFileSync(join(dir, "site", "releases.json"), "utf8") : undefined;
   rmSync(dir, { recursive: true, force: true });
@@ -171,6 +177,23 @@ test("publication workflow checks reject disabled or misplaced controls", async 
   const disabledPage = structuredClone(page);
   disabledPage.jobs.deploy.if = false;
   assert.throws(() => assertInstallPageWorkflow(disabledPage), /default branch/);
+
+  // A redeploy after a failed or cancelled publication would snapshot a release that is not there.
+  const anyConclusion = structuredClone(page);
+  anyConclusion.jobs.deploy.if = anyConclusion.jobs.deploy.if.replace("github.event.workflow_run.conclusion == 'success' && ", "");
+  assert.notEqual(anyConclusion.jobs.deploy.if, page.jobs.deploy.if);
+  assert.throws(() => assertInstallPageWorkflow(anyConclusion), /successful publication/);
+
+  // workflow_run matches by workflow name, so a pull request's same-named workflow or a fork's run must not qualify.
+  for (const condition of [
+    "github.event.workflow_run.event == 'workflow_dispatch' && ",
+    "github.event.workflow_run.head_repository.full_name == github.repository && ",
+  ]) {
+    const relaxed = structuredClone(page);
+    relaxed.jobs.deploy.if = relaxed.jobs.deploy.if.replace(condition, "");
+    assert.notEqual(relaxed.jobs.deploy.if, page.jobs.deploy.if, condition);
+    assert.throws(() => assertInstallPageWorkflow(relaxed), /successful publication/, condition);
+  }
 });
 
 test("the MCPB smoke binds initialize serverInfo.version to the archived manifest", async () => {

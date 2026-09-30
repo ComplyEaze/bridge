@@ -1,12 +1,15 @@
 //! Native Trial Balance source contract and closed request profile.
 //! See TALLY_PROTOCOL_REFERENCE section 5.6 for observed field semantics.
+use crate::xml_text::escape_text as xml_escape;
 use crate::{native_outstandings::NativeLedgerSnapshotPeriod, PartyLedgerMasterFieldObservation};
 use bridge_tally_primitives::ExactDecimal;
 use serde::Serialize;
 use std::fmt;
 mod scalar;
 mod wire;
-pub use wire::parse_native_trial_balance;
+// One classifier for every reader, shared with `vouchers` (bridge#674).
+pub(crate) use crate::currency_composite::is_currency_composite;
+pub use wire::{parse_native_trial_balance, parse_native_trial_balance_with_currency};
 
 /// One amount exactly as the native collection exposed it.
 ///
@@ -33,6 +36,19 @@ pub struct NativeTrialBalanceRow {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeTrialBalance {
     pub rows: Vec<NativeTrialBalanceRow>,
+}
+
+/// A several-currency book's Trial Balance (bridge#551): the plain
+/// base-currency rows, which alone are read, and the rows set aside by name.
+/// Totals over `report` cover plain base-currency ledgers only and are not
+/// expected to balance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrencyScopedTrialBalance {
+    pub report: NativeTrialBalance,
+    /// Ledgers kept in another currency, with their `CURRENCYNAME`.
+    pub foreign_currency_ledgers: Vec<crate::native_outstandings::ForeignCurrencyLedger>,
+    /// Base-currency ledgers with a value Tally wrote as a currency composite.
+    pub mixed_currency_ledgers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,21 +83,41 @@ pub fn render_native_trial_balance_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_trial_balance_collection(
+        company,
+        period,
+        "NAME, GUID, PARENT, TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING",
+    )
+}
+
+/// [`render_native_trial_balance_request`] with `CURRENCYNAME` appended to
+/// its `FETCH`, so each row names its ledger's currency and a foreign-currency
+/// ledger can be set aside by name (bridge#551). Sent only when the company
+/// defines several Currency masters, so a single-currency book's request is
+/// byte-for-byte unchanged. On the captured several-currency book every row
+/// carried it (`trial_balance_currency_forex_live`; one book, one run: PARTIAL).
+pub fn render_native_trial_balance_request_with_currency(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
+    render_trial_balance_collection(
+        company,
+        period,
+        "NAME, GUID, PARENT, TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING, CURRENCYNAME",
+    )
+}
+
+fn render_trial_balance_collection(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    fetch: &str,
+) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>NAME, GUID, PARENT, TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

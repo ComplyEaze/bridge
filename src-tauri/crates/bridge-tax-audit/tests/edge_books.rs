@@ -116,7 +116,8 @@ fn build(s: &Value) -> Book {
                 name: name.clone(),
                 parent: chain.first().cloned().unwrap_or_default(),
                 chain,
-                chain_complete: true,
+                chain_complete: typed(l, "chain_complete", false, "true or false", Value::as_bool)
+                    .unwrap_or(true),
                 master_opening_paise: 0,
                 guid: l["guid"].as_str().unwrap().to_string(),
                 masterid: None,
@@ -206,6 +207,7 @@ fn rules(s: &Value) -> Rules {
             "s36_1_va" => rules.s36_1_va_due_day = None,
             "s194j" => rules.s194j_aggregate_paise = None,
             "s194t" => rules.s194t = None,
+            "tds_rates" => rules.tds_rates = None,
             other => panic!("rules_without {other} is not wired here"),
         }
     }
@@ -258,9 +260,47 @@ fn creditor_ageing_params(c: &Value) -> creditor_ageing_43bh::Params {
     }
 }
 
+/// A table of the spec's keys that are present, as TOML (a challan's `date` string as a TOML date).
+fn toml_table(s: &Value, keys: &[&str]) -> toml::Table {
+    keys.iter()
+        .filter(|k| !s[**k].is_null())
+        .map(|k| {
+            let mut v = toml_of(&s[*k]);
+            if *k == "challans" {
+                for c in v.as_array_mut().into_iter().flatten() {
+                    if let Some(d) = c.get("date").and_then(toml::Value::as_str) {
+                        let date: toml::value::Datetime = d.parse().expect("an ISO date");
+                        c.as_table_mut()
+                            .unwrap()
+                            .insert("date".to_string(), toml::Value::Datetime(date));
+                    }
+                }
+            }
+            ((*k).to_string(), v)
+        })
+        .collect()
+}
+
 /// The `[tds]`/`[tds_payees]` values `parity/edge_golden.py` passes `tds_payees`: a
 /// `s194j_category_by_ledger` value that is not a string is kept as `None`, as `TdsConfig` keeps it.
+/// The lists are read by the crate's own readers from the spec's keys, as the edge runner reads
+/// them through the reference's.
 fn tds_config(s: &Value) -> TdsConfig {
+    let tds = toml_table(
+        s,
+        &[
+            "nature_by_ledger",
+            "previous_year_turnover_status",
+            "goods_carriage_ledgers",
+            "form_26a",
+            "challans",
+        ],
+    );
+    let tds_payees = toml_table(
+        s,
+        &["reversals", "gst_separate_by_agreement", "foreseeability"],
+    );
+    let lists = tds_payees::read_config_lists(&tds, Some(&tds_payees)).unwrap();
     let map = |key: &str| -> BTreeMap<String, String> {
         s[key]
             .as_object()
@@ -283,6 +323,38 @@ fn tds_config(s: &Value) -> TdsConfig {
                     .collect()
             })
             .unwrap_or_default(),
+        reversals: lists.reversals,
+        gst_separate: lists.gst_separate,
+        foreseeability_names: lists.foreseeability_names,
+        challans: lists.challans,
+        form_26a: lists.form_26a,
+        turnover_is_placeholder: lists.turnover_is_placeholder,
+        goods_carriage_ledgers: strs(&s["goods_carriage_ledgers"]).into_iter().collect(),
+    }
+}
+
+/// What the edge runner passes `tds_payees` from the other tables: the spec's `tds_payable_ledgers`,
+/// `gst_ledgers`, `partners` keys, `client_state` and `deductor_activity`.
+fn tds_inputs(s: &Value) -> tds_payees::Inputs {
+    let mut client = toml::Table::new();
+    if let Some(state) = s.get("client_state") {
+        client.insert("state".to_string(), toml_of(state));
+    }
+    let mut cfg = toml::Table::new();
+    if let Some(activity) = s.get("deductor_activity") {
+        let mut deductor = toml::Table::new();
+        deductor.insert("activity".to_string(), toml_of(activity));
+        cfg.insert("deductor".to_string(), toml::Value::Table(deductor));
+    }
+    tds_payees::Inputs {
+        tds_ledgers: strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+        gst_ledgers: strs(&s["gst_ledgers"]).into_iter().collect(),
+        other_names: s["partners"]
+            .as_object()
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default(),
+        client_state: tds_payees::read_client_state(&client).unwrap(),
+        deductor_activity: tds_payees::read_deductor_activity(&cfg).unwrap(),
     }
 }
 
@@ -313,25 +385,14 @@ fn partners(s: &Value) -> PartnersConfig {
     }
 }
 
-/// The `loans` table `parity/edge_golden.py` passes `loans_interest`, typed as the crate types a
-/// bound `[loans.loan_ledgers]`.
+/// The `loans` table `parity/edge_golden.py` passes `loans_interest`, typed by the crate's own
+/// reader of a bound `[loans.loan_ledgers]` (an `interest_ledger` one name or a list).
 fn loans(s: &Value) -> BTreeMap<String, loans_interest::LoanConfig> {
-    s["loans"]
+    let entries: BTreeMap<String, toml::Value> = s["loans"]
         .as_object()
-        .map(|o| {
-            o.iter()
-                .map(|(k, v)| {
-                    let text = |key: &str| v[key].as_str().unwrap().to_string();
-                    let cfg = loans_interest::LoanConfig {
-                        lender: text("lender"),
-                        lender_type: text("lender_type"),
-                        interest_ledger: v["interest_ledger"].as_str().map(str::to_string),
-                    };
-                    (k.clone(), cfg)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+        .map(|o| o.iter().map(|(k, v)| (k.clone(), toml_of(v))).collect())
+        .unwrap_or_default();
+    loans_interest::loan_config(&entries).unwrap()
 }
 
 /// The `[tds_tcs_26as]` values `parity/edge_golden.py` passes both 26AS tests.
@@ -519,7 +580,9 @@ fn check(name: &str) {
             }
             "tds_payees" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
-                let r = tds_payees::run(&book, &rules, entity_type, &tds_config(&s)).unwrap();
+                let r =
+                    tds_payees::run(&book, &rules, entity_type, &tds_config(&s), &tds_inputs(&s))
+                        .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
                 let rust = canonical_test_result(&book, &r, None).unwrap();
                 let golden = common::golden_named(&format!("edge.{name}.{test}"));
@@ -532,22 +595,25 @@ fn check(name: &str) {
                 let shared: BTreeSet<String> =
                     strs(&s["shared_interest_ledgers"]).into_iter().collect();
                 let loans = loans(&s);
-                let turnover = s["previous_year_turnover_paise"].as_i64();
+                let tds_payable: BTreeSet<String> =
+                    strs(&s["tds_payable_ledgers"]).into_iter().collect();
+                // The activity and the turnover's status through the crate's own readers, as the
+                // edge runner reads them through the reference's.
+                let inputs = loans_interest::Inputs {
+                    previous_year_turnover_paise: s["previous_year_turnover_paise"].as_i64(),
+                    cash: &cash,
+                    bank: &bank,
+                    shared_interest_ledgers: &shared,
+                    tds_payable_ledgers: &tds_payable,
+                    deductor_activity: tds_inputs(&s).deductor_activity,
+                    turnover_is_placeholder: tds_config(&s).turnover_is_placeholder,
+                };
                 // Without a net_reversals key the book runs the rule in force, through run() and
                 // check_invariants(), so the default switch is what that golden pins.
                 match typed(&s, "net_reversals", false, "true or false", Value::as_bool) {
                     None => {
-                        let r = loans_interest::run(
-                            &book,
-                            &rules,
-                            entity_type,
-                            &loans,
-                            turnover,
-                            &cash,
-                            &bank,
-                            &shared,
-                        )
-                        .unwrap();
+                        let r = loans_interest::run(&book, &rules, entity_type, &loans, &inputs)
+                            .unwrap();
                         let c = loans_interest::check_invariants(&book, &r).unwrap();
                         (r, c)
                     }
@@ -557,10 +623,7 @@ fn check(name: &str) {
                             &rules,
                             entity_type,
                             &loans,
-                            turnover,
-                            &cash,
-                            &bank,
-                            &shared,
+                            &inputs,
                             net_reversals,
                         )
                         .unwrap();
@@ -572,9 +635,15 @@ fn check(name: &str) {
             }
             "partners_40b_194t" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
-                let r =
-                    partners_40b_194t::run(&book, &rules, &period(&s), entity_type, &partners(&s))
-                        .unwrap();
+                let r = partners_40b_194t::run(
+                    &book,
+                    &rules,
+                    &period(&s),
+                    entity_type,
+                    &partners(&s),
+                    &strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+                )
+                .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
                 let rust = canonical_test_result(&book, &r, None).unwrap();
                 let golden = common::golden_named(&format!("edge.{name}.{test}"));

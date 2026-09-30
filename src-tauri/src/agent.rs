@@ -5,6 +5,7 @@ use crate::local_files::directory::{ensure_private_directory, DirectoryAdmission
 use crate::local_files::file as local_file;
 use crate::local_files::paths::default_data_dir;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 
 #[path = "agent_import.rs"]
 mod agent_import;
@@ -434,10 +435,12 @@ struct Candidates {
 }
 
 /// A compliance read refused on its size before the master request was sent:
-/// the counted ledgers, the estimated response and the budget it exceeded.
+/// the master mark, the ledgers a catalogue counted (none when the mark alone
+/// was refused), the estimated response and the budget it exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
+    counted_ledgers: Option<u64>,
     estimated_bytes: u64,
     budget_bytes: u64,
 }
@@ -449,10 +452,12 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
         {
             crate::tally::connection::PartyLedgerMasterSourceValidationError::TooLarge {
                 master_alter_id,
+                counted_ledgers,
                 estimated_bytes,
                 budget_bytes,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
+                counted_ledgers: *counted_ledgers,
                 estimated_bytes: *estimated_bytes,
                 budget_bytes: *budget_bytes,
             }),
@@ -491,6 +496,8 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
                 | Transport::RequestFailed
                 | Transport::HttpStatus { .. }
                 | Transport::UnsupportedContentEncoding => Some(Unanswered(transport.safe_code())),
+                // Bridge's own wire gate held the request back: nothing was sent.
+                Transport::WireRefused { refusal } => Some(Unanswered(refusal.safe_code())),
                 Transport::InvalidEncoding {
                     code: code @ "response_content_type_unsupported",
                 } => Some(Unanswered(code)),
@@ -613,9 +620,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "company_several_currency_masters" => Some(
             "This company keeps more than one Currency master. The opening balances these \
              reads return (and ledger_movement's movements) name no currency, so Bridge \
-             refused before reading any ledger. Neither ledger_masters nor ledger_movement \
-             supports a book with several Currency masters yet (#551, #716). Retrying \
-             refuses again.",
+             refused before reading any ledger. ledger_masters with fields=compliance reads \
+             such a book through the base currency Tally identifies: it returns the plain \
+             base-currency ledgers and names the ones it leaves out (#551). The basic read \
+             and ledger_movement do not support it yet (#716). Retrying this read refuses \
+             again.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
@@ -631,14 +640,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_masters_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) puts the estimated \
-             compliance response over Bridge's budget, so no ledger request was sent: a read \
-             of that size has left Tally's gateway unable to answer (#637). The mark is an \
-             UPPER BOUND on ledgers, since stock items, units and every other master raise it \
-             too, so a company with fewer ledgers may be refused. Call ledger_masters with \
-             fields=basic, which returns names, parents and opening balances without the \
-             compliance fields. Retrying this call refuses again. A `group` filter does not \
-             narrow the request, and a precise ledger count is pending (#668).",
+            "The estimated compliance response is over Bridge's budget, so no master request \
+             was sent: a read of that size has left Tally's gateway unable to answer (#637). \
+             When `size.counted_ledgers` is a number, Bridge counted that many ledgers with a \
+             catalogue read and refused on the count. When it is null, the company's \
+             master-alteration mark (`size.master_alter_id`) is too high to count within \
+             budget and was refused as it stands; the mark is an UPPER BOUND on ledgers, since \
+             stock items, units and every other master raise it too, so a company with fewer \
+             ledgers may be refused. Call ledger_masters with fields=basic, which returns \
+             names, parents and opening balances without the compliance fields. Retrying this \
+             call refuses again. A `group` filter does not narrow the request.",
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
@@ -675,6 +686,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              A shorter date window will not help, because the count covers the whole book. \
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
+        ),
+        // #697: every Bridge process sends to one Tally one request at a time.
+        "tally_endpoint_busy" => Some(
+            "Another Bridge window or AI client was talking to this Tally for the whole \
+             bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
+             same request is safe to repeat.",
         ),
         "import_post_window_not_bounded" => Some(
             "Before posting, Bridge checks the batch's whole date range in one request, and \
@@ -738,6 +755,16 @@ impl ToolFailure {
             .any(|cause| cause.is::<crate::tally::runtime::ToolCancelled>())
         {
             "request_cancelled"
+        } else if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error)
+            // Never in place of an unknown post outcome: that code is what
+            // tells the caller not to rebuild. A wire refusal cannot reach it
+            // (the post's lock is taken before its attempt is recorded), and
+            // this keeps it so.
+            .filter(|_| code != "import_dispatch_outcome_unknown")
+        {
+            // Held back by the endpoint's wire gate: nothing was sent, and
+            // the caller's next step is the refusal's, not the operation's.
+            refusal.safe_code()
         } else if error
             .chain()
             .any(|cause| cause.is::<crate::tally::runtime::EducationBoundaryRefusal>())
@@ -943,6 +970,13 @@ impl Server {
                 evidence.state = "partial";
                 evidence.reason_code = Some(code.clone());
                 let mut error = json!({"code": code, "message": "Bridge refused this operation."});
+                // Retryable as it stands (#697): another Bridge window or AI
+                // client held the Tally endpoint for the whole bounded wait.
+                // A few bytes, so it is kept under any response budget.
+                if code == "tally_endpoint_busy" {
+                    error["retry_after_s"] =
+                        json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+                }
                 // Additive: `code` and `message` keep their existing shape for
                 // every refusal, and `remediation` appears only for the codes
                 // that have a concrete next step to name.
@@ -983,6 +1017,7 @@ impl Server {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["size"] = json!({
                             "master_alter_id": size.master_alter_id,
+                            "counted_ledgers": size.counted_ledgers,
                             "estimated_bytes": size.estimated_bytes,
                             "budget_bytes": size.budget_bytes,
                         });
@@ -1691,15 +1726,6 @@ fn mask(value: &str) -> String {
         chars[chars.len() - 2],
         chars[chars.len() - 1]
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 pub async fn run_stdio() -> Result<(), String> {

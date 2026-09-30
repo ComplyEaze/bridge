@@ -236,6 +236,67 @@ pub fn parse_native_party_ledger_master_records_with_evidence(
     )
 }
 
+/// [`parse_native_party_ledger_master_records_with_evidence`], except that a
+/// ledger named in `unparsed` keeps its `OPENINGBALANCE` as text and never
+/// has it parsed. The compliance source names the ledgers it sets aside
+/// (bridge#551), whose openings may be currency composites; their rows are
+/// still read and bound to the company, and the source then drops them.
+pub fn parse_native_party_ledger_master_records_leaving_unparsed(
+    xml: &str,
+    expected_company_guid: &str,
+    unparsed: &std::collections::BTreeSet<String>,
+) -> anyhow::Result<ParsedExport<ParsedSourceRecord<PartyLedgerMasterRecord>>> {
+    parse_native_ledger_collection_with_evidence(
+        xml,
+        expected_company_guid,
+        NativeLedgerCollectionCompanyBinding::ResponseGuid,
+        |reader, element| {
+            party_ledger_master_collection_row(
+                reader,
+                element,
+                OpeningAdmission::UnparsedFor(unparsed),
+            )
+        },
+    )
+}
+
+/// The party/ledger master collection's structure and identities, with no
+/// `OPENINGBALANCE` parsed. The compliance source checks a master response
+/// with this as soon as it is read, so a wrong or damaged response is refused
+/// before the balance request is sent; the amounts are admitted later, once
+/// the balance snapshot has named the ledgers set aside (bridge#551).
+pub fn parse_native_party_ledger_master_structure(
+    xml: &str,
+    expected_company_guid: &str,
+) -> anyhow::Result<ParsedExport<ParsedSourceRecord<PartyLedgerMasterRecord>>> {
+    parse_native_ledger_collection_with_evidence(
+        xml,
+        expected_company_guid,
+        NativeLedgerCollectionCompanyBinding::ResponseGuid,
+        |reader, element| {
+            party_ledger_master_collection_row(reader, element, OpeningAdmission::UnparsedForAll)
+        },
+    )
+}
+
+/// Which rows' `OPENINGBALANCE` is parsed as a decimal.
+#[derive(Clone, Copy)]
+enum OpeningAdmission<'a> {
+    Parsed,
+    UnparsedFor(&'a std::collections::BTreeSet<String>),
+    UnparsedForAll,
+}
+
+impl OpeningAdmission<'_> {
+    fn parses(self, ledger: &str) -> bool {
+        match self {
+            Self::Parsed => true,
+            Self::UnparsedFor(names) => !names.contains(ledger),
+            Self::UnparsedForAll => false,
+        }
+    }
+}
+
 fn parse_native_ledger_collection_with_evidence<T>(
     xml: &str,
     expected_company_guid: &str,
@@ -248,7 +309,9 @@ fn parse_native_ledger_collection_with_evidence<T>(
     let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = configured_reader(sanitized.as_str());
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_answered = false;
     let mut collection_seen = false;
     let mut records = Vec::new();
     let mut identities = HashMap::<String, u64>::new();
@@ -263,11 +326,21 @@ fn parse_native_ledger_collection_with_evidence<T>(
                 if path.is_empty() && name != b"ENVELOPE" {
                     anyhow::bail!("native ledger collection root was not ENVELOPE");
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
-                    if status_seen || read_required_text(&mut reader, element.name())? != "1" {
-                        anyhow::bail!("native ledger collection did not report success");
+                    if std::mem::replace(&mut status_seen, true) {
+                        anyhow::bail!("native ledger collection carried a second STATUS");
                     }
-                    status_seen = true;
+                    // An empty STATUS is no answer (bridge#717, #863): the
+                    // envelope's end refuses it, so a response cut off after
+                    // it still ends as unterminated.
+                    match read_optional_text(&mut reader, element.name())?.as_deref() {
+                        None => {}
+                        Some("1") => status_answered = true,
+                        Some(_) => anyhow::bail!("native ledger collection did not report success"),
+                    }
                     continue;
                 }
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
@@ -334,7 +407,13 @@ fn parse_native_ledger_collection_with_evidence<T>(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
-                if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
+                // A self-closing STATUS is no answer, and is still a STATUS.
+                if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_seen, true) {
+                        anyhow::bail!("native ledger collection carried a second STATUS");
+                    }
+                } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION"
+                {
                     collection_seen = true;
                 } else if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
                     && name == b"LEDGER"
@@ -350,8 +429,14 @@ fn parse_native_ledger_collection_with_evidence<T>(
     if !path.is_empty() {
         anyhow::bail!("native ledger collection ended before its root closed");
     }
-    if !status_seen {
-        anyhow::bail!("native ledger collection did not report success");
+    if !envelope_seen {
+        anyhow::bail!("native ledger collection had no ENVELOPE");
+    }
+    // A complete envelope with no STATUS, an empty one or a self-closing one is
+    // no answer, typed so a caller can tell it from Tally's failure answer
+    // (bridge#717, #863).
+    if !status_answered {
+        return Err(crate::NativeCollectionError::StatusAbsent.into());
     }
     if !collection_seen {
         anyhow::bail!("native ledger collection omitted BODY/DATA/COLLECTION");
@@ -414,7 +499,12 @@ fn parse_native_ledger_collection_row(
         alter_id,
         response_company_guid,
         ..
-    } = parse_native_ledger_collection_row_with_master_fields(reader, element, false)?;
+    } = parse_native_ledger_collection_row_with_master_fields(
+        reader,
+        element,
+        false,
+        OpeningAdmission::Parsed,
+    )?;
     Ok(NativeLedgerCollectionRow {
         record: ledger,
         identities,
@@ -427,13 +517,21 @@ fn parse_native_party_ledger_master_collection_row(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<NativeLedgerCollectionRow<PartyLedgerMasterRecord>> {
+    party_ledger_master_collection_row(reader, element, OpeningAdmission::Parsed)
+}
+
+fn party_ledger_master_collection_row(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    openings: OpeningAdmission<'_>,
+) -> anyhow::Result<NativeLedgerCollectionRow<PartyLedgerMasterRecord>> {
     let ParsedNativeLedgerCollectionRow {
         ledger,
         fields,
         identities,
         alter_id,
         response_company_guid,
-    } = parse_native_ledger_collection_row_with_master_fields(reader, element, true)?;
+    } = parse_native_ledger_collection_row_with_master_fields(reader, element, true, openings)?;
     Ok(NativeLedgerCollectionRow {
         record: PartyLedgerMasterRecord { ledger, fields },
         identities,
@@ -446,6 +544,7 @@ fn parse_native_ledger_collection_row_with_master_fields(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     retain_master_fields: bool,
+    openings: OpeningAdmission<'_>,
 ) -> anyhow::Result<ParsedNativeLedgerCollectionRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
     let name = attr_value(reader, element, b"NAME")
@@ -541,19 +640,22 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     // Every captured row carries this field. Its absence is
                     // unmeasured, so fail closed rather than silently turning
                     // a missing debtor/creditor balance into zero.
-                    bridge_tally_primitives::ExactDecimal::parse(opening_balance.clone()).map_err(
-                        |error| {
-                            // Classified only to name the refusal: a composite
-                            // is refused exactly as any other non-decimal is.
-                            if crate::native_outstandings::is_foreign_currency_balance(
-                                &opening_balance,
-                            ) {
-                                anyhow::Error::new(NativeLedgerAmountError::ForeignCurrencyOpening)
-                            } else {
-                                anyhow::Error::from(error)
-                            }
-                        },
-                    )?;
+                    if openings.parses(&ledger.name) {
+                        bridge_tally_primitives::ExactDecimal::parse(opening_balance.clone())
+                            .map_err(|error| {
+                                // Classified only to name the refusal: a composite
+                                // is refused exactly as any other non-decimal is.
+                                if crate::native_outstandings::is_foreign_currency_balance(
+                                    &opening_balance,
+                                ) {
+                                    anyhow::Error::new(
+                                        NativeLedgerAmountError::ForeignCurrencyOpening,
+                                    )
+                                } else {
+                                    anyhow::Error::from(error)
+                                }
+                            })?;
+                    }
                     ledger.opening_balance = Some(opening_balance);
                 }
                 b"BRIDGECOMPANYGUID" => {

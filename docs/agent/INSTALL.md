@@ -7,7 +7,7 @@ unavailable.
 
 ## If a package is published
 
-Check the project's [GitHub Releases](https://github.com/lamemustafa/bridge/releases)
+Check the project's [GitHub Releases](https://github.com/ComplyEaze/bridge/releases)
 for a compatible `.mcpb`. If no release asset is listed, use the [source MCP
 setup](./README.md) instead; the steps below apply only after a package is
 published. Preview packaging targets Windows x64 and Apple Silicon Mac (ARM64);

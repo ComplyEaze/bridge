@@ -451,6 +451,97 @@ Reading ledgers and vouchers in Education waits for the Collection-based profile
 - whether Education accepts `CompanyListV1`, a custom report with no `$$` function that the
   live-read tool still sends.
 
+## 11e. Ledger master read sizes and part reads on two books — **PARTIAL**
+
+**PARTIAL, 2026-09-29.** One licensed TallyPrime 7.1 Silver book of 1,989 synthetic ledgers
+(`ALTMSTID` 2,197, one period, no vouchers), read by scripts, not by Bridge's read path. Every
+size below is wire bytes: the responses are UTF-16LE, so the file size is the byte count Tally sent.
+
+| Read (whole book) | Bytes | Bytes per ledger | Time |
+| --- | --- | --- | --- |
+| Balance-free ledger catalogue | 2,195,342 | 1,104 | 0.35 s |
+| Ledger balances | 2,468,320 | 1,241 | 0.42 to 0.46 s |
+| Party-ledger master | 5,718,512 | 2,875 | 0.86 to 1.00 s |
+| Groups | 59,520 | not per ledger | 0.06 s |
+
+- **Repeat reads were byte-identical.** Each paired read returned the same bytes twice, and the
+  catalogue read at three different times agreed with itself.
+- **Row cost depends on the row.** A ledger with party fields cost about 3.2 to 3.3 KB in the
+  master read and a plain ledger about 1.9 to 2.0 KB, so 2,875 bytes per ledger is a mean for this
+  synthetic mix, not a bound. The 3,750 bytes per ledger Bridge budgets (#637) sits above it.
+- **A part read of the master is cheap (the #679 go/no-go, GO).** A 20-ledger part took 0.037 to
+  0.122 s, 4 to 14 percent of the whole master read, against a no-go line of 50 percent. 150
+  ledgers took 0.08 s, 300 took 0.14 to 0.22 s and 907 took 0.38 s: time tracked the row count
+  plus a fixed envelope of about 0.03 s. Parts split by parent group worked for a parent name
+  containing `&`, a nested parent and the reserved root, and balance parts worked too.
+- **The parts add up.** The union of 14 master parts by GUID equalled the catalogue's 1,989 ledgers,
+  with none missing, none extra, none twice and no differing field.
+- **The whole book is the cost, not the count.** The count read (the catalogue) is about 38 percent
+  of the master read's bytes and 35 to 41 percent of its time on this book, which is why the read is
+  admitted by a count and not by the mark alone once the mark is high enough to matter (#668).
+
+**A second book, PARTIAL, 2026-09-29 (one licensed 7.1 Silver book of about 9.5 thousand ledgers,
+about 1.35 thousand parents of which about three quarters hold one ledger, `ALTMSTID` about 20
+thousand; read by scripts).** Whole reads: the
+catalogue about 11.6 MB in about 1.5 s; balances about 12.4 MB in about 12 s. Balance time is not linear from parts: a
+part of a few hundred rows took about 0.1 s (0.4 ms per row) and the whole took about 12 s (1.3 ms per row). A parent-group
+part of the master with the compliance fields took under 0.1 s at about 20 rows, about 0.5 s at a few hundred rows and
+under 0.8 s at about 1.5 thousand rows (about 4 MB); every row bound to the selected company. The 3,750-byte budget held (mean
+1,900 to 2,800).
+
+**Filters other than the parent returned an empty collection — the cause is UNVERIFIED, so do not
+build a split on them (#679).** Each of these, sent on the ledger balance collection with the
+parent filter's formula mechanism, returned zero rows and the same 2,994-byte body a closed or
+absent company returns: `$Name >= "lo" AND $Name < "hi"` (lower-case bounds, then the exact-case
+bounds of a real name range), `$$StringPart:$Name:0:1 = "X"`, `$AlterID > 0 AND $AlterID <= 2000`
+and `$AlterID > 10000 AND $AlterID <= 12000`. Whether Tally does not support them on this
+collection or the formula syntax was wrong is not known. Only `$Parent = "..."` is measured to
+partition. Splitting by parent fits this book poorly: about three quarters of its parents hold one ledger.
+
+**Every one of those filter forms partitions on the synthetic book, so the empty result is not "the
+filter is unsupported" (PARTIAL, one synthetic book of 1,989 ledgers, no vouchers, 2026-09-29).**
+Each returned exactly the expected rows, compared as sets by name: the name range, the `StringPart`
+prefix and the `AlterID` span on the balance collection, on the master collection and on a custom
+`TYPE Ledger` collection with no `ISMODIFY` (300, 300 and 100 rows); a single comparison (`$Name >
+"lo"`, 1,787 rows) and `$AlterID > 100` (1,987 rows), the latter also through a `$$Number:` cast
+with the same set; an exact-name filter (the must-match control, 1 row); and two parents joined
+with `OR`, including one whose name contains `&` (360 and 400 rows, each the union of its parts).
+Every request took 0.07 to 0.45 s. This is the prerequisite for splitting a read by several
+parents at once (#679).
+
+**The filter mechanism also works on the second book (PARTIAL, one real book of about 9.5 thousand
+ledgers, 2026-09-29).** On the balance collection an exact-name filter for a name taken from that book's own
+catalogue returned exactly 1 row (the must-match control that was missing), and `$Parent = "a" OR
+$Parent = "b"` for two parents of 3 ledgers each returned 6 rows, 3 from each, every row bound to the
+selected company; both took under 0.11 s. So the earlier empty results on that book were not "the
+formula mechanism does not work there". Whether the name-range, `StringPart` and `AlterID` forms
+match rows on it is still UNVERIFIED: they were not re-sent, and the untested explanation is that
+the bounds they used matched no ledger.
+
+**A one-day voucher census at a far-future date was answered normally with zero vouchers
+(PARTIAL, one book, 2026-09-29).** On the second book a census for a far-future day, the
+company header's own last-voucher date, returned a well-formed empty collection in 0.18 s, while the same request for a
+day known to hold a few hundred vouchers returned all of them. It is UNVERIFIED that zero means no voucher sits on
+that day: a five-digit-year date literal may not parse to that date and match nothing, and a census cannot
+tell the two apart.
+
+**Tally honours a far-future `SVTODATE` on the balance collection; it does not clamp it (PARTIAL,
+one parent of about 80 ledgers on the second book, 2026-09-29).** The same parent read as at
+20260401, at 20260929 and at a far-future date returned the same ledgers and the same opening balances
+each time, with closing balances that differ in tens of rows (first and second date, first and third) and in
+fewer than 20 (second and third). If the far-future date were dropped or replaced by the reporting
+date the second and third reads would be identical, so it was applied as a later date. What that
+proves is only that an as-of balance read at such a date takes in whatever is dated after the
+reporting date. Whether those rows moved because of a mistyped far-future voucher or because of
+legitimate later-dated ones is UNVERIFIED, as is a book whose stray voucher sits in another
+parent.
+
+**Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
+or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 1.00 s on the synthetic
+book (the whole party-ledger master) and 12.0 s on the second (the whole balance read). Do not read the 3,750-byte budget or the
+10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
+row cost seen here.
+
 ## 11a. Scale measurements — 11,287-voucher corpus
 
 **VERIFIED 2026-07-29** on a generated production-shaped corpus: 25 customers and 15
@@ -1036,3 +1127,4 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-26 | §11c.5: the multi-voucher step through Bridge's own post path (50 and 200, one run each) is VERIFIED; and what screen actions move `ALTVCHID` and `ALTMSTID`, with the fields the import-verification read cannot see. |
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |
 | 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (308 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (123 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
+| 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |

@@ -100,6 +100,7 @@ fn parse_envelope(
     let mut body_seen = false;
     let mut data_seen = false;
     let mut status_seen = false;
+    let mut status_answered = false;
     let mut collection_seen = false;
     let mut rows = Vec::new();
     let mut identities = HashSet::new();
@@ -153,10 +154,18 @@ fn parse_envelope(
                             "trial_balance_duplicate_status",
                         ));
                     }
-                    if read_element_text(&mut reader, element.name())?.trim() != "1" {
+                    status_seen = true;
+                    let status = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717, #863): the
+                    // envelope's end refuses it, so a response cut off after
+                    // it still ends as unterminated.
+                    if status.trim().is_empty() {
+                        continue;
+                    }
+                    if status.trim() != "1" {
                         return Err(NativeTrialBalanceError::TallyReportedFailure);
                     }
-                    status_seen = true;
+                    status_answered = true;
                     continue;
                 }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
@@ -198,6 +207,16 @@ fn parse_envelope(
                 let name = element.name().as_ref().to_ascii_uppercase();
                 if name == b"LINEERROR" || name == b"ERROR" || name == b"DOCTYPE" {
                     return Err(NativeTrialBalanceError::TallyReportedFailure);
+                }
+                // A self-closing STATUS is no answer, and is still a STATUS: a
+                // second one of any kind is refused (bridge#717, #863).
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_seen, true) {
+                        return Err(NativeTrialBalanceError::InvalidResponse(
+                            "trial_balance_duplicate_status",
+                        ));
+                    }
+                    continue;
                 }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     if collection_seen {
@@ -246,8 +265,12 @@ fn parse_envelope(
             "trial_balance_envelope_incomplete",
         ));
     }
-    if !status_seen {
-        return Err(NativeTrialBalanceError::TallyReportedFailure);
+    // A complete envelope with no STATUS, an empty one or a self-closing one is
+    // no answer, not Tally's failure report (bridge#717, #863).
+    if !status_answered {
+        return Err(NativeTrialBalanceError::InvalidResponse(
+            "trial_balance_status_absent",
+        ));
     }
     if !collection_seen {
         return Err(NativeTrialBalanceError::InvalidResponse(

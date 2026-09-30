@@ -18,6 +18,13 @@ pub const SURFACE_SCHEMA_VERSION: u16 = 2;
 pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 2;
 pub const TRUST_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const ATTESTATION_SCHEMA_VERSION: u16 = 1;
+/// The review URL of an attestation must point at this repository: it is part of the signed bytes.
+/// The repository moved from the lamemustafa account to the ComplyEaze organization; GitHub keeps
+/// the old name as a permanent redirect, so a URL under either name is accepted.
+pub const REVIEW_URL_PREFIXES: [&str; 2] = [
+    "https://github.com/lamemustafa/bridge/",
+    "https://github.com/ComplyEaze/bridge/",
+];
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// Capacity deliberately reserved for one small cohesive surface change.
 pub const RESERVED_SURFACE_FILES: usize = 15;
@@ -351,11 +358,16 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // ledger read too large for one request may be split by parent group, and
 // whether the parts together returned every ledger the catalogue named, once;
 // a defect there returns a book with ledgers missing or repeated.
+// `bridge-tally-protocol/src/ledger_census.rs` (bridge#679) renders the request
+// that counts a book's ledgers by AlterID span, and decides whether the slices
+// added up to a count (order, duplicates, span, an empty census); a defect there
+// sizes the next ledger read for fewer ledgers than the book holds, and a
+// request past the response cap is cut off mid-read.
 // `src-tauri/src/request_trail.rs` (bridge#918) builds, field by field, the
 // record of a call's Tally sends that reaches the egress receipt; a defect
 // there puts request or response text, a company name or a row value into a
 // journal the user keeps.
-pub const MAX_SURFACE_FILES: usize = 294;
+pub const MAX_SURFACE_FILES: usize = 295;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;
@@ -1239,9 +1251,9 @@ impl ReviewedEvidenceAttestation {
         if self.reviewed_at_unix_ms <= 0 || self.expires_at_unix_ms <= self.reviewed_at_unix_ms {
             return Err(invalid("attestation_time_invalid"));
         }
-        if !self
-            .review_url
-            .starts_with("https://github.com/lamemustafa/bridge/")
+        if !REVIEW_URL_PREFIXES
+            .iter()
+            .any(|prefix| self.review_url.starts_with(prefix))
             || self.review_url.len() > 256
             || self.review_url.chars().any(char::is_control)
         {

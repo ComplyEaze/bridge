@@ -242,8 +242,10 @@ fn the_published_schema_names_the_three_numbering_methods_and_its_bounds() {
         schema["required"],
         json!(["company_guid", "from", "to", "numbering", "vouchers"])
     );
-    // The tool reads; it must not be annotated as a write.
-    assert!(tool.get("annotations").is_none());
+    // The tool reads; it is annotated read-only and never as a write. An absent
+    // annotation would read to a host as "destructive".
+    assert_eq!(tool["annotations"]["readOnlyHint"], json!(true));
+    assert_eq!(tool["annotations"]["destructiveHint"], json!(false));
     let description = tool["description"].as_str().expect("tool description");
     assert!(description.contains("manual"));
     // The spelling matters: `safe_reason_code` returns the `presence_`-prefixed

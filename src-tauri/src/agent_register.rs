@@ -634,3 +634,7 @@ impl Server {
 #[cfg(test)]
 #[path = "agent_register_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "agent_register_server_tests.rs"]
+mod server_tests;

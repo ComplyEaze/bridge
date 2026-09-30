@@ -114,13 +114,24 @@ under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 1
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
 `unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
-count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
-refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`
-object (`master_alter_id`, `estimated_bytes`, `limit_bytes`): the catalogue that would count the
-book could pass the transport's response cap, and a response past the cap is cut off mid-read. The
-mark is an upper bound on ledgers, since every master raises it, so a company with fewer ledgers
-may be refused. The limits are unverified against a live Tally beyond a two-parent filter;
-`fields=basic` still reads any of these books.
+count and the last read is refused, but only after those reads were sent. A mark above 22,857 has
+its ledgers counted by AlterID span instead of by catalogue (#679): one read per slice of at most
+4,000 AlterIDs over `(0, mark]`, each asking for the ledgers' GUIDs only and made once, not paired,
+so a mark of 316,028 is 80 requests of about 0.15 s each. The census is bounded by the same extent
+bracket as every other read. A slice holding more ledgers than its span (`ledger_span_slice_over_bound`),
+a GUID seen twice (`ledger_span_duplicate_identity`), no ledger at all (`ledger_span_census_empty`:
+an empty slice is the answer a closed or absent company gives too) or a slice past the response
+limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
+read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
+would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
+`size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
+census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
+estimated past `limit_bytes`; a response past the transport's cap is cut off mid-read. The mark is an upper bound on ledgers, since every master raises it, so a
+company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
+two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
+these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
@@ -148,6 +159,17 @@ milliseconds, and the kind of the request that failed; the last 64 parts listed 
 counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
 timed out can be diagnosed without sending it again (bridge#799). The message and every other
 field are dropped; no row content, name or narration is kept.
+A call that sent requests to Tally also keeps a `request_trail` in that record (bridge#918): for
+each of the last 32 sends (the rest counted, and so are the sends that failed), its place in the
+call, its kind (`post` or `status`), the request's size, an outcome code (`answered`, the transport
+error's code, or `send_abandoned` when a cancelled call dropped it), the response's size, and the
+milliseconds the send held the endpoint's lock, so a failed read says which request failed. It
+holds no request or response body, name or value, and no hash of either (a request names the
+company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
+exact size remains, so it shows a company name's length to a reader who holds the request template.
+A request that cannot be built (over the size cap) sends nothing and leaves no record, and a call
+cancelled before its post was dispatched leaves no trail in its receipt. To match a failure with
+`read_evidence`, use the place in the call and the receipt's time.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery
@@ -358,8 +380,9 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 
 ## Voucher-file preparation and verification
 
-The MCPB extension exposes `verify_import` by default as a read-only recovery
-tool, and `build_import_xml` by default because it always sets
+The MCPB extension exposes `verify_import` by default as a recovery tool (it
+reads Tally, saves local proof files and writes nothing to Tally), and
+`build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
 Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
@@ -871,7 +894,7 @@ sent directly as Tally's upsert key. Reused labels in independent batches theref
 have different wire identities, so rebuilding after losing the batch journal
 creates a new identity and does not deduplicate the business event.
 
-**An unknown outcome requires read-only reconciliation for every voucher type.**
+**An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not
 re-import or rebuild the same business event, including a `Journal`. The
 controlled repeat observation returned `CREATED=0, ALTERED=1` and left one

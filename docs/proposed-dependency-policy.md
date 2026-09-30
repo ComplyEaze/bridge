@@ -1,5 +1,14 @@
 # Proposed dependency-security and compatibility-surface CI changes
 
+> **Status note, 30 Sep 2026:** schema 3 removed `scripts/reseal.sh`,
+> `scripts/reseal.test.mjs`, `scripts/reseal-merge-driver.mjs` and its test, and the
+> `rehash-surface` command. The body below still describes them as they were and is
+> kept as history; where it says a script "is implemented and tested" or "reseal",
+> read it as schema 2. A pull request that changes a pinned file now adds an
+> acknowledgement file instead; see `docs/release-process.md`
+> ("Compatibility-surface reseal"). `scripts/check-advisory-delta.mjs` is not
+> affected by this note.
+
 This document proposes workflow changes that are **not implemented**. They
 are written here, rather than under `.github/`, because this change was
 scoped to leave that directory untouched -- an owner who wants any of the

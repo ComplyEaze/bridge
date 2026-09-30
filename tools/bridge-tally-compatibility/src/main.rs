@@ -1,15 +1,14 @@
 use std::{
     fs,
-    io::Write,
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
 use bridge_tally_compatibility::{
     enforce_support_gate, format_gate_success, now_unix_ms, parse_artifact, render_claim_matrix,
-    safe_error_code, verify_claim_matrix_markdown, CompatibilitySurfaceManifest,
-    LiveCompatibilityReceipt, ReviewedEvidenceAttestation, SupportClaimsManifest,
-    TrustedEvidenceKeys, MAX_ARTIFACT_BYTES,
+    safe_error_code, verify_claim_matrix_markdown, LiveCompatibilityReceipt,
+    ReviewedEvidenceAttestation, SupportClaimsManifest, SurfacePins, TrustedEvidenceKeys,
+    MAX_ARTIFACT_BYTES,
 };
 
 fn main() -> ExitCode {
@@ -28,50 +27,22 @@ fn main() -> ExitCode {
     }
 }
 
-#[derive(Debug)]
-struct CommandOutput {
-    message: String,
-    output_path: Option<PathBuf>,
+fn emit_output(message: String) -> Result<(), &'static str> {
+    println!("{message}");
+    Ok(())
 }
 
-impl CommandOutput {
-    fn stdout(message: String) -> Self {
-        Self {
-            message,
-            output_path: None,
-        }
-    }
-
-    fn output_file(message: String, output_path: Option<PathBuf>) -> Self {
-        Self {
-            message,
-            output_path,
-        }
-    }
-}
-
-fn emit_output(output: CommandOutput) -> Result<(), &'static str> {
-    if let Some(path) = output.output_path {
-        write_output_atomically(&path, &output.message)
-    } else {
-        println!("{}", output.message);
-        Ok(())
-    }
-}
-
-fn run() -> Result<CommandOutput, &'static str> {
+fn run() -> Result<String, &'static str> {
     run_from_args(std::env::args().skip(1))
 }
 
-fn run_from_args(mut args: impl Iterator<Item = String>) -> Result<CommandOutput, &'static str> {
+fn run_from_args(mut args: impl Iterator<Item = String>) -> Result<String, &'static str> {
     match args.next().as_deref() {
         Some("validate-receipt") => {
             let path = one_path(&mut args)?;
             let bytes = read_bounded(&path)?;
             LiveCompatibilityReceipt::from_json(&bytes).map_err(|error| safe_error_code(&error))?;
-            Ok(CommandOutput::stdout(
-                "compatibility_receipt_valid".to_string(),
-            ))
+            Ok("compatibility_receipt_valid".to_string())
         }
         Some("gate") => {
             let support = next_path(&mut args, "missing_support_manifest")?;
@@ -82,14 +53,15 @@ fn run_from_args(mut args: impl Iterator<Item = String>) -> Result<CommandOutput
             if args.next().is_some() {
                 return Err("unexpected_argument");
             }
-            gate_command(&support, &surface, &trust, &evidence, &root).map(CommandOutput::stdout)
+            gate_command(&support, &surface, &trust, &evidence, &root)
         }
-        Some("rehash-surface") => {
+        Some("surface-digest") => {
             let surface = next_path(&mut args, "missing_surface_manifest")?;
             let repository_root = next_path(&mut args, "missing_repository_root")?;
-            let output_path = optional_output_path(&mut args)?;
-            rehash_surface_command(&surface, &repository_root)
-                .map(|message| CommandOutput::output_file(message, output_path))
+            if args.next().is_some() {
+                return Err("unexpected_argument");
+            }
+            surface_digest_command(&surface, &repository_root)
         }
         Some("check-matrix-markdown") => {
             let manifest_path = next_path(&mut args, "missing_support_manifest")?;
@@ -102,156 +74,29 @@ fn run_from_args(mut args: impl Iterator<Item = String>) -> Result<CommandOutput
             let markdown = fs::read(&markdown_path).map_err(|_| "matrix_markdown_unavailable")?;
             verify_claim_matrix_markdown(&manifest, &markdown)
                 .map_err(|error| safe_error_code(&error))?;
-            Ok(CommandOutput::stdout(
-                "compatibility_matrix_markdown_current".to_string(),
-            ))
+            Ok("compatibility_matrix_markdown_current".to_string())
         }
         Some("render-matrix") => {
             let path = one_path(&mut args)?;
             let manifest = SupportClaimsManifest::from_json(&read_bounded(&path)?)
                 .map_err(|error| safe_error_code(&error))?;
-            render_claim_matrix(&manifest)
-                .map(CommandOutput::stdout)
-                .map_err(|error| safe_error_code(&error))
+            render_claim_matrix(&manifest).map_err(|error| safe_error_code(&error))
         }
-        _ => Err("usage_validate_receipt_rehash_surface_render_or_check_matrix_markdown_or_gate"),
+        _ => Err("usage_validate_receipt_surface_digest_render_or_check_matrix_markdown_or_gate"),
     }
 }
 
-fn optional_output_path(
-    args: &mut impl Iterator<Item = String>,
-) -> Result<Option<PathBuf>, &'static str> {
-    match args.next() {
-        None => Ok(None),
-        Some(flag) if flag == "--output" => {
-            let output_path = next_path(args, "missing_output_path")?;
-            if args.next().is_some() {
-                return Err("unexpected_argument");
-            }
-            Ok(Some(output_path))
-        }
-        Some(_) => Err("unexpected_argument"),
-    }
-}
-
-fn write_output_atomically(output_path: &Path, contents: &str) -> Result<(), &'static str> {
-    let parent = output_path.parent().unwrap_or_else(|| Path::new("."));
-    let mut temporary = create_temporary_output_file(output_path, parent)?;
-    temporary
-        .write_all(contents.as_bytes())
-        .map_err(|_| "output_write_failed")?;
-    temporary
-        .as_file()
-        .sync_all()
-        .map_err(|_| "output_sync_failed")?;
-    let temporary_path = temporary.into_temp_path();
-    replace_output_file(temporary_path.as_ref(), output_path)
-}
-
-#[cfg(unix)]
-fn create_temporary_output_file(
-    output_path: &Path,
-    parent: &Path,
-) -> Result<tempfile::NamedTempFile, &'static str> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let existing_permissions = match fs::metadata(output_path) {
-        Ok(metadata) => Some(metadata.permissions()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(_) => return Err("output_metadata_unavailable"),
-    };
-    let mut builder = tempfile::Builder::new();
-    if existing_permissions.is_none() {
-        // Fresh artifacts retain the longstanding 0666 request, which the OS
-        // filters through umask at creation time.
-        builder.permissions(std::fs::Permissions::from_mode(0o666));
-    }
-    let temporary = builder
-        .tempfile_in(parent)
-        .map_err(|_| "output_directory_unavailable")?;
-    // tempfile creation is intentionally still constrained by the process
-    // umask for a new output. A replacement inherits the existing destination
-    // mode only after this descriptor is owned, so a restrictive umask cannot
-    // silently change its public contract.
-    if let Some(permissions) = existing_permissions {
-        temporary
-            .as_file()
-            .set_permissions(permissions)
-            .map_err(|_| "output_permissions_unavailable")?;
-    }
-    Ok(temporary)
-}
-
-#[cfg(not(unix))]
-fn create_temporary_output_file(
-    _output_path: &Path,
-    parent: &Path,
-) -> Result<tempfile::NamedTempFile, &'static str> {
-    tempfile::NamedTempFile::new_in(parent).map_err(|_| "output_directory_unavailable")
-}
-
-#[cfg(not(windows))]
-fn replace_output_file(temporary_path: &Path, output_path: &Path) -> Result<(), &'static str> {
-    fs::rename(temporary_path, output_path).map_err(|_| "output_replace_failed")
-}
-
-#[cfg(windows)]
-fn replace_output_file(temporary_path: &Path, output_path: &Path) -> Result<(), &'static str> {
-    if !output_path.exists() {
-        return fs::rename(temporary_path, output_path).map_err(|_| "output_replace_failed");
-    }
-
-    let output_wide = windows_path(output_path)?;
-    let temporary_wide = windows_path(temporary_path)?;
-    // The temporary file is created in the output directory, as ReplaceFileW requires.
-    let replaced = unsafe {
-        ReplaceFileW(
-            output_wide.as_ptr(),
-            temporary_wide.as_ptr(),
-            std::ptr::null(),
-            0,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        )
-    };
-    if replaced == 0 {
-        return Err("output_replace_failed");
-    }
-    Ok(())
-}
-
-#[cfg(windows)]
-fn windows_path(path: &Path) -> Result<Vec<u16>, &'static str> {
-    use std::os::windows::ffi::OsStrExt;
-
-    Ok(path.as_os_str().encode_wide().chain([0]).collect())
-}
-
-#[cfg(windows)]
-#[link(name = "Kernel32")]
-extern "system" {
-    fn ReplaceFileW(
-        replaced_file_name: *const u16,
-        replacement_file_name: *const u16,
-        backup_file_name: *const u16,
-        replace_flags: u32,
-        exclude: *mut std::ffi::c_void,
-        reserved: *mut std::ffi::c_void,
-    ) -> i32;
-}
-
-fn rehash_surface_command(
+/// Prints the surface digest that receipts and attestations bind, computed from the live bytes of
+/// every pinned file. Used to compare the digest across a change to the surface layout.
+fn surface_digest_command(
     surface_path: &Path,
     repository_root: &Path,
 ) -> Result<String, &'static str> {
-    let surface = CompatibilitySurfaceManifest::from_json(&read_bounded(surface_path)?)
+    let pins = SurfacePins::from_json(&read_bounded(surface_path)?)
         .map_err(|error| safe_error_code(&error))?;
-    let (rehashed, changed) = surface
-        .rehash_files(repository_root)
-        .map_err(|error| safe_error_code(&error))?;
-    let json = serde_json::to_string_pretty(&rehashed).map_err(|_| "serialization_failed")?;
-    eprintln!("rehash_surface_changed:{changed}");
-    Ok(json)
+    pins.resolve(repository_root)
+        .and_then(|surface| surface.digest())
+        .map_err(|error| safe_error_code(&error))
 }
 
 fn gate_command(
@@ -263,7 +108,8 @@ fn gate_command(
 ) -> Result<String, &'static str> {
     let support = SupportClaimsManifest::from_json(&read_bounded(support_path)?)
         .map_err(|error| safe_error_code(&error))?;
-    let surface = CompatibilitySurfaceManifest::from_json(&read_bounded(surface_path)?)
+    let surface = SurfacePins::from_json(&read_bounded(surface_path)?)
+        .and_then(|pins| pins.resolve(repository_root))
         .map_err(|error| safe_error_code(&error))?;
     let trust = TrustedEvidenceKeys::from_json(&read_bounded(trust_path)?)
         .map_err(|error| safe_error_code(&error))?;
@@ -333,7 +179,3 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>, &'static str> {
     }
     fs::read(path).map_err(|_| "artifact_unavailable")
 }
-
-#[cfg(test)]
-#[path = "main_tests.rs"]
-mod tests;

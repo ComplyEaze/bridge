@@ -16,16 +16,329 @@ and macOS. A smoke bundle is not a production release.
 
 ### Compatibility-surface reseal
 
-Any change to a pinned file requires a deliberate compatibility-surface reseal
-before the claim gate can pass. That includes `package.json`,
-`src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and either workflow — and it is
-not only dependency updates. **The canonical `docs/tally/TALLY_PROTOCOL_REFERENCE.md`
-index and each part it declares must be pinned sources, so a documentation-only edit to either
-stales its digest and fails the gate. Adding or removing a declared part also changes the pin
-list; see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
-compatibility gate is involved, and PRs have failed CI for exactly this.
+The heading keeps its old name so existing links resolve. Since schema 3 there is
+**no reseal**: nothing is regenerated, no hash is stored, and no tool rewrites the
+surface. What replaces it is an acknowledgement filed with the pull request.
 
-Run this from `tools`, **with the pinned toolchain**. A Homebrew
+Any change to a pinned file needs a deliberate acknowledgement filed with the
+pull request. That includes `package.json`, `src-tauri/Cargo.toml`,
+`src-tauri/Cargo.lock` and either workflow, and it is not only dependency
+updates. **The canonical `docs/tally/TALLY_PROTOCOL_REFERENCE.md` index and each
+part it declares are pinned sources, so a documentation-only edit to either needs
+an acknowledgement. Adding or removing a declared part also changes the pin list;
+see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
+compatibility gate is involved.
+
+**Enforcement today.** The GitHub check is report-only: it prints
+`WOULD FAIL: <reason>` and exits 0, so it does not block a merge. The blocking
+leg is `scripts/merge-gate.sh`, a local tool run by whoever merges (the
+orchestrator), not CI. The one exception is a push to master, which is always
+enforced (below). Making the pull request check enforcing is a later change to two
+pinned files: drop `--report-only` from the step in
+`.github/workflows/ci.yml` and change the exact step text that
+`scripts/check-ci-workflow-consistency.mjs` requires, both pinned, with their own
+acknowledgement.
+
+What this trades away, stated plainly. Under schema 2 the required
+`Tally portable core` job failed a pull request, and again the master push, when a
+pinned file's bytes differed from its stored hash. Nothing stored remains to
+compare, so that job can no longer fail on a changed pinned file. On a pull request,
+while the check is report-only, a change merged without `scripts/merge-gate.sh`
+reaches master with every check green. What restores the after-the-fact tripwire: a
+push to master is checked like a pull request and is never report-only. Every
+first-parent commit the push landed (`before..HEAD`, `before` from the event payload;
+each one a squashed pull request, attributed by the `(#N)` in its subject) must carry
+exactly the acknowledgement its pinned changes need, and the master run goes red if
+any does not. A push whose `before` is missing, new or not an ancestor of HEAD (a
+force-push) cannot be verified and fails. This covers the base race: `merge-gate.sh` reads
+the pin list when it runs but the merge binds only the head, so another pull request
+that pins a file after this one was gated lets an unacknowledged change land; the
+master run then fails instead of nobody noticing. It does not stop the merge, and a
+red master needs an acknowledgement-only follow-up pull request to clear.
+
+#### What the surface is
+
+`docs/tally/compatibility/compatibility-surface.json` (schema 3) is an authored,
+sorted, unique list:
+
+```json
+{
+  "schema_version": 3,
+  "files": [
+    { "path": ".github/workflows/ci.yml" },
+    { "path": "src/NewScreen.tsx", "reason": "Decides what the client sees before a post." }
+  ]
+}
+```
+
+- `files` rows hold a repository-relative `path` and an optional `reason`
+  (at most 500 characters). There is no `sha256`, and no other key.
+- The top level has exactly `files` and `schema_version`. A schema 2 file, with
+  stored hashes, is refused with a message naming the migration.
+- The surface digest that receipts and attestations bind is **computed by the
+  gate from the live bytes of every pinned file**, never stored. Change one byte
+  of a pinned file and the digest moves, so evidence bound to the old digest goes
+  stale. The matrix carries no copy of the digest (bridge#760).
+- Because no per-file value is stored, two pull requests that change different
+  pinned files, or even the same pinned file, no longer conflict in the surface.
+  Each adds its own uniquely named acknowledgement.
+
+#### Acknowledging a change to a pinned file
+
+A pull request whose diff changes a pinned file (any status, under its old and its
+new name), adds a pin, or removes a pin adds exactly one file,
+`docs/tally/compatibility/acks/pr-<N>.txt`, where `<N>` is the pull request number.
+An edit to the pin list that adds or removes no pin (only a `reason` changed, or
+rows reordered) needs no acknowledgement, and adding one when nothing pinned
+changed is an error. Its lines are:
+
+```text
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+src/ClientSwitcher.tsx
+removed-pin: src/OldScreen.tsx
+reviewer: some-github-login
+```
+
+- One repository path per line, sorted and unique: every pinned path the diff
+  changes, and every pin the diff adds. "Changes" means any status: added,
+  modified, deleted, type or mode change, and both the old and the new name of a
+  rename. Pinned means pinned at the base or at the head.
+- One `removed-pin: <path>` line for each pin the diff removes from the list.
+  A removed pin is a decision, so it is named.
+- Exactly one `reviewer: <github login>` line.
+- No hashes, and no other content: a 64-hex token is refused, so that two pull
+  requests editing the same file never disagree over an acknowledgement.
+- `.gitattributes` (its end-of-line rules decide the bytes that are hashed) and
+  `scripts/check-surface-ack.mjs` are ordinary pins, each with its own `reason` in
+  the list; there is no special rule for them.
+- A pull request that touches no pinned path adds no acknowledgement. A pull
+  request that only deletes old acknowledgements (a cleanup) passes.
+- An acknowledgement is append-only for its own pull request: an existing one is
+  never modified. After merge it means nothing, and old files may be cleaned up.
+- The branch name is not the file name, so a lane branch is fine.
+
+The `reviewer:` login is procedural assurance, not authentication: the file is
+written by hand and proves nothing by itself. What it records is that a named
+person read the pinned changes and stands behind them. Say which files you
+looked at in the review.
+
+**What checks it**
+
+- CI runs `scripts/check-surface-ack.mjs` in the `workflow-consistency` job. It
+  reports a missing, wrong, edited or unneeded acknowledgement, but is
+  report-only today (see above). Its modes:
+  - `pull_request`: diffs the merge commit against its first parent (`HEAD^1`),
+    after asserting that `HEAD^2` equals the pull request's head commit.
+  - `merge_group` (once a merge queue exists): checks each first-parent commit in
+    `base_sha..head_sha` against its own acknowledgement, and fails closed when a
+    commit cannot be attributed to one pull request.
+  - `push` (master): every first-parent commit in `before..HEAD` is checked like a
+    pull request, each attributed by the `(#N)` in its subject, and a failure is never
+    report-only; a missing, all-zero or non-ancestor `before` fails closed. It also
+    validates that every file in the acknowledgements directory is well formed.
+  - `workflow_dispatch`: only the acknowledgements directory is validated.
+  The checker runs from the pull request's own tree, so a pull request could weaken
+  it; that is why the script and `ci.yml` are pinned, which makes the change
+  visible and acknowledged. A change that makes the checker skip itself shows no
+  `WOULD FAIL` in its own pull request run, so the pin alone does not make it red
+  in CI; `scripts/merge-gate.sh`, which is also pinned (with
+  `scripts/check-ci-workflow-consistency.mjs`, which enforces the step's shape), is
+  what sees it. Run the gate from a checkout of the base branch, not from the pull
+  request's own tree, or a weakened copy gates itself.
+- `scripts/merge-gate.sh` (run locally by whoever merges) reads the pin list at
+  the head and requires the same `pr-<N>.txt`. It measures removed and added pins
+  against the pull request's merge base (not the base tip), and reads the base tip
+  only to know which files are pinned there, so a branch that is behind a
+  master commit that added a pin is not reported as indeterminate. It also
+  requires a review or comment that names the head commit, the acknowledgement
+  path and every touched path. The `reviewer:` login must be that review's author.
+- The `Tally portable core` job still runs the `gate` command, which checks
+  required-file coverage and that every pinned file exists, and computes the
+  digest from the files. It no longer compares a stored hash, so a changed
+  pinned file does not fail it by itself.
+
+The digest is the same one schema 2 produced for the same bytes, so an
+attestation or receipt made against the old surface stays valid exactly as long
+as no pinned byte changes and the pin list is unchanged (adding or removing a pin
+moves the digest too). Adding four pins (`.gitattributes`, the acknowledgement checker,
+`scripts/merge-gate.sh` and `scripts/check-ci-workflow-consistency.mjs`) in the
+cut-over itself moved the digest once. Print the current digest with
+`cargo run -p bridge-tally-compatibility -- surface-digest docs/tally/compatibility/compatibility-surface.json .`
+(the `surface-digest` subcommand resolves the surface the same way the gate does).
+
+Two byte changes have no pinned path in a diff, and are closed differently. A
+`.gitattributes` below the repository root (end-of-line, `ident` or
+`working-tree-encoding` rules) changes the bytes a pinned file is hashed as, so the
+acknowledgement checks refuse any nested `.gitattributes` outright. A pinned path
+that is, or sits under, a symbolic link would make the digest follow an unpinned
+target, so `resolve` refuses it (`surface_file_symlink`).
+
+The live-read collectors (`bridge-tally-live-read` and its native outstandings
+qualification) refuse to start unless every pinned file on disk is byte-identical
+to the blob committed at `HEAD` (`git hash-object --no-filters` against
+`git ls-tree`, so `assume-unchanged`, `skip-worktree`, clean filters, line-ending
+rules and a stale stat cache cannot hide an edit; an untracked or ignored pin, a
+symlink or a tree that is not the repository at the root refuses; git runs
+without `GIT_DIR` and the other redirecting variables). The reference is `HEAD`,
+not reviewed master: this refuses uncommitted edits only. A committed but not yet
+reviewed edit to a pinned request builder runs against live Tally, and is caught
+at `scripts/merge-gate.sh`, where the acknowledgement and the review name the file.
+Schema 2's reference was the stored hash, which a reseal in the same pull request
+moved too, so that case was not caught before either. A pull request stacked on another carries
+its own acknowledgement, so when the child merges into the parent branch and the
+parent then goes to master, it holds two. Fold them into the parent's `pr-<N>.txt`
+(the union of the two path lists) before the parent merges; both checkers require
+exactly one new acknowledgement.
+
+#### Adding or removing a pin
+
+Edit the sorted list by hand.
+
+1. Insert the entry in sorted path order with a `reason` (required for a pin added
+   by a pull request, at most 500 characters): why this file decides what Bridge
+   posts or lets leave the machine. Paths are relative, unique and sorted.
+2. Raise `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs` to the
+   new pin count. The convention is to pin exactly the count in use, and
+   `RESERVED_SURFACE_FILES` bounds how far the cap may exceed it. Raising it is an
+   explicit compatibility-surface decision: record the reason in the commit and
+   the pull request. That file is pinned, so this edit is itself covered by the
+   acknowledgement.
+3. Add the acknowledgement, listing the new pin's path (and a `removed-pin:` line for
+   each removal). Then run the tool's tests: a cap change can invalidate a test that
+   hard-codes the old bound.
+
+Removing a pin is done the same way, with a `removed-pin:` line and the cap kept
+in step. A malformed list is refused by the tool and by CI.
+
+**`MAX_SURFACE_FILES` is the line most likely to be silently wrong, and it is
+worse when it does NOT conflict.** If two branches start from the same cap and
+each add one pin, both change it from N to N+1: an **identical edit**, which git
+merges without a conflict. The merged surface then holds N+2 pins against a cap
+of N+1, and the gate fails with `surface_file_count_invalid`. That failure is
+loud, so it is not dangerous; what is misleading is expecting a conflict to
+prompt you. Recompute the cap from the merged pin count whether or not git
+stopped to ask.
+
+#### What the coverage report shows
+
+`scripts/surface_coverage_report.py` prints a surface coverage report. Run it by
+hand before opening a pull request that moves code. It never fails. Against the
+merge-base with `origin/master` (override with `--base`) it lists two things the
+gate cannot see: a pin that was dropped, and a module declared directly by a
+pinned module and newly left unpinned. Modules left unpinned before the branch
+are not reprinted, test-only modules are only counted, and feature-gated ones are
+labelled.
+
+**A clean report is not evidence that nothing left the pinned surface.** It does
+not see code moved between files that already existed; a new module declared by
+an *unpinned* module, even one carved out of a pinned file (a new file under an
+unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
+file that stops being compiled; a test-only or feature-gated module becoming
+production; or a new crate root. The script's docstring keeps the full list.
+
+Read it, then pin each listed file that decides what Bridge posts or lets leave
+the machine, and leave the rest; see the comment on `MAX_SURFACE_FILES` for the
+rule and bridge#416 for the reasoning.
+
+#### When the surface conflicts in a merge or rebase
+
+The pin list is authored and no hash is stored, so a conflict in
+`compatibility-surface.json` means both sides edited the list (or both inserted
+at the same sorted position). Merge it by hand and be precise about the hazard:
+
+**A dropped entry can slip through.** The gate checks the pins that are
+still in the list. Lose one in the resolution and the gate does not fail. That is why the
+list must be *merged*, never resolved by taking one side wholesale. (A dropped pin
+that existed at the base is a removed pin, which `scripts/merge-gate.sh` blocks
+unless the acknowledgement has a `removed-pin:` line. A pin that only the branch
+itself added, dropped in a resolution, is not seen by anything.)
+
+**Where a pin matters enough that this is unacceptable, make it REQUIRED.**
+`REQUIRED_SURFACE_FILES` and `REQUIRED_SURFACE_DIRECTORIES` are checked for
+presence, so an entry in either cannot be dropped silently at all.
+`gate_rejects_each_omitted_required_lifecycle_path` iterates that list, so adding
+a path also tests it. A procedure a maintainer must follow is weaker than a
+constant they cannot circumvent. The matrix is worse: a dropped claim leaves no
+trace at all, so reconcile its claims the same way.
+
+1. Resolve every non-generated conflict and settle those files completely.
+2. Reconcile the pin list against the merge base. List the pins each side added and
+   removed and confirm the union of additions minus the union of removals is
+   present.
+
+   **Name the two sides explicitly; during a rebase `HEAD` is not your branch.**
+   When a rebase stops on a conflict, `HEAD` is the upstream plus whatever has
+   already been replayed, and the commit being applied is `REBASE_HEAD`. The
+   conflict stages say it without either name: stage 2 is the side you are
+   replaying onto, stage 3 the side being applied.
+
+   ```bash
+   surface=docs/tally/compatibility/compatibility-surface.json
+   pins() { python3 -c 'import json,sys; [print(f["path"]) for f in json.load(sys.stdin)["files"]]' | sort; }
+
+   git show ":1:$surface" | pins > /tmp/pins-base.txt   # merge base
+   git show ":2:$surface" | pins > /tmp/pins-ours.txt   # replayed onto / current
+   git show ":3:$surface" | pins > /tmp/pins-theirs.txt # being applied / incoming
+
+   comm -13 /tmp/pins-base.txt /tmp/pins-ours.txt   # added by one side
+   comm -13 /tmp/pins-base.txt /tmp/pins-theirs.txt # added by the other
+   comm -23 /tmp/pins-base.txt /tmp/pins-ours.txt   # removed by one side
+   comm -23 /tmp/pins-base.txt /tmp/pins-theirs.txt # removed by the other
+   ```
+
+   Removals need the same treatment as additions. A pin one side deliberately
+   retired is still present in the base, so it appears in neither `comm -13`
+   output; take the other side wholesale and it comes back. Where one side removed
+   an entry the other side *modified*, that is a genuine add/remove conflict and
+   wants a decision, not a default; say which way in the commit.
+
+   If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
+   (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
+3. **Recompute `MAX_SURFACE_FILES` from the reconciled pin count.** Do not carry a
+   number derived from either side's cap.
+4. Run the gate, and check the pin count against the union you computed; the gate
+   cannot do this for you. Add or update the acknowledgement so it lists every
+   changed pinned path and every added pin.
+
+A rebase carrying several commits that touch pinned files needs the acknowledgement
+on the pull request, not per commit; CI checks the merge result.
+
+#### Migrating an open branch across schema 3
+
+A branch cut before schema 3 still carries a schema 2 surface file (a `sha256` on
+every row). Merging master into it conflicts on that file. Once per branch:
+
+1. Merge master and resolve every source conflict:
+
+   ```sh
+   git fetch origin
+   git merge origin/master
+   ```
+
+2. Take master's surface file wholesale (schema 3):
+
+   ```sh
+   git checkout origin/master -- docs/tally/compatibility/compatibility-surface.json
+   ```
+
+3. Re-add the pins the branch itself added. `git diff <merge-base>..HEAD --
+   docs/tally/compatibility/compatibility-surface.json` shows them. Insert each as
+   `{ "path": "...", "reason": "..." }` in sorted order, and keep
+   `MAX_SURFACE_FILES` equal to the merged pin count. A branch that only changed the
+   contents of already-pinned files has nothing to re-add.
+4. Add `docs/tally/compatibility/acks/pr-<N>.txt` as above if the branch changes any
+   pinned path. Until the branch has merged master, its head still holds a schema 2
+   file, which the acknowledgement check and `scripts/merge-gate.sh` refuse to read
+   at the head (the merge gate reports the branch as indeterminate).
+5. Delete the leftover local merge-driver configuration, once per clone (harmless
+   if absent): `git config --remove-section merge.bridge-compat-reseal`.
+
+`scripts/reseal.sh`, `rehash-surface` and the merge driver no longer exist. Do not
+recreate them.
+
+#### Running the compatibility tool
+
+The tool's tests and the `gate` command need the pinned toolchain. A Homebrew
 `rustc` earlier on `PATH` shadows rustup, and this project pins the version in
 `rust-toolchain.toml`, so check `rustc --version` first. Setting `RUSTC` alone
 is **not** enough to escape the shadow: `cargo clippy` still resolves the wrong
@@ -43,379 +356,6 @@ rustc --version   # must match rust-toolchain.toml before you continue
 Quote `rustc_path` rather than piping it through `xargs dirname`: `xargs` splits
 on whitespace, so a home directory containing a space turns one path into
 several and the `PATH` entry it builds points nowhere.
-
-`--output` asks the
-compatibility tool to stage and replace the destination itself, and it is
-required — without it the command prints to stdout and changes nothing on
-disk, which looks like success:
-
-```bash
-cargo run --locked -p bridge-tally-compatibility -- rehash-surface \
-  ../docs/tally/compatibility/compatibility-surface.json .. \
-  --output ../docs/tally/compatibility/compatibility-surface.json
-```
-
-```powershell
-cargo run --locked -p bridge-tally-compatibility -- rehash-surface `
-  ../docs/tally/compatibility/compatibility-surface.json .. `
-  --output ../docs/tally/compatibility/compatibility-surface.json
-```
-
-`rehash-surface` reads the raw bytes of every existing pin, rewrites its
-`sha256`, and reports the changed-entry count; it neither adds nor removes
-pins. That is the whole reseal. The surface (schema 2) stores only the per-file
-hashes: the surface digest that receipts and attestations bind is computed by
-the gate from those hashes, never stored, and the matrix carries no copy of it
-(bridge#760). So a reseal never touches the matrix, and two changes that pin
-different files merge without conflict. CI intentionally checks the resulting
-surface but never reseals it. Without `--output`, the command retains its
-stdout contract. With `--output`,
-the tool writes raw UTF-8 without a BOM to a temporary file in the destination
-directory and replaces the destination only after successful serialization.
-This keeps failure fail-closed without relying on shell redirection or move
-semantics.
-On Unix, replacement preserves an existing destination's mode; a new
-destination uses the normal `0666` mode subject to the process umask. Windows
-uses its normal ACL semantics rather than POSIX mode bits.
-
-#### Adding or removing a pin
-
-Edit the file list by hand: add the entry in sorted path order with any
-64-hex placeholder `sha256`, or delete it. Then reseal as above.
-`rehash-surface` validates the list's shape (sorted, unique, relative paths,
-64-hex hashes, within `MAX_SURFACE_FILES`) and writes every entry's real hash,
-the new one included. A malformed list is refused and left unchanged.
-`scripts/reseal.sh --pins-changed` still works and is now the same as an
-ordinary reseal.
-
-#### What the reseal reports after it succeeds
-
-A successful `scripts/reseal.sh` (not `--verify`) prints a surface coverage
-report from `scripts/surface_coverage_report.py`. It never fails the reseal.
-Against the merge-base with `origin/master` (override with
-`SURFACE_REPORT_BASE`) it lists two things the gate cannot see: a pin that was
-dropped, and a module declared directly by a pinned module and newly left
-unpinned. Modules left unpinned before the branch are not reprinted, test-only
-modules are only counted, and feature-gated ones are labelled.
-
-**A clean report is not evidence that nothing left the seal.** It does not see
-code moved between files that already existed; a new module declared by an
-*unpinned* module, even one carved out of a pinned file (a new file under an
-unpinned `db/mod.rs`, say); deeper descendants of a pinned module; a pinned
-file that stops being compiled; a test-only or feature-gated module becoming
-production; or a new crate root. The script's docstring keeps the full list.
-The merge driver (`scripts/reseal-merge-driver.mjs`) writes the reconciled lists
-itself and does not print the report; run `scripts/reseal.sh` after resolving.
-
-Read it, then pin each listed file that decides what Bridge posts or lets leave
-the machine, and leave the rest; see the comment on `MAX_SURFACE_FILES` for the
-rule and bridge#416 for the reasoning.
-
-#### When the surface itself conflicts in a merge or rebase
-
-Every pin's `sha256` is generated: never hand-merge or hand-edit a hash. The pin
-*list* and the matrix's *claims* are authored, and a merge must reconcile them
-(below).
-
-Be precise about what the gate does and does not protect, because the two halves
-behave oppositely.
-
-**Stale bytes cannot slip through.** `validate_files` re-reads the raw bytes of
-every pinned file present and compares the SHA-256, so a surface pinning stale
-content fails with `surface_file_changed`. A reseal re-reads the bytes, so the
-only way to green is a hash that matches the merged file. For hashes the gate is byte-exact and
-fail-closed, so hand-merging them is futile rather than unsafe: every wrong
-resolution is loud, and regenerating is the only route to green.
-
-**A dropped entry slips through silently.** The gate can only check pins that are
-still in the list, and claims that are still in the matrix. Lose one in the
-resolution and the gate passes. That asymmetry is the whole hazard, and it is why
-the authored half below must be merged rather than regenerated.
-
-**When does this section apply at all?** With schema 2, two changes that touch
-different pinned files, even adjacent entries, merge without any conflict, on
-GitHub as well as locally, because each changes only its own `sha256` line. A
-conflict here now means both sides changed the same pinned file, or both
-inserted pins at the same sorted position, or one appended a pin after the last
-entry while the other edited the last pinned file, or one renamed a pin while
-the other edited that file, or both edited the claims. One case
-merges cleanly and is still caught: one side adds a pin for a file (its hash
-from that side's bytes) while the other edits that file. The merged hash line
-and the merged bytes then disagree, and `validate_files` fails with
-`surface_file_changed` on the merge result. That rests on CI running on the
-merge result, which `strict: true` branch protection (or a merge queue)
-ensures.
-
-**What does matter is the order.** Resolve every genuine *source* conflict first,
-and only then regenerate. `tools/bridge-tally-compatibility/src/lib.rs` is itself a
-pinned file: the tool pins its own source into the surface it produces. Regenerate
-before that file is final and you pin a half-merged copy -- the gate will catch it,
-but only after you have spent the cycle.
-
-**These two files are not wholly generated, and that is what makes the conflict
-dangerous.** Each carries two kinds of content:
-
-- **derived** -- every pinned file's `sha256`. Regenerating rewrites these, so
-  conflicts in them are noise. (Schema 1 also stored the aggregate digest in both
-  files; schema 2 stores none, bridge#760.)
-- **authored** -- the surface's *pin list*, and the matrix's *claims and promotion
-  constraints*. **Nothing regenerates these.** `rehash-surface` re-reads the bytes
-  of every entry that is present; it cannot restore an entry that is absent.
-
-So "take one side wholesale" is safe for the derived half and **silently lossy for
-the authored half**, and the gate will not catch it. Measured: delete one
-judgment-pinned entry from the surface, reseal, and the gate returns
-`compatibility_gate_passed`.
-
-**Where a pin matters enough that this is unacceptable, make it REQUIRED rather than
-relying on this procedure.** `REQUIRED_SURFACE_FILES` and `REQUIRED_SURFACE_DIRECTORIES`
-are checked for presence, not merely hashed, so an entry in either cannot be dropped
-silently at all. The same deletion that returned `compatibility_gate_passed` as a
-judgment pin returns `surface_required_directory_file_unpinned` once the path is
-required. `gate_rejects_each_omitted_required_lifecycle_path` iterates that list, so
-adding a path is also what tests it. A procedure a maintainer must follow is weaker
-than a constant they cannot circumvent; this section exists for the pins that are not
-worth promoting, not as a substitute for promoting the ones that are. `validate_files` enforces the required
-directories and `REQUIRED_SURFACE_FILES`; a judgment pin is in neither, so its
-absence is invisible. The matrix is worse: a dropped claim leaves no trace at all.
-
-1. Resolve every non-generated conflict and settle those files completely.
-2. Take **one side wholesale** for `compatibility-surface.json` and
-   `compatibility-matrix.json` -- but only as a starting point for the derived half.
-3. **Reconcile the authored half by hand, against the merge base.** This is the one
-   part of these files that must be *merged* rather than regenerated. List the pins
-   each side added and confirm the union is present:
-
-   **Name the two sides explicitly — during a rebase `HEAD` is not your branch.**
-   When a rebase stops on a conflict, `HEAD` is the upstream plus whatever has
-   already been replayed, and the commit being applied is `REBASE_HEAD`. Comparing
-   `HEAD` against `origin/master` there compares upstream with itself and never
-   reads the feature-side manifest at all — so it misses exactly the pin it is
-   meant to preserve. The conflict stages say it without either name: stage 2 is
-   the side you are replaying onto, stage 3 the side being applied.
-
-   ```bash
-   surface=docs/tally/compatibility/compatibility-surface.json
-   pins() { python3 -c 'import json,sys; [print(f["path"]) for f in json.load(sys.stdin)["files"]]' | sort; }
-
-   # during a rebase or merge conflict, read the stages -- they are unambiguous
-   git show ":1:$surface" | pins > /tmp/pins-base.txt   # merge base
-   git show ":2:$surface" | pins > /tmp/pins-ours.txt   # replayed onto / current
-   git show ":3:$surface" | pins > /tmp/pins-theirs.txt # being applied / incoming
-
-   # every pin either side ADDED since the base must survive the resolution
-   comm -13 /tmp/pins-base.txt /tmp/pins-ours.txt   # added by one side
-   comm -13 /tmp/pins-base.txt /tmp/pins-theirs.txt # added by the other
-
-   # and every pin either side REMOVED must stay removed -- additions alone are
-   # not enough, see below
-   comm -23 /tmp/pins-base.txt /tmp/pins-ours.txt   # removed by one side
-   comm -23 /tmp/pins-base.txt /tmp/pins-theirs.txt # removed by the other
-   ```
-
-   **Removals need the same treatment, and checking only additions hides them.**
-   A pin or claim that one side deliberately retired is still present in the base,
-   so it appears in neither `comm -13` output. Take the other side wholesale and it
-   comes back; reseal and the gate accepts it, because a resurrected pin hashes
-   fine. The retirement is silently undone, and which way it goes depends only on
-   which side step 2 happened to start from.
-
-   The union of additions minus the union of removals is the answer. Where one side
-   removed an entry the other side *modified*, that is a genuine add/remove conflict
-   and wants a decision, not a default -- resolve it explicitly and say which way in
-   the commit.
-
-   If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
-   (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
-
-   Do the same for the matrix's claims. A pin or claim that exists on one side and
-   not in your result is being deleted, and nothing downstream will say so.
-4. **Recompute `MAX_SURFACE_FILES` from the reconciled pin count, BEFORE regenerating.**
-   Do not carry a number derived from either side's cap. The ordering is not a
-   preference: `tools/bridge-tally-compatibility/src/lib.rs` is itself pinned, so
-   editing the constant after regenerating leaves its own digest stale and the gate
-   fails `surface_file_changed` until you reseal again. Every edit to a pinned file,
-   the cap included, belongs before the regeneration that hashes it, or the
-   regeneration has to be repeated.
-5. Regenerate: `scripts/reseal.sh` (or the one `rehash-surface` command above).
-6. Run the gate, and **check the pin count against the union you computed in step
-   3** -- the gate cannot do this for you.
-
-   `rehash-surface` also reports a changed-entry count, which is a check on your
-   reasoning **once you know what it counts**: only entries already in the list
-   whose digest on disk differs from the digest recorded. A newly added entry whose
-   digest you computed from disk is therefore **not** counted -- it already matches.
-   So adding one pin and raising the cap reports **one** (the tool's own pinned
-   source, changed by the cap edit) if you computed the new entry's digest from
-   disk, and **two** if you added it with a placeholder digest, as "Adding or
-   removing a pin" above suggests. Reconcile the number with how you added the pin; do not adjust a
-   digest to reach an expected count.
-
-A rebase carrying several commits that touch pinned files needs this at **each**
-commit that does, not once at the end. CI gates the final tree, but a history whose
-intermediate commits do not gate is not bisectable.
-
-**`MAX_SURFACE_FILES` is the line most likely to be silently wrong, and it is worse
-when it does NOT conflict.** The convention is to pin exactly the count in use, so
-any branch adding a pin must raise it. If two branches start from the same cap and
-each add one pin, both change it from N to N+1 -- an **identical edit**, which git
-merges automatically without ever showing you a conflict. The reconciled surface
-then holds N+2 pins against a cap of N+1, and step 4 fails with
-`surface_file_count_invalid`.
-
-That failure is loud, so it is not dangerous; what is misleading is expecting a
-conflict to prompt you. Recompute the cap from the reconciled pin count every time,
-whether or not git stopped to ask. The cap *test* derives its size from the constant
-precisely so that changing the cap does not also rewrite the test.
-
-Two further constraints apply:
-
-- `MAX_SURFACE_FILES` caps the pin count, and `RESERVED_SURFACE_FILES` bounds
-  how far the cap may exceed it. When the surface is at its cap, adding a pin
-  requires raising the constant, which the constant's own comment calls an
-  explicit compatibility-surface decision -- record the reason in the commit.
-- The tool pins its own source, so editing `tools/bridge-tally-compatibility`
-  to raise that cap stales its digest and needs another reseal after the edit.
-  Expect two passes, and run the tool's tests between them: a cap change can
-  invalidate a test that hard-codes the old bound.
-
-The PowerShell commands are intended for Windows PowerShell 5.1 and PowerShell
-7+. They deliberately do not use `>`: Windows PowerShell 5.1 redirection was
-measured to produce UTF-16LE. The output-path procedure is reasoned from the
-tool's byte writer, not host-verified; before relying on it on a Windows host,
-confirm the result with `Format-Hex` and require no UTF-8 BOM (`EF BB BF`).
-
-#### `scripts/reseal.sh` (wrapper)
-
-`scripts/reseal.sh` wraps the `rehash-surface` command above into one call, on
-Unix hosts. It resolves the pinned toolchain, prints the tool's own
-changed-entry count so a reseal that changed nothing (a no-op run) is visible as
-exactly that, and then prints the surface coverage report.
-
-```sh
-scripts/reseal.sh                  # reseal: rehash every pinned file
-scripts/reseal.sh --pins-changed   # the same; kept for existing instructions
-scripts/reseal.sh --verify         # reseals into a scratch copy and fails if
-                                    # it differs from the committed surface;
-                                    # never mutates the working tree. For CI --
-                                    # not wired into any workflow yet, since
-                                    # this repository's automation may not
-                                    # touch `.github/` here; see
-                                    # docs/proposed-dependency-policy.md for
-                                    # the proposed step.
-```
-
-It resolves the pinned toolchain itself (the same `rustc --version` shadowing
-hazard described above), and always runs from the repository root regardless
-of the caller's current directory. It has no PowerShell equivalent; run the
-`rehash-surface` command by hand on Windows.
-
-#### Merge driver (local only)
-
-Under schema 1, two PRs that each resealed after touching DIFFERENT
-already-pinned files always conflicted, on exactly two lines: the stored
-aggregate digests `manifest_sha256` (in the surface) and
-`compatibility_surface_sha256` (in the matrix). Schema 2 stores neither
-(bridge#760), so that case no longer conflicts anywhere, and
-`scripts/reseal-merge-driver.test.mjs` checks it with the driver overridden by
-git's built-in text merge (an `info/attributes` entry `merge=text`), as GitHub
-merges. What remains for the driver is the rarer case of both sides
-changing the pin list or the claims.
-
-A git merge driver at `scripts/reseal-merge-driver.mjs`, wired via
-`.gitattributes`, resolves the common case of that automatically: it
-reconciles the surface's pin list and the matrix's claim list with a real
-three-way merge (independent additions and removals from either side are
-both kept/honored automatically; the SAME entry changed on both sides to
-DIFFERENT content is refused, not guessed at, and falls back to git's
-ordinary conflict markers for manual resolution exactly as described above),
-then writes the reconciled lists. Every pinned file's post-merge hash is computed from git refs
-(`git diff --name-only`/`git show` against the merge base, "ours" and
-"theirs"), never from the working tree -- an earlier version of this driver
-read the working tree instead and a real merge experiment caught it sealing
-a wrong hash, because git does not guarantee every other path has already
-been checked out to its final post-merge content by the time this driver
-runs for the compatibility files specifically. It runs no tool, so it needs no
-Rust toolchain. See the extensive comments in
-`scripts/reseal-merge-driver.mjs` for the exact mechanics, including why
-`.git/MERGE_HEAD` -- the seemingly obvious way to learn "ours"/"theirs" from
-inside a running merge driver -- does not work (it is not written until
-*after* the whole tree-level merge finishes, i.e. after every driver
-invocation, and in a linked git worktree `.git` is a redirect file rather
-than a directory besides) and the gitattributes placeholders (`%S`/`%X`/`%Y`)
-used instead.
-
-**This is a LOCAL-ONLY convenience.** A `.gitattributes` `merge=` driver
-requires local git configuration to activate (below) and runs only when
-*your own* `git merge`/`git rebase` executes on *your* machine. **GitHub's
-server-side merge -- the "Merge pull request" button, and the mergeability
-check GitHub computes for an open PR -- does not run repository merge
-drivers at all; GitHub has no mechanism to execute arbitrary repository code
-as part of that merge.** So this reduces the pain of a maintainer juggling
-several compatibility-surface branches locally; it does **not** change what
-a PR shows as conflicting on GitHub, and does not touch anything under
-`.github/`. A PR that would conflict on GitHub still needs a rebase/merge
-performed locally (with this configured) to resolve automatically, then
-pushed.
-
-One-time setup per local checkout (not committed -- `.gitattributes` names
-the driver, but the driver's actual command has to come from local git
-config, by design: git will not execute arbitrary commands named in a
-version-controlled file without an explicit local opt-in):
-
-```sh
-git config merge.bridge-compat-reseal.name "Bridge compatibility-surface reseal driver"
-git config merge.bridge-compat-reseal.driver "node scripts/reseal-merge-driver.mjs %O %A %B %P %S %X %Y"
-```
-
-When it declines to resolve (a genuine conflict on the pin/claim list, or on
-a pinned file's own content, or an operation other than an ordinary `git
-merge`), it falls back to git's plain three-way text merge and prints why --
-resolve the conflict markers by hand following the procedure above, then run
-`scripts/reseal.sh` yourself.
-
-#### Migrating an open branch across bridge#760
-
-A branch cut before bridge#760 still carries schema-1 files and the old driver.
-During a local merge git runs the driver of the side that is **checked out**, so
-merging master into such a branch runs the *old* driver. It writes schema-1
-files, which the new tool, `scripts/reseal.sh` and the gate all refuse
-(`artifact_json_invalid`). That fails closed, but it has to be finished by hand,
-once per branch:
-
-1. Merge master without committing, and resolve every source conflict:
-
-   ```sh
-   git fetch origin
-   git merge --no-commit origin/master
-   ```
-
-2. Take master's two files, which have the schema-2 shape (`schema_version: 2`,
-   no `manifest_sha256`, no `compatibility_surface_sha256`):
-
-   ```sh
-   git checkout origin/master -- docs/tally/compatibility/compatibility-surface.json \
-     docs/tally/compatibility/compatibility-matrix.json
-   ```
-
-3. Re-apply the branch's own authored changes, if it had any: pins it added (in
-   sorted order, with any 64-hex placeholder `sha256`) or removed, and claims it
-   changed. Compare with the merge base as in "When the surface itself conflicts
-   in a merge or rebase" above. A branch that only changed the contents of
-   already-pinned files has nothing to re-apply.
-4. Reseal, verify and commit:
-
-   ```sh
-   scripts/reseal.sh
-   scripts/reseal.sh --verify
-   git add docs/tally/compatibility/compatibility-surface.json docs/tally/compatibility/compatibility-matrix.json
-   git commit
-   ```
-
-The merge commit then holds schema 2, and every later merge runs the new driver.
-Updating such a branch on GitHub ("Update branch") instead reports a conflict
-on the two files whenever the branch had resealed; resolve it locally the same
-way.
 
 Before cutting a candidate, regenerate and verify the Rust third-party notice
 with the pinned generator:
@@ -481,6 +421,13 @@ corepack pnpm run license:all
   reviewers; never place them in repository variables, logs, or artifacts.
 - Publish SHA-256 checksums and provenance/attestation evidence with every
   downloadable artifact.
+  Each preview archive gets a GitHub build attestation (`actions/attest`, in a
+  separate job that runs no repository code and is the only one that can mint
+  the identity token) that the publish job verifies with `gh attestation
+  verify`, requiring this workflow, this commit, the default branch and a
+  GitHub-hosted runner, before the release is created; the release notes tell
+  readers how to check a download. It records which workflow run and commit built the bytes. It is not
+  a code signature, and no client checks it yet.
 - Do not create or move a `v*` tag until signed artifacts from both supported
   platforms pass the candidate gates. Release tags must be immutable.
 
@@ -617,7 +564,7 @@ patch for a fix-only release:
 `src-tauri/Cargo.lock`, and the README sentence naming the current version.
 It checks every file first and writes none if one fails. Then:
 
-1. Run `scripts/reseal.sh`, because three of those files are pinned.
+1. Add `docs/tally/compatibility/acks/pr-<N>.txt` to the version pull request, because three of those files are pinned (see "Compatibility-surface reseal").
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
@@ -706,3 +653,5 @@ disagree.
    the same version or checksum.
 5. Preserve release notes explaining impact, upgrade/rollback steps, and the
    last known-good version without including customer data.
+
+<!-- Merge-queue canary, 30 Sep 2026: this comment tests the queue and can be removed. -->

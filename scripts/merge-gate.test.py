@@ -3,8 +3,8 @@
 
 The gate was cut from 3977 lines of merge-gate.sh/.test.py/_fake_gh.py/
 _privacy.py/_diff.py down to only what runs as a real required CI check:
-compatibility-surface validation, the privacy/PII scan, and a minimal
-review-evidence-names-current-head check. This suite exercises only that
+compatibility-surface validation (schema 3 and the pinned-path acknowledgement),
+the privacy/PII scan, and a minimal review-evidence-names-current-head check. This suite exercises only that
 kept surface, plus a dedicated regression test for each of the 7 defects
 fixed in the kept code (#346, #358, #360, #365, #366, #373, #377).
 
@@ -28,6 +28,8 @@ FAKE_GH = ROOT / "scripts" / "merge_gate_test_gh.py"
 PRIVACY_MODULE_PATH = ROOT / "scripts" / "merge_gate_privacy.py"
 HEAD = "0123456789abcdef0123456789abcdef01234567"
 SHORT = HEAD[:7]
+ACK_DIR = "docs/tally/compatibility/acks"
+ACK_PATH = ACK_DIR + "/pr-321.txt"
 
 
 def load_privacy_module():
@@ -76,12 +78,12 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
         return subprocess.run(
-            [str(SCRIPT), "321", "--repo", "lamemustafa/bridge", *extra_args],
+            [str(SCRIPT), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
             env=env,
             text=True,
@@ -114,10 +116,20 @@ class MergeGateControls(unittest.TestCase):
 
     # -- Baseline -----------------------------------------------------------
 
+    def test_the_organization_name_is_the_same_policy_as_the_old_account_name(self):
+        result = self.run_gate("pass", repo="ComplyEaze/bridge")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_any_other_repository_is_refused(self):
+        for repo in ("someone/bridge", "ComplyEaze/other", "complyeaze/bridge"):
+            result = self.run_gate("pass", repo=repo)
+            self.assertEqual(result.returncode, 2, repo + result.stdout + result.stderr)
+            self.assertIn("unsupported repository", result.stderr)
+
     def test_pass_scenario_may_merge(self):
         self.assert_pass("pass", "review evidence names the current head")
 
-    # -- Compatibility-surface validation (KEEP #1) --------------------------
+    # -- Compatibility-surface schema (schema 3 at head; 2 or 3 at the base) --
 
     def test_surface_fetch_failure_is_indeterminate(self):
         self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
@@ -125,20 +137,268 @@ class MergeGateControls(unittest.TestCase):
     def test_surface_malformed_is_indeterminate(self):
         self.assert_indeterminate("surface-malformed", "could not read and validate compatibility surface at " + SHORT)
 
-    def test_surface_head_schema_2_with_an_extra_key_is_indeterminate(self):
-        self.assert_indeterminate("surface-head-schema2-extra-key", "could not read and validate compatibility surface at " + SHORT)
+    def test_head_schema_3_is_read(self):
+        self.assert_pass("pass", "validated schema-3 compatibility surface at head " + SHORT)
 
-    def test_surface_head_on_schema_1_is_indeterminate(self):
+    def test_head_schema_3_with_a_stored_hash_is_indeterminate(self):
+        self.assert_indeterminate("surface-head-schema3-extra-key", "could not read and validate compatibility surface at " + SHORT)
+
+    def test_head_schema_3_with_an_extra_top_level_key_is_indeterminate(self):
+        self.assert_indeterminate("surface-head-schema3-extra-top-level-key", "could not read and validate compatibility surface at " + SHORT)
+
+    def test_head_schema_3_with_a_non_string_reason_is_indeterminate(self):
+        self.assert_indeterminate("surface-head-schema3-reason-not-a-string", "could not read and validate compatibility surface at " + SHORT)
+
+    def test_head_schema_3_with_a_duplicate_path_is_indeterminate(self):
+        self.assert_indeterminate("surface-head-schema3-duplicate-path", "could not read and validate compatibility surface at " + SHORT)
+
+    def test_head_schema_3_with_an_empty_path_is_indeterminate(self):
+        self.assert_indeterminate("surface-head-schema3-empty-path", "could not read and validate compatibility surface at " + SHORT)
+
+    def test_head_on_schema_2_is_indeterminate_and_says_to_merge_master_and_migrate(self):
+        result = self.assert_indeterminate("surface-head-schema2", "could not read and validate compatibility surface at " + SHORT)
+        self.assertIn("still schema 2", result.stdout)
+        self.assertIn("merge master into the branch and migrate the pin list to schema 3, see docs/release-process.md", result.stdout)
+
+    def test_head_on_schema_1_gets_no_migration_hint(self):
+        result = self.assert_indeterminate("surface-head-schema1", "could not read and validate compatibility surface at " + SHORT)
+        self.assertNotIn("merge master", result.stdout)
+
+    def test_head_on_schema_1_is_indeterminate(self):
         self.assert_indeterminate("surface-head-schema1", "could not read and validate compatibility surface at " + SHORT)
 
-    def test_base_pinned_path_removed_from_head_is_indeterminate(self):
-        self.assert_indeterminate("surface-unpins", "base-pinned path(s) are absent from the head surface")
+    def test_base_on_schema_2_is_read(self):
+        self.assert_pass("surface-base-schema2", "validated schema-2 compatibility surface at base aaaaaaa")
 
-    def test_touched_pinned_path_without_reseal_blocks(self):
-        self.assert_blocked("surface-reseal-missing", "changed pinned paths omit the compatibility surface reseal")
+    def test_base_on_schema_1_is_indeterminate(self):
+        self.assert_indeterminate("surface-base-schema1", "could not read and validate compatibility surface at base aaaaaaa")
 
-    def test_touched_pinned_path_with_reseal_passes(self):
-        self.assert_pass("surface-reseal-present", "changed pinned paths include the compatibility surface")
+    def test_base_on_schema_3_with_a_stored_hash_is_indeterminate(self):
+        self.assert_indeterminate("surface-base-schema3-extra-key", "could not read and validate compatibility surface at base aaaaaaa")
+
+    def test_an_unreadable_merge_base_is_indeterminate(self):
+        self.assert_indeterminate("merge-base-fetch-fail", "could not read the merge base")
+
+    # -- Pinned-path acknowledgement (pr-<N>.txt) ------------------------------
+
+    def test_ack_missing_blocks(self):
+        self.assert_blocked("ack-missing", "but the PR does not add " + ACK_PATH)
+
+    def test_ack_exact_passes(self):
+        result = self.assert_pass("ack-exact", "review evidence names the current head")
+        self.assertIn(ACK_PATH + " lists the 1 touched pinned path(s), reviewer reviewer", result.stdout)
+        self.assertIn("names " + SHORT + ", " + ACK_PATH + " and all pinned paths touched", result.stdout)
+
+    def test_ack_exact_via_a_review_body_passes(self):
+        self.assert_pass("ack-exact-via-review", "all pinned paths touched")
+
+    def test_ack_with_an_extra_path_blocks(self):
+        self.assert_blocked("ack-extra-path", "lists path(s) the PR does not touch: src/other.rs")
+
+    def test_ack_missing_a_touched_path_blocks(self):
+        self.assert_blocked("ack-missing-path", "omits touched pinned path(s): src/other.rs")
+
+    def test_a_modified_ack_instead_of_an_added_one_blocks(self):
+        self.assert_blocked("ack-modified", "but the PR does not add " + ACK_PATH)
+
+    def test_editing_another_acknowledgement_blocks(self):
+        self.assert_blocked("ack-other-modified", "acknowledgement files are append-only")
+
+    def test_deleting_another_acknowledgement_while_touching_a_pin_blocks(self):
+        self.assert_blocked("ack-other-deleted", "acknowledgement files are append-only")
+
+    def test_ack_with_a_hash_token_blocks(self):
+        self.assert_blocked("ack-with-hash-token", "contains a 64-hex token")
+
+    def test_ack_with_unsorted_paths_blocks(self):
+        self.assert_blocked("ack-unsorted", "paths must be sorted and unique")
+
+    def test_ack_with_a_duplicate_path_blocks(self):
+        self.assert_blocked("ack-duplicate-path", "paths must be sorted and unique")
+
+    def test_ack_without_a_reviewer_line_blocks(self):
+        self.assert_blocked("ack-no-reviewer", "needs exactly one 'reviewer: <github login>' line")
+
+    def test_ack_with_two_reviewer_lines_blocks(self):
+        self.assert_blocked("ack-two-reviewers", "needs exactly one 'reviewer: <github login>' line")
+
+    def test_ack_with_a_line_that_is_not_a_repository_path_blocks(self):
+        self.assert_blocked("ack-path-not-a-repository-path", "has a line that is not a repository path")
+
+    def test_an_unreadable_ack_is_indeterminate(self):
+        self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+
+    def test_an_ack_with_no_pinned_path_touched_blocks(self):
+        self.assert_blocked("ack-without-pinned-change", "no pinned path is touched, so no acknowledgement may be added")
+
+    def test_an_ack_cleanup_that_only_deletes_acks_passes(self):
+        self.assert_pass("ack-cleanup-only", "changed files contain no pinned path requiring an acknowledgement")
+
+    def test_unpinned_change_needs_no_ack(self):
+        self.assert_pass("pass", "changed files contain no pinned path requiring an acknowledgement")
+
+    # -- Pin list edits: an added or removed pin is a touch ------------------------
+
+    def test_pin_added_with_the_file_unchanged_needs_an_ack(self):
+        self.assert_blocked("pin-only-change", "but the PR does not add " + ACK_PATH)
+
+    def test_pin_added_with_an_ack_and_a_reason_passes(self):
+        self.assert_pass("pin-only-change-acked", "all pinned paths touched")
+
+    def test_pin_added_without_a_reason_blocks(self):
+        self.assert_blocked("pin-added-without-reason", "pin(s) added without a non-empty reason: src/new.rs")
+
+    def test_pin_removed_without_a_removed_pin_line_blocks(self):
+        self.assert_blocked("pin-removed-no-line", "lacks a removed-pin line for: src/other.rs")
+
+    def test_pin_removed_with_a_removed_pin_line_passes(self):
+        self.assert_pass("pin-removed-with-line", "all pinned paths touched")
+
+    def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
+        self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")
+
+    # -- The review or comment must name the head, the ack and every touched path ----
+
+    def test_comment_missing_a_touched_file_blocks(self):
+        self.assert_blocked("comment-missing-file", "no review or comment names every pinned path touched; the closest lacks: src/other.rs")
+
+    def test_comment_naming_every_touched_file_passes(self):
+        self.assert_pass("comment-names-all", "names " + SHORT + ", " + ACK_PATH + " and all pinned paths touched")
+
+    def test_comment_missing_the_ack_path_blocks(self):
+        self.assert_blocked("comment-missing-ack-path", "the closest lacks: " + ACK_PATH)
+
+    def test_comment_naming_another_head_blocks(self):
+        self.assert_blocked("comment-names-another-head", "no review or comment names head " + SHORT + " together with " + ACK_PATH)
+
+    def test_reviewer_who_is_not_the_acks_reviewer_blocks(self):
+        self.assert_blocked("reviewer-not-matching", "is by someone-else, not the acknowledgement's reviewer 'reviewer'")
+
+    def test_reviewer_login_comparison_ignores_case(self):
+        self.assert_pass("reviewer-login-case-differs", "all pinned paths touched")
+
+    # -- Renames, stale branches, the cut-over PR -----------------------------------
+
+    def test_rename_of_a_pinned_file_needs_an_ack_for_the_old_path(self):
+        self.assert_blocked("rename-old-path-pinned", "but the PR does not add " + ACK_PATH)
+
+    def test_rename_of_a_pinned_file_with_an_ack_for_the_old_path_passes(self):
+        result = self.assert_pass("rename-old-path-acked", "all pinned paths touched")
+        self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
+
+    def test_a_nested_gitattributes_blocks(self):
+        self.assert_blocked("nested-gitattributes", "a nested .gitattributes can change the bytes of a pinned file")
+
+    def test_pr_behind_a_pin_adding_master_commit_is_not_indeterminate(self):
+        # The base tip pins one more path than the head, but the PR's merge base
+        # does not: nothing was removed, so nothing is compared against the tip.
+        result = self.assert_pass("behind-a-pin-adding-master-commit", "validated schema-3 compatibility surface at merge base bbbbbbb")
+        self.assertNotIn("INDETERMINATE", result.stdout)
+
+    def test_pr_behind_master_that_touches_a_path_master_pinned_needs_an_ack(self):
+        self.assert_blocked("behind-master-pin-touched", "but the PR does not add " + ACK_PATH)
+
+    def test_cut_over_pr_schema_2_base_schema_3_head_passes_with_an_ack(self):
+        self.assert_pass("cut-over", "validated schema-2 compatibility surface at base aaaaaaa")
+
+    def test_cut_over_pr_without_an_ack_blocks(self):
+        self.assert_blocked("cut-over-without-ack", "but the PR does not add " + ACK_PATH)
+
+    # -- .gitattributes is pinned like any file: the gate has no special case for it ----
+
+    def test_gitattributes_pinned_and_edited_without_an_ack_blocks(self):
+        self.assert_blocked("gitattributes-no-ack", "but the PR does not add " + ACK_PATH)
+
+    def test_gitattributes_pinned_and_edited_with_an_ack_listing_it_passes(self):
+        result = self.assert_pass("gitattributes-acked", "all pinned paths touched")
+        self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
+
+    def test_gitattributes_pinned_and_edited_with_an_ack_that_omits_it_blocks(self):
+        self.assert_blocked("gitattributes-wrong-ack", "omits touched pinned path(s): .gitattributes")
+
+    def test_gitattributes_edited_but_not_pinned_needs_no_ack(self):
+        self.assert_pass("gitattributes-unpinned", "changed files contain no pinned path requiring an acknowledgement")
+
+    # -- removed-pin lines are sorted and unique, like the path lines --------------------
+
+    def test_sorted_removed_pin_lines_pass(self):
+        self.assert_pass("removed-pins-sorted", "all pinned paths touched")
+
+    def test_unsorted_removed_pin_lines_block(self):
+        self.assert_blocked("removed-pins-unsorted", "removed-pin lines must be sorted and unique")
+
+    def test_duplicate_removed_pin_lines_block(self):
+        self.assert_blocked("removed-pins-duplicate", "removed-pin lines must be sorted and unique")
+
+    # -- The reviewer login is a GitHub login (the same expression as the CI checker) ---------
+
+    def test_reviewer_login_shapes(self):
+        for scenario in ("reviewer-login-39-chars", "reviewer-login-bot"):
+            self.assert_pass(scenario, "all pinned paths touched")
+        for scenario in ("reviewer-login-trailing-hyphen", "reviewer-login-leading-hyphen", "reviewer-login-40-chars"):
+            self.assert_blocked(scenario, "needs exactly one 'reviewer: <github login>' line")
+
+    # -- The reason on an added pin: non-empty, at most 500 characters, no control character --
+
+    def test_pin_reason_of_501_characters_blocks(self):
+        self.assert_blocked("pin-reason-501-chars", "pin(s) added with a reason over 500 characters or containing a control character: src/new.rs")
+
+    def test_pin_reason_of_500_astral_characters_passes(self):
+        self.assert_pass("pin-reason-500-astral-chars", "all pinned paths touched")
+
+    def test_pin_reason_with_a_control_character_blocks(self):
+        self.assert_blocked("pin-reason-control-char", "reason over 500 characters or containing a control character")
+
+    # -- An ack may only be added: a rename of an ack is a delete plus an add ------------------
+
+    def test_an_ack_renamed_out_of_the_directory_blocks_with_a_pinned_change(self):
+        self.assert_blocked("ack-renamed-out-with-pin-change", "acknowledgement files are append-only; the PR also changes: " + ACK_DIR + "/pr-100.txt")
+
+    def test_an_ack_renamed_out_of_the_directory_blocks_without_a_pinned_change(self):
+        self.assert_blocked("ack-renamed-out-no-pin-change", "no pinned path is touched, so no acknowledgement may be added or changed: " + ACK_DIR + "/pr-100.txt")
+
+    def test_an_ack_that_git_pairs_with_an_unrelated_deleted_file_is_still_an_add(self):
+        self.assert_pass("ack-added-as-a-rename-from-outside", "all pinned paths touched")
+
+    # -- Copies: the destination counts, the source only when it is itself pinned ----------------
+
+    def test_a_copy_of_a_pinned_file_counts_the_pinned_source(self):
+        self.assert_blocked("copy-of-a-pinned-file", "but the PR does not add " + ACK_PATH)
+        result = self.assert_pass("copy-of-a-pinned-file-acked", "all pinned paths touched")
+        self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
+
+    def test_a_copy_of_an_unpinned_file_needs_no_ack(self):
+        self.assert_pass("copy-of-an-unpinned-file", "changed files contain no pinned path requiring an acknowledgement")
+
+    # -- A path is named in the review or comment only as a whole token ----------------------------
+
+    def test_a_longer_path_does_not_name_a_shorter_one(self):
+        self.assert_blocked("comment-names-a-longer-path", "the closest lacks: src/example.rs")
+
+    def test_a_longer_ack_path_does_not_name_the_ack(self):
+        self.assert_blocked("comment-names-a-longer-ack-path", "the closest lacks: " + ACK_PATH)
+
+    def test_paths_in_backticks_quotes_parentheses_commas_and_colons_are_named(self):
+        self.assert_pass("comment-names-paths-in-punctuation", "all pinned paths touched")
+
+    def test_a_path_with_spaces_and_parentheses_can_be_named(self):
+        self.assert_pass("comment-names-a-path-with-spaces", "all pinned paths touched")
+
+    # -- A large ack: a match must not be lost when grep exits early under pipefail -------------------
+
+    def test_a_large_ack_still_reports_an_early_hex_token(self):
+        self.assert_blocked("ack-large-with-early-hex-token", "contains a 64-hex token")
+
+    def test_a_large_ack_still_reports_an_early_control_character(self):
+        self.assert_blocked("ack-large-with-early-control-char", "contains a control character")
+
+    # -- Ordering is by UTF-8 bytes (LC_ALL=C), not UTF-16 code units --------------------------------------
+
+    def test_ack_paths_in_utf8_byte_order_pass(self):
+        self.assert_pass("ack-utf8-byte-order", "all pinned paths touched")
+
+    def test_ack_paths_in_utf16_order_block(self):
+        self.assert_blocked("ack-utf8-utf16-order", "paths must be sorted and unique")
 
     # -- Privacy / PII scan (KEEP #2) ----------------------------------------
 

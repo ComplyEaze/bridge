@@ -21,6 +21,7 @@ fn stand_in_response() -> ToolResponse {
             tool: "post_import".into(),
             args_sha256: sha256_hex(b"post"),
             company_guid: None,
+            request_trail: None,
         },
         recovery_batch_id: None,
     }
@@ -110,6 +111,7 @@ fn completed_response() -> ToolResponse {
             tool: "post_import".into(),
             args_sha256: sha256_hex(b"post"),
             company_guid: Some(COMPANY.into()),
+            request_trail: None,
         },
         recovery_batch_id: Some(BATCH.into()),
     }

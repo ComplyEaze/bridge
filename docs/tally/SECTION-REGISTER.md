@@ -102,15 +102,20 @@ This file deliberately does **not** summarise what each existing section says. T
 authority for that, and a copy here would drift; an earlier draft of this register already
 described several ranges incorrectly.
 
-## Editing the reference needs a compatibility-surface reseal
+## Editing the reference needs a compatibility-surface acknowledgement
 
 `TALLY_PROTOCOL_REFERENCE.md` and each part it declares must be pinned in
-`compatibility-surface.json`, so **even a documentation-only edit stales a digest** and fails the
-`Tally portable core` job
-(`real_tree_has_complete_migration_and_report_surface_coverage`). Nothing in a docs diff suggests a
-compatibility gate is involved; two PRs failed CI for exactly this before it was written down.
+`compatibility-surface.json`, so **even a documentation-only edit changes a pinned file** and
+needs an acknowledgement file (`docs/tally/compatibility/acks/pr-<N>.txt`) in the same pull
+request. Nothing in a docs diff suggests a compatibility gate is involved.
 
-The procedure — the commands, their order, the required `--output`, and the toolchain to run them
-with — is in **[`docs/release-process.md`](../release-process.md#compatibility-surface-reseal)**.
+What actually happens: the `Tally portable core` job does not fail on such an edit by itself (no
+per-file hash is stored any more; the surface digest is computed from the live bytes, and the test
+`real_tree_has_complete_migration_and_report_surface_coverage` checks pin coverage, not bytes). The
+missing acknowledgement is reported by the CI check `scripts/check-surface-ack.mjs`, which is
+report-only today (it prints `WOULD FAIL` and exits 0), and is blocked by `scripts/merge-gate.sh`,
+the local tool run by whoever merges. Removing or renaming a declared part also edits the pin list.
+
+The procedure is in **[`docs/release-process.md`](../release-process.md#compatibility-surface-reseal)**.
 It is not repeated here: a second copy drifts, and a section author following a stale one leaves
-the surface improperly resealed.
+the acknowledgement wrong.

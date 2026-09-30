@@ -18,6 +18,7 @@ fn stand_in_response() -> ToolResponse {
             tool: "post_import".into(),
             args_sha256: sha256_hex(b"post"),
             company_guid: None,
+            request_trail: None,
         },
         recovery_batch_id: None,
     }
@@ -214,7 +215,8 @@ async fn cancellation_after_intent_keeps_answering_ping_until_post_completes() {
                     evidence: None,
                     tool: "post_import".into(),
                     args_sha256: sha256_hex(b"post"),
-                    company_guid: None
+                    company_guid: None,
+                    request_trail: None,
                 },
                 recovery_batch_id: None
             })
@@ -519,6 +521,7 @@ async fn readable_queue_traffic_cannot_starve_the_pending_post() {
                         tool: "post_import".into(),
                         args_sha256: sha256_hex(b"post"),
                         company_guid: None,
+                        request_trail: None,
                     },
                     recovery_batch_id: None,
                 }

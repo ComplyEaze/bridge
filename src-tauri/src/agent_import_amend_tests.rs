@@ -709,7 +709,9 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
 
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
-    // The compatibility gate cannot see a pin dropped by a merge resolution.
+    // A pin the branch itself added and then lost in a merge resolution is seen by nothing; one
+    // that existed at the base is a removed pin, which merge-gate.sh blocks without a
+    // `removed-pin:` line.
     // This module decides what an import file may overwrite; its reason sits
     // beside MAX_SURFACE_FILES.
     let surface: Value = serde_json::from_str(include_str!(

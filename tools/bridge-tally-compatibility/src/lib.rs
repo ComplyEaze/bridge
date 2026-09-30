@@ -351,7 +351,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // ledger read too large for one request may be split by parent group, and
 // whether the parts together returned every ledger the catalogue named, once;
 // a defect there returns a book with ledgers missing or repeated.
-pub const MAX_SURFACE_FILES: usize = 292;
+// `src-tauri/src/request_trail.rs` (bridge#918) builds, field by field, the
+// record of a call's Tally sends that reaches the egress receipt; a defect
+// there puts request or response text, a company name or a row value into a
+// journal the user keeps.
+pub const MAX_SURFACE_FILES: usize = 294;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

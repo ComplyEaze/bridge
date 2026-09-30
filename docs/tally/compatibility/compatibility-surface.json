@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "51ee3d386c9794451306a570578d22bcd41a33e7e0feb1f40e4e736f98ef774d"
+      "sha256": "3eb4dea091f7b1237998ebe77a5a3c15c5f3dc882bb7ef977ae0850a352d7887"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -367,7 +367,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs",
-      "sha256": "d0e5a770798e40e06ff2e7b6ed1c9714090c1aa88a27a232fb7a561980785a27"
+      "sha256": "63bcbe9f424f4a1d37a615b4b980a0b258d667f3edc3f4bbcf7c8fc017224efd"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/parent_partition.rs",
@@ -591,7 +591,7 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_parse_tests.rs",
-      "sha256": "2c6970b07015ef72f37a00451019eb9f0f64a055458cdf41a8969790b1a688aa"
+      "sha256": "58defb72145fef4249c1ed6a8211599771534ab16d69c7fe0464c91362fef34f"
     },
     {
       "path": "src-tauri/src/agent_voucher_scalars.rs",

@@ -557,21 +557,28 @@ fn book_holding(tag: &str, amount: &str) -> String {
 /// Record the captured two-Journal batch as this server built it: same
 /// company tuple and endpoint, so only the book decides the amendment.
 fn seed_original(server: &Server) {
+    seed_original_as(server, "posted_verified", ["txn-001", "txn-002"]);
+}
+
+/// The same record with another status and other transaction ids.
+fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
-    for voucher in &mut vouchers {
+    for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
         voucher.date = normalized_date(&voucher.date).unwrap();
+        voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":ORIGINAL, "identity_scheme":"batch_v1", "company_guid":CAPTURED_GUID,
         "endpoint_origin":super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap(),
         "company":{"name":"WR2 Unicode Lab","guid":CAPTURED_GUID,"company_number":"1","books_from":"20260401"},
-        "txn_ids":["txn-001","txn-002"],"date_from":"20260901","date_to":"20260902",
-        "sha256":"a".repeat(64), "built_at":"2026-09-16T00:00:00Z", "status":"posted_verified",
+        "txn_ids":txn_ids,"date_from":"20260901","date_to":"20260902",
+        "sha256":"a".repeat(64), "built_at":"2026-09-16T00:00:00Z", "status":status,
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":vouchers
     }))
     .unwrap();
     server.append_import_ledger(&line).unwrap();
+    line
 }
 
 /// Record the original batch's first verification, as verify_import does,
@@ -984,4 +991,137 @@ fn a_failed_baseline_write_leaves_the_previous_file_whole() {
     .unwrap();
     assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52)).is_err());
     assert_eq!(std::fs::read(&path).unwrap(), before);
+}
+
+/// A rebuild of the captured batch with the first voucher's debtor leg moved to
+/// another ledger and its narration changed: the same rows by transaction id,
+/// amounts and sides.
+fn remapped_rebuild() -> Value {
+    let mut input = captured_catalogue_payload();
+    for entry in &mut input.vouchers[0].entries {
+        if entry.ledger == "Bridge Nested Debtor WR4" {
+            entry.ledger = "WR2 Sales".into();
+        }
+    }
+    serde_json::to_value(input).unwrap()
+}
+
+/// Refused at build (#876): with writes off the file is imported by hand, and a
+/// hand import of a rebuilt row would put it in the books a second time.
+async fn assert_build_refused_for_a_row_already_sent(server: &Server, input: &Value) {
+    let ledger_before = std::fs::read(directory_ledger(server)).unwrap();
+    let built = server.build_import_xml(input).await.unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["error"]["code"], "import_txn_already_posted");
+    assert_eq!(result["error"]["blocking_batch_id"], ORIGINAL);
+    assert!(result.get("batch_id").is_none(), "{result}");
+    assert_eq!(built.evidence.state, "partial");
+    assert_eq!(
+        built.evidence.reason_code.as_deref(),
+        Some("import_txn_already_posted")
+    );
+    let step = result["error"]["next_step"].as_str().unwrap();
+    assert!(step.contains("amends_batch_id"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
+    assert!(step.contains("Never rename a statement row"), "{step}");
+    assert!(!step.contains("import the file"), "{step}");
+    assert!(!step.contains("import by hand"), "{step}");
+    assert_eq!(
+        std::fs::read(directory_ledger(server)).unwrap(),
+        ledger_before
+    );
+    let written = std::fs::read_dir(server.imports_dir().unwrap())
+        .map(|entries| entries.count())
+        .unwrap_or(0);
+    assert_eq!(written, 0, "no file is written for a refused row");
+}
+
+fn directory_ledger(server: &Server) -> std::path::PathBuf {
+    server.settings.data_dir.join("agent-import-ledger.jsonl")
+}
+
+#[tokio::test]
+async fn a_rebuild_of_a_row_a_posted_batch_holds_is_refused_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original(&server);
+    assert_build_refused_for_a_row_already_sent(&server, &remapped_rebuild()).await;
+    // Refused under the admission lock: only the reads that precede it were
+    // answered, not the mark, the repeated catalogue or the preflight.
+    let received = simulator.received();
+    simulator.cancel();
+    assert_eq!(received, 12, "requests answered before the row check");
+}
+
+#[tokio::test]
+async fn a_batch_sent_but_not_yet_verified_also_blocks_a_rebuild_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    let sent = seed_original_as(&server, "built", ["txn-001", "txn-002"]);
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&sent))
+        .unwrap();
+    assert_build_refused_for_a_row_already_sent(&server, &remapped_rebuild()).await;
+    simulator.cancel();
+}
+
+#[tokio::test]
+async fn a_statement_row_id_blocks_a_rebuild_whose_legs_changed() {
+    // A bank-statement build's row id survives a change of ledger and of
+    // amounts, so the id alone identifies the row.
+    let ids = [
+        "st-20260901-0123456789abcdef",
+        "st-20260902-fedcba9876543210",
+    ];
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(None)).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original_as(&server, "posted_verified", ids);
+    let mut input = remapped_rebuild();
+    for (voucher, id) in input["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip(ids)
+    {
+        voucher["bridge_txn_id"] = json!(id);
+    }
+    // Every voucher's amounts change, so only the statement id can match.
+    for (voucher, amount) in input["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .zip(["13.00", "8.00"])
+    {
+        for entry in voucher["entries"].as_array_mut().unwrap() {
+            entry["amount"] = json!(amount);
+        }
+    }
+    assert_build_refused_for_a_row_already_sent(&server, &input).await;
+    simulator.cancel();
+}
+
+#[tokio::test]
+async fn an_amendment_of_a_posted_batch_is_not_a_second_post_of_its_row() {
+    // Same date, amounts and sides as the batch it amends: only the narration
+    // changes. The row check must not treat the amended batch as a blocker.
+    let directory = tempfile::tempdir().unwrap();
+    let original = ORIGINAL.to_string();
+    let tag = import_identity(&original, "txn-001").to_string();
+    let simulator =
+        SequenceSimulator::spawn(build_plans_reading(Some(book_holding(&tag, "12.50")))).unwrap();
+    let server = simulated_server(directory.path(), simulator.address().port());
+    seed_original(&server);
+    seed_baseline(&server, 12);
+    let mut input = amendment_payload(&original, "12.50");
+    input["vouchers"][0]["narration"] = json!("Paid and settled again");
+    let built = server.build_import_xml(&input).await.unwrap();
+    let result = &built.payload["result"];
+    assert!(result.get("error").is_none(), "{result}");
+    assert_eq!(result["amendment"]["identity_batch_id"], original.as_str());
+    simulator.finish().unwrap();
 }

@@ -986,7 +986,8 @@ impl TallyClient {
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
         let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry());
+            .with_wire_gate(wire.gate_for(&config), wire.retry())
+            .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             config,
             http,
@@ -1019,7 +1020,8 @@ impl TallyClient {
             builder,
         )
         .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry());
+        .with_wire_gate(wire.gate_for(&config), wire.retry())
+        .with_send_observer(crate::request_trail::observer());
         Self {
             config,
             http,
@@ -1036,7 +1038,8 @@ impl TallyClient {
     ) -> anyhow::Result<Self> {
         let http =
             TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry());
+                .with_wire_gate(wire.gate_for(&config), wire.retry())
+                .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             config,
             http,

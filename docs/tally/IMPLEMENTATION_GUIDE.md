@@ -1239,8 +1239,8 @@ does not try — see `SECTION-REGISTER.md` for why three attempts each produced 
 false positive on legitimate edits, and for the other residuals.
 
 **2. The reference is pinned in the compatibility surface**, so even a
-documentation-only edit stales its digest and fails the `Tally portable core`
-job. The reseal procedure is in
+documentation-only edit changes a pinned file and needs a compatibility-surface
+acknowledgement file with the pull request. The procedure is in
 [`docs/release-process.md`](../release-process.md#compatibility-surface-reseal).
 
 Run before pushing:
@@ -1417,7 +1417,7 @@ linking also limit what a Rust compiler cache can save.
 
 Run licence and compatibility checks before an expensive validation cycle.
 When pinned bytes legitimately change, use the existing deliberate
-[compatibility reseal procedure](../release-process.md#compatibility-surface-reseal);
+[compatibility-surface acknowledgement procedure](../release-process.md#compatibility-surface-reseal);
 never remove pins or promote unknown claims to repair a dependency PR. Review
 related findings together, fix supported defects, and verify one final candidate.
 Do not restart unchanged native checks merely to chase an empty review queue.

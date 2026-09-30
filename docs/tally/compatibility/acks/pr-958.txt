@@ -1,0 +1,15 @@
+.gitattributes
+.github/workflows/ci.yml
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/compatibility/README.md
+scripts/check-ci-workflow-consistency.mjs
+scripts/check-surface-ack.mjs
+scripts/merge-gate.sh
+scripts/ux1-shell.test.mjs
+src-tauri/src/agent_presence_tests.rs
+tools/bridge-tally-compatibility/Cargo.toml
+tools/bridge-tally-compatibility/src/lib.rs
+tools/bridge-tally-compatibility/src/main.rs
+tools/bridge-tally-live-read/src/lib.rs
+tools/bridge-tally-live-read/src/native_outstandings_qualification.rs
+reviewer: lamemustafa

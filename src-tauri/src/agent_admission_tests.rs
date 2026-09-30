@@ -1,3 +1,4 @@
+// Admission tests: the published wire-pattern inventory and its limits.
 use super::*;
 
 #[test]

@@ -218,7 +218,7 @@ function compatibilitySurfacePaths() {
     manifest === null ||
     typeof manifest !== "object" ||
     Array.isArray(manifest) ||
-    manifest.schema_version !== 2 ||
+    manifest.schema_version !== 3 ||
     !Array.isArray(manifest.files) ||
     Object.keys(manifest).sort().join(",") !== "files,schema_version"
   ) {
@@ -231,8 +231,8 @@ function compatibilitySurfacePaths() {
       Array.isArray(file) ||
       typeof file.path !== "string" ||
       file.path.length === 0 ||
-      typeof file.sha256 !== "string" ||
-      !/^[0-9a-f]{64}$/.test(file.sha256)
+      Object.keys(file).some((key) => key !== "path" && key !== "reason") ||
+      (file.reason !== undefined && typeof file.reason !== "string")
     ) {
       throw new Error(
         `invalid compatibility surface file row ${index + 1} in ${relPath(compatibilitySurface)}`,

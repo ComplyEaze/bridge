@@ -161,11 +161,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
-      - name: Require pinned Rust for reseal regressions
-        run: rustup which --toolchain 1.96.0 rustc
       - run: node scripts/check-ci-workflow-consistency.mjs
-      - name: Test reseal and merge-driver regressions
-        run: node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs
+      # A pull request that changes a pinned file, or the pin list, adds its own
+      # acknowledgement file (docs/release-process.md). Report-only until the rule has
+      # run on real pull requests: it prints WOULD FAIL and exits 0.
+      - name: Check the surface acknowledgement
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}
+        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
       - run: node scripts/check-unbounded-reads.mjs

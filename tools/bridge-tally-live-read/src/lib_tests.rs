@@ -348,3 +348,64 @@ async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_th
     assert!(sent.is_ok(), "{sent:?}");
     assert_eq!(simulator.finish().unwrap().len(), 1);
 }
+
+fn git_in(directory: &Path, arguments: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(directory)
+        .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
+        .args(arguments)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {arguments:?} failed");
+}
+
+#[test]
+fn a_drifted_pinned_path_is_refused_and_a_clean_or_untracked_one_is_not() {
+    let directory = std::env::temp_dir().join(format!(
+        "bridge-live-read-drift-test-{}-{}",
+        std::process::id(),
+        now_unix_ms().unwrap()
+    ));
+    fs::create_dir(&directory).unwrap();
+    git_in(&directory, &["init", "-q"]);
+    fs::write(directory.join("a.rs"), b"one").unwrap();
+    fs::write(directory.join("[b].rs"), b"two").unwrap();
+    fs::write(directory.join("b.rs"), b"three").unwrap();
+    git_in(&directory, &["add", "."]);
+    git_in(&directory, &["commit", "-q", "-m", "base"]);
+
+    let clean = refuse_drifted_paths(&directory, &["a.rs", "[b].rs"], "surface_changed");
+    // An untracked file is not drift: only tracked pinned paths are compared with HEAD.
+    fs::write(directory.join("untracked.rs"), b"new").unwrap();
+    let untracked = refuse_drifted_paths(&directory, &["untracked.rs"], "surface_changed");
+
+    // A working-tree edit to one pinned file is drift; an edit only to the file a glob would have
+    // matched is not, because pathspecs are literal ("[b].rs" must not match "b.rs").
+    fs::write(directory.join("b.rs"), b"changed").unwrap();
+    let glob = refuse_drifted_paths(&directory, &["[b].rs"], "surface_changed");
+    fs::write(directory.join("a.rs"), b"edited").unwrap();
+    let drifted = refuse_drifted_paths(&directory, &["a.rs", "[b].rs"], "surface_changed");
+    // A staged change counts too.
+    git_in(&directory, &["checkout", "-q", "--", "a.rs"]);
+    fs::write(directory.join("a.rs"), b"staged").unwrap();
+    git_in(&directory, &["add", "a.rs"]);
+    let staged = refuse_drifted_paths(&directory, &["a.rs"], "surface_changed");
+    // A failed git query is an error, not a clean answer.
+    let not_a_repository = std::env::temp_dir().join(format!(
+        "bridge-live-read-drift-none-{}-{}",
+        std::process::id(),
+        now_unix_ms().unwrap()
+    ));
+    fs::create_dir(&not_a_repository).unwrap();
+    let failed = refuse_drifted_paths(&not_a_repository, &["a.rs"], "surface_changed");
+
+    fs::remove_dir_all(&directory).unwrap();
+    fs::remove_dir_all(&not_a_repository).unwrap();
+    assert_eq!(clean, Ok(()));
+    assert_eq!(untracked, Ok(()));
+    assert_eq!(glob, Ok(()));
+    assert_eq!(drifted, Err(error("surface_changed")));
+    assert_eq!(staged, Err(error("surface_changed")));
+    assert_eq!(failed, Err(error("git_query_failed")));
+}

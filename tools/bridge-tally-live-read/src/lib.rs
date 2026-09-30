@@ -10,8 +10,9 @@ use bridge_tally_compatibility::{
     now_unix_ms, sha256_file, ApplicationStatus, Architecture, CompatibilitySurfaceManifest,
     CountBucket, DatasetTier, EvidenceAuthority, EvidenceConfidence, LiveCompatibilityReceipt,
     LiveReadAuthority, LocaleProfile, LoopbackFamily, OdbcState, OperationEvidence,
-    OperationOutcome, Platform, ProductFamily, ProfileValue, ReadProfileId, SizeBucket, TallyMode,
-    TextEncoding, TransportProfile, LIVE_RECEIPT_SCHEMA_VERSION, MAX_ARTIFACT_BYTES,
+    OperationOutcome, Platform, ProductFamily, ProfileValue, ReadProfileId, SizeBucket,
+    SurfacePins, TallyMode, TextEncoding, TransportProfile, LIVE_RECEIPT_SCHEMA_VERSION,
+    MAX_ARTIFACT_BYTES,
 };
 use bridge_tally_protocol::{
     export_failure_reason_code, export_status, parse_companies_with_evidence,
@@ -167,15 +168,12 @@ impl LiveRunInputs {
 
         let surface_path =
             repository_root.join("docs/tally/compatibility/compatibility-surface.json");
-        let surface = CompatibilitySurfaceManifest::from_json(&read_bounded(
-            &surface_path,
-            MAX_ARTIFACT_BYTES,
-            "surface_unavailable",
-        )?)
-        .map_err(|_| error("surface_invalid"))?;
-        surface
-            .validate_files(&repository_root)
-            .map_err(|_| error("surface_changed"))?;
+        let surface = resolve_surface_refusing_drift(
+            &repository_root,
+            &read_bounded(&surface_path, MAX_ARTIFACT_BYTES, "surface_unavailable")?,
+            "surface_invalid",
+            "surface_changed",
+        )?;
 
         let observed_at_unix_ms = now_unix_ms().map_err(|_| error("system_clock_invalid"))?;
         let bridge_commit_sha = git_output(&repository_root, &["rev-parse", "HEAD"])?;
@@ -1225,18 +1223,59 @@ fn validate_current_surface(
     expected_manifest_sha256: &str,
 ) -> Result<(), LiveReadError> {
     let path = repository_root.join("docs/tally/compatibility/compatibility-surface.json");
-    let surface = CompatibilitySurfaceManifest::from_json(&read_bounded(
-        &path,
-        MAX_ARTIFACT_BYTES,
-        "surface_unavailable",
-    )?)
-    .map_err(|_| error("surface_invalid"))?;
+    let surface = resolve_surface_refusing_drift(
+        repository_root,
+        &read_bounded(&path, MAX_ARTIFACT_BYTES, "surface_unavailable")?,
+        "surface_invalid",
+        "surface_changed_after_consent",
+    )?;
     if surface.digest().map_err(|_| error("surface_invalid"))? != expected_manifest_sha256 {
         return Err(error("surface_changed_after_consent"));
     }
-    surface
-        .validate_files(repository_root)
-        .map_err(|_| error("surface_changed_after_consent"))
+    Ok(())
+}
+
+/// Resolves the surface (the digest is computed from the live bytes of every pinned file) and
+/// refuses when any pinned path differs from HEAD, in the index or in the working tree. Schema 2
+/// refused a drifted pinned file through its stored hash (`surface_changed`); schema 3 stores no
+/// hash, so without this refusal a live Tally session could run on edited pinned code and the
+/// mismatch would surface only at the gate afterwards. A pinned file is tracked, so untracked
+/// files are not considered here (the run metadata still records the whole tree's dirtiness).
+pub(crate) fn resolve_surface_refusing_drift(
+    repository_root: &Path,
+    surface_bytes: &[u8],
+    invalid_code: &'static str,
+    drifted_code: &'static str,
+) -> Result<CompatibilitySurfaceManifest, LiveReadError> {
+    let pins = SurfacePins::from_json(surface_bytes).map_err(|_| error(invalid_code))?;
+    let surface = pins
+        .resolve(repository_root)
+        .map_err(|_| error(invalid_code))?;
+    let paths: Vec<&str> = pins.files.iter().map(|pin| pin.path.as_str()).collect();
+    refuse_drifted_paths(repository_root, &paths, drifted_code)?;
+    Ok(surface)
+}
+
+/// Refuses when any of `paths` differs from `HEAD` in the index or working tree. Paths are taken
+/// literally, so a name containing `[`, `*`, `?` or a leading `:` cannot match another file. A file
+/// marked `assume-unchanged` or `skip-worktree` reads as clean here; the gate still sees its bytes.
+fn refuse_drifted_paths(
+    repository_root: &Path,
+    paths: &[&str],
+    drifted_code: &'static str,
+) -> Result<(), LiveReadError> {
+    let mut arguments = vec![
+        "--literal-pathspecs",
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        "--",
+    ];
+    arguments.extend(paths);
+    if !git_output(repository_root, &arguments)?.is_empty() {
+        return Err(error(drifted_code));
+    }
+    Ok(())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

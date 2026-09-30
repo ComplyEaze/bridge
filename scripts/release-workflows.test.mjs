@@ -179,9 +179,11 @@ function runSiteSummaryStep(run, { deployments, changeSite }) {
   writeFileSync(join(dir, "deployments.json"), JSON.stringify(deployments.map((deployment, index) => ({ id: 900 + index, sha: shas[deployment.sha] }))));
   deployments.forEach((deployment, index) => writeFileSync(join(dir, `statuses-${900 + index}.json`), JSON.stringify(deployment.states.map((state) => ({ state })))));
   writeFileSync(join(dir, "summary.md"), "");
-  const script = `gh() { [ "$1" = api ] && [ "$3" = --jq ] || exit 97; case "$2" in
-    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=*) jq -c ".[:\${2##*per_page=}]" "${dir}/deployments.json" | jq -r "$4" ;;
-    repos/example/bridge/deployments/*/statuses\\?per_page=1) id="\${2#*/deployments/}"; jq -r "$4" "${dir}/statuses-\${id%%/*}.json" ;;
+  // Each item is its own page, as `gh api --paginate` prints them with a per-page --jq, so a step
+  // that does not collect every page, or does not pass --paginate, fails here.
+  const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; case "$3" in
+    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5"; done ;;
+    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; jq -c '.[] | [.]' "${dir}/statuses-\${id%%/*}.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5"; done ;;
     *) exit 97 ;;
   esac; }\n${run}`;
   const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
@@ -218,6 +220,12 @@ test("the site summary step is informational, permitted to read deployments, and
   assert.doesNotMatch(changed.summary, /outside site|README/, "only site/ is compared, in the file list and the diff");
   assert.match(changed.summary, /^~~~~diff\n[\s\S]*^\+```\n[\s\S]*^~~~~$/m, "a diff line with a code fence stays inside the summary's fence");
 
+  // An earlier successful deployment of this same commit (a re-run) is not "the last deploy": the
+  // comparison goes on to the first different commit rather than reporting that nothing changed.
+  const rerun = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "self", states: ["success"] }, live], changeSite: "<p>two</p>\n" });
+  assert.equal(rerun.status, 0, rerun.stderr);
+  assert.match(rerun.summary, /^\+<p>two<\/p>$/m, "a successful deployment of this commit is skipped");
+
   const unchanged = runSiteSummaryStep(summary.run, { deployments: [own, live] });
   assert.equal(unchanged.status, 0, unchanged.stderr);
   assert.match(unchanged.summary, /Nothing under `site\/` differs from /);
@@ -228,6 +236,12 @@ test("the site summary step is informational, permitted to read deployments, and
     assert.equal(none.status, 0, none.stderr);
     assert.match(none.summary, /No earlier successful deployment of another commit was found/);
   }
+
+  // The last successful deployment can sit far down a long history of failed ones; a first page of
+  // any size would miss it and report nothing to compare.
+  const buried = runSiteSummaryStep(summary.run, { deployments: [own, ...Array.from({ length: 120 }, () => failed), live], changeSite: "<p>two</p>\n" });
+  assert.equal(buried.status, 0, buried.stderr);
+  assert.match(buried.summary, /^\+<p>two<\/p>$/m, "a successful deployment past the first 100 is still found");
 
   const unfetchable = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "unknown", states: ["success"] }] });
   assert.equal(unfetchable.status, 0, unfetchable.stderr);

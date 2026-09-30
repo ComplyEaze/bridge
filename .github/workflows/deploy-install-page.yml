@@ -74,11 +74,14 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          candidates="$(gh api "repos/${REPOSITORY}/deployments?environment=github-pages&per_page=30" --jq '.[] | [.id, .sha] | @tsv')"
+          # Newest first. --paginate reads every page, so the last successful deployment is found
+          # however many failed or repeated ones sit above it.
+          candidates="$(gh api --paginate "repos/${REPOSITORY}/deployments?environment=github-pages&per_page=100" --jq '.[] | [.id, .sha] | @tsv')"
           previous=""
           while read -r id sha; do
             [ -n "${id}" ] && [ "${sha}" != "${GITHUB_SHA}" ] || continue
-            state="$(gh api "repos/${REPOSITORY}/deployments/${id}/statuses?per_page=1" --jq '.[0].state // empty')"
+            # Statuses are newest first; sed reads them all, so the first line is the latest state.
+            state="$(gh api --paginate "repos/${REPOSITORY}/deployments/${id}/statuses?per_page=100" --jq '.[].state' | sed -n 1p)"
             if [ "${state}" = "success" ]; then previous="${sha}"; break; fi
           done <<< "${candidates}"
           {

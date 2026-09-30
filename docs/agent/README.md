@@ -397,9 +397,9 @@ The four rest on different observations, and each build reports its own in
   Account, and a build that names a counterparty warns so.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file. In the MCPB extension a Journal,
-Payment, Receipt or Contra is eligible for native posting, one voucher per
-approval; a saved batch of 2 to 50 posts in one import only in a source build
+licence mode, or manually imported file. In the MCPB extension an unnumbered
+Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
+per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
 that turns that on.
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction

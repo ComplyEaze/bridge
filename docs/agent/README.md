@@ -374,12 +374,17 @@ or vouchers.
   group is Duties & Taxes (by its `RESERVEDNAME`, so a renamed group or a user
   sub-group still counts). Purchase and Debit Note are the register. Every
   other voucher type that touches those ledgers (Sales, Journal, Payment) is
-  listed apart in `other_voucher_types_touching_duties_taxes` with exact totals:
+  listed apart in `other_voucher_types_touching_duties_taxes` with exact counts:
   whether such a voucher belongs in a return is the CA's call, not the tool's.
   A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
   counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
-  returned in `items` and paged by `offset` and `limit` like `vouchers`; every
-  list in the response has its party names masked when parties are masked.
+  returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
+  masters and the window, so rows can shift between pages); every ledger name in every list is
+  masked when parties are masked, the same way `vouchers` masks it.
+  A Debit Note can be a purchase return or a debit note issued to a customer, and a GST duty head
+  does not say whether a ledger is input or output, so each row carries `party_group` (the party's
+  predefined group, such as Sundry Creditors or Sundry Debtors) and the tool does not guess which it
+  is. Reverse-charge journals, imports and input service distribution get no special treatment.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
   `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with

@@ -1,6 +1,7 @@
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
 src-tauri/src/agent_register.rs
+src-tauri/src/agent_register_tests.rs
 src-tauri/src/agent_tests.rs
 tools/bridge-tally-compatibility/src/lib.rs
 reviewer: lamemustafa

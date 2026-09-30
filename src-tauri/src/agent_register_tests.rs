@@ -396,21 +396,23 @@ fn a_side_list_carries_its_exact_total_and_at_most_the_cap() {
 }
 
 #[test]
-fn party_names_are_marked_for_redaction_but_tax_ledger_names_are_not() {
+fn every_entry_ledger_is_marked_so_it_is_masked_like_vouchers_masks_it() {
     let row = mark_register_row(json!({
         "party": "Customer One",
         "tax_in_books": [{"ledger": "Input CGST"}],
+        "taxable_entries": [{"ledger": "Supplier Two"}],
         "party_entries": [{"ledger": "Customer One"}],
         "other_entries": [{"ledger": "Supplier Two"}],
     }));
-    assert_eq!(row["tax_in_books"][0]["ledger"], "Input CGST");
     let redacted = redact_value(row, Redaction::MaskParties);
     let text = redacted.to_string();
-    assert!(
-        !text.contains("Customer One") && !text.contains("Supplier Two"),
-        "{text}"
+    for name in ["Customer One", "Supplier Two", "Input CGST"] {
+        assert!(!text.contains(name), "{name} survived: {text}");
+    }
+    assert_eq!(
+        redacted["tax_in_books"][0]["ledger"],
+        json!(mask("Input CGST"))
     );
-    assert!(text.contains("Input CGST"), "{text}");
 }
 
 #[test]
@@ -694,8 +696,8 @@ fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
     assert!(!text.contains("SYN Supplier Intra (M2)"), "{text}");
     assert!(!text.contains("SYN Supplier Inter (M2)"), "{text}");
     assert!(
-        text.contains("Input CGST"),
-        "tax ledger names are not parties"
+        !text.contains("Input CGST") && !text.contains("Purchase - Goods"),
+        "a ledger is masked wherever it appears, tax and purchase ledgers included: {text}"
     );
 }
 
@@ -741,4 +743,102 @@ fn a_flag_tally_did_not_report_is_absent_from_a_listed_voucher_not_null() {
     let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
     let listed = &result.result["purchase_vouchers_without_duties_taxes_entry"]["listed"][0];
     assert!(listed.get("post_dated").is_none(), "{listed}");
+}
+
+#[test]
+fn a_ledger_is_masked_the_same_way_by_the_register_and_by_vouchers() {
+    let result = result_for(captured_rows(), &captured_index(), Redaction::MaskParties).unwrap();
+    let first = &result.result["items"][0];
+    let by_vouchers = redact_value(
+        mark_voucher_party_names(json!({"amounts": [{"ledger": "Input CGST"}]})),
+        Redaction::MaskParties,
+    );
+    assert_eq!(
+        first["tax_in_books"][0]["ledger"],
+        by_vouchers["amounts"][0]["ledger"]
+    );
+    assert_eq!(
+        first["taxable_entries"][0]["ledger"],
+        json!(mask("Purchase - Goods"))
+    );
+    // No ledger that appears in any row survives anywhere in the masked response.
+    let text = result.result.to_string();
+    for row in captured_rows() {
+        for entry in row["amounts"].as_array().unwrap() {
+            let name = entry["ledger"].as_str().unwrap();
+            if name.chars().count() > 4 {
+                assert!(!text.contains(name), "{name} survived: {text}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_other_types_list_masks_the_duties_taxes_ledgers_it_names() {
+    let result = result_for(captured_rows(), &captured_index(), Redaction::MaskParties).unwrap();
+    let listed = &result.result["other_voucher_types_touching_duties_taxes"]["listed"][0];
+    assert_eq!(
+        listed["duties_taxes_ledgers"][0],
+        json!(mask("Output CGST"))
+    );
+}
+
+#[test]
+fn a_debit_note_to_a_customer_is_told_from_a_purchase_return_by_its_party_group() {
+    let page = classify_register(&captured_index(), &captured_rows()).unwrap();
+    assert_eq!(
+        row_on(&page.rows, "20250916")["party_group"],
+        "Sundry Creditors"
+    );
+    let mut rows = captured_rows();
+    let debit_note = rows
+        .iter_mut()
+        .find(|row| row["voucher_class"] == "Debit Note")
+        .unwrap();
+    debit_note["party"] = json!("Bengaluru Distributors");
+    for entry in debit_note["amounts"].as_array_mut().unwrap() {
+        if entry["ledger"] == "SYN Supplier Intra (M2)" {
+            entry["ledger"] = json!("Bengaluru Distributors");
+        }
+    }
+    let page = classify_register(&captured_index(), &rows).unwrap();
+    assert_eq!(
+        row_on(&page.rows, "20250916")["party_group"],
+        "Sundry Debtors"
+    );
+    // The register does not guess: the tax heads and status are the same either way.
+    assert_eq!(row_on(&page.rows, "20250916")["status"], "complete");
+    // A party the masters do not list carries no group, not a guess.
+    let mut rows = captured_rows();
+    rows[0]["party"] = json!("A party created after the masters were read");
+    let page = classify_register(&captured_index(), &rows).unwrap();
+    assert!(row_on(&page.rows, "20250903").get("party_group").is_none());
+}
+
+#[test]
+fn an_unrecognised_head_sits_only_in_the_unrecognised_list() {
+    // Exactly one outcome: a head the classifier does not recognise is listed with its raw
+    // spelling and never appears as tax, whatever else changes about the vocabulary.
+    let mut masters = captured_masters();
+    masters
+        .iter_mut()
+        .find(|record| record.ledger.name == "Input CGST")
+        .unwrap()
+        .fields
+        .gst_duty_head = GstDutyHeadObservation::Unrecognized {
+        raw: "Central Tax".to_string(),
+    };
+    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let page = classify_register(&index, &captured_rows()).unwrap();
+    let row = row_on(&page.rows, "20250903");
+    assert_eq!(row["status"], "has_unrecognised_head");
+    assert_eq!(
+        ledgers(&row["duties_taxes_entries_with_unrecognised_head"]),
+        ["Input CGST"]
+    );
+    assert_eq!(
+        row["duties_taxes_entries_with_unrecognised_head"][0]["raw_head"],
+        "Central Tax"
+    );
+    assert_eq!(ledgers(&row["tax_in_books"]), ["Input SGST"]);
 }

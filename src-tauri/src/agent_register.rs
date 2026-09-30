@@ -31,6 +31,10 @@ enum LedgerGroup {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RegisterLedger {
     group: LedgerGroup,
+    /// The nearest predefined group's `RESERVEDNAME` (for example Sundry Debtors), when the
+    /// chain resolves to one. Reported for a voucher's party so a Debit Note to a customer can
+    /// be told from a purchase return; it says nothing about which tax ledger is input or output.
+    reserved: Option<String>,
     tax_type: Option<String>,
     head: GstDutyHeadObservation,
 }
@@ -59,6 +63,7 @@ impl MasterIndex {
             let chain = groups.ancestry_chain(parent.as_deref());
             let ledger = RegisterLedger {
                 group: ledger_group(&chain),
+                reserved: nearest_reserved(&chain),
                 tax_type: record.fields.tax_type.returned_text().map(str::to_string),
                 head: record.fields.gst_duty_head.clone(),
             };
@@ -94,6 +99,15 @@ fn ledger_group(chain: &AncestryChain) -> LedgerGroup {
             None => LedgerGroup::Other,
         },
     }
+}
+
+fn nearest_reserved(chain: &AncestryChain) -> Option<String> {
+    chain
+        .hops
+        .iter()
+        .map(|hop| hop.reserved_name.trim())
+        .find(|reserved| !reserved.is_empty())
+        .map(str::to_string)
 }
 
 fn gap_code(gap: AncestryGap) -> &'static str {
@@ -306,6 +320,15 @@ pub(super) fn classify_register(
                 out[key] = value.clone();
             }
         }
+        // The party ledger's predefined group, from the same masters read: a Debit Note to a
+        // Sundry Debtors party is a customer's debit note, not a purchase return. Absent when
+        // the party is unknown or its group did not resolve; the tool never guesses the intent.
+        if let Some(reserved) = party
+            .and_then(|name| index.by_name.get(name))
+            .and_then(|ledger| ledger.reserved.as_ref())
+        {
+            out["party_group"] = json!(reserved);
+        }
         out["status"] = json!(status);
         out["tax_in_books"] = Value::Array(tax);
         out["duties_taxes_entries_without_gst_head"] = Value::Array(without_head);
@@ -332,15 +355,20 @@ fn bounded_list(items: &[Value]) -> Value {
     })
 }
 
-/// The party names a response may need to redact: the voucher's party, and the ledger of an
-/// entry that is the party's own or has no known role. Tax and purchase ledger names are the
-/// book's vocabulary, not parties.
+/// The names a response may need to mask: the voucher's party and every entry's ledger.
 pub(super) fn mark_register_row(mut row: Value) -> Value {
     mark_party_field(&mut row, "party");
+    // Every entry's ledger, as `vouchers` marks them: a ledger can be named for a party (a
+    // per-deductee TDS ledger, a purchase ledger per supplier), and the same ledger must be
+    // masked the same way by every tool.
     for list in [
+        "tax_in_books",
+        "duties_taxes_entries_without_gst_head",
+        "duties_taxes_entries_with_unrecognised_head",
+        "entries_on_ledgers_with_unresolved_group",
+        "taxable_entries",
         "party_entries",
         "other_entries",
-        "entries_on_ledgers_with_unresolved_group",
     ] {
         if let Some(entries) = row.get_mut(list).and_then(Value::as_array_mut) {
             for entry in entries {
@@ -351,7 +379,8 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
     row
 }
 
-/// A side-list item names ledgers it could not place, which may be a party's.
+/// A side-list item names ledgers: the ones it could not place, and the Duties & Taxes ledgers
+/// the voucher touches; any of them can be named for a party.
 fn mark_register_side_item(mut item: Value) -> Value {
     if let Some(entries) = item
         .get_mut("unplaced_ledgers")
@@ -359,6 +388,16 @@ fn mark_register_side_item(mut item: Value) -> Value {
     {
         for entry in entries {
             mark_party_field(entry, "ledger");
+        }
+    }
+    if let Some(names) = item
+        .get_mut("duties_taxes_ledgers")
+        .and_then(Value::as_array_mut)
+    {
+        for name in names {
+            if let Value::String(text) = name.take() {
+                *name = party_name_value(text);
+            }
         }
     }
     item

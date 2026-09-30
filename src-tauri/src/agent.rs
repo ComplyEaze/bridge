@@ -193,6 +193,17 @@ fn open_bill_json(bill: &OpenBillRow) -> Value {
 fn unallocated_party_json(party: &UnallocatedParty) -> Value {
     let mut value = serde_json::to_value(party).unwrap_or_default();
     mark_party_field(&mut value, "party");
+    // The ledger's bill-wise flag, written from the composition that carries it
+    // so the two cannot disagree. Absent with the composition.
+    if let (Some(object), Some(composition)) = (value.as_object_mut(), party.composition) {
+        object.insert(
+            "ledger_bill_wise".to_string(),
+            Value::Bool(matches!(
+                composition,
+                UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+            )),
+        );
+    }
     value
 }
 

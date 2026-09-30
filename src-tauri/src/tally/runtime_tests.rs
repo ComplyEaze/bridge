@@ -1871,7 +1871,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 &row.party[3..6],
                 row.amount.as_str(),
                 row.direction,
-                row.ledger_bill_wise,
                 row.opening_balance.as_ref().map(|opening| opening.as_str()),
                 row.composition,
             )
@@ -1887,7 +1886,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 "P08",
                 "20000",
                 ExposureDirection::Receivable,
-                Some(true),
                 Some("-20000.00"),
                 Some(Mixed)
             ),
@@ -1895,7 +1893,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 "P03",
                 "7500",
                 ExposureDirection::Receivable,
-                Some(false),
                 Some("0.00"),
                 Some(Off)
             ),
@@ -1903,7 +1900,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 "P02",
                 "3000",
                 ExposureDirection::Payable,
-                Some(true),
                 Some("0.00"),
                 Some(Mixed)
             ),
@@ -1911,7 +1907,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 "P05",
                 "1500",
                 ExposureDirection::Payable,
-                Some(true),
                 Some("0.00"),
                 Some(Mixed)
             ),
@@ -1919,7 +1914,6 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
                 "P06",
                 "800",
                 ExposureDirection::Receivable,
-                Some(true),
                 Some("0.00"),
                 Some(Mixed)
             ),

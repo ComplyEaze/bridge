@@ -1367,7 +1367,6 @@ fn outstandings_top_ranking_includes_wholly_unallocated_parties() {
         amount: bridge_tally_core::ExactDecimal::parse("100".to_string())
             .expect("synthetic amount"),
         direction: ExposureDirection::Receivable,
-        ledger_bill_wise: None,
         opening_balance: None,
         composition: None,
     }];
@@ -1423,7 +1422,6 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
             amount: bridge_tally_core::ExactDecimal::parse("30".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Receivable,
-            ledger_bill_wise: None,
             opening_balance: None,
             composition: None,
         },
@@ -1432,7 +1430,6 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
             amount: bridge_tally_core::ExactDecimal::parse("40".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Payable,
-            ledger_bill_wise: None,
             opening_balance: None,
             composition: None,
         },

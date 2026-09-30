@@ -39,6 +39,7 @@ const COMPANY_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 fn fixture(name: &str) -> String {
     let bytes = std::fs::read(format!("{FIXTURES}/{name}.utf16le.xml"))
         .unwrap_or_else(|error| panic!("fixture {name} unreadable: {error}"));
+    assert_eq!(bytes.len() % 2, 0, "a UTF-16LE fixture has an even length");
     let units = bytes
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
@@ -137,11 +138,14 @@ fn each_residual_carries_its_ledgers_bill_wise_flag_and_opening() {
             row.amount.as_str()
         );
         assert_eq!(row.bill_wise_on, bill_wise, "{prefix}: bill-wise flag");
+        let observed = row
+            .opening_balance
+            .as_ref()
+            .unwrap_or_else(|| panic!("{prefix}: the opening was sent and must be observed"));
         assert!(
-            row.opening_balance
-                .numeric_eq(&bridge_tally_primitives::ExactDecimal::parse(opening).unwrap()),
+            observed.numeric_eq(&bridge_tally_primitives::ExactDecimal::parse(opening).unwrap()),
             "{prefix}: opening {} is not {opening}",
-            row.opening_balance.as_str()
+            observed.as_str()
         );
     }
 }
@@ -156,4 +160,114 @@ fn only_the_ledger_that_keeps_no_bills_is_bill_wise_off_among_the_residual_parti
         .map(|row| row.party.as_str())
         .collect::<Vec<_>>();
     assert_eq!(off, ["OL P03 Not Billwise Debtor"]);
+}
+
+fn ledger_fixture_with(edit: impl Fn(&str) -> String) -> String {
+    edit(&fixture("native-outstandings-lab-ledgers"))
+}
+
+fn compute_with_ledgers(ledgers_xml: &str) -> Result<NativeOutstandingsResult, String> {
+    let books_from = TallyDate::parse("20250401").unwrap();
+    let as_of = TallyDate::parse("20260630").unwrap();
+    let receivable = parse_native_bill_rows(
+        &fixture("native-outstandings-lab-bills-receivable"),
+        &books_from,
+        &as_of,
+    )
+    .unwrap();
+    let payable = parse_native_bill_rows(
+        &fixture("native-outstandings-lab-bills-payable"),
+        &books_from,
+        &as_of,
+    )
+    .unwrap();
+    let groups =
+        parse_native_group_snapshot(&fixture("native-outstandings-lab-groups"), COMPANY_GUID)
+            .unwrap();
+    let ledgers = parse_native_ledger_snapshot_for_company(ledgers_xml, COMPANY_GUID)
+        .map_err(|error| format!("{error:?}"))?;
+    compute_native_outstandings(
+        "BRIDGE OUTSTANDINGS LAB",
+        &receivable,
+        &payable,
+        NativeMasterSnapshot {
+            ledgers: &ledgers,
+            groups: NativeGroupSnapshot::Complete(&groups),
+        },
+        AgeingAnchor::DueDate,
+        &as_of,
+        0,
+    )
+    .map_err(|error| format!("{error:?}"))
+}
+
+/// An empty `OPENINGBALANCE` element is unknown, never zero: the residual must
+/// not say the opening is 0 (the reference: "Empty opening values remain
+/// unknown, never zero"). The empty element is injected into the capture.
+#[test]
+fn an_empty_opening_balance_is_carried_as_unknown_not_zero() {
+    let needle = "<OPENINGBALANCE TYPE=\"Amount\">-20000.00</OPENINGBALANCE>";
+    let emptied = ledger_fixture_with(|xml| {
+        assert_eq!(
+            xml.matches(needle).count(),
+            2,
+            "P08's own opening, and the account it owns"
+        );
+        xml.replacen(
+            needle,
+            "<OPENINGBALANCE TYPE=\"Amount\"></OPENINGBALANCE>",
+            1,
+        )
+    });
+    let result = compute_with_ledgers(&emptied).expect("an empty opening does not refuse the read");
+    let p08 = residual(&result, "OL P08 ");
+    assert!(
+        p08.opening_balance.is_none(),
+        "an empty opening is None, not 0"
+    );
+    // The figure itself is untouched: the residual is still the closing balance.
+    assert!(p08
+        .amount
+        .numeric_eq(&bridge_tally_primitives::ExactDecimal::parse("-20000").unwrap()));
+    // A non-empty zero is still observed as zero.
+    let p01 = residual(&result, "OL P01 ");
+    assert!(p01
+        .opening_balance
+        .as_ref()
+        .is_some_and(|opening| opening.is_zero()));
+}
+
+/// The bill-wise flag decides the composition, so its refusals are pinned: a
+/// missing, empty or unknown flag refuses the read and never defaults.
+#[test]
+fn a_missing_empty_or_unknown_bill_wise_flag_refuses_the_read() {
+    let needle = "<ISBILLWISEON TYPE=\"Logical\">Yes</ISBILLWISEON>";
+    for (label, replacement, code) in [
+        ("missing", "", "ledger_bill_wise_flag_missing"),
+        (
+            "self-closing",
+            "<ISBILLWISEON TYPE=\"Logical\"/>",
+            "ledger_bill_wise_flag_invalid",
+        ),
+        (
+            "empty",
+            "<ISBILLWISEON TYPE=\"Logical\"></ISBILLWISEON>",
+            "ledger_bill_wise_flag_invalid",
+        ),
+        (
+            "unknown",
+            "<ISBILLWISEON TYPE=\"Logical\">Maybe</ISBILLWISEON>",
+            "ledger_bill_wise_flag_invalid",
+        ),
+    ] {
+        let edited = ledger_fixture_with(|xml| {
+            assert!(xml.matches(needle).count() >= 1);
+            xml.replacen(needle, replacement, 1)
+        });
+        let error = compute_with_ledgers(&edited).expect_err(label);
+        assert!(
+            error.contains(code),
+            "{label}: expected {code}, got {error}"
+        );
+    }
 }

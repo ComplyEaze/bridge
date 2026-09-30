@@ -457,7 +457,7 @@ fn compute_residuals(
             party: ledger.name.clone(),
             amount: residual,
             bill_wise_on: ledger.bill_wise_on,
-            opening_balance: ledger.opening_balance.clone(),
+            opening_balance: ledger.opening_balance_observed.clone(),
         });
     }
     Ok((residuals, residual_total, has_unaged_receivable))

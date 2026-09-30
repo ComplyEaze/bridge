@@ -105,6 +105,11 @@ pub struct LedgerSnapshotEntry {
     /// its own documented treatment of that observed wire shape.
     pub closing_balance: Option<ExactDecimal>,
     pub opening_balance: ExactDecimal,
+    /// The opening as Tally sent it: `None` when the element was empty, which is
+    /// unknown and not zero. `opening_balance` above reads an empty element as
+    /// zero for the callers that established that reading; anything that shows
+    /// the opening uses this field.
+    pub opening_balance_observed: Option<ExactDecimal>,
     pub bill_wise_on: bool,
     /// The ledger's own `CURRENCYNAME` (bridge#551), `None` when the element
     /// was absent or empty. Compared with the base master's NAME by
@@ -118,8 +123,9 @@ pub struct LedgerSnapshotEntry {
 /// bills, so the residual is money the ledger balance carries with no bill
 /// reference at all, and therefore no truthful bill age.
 ///
-/// It is NOT "the on-account amount". On a ledger that keeps no bills it is
-/// the whole balance; on a bill-wise ledger it is the net of the on-account
+/// It is NOT "the on-account amount". On a ledger whose bill-wise flag is off it
+/// is what the ledger carries (seen on one ledger that never had bills; a flag
+/// switched off after bills existed is unmeasured); on a bill-wise ledger it is the net of the on-account
 /// entries and of any opening balance not allocated to a reference, and the
 /// bills reports alone cannot separate those (a live book, #945). `bill_wise_on`
 /// and `opening_balance` are the ledger's own values, carried so a reader can
@@ -130,8 +136,10 @@ pub struct PartyResidual {
     pub amount: ExactDecimal,
     /// The ledger's `ISBILLWISEON`.
     pub bill_wise_on: bool,
-    /// The ledger's own opening balance, as the snapshot read it.
-    pub opening_balance: ExactDecimal,
+    /// The ledger's opening balance as of the start of the snapshot period (the
+    /// books-from date, not the current year's). `None` when Tally sent an empty
+    /// element: unknown, never zero.
+    pub opening_balance: Option<ExactDecimal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -15,7 +15,6 @@ fn opposing_unallocated_direction_is_preserved_and_only_gross_exposure_is_ranked
         party: "Synthetic Party".into(),
         amount: bridge_tally_core::ExactDecimal::parse("30").unwrap(),
         direction: ExposureDirection::Payable,
-        ledger_bill_wise: None,
         opening_balance: None,
         composition: None,
     }];
@@ -446,7 +445,6 @@ fn unallocated_totals_split_by_composition_and_the_parts_add_up() {
             party: name.into(),
             amount: bridge_tally_core::ExactDecimal::parse(amount).unwrap(),
             direction,
-            ledger_bill_wise: composition.map(|c| c != NotBillWiseLedger),
             opening_balance: None,
             composition,
         };
@@ -504,7 +502,6 @@ fn an_unallocated_row_carries_its_composition_and_opening_through_the_json_and_r
         party: "Synthetic Debtor".into(),
         amount: bridge_tally_core::ExactDecimal::parse("7500").unwrap(),
         direction: ExposureDirection::Receivable,
-        ledger_bill_wise: Some(false),
         opening_balance: Some(bridge_tally_core::ExactDecimal::parse("-100.00").unwrap()),
         composition: Some(NotBillWiseLedger),
     };

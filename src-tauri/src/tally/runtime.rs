@@ -1605,8 +1605,7 @@ fn all_unallocated_parties(
                 } else {
                     ExposureDirection::Payable
                 },
-                ledger_bill_wise: Some(residual.bill_wise_on),
-                opening_balance: Some(residual.opening_balance.clone()),
+                opening_balance: residual.opening_balance.clone(),
                 composition: Some(if residual.bill_wise_on {
                     UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
                 } else {
@@ -1707,13 +1706,14 @@ pub struct UnallocatedParty {
     pub party: String,
     pub amount: ExactDecimal,
     pub direction: ExposureDirection,
-    /// The ledger's own `ISBILLWISEON`. `None` when the row was not built from
-    /// a ledger snapshot (older saved rows), which is not the same as `false`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ledger_bill_wise: Option<bool>,
-    /// The ledger's own opening balance, shown and never interpreted.
+    /// The ledger's own opening balance as of the start of the books, shown and
+    /// never interpreted. `None` when Tally sent none (an empty element is
+    /// unknown, not zero) or the row was not built from a ledger snapshot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opening_balance: Option<ExactDecimal>,
+    /// What the ledger's bill-wise flag says about the amount; it also carries
+    /// that flag (`NotBillWiseLedger` is flag off), so the two cannot disagree.
+    /// `None` for a row not built from a ledger snapshot (older saved rows).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composition: Option<UnallocatedComposition>,
 }

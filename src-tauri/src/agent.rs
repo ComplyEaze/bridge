@@ -408,14 +408,19 @@ struct ToolFailure {
     /// is known. `code` keeps naming what failed.
     cause: Option<&'static str>,
     /// How many rows a refused read returned against how many it was counted
-    /// to hold, when the refusal is that disagreement. Numbers only.
-    counts: Option<RowCounts>,
+    /// to hold, when the refusal is that disagreement. Numbers only; boxed to
+    /// keep the refusal under clippy's 128-byte large-error limit on every
+    /// other path.
+    counts: Option<Box<RowCounts>>,
     /// What each request of a window read cost up to its failure (#595), when
     /// the failure came out of one. Data-free.
     window_timings: Option<Box<WindowReadTimings>>,
-    /// The count and estimate a read was refused on before it was sent (#637).
+    /// The mark and estimate a read was refused on before it was sent (#637).
     /// Numbers only; boxed to keep the refusal small on every other path.
     read_size: Option<Box<ReadSize>>,
+    /// How many ledgers a parent-group read was refused over because their
+    /// parent group name cannot be carried in a filter. A count only.
+    unsupported_parent_ledgers: Option<u64>,
     /// Set when no response reached Tally-protocol parsing (#629). The refusal
     /// then names the configured endpoint, so a wrong or reset port is visible
     /// instead of reading as a Tally data problem.
@@ -434,15 +439,30 @@ struct Candidates {
     items: Vec<Value>,
 }
 
-/// A compliance read refused on its size before the master request was sent:
-/// the master mark, the ledgers a catalogue counted (none when the mark alone
-/// was refused), the estimated response and the budget it exceeded.
+/// A compliance read refused before any ledger request was sent because the
+/// catalogue that would count its ledgers is over the response limit: the
+/// master mark, the estimated catalogue response and the limit it exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
-    counted_ledgers: Option<u64>,
     estimated_bytes: u64,
-    budget_bytes: u64,
+    limit_bytes: u64,
+}
+
+fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
+    error.chain().find_map(|cause| {
+        match cause
+            .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
+        {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::ParentPartition {
+                source:
+                    bridge_tally_protocol::parent_partition::ParentPartitionError::ParentNameUnsupported {
+                        ledgers,
+                    },
+            } => Some(*ledgers),
+            _ => None,
+        }
+    })
 }
 
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
@@ -450,16 +470,14 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
-            crate::tally::connection::PartyLedgerMasterSourceValidationError::TooLarge {
+            crate::tally::connection::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
-                counted_ledgers,
                 estimated_bytes,
-                budget_bytes,
+                limit_bytes,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
-                counted_ledgers: *counted_ledgers,
                 estimated_bytes: *estimated_bytes,
-                budget_bytes: *budget_bytes,
+                limit_bytes: *limit_bytes,
             }),
             _ => None,
         }
@@ -540,6 +558,7 @@ impl From<String> for ToolFailure {
             counts: None,
             window_timings: None,
             read_size: None,
+            unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
         }
@@ -639,17 +658,60 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              not because the response was damaged. Retrying refuses again.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
-        "ledger_masters_too_large" => Some(
-            "The estimated compliance response is over Bridge's budget, so no master request \
-             was sent: a read of that size has left Tally's gateway unable to answer (#637). \
-             When `size.counted_ledgers` is a number, Bridge counted that many ledgers with a \
-             catalogue read and refused on the count. When it is null, the company's \
-             master-alteration mark (`size.master_alter_id`) is too high to count within \
-             budget and was refused as it stands; the mark is an UPPER BOUND on ledgers, since \
-             stock items, units and every other master raise it too, so a company with fewer \
-             ledgers may be refused. Call ledger_masters with fields=basic, which returns \
-             names, parents and opening balances without the compliance fields. Retrying this \
-             call refuses again. A `group` filter does not narrow the request.",
+        "ledger_catalogue_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) is above what \
+             Bridge can read a ledger catalogue for, so no request for ledgers was sent: a \
+             catalogue past the transport's response cap is cut off mid-read, which can leave \
+             Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
+             since stock items, units and every other master raise it too, so a company with \
+             fewer ledgers may be refused. Call ledger_masters with fields=basic, which \
+             returns names, parents and opening balances without the compliance fields. \
+             Retrying this call refuses again. A `group` filter does not narrow the request.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book too
+        // large for one compliance read is read as parts by parent group (#679).
+        "parent_over_budget" | "parent_partition_too_many_parts" => Some(
+            "This book has more ledgers than one compliance read may carry, so Bridge reads it \
+             as parts by immediate parent group, and it cannot be split that way: either one \
+             group holds more ledgers than a part may (Bridge does not split a group), or the \
+             groups need more parts than Bridge will send. No master was requested. Call \
+             ledger_masters with fields=basic, which returns names, parents and opening \
+             balances without the compliance fields. Retrying this call refuses again.",
+        ),
+        "parent_partition_voucher_witness_absent" => Some(
+            "This book is too large for one compliance read, so Bridge reads it as several \
+             parts, and balances read at different moments only agree if no voucher was \
+             written between them. Bridge proves that with the company's voucher high-water \
+             (`voucher_alter_id` in the company extent), and this Tally did not report one. \
+             No part was requested. Call ledger_masters with fields=basic. Retrying this \
+             call refuses again.",
+        ),
+        "parent_name_unsupported" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but `unsupported_parent_ledgers` of its ledgers sit under a parent group \
+             whose name a filter cannot carry (a quotation mark, a control character, an empty \
+             name or an unexpected replacement character), so no filter can name them. No \
+             master was requested. Call ledger_masters with fields=basic. Retrying this call \
+             refuses again.",
+        ),
+        "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
+            "This book is too large for one compliance read and Bridge reads it by parent \
+             group, but its ledger catalogue holds a ledger with no parent group or a repeated \
+             ledger identity. No master was requested. Call ledger_masters with fields=basic. \
+             Retrying this call refuses again.",
+        ),
+        "parent_part_row_outside_parents"
+        | "parent_part_row_not_in_catalogue"
+        | "parent_part_row_differs_from_catalogue"
+        | "parent_part_row_repeated"
+        | "parent_part_rows_missing" => Some(
+            "The parts of this parent-group read did not add up to the ledger catalogue that \
+             planned them, so Bridge released nothing: a part returned a ledger it should not \
+             have, returned one twice, or missed one, or a ledger's name or group differs \
+             between the catalogue and the part. A ledger added, renamed, moved or deleted \
+             during the read can cause it; retry once while the book is quiet. A repeat means \
+             Tally's filtered read and its catalogue disagree about this book: call \
+             ledger_masters with fields=basic instead.",
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
@@ -842,6 +904,7 @@ impl ToolFailure {
             counts: None,
             window_timings: None,
             read_size: read_size_refusal(&error).map(Box::new),
+            unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
         }
@@ -955,6 +1018,7 @@ impl Server {
                 counts,
                 window_timings,
                 read_size,
+                unsupported_parent_ledgers,
                 unanswered,
                 candidates,
             }) => {
@@ -1013,13 +1077,17 @@ impl Server {
                         error["cause"] = json!(cause);
                     }
                 }
+                if let Some(ledgers) = unsupported_parent_ledgers {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["unsupported_parent_ledgers"] = json!(ledgers);
+                    }
+                }
                 if let Some(size) = read_size {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["size"] = json!({
                             "master_alter_id": size.master_alter_id,
-                            "counted_ledgers": size.counted_ledgers,
                             "estimated_bytes": size.estimated_bytes,
-                            "budget_bytes": size.budget_bytes,
+                            "limit_bytes": size.limit_bytes,
                         });
                     }
                 }

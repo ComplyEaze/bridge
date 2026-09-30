@@ -701,15 +701,14 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
     use crate::tally::connection::PartyLedgerMasterSourceValidationError as Validation;
     use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
     let too_large = party_ledger_master_runtime_command_error(with_read_evidence(
-        anyhow::Error::new(Validation::TooLarge {
-            master_alter_id: 9_500,
-            counted_ledgers: Some(9_400),
-            estimated_bytes: 35_250_000,
-            budget_bytes: 16_000_000,
+        anyhow::Error::new(Validation::CatalogueTooLarge {
+            master_alter_id: 30_000,
+            estimated_bytes: 42_000_000,
+            limit_bytes: 32_000_000,
         }),
         RuntimeReadEvidence::empty(),
     ));
-    assert_eq!(too_large.code, "ledger_masters_too_large");
+    assert_eq!(too_large.code, "ledger_catalogue_too_large");
     assert_eq!(too_large.category, "Response size");
     assert_eq!(too_large.retry, "after_change");
     assert!(!too_large.local_state_changed);

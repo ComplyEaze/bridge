@@ -347,7 +347,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value
 // break out of the element it belongs to.
-pub const MAX_SURFACE_FILES: usize = 291;
+// `bridge-tally-protocol/src/parent_partition.rs` (bridge#679) decides whether a
+// ledger read too large for one request may be split by parent group, and
+// whether the parts together returned every ledger the catalogue named, once;
+// a defect there returns a book with ledgers missing or repeated.
+pub const MAX_SURFACE_FILES: usize = 292;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

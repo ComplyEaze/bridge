@@ -371,11 +371,18 @@ posted and nothing is inferred.
   other voucher type that touches those ledgers (Sales, Journal, Payment) is
   listed apart in `other_voucher_types_touching_duties_taxes` with exact totals:
   whether such a voucher belongs in a return is the CA's call, not the tool's.
+  A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
+  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
+  returned in `items` and paged by `offset` and `limit` like `vouchers`; every
+  list in the response has its party names masked when parties are masked.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
   `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
-  assigned one; it is usually TDS or another payable, not a missing GST head.
+  assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
+  ledger whose own tax type is not GST (usually TDS or another payable), and
+  `absent` is a ledger with no head whose tax type is GST or was not reported,
+  which may be a GST ledger whose head is missing (`tax_type` is returned).
   An entry whose head is not in the recognised vocabulary, or contradicts the
   ledger's tax type, is listed with its raw spelling in
   `duties_taxes_entries_with_unrecognised_head`. No name is ever matched and no

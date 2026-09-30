@@ -118,6 +118,9 @@ pub(super) struct RegisterPage {
     /// Vouchers that touch a ledger whose group cannot be resolved and no Duties & Taxes
     /// ledger: they may have nothing to do with tax, so they are named, not classified.
     pub(super) vouchers_with_unplaced_ledgers: Vec<Value>,
+    /// Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger (exempt or
+    /// unregistered purchases, or tax booked to a ledger filed elsewhere): counted, not dropped.
+    pub(super) register_class_without_duties_taxes_entry: Vec<Value>,
     pub(super) vouchers_observed: usize,
 }
 
@@ -141,6 +144,7 @@ pub(super) fn classify_register(
         other_voucher_types: Vec::new(),
         unclassified_voucher_type: Vec::new(),
         vouchers_with_unplaced_ledgers: Vec::new(),
+        register_class_without_duties_taxes_entry: Vec::new(),
         vouchers_observed: rows.len(),
     };
     for row in rows {
@@ -188,8 +192,12 @@ pub(super) fn classify_register(
                             without_head.push(item);
                         }
                         GstDutyHeadObservation::Absent => {
+                            // No head, and the ledger's own TAXTYPE is GST or was not
+                            // reported: unlike not_tax_ledger, this may be a GST ledger
+                            // whose head is missing.
                             let mut item = entry.clone();
                             item["observation"] = json!("absent");
+                            item["tax_type"] = json!(ledger.tax_type);
                             without_head.push(item);
                         }
                         GstDutyHeadObservation::Unrecognized { raw } => {
@@ -223,9 +231,6 @@ pub(super) fn classify_register(
                 }
             }
         }
-        if touched.is_empty() && unresolved.is_empty() {
-            continue;
-        }
         let class = row.get("voucher_class").and_then(Value::as_str);
         let identity = json!({
             "date": row.get("date"),
@@ -234,6 +239,13 @@ pub(super) fn classify_register(
             "voucher_class": class,
             "guid": row.get("guid"),
         });
+        if touched.is_empty() && unresolved.is_empty() {
+            if class.is_some_and(is_register_class) {
+                page.register_class_without_duties_taxes_entry
+                    .push(identity);
+            }
+            continue;
+        }
         if !touched.is_empty() {
             match class {
                 Some(class) if is_register_class(class) => {}
@@ -292,6 +304,7 @@ pub(super) fn classify_register(
         out["duties_taxes_entries_without_gst_head"] = Value::Array(without_head);
         out["duties_taxes_entries_with_unrecognised_head"] = Value::Array(unrecognised);
         out["entries_on_ledgers_with_unresolved_group"] = Value::Array(unresolved);
+        out["has_taxable_entry"] = json!(!taxable.is_empty());
         out["taxable_entries"] = Value::Array(taxable);
         out["party_entries"] = Value::Array(party_entries);
         out["other_entries"] = Value::Array(other);
@@ -317,7 +330,11 @@ fn bounded_list(items: &[Value]) -> Value {
 /// book's vocabulary, not parties.
 pub(super) fn mark_register_row(mut row: Value) -> Value {
     mark_party_field(&mut row, "party");
-    for list in ["party_entries", "other_entries"] {
+    for list in [
+        "party_entries",
+        "other_entries",
+        "entries_on_ledgers_with_unresolved_group",
+    ] {
         if let Some(entries) = row.get_mut(list).and_then(Value::as_array_mut) {
             for entry in entries {
                 mark_party_field(entry, "ledger");
@@ -327,22 +344,90 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
     row
 }
 
-/// The marks the window was planned against, the marks its own read observed (only a divided
-/// read reports any) and the marks read after it must all be the ones the masters were pinned
-/// under; any difference means the book moved while the window was read.
-fn window_drift(
-    pinned: CompanyMarks,
-    observed_by_window: Option<CompanyMarks>,
-    closing: CompanyMarks,
-) -> Option<&'static str> {
-    (closing != pinned || observed_by_window.is_some_and(|marks| marks != pinned))
-        .then_some("voucher_window_changed_during_read")
+/// A side-list item names ledgers it could not place, which may be a party's.
+fn mark_register_side_item(mut item: Value) -> Value {
+    if let Some(entries) = item
+        .get_mut("unplaced_ledgers")
+        .and_then(Value::as_array_mut)
+    {
+        for entry in entries {
+            mark_party_field(entry, "ledger");
+        }
+    }
+    item
+}
+
+/// The window was planned against the marks the masters were read under; the marks read after
+/// it must be those marks, or the book moved while the window was read. (An undivided window
+/// read reports no marks of its own, so this closing read is the check.)
+fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static str> {
+    (closing != pinned).then_some("voucher_window_changed_during_read")
 }
 
 /// The masters read after the window must be the masters read before it, in everything that
-/// decides a classification, and under the same marks.
-fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> bool {
-    second.index != first.index || second.marks != first.marks
+/// decides a classification, and under the same marks. A voucher mark that moved is the
+/// window's problem, not the masters'.
+fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> Option<&'static str> {
+    if second.marks.vouchers != first.marks.vouchers {
+        Some("voucher_window_changed_during_read")
+    } else if second.index != first.index || second.marks.masters != first.marks.masters {
+        Some("ledger_snapshot_drifted")
+    } else {
+        None
+    }
+}
+
+/// What the tool returns for one window, except `state` and `reason`, which depend on whether
+/// an empty window was corroborated.
+pub(super) struct RegisterResult {
+    pub(super) result: Value,
+    pub(super) truncated: bool,
+}
+
+/// Validate the window, classify its vouchers, page the register and mark and redact every
+/// party name in every list of the response.
+pub(super) fn register_result(
+    index: &MasterIndex,
+    rows: Vec<Value>,
+    (from, to): (&str, &str),
+    (offset, limit): (usize, usize),
+    redaction: Redaction,
+) -> Result<RegisterResult, String> {
+    // An undivided window read is admitted by its caller against the window: rows dated
+    // outside it would otherwise be returned as register rows.
+    let rows = validate_then_filter_voucher_rows(rows, from, to, None)?;
+    let page = classify_register(index, &rows)?;
+    let total = page.rows.len();
+    let (items, truncated, next_offset) = paginate(page.rows, offset, limit);
+    let items = items
+        .into_iter()
+        .map(|row| redact_value(mark_register_row(row), redaction))
+        .collect::<Vec<_>>();
+    let side = |list: &[Value]| {
+        let marked = list
+            .iter()
+            .cloned()
+            .map(mark_register_side_item)
+            .collect::<Vec<_>>();
+        redact_value(bounded_list(&marked), redaction)
+    };
+    let result = json!({
+        "profile": "agent_purchase_register_v1",
+        "register_classes": ["Purchase", "Debit Note"],
+        "items": items,
+        "offset": offset,
+        "next_offset": next_offset,
+        "total": total,
+        "vouchers_observed": page.vouchers_observed,
+        "ledger_masters_observed": index.len(),
+        "other_voucher_types_touching_duties_taxes": side(&page.other_voucher_types),
+        "unclassified_voucher_type": side(&page.unclassified_voucher_type),
+        "vouchers_with_unplaced_ledgers": side(&page.vouchers_with_unplaced_ledgers),
+        "purchase_vouchers_without_duties_taxes_entry":
+            side(&page.register_class_without_duties_taxes_entry),
+        "coverage": "items are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger are counted in purchase_vouchers_without_duties_taxes_entry, not returned as items",
+    });
+    Ok(RegisterResult { result, truncated })
 }
 
 /// One page of the register: the rows from `offset`, at most `limit`, whether more remain and
@@ -397,14 +482,9 @@ impl Server {
                 .post_read_observing_boundary(&identity, company_high_water_read(&company.name))
                 .await?;
             evidence = combine_evidence(evidence.clone(), closing_evidence);
-            let (vouchers, masters) =
-                parse_company_marks(&marks_xml, identity.company_guid())?;
+            let (vouchers, masters) = parse_company_marks(&marks_xml, identity.company_guid())?;
             let closing = CompanyMarks { vouchers, masters };
-            if let Some(code) = window_drift(
-                first.marks,
-                window.witness.as_ref().map(|witness| witness.marks),
-                closing,
-            ) {
+            if let Some(code) = window_drift(first.marks, closing) {
                 return Err(code.to_string().into());
             }
             // The two marks can be unchanged by an edit that does not move them (a duty head
@@ -412,8 +492,8 @@ impl Server {
             // read again and must classify exactly as they did.
             let second = self.read_register_masters(&identity).await?;
             evidence = combine_evidence(evidence.clone(), second.evidence.clone());
-            if masters_drifted(&first, &second) {
-                return Err("ledger_snapshot_drifted".to_string().into());
+            if let Some(code) = masters_drifted(&first, &second) {
+                return Err(code.to_string().into());
             }
             let mut state = "complete";
             let mut reason = None;
@@ -436,36 +516,24 @@ impl Server {
                     evidence.reason_code = corroboration_reason.map(str::to_string);
                 }
             }
-            let page = classify_register(&first.index, &window.rows)?;
             let offset = arg_usize(args, "offset", 0)?;
-            let limit =
-                arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
-            let total = page.rows.len();
-            let (rows, truncated, next_offset) = paginate(page.rows, offset, limit);
-            let rows = rows
-                .into_iter()
-                .map(|row| redact_value(mark_register_row(row), self.settings.redaction))
-                .collect::<Vec<_>>();
+            let limit = arg_positive_usize(args, "limit", self.settings.max_rows)?
+                .min(self.settings.max_rows);
+            let RegisterResult {
+                mut result,
+                truncated,
+            } = register_result(
+                &first.index,
+                window.rows,
+                (&from, &to),
+                (offset, limit),
+                self.settings.redaction,
+            )?;
+            result["state"] = json!(state);
+            result["reason"] = json!(reason);
             let payload = json!({
                 "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": {
-                    "state": state,
-                    "reason": reason,
-                    "profile": "agent_purchase_register_v1",
-                    "register_classes": ["Purchase", "Debit Note"],
-                    "rows": rows,
-                    "offset": offset,
-                    "next_offset": next_offset,
-                    "total": total,
-                    "vouchers_observed": page.vouchers_observed,
-                    "ledger_masters_observed": first.index.len(),
-                    "other_voucher_types_touching_duties_taxes":
-                        bounded_list(&page.other_voucher_types),
-                    "unclassified_voucher_type": bounded_list(&page.unclassified_voucher_type),
-                    "vouchers_with_unplaced_ledgers":
-                        bounded_list(&page.vouchers_with_unplaced_ledgers),
-                    "coverage": "rows are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call)",
-                }
+                "result": result,
             });
             Ok(ToolOutcome {
                 payload,

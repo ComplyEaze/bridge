@@ -484,12 +484,11 @@ const PINNED: CompanyMarks = CompanyMarks {
 
 #[test]
 fn a_window_whose_marks_are_unchanged_is_stable() {
-    assert_eq!(window_drift(PINNED, None, PINNED), None);
-    assert_eq!(window_drift(PINNED, Some(PINNED), PINNED), None);
+    assert_eq!(window_drift(PINNED, PINNED), None);
 }
 
 #[test]
-fn a_window_is_refused_when_either_mark_moved_before_or_after_it() {
+fn a_window_is_refused_when_either_mark_moved_after_it() {
     let moved_voucher = CompanyMarks {
         vouchers: 55,
         ..PINNED
@@ -500,35 +499,35 @@ fn a_window_is_refused_when_either_mark_moved_before_or_after_it() {
     };
     for closing in [moved_voucher, moved_master] {
         assert_eq!(
-            window_drift(PINNED, None, closing),
+            window_drift(PINNED, closing),
             Some("voucher_window_changed_during_read"),
             "{closing:?}"
         );
     }
-    // The window's own observation disagrees with the marks the masters were pinned under.
-    assert_eq!(
-        window_drift(PINNED, Some(moved_master), PINNED),
-        Some("voucher_window_changed_during_read")
-    );
 }
 
 #[test]
 fn masters_read_again_must_match_in_classification_and_marks() {
     let first = masters_read(PINNED, captured_index());
-    assert!(!masters_drifted(
-        &first,
-        &masters_read(PINNED, captured_index())
-    ));
-    assert!(masters_drifted(
-        &first,
-        &masters_read(
-            CompanyMarks {
-                masters: 121,
-                ..PINNED
-            },
-            captured_index()
-        )
-    ));
+    assert_eq!(
+        masters_drifted(&first, &masters_read(PINNED, captured_index())),
+        None
+    );
+    // A master mark that moved, or a classification input that changed under the same marks,
+    // is the masters drifting.
+    assert_eq!(
+        masters_drifted(
+            &first,
+            &masters_read(
+                CompanyMarks {
+                    masters: 121,
+                    ..PINNED
+                },
+                captured_index()
+            )
+        ),
+        Some("ledger_snapshot_drifted")
+    );
     let mut masters = captured_masters();
     masters
         .iter_mut()
@@ -537,7 +536,24 @@ fn masters_read_again_must_match_in_classification_and_marks() {
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
     let rehead = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
-    assert!(masters_drifted(&first, &masters_read(PINNED, rehead)));
+    assert_eq!(
+        masters_drifted(&first, &masters_read(PINNED, rehead)),
+        Some("ledger_snapshot_drifted")
+    );
+    // A voucher posted after the closing marks were read is the window's drift, not the masters'.
+    assert_eq!(
+        masters_drifted(
+            &first,
+            &masters_read(
+                CompanyMarks {
+                    vouchers: 55,
+                    ..PINNED
+                },
+                captured_index()
+            )
+        ),
+        Some("voucher_window_changed_during_read")
+    );
 }
 
 #[test]
@@ -552,4 +568,129 @@ fn a_page_says_where_the_next_one_starts() {
     let (page, truncated, next) = paginate(rows, 2, 3);
     assert_eq!(page[0]["n"], 2);
     assert_eq!((page.len(), truncated, next), (3, false, None));
+}
+
+fn result_for(
+    rows: Vec<Value>,
+    index: &MasterIndex,
+    redaction: Redaction,
+) -> Result<RegisterResult, String> {
+    register_result(index, rows, ("20250901", "20250930"), (0, 500), redaction)
+}
+
+#[test]
+fn a_row_dated_outside_the_window_is_refused_not_returned() {
+    let mut rows = captured_rows();
+    rows[1]["date"] = json!("20251015");
+    assert_eq!(
+        result_for(rows, &captured_index(), Redaction::None).map(|_| ()),
+        Err("window_not_honoured".to_string())
+    );
+}
+
+#[test]
+fn the_result_carries_items_and_every_list_the_response_promises() {
+    let result = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
+    assert!(!result.truncated);
+    let body = &result.result;
+    assert_eq!(body["items"].as_array().unwrap().len(), 5);
+    assert_eq!(body["total"], 5);
+    assert_eq!(body["vouchers_observed"], 8);
+    assert_eq!(body["ledger_masters_observed"], 41);
+    assert_eq!(
+        body["other_voucher_types_touching_duties_taxes"]["total"],
+        3
+    );
+    assert_eq!(body["unclassified_voucher_type"]["total"], 0);
+    assert_eq!(body["vouchers_with_unplaced_ledgers"]["total"], 0);
+    assert_eq!(
+        body["purchase_vouchers_without_duties_taxes_entry"]["total"],
+        0
+    );
+    assert_eq!(body["items"][0]["has_taxable_entry"], true);
+}
+
+#[test]
+fn a_purchase_with_no_duties_taxes_entry_is_counted_not_dropped() {
+    let mut rows = captured_rows();
+    let entries = rows[0]["amounts"].as_array_mut().unwrap();
+    entries.retain(|entry| {
+        let name = entry["ledger"].as_str().unwrap();
+        name != "Input CGST" && name != "Input SGST"
+    });
+    let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
+    let body = &result.result;
+    assert_eq!(body["items"].as_array().unwrap().len(), 4);
+    assert_eq!(
+        body["purchase_vouchers_without_duties_taxes_entry"]["total"],
+        1
+    );
+    assert_eq!(
+        body["purchase_vouchers_without_duties_taxes_entry"]["listed"][0]["date"],
+        "20250903"
+    );
+}
+
+#[test]
+fn an_entry_on_a_ledger_with_no_head_and_a_gst_tax_type_says_so() {
+    // `absent` is a ledger whose TAXTYPE is GST (or not reported) with no head: unlike a
+    // not_tax_ledger, it may be a GST ledger whose head is missing, and the row carries the
+    // tax type so a reader can tell.
+    let mut masters = captured_masters();
+    masters
+        .iter_mut()
+        .find(|record| record.ledger.name == "Input CGST")
+        .unwrap()
+        .fields
+        .gst_duty_head = GstDutyHeadObservation::Absent;
+    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let page = classify_register(&index, &captured_rows()).unwrap();
+    let row = row_on(&page.rows, "20250903");
+    let entry = &row["duties_taxes_entries_without_gst_head"][0];
+    assert_eq!(entry["ledger"], "Input CGST");
+    assert_eq!(entry["observation"], "absent");
+    assert_eq!(entry["tax_type"], "GST");
+    assert_eq!(row["status"], "has_entries_without_gst_head");
+}
+
+#[test]
+fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
+    // With Sundry Creditors missing from the group collection the suppliers' own ledgers
+    // cannot be placed, so their names sit in `entries_on_ledgers_with_unresolved_group`; the
+    // vouchers with no Duties & Taxes ledger go to the side lists. Masked, none of the
+    // supplier names may remain anywhere.
+    let xml = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml"
+    ));
+    let groups: Vec<_> = parse_native_group_snapshot(&xml, COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .filter(|group| group.name != "Sundry Creditors")
+        .collect();
+    let index = MasterIndex::build(
+        captured_masters().iter(),
+        &GroupIndex::build(groups),
+        Vec::new(),
+    )
+    .unwrap();
+    let mut rows = captured_rows();
+    // A voucher whose only tax-free ledgers are unplaced lands in the unplaced side list.
+    rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
+        let name = entry["ledger"].as_str().unwrap();
+        name != "Input CGST" && name != "Input SGST"
+    });
+    rows[0]["voucher_class"] = json!("Sales");
+    let plain = result_for(rows.clone(), &index, Redaction::None).unwrap();
+    assert!(
+        plain.result.to_string().contains("SYN Supplier Intra (M2)"),
+        "the unmasked response does name the supplier, so the assertion below can fail"
+    );
+    let masked = result_for(rows, &index, Redaction::MaskParties).unwrap();
+    let text = masked.result.to_string();
+    assert!(!text.contains("SYN Supplier Intra (M2)"), "{text}");
+    assert!(!text.contains("SYN Supplier Inter (M2)"), "{text}");
+    assert!(
+        text.contains("Input CGST"),
+        "tax ledger names are not parties"
+    );
 }

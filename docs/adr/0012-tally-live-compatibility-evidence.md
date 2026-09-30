@@ -46,8 +46,10 @@ matrix cell additionally requires an exact-scope maintainer review attestation
 signed with Ed25519 by a configured non-revoked key. The release gate verifies
 the signature, key validity at review and release time, attestation expiry,
 receipt age, exact claim dimensions and operations, clean source state, commit,
-and current compatibility-surface digest. Evidence cannot be generalized to a
-different cell.
+and current compatibility-surface digest. Since surface schema 3 that digest is
+computed from the live bytes of every pinned file and never stored, so a changed
+pinned file makes evidence bound to the old digest stale. Evidence cannot be
+generalized to a different cell.
 
 The checked-in matrix is the claim authority. Missing evidence remains
 `unknown`; absence is never converted to success. `Unsupported` requires a

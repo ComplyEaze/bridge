@@ -694,3 +694,19 @@ fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
         "tax ledger names are not parties"
     );
 }
+
+#[test]
+fn a_row_without_a_purchase_ledger_entry_says_it_has_no_taxable_entry() {
+    // An item invoice may hold its purchase ledger in an inventory allocation the parser does
+    // not read, so the row says so instead of reporting a complete voucher with nothing taxable.
+    let mut rows = captured_rows();
+    rows[0]["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["ledger"] != "Purchase - Goods");
+    let page = classify_register(&captured_index(), &rows).unwrap();
+    let row = row_on(&page.rows, "20250903");
+    assert_eq!(row["has_taxable_entry"], false);
+    assert!(row["taxable_entries"].as_array().unwrap().is_empty());
+    assert_eq!(row_on(&page.rows, "20250905")["has_taxable_entry"], true);
+}

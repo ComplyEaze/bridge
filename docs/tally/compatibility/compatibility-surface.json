@@ -455,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "2b74adceb80c4127cdbba9ff4bf3df87eb66158a7bc1a3cfea163ec4afe879f0"
+      "sha256": "f4c6868095001e74ac73cd58851d824bd08cd8dc4cb19c93e85630a9fdde96f7"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -515,7 +515,7 @@
     },
     {
       "path": "src-tauri/src/agent_import_post.rs",
-      "sha256": "235f4c2a5fb8ed7a196fce606eeba1831da807c19de07fa01bcd556bd6b77423"
+      "sha256": "1ce87dc299d71cda05c60d2ec481b37163838f5a49db357c0970cc80d6880140"
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs",

@@ -833,7 +833,9 @@ matching weeks or months ceiling; those units are constrained by checked
 resulting-date arithmetic instead.
 
 The voucher parser accepts explicit `N Day(s)`, `N Week(s)`, and `N Month(s)` forms only. It
-rejects an unknown unit rather than guessing a day count. Weeks add exactly seven days each;
+does not guess a day count for an unknown unit: the voucher-scan boundary rejects it, and the
+agent `vouchers` read carries the text as `unrecognised` instead (so `10000 Days`, above the
+ceiling, is carried, not refused). Weeks add exactly seven days each;
 months use a calendar-month operation that preserves the day of month when possible and otherwise
 clamps to the target month's last day. The same licensed-gateway evidence measured:
 

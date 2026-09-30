@@ -1897,3 +1897,67 @@ fn a_repeated_or_nested_bill_date_is_a_protocol_error() {
         Err("agent_read_protocol_invalid".to_string())
     );
 }
+
+/// The one allocation of the GST capture whose credit period text is replaced.
+fn carried_credit_period(text: &str) -> serde_json::Value {
+    let captured = gst_credit_period_vouchers();
+    let needle = "<BILLCREDITPERIOD JD=\"45747\" P=\"15 Days\">15 Days</BILLCREDITPERIOD>";
+    let injected = captured.replacen(
+        needle,
+        &format!("<BILLCREDITPERIOD>{text}</BILLCREDITPERIOD>"),
+        1,
+    );
+    let rows = parse_agent_rows(&injected, GST_CREDIT_PERIODS_COMPANY_GUID).unwrap();
+    allocations_of(&rows)
+        .into_iter()
+        .map(|allocation| allocation["credit_period"].clone())
+        .find(|period| period["unit"] == "unrecognised")
+        .expect("the injected text is carried")
+}
+
+#[test]
+fn the_credit_period_text_cap_counts_characters_and_never_splits_one() {
+    // 41 ASCII characters: one over the cap, so cut and marked.
+    let period = carried_credit_period(&"a".repeat(41));
+    assert_eq!(period["text"].as_str().unwrap(), "a".repeat(40));
+    assert_eq!(period["truncated"], true);
+    // 40 Devanagari characters are 120 bytes: at the cap by characters, so carried
+    // whole and not marked (a byte count would cut and mark it).
+    let at_cap = "\u{0915}".repeat(40);
+    assert_eq!(at_cap.len(), 120);
+    let period = carried_credit_period(&at_cap);
+    assert_eq!(period["text"].as_str().unwrap(), at_cap);
+    assert!(period.get("truncated").is_none());
+    // 41 Devanagari characters: cut to 40 whole characters, never mid-code-point.
+    let over = "\u{0915}".repeat(41);
+    let period = carried_credit_period(&over);
+    assert_eq!(period["text"].as_str().unwrap(), at_cap);
+    assert_eq!(period["truncated"], true);
+    // A combining sequence counts by scalar value: 40 of them, cut at the 40th.
+    let mixed = "e\u{0301}".repeat(21);
+    let period = carried_credit_period(&mixed);
+    assert_eq!(period["text"].as_str().unwrap().chars().count(), 40);
+    assert_eq!(period["truncated"], true);
+}
+
+#[test]
+fn a_whitespace_only_or_self_closing_bill_date_is_not_observed() {
+    let captured = captured_entry_wildcard_vouchers();
+    let needle = "<BILLDATE TYPE=\"Date\">20250627</BILLDATE>";
+    for replacement in [
+        "<BILLDATE TYPE=\"Date\">   </BILLDATE>",
+        "<BILLDATE TYPE=\"Date\"/>",
+    ] {
+        let injected = captured.replace(needle, replacement);
+        let rows = parse_agent_rows(&injected, WILDCARD_ALLOCATION_COMPANY_GUID).unwrap();
+        assert!(allocations_of(&rows)
+            .iter()
+            .all(|allocation| allocation.get("bill_date").is_none()));
+    }
+    // A padded date is carried trimmed.
+    let padded = captured.replace(needle, "<BILLDATE TYPE=\"Date\"> 20250627 </BILLDATE>");
+    let rows = parse_agent_rows(&padded, WILDCARD_ALLOCATION_COMPANY_GUID).unwrap();
+    assert!(allocations_of(&rows)
+        .iter()
+        .any(|allocation| allocation["bill_date"] == "20250627"));
+}

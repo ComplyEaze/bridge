@@ -9,6 +9,10 @@
 //!   scans every voucher in a date/AlterID-partitioned wildcard fetch and
 //!   derives outstandings from bill allocations.
 //!
+//! The bill credit-period type and its parser ([`CreditPeriod`],
+//! [`parse_credit_period`]) also live here, shared by the voucher-scan parser and
+//! the agent `vouchers` read.
+//!
 //! Both begin by pinning the same verified company identity and book extent
 //! (`PinnedCompany`, `CompanyBookExtent`, via `parse_company_book_extent`),
 //! and both end by producing the same report shape (`OutstandingsReport` and

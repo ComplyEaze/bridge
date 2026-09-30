@@ -295,6 +295,11 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         .as_str()
         .unwrap()
         .starts_with("I accept the ComplyEaze Bridge Terms of Use"));
+    // One version label everywhere: the setting's key, the record and the title the user ticks.
+    assert!(setting["title"]
+        .as_str()
+        .unwrap()
+        .ends_with(&format!("(version {TERMS_VERSION})")));
     let description = setting["description"].as_str().unwrap();
     assert!(description.contains("https://bridge.complyeaze.com/terms"));
     assert!(description.contains("https://bridge.complyeaze.com/privacy"));
@@ -302,12 +307,8 @@ fn the_manifest_asks_for_exactly_the_terms_this_build_enforces() {
         manifest["server"]["mcp_config"]["env"][TERMS_ENV],
         format!("${{user_config.{key}}}")
     );
-    // Posting keeps its own separate setting, and turning it on confirms the posting section.
+    // Posting keeps its own separate setting; accepting the Terms above covers the whole Terms.
     assert_eq!(manifest["user_config"]["enable_writes"]["default"], false);
-    assert!(manifest["user_config"]["enable_writes"]["description"]
-        .as_str()
-        .unwrap()
-        .contains("section 9 of the Terms of Use"));
     // No other setting is required except the accept-terms one.
     for (name, option) in manifest["user_config"].as_object().unwrap() {
         if name != &key {

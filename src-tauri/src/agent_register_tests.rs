@@ -685,6 +685,10 @@ fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
         plain.result.to_string().contains("SYN Supplier Intra (M2)"),
         "the unmasked response does name the supplier, so the assertion below can fail"
     );
+    assert!(
+        plain.result.to_string().contains("SYN Supplier Inter (M2)"),
+        "and the second supplier, so its masking is tested too"
+    );
     let masked = result_for(rows, &index, Redaction::MaskParties).unwrap();
     let text = masked.result.to_string();
     assert!(!text.contains("SYN Supplier Intra (M2)"), "{text}");
@@ -709,4 +713,32 @@ fn a_row_without_a_purchase_ledger_entry_says_it_has_no_taxable_entry() {
     assert_eq!(row["has_taxable_entry"], false);
     assert!(row["taxable_entries"].as_array().unwrap().is_empty());
     assert_eq!(row_on(&page.rows, "20250905")["has_taxable_entry"], true);
+}
+
+#[test]
+fn a_cancelled_purchase_with_no_tax_entry_is_listed_with_its_flag() {
+    let mut rows = captured_rows();
+    rows[0]["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["ledger"] != "Input CGST" && entry["ledger"] != "Input SGST");
+    rows[0]["cancelled"] = json!(true);
+    let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
+    let listed = &result.result["purchase_vouchers_without_duties_taxes_entry"]["listed"][0];
+    assert_eq!(listed["date"], "20250903");
+    assert_eq!(listed["cancelled"], true);
+    assert_eq!(listed["optional"], false);
+}
+
+#[test]
+fn a_flag_tally_did_not_report_is_absent_from_a_listed_voucher_not_null() {
+    let mut rows = captured_rows();
+    rows[0].as_object_mut().unwrap().remove("post_dated");
+    rows[0]["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["ledger"] != "Input CGST" && entry["ledger"] != "Input SGST");
+    let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
+    let listed = &result.result["purchase_vouchers_without_duties_taxes_entry"]["listed"][0];
+    assert!(listed.get("post_dated").is_none(), "{listed}");
 }

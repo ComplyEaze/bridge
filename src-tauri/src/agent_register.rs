@@ -239,6 +239,13 @@ pub(super) fn classify_register(
             "voucher_class": class,
             "guid": row.get("guid"),
         });
+        // Present only when Tally reported them, like `vouchers`: absent is not false.
+        let mut identity = identity;
+        for key in ["cancelled", "optional", "post_dated"] {
+            if let Some(value) = row.get(key) {
+                identity[key] = value.clone();
+            }
+        }
         if touched.is_empty() && unresolved.is_empty() {
             if class.is_some_and(is_register_class) {
                 page.register_class_without_duties_taxes_entry

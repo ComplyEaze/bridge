@@ -54,6 +54,94 @@ pub fn bill_allocation_without_type_is_placeholder(name: Option<&str>) -> bool {
     name.is_none_or(|value| value.trim().is_empty())
 }
 
+/// Tally's credit period on a bill: a magnitude and a unit, kept typed so a
+/// due date is a calendar operation (months are not a guessed number of days).
+/// [`parse_credit_period`] returns an error for an unknown wire unit, never a
+/// default; each boundary decides what that error costs (the voucher scan
+/// refuses the read, the agent `vouchers` read carries the text as
+/// `unrecognised`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreditPeriod {
+    Days(u32),
+    Weeks(u32),
+    Months(u32),
+}
+
+// Licensed TallyPrime 7.1 read-back on 2026-08-23 retained up to 9999 days,
+// but silently discarded 10000 days to an empty credit period. This is a
+// measured wire-format ceiling, not a business-term policy. Weeks and months
+// have no equivalent measured ceiling, so their checked resulting date is the
+// bound instead.
+const MAX_TALLY_CREDIT_PERIOD_DAYS: u32 = 9999;
+
+/// The error code for a credit period that is not `<n> Days|Weeks|Months`
+/// (singular forms too), or whose days exceed what Tally retains.
+pub const BILL_CREDIT_PERIOD_INVALID: &str = "bill_credit_period_invalid";
+
+/// Parses Tally's `BILLCREDITPERIOD` text (`30 Days`, `2 Weeks`, `1 Months`).
+/// Blank text is `Days(0)`, the legacy scan's reading of "none set"; a caller
+/// that must tell "none set" from "zero" checks for blank before calling.
+/// This lives here so the voucher-scan boundary and the agent `vouchers`
+/// boundary cannot drift apart on what a credit period is.
+pub fn parse_credit_period(value: &str) -> Result<CreditPeriod, &'static str> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(CreditPeriod::Days(0));
+    }
+    let Some((magnitude, period, maximum)) = [
+        (
+            " Months",
+            CreditPeriod::Months as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Month",
+            CreditPeriod::Months as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Weeks",
+            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Week",
+            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Days",
+            CreditPeriod::Days as fn(u32) -> CreditPeriod,
+            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
+        ),
+        (
+            " Day",
+            CreditPeriod::Days as fn(u32) -> CreditPeriod,
+            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
+        ),
+    ]
+    .into_iter()
+    .find_map(|(suffix, period, maximum)| {
+        value
+            .strip_suffix(suffix)
+            .map(|magnitude| (magnitude, period, maximum))
+    }) else {
+        return Err(BILL_CREDIT_PERIOD_INVALID);
+    };
+    if magnitude.is_empty() || !magnitude.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(BILL_CREDIT_PERIOD_INVALID);
+    }
+    let magnitude = magnitude
+        .parse::<u32>()
+        .map_err(|_| BILL_CREDIT_PERIOD_INVALID)?;
+    if let Some(maximum) = maximum {
+        if magnitude > maximum {
+            return Err(BILL_CREDIT_PERIOD_INVALID);
+        }
+    }
+    Ok(period(magnitude))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OutstandingsError {
     InvalidDateWindow,

@@ -293,6 +293,18 @@ or immediate parent groups. A missing opening keeps both opening and closing
 unestablished, including at book start. Qualification covers the recorded account
 groups and instances; it is not a claim of universal ledger-report parity.
 
+`ledger_movement` reads the book's whole ledger catalogue twice, once before the
+voucher window and once after it, whatever `ledger` names. Each catalogue read is
+sent once: a read that outlived its deadline is not sent again, because the
+gateway may still be building the abandoned response. A catalogue read that
+outlives the deadline or passes the response cap refuses with
+`ledger_movement_read_failed` and the cause `movement_catalogue_deadline_exceeded`
+or `movement_catalogue_too_large`. The catalogue lists every ledger in the book, so
+it does not shrink with the voucher window and narrowing `from` and `to` is not
+known to help; the refusal's remediation says so. A
+`ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
+after it, before any voucher is read.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after

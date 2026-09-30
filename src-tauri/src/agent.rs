@@ -620,6 +620,12 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 
+/// The causes of a movement's ledger catalogue read that outlived its deadline
+/// or the response cap. The catalogue lists every ledger in the book, so it does
+/// not shrink with the voucher window.
+const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
+const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -656,6 +662,18 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. Bridge \
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
+        ),
+        // Causes of `ledger_movement_read_failed`: the ledger catalogue is read whole,
+        // whatever voucher window is asked for (#485).
+        MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED | MOVEMENT_CATALOGUE_TOO_LARGE => Some(
+            "The book's ledger catalogue, which ledger_movement reads whole whatever \
+             voucher window it is given, took longer than one request may or was larger than \
+             one response may be. It lists every ledger in the book, so it does not shrink \
+             when the window does: narrowing from and to is not known to help, and calling \
+             again sends the same read again, so do not retry in a loop. trial_balance \
+             reads Tally's own period figures per ledger without this catalogue read (a \
+             whole-book read of its own, on a different basis: not literal voucher \
+             movement).",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(

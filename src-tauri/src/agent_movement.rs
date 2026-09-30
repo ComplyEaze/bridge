@@ -194,8 +194,15 @@ impl Server {
             .map_err(|error| {
                 // A catalogue that outlived its deadline or the response cap says
                 // which, beside the operation's own code (`code` keeps naming
-                // what failed).
-                let cause = window_too_large_code(&error);
+                // what failed). Its own causes, not the transport's window ones:
+                // the catalogue lists every ledger in the book and does not shrink
+                // with the voucher window, so an agent told the window was too
+                // large would narrow the dates and send the same read again.
+                let cause = window_too_large_code(&error).and_then(|code| match code {
+                    "request_deadline_exceeded" => Some(MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED),
+                    "response_size_limit_exceeded" => Some(MOVEMENT_CATALOGUE_TOO_LARGE),
+                    _ => None,
+                });
                 let mut failure = ToolFailure::from_runtime("ledger_movement_read_failed", error);
                 if failure.cause.is_none() {
                     failure.cause = cause;

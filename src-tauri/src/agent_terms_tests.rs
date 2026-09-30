@@ -149,6 +149,28 @@ async fn an_acceptance_that_cannot_be_recorded_refuses_every_tool() {
 }
 
 #[tokio::test]
+async fn a_damaged_record_file_refuses_and_names_the_file() {
+    let directory = tempfile::tempdir().unwrap();
+    // A last line that stops before its newline, as a process killed mid-append leaves it.
+    std::fs::write(
+        directory.path().join(RECORD_FILE),
+        "{\"terms_version\":\"2026",
+    )
+    .unwrap();
+    let server = Server::for_mcp_with(settings(directory.path()), Some("true"));
+    let response = server.call_tool_response("voucher_schema", json!({})).await;
+    assert_eq!(
+        error_code(&response).as_deref(),
+        Some("terms_record_unavailable")
+    );
+    let message = response.value["structuredContent"]["result"]["error"]["remediation"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(message.contains(RECORD_FILE), "{message}");
+    assert!(message.contains("move it aside"), "{message}");
+}
+
+#[tokio::test]
 async fn initialize_and_the_tool_list_answer_before_the_terms_are_accepted() {
     let directory = tempfile::tempdir().unwrap();
     let server = Server::for_mcp_with(settings(directory.path()), None);

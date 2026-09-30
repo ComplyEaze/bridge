@@ -339,6 +339,10 @@ def smoke(archive, repository):
             (Path(temporary) / "data" / "agent-egress.jsonl").read_bytes(),
             output.splitlines(keepends=True)[2],
         )
+        # Accepting the Terms is recorded once, next to the receipts, in the data folder.
+        acceptance = (Path(temporary) / "data" / "terms-acceptance.jsonl").read_bytes().splitlines()
+        require(len(acceptance) == 1 and json.loads(acceptance[0]).get("source") == "setting",
+                "terms_acceptance_not_recorded")
         statement_vouchers = statement_smoke(command, environment, temporary, repository)
         return {
             "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),

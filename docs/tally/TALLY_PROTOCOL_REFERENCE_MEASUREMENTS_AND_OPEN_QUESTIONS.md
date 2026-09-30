@@ -554,9 +554,11 @@ parents (one request at a time), `NOT` formulas of the same form returned exactl
 the expected ledgers, every GUID distinct and every row bound to the selected company (balance rows
 compared by name and parent): one formula of 2 and of 4 terms, two formulas of 2 terms applied
 together, one formula of 200 terms, two of 200 terms applied together, and 511 excluded parents as
-three formulas of 200, 200 and 111 terms, which left 41 ledgers. Each answered in 0.3 s to 1.0 s
-with a body of 53 KB to 3.9 MB, and a second identical request returned identical bytes. That book
-has no vouchers, and seven formulas of 200 terms were not measured. Bridge now ends a part read as
+three formulas of 200, 200 and 111 terms, which left 41 ledgers; the same 511 as seven formulas of
+73 terms; and those 511 plus 889 parent names that are not in the book as seven formulas of 200
+terms (a request of about 110 KB), which also left 41. Each answered in 0.3 s to 1.0 s with a body
+of 53 KB to 3.9 MB, and a second identical request returned identical bytes. That book has no
+vouchers, and seven formulas of 200 terms naming real parents were not measured. Bridge now ends a part read as
 soon as any part's master comes back with a different ledger count than the catalogue holds: that
 part's balance, any later part and the group read are never requested, though the master pair
 itself was sent, so this cannot keep the complement's own `NOT`-filtered master off the wire. Every
@@ -1176,4 +1178,4 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |
 | 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (about 300 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (about 120 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |
-| 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as three formulas. PARTIAL (bridge#679) |
+| 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as up to seven formulas, and for a seven-formula request of about 110 KB whose extra names were fictitious. PARTIAL (bridge#679) |

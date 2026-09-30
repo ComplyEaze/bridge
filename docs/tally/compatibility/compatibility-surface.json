@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "9ed5aeacab81b25a4421e0edf05c6147101e0e4bbfe9bd2f87c70caf022308f6"
+      "sha256": "51ee3d386c9794451306a570578d22bcd41a33e7e0feb1f40e4e736f98ef774d"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -459,7 +459,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "510d4551c7de1dea943be501c0871784a374b226571346d0e055da82b9b084e8"
+      "sha256": "dde01720b8b7cb315acb370de8ecf190e51733eda729c606768d7424ac2d7443"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",

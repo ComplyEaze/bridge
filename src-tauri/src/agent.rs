@@ -1300,6 +1300,7 @@ impl Server {
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "egress_log" => self.egress_log(args).map_err(Into::into),
+            "local_data_report" => self.local_data_report(args).map_err(Into::into),
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -1347,6 +1348,31 @@ impl Server {
             evidence,
             company_guid: None,
             truncated,
+        })
+    }
+
+    /// What Bridge stores locally, by class: counts, sizes, ages and whether the
+    /// import journal is settled. Reads only Bridge's own data folder, changes
+    /// nothing and names no path: the result enters the AI conversation.
+    fn local_data_report(&self, args: &Value) -> Result<ToolOutcome, String> {
+        if args.as_object().is_some_and(|object| !object.is_empty()) {
+            return Err("argument_schema_invalid".to_string());
+        }
+        let payload = agent_import::local_data::tool_payload(&self.settings.data_dir);
+        let evidence = Evidence {
+            request_sha256: sha256_hex(b"local_data_report"),
+            response_sha256: sha256_json(&payload),
+            bytes: 0,
+            state: "complete",
+            read_at: None,
+            duration_ms: None,
+            reason_code: None,
+        };
+        Ok(ToolOutcome {
+            payload: json!({"result": payload}),
+            evidence,
+            company_guid: None,
+            truncated: false,
         })
     }
 
@@ -1794,6 +1820,23 @@ fn mask(value: &str) -> String {
         chars[chars.len() - 2],
         chars[chars.len() - 1]
     )
+}
+
+/// `bridge_mcp --local-data-report [--show-paths]`: a read-only report of the
+/// local data Bridge keeps. `None` when the arguments are not this mode.
+pub fn run_local_data_report_from_args(mut args: impl Iterator<Item = String>) -> Option<i32> {
+    if args.next().as_deref() != Some("--local-data-report") {
+        return None;
+    }
+    let show_paths = match args.next().as_deref() {
+        None => false,
+        Some("--show-paths") => true,
+        Some(_) => return None,
+    };
+    if args.next().is_some() {
+        return None;
+    }
+    Some(agent_import::local_data::run(show_paths))
 }
 
 pub async fn run_stdio() -> Result<(), String> {

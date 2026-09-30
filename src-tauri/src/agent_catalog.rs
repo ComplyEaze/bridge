@@ -330,6 +330,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
         "changed_since",
         "read_evidence",
         "egress_log",
+        "local_data_report",
     ];
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_inventory");
@@ -445,6 +446,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     "read_evidence" | "egress_log" => (
                         "Return bounded local metadata-only read evidence or egress receipts.",
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
+                    ),
+                    "local_data_report" => (
+                        "Reports what Bridge stores locally, by class, with counts, sizes, the age of the oldest file and whether its import journal is settled (how many batches were sent or found posted, and how many are not settled). Reads only Bridge's own local data folder, modifies and deletes none of the files it reports, and names no file path. It covers the MCP agent data folder, not the desktop app's own files. A journal or import files that Bridge still needs for a batch not yet settled are what a later deletion must keep, so never suggest removing them.",
+                        json!({"type":"object","additionalProperties":false}),
                     ),
                     "lab_read_inventory" => (
                         "LAB-ONLY. Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID/BRIDGE_LAB_DENY_GUIDS are both set to well-formed GUIDs. This is a read: company_guid selects the company like any other read tool and is verified the same way (`company_identity_not_found`/`company_identity_ambiguous`), independent of the configured lab target -- the stronger loaded-company/deny-list guard applies only to a lab write batch, not a read. Read-only: units, godowns, stock groups and stock items (parent, base unit, opening qty/rate/value, GST/HSN fields as returned, unclassified), plus inventory entries per voucher for a date window. Reuses the same windowing and window_honoured corroboration as `vouchers`. No signed compatibility evidence exists yet for any inventory field on this Tally release/mode -- treat every value as exploratory.",

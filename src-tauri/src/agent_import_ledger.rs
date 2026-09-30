@@ -303,6 +303,59 @@ pub(super) fn remote_ids_recorded(
     Ok(recorded)
 }
 
+/// How settled the journal's batches are, for the local-data report: which
+/// batches a later post or verification still leans on. Nothing is retained
+/// but counts.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Settlement {
+    /// Distinct batches in the journal.
+    pub(super) batches: usize,
+    /// Batches that were sent to Tally (a dispatch intent) or that a readback
+    /// found posted: the ones the double-post checks look up.
+    pub(super) sent_or_found: usize,
+    /// Batches with a dispatch intent whose latest verification is not
+    /// `posted_verified`, or that have no recorded response.
+    pub(super) unsettled: usize,
+}
+
+/// Validate the whole journal and count its batches by settlement (#local-data).
+pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
+    #[derive(Default)]
+    struct Progress {
+        dispatched: bool,
+        responded: bool,
+        verified: bool,
+    }
+    let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(batch) => {
+            batches.entry(batch.batch_id.clone()).or_default().verified =
+                batch.status == "posted_verified";
+        }
+        Record::Status(update) => {
+            let progress = batches.entry(update.batch_id.clone()).or_default();
+            match update.record_type {
+                StatusKind::DispatchIntent => progress.dispatched = true,
+                StatusKind::DispatchResponse => progress.responded = true,
+                StatusKind::VerificationStatus => {
+                    progress.verified = update.status == "posted_verified";
+                }
+            }
+        }
+    })?;
+    Ok(Settlement {
+        batches: batches.len(),
+        sent_or_found: batches
+            .values()
+            .filter(|progress| progress.dispatched || progress.verified)
+            .count(),
+        unsettled: batches
+            .values()
+            .filter(|progress| progress.dispatched && !(progress.responded && progress.verified))
+            .count(),
+    })
+}
+
 fn scan_records(
     mut reader: impl BufRead,
     mut visit: impl FnMut(Record, VerificationGeneration),

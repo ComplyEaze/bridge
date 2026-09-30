@@ -50,6 +50,8 @@ mod amend;
 mod approval;
 #[path = "agent_import_ledger.rs"]
 pub(super) mod ledger;
+#[path = "agent_import_local_data.rs"]
+pub(super) mod local_data;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]

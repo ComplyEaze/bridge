@@ -1,5 +1,9 @@
 # Goal 4 report — PR #228 review rectification
 
+> Historical: this report was written before the live runs now recorded in
+> [docs/agent/README.md](./README.md), and its statement that no live Tally was run describes
+> that report's own run only.
+
 Completed on `feat/agent-connector`; local commits only. `REMOTEID` remains in
 the generated import for Tally-side upsert idempotency, but is deliberately not
 used as a readback correlation key: the implementation guide's verified

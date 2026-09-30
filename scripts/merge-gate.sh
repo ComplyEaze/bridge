@@ -570,6 +570,7 @@ else
   metadata_only_count=0
   metadata_only_examples=""
   binary_count=0
+  binary_examples=""
   gitlink_count=0
   bounded_coverage_name() {
     local item
@@ -611,6 +612,9 @@ else
       if [ "$binary" -eq 1 ]; then
         # Its bytes cannot be reconciled through textual hunks.
         binary_count=$((binary_count + 1))
+        if [ "$binary_count" -le 8 ]; then
+          binary_examples="${binary_examples}${binary_examples:+; }$(bounded_coverage_name "$filename")"
+        fi
         continue
       fi
       if [ "$status" = "removed" ]; then
@@ -655,7 +659,7 @@ else
       if [ "$BINARY_REVIEW_SHA" = "$head" ] && [ "$INDEPENDENT_REVIEW_SHA" = "$head" ]; then
         say "ok" "$binary_count binary addition/change(s) have explicit current-head binary and independent review attestations"
       else
-        bad "$binary_count binary addition/change(s) require matching --binary-review-sha and --independent-review-sha human attestations"
+        bad "$binary_count binary addition/change(s) require matching --binary-review-sha and --independent-review-sha human attestations (first 8 at most: $binary_examples)"
       fi
     fi
     [ "$gitlink_count" -eq 0 ] || unknown "$gitlink_count gitlink change(s) require explicit provenance, license, and NOTICE review"
@@ -670,6 +674,39 @@ else
     # carry no newly added material and are deliberately excluded.
     path_text=$(awk -F '\t' '$2 != "removed" { print $1 }' "$changed_records")
   fi
+  # Where the scan's hits are: location and category per line, never a value. Runs only when the
+  # scan blocked or was indeterminate; a failure here changes no verdict.
+  explain_privacy_hits() {
+    local input="$tmpdir/privacy-explain-input.json" located
+    printf '%s' "$title" >"$tmpdir/ex-title"
+    printf '%s' "$raw_prbody" >"$tmpdir/ex-body"
+    printf '%s' "${commit_identity_names:-}" >"$tmpdir/ex-names"
+    printf '%s' "${path_text:-}" >"$tmpdir/ex-paths"
+    printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/ex-messages.json"
+    printf '%s' "$parsed_diff" >"$tmpdir/ex-diff.json"
+    if ! jq -n --rawfile title "$tmpdir/ex-title" --rawfile body "$tmpdir/ex-body" \
+          --rawfile names "$tmpdir/ex-names" --rawfile paths "$tmpdir/ex-paths" \
+          --slurpfile messages "$tmpdir/ex-messages.json" --slurpfile diff "$tmpdir/ex-diff.json" '
+        ($diff[0]) as $d |
+        {sources: ([{label: "pr-title", text: $title}, {label: "pr-body", text: $body},
+                    {label: "commit-identity-names", text: $names}] +
+                   ($messages[0] | to_entries | map({label: ("commit-message-" + ((.key + 1) | tostring)), text: .value}))),
+         added: ([$paths | split("\n")[] | select(length > 0) | {path: ., line: 0, text: .}] +
+                 [range(0; $d.added_payload | length) as $i |
+                  {path: $d.added_locations[$i][0], line: $d.added_locations[$i][1], text: $d.added_payload[$i]}])}
+      ' >"$input" 2>/dev/null \
+       || ! located=$(python3 "$script_dir/merge_gate_privacy.py" --head "$head" --explain <"$input" 2>/dev/null) \
+       || ! jq -e '(.hits | type == "array") and (.truncated | type == "number")' <<<"$located" >/dev/null 2>&1; then
+      say "note" "could not locate the lines that tripped the privacy scan"
+      return 0
+    fi
+    if [ "$(jq -r '.hits | length' <<<"$located")" -eq 0 ]; then
+      say "note" "no single line reproduces the privacy finding (it needs context from several lines, or comes from the whole PR text)"
+    else
+      while IFS= read -r line; do say "note" "$line"; done < <(jq -r '.hits[] | "at \(.where): \(.messages | join("; "))"' <<<"$located")
+      [ "$(jq -r '.truncated' <<<"$located")" -eq 0 ] || say "note" "$(jq -r '.truncated' <<<"$located") more line(s) not listed"
+    fi
+  }
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
@@ -692,6 +729,9 @@ else
       while IFS= read -r message; do bad "$message"; done < <(jq -r '.blockers[]' <<<"$privacy_result")
       while IFS= read -r message; do unknown "$message"; done < <(jq -r '.indeterminate[]' <<<"$privacy_result")
       while IFS= read -r message; do say "note" "$message"; done < <(jq -r '.notes[]' <<<"$privacy_result")
+      if jq -e '(.blockers | length) + (.indeterminate | length) > 0' <<<"$privacy_result" >/dev/null 2>&1; then
+        explain_privacy_hits
+      fi
     fi
   fi
   fi

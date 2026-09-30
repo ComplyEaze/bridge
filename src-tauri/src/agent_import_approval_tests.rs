@@ -1559,7 +1559,7 @@ fn the_agent_preview_says_when_the_post_happens() {
     let [now] = agent_post_timing_lines();
     assert_eq!(
         now,
-        "Bridge posts this now or when asked again within 15 minutes, unless cancelled, refused or restarted."
+        "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted."
     );
     // Exactly at the width cap, which refuses only past it: no margin.
     assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");

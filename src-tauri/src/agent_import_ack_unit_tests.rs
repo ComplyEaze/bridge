@@ -547,7 +547,7 @@ fn each_kind_of_step_doubt_is_shown_in_its_own_words() {
     for (step, said, never) in [
         (
             Value::Null,
-            "changed this company's vouchers:\nBridge could not read its voucher mark after posting.\n",
+            "changed this company's vouchers:\nComplyEaze Bridge could not read its voucher mark after posting.\n",
             "Tally reported",
         ),
         (

@@ -53,7 +53,7 @@ const expectedSeamControl = [
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
   "    # platforms as bundle-smoke, whose runs it guards.",
-  "    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'",
+  "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",
   "    permissions:",
@@ -127,7 +127,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "85fdd243e10222a6e10dabffa5e5ef0a765a3d8ca00469bdfc382c91dd9928d4"],
+  ], "19892c5846921e054d6cb4dc5376b5814917bec9f31133c63ff5a91a7e24c0f5"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -138,7 +138,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "1b60d4c3772bff9479bb4bf7925e91e039db62f2e76b1d4de78a0fa2a39e816a"],
+  ], "a328a5925bcd988ab70f3fc3d671bcadff3cae47700740afa103ccf6f03ac29a"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "02ffb0e75b37aad5c1238ce91ce19f82aa713deb1941978cb3687ad2757c8122"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -157,7 +157,7 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],
+  ["ci.yml", workflow, "d97e58832b09663100294b170e1a3f43958fbd3e31db2ee6a089d92ff8f2db75"],
   ["release-mcpb-preview.yml", releaseWorkflow, "cf1da8bf810c3134d781b2b95e08803b9c1e58b48d20992931ec17660bd73c42"],
 ]) {
   const lines = source.split("\n");
@@ -170,10 +170,10 @@ for (const path of trackedFiles().filter((file) => file.startsWith(".github/acti
   localActions.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
 }
 const localActionsDigest = localActions.digest("hex");
-if (localActionsDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
+if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
-if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
@@ -245,6 +245,7 @@ const expectedChanges = [
   "          EVENT_NAME: ${{ github.event_name }}",
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
   "        run: |",
   "          set -euo pipefail",
   "",
@@ -257,6 +258,8 @@ const expectedChanges = [
   "",
   "          if [[ \"$EVENT_NAME\" == \"pull_request\" ]]; then",
   "            base=\"$PR_BASE_SHA\"",
+  "          elif [[ \"$EVENT_NAME\" == \"merge_group\" ]]; then",
+  "            base=\"$MERGE_GROUP_BASE_SHA\"",
   "          else",
   "            base=\"$BEFORE_SHA\"",
   "          fi",

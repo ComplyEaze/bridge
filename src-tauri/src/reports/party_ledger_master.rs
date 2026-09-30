@@ -29,6 +29,10 @@ pub(crate) struct PartyLedgerMasterSource {
     pub(crate) currency_decimal_places: u8,
     pub(crate) from: TallyDate,
     pub(crate) to: TallyDate,
+    /// The extent's last voucher date when the read was pinned. It is after
+    /// `to` only when the balance snapshot was ended at the host's today
+    /// because the book holds a later-dated voucher (#875).
+    pub(crate) last_voucher_date: TallyDate,
     pub(crate) rows: Vec<PartyLedgerMasterRow>,
     /// Ordered master/balance/group request body commitments (UTF-16LE on wire).
     pub(crate) request_sha256: String,
@@ -50,6 +54,22 @@ pub(crate) struct PartyLedgerMasterSource {
     /// Base-currency ledgers left out of `rows` because a balance of theirs
     /// is a currency composite (bridge#551). Empty on a book with one master.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+}
+
+impl PartyLedgerMasterSource {
+    /// Said in the workbook only when a voucher is dated after the balance
+    /// snapshot's end, so a workbook read as "everything in the book" is not.
+    /// It claims no count and no cause: a later date may be legitimate
+    /// (post-dated entries) or a typing error.
+    pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
+        (self.last_voucher_date > self.to).then(|| {
+            format!(
+                "Vouchers dated after {} (latest in Tally: {}) are not included in these balances. Review them in Tally before relying on this workbook.",
+                self.to.as_str(),
+                self.last_voucher_date.as_str()
+            )
+        })
+    }
 }
 
 #[derive(Debug, Clone)]

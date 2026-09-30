@@ -409,8 +409,9 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   `voucher_presence`, the empty-window corroboration read and the desktop voucher
   screen. Write-side verification is not affected, because its fetch names no
   allocation fields.
-- Only an allocation that has a `BILLTYPE` or a name is read. An untyped
-  placeholder container is skipped, and its `BILLDATE` is not validated.
+- An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
+  if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
+  name, it refuses the read (`bill_allocation_field_missing`).
 
 ## Voucher-file preparation and verification
 

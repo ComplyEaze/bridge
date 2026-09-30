@@ -3,7 +3,7 @@
 **Status: working conventions, written 2026-09-17. Improve them by PR.** This is the TypeScript and
 React sibling of [`rust-module-conventions.md`](./rust-module-conventions.md). Read that document's
 principles section first; they are not repeated here. [`module-decomposition.md`](./module-decomposition.md)
-covers pinning and resealing, and applies to `src/` unchanged.
+covers pinning and the acknowledgement of pinned changes, and applies to `src/` unchanged.
 
 ## The two constraints general advice does not know about
 

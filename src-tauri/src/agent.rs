@@ -441,14 +441,17 @@ struct Candidates {
     items: Vec<Value>,
 }
 
-/// A compliance read refused before any ledger request was sent because the
-/// catalogue that would count its ledgers is over the response limit: the
-/// master mark, the estimated catalogue response and the limit it exceeded.
+/// A compliance read refused before any ledger request was sent because its
+/// master mark is past the census's reach and the catalogue that would count
+/// its ledgers is over the response limit: the master mark, the estimated
+/// catalogue response, the limit it exceeded and the largest mark the census
+/// counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
     estimated_bytes: u64,
     limit_bytes: u64,
+    limit_master_alter_id: u64,
 }
 
 fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
@@ -488,10 +491,12 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 master_alter_id,
                 estimated_bytes,
                 limit_bytes,
+                mark_limit,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
+                limit_master_alter_id: *mark_limit,
             }),
             _ => None,
         }
@@ -692,13 +697,65 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) is above what \
-             Bridge can read a ledger catalogue for, so no request for ledgers was sent: a \
-             catalogue past the transport's response cap is cut off mid-read, which can leave \
+             Bridge can count ledgers for (400,000), so no request for ledgers was sent: a \
+             response past the transport's response cap is cut off mid-read, which can leave \
              Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
              since stock items, units and every other master raise it too, so a company with \
              fewer ledgers may be refused. Call ledger_masters with fields=basic, which \
              returns names, parents and opening balances without the compliance fields. \
              Retrying this call refuses again. A `group` filter does not narrow the request.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book whose mark is
+        // past what its catalogue can be read for is counted by AlterID span (#679).
+        "ledger_span_slice_over_bound"
+        | "ledger_span_duplicate_identity"
+        | "ledger_span_census_empty" => Some(
+            "Bridge counts this book's ledgers by AlterID span before reading them, because its \
+             master-alteration mark is too high to read a catalogue for, and the count could not \
+             be trusted: a slice returned more ledgers than its span can hold (Tally may have \
+             ignored its filter), a ledger was seen twice, no ledger was found at all (a closed or \
+             absent company answers an empty slice exactly like a book without ledgers). No \
+             master was requested. A ledger added or deleted \
+             during the count can cause it; retry once while the book is quiet. A repeat means \
+             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        "ledger_span_slice_malformed" | "ledger_span_identity_mismatch" => Some(
+            "Bridge counts this book's ledgers by AlterID span before reading them, and a slice \
+             of the answer was damaged, held a field it should not, or answered for another \
+             company. No master was requested. Switching or closing the company in Tally during \
+             the count can cause it; retry once with the company left alone. A repeat means \
+             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        // Not reachable after admission (the plan is bounded before it is made); named so
+        // a refusal here is never read as a transient one.
+        "ledger_span_too_many_slices" | "ledger_span_plan_invalid" | "ledger_span_incomplete" => Some(
+            "Bridge could not plan or finish the AlterID-span count of this book's ledgers. No \
+             master was requested. Retrying this call refuses again; call ledger_masters with \
+             fields=basic instead.",
+        ),
+        "ledger_span_slice_response_too_large" => Some(
+            "Bridge counts this book's ledgers by AlterID span, and one slice's answer was \
+             larger than Bridge's response limit, far more than the slice's span can account \
+             for: Tally may have ignored the slice's filter. Bridge sent nothing after that \
+             response and released nothing. Retrying is expected to refuse again; call \
+             ledger_masters with fields=basic.",
+        ),
+        "ledger_count_differs" => Some(
+            "Two counts of this book's ledgers, taken by different requests, disagree: the \
+             AlterID-span census against the catalogue, or the catalogue's or census's count \
+             against the ledgers the master read returned. A ledger added or deleted during the \
+             read can cause it; retry once while the book is quiet. A repeat means Tally answers \
+             one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
+             book's master-alteration mark: call ledger_masters with fields=basic instead. Bridge \
+             released nothing.",
+        ),
+        "ledger_count_catalogue_too_large" => Some(
+            "The census counted more ledgers than one compliance read holds, so Bridge would \
+             read them in parts by parent group, but the catalogue that names their parents \
+             would itself be larger than Bridge's response limit. Nothing was requested after \
+             the census. Call ledger_masters with fields=basic. Retrying this call refuses again.",
         ),
         // Causes reached through `party_ledger_master_read_failed` when a book too
         // large for one compliance read is read as parts by parent group (#679).
@@ -1143,6 +1200,7 @@ impl Server {
                             "master_alter_id": size.master_alter_id,
                             "estimated_bytes": size.estimated_bytes,
                             "limit_bytes": size.limit_bytes,
+                            "limit_master_alter_id": size.limit_master_alter_id,
                         });
                     }
                 }

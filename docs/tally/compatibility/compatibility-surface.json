@@ -282,6 +282,10 @@
       "sha256": "f44ef829e854973c35a110b18f43909aa6ac7b02e0e1e2d07f743791c412f9c6"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/ledger_census.rs",
+      "sha256": "9898ef162febf71e179a197e69f4d5fda6ef4a6b8c3d991209a1e93874d21820"
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs",
       "sha256": "109b3dc3ee26e1c10405cf0473c1988e9059b6338a8706e625ebc1ece929df46"
     },
@@ -383,7 +387,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs",
-      "sha256": "b4205356cd2d9496d3105e4b3eba2498135b9f14901a1bda562c8398acadff87"
+      "sha256": "43dd5cf94068105b8c1270df9113d8bb2fc15ac4ef21e5dd43a09013396979b7"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/text_encoding.rs",
@@ -627,7 +631,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "9f203f26e422b7b804300171cc248c5a907ed84e573c6d6d9397406d1933d5e1"
+      "sha256": "bdbdb9f789431dbc8e9a8c227a3952c2ed670eac5911533a363a260222dc8934"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",

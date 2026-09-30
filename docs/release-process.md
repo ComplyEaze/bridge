@@ -481,6 +481,13 @@ corepack pnpm run license:all
   reviewers; never place them in repository variables, logs, or artifacts.
 - Publish SHA-256 checksums and provenance/attestation evidence with every
   downloadable artifact.
+  Each preview archive gets a GitHub build attestation (`actions/attest`, in a
+  separate job that runs no repository code and is the only one that can mint
+  the identity token) that the publish job verifies with `gh attestation
+  verify`, requiring this workflow, this commit, the default branch and a
+  GitHub-hosted runner, before the release is created; the release notes tell
+  readers how to check a download. It records which workflow run and commit built the bytes. It is not
+  a code signature, and no client checks it yet.
 - Do not create or move a `v*` tag until signed artifacts from both supported
   platforms pass the candidate gates. Release tags must be immutable.
 

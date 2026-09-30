@@ -358,6 +358,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // ledger read too large for one request may be split by parent group, and
 // whether the parts together returned every ledger the catalogue named, once;
 // a defect there returns a book with ledgers missing or repeated.
+// `bridge-tally-protocol/src/ledger_census.rs` (bridge#679) renders the request
+// that counts a book's ledgers by AlterID span, and decides whether the slices
+// added up to a count (order, duplicates, span, an empty census); a defect there
+// sizes the next ledger read for fewer ledgers than the book holds, and a
+// request past the response cap is cut off mid-read.
 // `bridge-tally-protocol/src/native_masters.rs`,
 // `src-tauri/src/tally/runtime_masters.rs` (each with its tests) and
 // `src-tauri/src/agent_masters.rs` (bridge#724 masters read) parse Tally's
@@ -367,7 +372,7 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // stock groups only; voucher types are checked after the read and groups not at
 // all. A defect there returns another company's masters, or sends a read one
 // response cannot carry.
-pub const MAX_SURFACE_FILES: usize = 297;
+pub const MAX_SURFACE_FILES: usize = 298;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

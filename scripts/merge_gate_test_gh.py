@@ -609,6 +609,32 @@ def state():
             "+Public agent contact: " + PUBLIC_AGENT_ADDRESS + "\n"
         )
 
+    elif scenario == "digit-run-in-payload":
+        s["files"] = [{"filename": "docs/example.md", "status": "added", "additions": 3, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/docs/example.md b/docs/example.md\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/docs/example.md\n"
+            "@@ -0,0 +4,3 @@\n"
+            "+a harmless first line\n"
+            "+synthetic account " + "12345" + "678901" + " for the test\n"
+            "+a harmless last line\n"
+        )
+
+    elif scenario in {"merge-commit-conflict-comment-block", "merge-commit-conflict-block-customer-address"}:
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        extra = "#\tdocs/x.json\n" if scenario == "merge-commit-conflict-comment-block" else "# contact customer" + "@" + "company.test\n"
+        commit["commit"]["message"] = (
+            "Merge master into the lane branch\n\n"
+            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
+            "# Conflicts:\n" + extra
+        )
+        s["commits"] = [commit]
+
     elif scenario == "public-agent-spoof-header":
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])

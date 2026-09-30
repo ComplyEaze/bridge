@@ -1,5 +1,9 @@
 //! Refusal replay of captured reports; UTF-8 fault captures are sent in the
 //! negotiated UTF-16LE encoding without changing their XML content.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::tally::connection::PartyLedgerMasterSourceValidationError;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

@@ -65,7 +65,7 @@ impl PartyLedgerMasterSource {
     pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
         (self.last_voucher_date > self.to).then(|| {
             format!(
-                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first date Tally accepts on or after this computer's date, or at the start of the books if that is later; if this computer's date is wrong, correct it and export again.",
+                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.",
                 self.to.as_str(),
                 self.last_voucher_date.as_str()
             )

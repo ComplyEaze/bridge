@@ -41,8 +41,9 @@ contain customer data in release artifacts.
   `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid).
   ComplyEaze™ and ComplyEaze Bridge™, and the related logos and visual
   identity, are trade marks of SPMS Comply Eaze Solutions LLP (ComplyEaze). The
-  Apache License 2.0 does not grant any right to use them (section 6 of the
-  license); see TRADEMARKS.md. The logo and icon files — docs/brand/,
+  Apache License 2.0 does not grant permission to use them, except to describe
+  where the software came from and to reproduce the NOTICE file (section 6 of
+  the license); see TRADEMARKS.md. The logo and icon files — docs/brand/,
   src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are
   not licensed under Apache-2.0: all rights in them are reserved. They are
   included so that official builds carry the ComplyEaze Bridge identity. A fork

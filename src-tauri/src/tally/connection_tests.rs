@@ -85,6 +85,7 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
         DateBoundaryProfile::ModeAgnostic,
         TallyDate::parse("20260401").unwrap(),
         TallyDate::parse("20260731").unwrap(),
+        &TallyDate::parse("20990101").unwrap(),
     )
     .unwrap();
     let requests = [
@@ -165,10 +166,53 @@ fn party_master_snapshot_uses_the_next_common_admissible_boundary() {
         DateBoundaryProfile::ModeAgnostic,
         TallyDate::parse("20260401").unwrap(),
         TallyDate::parse("20260415").unwrap(),
+        &TallyDate::parse("20260930").unwrap(),
     )
     .expect("the derived common boundary is valid");
     assert_eq!(period.to().as_str(), "20260501");
     assert!(period.to() >= &TallyDate::parse("20260415").unwrap());
+}
+
+/// The closing date of the party-master balance snapshot, for a book from
+/// 20260401, by the extent's last voucher date and the host's today (#875).
+fn snapshot_to(last_voucher_date: &str, today: &str) -> String {
+    party_ledger_master_balance_period(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse(last_voucher_date).unwrap(),
+        &TallyDate::parse(today).unwrap(),
+    )
+    .expect("a valid period")
+    .to()
+    .as_str()
+    .to_owned()
+}
+
+#[test]
+fn party_master_snapshot_ends_near_today_when_a_voucher_is_dated_far_ahead() {
+    // A year-5000s last voucher date sits on day 31, so without the clamp it
+    // would pass through unchanged as the closing boundary. The next admissible
+    // boundary after today (30 Sep: the 1st) is what is requested.
+    assert_eq!(snapshot_to("50261231", "20260930"), "20261001");
+    assert_eq!(snapshot_to("20270115", "20260930"), "20261001");
+    // Today on an admissible boundary ends the snapshot there, not on the next one.
+    assert_eq!(snapshot_to("50261231", "20260831"), "20260831");
+}
+
+#[test]
+fn party_master_snapshot_is_unchanged_without_a_later_dated_voucher() {
+    // Last voucher before, on and (a book read years later) well before today:
+    // the clamp changes nothing, including a stray date that is exactly today.
+    assert_eq!(snapshot_to("20260415", "20260930"), "20260501");
+    assert_eq!(snapshot_to("20260930", "20260930"), "20261001");
+    assert_eq!(snapshot_to("20260731", "20990101"), "20260731");
+}
+
+#[test]
+fn party_master_snapshot_never_ends_before_the_books_begin() {
+    // A host clock before `books_from` (a book for a coming year) must not make
+    // an inverted period: the snapshot falls back to the start of the books.
+    assert_eq!(snapshot_to("20260731", "20260325"), "20260401");
 }
 
 #[test]

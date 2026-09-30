@@ -531,7 +531,7 @@
     },
     {
       "path": "src-tauri/src/agent_ledgers.rs",
-      "sha256": "d87f63dacde0491c877d35b89b41479d04f124a0b33df698143ce8eafb454c0a"
+      "sha256": "551cf77ed11a75f96788d328ca34cedaf932e7257dd8ff0a2a658a3ecd226da3"
     },
     {
       "path": "src-tauri/src/agent_movement.rs",
@@ -811,19 +811,19 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master.rs",
-      "sha256": "51f0af31c296536d46320f8feede462b4e24584f173c3f499753b6c9710a4f40"
+      "sha256": "98f0edf34e1e07a144d16f53b322e4374d0c820c0d8c376ecc5eed54cd430daa"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_tests.rs",
-      "sha256": "9b71538e941df23aba78892761a9399f376ca4fd01de9b5c0a058865e293e12b"
+      "sha256": "9c805b567ecb0fee1c7db11243065daec47b4e6972c31f69872fa9c11872fe1b"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx.rs",
-      "sha256": "358d4684f7b0dca9c0537fb7668e36e10b5326a73b933714702d155907a6fed1"
+      "sha256": "c33d2b6b39c315c2b2a020034734ff09c49bdc7210c821a2830f6e2a5668d2ac"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx_tests.rs",
-      "sha256": "e640284d8995c04276d073f8ffacde480c2c4a085c7e8e0c21bcabfe7a0cd509"
+      "sha256": "3118414f3976c7d0548132bc50dfd73e5b5f68fc9a53b78c5f625a0f7a89dfb6"
     },
     {
       "path": "src-tauri/src/reports/party_statement.rs",
@@ -855,7 +855,7 @@
     },
     {
       "path": "src-tauri/src/reports/schedule_iii_tests.rs",
-      "sha256": "930b4c0c792ccb2d45c5ba2e48c821ae30ef15f1d677b38df11c31b6cf1ade7e"
+      "sha256": "507ec147270a746a3f95adadf886785d2807e236ce91d4f7065d357e97e2d197"
     },
     {
       "path": "src-tauri/src/reports/statements.rs",
@@ -959,7 +959,7 @@
     },
     {
       "path": "src-tauri/src/tally/runtime.rs",
-      "sha256": "a9fb996f998d24c59341532992b4bbb381bf2f41c4dce3571aa3127e6f8921fd"
+      "sha256": "5ea68af509f31a30e6e6e6e344c3ea94db98ea954e38f522dd966802b15bac26"
     },
     {
       "path": "src-tauri/src/tally/runtime_control.rs",

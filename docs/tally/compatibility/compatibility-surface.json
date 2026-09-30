@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "51ee3d386c9794451306a570578d22bcd41a33e7e0feb1f40e4e736f98ef774d"
+      "sha256": "bb6146ba05d15d7a676c8b9f5c1af21d37c5ff2085c1d6252caf691d29a39159"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -283,7 +283,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs",
-      "sha256": "019b7ca8458d60b57f9ece0106d7005b67f2635198a21af32e6655fa38175ece"
+      "sha256": "c0b62d8b2056d83aed9aeac9ba6ebf4b1cb43486d52591f8809aa30d262b8060"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs",
@@ -375,7 +375,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs",
-      "sha256": "b4205356cd2d9496d3105e4b3eba2498135b9f14901a1bda562c8398acadff87"
+      "sha256": "43dd5cf94068105b8c1270df9113d8bb2fc15ac4ef21e5dd43a09013396979b7"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/text_encoding.rs",
@@ -451,7 +451,7 @@
     },
     {
       "path": "src-tauri/src/agent.rs",
-      "sha256": "db84a7017226477a4f4a73703be6a770a247c00bef7907253af5f3dbf3bf7ee9"
+      "sha256": "20ad9d3903341d49add39adcafff49da3f1fe34bc57bf266e20add104d5cd036"
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
@@ -459,7 +459,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "f1f08a7a0ead6a08e7a20e74732caf8609f18e1cfa7da7b28c6d1210f57b5224"
+      "sha256": "f10a6250564e38ea3bd26223c65709d739076d19db0fe31832d3fc439091ba27"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -615,7 +615,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "9f203f26e422b7b804300171cc248c5a907ed84e573c6d6d9397406d1933d5e1"
+      "sha256": "cc792007ad8763c3431be95ad56284915c3adf96e775ce4982f7ebdc31446204"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -943,7 +943,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "8ad25a5e6effb2de5cd8e0982a24da405347d61589a7337156e4fd708f8c1281"
+      "sha256": "1529bfe70f96648cd884da63b009423bb561383ead419978ef43f5f9f2d171c7"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",

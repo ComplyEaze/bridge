@@ -1866,17 +1866,22 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
 }
 
 /// A mark whose master estimate fits is admitted with no count read; any more
-/// is counted first, up to the largest mark whose catalogue fits the response
-/// limit, and past that it is refused before anything is sent, naming the mark
-/// (#637, #668, #679). The limits are the constants' own quotients, so a
+/// is counted first, by the catalogue up to the largest mark whose catalogue
+/// fits the response limit, by the census up to the largest mark it covers, and
+/// past that it is refused before anything is sent, naming the mark (#637,
+/// #668, #679). The limits are the constants' own quotients and products, so a
 /// changed constant moves them and the test still pins each side of each.
 #[test]
-fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catalogue() {
+fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses() {
     let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
         / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
     let count_limit = super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
         / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
-    assert_eq!((master_limit, count_limit), (4_266, 22_857));
+    let census_limit = super::ledger_census_mark_limit();
+    assert_eq!(
+        (master_limit, count_limit, census_limit),
+        (4_266, 22_857, 400_000)
+    );
     assert_eq!(
         super::admit_compliance_master_read(master_limit, None).unwrap(),
         super::ComplianceAdmission::Admitted
@@ -1888,12 +1893,20 @@ fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catal
             "mark {mark}"
         );
     }
-    for mark in [count_limit + 1, 1_000_000] {
+    for mark in [count_limit + 1, 102_161, census_limit] {
+        assert_eq!(
+            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::ComplianceAdmission::CensusFirst,
+            "mark {mark}"
+        );
+    }
+    for mark in [census_limit + 1, 1_000_000] {
         match super::admit_compliance_master_read(mark, None) {
             Err(super::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
                 estimated_bytes,
                 limit_bytes,
+                mark_limit,
             }) => {
                 assert_eq!(master_alter_id, mark);
                 assert_eq!(
@@ -1904,10 +1917,84 @@ fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catal
                     limit_bytes,
                     super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
                 );
+                assert_eq!(mark_limit, census_limit);
             }
             other => panic!("expected a catalogue refusal on the mark, got {other:?}"),
         }
     }
+}
+
+/// A census count admits a read like a catalogue's: whole when it fits one read,
+/// in parts when it does not, whatever the mark (#679). The catalogue that then
+/// names the parents is bounded by the count, at the catalogue limit.
+#[test]
+fn a_census_count_admits_the_read_and_bounds_the_catalogue_that_names_its_parents() {
+    let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+        / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
+    let count_limit = super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+        / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
+    // A real book: 864 ledgers under a mark of 102,161.
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(864)).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(master_limit)).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(master_limit + 1)).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    super::admit_counted_catalogue(count_limit).expect("a count at the catalogue limit fits");
+    match super::admit_counted_catalogue(count_limit + 1) {
+        Err(super::PartyLedgerMasterSourceValidationError::CountedCatalogueTooLarge {
+            ledgers,
+            estimated_bytes,
+            limit_bytes,
+        }) => {
+            assert_eq!(ledgers, count_limit + 1);
+            assert_eq!(
+                estimated_bytes,
+                (count_limit + 1) * super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL
+            );
+            assert_eq!(
+                limit_bytes,
+                super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+            );
+        }
+        other => panic!("expected a refusal on the counted catalogue, got {other:?}"),
+    }
+}
+
+/// A census slice of ledgers with the longest name Bridge assumes fits the
+/// budget the master read is held to, and that budget sits under the
+/// transport's cap (#679). The slice width is chosen by this product: raise the
+/// width or the assumed name length past the budget and this fails before any
+/// request could be sent. The row bytes are 846 for a four-character name on
+/// the synthetic book (two copies of the name), so the fixed part is the
+/// measured 415 characters and the name terms are assumptions.
+#[test]
+fn a_census_slice_of_the_longest_assumed_names_fits_the_response_budget() {
+    let worst_row = super::ledger_census_worst_row_bytes();
+    assert_eq!(worst_row, 3_902);
+    let slice = super::LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED * worst_row;
+    assert!(
+        slice <= super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
+        "{slice} bytes"
+    );
+    assert!(
+        slice * 2 <= bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64,
+        "a full slice must sit at least twice under the transport cap"
+    );
+    // The measured row, reproduced: 4-character names, no escaping.
+    let measured_row = 2 * (super::LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL + 2 * 4);
+    assert_eq!(measured_row, 846);
+    // The census covers the largest mark in whole slices of that width.
+    assert_eq!(
+        super::ledger_census_limits().slice_width * super::ledger_census_limits().max_slices as u64,
+        super::ledger_census_mark_limit()
+    );
 }
 
 /// The catalogue is bounded before it is sent because a response past the

@@ -1,0 +1,15 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver synthetic-company ledger census slice request (render_ledger_census_slice_request, slice (0, 8]): the slice holds no ledger, and Tally answers the same empty body (2,994 bytes) for the far slice (9,000,000, 9,000,008] and for (8, 16]",
+  "observed_date": "2026-09-30",
+  "source_response_bytes": 2994,
+  "source_response_sha256": "6e9e95e8dc9645f69e0794b10a9aac68daff14b259c9f5ba7abad57a75a52c6f",
+  "source_request_bytes": 1898,
+  "source_request_sha256": "aa953b2927bc55e394947b54f8621ac0fd3ad6d5e23bf2e8909b796a4e54b53d",
+  "fixture_bytes": 2994,
+  "fixture_sha256": "6e9e95e8dc9645f69e0794b10a9aac68daff14b259c9f5ba7abad57a75a52c6f",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 0,
+  "transformation": [],
+  "provenance_limit": "Byte-exact live response, sent once (not a paired read) from a synthetic lab company named `BRIDGE SIZE 2K` (GUID f8dab51e-a5d9-49d5-9232-54a16c8b95bb), captured 30 Sep 2026 17:57 IST on licensed TallyPrime 7.1 Silver, reads only. Establishes what Tally answers to this request shape for this slice on this book; it does not establish that an empty slice differs from the same request sent to a closed or absent company (another capture, 30 Sep 2026, returned the same 2,994-byte empty body for one; not kept), and it says nothing about a book with a different ledger-name length.",
+  "sensitivity_review": "Operator-created synthetic lab company with synthetic ledger names (`SZ Debtor NNNN`); no GSTIN, PAN, email, phone, address, URL, credentials or machine paths."
+}

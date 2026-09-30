@@ -24,7 +24,10 @@
 //!   back can keep taking the lock between another process's polls, and that
 //!   waiter can end as busy after its budget though each send was short. The
 //!   import POST is one try after its checks, so this can refuse a post whose
-//!   approval then lapses and is asked for again (#869).
+//!   approval then lapses and is asked for again (#869). A faster waiter poll
+//!   (50 ms, #697) takes a free moment sooner, so the import POST's single try
+//!   loses to a waiting process more often than it did at a 500 ms poll; how
+//!   often is not measured.
 use crate::endpoint_coordination::lease_path;
 use crate::local_files::file::open_local_file;
 #[cfg(not(test))]

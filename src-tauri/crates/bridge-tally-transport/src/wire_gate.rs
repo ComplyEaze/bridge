@@ -104,17 +104,26 @@ pub struct WireRetryPolicy {
 }
 
 impl WireRetryPolicy {
-    /// 50 ms apart, 9 s per operation. The budget is charged each pause's
-    /// requested length; the 1 s under [`WIRE_WAIT_MAX`] absorbs a timer's
-    /// overrun of the at most 180 pauses (about 5 ms each, against about 26 ms
-    /// at the old 500 ms / 9.5 s), so the wall-clock wait stays within 10 s.
+    /// 50 ms apart, 9 s per operation. `acquire` charges each pause at its
+    /// requested length and then charges what the try and the pause really took
+    /// beyond it (a timer runs long: on Windows its tick is about 15.6 ms), so
+    /// the wall-clock wait is at most the total plus the last pause's overrun
+    /// and one final try: inside [`WIRE_WAIT_MAX`] (10 s) with 1 s to spare on
+    /// any timer that overruns a pause by less than a tick.
     ///
-    /// The pause is shorter than the gap a sender leaves between operations
-    /// (the 500 ms request spacing, or less if that is ever lowered): a waiter
-    /// polling every 500 ms against a 250 ms gap kept landing on a held lock
-    /// and waited a median 2 s, against 0.1 s at a 500 ms gap (#595 C6). The
-    /// cost is about 20 open-and-try-lock calls a second for an operation that
-    /// is waiting.
+    /// The pause is shorter than the gap a sender leaves between its
+    /// operations (the request spacing is per operation): a waiter polling
+    /// every 500 ms against a 250 ms gap kept landing on a held lock. In one
+    /// two-process run on a synthetic book the waiter's whole call took a median
+    /// 2.1 s at a 250 ms gap against 0.11 s at a 500 ms gap (bridge#595, C6
+    /// comment of 30 Sep; partial confidence; the cause there is an inference).
+    /// One run of an offline test with two transports on one lock file
+    /// (`endpoint_wire_tests.rs`) shows the same gap dependence: with the old
+    /// poll a waiter lagged up to 2.3 s behind a 250 ms gap and 0.34 s behind a
+    /// 500 ms one. At the shipped 500 ms gap nothing measured improves: this
+    /// matters once the gap is lowered, and it makes `post_import`'s single
+    /// try (#869) lose more often to a waiting process. A poll costs an open
+    /// and a try-lock: about 20 a second for an operation that is waiting.
     pub const DEFAULT: Self = Self {
         delay: Duration::from_millis(50),
         total: Duration::from_millis(9_000),
@@ -166,6 +175,17 @@ impl WireWaitBudget {
         Duration::from_nanos(self.remaining_nanos.load(Ordering::SeqCst))
     }
 
+    /// Charge time the allowance did not plan for (a pause that ran long, the
+    /// try itself). Saturates at nothing left.
+    fn consume(&self, spent: Duration) {
+        let spent = u64::try_from(spent.as_nanos()).unwrap_or(u64::MAX);
+        let _ = self
+            .remaining_nanos
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                Some(left.saturating_sub(spent))
+            });
+    }
+
     /// Take up to `step` from the allowance for one pause: the pause to take,
     /// or `None` once nothing is left. Atomic, so two sends of one operation
     /// racing on a shared clone can never draw the same time twice.
@@ -206,8 +226,9 @@ impl TallyWireGate for UngatedWire {
 
 /// Take the wire lock for one send, trying again `delay` apart while another
 /// holder has it, for as long as the operation's `budget` lasts. Each pause is
-/// charged to the budget before it is taken, at its requested length, so the
-/// operation's pauses never add up to more than the budget's total. Only
+/// charged to the budget before it is taken, at its requested length, and what
+/// the try and the pause really took beyond that is charged after it, so the
+/// operation's waits cannot add up to much more than the budget's total. Only
 /// [`WireRefusal::Busy`] is tried again: an unusable lock will not change by
 /// waiting.
 pub(crate) async fn acquire(
@@ -216,6 +237,7 @@ pub(crate) async fn acquire(
     budget: &WireWaitBudget,
 ) -> Result<Box<dyn WireLockHeld>, WireRefusal> {
     loop {
+        let started = std::time::Instant::now();
         match gate.try_acquire() {
             Ok(held) => return Ok(held),
             Err(WireRefusal::Busy) => {
@@ -225,6 +247,10 @@ pub(crate) async fn acquire(
                 // A refused attempt holds nothing; nothing is held here but
                 // what the caller took before calling.
                 gate.pause(pause).await;
+                // The pause was charged at its requested length. Charge what
+                // the try and the pause really took beyond it, so a coarse
+                // timer or a slow open cannot stretch the wait past the total.
+                budget.consume(started.elapsed().saturating_sub(pause));
             }
             Err(refusal) => return Err(refusal),
         }

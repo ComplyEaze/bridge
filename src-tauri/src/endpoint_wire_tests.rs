@@ -177,7 +177,7 @@ async fn a_send_refused_past_the_bound_sends_nothing() {
             refusal: WireRefusal::Busy
         }
     );
-    // It waited its three pauses, and no longer than its bound.
+    // It waited out its 150 ms budget, and no longer than its bound.
     let waited = started.elapsed();
     assert!(waited >= Duration::from_millis(150), "{waited:?}");
     assert!(waited < WIRE_TEST_BOUND, "{waited:?}");
@@ -223,44 +223,51 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
 /// Start and end of each of a sender's operations.
 type Marks = Mutex<Vec<(Instant, Option<Instant>)>>;
 
-/// How long the stub endpoint holds each response, so one send holds the lock for about this long.
+/// How long the stub endpoint holds each response, so one send holds the lock
+/// for about this long.
 const HOLD: Duration = Duration::from_millis(40);
 
 /// #595 C6: how long after a sender's operation ends a second transport on the
-/// same lock file gets its one send in, while the sender runs `OPERATIONS`
-/// operations of six sends with `gap` between them (the request spacing).
+/// same lock file gets its one send in, while the sender runs ten operations of
+/// six back-to-back sends with `gap` between operations (the request spacing is
+/// per operation; here the gap stands for it).
 ///
 /// Two transports with a gate each on one lock file contend like two processes:
 /// flock (and LockFileEx on Windows) conflicts between separate opens, even in
-/// one process. The stub endpoint holds every response for `HOLD`, so a
-/// send holds the lock for about that long. The waiter starts 10 ms into the
-/// sender's operation, so it finds the lock held, and its lag is measured from
-/// the end of that operation, less its own hold. Real time throughout: a lock
-/// and a socket do not run on a paused clock.
-fn waiter_lag_behind_a_sender(
-    retry: WireRetryPolicy,
-    gap: Duration,
-    hold: Duration,
-) -> Vec<Duration> {
+/// one process. The waiter starts 10 ms or 120 ms into a sender operation (the
+/// second phase is mid-burst), so it finds the lock held. Its lag is measured
+/// from the end of that operation, less the time one uncontended send of its own
+/// takes (measured first, so the stub's and the machine's overhead cancel). A
+/// waiter that gets in between two of the sender's sends has no lag to measure
+/// and reads as zero. Real time throughout: a lock and a socket do not run on a
+/// paused clock.
+fn waiter_lag_behind_a_sender(retry: WireRetryPolicy, gap: Duration) -> Vec<Duration> {
     const OPERATIONS: usize = 10;
-    const SAMPLES: [usize; 4] = [1, 3, 5, 7];
+    // (index of the sender's operation, how far into it the waiter starts)
+    const SAMPLES: [(usize, u64); 4] = [(1, 10), (3, 120), (5, 10), (7, 120)];
     // Held for the whole test: a forked child would keep these locks taken.
     let _window = fork_window();
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("coordination");
     let plans =
-        vec![xml().with_delivery(Delivery::SlowHeaders(hold)); OPERATIONS * 6 + SAMPLES.len()];
+        vec![xml().with_delivery(Delivery::SlowHeaders(HOLD)); OPERATIONS * 6 + SAMPLES.len() + 1];
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let endpoint = endpoint("127.0.0.1", simulator.address().port());
     let sender = transport(&root, &endpoint, retry);
     let waiter = transport(&root, &endpoint, retry);
-    // Start and end of each of the sender's operations.
     let marks: std::sync::Arc<Marks> = Default::default();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     let lags = runtime.block_on(async {
+        // One send of the waiter's own with nothing else running.
+        let alone = Instant::now();
+        waiter
+            .post_xml_decoded("<ENVELOPE/>".into())
+            .await
+            .expect("uncontended send");
+        let own = alone.elapsed();
         let sending = async {
             for _ in 0..OPERATIONS {
                 marks.lock().unwrap().push((Instant::now(), None));
@@ -276,7 +283,7 @@ fn waiter_lag_behind_a_sender(
         };
         let waiting = async {
             let mut lags = Vec::new();
-            for index in SAMPLES {
+            for (index, offset_ms) in SAMPLES {
                 let start = loop {
                     let started = marks.lock().unwrap().get(index).map(|mark| mark.0);
                     if let Some(started) = started {
@@ -284,7 +291,7 @@ fn waiter_lag_behind_a_sender(
                     }
                     tokio::time::sleep(Duration::from_millis(1)).await;
                 };
-                tokio::time::sleep_until((start + Duration::from_millis(10)).into()).await;
+                tokio::time::sleep_until((start + Duration::from_millis(offset_ms)).into()).await;
                 waiter
                     .post_xml_decoded("<ENVELOPE/>".into())
                     .await
@@ -297,7 +304,7 @@ fn waiter_lag_behind_a_sender(
                     }
                     tokio::time::sleep(Duration::from_millis(1)).await;
                 };
-                lags.push(done.saturating_duration_since(end).saturating_sub(hold));
+                lags.push(done.saturating_duration_since(end).saturating_sub(own));
             }
             lags
         };
@@ -307,47 +314,51 @@ fn waiter_lag_behind_a_sender(
     lags
 }
 
-/// At the shipped poll a waiting send gets in within a poll and a half of the
-/// sender's operation ending, at the 250 ms gap a lower request spacing would
-/// leave. With the old 500 ms poll the same waiter lagged 240 ms or more here,
-/// and in the measured two-process run a median 2 s (#595 C6).
+/// At the shipped 50 ms poll a waiting send gets in within three polls (150
+/// ms) of the sender's operation ending, at the 250 ms gap a lower request
+/// spacing would leave. With the old 500 ms poll the same harness measured lags
+/// of about 0.23 s, 2.35 s, 1.34 s and 0.33 s at this gap (the two mid-burst
+/// phases wait several polls), and 0.23 to 0.34 s at a 500 ms gap.
 #[test]
 fn a_waiting_send_follows_a_senders_250_ms_gap_closely_at_the_shipped_poll() {
-    let lags =
-        waiter_lag_behind_a_sender(WireRetryPolicy::DEFAULT, Duration::from_millis(250), HOLD);
+    let lags = waiter_lag_behind_a_sender(WireRetryPolicy::DEFAULT, Duration::from_millis(250));
     assert!(
         lags.iter().all(|lag| *lag < Duration::from_millis(150)),
         "{lags:?}"
     );
 }
 
-/// Characterisation of the old 500 ms / 9.5 s poll, not a gate: a waiter whose
-/// poll is longer than the sender's gap lags by more than the shipped poll
-/// allows. Real time, so it runs only on request.
+/// Characterisation of the old 500 ms / 9.5 s poll, not a gate: against the
+/// same sender the mid-burst waiter waits one or more seconds at a 250 ms gap
+/// (one run of this harness measured 2.35 s and 1.34 s), which resembles the
+/// two-process run (bridge#595, C6 comment) but is tuned to this sender's cycle
+/// (six 40 ms sends plus the gap, close to the 500 ms poll period). Real time,
+/// so it runs only on request.
 #[test]
 #[ignore = "characterisation of the old 500 ms poll; about 10 s of real time"]
-fn the_old_500_ms_poll_lags_behind_a_250_ms_gap() {
+fn the_old_500_ms_poll_waits_seconds_behind_a_250_ms_gap() {
     let old =
         WireRetryPolicy::new(Duration::from_millis(500), Duration::from_millis(9_500)).unwrap();
-    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(250), HOLD);
+    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(250));
     println!("old poll, 250 ms gap: {lags:?}");
     assert!(
-        lags.iter().any(|lag| *lag >= Duration::from_millis(150)),
+        lags.iter().any(|lag| *lag >= Duration::from_secs(1)),
         "{lags:?}"
     );
 }
 
-/// The same old poll against the shipped 500 ms gap: a poll always finds a free
-/// moment within one cycle, which is why nothing showed at 500 ms.
+/// The same old poll against the shipped 500 ms gap, for comparison with the
+/// test above: a poll finds a free moment within a cycle, so no waiter lags
+/// more than about 0.35 s (measured 0.23 to 0.34 s).
 #[test]
 #[ignore = "characterisation of the old 500 ms poll; about 10 s of real time"]
-fn the_old_500_ms_poll_keeps_up_with_a_500_ms_gap() {
+fn the_old_500_ms_poll_at_a_500_ms_gap_for_comparison() {
     let old =
         WireRetryPolicy::new(Duration::from_millis(500), Duration::from_millis(9_500)).unwrap();
-    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(500), HOLD);
+    let lags = waiter_lag_behind_a_sender(old, Duration::from_millis(500));
     println!("old poll, 500 ms gap: {lags:?}");
     assert!(
-        lags.iter().all(|lag| *lag < Duration::from_millis(400)),
+        lags.iter().all(|lag| *lag < Duration::from_millis(500)),
         "{lags:?}"
     );
 }

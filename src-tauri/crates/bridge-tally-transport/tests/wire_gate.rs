@@ -6,7 +6,7 @@
 //! matters to this crate: a second holder is refused at once. The file lock the
 //! application injects is tested against another process in the application.
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc, Mutex,
 };
 use std::time::Duration;
@@ -28,6 +28,10 @@ struct Record {
     paused_for: Mutex<Vec<Duration>>,
     busy_first: AtomicUsize,
     always: Mutex<Option<WireRefusal>>,
+    /// Pauses that take no real time, so a test of the budget's arithmetic
+    /// does not depend on the timer: `acquire` charges a pause's real overrun
+    /// too, and a 1 ms sleep really takes longer.
+    instant: AtomicBool,
 }
 
 struct RecordingGate(Arc<Record>);
@@ -74,6 +78,9 @@ impl TallyWireGate for RecordingGate {
     fn pause(&self, delay: Duration) -> WirePause {
         self.0.pauses.fetch_add(1, Ordering::SeqCst);
         self.0.paused_for.lock().unwrap().push(delay);
+        if self.0.instant.load(Ordering::SeqCst) {
+            return Box::pin(std::future::ready(()));
+        }
         Box::pin(tokio::time::sleep(delay))
     }
 }
@@ -101,6 +108,17 @@ fn quick(pauses: u32) -> WireRetryPolicy {
     .unwrap()
 }
 
+/// Pauses of 50 ms a test never really waits (see `Record::instant`), with a
+/// budget of `pauses` of them: the logical length leaves real time out of the
+/// arithmetic, so a scheduler stall of a millisecond cannot change a count.
+fn logical(pauses: u32) -> WireRetryPolicy {
+    WireRetryPolicy::new(
+        Duration::from_millis(50),
+        Duration::from_millis(50) * pauses,
+    )
+    .unwrap()
+}
+
 fn xml() -> ScenarioPlan {
     ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le)
 }
@@ -114,8 +132,9 @@ fn the_retry_bound_never_exceeds_ten_seconds() {
     assert!(WireRetryPolicy::DEFAULT.total() <= WIRE_WAIT_MAX);
     assert_eq!(WIRE_WAIT_MAX, Duration::from_secs(10));
     // The shipped values. The pause stays shorter than the gap between a
-    // sender's operations (#595 C6), and at most 180 of them fit the total, so
-    // the 1 s under the cap absorbs the timer's overrun.
+    // sender's operations (#595 C6); at most 180 of them fit the total, and
+    // `acquire` also charges a pause's real overrun (see the slow-timer test
+    // below), so the wait stays inside the cap whatever the timer does.
     assert_eq!(WireRetryPolicy::DEFAULT.delay(), Duration::from_millis(50));
     assert_eq!(
         WireRetryPolicy::DEFAULT.total(),
@@ -129,6 +148,50 @@ fn the_retry_bound_never_exceeds_ten_seconds() {
     assert!(WireRetryPolicy::new(Duration::MAX, Duration::MAX).is_none());
     // A zero budget tries once and never waits.
     assert!(WireRetryPolicy::new(half, Duration::ZERO).is_some());
+}
+
+/// A gate whose lock is always taken and whose timer runs long, as a coarse
+/// timer does (on Windows a 50 ms sleep can take 60 ms or more).
+struct SlowTimerGate(Duration);
+
+impl TallyWireGate for SlowTimerGate {
+    fn try_acquire(&self) -> Result<Box<dyn WireLockHeld>, WireRefusal> {
+        Err(WireRefusal::Busy)
+    }
+
+    fn pause(&self, delay: Duration) -> WirePause {
+        Box::pin(tokio::time::sleep(delay + self.0))
+    }
+}
+
+/// The wait is bounded in real time, not only in charged time: pauses of 5 ms
+/// that really take 15 ms, against a 100 ms total, end near the total, not at
+/// twenty pauses of 15 ms (300 ms). The bound the tool text promises ("about 10
+/// seconds") rests on this.
+#[tokio::test]
+async fn a_slow_timer_cannot_stretch_the_wait_past_the_total() {
+    let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
+    let transport = TallyHttpTransport::new(TallyEndpointConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    })
+    .unwrap()
+    .with_wire_gate(
+        Arc::new(SlowTimerGate(Duration::from_millis(10))),
+        WireRetryPolicy::new(Duration::from_millis(5), Duration::from_millis(100)).unwrap(),
+    );
+    let started = std::time::Instant::now();
+    let refused = transport.post_xml_decoded("<ENVELOPE/>".into()).await;
+    let waited = started.elapsed();
+    assert_eq!(
+        refused.unwrap_err(),
+        TallyTransportError::WireRefused {
+            refusal: WireRefusal::Busy
+        }
+    );
+    assert!(waited >= Duration::from_millis(100), "{waited:?}");
+    assert!(waited < Duration::from_millis(200), "{waited:?}");
+    assert_eq!(simulator.received(), 0);
 }
 
 /// The invariant, as this crate can see it: every send takes the lock once,
@@ -164,7 +227,8 @@ async fn each_send_holds_the_lock_for_that_send_only() {
 #[tokio::test]
 async fn a_busy_lock_is_tried_again_and_the_send_then_goes_through() {
     let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
-    let (transport, record) = gated(&simulator, quick(4));
+    let (transport, record) = gated(&simulator, logical(4));
+    record.instant.store(true, Ordering::SeqCst);
     record.busy_first.store(3, Ordering::SeqCst);
     transport.post_xml("<ENVELOPE/>".into()).await.unwrap();
     assert_eq!(record.pauses.load(Ordering::SeqCst), 3);
@@ -176,7 +240,8 @@ async fn a_busy_lock_is_tried_again_and_the_send_then_goes_through() {
 #[tokio::test]
 async fn a_lock_busy_past_the_bound_refuses_and_sends_nothing() {
     let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
-    let (transport, record) = gated(&simulator, quick(2));
+    let (transport, record) = gated(&simulator, logical(2));
+    record.instant.store(true, Ordering::SeqCst);
     *record.always.lock().unwrap() = Some(WireRefusal::Busy);
     let refused = transport.post_xml_decoded("<ENVELOPE/>".into()).await;
     assert_eq!(
@@ -380,17 +445,19 @@ async fn a_lock_taken_ahead_of_a_send_is_held_while_that_send_is_in_flight() {
 #[tokio::test]
 async fn the_last_pause_is_clipped_to_what_the_budget_has_left() {
     let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
-    let policy = WireRetryPolicy::new(Duration::from_millis(2), Duration::from_millis(5)).unwrap();
+    let policy =
+        WireRetryPolicy::new(Duration::from_millis(100), Duration::from_millis(250)).unwrap();
     let (transport, record) = gated(&simulator, policy);
+    record.instant.store(true, Ordering::SeqCst);
     *record.always.lock().unwrap() = Some(WireRefusal::Busy);
     assert!(transport.get_status_decoded().await.is_err());
     let paused = record.paused_for.lock().unwrap().clone();
     assert_eq!(
         paused,
         vec![
-            Duration::from_millis(2),
-            Duration::from_millis(2),
-            Duration::from_millis(1)
+            Duration::from_millis(100),
+            Duration::from_millis(100),
+            Duration::from_millis(50)
         ]
     );
 }
@@ -439,12 +506,13 @@ async fn taking_the_lock_ahead_of_a_send_never_waits() {
 #[tokio::test]
 async fn two_sends_in_one_operation_share_one_wait_budget() {
     let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
-    let (transport, record) = gated(&simulator, quick(3));
-    let budget = || WireWaitBudget::new(Duration::from_millis(3));
+    let (transport, record) = gated(&simulator, logical(3));
+    record.instant.store(true, Ordering::SeqCst);
+    let budget = || WireWaitBudget::new(Duration::from_millis(150));
     let operation = transport.for_operation(budget());
     assert_eq!(
         operation.wire_budget_remaining(),
-        Some(Duration::from_millis(3))
+        Some(Duration::from_millis(150))
     );
     // The first send waits out two of the operation's three pauses.
     record.busy_first.store(2, Ordering::SeqCst);
@@ -452,7 +520,7 @@ async fn two_sends_in_one_operation_share_one_wait_budget() {
     assert_eq!(record.pauses.load(Ordering::SeqCst), 2);
     assert_eq!(
         operation.wire_budget_remaining(),
-        Some(Duration::from_millis(1))
+        Some(Duration::from_millis(50))
     );
     // The second send has one pause left, not a fresh three.
     *record.always.lock().unwrap() = Some(WireRefusal::Busy);

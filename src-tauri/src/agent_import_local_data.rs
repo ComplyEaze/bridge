@@ -156,7 +156,7 @@ fn scan_directory(
         Ok(entries) => entries,
         Err(error) if error.kind() == ErrorKind::NotFound => return,
         Err(_) => {
-            report.folders_not_read.push(label);
+            note_not_listed(report, label);
             return;
         }
     };
@@ -206,13 +206,19 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         journal: Journal::Absent,
     };
     match fs::read_dir(root) {
-        Err(error) if error.kind() == ErrorKind::NotFound => {
+        // A link whose target is gone (a disk that is not mounted) is not a
+        // folder that was never made: it is a folder that cannot be read.
+        Err(error) if error.kind() == ErrorKind::NotFound && !is_dangling_link(root) => {
             report.root = Root::Missing;
+            // The lease folder is the user's, not the data folder's: its locks
+            // are counted whether or not the data folder exists.
+            scan_leases(&mut report, root, coordination);
             return report;
         }
         Err(_) => {
             report.root = Root::Unreadable;
             report.journal = Journal::NotRead(DATA_FOLDER_UNREADABLE);
+            scan_leases(&mut report, root, coordination);
             return report;
         }
         Ok(_) => {}
@@ -248,14 +254,37 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         let dir = root.join(name);
         if is_link(&dir) {
             // Counted as a link above, and not entered: its class is unseen.
-            report.folders_not_read.push(name);
+            note_not_listed(&mut report, name);
         } else {
             scan_directory(&mut report, name, &dir, class, &[], ENTRY_CAP);
         }
     }
-    // The lease folder is the shared per-user one, which is the root's own
-    // `native-dispatch-leases` by default and elsewhere with a custom folder:
-    // scan each distinct one once.
+    scan_leases(&mut report, root, coordination);
+    report.journal = read_journal(root, || std::thread::sleep(Duration::from_millis(100)));
+    report
+}
+
+/// Name a folder the report did not see, once.
+fn note_not_listed(report: &mut Report, label: &'static str) {
+    if !report.folders_not_read.contains(&label) {
+        report.folders_not_read.push(label);
+    }
+}
+
+/// A symlink whose target cannot be reached.
+fn is_dangling_link(path: &Path) -> bool {
+    is_link(path) && fs::metadata(path).is_err()
+}
+
+/// Count the lease-lock files. The lease folder is the shared per-user one,
+/// which is the root's own `native-dispatch-leases` by default and elsewhere
+/// with a custom folder: scan each distinct one once. A lease folder that is a
+/// link, or under a coordination folder that is a dangling link, is named as not
+/// listed.
+fn scan_leases(report: &mut Report, root: &Path, coordination: Option<&Path>) {
+    if coordination.is_some_and(is_dangling_link) {
+        note_not_listed(report, "lock_folder");
+    }
     let mut leases: Vec<PathBuf> = Vec::new();
     for candidate in coordination
         .map(|dir| dir.join("native-dispatch-leases"))
@@ -264,25 +293,14 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
     {
         let canonical = fs::canonicalize(&candidate).unwrap_or_else(|_| candidate.clone());
         if is_link(&candidate) {
-            if !report.folders_not_read.contains(&"lock_folder") {
-                report.folders_not_read.push("lock_folder");
-            }
+            note_not_listed(report, "lock_folder");
         } else if !leases.contains(&canonical) {
             leases.push(canonical);
         }
     }
     for dir in leases {
-        scan_directory(
-            &mut report,
-            "lock_folder",
-            &dir,
-            |_| "locks",
-            &[],
-            ENTRY_CAP,
-        );
+        scan_directory(report, "lock_folder", &dir, |_| "locks", &[], ENTRY_CAP);
     }
-    report.journal = read_journal(root, || std::thread::sleep(Duration::from_millis(100)));
-    report
 }
 
 /// The data folder could not be listed, so the journal was not looked for.
@@ -425,8 +443,9 @@ fn folders() -> (PathBuf, Option<PathBuf>) {
 /// `bridge_mcp --local-data-report [--show-paths]`: prints the report as JSON.
 /// The exit status is 0 when the report is complete (a missing folder is a
 /// complete report), 2 when the folder cannot be read, 3 when the report is
-/// incomplete (the journal was not read, or an entry or folder could not be
-/// read, or a folder passed the listing cap) and 1 when it could not be printed.
+/// incomplete (the journal was not read, an entry could not be read, a folder
+/// could not be listed or is a link that was not entered, or a folder passed the
+/// listing cap: `incomplete_reason` says which) and 1 when it could not be printed.
 pub(in crate::agent) fn run(show_paths: bool) -> i32 {
     let (root, coordination) = folders();
     let report = build(&root, coordination.as_deref());

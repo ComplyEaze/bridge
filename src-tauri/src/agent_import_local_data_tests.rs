@@ -549,6 +549,7 @@ fn a_folder_past_the_entry_cap_is_reported_as_capped() {
 
 /// The tool's evidence says `partial` when the report could not read part of what
 /// it reports on, and `complete` when it read all of it.
+#[cfg(unix)]
 #[tokio::test]
 async fn the_tool_evidence_is_partial_when_a_folder_could_not_be_listed() {
     let directory = tempfile::tempdir().unwrap();
@@ -581,5 +582,40 @@ fn a_linked_lock_folder_is_named_as_not_listed() {
     let report = build(root, Some(root));
     assert_eq!(report.folders_not_read, ["lock_folder"]);
     assert_eq!(class(&report, "locks").files, 0, "the link is not followed");
+    assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
+}
+
+/// A data folder that is a link to a target that is gone is unreadable, not a
+/// folder that was never made.
+#[cfg(unix)]
+#[test]
+fn a_dangling_data_folder_link_is_unreadable_and_not_missing() {
+    let directory = tempfile::tempdir().unwrap();
+    let link = directory.path().join("Bridge");
+    std::os::unix::fs::symlink(directory.path().join("gone"), &link).unwrap();
+    let report = build(&link, None);
+    assert_eq!(report.root, Root::Unreadable);
+    assert_eq!(report.journal, Journal::NotRead(DATA_FOLDER_UNREADABLE));
+    assert_eq!(exit_status(&report, true), 2);
+}
+
+/// The lease locks are the user's, so they are counted when the data folder does
+/// not exist; a dangling coordination folder is named, not read as empty.
+#[cfg(unix)]
+#[test]
+fn the_lock_folder_is_counted_when_the_data_folder_is_missing() {
+    let directory = tempfile::tempdir().unwrap();
+    let coordination = directory.path().join("shared");
+    write(&coordination.join("native-dispatch-leases/a.lock"), b"");
+    let missing = directory.path().join("nope");
+    let report = build(&missing, Some(&coordination));
+    assert_eq!(report.root, Root::Missing);
+    assert_eq!(class(&report, "locks").files, 1);
+    assert_eq!(report.incomplete_reason(), None);
+
+    let dangling = directory.path().join("dangling");
+    std::os::unix::fs::symlink(directory.path().join("gone"), &dangling).unwrap();
+    let report = build(&missing, Some(&dangling));
+    assert_eq!(report.folders_not_read, ["lock_folder"]);
     assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
 }

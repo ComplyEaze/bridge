@@ -285,6 +285,111 @@ fn live_capture_backs_the_recognised_duty_head_vocabulary() {
     );
 }
 
+fn captured_live_ledger_masters_with_sgst_utgst() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-masters-sgst-utgst.utf16le.xml"
+    );
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
+    // Bytes TallyPrime 7.1 Silver sent for ledger_masters fields=compliance (see the
+    // fixture's JSON sidecar for the binary, relay and times): ledgers created with the
+    // literal head `SGST/UTGST` come back with exactly that string, and TAXTYPE GST.
+    // Before this head was recognised the same bytes classified as `unrecognized`,
+    // and a caller could not tell those ledgers from a misspelt head.
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20250401").unwrap(),
+        TallyDate::parse("20250804").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
+        "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
+        "the fixture answers exactly the request ledger_masters sends"
+    );
+    let parsed = parse_native_party_ledger_master_records_with_evidence(
+        &captured_live_ledger_masters_with_sgst_utgst(),
+        COMPANY_GUID,
+    )
+    .expect("the live SGST/UTGST capture parses");
+    assert_eq!(parsed.records.len(), 36);
+
+    let mut heads: Vec<(String, GstDutyHead)> = parsed
+        .records
+        .iter()
+        .filter_map(|row| match &row.record.fields.gst_duty_head {
+            GstDutyHeadObservation::Recognized { raw, head } => Some((raw.clone(), *head)),
+            _ => None,
+        })
+        .collect();
+    heads.sort_by(|left, right| left.0.cmp(&right.0));
+    heads.dedup();
+    assert_eq!(
+        heads,
+        vec![
+            ("CGST".to_string(), GstDutyHead::Cgst),
+            ("Cess".to_string(), GstDutyHead::Cess),
+            ("IGST".to_string(), GstDutyHead::Igst),
+            ("SGST/UTGST".to_string(), GstDutyHead::SgstUtgst),
+            ("State Tax".to_string(), GstDutyHead::StateTax),
+            ("UT Tax".to_string(), GstDutyHead::UtTax),
+        ],
+        "every recognised spelling is backed by bytes Tally sent"
+    );
+
+    let sgst_utgst_rows: Vec<_> = parsed
+        .records
+        .iter()
+        .filter(|row| {
+            matches!(
+                &row.record.fields.gst_duty_head,
+                GstDutyHeadObservation::Recognized { head: GstDutyHead::SgstUtgst, .. }
+            )
+        })
+        .collect();
+    assert_eq!(sgst_utgst_rows.len(), 2, "the probe ledger and the batch ledger");
+    for row in sgst_utgst_rows {
+        assert_eq!(row.record.ledger.parent.returned_text(), Some("Duties & Taxes"));
+        assert_eq!(row.record.fields.tax_type.returned_text(), Some("GST"));
+    }
+    assert!(captured_live_ledger_masters_with_sgst_utgst()
+        .contains(">SGST/UTGST</GSTDUTYHEAD>"));
+
+    // The serialised wire shape a caller of ledger_masters sees.
+    let wire = serde_json::to_value(&GstDutyHeadObservation::Recognized {
+        raw: "SGST/UTGST".to_string(),
+        head: GstDutyHead::SgstUtgst,
+    })
+    .unwrap();
+    assert_eq!(
+        wire,
+        json!({"observation": "recognized", "raw": "SGST/UTGST", "head": "sgst_utgst"})
+    );
+}
+
+#[test]
+fn sgst_utgst_on_a_non_gst_ledger_is_contradictory_not_recognised() {
+    assert_eq!(
+        GstDutyHeadObservation::from_observations(
+            &PartyLedgerMasterFieldObservation::Returned("Others".to_string()),
+            &PartyLedgerMasterFieldObservation::Returned("SGST/UTGST".to_string()),
+        ),
+        GstDutyHeadObservation::Contradictory {
+            tax_type: "Others".to_string(),
+            raw: "SGST/UTGST".to_string(),
+        }
+    );
+}
+
 #[test]
 fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     // bridge#624, over a live TallyPrime 7.1 Silver capture of the request this
@@ -505,6 +610,7 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         ("CGST", GstDutyHead::Cgst),
         ("IGST", GstDutyHead::Igst),
         ("State Tax", GstDutyHead::StateTax),
+        ("SGST/UTGST", GstDutyHead::SgstUtgst),
         ("UT Tax", GstDutyHead::UtTax),
         ("Cess", GstDutyHead::Cess),
     ] {
@@ -527,6 +633,10 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         "State",
         "Integrated",
         "Union Territory Tax",
+        "sgst/utgst",
+        "SGST / UTGST",
+        "SGST/UTGST ",
+        "UTGST",
     ] {
         assert_eq!(
             GstDutyHeadObservation::from_observations(

@@ -192,6 +192,14 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: LedgerCensusError,
     },
+    /// A slice of the ledger census (#679) failed validation: another company,
+    /// a damaged response, a foreign field, or a ledger seen twice within the
+    /// slice. Nothing was sized from it.
+    #[error("Tally ledger census slice failed validation")]
+    LedgerSpanSliceInvalid {
+        #[source]
+        source: StandardLedgerCatalogError,
+    },
     /// One slice of the ledger census answered past the transport's response
     /// cap (#679), more than the slice's span can account for: Tally may have
     /// ignored the slice's filter. The transport drops the connection with the
@@ -253,6 +261,15 @@ impl PartyLedgerMasterSourceValidationError {
             Self::VoucherWitnessAbsent => "parent_partition_voucher_witness_absent",
             Self::ParentPartResponseTooLarge { .. } => "parent_part_response_too_large",
             Self::LedgerSpan { source } => source.safe_code(),
+            Self::LedgerSpanSliceInvalid { source } => match source {
+                StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
+                StandardLedgerCatalogError::CompanyIdentityMismatch => {
+                    "ledger_span_identity_mismatch"
+                }
+                StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                StandardLedgerCatalogError::MalformedResponse
+                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+            },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
             Self::CountedCatalogueTooLarge { .. } => "ledger_count_catalogue_too_large",
@@ -339,9 +356,12 @@ const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
 const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
 
 /// Characters of a GUID-only census row that do not depend on the ledger's
-/// name: 415 on the synthetic book, from 846 bytes for a row whose name is 4
-/// characters (two copies of it), 30 Sep 2026. PARTIAL: one book, one company
-/// name length; the company name is not in the row.
+/// name, counting the row's separators: 391 in the committed eight-row capture
+/// (a row is 2 x name + about 390 characters), and about 395 in the mean row of
+/// the synthetic book's 800-wide slices (846 bytes a row; about 395 if those
+/// names were as long as the capture's). 415 is above both, so a change that lowered it below the capture
+/// fails a test; it is a margin, not a measurement. PARTIAL: one company name
+/// length (the company name is not in the row), no row with aliases.
 const LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL: u64 = 415;
 
 /// The longest ledger name (in characters) a census row is assumed to carry.
@@ -1693,6 +1713,7 @@ impl TallyClient {
                 let counted = self
                     .count_ledgers_by_span(
                         identity,
+                        &opening_extent,
                         master_mark,
                         &mut evidence,
                         &mut count_evidence,
@@ -1936,14 +1957,17 @@ impl TallyClient {
     /// per slice of `(0, mark]`, each asking for the ledgers' GUIDs only, and
     /// no slice is read twice. Stability of the book across the census is not
     /// proven here: the caller's opening and closing company extent, which
-    /// carry the master mark and the company GUID, are the bracket, and an
+    /// carry the master mark and the company GUID, are the bracket (and the
+    /// caller reads the extent again before it acts on the count), and an
     /// empty slice is the same body a closed or absent company answers with, so
     /// a census that found no ledger at all is refused rather than counted.
-    /// Each slice's evidence is added to `evidence` and to `count_evidence` as
-    /// it completes, so a failure still accounts for what was sent.
+    /// Each slice that answered is added to `evidence` and to `count_evidence`
+    /// as it completes, so a refusal still accounts for what was received; a
+    /// slice whose request failed answered nothing and adds nothing.
     async fn count_ledgers_by_span(
         &self,
         identity: &VerifiedCompanyIdentity,
+        opening_extent: &CompanyBookExtent,
         master_mark: u64,
         evidence: &mut RuntimeReadEvidence,
         count_evidence: &mut RuntimeReadEvidence,
@@ -1968,15 +1992,27 @@ impl TallyClient {
                 MAX_STANDARD_LEDGER_IDENTITY_ROWS as u64,
             )
             .map_err(|source| {
-                PartyLedgerMasterSourceValidationError::LedgerCountInvalid { source }
+                PartyLedgerMasterSourceValidationError::LedgerSpanSliceInvalid { source }
             })?;
             census
                 .accept(guids)
                 .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
         }
-        Ok(census
+        let counted = census
             .finish()
-            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?)
+            .map_err(|source| PartyLedgerMasterSourceValidationError::LedgerSpan { source })?;
+        // A company closed, reopened or switched during the census answers the
+        // remaining slices with the same empty body as a slice past every
+        // ledger, so the count can be low, and the count sizes the next read.
+        // The extent (company GUID and marks) is read again before the count
+        // leaves this function, so no caller can use a count without it, and
+        // any change refuses the call.
+        if self.fetch_company_book_extent(identity).await? != *opening_extent {
+            return Err(anyhow::Error::new(
+                PairedReadValidationError::PartyLedgerExtent,
+            ));
+        }
+        Ok(counted)
     }
 
     /// One master-and-balance pair of a compliance ledger read: the whole book,

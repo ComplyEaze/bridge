@@ -1987,9 +1987,32 @@ fn a_census_slice_of_the_longest_assumed_names_fits_the_response_budget() {
         slice * 2 <= bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64,
         "a full slice must sit at least twice under the transport cap"
     );
-    // The measured row, reproduced: 4-character names, no escaping.
-    let measured_row = 2 * (super::LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL + 2 * 4);
-    assert_eq!(measured_row, 846);
+    // The fixed characters of a row are at least what the committed live capture
+    // shows (its row minus two copies of its name), so lowering the constant
+    // below a real row fails here.
+    let capture = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/ledger-census-slice-eight-rows.utf16le.xml"
+    );
+    let text = String::from_utf16(
+        &capture
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let start = text.find("<COLLECTION").unwrap();
+    let inner =
+        &text[start + text[start..].find('>').unwrap() + 1..text.find("</COLLECTION>").unwrap()];
+    let rows = inner.matches("<LEDGER ").count();
+    let name_chars: usize = inner
+        .split("<NAME>")
+        .skip(1)
+        .map(|part| part.find("</NAME>").unwrap())
+        .sum();
+    assert_eq!(rows, 8);
+    let fixed_per_row = (inner.len() - 2 * name_chars).div_ceil(rows) as u64;
+    assert_eq!(fixed_per_row, 391);
+    assert!(fixed_per_row <= super::LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL);
     // The census covers the largest mark in whole slices of that width.
     assert_eq!(
         super::ledger_census_limits().slice_width * super::ledger_census_limits().max_slices as u64,

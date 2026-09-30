@@ -622,8 +622,8 @@ was open. Each request cost about 0.15 s on the 316,028-mark book, whether or no
 inside the bracket, and does not pair the reads.
 
 **Not established** for the census: that AlterIDs are distinct across a book's ledgers (a slice's row
-bound rests on it; Bridge refuses a slice that breaks it, and any ledger sharing an AlterID would be
-missed), how many names a ledger's row carries when it has aliases (each alias would add to the row
+bound rests on it: two ledgers sharing an AlterID both fall in one slice, and only a slice pushed past
+its span by them is refused, so this can cost a spurious refusal, not a missed ledger), how many names a ledger's row carries when it has aliases (each alias would add to the row
 past the two copies bounded here), a book whose ledgers' AlterIDs exceed its master mark (the mark is
 assumed to bound them; a census then undercounts, and Bridge compares the count with the ledgers the
 read returns and refuses a difference), a mark above 400,000, a slice of names longer than 88

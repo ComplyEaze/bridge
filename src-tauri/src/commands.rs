@@ -358,9 +358,9 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
         error
             .chain()
             .find_map(|cause| match cause.downcast_ref::<Validation>()? {
-                error @ (Validation::LedgerSpan { .. } | Validation::LedgerCountDiffers { .. }) => {
-                    Some((error.safe_code(), false))
-                }
+                error @ (Validation::LedgerSpan { .. }
+                | Validation::LedgerSpanSliceInvalid { .. }
+                | Validation::LedgerCountDiffers { .. }) => Some((error.safe_code(), false)),
                 error @ (Validation::LedgerSpanSliceResponseTooLarge { .. }
                 | Validation::CountedCatalogueTooLarge { .. }) => Some((error.safe_code(), true)),
                 _ => None,

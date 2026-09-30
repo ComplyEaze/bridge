@@ -1741,6 +1741,39 @@ mod through_the_tool {
         plans
     }
 
+    /// `census_plans` for a census that completes: the book's extent is read
+    /// again after the last slice, before any read is admitted by the count
+    /// (#679). `after` is that extent's text.
+    fn census_plans_after(
+        mark: u64,
+        slices: Vec<String>,
+        after: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(slices.into_iter().map(xml));
+        pair(&mut plans, xml(after));
+        for source in reads {
+            pair(&mut plans, xml(source));
+        }
+        if let Some(closing) = closing {
+            pair(&mut plans, xml(closing));
+            plans.extend([xml(companies()), status(), xml(companies())]);
+        }
+        plans
+    }
+
+    /// [`census_plans_after`] with the extent unchanged.
+    fn census_plans_checked(
+        mark: u64,
+        slices: Vec<String>,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
+        census_plans_after(mark, slices, extent_with_master_mark(mark), reads, closing)
+    }
+
     /// A book whose mark (102,161: the shape of a real book of 864 ledgers) is
     /// past what its catalogue can be read for is counted by AlterID span, one
     /// single read per slice of 4,000, and the count admits the whole read: the
@@ -1750,7 +1783,7 @@ mod through_the_tool {
         let mark = 102_161_u64;
         let slices = census_bodies(mark, GUID, &[(24, 0..9)]);
         assert_eq!(slices.len(), 26);
-        let plans = census_plans(
+        let plans = census_plans_checked(
             mark,
             slices,
             vec![masters(), balances(), groups()],
@@ -1787,7 +1820,7 @@ mod through_the_tool {
         assert_ne!(wire(&one_slice), wire(&two_slices));
         let mut bytes = Vec::new();
         for slices in [&one_slice, &two_slices] {
-            let plans = census_plans(
+            let plans = census_plans_checked(
                 mark,
                 slices.clone(),
                 vec![masters(), balances(), groups()],
@@ -1814,7 +1847,7 @@ mod through_the_tool {
     #[tokio::test]
     async fn a_census_count_that_differs_from_the_master_read_stops_the_read_after_its_master() {
         let mark = 102_161_u64;
-        let plans = census_plans(
+        let plans = census_plans_checked(
             mark,
             census_bodies(mark, GUID, &[(24, 0..8)]),
             vec![masters()],
@@ -1898,6 +1931,62 @@ mod through_the_tool {
         assert_eq!(refusal(&response)["cause"], "ledger_count_differs");
     }
 
+    /// A company closed, reopened or switched during the census answers the
+    /// slices after that moment with the same empty body as a slice past every
+    /// ledger, so the count can be low, and the count sizes the next read. The
+    /// book's extent is read again after the census and before that read is
+    /// admitted (#679): the company switching after the first, a middle or the
+    /// last slice that held ledgers refuses the call, and nothing is sent after
+    /// that extent (the plans end there; a request past them fails the count).
+    #[tokio::test]
+    async fn a_book_that_changes_during_the_census_is_refused_before_the_next_read_is_sized() {
+        let mark = 102_161_u64;
+        // Ledgers up to the slice of the switch, empty answers after it.
+        for switched_after in [0_usize, 12, 24] {
+            let filled: Vec<(usize, std::ops::Range<u32>)> = (0..=switched_after)
+                .step_by(12)
+                .enumerate()
+                .map(|(position, slice)| {
+                    let start = position as u32 * 5;
+                    (slice, start..start + 5)
+                })
+                .collect();
+            let slices = census_bodies(mark, GUID, &filled);
+            // The master mark moved: the book was edited, or another was opened.
+            let plans = census_plans_after(
+                mark,
+                slices.clone(),
+                extent_with_master_mark(mark + 1),
+                Vec::new(),
+                None,
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(
+                requests, total,
+                "a read was sent after the switch at slice {switched_after}"
+            );
+            assert_eq!(
+                refusal(&response)["cause"],
+                "party_ledger_extent_changed",
+                "switch at slice {switched_after}"
+            );
+            // Another company's extent answers the same request: still nothing more.
+            let other = extent_with_master_mark(mark).replace(GUID, LAB_COMPANY_GUID);
+            assert_ne!(other, extent_with_master_mark(mark));
+            let plans = census_plans_after(mark, slices, other, Vec::new(), None);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(
+                requests, total,
+                "a read was sent after the company switched at slice {switched_after}"
+            );
+            assert_eq!(response["isError"], true, "{response}");
+        }
+    }
+
     /// A census that refuses still accounts for every slice it sent, the
     /// refused one included: two refusals that differ only in the size of the
     /// last slice differ in evidence bytes by exactly that difference.
@@ -1928,10 +2017,28 @@ mod through_the_tool {
     }
 
     #[tokio::test]
+    async fn a_ledger_seen_twice_within_one_slice_stops_the_census_there() {
+        let twice = census_slice(GUID, 0..3);
+        let second = format!("-{:08x}", 0x2000_0000 + 1);
+        let first = format!("-{:08x}", 0x2000_0000);
+        assert_eq!(twice.matches(&second).count(), 1);
+        let cause = census_stops_at(vec![twice.replace(&second, &first)]).await;
+        assert_eq!(cause, "ledger_span_duplicate_identity");
+    }
+
+    #[tokio::test]
+    async fn a_failed_slice_is_refused_as_malformed_not_counted_as_empty() {
+        let failed = census_empty().replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+        assert_ne!(failed, census_empty());
+        let cause = census_stops_at(vec![failed]).await;
+        assert_eq!(cause, "ledger_span_slice_malformed");
+    }
+
+    #[tokio::test]
     async fn a_slice_of_another_company_stops_the_census_there() {
         let other = "00000000-0000-0000-0000-000000000000";
         let cause = census_stops_at(vec![census_empty(), census_slice(other, 0..3)]).await;
-        assert_eq!(cause, "ledger_catalogue_identity_mismatch");
+        assert_eq!(cause, "ledger_span_identity_mismatch");
     }
 
     #[tokio::test]
@@ -1965,7 +2072,7 @@ mod through_the_tool {
     async fn a_census_count_past_one_read_is_read_in_parts_after_the_catalogue() {
         let mark = 30_000_u64;
         let rows = split_book();
-        let mut plans = census_plans(
+        let mut plans = census_plans_checked(
             mark,
             census_bodies(mark, GUID, &[(0, 0..4_000), (1, 4_000..4_300)]),
             vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
@@ -2000,7 +2107,7 @@ mod through_the_tool {
     async fn a_census_and_a_catalogue_that_count_differently_stop_the_read_after_the_catalogue() {
         let mark = 30_000_u64;
         let rows = split_book();
-        let plans = census_plans(
+        let plans = census_plans_checked(
             mark,
             census_bodies(mark, GUID, &[(0, 0..4_000), (1, 4_000..4_299)]),
             vec![generated_catalogue(&rows.iter().collect::<Vec<_>>())],
@@ -2027,7 +2134,8 @@ mod through_the_tool {
             (4, 16_000..20_000),
             (5, 20_000..22_858),
         ];
-        let plans = census_plans(mark, census_bodies(mark, GUID, &filled), Vec::new(), None);
+        let plans =
+            census_plans_checked(mark, census_bodies(mark, GUID, &filled), Vec::new(), None);
         let total = plans.len();
         let (response, requests) = call_with_max_bytes(
             plans,

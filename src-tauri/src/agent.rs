@@ -677,13 +677,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // past what its catalogue can be read for is counted by AlterID span (#679).
         "ledger_span_slice_over_bound"
         | "ledger_span_duplicate_identity"
-        | "ledger_span_census_empty" => Some(
+        | "ledger_span_census_empty"
+        | "ledger_span_slice_malformed"
+        | "ledger_span_identity_mismatch" => Some(
             "Bridge counts this book's ledgers by AlterID span before reading them, because its \
              master-alteration mark is too high to read a catalogue for, and the count could not \
              be trusted: a slice returned more ledgers than its span can hold (Tally may have \
              ignored its filter), a ledger was seen twice, no ledger was found at all (a closed or \
-             absent company answers an empty slice exactly like a book without ledgers). No \
-             master was requested. A ledger added or deleted \
+             absent company answers an empty slice exactly like a book without ledgers), a \
+             slice was damaged or held a field it should not, or a slice answered for another \
+             company. No master was requested. A ledger added or deleted \
              during the count can cause it; retry once while the book is quiet. A repeat means \
              Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
              with fields=basic instead.",

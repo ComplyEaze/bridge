@@ -10,8 +10,10 @@
 //!
 //! The census asks for the ledgers in slices `(after, through]` of AlterID,
 //! fetching each row's GUID only. AlterIDs are taken to be distinct (PARTIAL:
-//! no two ledgers shared one on any book read, which is not a proof), so a
-//! slice holds at most `through - after` ledgers, and the rows of the slices, taken together,
+//! no two ledgers shared one on any book read, which is not a proof; two that
+//! did would both fall in one slice and could push it over its span, which is
+//! refused, never undercounted), so a slice holds at most `through - after`
+//! ledgers, and the rows of the slices, taken together,
 //! are the book's ledgers if the slices cover `(0, mark]` and the book did not
 //! change while they were read (the caller brackets the census with the
 //! opening and closing company extent; nothing here proves that).

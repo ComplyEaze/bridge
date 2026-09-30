@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "bb6146ba05d15d7a676c8b9f5c1af21d37c5ff2085c1d6252caf691d29a39159"
+      "sha256": "4cc9f32f363acf3de1b7f1530aa08c26d15d46aaceb9ffc1eea1434a47c7a479"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -282,6 +282,10 @@
       "sha256": "f44ef829e854973c35a110b18f43909aa6ac7b02e0e1e2d07f743791c412f9c6"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/ledger_census.rs",
+      "sha256": "9898ef162febf71e179a197e69f4d5fda6ef4a6b8c3d991209a1e93874d21820"
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs",
       "sha256": "c0b62d8b2056d83aed9aeac9ba6ebf4b1cb43486d52591f8809aa30d262b8060"
     },
@@ -451,7 +455,7 @@
     },
     {
       "path": "src-tauri/src/agent.rs",
-      "sha256": "20ad9d3903341d49add39adcafff49da3f1fe34bc57bf266e20add104d5cd036"
+      "sha256": "9116cdd8d68d5e80644f0e630038e294a585ba3425e40f3df7a0fb4c8f7a2428"
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
@@ -459,7 +463,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "f10a6250564e38ea3bd26223c65709d739076d19db0fe31832d3fc439091ba27"
+      "sha256": "2a2aa8386c62d4af6fa9649a09489bb31d3195e88bbc48fa92196b4354f6975b"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -615,7 +619,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "cc792007ad8763c3431be95ad56284915c3adf96e775ce4982f7ebdc31446204"
+      "sha256": "082720fd1cff5d5a9281fa4e33800b2f89656272c120ab9e8d511000fb1ca691"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -943,7 +947,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "1529bfe70f96648cd884da63b009423bb561383ead419978ef43f5f9f2d171c7"
+      "sha256": "c17211fbfb706deba132afec9393d95e911122e2a77c578638a0a9c80bb75e91"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",
@@ -1135,7 +1139,7 @@
     },
     {
       "path": "tools/bridge-tally-compatibility/src/lib.rs",
-      "sha256": "f232058869783078bb2669b9014fbd1810777d9239f52bc90264e57bc105dc82"
+      "sha256": "38976e9329b553677fcea23438c6b144831df4b96e77718e31345b899aa53c2a"
     },
     {
       "path": "tools/bridge-tally-compatibility/src/main.rs",

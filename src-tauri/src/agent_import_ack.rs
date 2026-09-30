@@ -536,7 +536,7 @@ fn render_review_text(
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
     let preview = format!(
-        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
+        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
         shown(&row.date),

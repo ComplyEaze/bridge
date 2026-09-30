@@ -1578,6 +1578,22 @@ fn the_agent_preview_says_when_the_post_happens() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     assert!(batch.ends_with(&format!("\n{now}")), "{batch}");
+    // The product is named in full in every line the person reads, in a
+    // single voucher's dialog and in a batch's.
+    for text in [&single, &batch] {
+        for (at, _) in text.match_indices("Bridge") {
+            assert!(
+                text[..at].ends_with("ComplyEaze "),
+                "a bare Bridge at {at}: {text}"
+            );
+        }
+        assert!(text.contains(
+            "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference."
+        ));
+        assert!(text.contains(
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
+        ));
+    }
     // The footer counts inside the caps: one long enough is refused.
     let crowded = vec!["x".to_string(); BATCH_REVIEW_MAX_LINES];
     for line in [&one, &two] {

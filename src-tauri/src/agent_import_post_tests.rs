@@ -30,6 +30,17 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
     (line, endpoint)
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 #[test]
 fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
     let (line, endpoint) = batch();
@@ -46,10 +57,12 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
         "REF-1",
         "Synthetic test only",
         "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.",
         &line.batch_id,
     ] {
         assert!(preview.contains(field), "missing {field}");
     }
+    every_bridge_is_the_brand(&preview);
 }
 
 #[test]

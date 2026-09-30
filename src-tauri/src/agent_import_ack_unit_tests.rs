@@ -16,6 +16,17 @@ fn row_json(entries: usize, narration: &str) -> Value {
     })
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 fn doubt() -> Value {
     json!({"state":"posted_under_changed_masters","ledgers":["Cash"]})
 }
@@ -40,6 +51,11 @@ fn the_review_shows_the_doubt_and_the_voucher() {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
     assert!(preview.starts_with("Record that you reviewed ONE Journal"));
+    assert!(
+        preview.contains("\nComplyEaze Bridge posted it, but these ledgers no longer resolve\n"),
+        "{preview}"
+    );
+    every_bridge_is_the_brand(&preview);
     assert!(
         preview.contains(&format!("Choosing \"{REVIEW_BUTTON}\"")),
         "names the button the platform shows: {preview}"
@@ -508,16 +524,20 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         &format!("Batch: {BATCH}"),
         "I reviewed these 3 vouchers in Tally.",
         "reconciliation_required",
+        "ComplyEaze Bridge posted them, but cannot confirm that only they",
+        "\" ComplyEaze Bridge changes nothing in Tally,",
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
+    every_bridge_is_the_brand(&preview);
     let masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
     let preview =
         batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
     assert!(
-        preview.contains("these ledgers no longer resolve"),
+        preview.contains("ComplyEaze Bridge posted them, but these ledgers no longer resolve"),
         "{preview}"
     );
+    every_bridge_is_the_brand(&preview);
     assert!(preview.contains("  \"Cash\""), "{preview}");
     // Too many ledgers for one dialog.
     let wide = (0..40)

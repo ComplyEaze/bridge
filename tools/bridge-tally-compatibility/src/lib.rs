@@ -363,7 +363,11 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // added up to a count (order, duplicates, span, an empty census); a defect there
 // sizes the next ledger read for fewer ledgers than the book holds, and a
 // request past the response cap is cut off mid-read.
-pub const MAX_SURFACE_FILES: usize = 293;
+// `src-tauri/src/request_trail.rs` (bridge#918) builds, field by field, the
+// record of a call's Tally sends that reaches the egress receipt; a defect
+// there puts request or response text, a company name or a row value into a
+// journal the user keeps.
+pub const MAX_SURFACE_FILES: usize = 295;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

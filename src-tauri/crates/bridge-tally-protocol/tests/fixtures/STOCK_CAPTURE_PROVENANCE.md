@@ -26,9 +26,18 @@ Every file is a live capture, never hand-written.
   - Stock Summary: no `HEADER`/`STATUS`, and 3 `DSPACCNAME`/`DSPSTKINFO` pairs (the top-level stock groups).
   - **The report's closing-amount total equals the sum of the stock items' `CLOSINGVALUE` exactly (3000.01).** The same tie held on a larger real book at the same period end (recorded privately, by role only).
 
+**Company inventory flags (2026-09-30 19:51:37 IST, the same book, extent read before and after and equal).**
+- **Request:** the production book-extent Company collection, with its `FETCH` extended by `ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON` and seven `NUM*` counts, and one single-term filter `$GUID = "<the company's GUID>"`.
+- **Why the filter:** a `Company` collection ignores `SVCURRENTCOMPANY` and returns every loaded company (§12a.7). The filter returned exactly this company's row. That is what makes the capture safe to keep.
+- **Values:** `ISINTEGRATED` `Yes`, `ISINVENTORYON` `Yes`, `ISBATCHWISEON` `Yes`, and `NUMSTOCKITEMS` 11.
+  - `NUMSTOCKITEMS`, `NUMGODOWNS` and `NUMUNITS` equal the rows in the captures above.
+  - `NUMVOUCHERTYPES` (35) does not equal the voucher-type rows (26).
+
 | file | bytes | sha256 | content |
 |---|---|---|---|
 | `stock_items_fy_request.utf16le.xml` | 1258 | `dacd47b0b96772f220b97abf3714650c760a98f4e54197b681ba35cd69c9edab` | request, stock items |
 | `stock_items_shape_lab_fy_live.utf16le.xml` | 16904 | `7a76a52474b6b56357d687474d3f916f7a43618e3d57d5454cf11de0f9eea467` | stock items, 11 rows |
 | `stock_summary_report_fy_request.utf16le.xml` | 758 | `17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8` | request, Stock Summary |
 | `stock_summary_report_shape_lab_fy_live.utf16le.xml` | 1370 | `862c3206e5f22922cea932380da07d2170591085da7ef8227f4c911452bfe9a4` | Stock Summary, 3 rows |
+| `company_inventory_flags_request.utf16le.xml` | 1624 | `e30ddb83ffbb0604046e1d13cc3d771983c6892cbb7bf2908350ebc2db59e869` | request, company inventory flags |
+| `company_inventory_flags_shape_lab_live.utf16le.xml` | 4902 | `3bdc6c55ee4c20df7d8f6739926f20ba9469ca9c1fef776d3c17ee57b4c1dc10` | company inventory flags, 1 row |

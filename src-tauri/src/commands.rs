@@ -381,7 +381,7 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
             tally_command_error(
                 code,
                 "Response validation",
-                "Bridge withheld the party/ledger master: counting this company's ledgers did not add up. Nothing was released.",
+                "Bridge withheld the party/ledger master: counting this company's ledgers failed or did not add up. Nothing was released.",
                 "after_change",
                 false,
                 "Retry once while nobody is editing this company in Tally. If it refuses again, this company cannot be exported by Bridge yet.",

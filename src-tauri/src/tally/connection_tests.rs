@@ -1971,9 +1971,9 @@ fn a_census_count_admits_the_read_and_bounds_the_catalogue_that_names_its_parent
 /// budget the master read is held to, and that budget sits under the
 /// transport's cap (#679). The slice width is chosen by this product: raise the
 /// width or the assumed name length past the budget and this fails before any
-/// request could be sent. The row bytes are 846 for a four-character name on
-/// the synthetic book (two copies of the name), so the fixed part is the
-/// measured 415 characters and the name terms are assumptions.
+/// request could be sent. The fixed part of a row (415 characters) is a margin
+/// above the committed capture's 391, checked below, and the name terms are
+/// assumptions.
 #[test]
 fn a_census_slice_of_the_longest_assumed_names_fits_the_response_budget() {
     let worst_row = super::ledger_census_worst_row_bytes();

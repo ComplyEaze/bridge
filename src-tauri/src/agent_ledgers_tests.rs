@@ -1938,6 +1938,11 @@ mod through_the_tool {
     /// admitted (#679): the company switching after the first, a middle or the
     /// last slice that held ledgers refuses the call, and nothing is sent after
     /// that extent (the plans end there; a request past them fails the count).
+    /// The refusal comes from the extent alone whatever the slices held; the
+    /// three positions keep a partial count (5, 10 and 15 ledgers against the
+    /// nine master rows) from being read as a match. A company closed and
+    /// reopened with equal marks is not caught here: its low count meets the
+    /// count-versus-master-rows test above, after the master pair is sent.
     #[tokio::test]
     async fn a_book_that_changes_during_the_census_is_refused_before_the_next_read_is_sized() {
         let mark = 102_161_u64;

@@ -357,11 +357,11 @@ const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
 
 /// Characters of a GUID-only census row that do not depend on the ledger's
 /// name, counting the row's separators: 391 in the committed eight-row capture
-/// (a row is 2 x name + about 390 characters), and about 395 in the mean row of
-/// the synthetic book's 800-wide slices (846 bytes a row; about 395 if those
-/// names were as long as the capture's). 415 is above both, so a change that lowered it below the capture
-/// fails a test; it is a margin, not a measurement. PARTIAL: one company name
-/// length (the company name is not in the row), no row with aliases.
+/// (a row is 2 x name + about 390 characters). An earlier run whose rows are not
+/// committed averaged 846 bytes a row, 423 characters, with names whose length
+/// was not recorded. 415 is above the capture's figure, so a change that
+/// lowered it below the capture fails a test; it is a margin, not a
+/// measurement. PARTIAL: one capture, and no row with aliases.
 const LEDGER_CENSUS_ROW_FIXED_CHARS_PARTIAL: u64 = 415;
 
 /// The longest ledger name (in characters) a census row is assumed to carry.
@@ -1958,12 +1958,13 @@ impl TallyClient {
     /// no slice is read twice. Stability of the book across the census is not
     /// proven here: the caller's opening and closing company extent, which
     /// carry the master mark and the company GUID, are the bracket (and the
-    /// caller reads the extent again before it acts on the count), and an
-    /// empty slice is the same body a closed or absent company answers with, so
-    /// a census that found no ledger at all is refused rather than counted.
-    /// Each slice that answered is added to `evidence` and to `count_evidence`
-    /// as it completes, so a refusal still accounts for what was received; a
-    /// slice whose request failed answered nothing and adds nothing.
+    /// extent is read again here, before the count is returned), and an empty
+    /// slice is the same body a closed or absent company answers with, so a
+    /// census that found no ledger at all is refused rather than counted.
+    /// Each slice whose answer was received in full is added to `evidence` and
+    /// to `count_evidence` as it completes, so a refusal still accounts for
+    /// what was received; a slice whose request failed, or whose answer passed
+    /// the response cap, adds nothing.
     async fn count_ledgers_by_span(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -2005,8 +2006,12 @@ impl TallyClient {
         // remaining slices with the same empty body as a slice past every
         // ledger, so the count can be low, and the count sizes the next read.
         // The extent (company GUID and marks) is read again before the count
-        // leaves this function, so no caller can use a count without it, and
-        // any change refuses the call.
+        // leaves this function, so no caller can use a count without it, and a
+        // change in either refuses the call. It does NOT catch a company closed
+        // and reopened with equal marks between the slices and this read: the
+        // count is then low and passes, and a whole read sized from it is sent
+        // before the count-versus-rows check refuses (#938 adds a cross-check
+        // against the company's own ledger count for exactly this).
         if self.fetch_company_book_extent(identity).await? != *opening_extent {
             return Err(anyhow::Error::new(
                 PairedReadValidationError::PartyLedgerExtent,

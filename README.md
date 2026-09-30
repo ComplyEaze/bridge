@@ -10,7 +10,7 @@ vouchers as a file. If you turn posting on in the extension, it posts them one
 at a time, after you approve each one.
 
 **Current release:**
-<!-- managed:current-release -->[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/latest) (26 September 2026)<!-- /managed:current-release -->,
+<!-- managed:current-release -->[`mcp-preview-0.3.0`](https://github.com/ComplyEaze/bridge/releases/latest) (26 September 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs. We check each release before we
 publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
@@ -74,9 +74,9 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   does not name the Tally release or licence tier). Not every read has its own
   recorded live run.
 - Posting one Journal, on a development build from 22 September 2026
-  ([issue #579](https://github.com/lamemustafa/bridge/issues/579#issuecomment-5773745569)),
+  ([issue #579](https://github.com/ComplyEaze/bridge/issues/579#issuecomment-5773745569)),
   and a Payment, a Contra and two Receipts (one of three entries) with the
-  approval dialog on macOS ([PR #600](https://github.com/lamemustafa/bridge/pull/600#issuecomment-5781144386)),
+  approval dialog on macOS ([PR #600](https://github.com/ComplyEaze/bridge/pull/600#issuecomment-5781144386)),
   each read back as posted. These builds predate the release published on
   26 September 2026 (version 0.3.0).
 - Native posts of ten batches on licensed TallyPrime Gold 7.1, in one session
@@ -140,7 +140,7 @@ reading. When writing is off, the write tools do not merely refuse — they are
 exist.
 
 - **The Claude Desktop extension turns voucher posting off by default.** Three
-  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/lamemustafa/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/lamemustafa/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/lamemustafa/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/lamemustafa/bridge/issues/579), [#582](https://github.com/lamemustafa/bridge/pull/582)). Turning on
+  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). Turning on
   **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the extension
   settings adds `post_import`, which posts one saved voucher of those types; every
   posting still waits for your approval in a separate Bridge dialog. Leave it
@@ -179,7 +179,7 @@ With writing on:
 **The extension is built from the same source library as the desktop app,
 which still contains a document-upload feature and an AXAL sign-in.** No
 published build exposes them and no tool of the extension reaches them. They
-are being removed ([#914](https://github.com/lamemustafa/bridge/pull/914)).
+are being removed ([#914](https://github.com/ComplyEaze/bridge/pull/914)).
 No desktop installer is published. See
 [Security and privacy](./docs/security-and-privacy.md).
 
@@ -221,7 +221,7 @@ forwarding described below is missing rather than that the gateway is off.
 If instead it hangs without answering, Tally may simply be busy behind
 another request — wait and retry rather than changing the setting.
 
-The [latest published release](https://github.com/lamemustafa/bridge/releases/latest)
+The [latest published release](https://github.com/ComplyEaze/bridge/releases/latest)
 of the Claude Desktop extension is the one to install.
 Follow the [installation guide](./docs/agent/INSTALL.md) to install and configure
 it. Before you do, know what it is and is not:
@@ -260,7 +260,7 @@ database operations.
 
 ## First useful result
 
-Install the [latest published release](https://github.com/lamemustafa/bridge/releases/latest)
+Install the [latest published release](https://github.com/ComplyEaze/bridge/releases/latest)
 of the Claude Desktop extension with the [installation guide](./docs/agent/INSTALL.md). For source
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).

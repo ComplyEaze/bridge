@@ -5,7 +5,7 @@
 | Version | Security status |
 | --- | --- |
 | `master` | Fixes, if made, land here first |
-| <!-- managed:latest-preview -->[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/latest) (26 September 2026)<!-- /managed:latest-preview -->, the latest published release | A fix, if we make one, ships as a new release |
+| <!-- managed:latest-preview -->[`mcp-preview-0.3.0`](https://github.com/ComplyEaze/bridge/releases/latest) (26 September 2026)<!-- /managed:latest-preview -->, the latest published release | A fix, if we make one, ships as a new release |
 | Earlier releases | Superseded; install the latest release |
 | `v0.1.0` | Historical bootstrap release; unsupported |
 
@@ -21,7 +21,7 @@ be presented as a signed production release.
 
 Do not open a public issue for a suspected vulnerability or credential leak.
 Report it privately, either through
-[GitHub private vulnerability reporting](https://github.com/lamemustafa/bridge/security/advisories/new)
+[GitHub private vulnerability reporting](https://github.com/ComplyEaze/bridge/security/advisories/new)
 or by email to <security@complyeaze.com>. If the advisory channel is
 temporarily unavailable, use the email address; do not disclose the
 vulnerability in a public issue.

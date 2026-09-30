@@ -41,7 +41,7 @@ ComplyEaze Bridge tool can approve it.
   built from the same source library as the desktop app, which still contains a
   document-upload feature and an AXAL sign-in. No published build exposes them,
   and no tool of the extension reaches them (see section 3). They are being
-  removed ([#914](https://github.com/lamemustafa/bridge/pull/914)).
+  removed ([#914](https://github.com/ComplyEaze/bridge/pull/914)).
 
 ## 3. Which network destinations can it contact?
 

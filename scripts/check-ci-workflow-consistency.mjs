@@ -17,13 +17,15 @@ const workflow = readFileSync(workflowPath, "utf8");
 const failures = [];
 const metadataByWorkspace = new Map();
 
-// These suites may skip in the frontend job, which intentionally has no Rust.
-// Bind their real execution to an existing required job with the pinned toolchain.
+// The surface acknowledgement check runs in this job: it runs on every event, has the full
+// history, and is required through `Required checks`. The step is report-only today (it exits 0),
+// so what blocks a pinned-file change without its acknowledgement file is scripts/merge-gate.sh;
+// the step must stay, keep its exact shape (no
+// `continue-on-error`, no step-level `if`) and run the checker with the report-only flag until the
+// rule is enforced (dropping the flag is a pinned ci.yml change with its own acknowledgement).
 const workflowConsistency = jobBlock(workflow, "workflow-consistency");
 const toolchain = readFileSync(resolve(repositoryRoot, "rust-toolchain.toml"), "utf8").match(/^channel *= *"([^"]+)"/m)?.[1];
 if (!toolchain) throw new Error("could not read [toolchain].channel from rust-toolchain.toml");
-const pinnedRustPreflight = `rustup which --toolchain ${toolchain} rustc`;
-const resealRegressions = "node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs";
 const pinnedRustSetup = new RegExp(
   `^      - uses: dtolnay/rust-toolchain@[^\\n]+\\n        with:\\n          toolchain: ${escapeRegex(toolchain)}$`,
   "m",
@@ -31,12 +33,29 @@ const pinnedRustSetup = new RegExp(
 if (!pinnedRustSetup.test(workflowConsistency)) {
   failures.push("workflow-consistency must install the repository's pinned Rust toolchain");
 }
-const preflightOffset = exactRunStepOffset(workflowConsistency, "Require pinned Rust for reseal regressions", pinnedRustPreflight);
-const regressionOffset = exactRunStepOffset(workflowConsistency, "Test reseal and merge-driver regressions", resealRegressions);
-if (preflightOffset === -1) failures.push("workflow-consistency must fail when pinned Rust is unavailable");
-if (regressionOffset === -1) failures.push("workflow-consistency must run the reseal regression suites");
-if (preflightOffset !== -1 && regressionOffset !== -1 && preflightOffset > regressionOffset) {
-  failures.push("workflow-consistency must require pinned Rust before running reseal regressions");
+const surfaceAckStep = [
+  "      - name: Check the surface acknowledgement",
+  "        env:",
+  "          PR_NUMBER: ${{ github.event.pull_request.number }}",
+  "          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
+  "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}",
+  '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only',
+].join("\n");
+// The step block runs from its `- name:` line up to the next step (or the job end), so a line
+// appended after `run:` (`continue-on-error`, `if`, ...) is a difference, not a pass. Blank and
+// full-line comment lines at step indentation just before the next step belong to that step.
+const surfaceAckLines = workflowConsistency.split("\n");
+const surfaceAckStart = surfaceAckLines.indexOf("      - name: Check the surface acknowledgement");
+let surfaceAckBlock = null;
+if (surfaceAckStart !== -1) {
+  let end = surfaceAckStart + 1;
+  while (end < surfaceAckLines.length && !surfaceAckLines[end].startsWith("      - ")) end += 1;
+  while (end > surfaceAckStart + 1 && /^(?: {6}#.*)?$/.test(surfaceAckLines[end - 1])) end -= 1;
+  surfaceAckBlock = surfaceAckLines.slice(surfaceAckStart, end).join("\n");
+}
+if (surfaceAckBlock !== surfaceAckStep) {
+  failures.push("workflow-consistency must run the surface acknowledgement check with its exact shape");
 }
 
 // bridge#583: the release positive control is what makes a clean seam scan of the shipped
@@ -139,7 +158,7 @@ for (const [source, job, expected, digest] of [
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
   ], "a328a5925bcd988ab70f3fc3d671bcadff3cae47700740afa103ccf6f03ac29a"],
-  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "02ffb0e75b37aad5c1238ce91ce19f82aa713deb1941978cb3687ad2757c8122"],
+  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",

@@ -476,16 +476,14 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
             master_alter_id,
             estimated_bytes,
             limit_bytes,
+            limit_master_alter_id,
         }) = cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
         {
-            // The estimate is the mark times the kind's worst row, so the largest
-            // mark admitted is the budget over that row (0 if it saturated).
-            let row_bytes = estimated_bytes.checked_div(*master_alter_id).unwrap_or(0);
             return Some(ReadSize {
                 master_alter_id: *master_alter_id,
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
-                limit_master_alter_id: limit_bytes.checked_div(row_bytes).unwrap_or(0),
+                limit_master_alter_id: *limit_master_alter_id,
             });
         }
         match cause

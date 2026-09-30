@@ -152,15 +152,21 @@ fn the_admission_edge_is_the_largest_mark_that_fits_and_the_next_refuses() {
                 master_alter_id,
                 estimated_bytes,
                 limit_bytes: 16_000_000,
-            }) if master_alter_id == largest + 1 && estimated_bytes == (largest + 1) * row_bytes
+                limit_master_alter_id,
+            }) if master_alter_id == largest + 1
+                && estimated_bytes == (largest + 1) * row_bytes
+                && limit_master_alter_id == largest
         ));
     }
     assert!(!sized_before_the_read(NativeMasterKind::VoucherTypes));
     // A mark so large that its product would overflow refuses; it never wraps.
+    // The admitted-mark limit comes from the row size, not from the saturated
+    // estimate, so it stays exact.
     assert!(matches!(
         admit_masters_size(NativeMasterKind::Godowns, u64::MAX),
         Err(MastersReadError::TooLarge {
             estimated_bytes: u64::MAX,
+            limit_master_alter_id: 1_152,
             ..
         })
     ));
@@ -302,6 +308,7 @@ async fn a_book_over_the_budget_is_refused_before_the_collection_request() {
                     master_alter_id,
                     estimated_bytes,
                     limit_bytes: 16_000_000,
+                    ..
                 }) if *master_alter_id == mark && *estimated_bytes == mark * row_bytes
             ),
             "{kind:?}: {error:?}"
@@ -407,6 +414,26 @@ async fn a_response_with_no_collection_is_the_parsers_typed_refusal() {
     // The completed collection read is kept as evidence.
     let evidence = &error.downcast_ref::<RuntimeReadFailure>().unwrap().evidence;
     assert!(!evidence.response_sha256.is_empty());
+}
+
+#[tokio::test]
+async fn a_group_answer_bridge_cannot_read_refuses_at_once() {
+    // The captured group snapshot with its collection removed: the group parser
+    // refuses it, and that refusal is returned at once, never held behind a
+    // closing extent read (no closing extent is provided).
+    let captured = groups();
+    let start = captured.find("<COLLECTION").unwrap();
+    let end = captured.rfind("</COLLECTION>").unwrap() + "</COLLECTION>".len();
+    let absent = format!("{}{}", &captured[..start], &captured[end..]);
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(absent));
+    let (result, dispatched) = run(plans, MastersKind::Groups).await;
+
+    let error = result.err().expect("refused");
+    assert!(cause::<PairedReadValidationError>(&error).is_none());
+    assert!(cause::<MastersReadError>(&error).is_none());
+    // Mode probe and identity (3), opening extent (4), the group pair (4).
+    assert_eq!(dispatched, 11);
 }
 
 #[tokio::test]

@@ -62,6 +62,8 @@ pub(crate) enum MastersReadError {
         master_alter_id: u64,
         estimated_bytes: u64,
         limit_bytes: u64,
+        /// The largest mark this kind is admitted at: the budget over its worst row.
+        limit_master_alter_id: u64,
     },
     /// The collection came back and broke what its size was admitted on (the
     /// master mark bounds the rows; the response fits the estimate).
@@ -116,6 +118,7 @@ pub(crate) fn admit_masters_size(
             master_alter_id,
             estimated_bytes: estimate.estimated_bytes,
             limit_bytes: budget_bytes(),
+            limit_master_alter_id: budget_bytes().checked_div(row_bytes).unwrap_or(0),
         });
     }
     Ok(estimate.estimated_bytes)

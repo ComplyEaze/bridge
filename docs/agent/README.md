@@ -249,10 +249,10 @@ mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
 1,160 for stock groups; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes`). Retrying refuses again. Any book whose master mark is above
-those figures refuses these three kinds, which is most live books; the two
-stock-heavy client books measured had marks of about 100,000 and 300,000
-(protocol reference §12a.12). `voucher_types` and `groups` have no size check
+`limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
+read at). Retrying refuses again. Both stock-heavy client books measured, with
+marks of about 100,000 and 300,000, refuse these three kinds; how common such
+marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read, and groups that of the group read `profit_and_loss` and `balance_sheet`
 make.

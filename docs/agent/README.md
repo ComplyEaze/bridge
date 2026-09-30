@@ -137,7 +137,17 @@ an empty slice is the answer a closed or absent company gives too) or a slice pa
 limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
 read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
 would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
-count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. After the
+slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
+(`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
+higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
+company or held something other than a plain number; a count that is equal, lower or absent never admits
+or sizes anything, and the
+result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
+`company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
+on three books only (one synthetic with its answer captured in the tree, two real books read by
+another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
 census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is

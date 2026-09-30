@@ -621,6 +621,21 @@ was open. Each request cost about 0.15 s on the 316,028-mark book, whether or no
 (the filter scan dominates): 80 slices took 11.8 s of transport time. Bridge reads each slice once,
 inside the bracket, and does not pair the reads.
 
+**The company's own ledger count (`NUMLEDGERS`, bridge#938) agrees with the census — PARTIAL, three books.**
+The Company collection fetched with `Name, GUID, NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`, sent once on
+30 Sep 2026 on a licensed 7.1 Silver holding 31 lab companies) answered 200 with a status 1 collection of one
+`COMPANY` row per loaded company, whatever `SVCURRENTCOMPANY` named, each row `NAME`, `GUID` and
+`NUMLEDGERS` (a number with a leading space, as `ALTMSTID` is): present on 31 of 31 rows, in 0.09 s for
+18.7 KB. The synthetic 4,339-ledger book's value, 4,339, equalled its catalogue and AlterID-census counts, and two
+real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane, also equalled their censuses
+(recorded in #938 only; the tree holds the synthetic book's capture, and the counts of the two other kept rows,
+6 and 123, are not compared with a census anywhere in this tree). That is three books, one of them captured here: what `NUMLEDGERS` counts for a book with deleted or hidden ledgers, and on another Tally
+version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the
+company reports is refused (`ledger_count_company_differs`), which is meant to catch a company closed and
+reopened with equal marks while the census ran (by reasoning: that case was not reproduced live) and also
+refuses a ledger added during the read; an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
+sizes nothing, and the result of a counted read says which it was (`ledger_count_cross_check.status`).
+
 **Not established** for the census: that AlterIDs are distinct across a book's ledgers (a slice's row
 bound rests on it: two ledgers sharing an AlterID both fall in one slice, and only a slice pushed past
 its span by them is refused, so this can cost a spurious refusal, not a missed ledger), how many names a ledger's row carries when it has aliases (each alias would add to the row
@@ -1219,3 +1234,4 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |
 | 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as up to seven formulas, and for a seven-formula request of about 110 KB whose extra names were fictitious. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the `$AlterID > a AND $AlterID <= b` filter on `List of Ledgers` (GUID-only fetch) on three licensed 7.1 Silver books, marks 5,547, 102,161 and 316,028: slices hold at most their width, their union equals the catalogue, an empty slice is a well-formed 2,994-byte answer. PARTIAL (bridge#679) |
+| 2026-09-30 | §11e: the Company collection's `NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`): present on all 31 loaded lab companies, equal to the ledger catalogue and census counts on a 4,339-ledger synthetic book, and to the census counts of two real books read by another lane. PARTIAL (bridge#938) |

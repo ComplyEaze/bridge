@@ -741,6 +741,23 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              book's master-alteration mark: call ledger_masters with fields=basic instead. Bridge \
              released nothing.",
         ),
+        "ledger_count_company_differs" => Some(
+            "Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
+             company's ledgers is higher than that census found: the census missed ledgers, either \
+             because a ledger was added during the read or (reasoned, not reproduced) because \
+             the company was closed and reopened while it ran, and a read sized from the low \
+             count would have been sized too small. No master was requested. Retry once with the company left alone and \
+             nobody editing it in Tally. A repeat means the census and Tally's count disagree \
+             about this book: call ledger_masters with fields=basic instead."
+        ),
+        "ledger_count_company_invalid" => Some(
+            "Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
+             own count of its ledgers to check it, and the answer was damaged, named another \
+             company (or the company is no longer loaded), or held a count that is not a plain \
+             number. No master was requested. Retry once with the company left alone. A repeat \
+             means Tally's answer to that request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead."
+        ),
         "ledger_count_catalogue_too_large" => Some(
             "The census counted more ledgers than one compliance read holds, so Bridge would \
              read them in parts by parent group, but the catalogue that names their parents \

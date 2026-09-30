@@ -4,8 +4,9 @@ This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the latest
 published release (version 0.3.0). It was written from a reading of that
 release's source code on 30 September 2026. It was not tested on a running
-system. Unless a line says otherwise, each answer rests on reading that source.
-Anything not measured on a running system is marked **Not measured**.
+system (see the README's list of what has been run). Unless a line says
+otherwise, each answer rests on reading that source. Anything not measured on
+a running system is marked **Not measured**.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 

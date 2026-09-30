@@ -82,14 +82,18 @@ stated. The [MCP guide](./docs/agent/README.md) and
   on 28 September 2026, on a development build and one client book (the import
   request was captured for nine of them); their approval step was not recorded
   ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
+- The published 0.3.0 package on Windows x64, in Claude Desktop (on a free plan;
+  we make no claim about other plans): reads only, against licensed TallyPrime
+  Gold 7.1 with one client book, on 28 September 2026, in a session separate
+  from the development-build posting above (reported by the owner; no logs were
+  kept).
 
-Not yet run by us in a controlled test: the published package itself against a
-live TallyPrime; any ComplyEaze Bridge build running on Windows against a live
-TallyPrime, including the approval window; posting on TallyPrime Education;
-posting on TallyPrime Gold with its approval step recorded. Each release
-package is built and launched, its tool list checked and a synthetic encrypted
-bank statement parsed, on hosted CI runners for Windows x64 and Apple Silicon
-Mac.
+Not yet run by us in a controlled test: posting with a published package
+against a live TallyPrime; the approval window on Windows; posting on TallyPrime
+Education; posting on TallyPrime Gold with its approval step recorded. Each
+release package is built and launched, its tool list checked and a synthetic
+encrypted bank statement parsed, on hosted CI runners for Windows x64 and Apple
+Silicon Mac.
 
 ## Not in the latest release
 
@@ -228,8 +232,10 @@ it. Before you do, know what it is and is not:
   exactly which bytes and which source commit you downloaded.
 - **Checked only as far as launching.** The release build confirms the package
   starts and lists its tools. It does **not** establish that it works against
-  your Tally, or in conversation inside Claude Desktop. Validation against Tally
-  on Windows is still outstanding.
+  your Tally, or in conversation inside Claude Desktop. The owner reports one
+  read-only session of the published 0.3.0 package in Claude Desktop on Windows
+  x64 against a live licensed TallyPrime Gold 7.1, with no logs kept; posting
+  and the approval window have not been run on Windows.
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on

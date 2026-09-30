@@ -569,10 +569,14 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
    of the same statement (other amount formatting or narration wrapping) derives
    different ids and is not seen; a hand-typed id reused for a genuinely
-   different event is refused too, and only after the user has seen the existing
-   voucher and said yes may it be rebuilt under a new transaction id (never one with a `st-` id, which names
-   the same bank row whatever its ledger); two Bridge installs on one company
-   keep separate journals. The check at build is a point in time: a batch posted
+   different event is refused too. The next step is advice, not a control: the
+   agent asks the user to open the existing voucher in Tally and compare it by
+   hand, and Bridge does not check that judgement (`verify_import` does not
+   return the voucher's date, amounts or narration, and nothing binds the
+   user's answer to the rebuild). A statement row that is re-entered inline
+   under any other id, including a `st-` id with a suffix, is a hand-typed id
+   and is not seen; two Bridge installs on one company keep separate
+   journals. The check at build is a point in time: a batch posted
    natively after this one was built sees it only as built, so a file already
    written can still be imported by hand after that post, and two hand imports
    of one file are not seen at all. A build that is an amendment is not checked,

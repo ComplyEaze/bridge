@@ -1244,7 +1244,8 @@ impl Server {
                     }
                 }
                 // Name the earlier batch to verify. Both refusal paths land
-                // here; the journal only grows, so a later read still finds one.
+                // here; the journal only grows, so a later read finds one unless a later
+                // record of that batch replaced its row set, and then no batch is named.
                 if outcome.payload["result"]["error"]["code"] == "import_txn_already_posted" {
                     let blocking = snapshot.as_ref().and_then(|current| {
                         let _lock = self.lock_import_admission_shared().ok()?;
@@ -1395,7 +1396,7 @@ const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could no
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
-const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat for a different event: compare narration and ledgers, and if it is a different event, show the user the existing voucher's date, amount, ledgers and narration from verify_import, and rebuild that voucher under a new bridge_txn_id only after their explicit yes. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat for a different event: compare narration and ledgers, and if it is a different event, ask the user to open the existing voucher in Tally and compare it with this row by hand (Bridge does not check that judgement, and verify_import does not return the voucher's date, amounts or narration), and rebuild that voucher under a new bridge_txn_id only if the user says it is a different event. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };

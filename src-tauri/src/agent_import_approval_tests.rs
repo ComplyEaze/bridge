@@ -1680,6 +1680,7 @@ async fn a_redeem_only_entry_with_nothing_held_is_refused_and_asks_nobody() {
                     evidence: evidence_from_runtime_read(
                         crate::tally::runtime::RuntimeReadEvidence::empty(),
                     ),
+                    call_started: std::time::Instant::now(),
                 },
             ),
         )
@@ -1844,6 +1845,20 @@ async fn two_pass_call_with(
     Server,
     ScriptedApproval,
 ) {
+    two_pass_call_recording(between, Default::default()).await
+}
+
+/// `two_pass_call_with`, noting the start each pass took its budgets from.
+async fn two_pass_call_recording(
+    between: impl FnOnce(&Server, &ImportLedgerLine) -> Between,
+    starts: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>,
+) -> (
+    Value,
+    ImportLedgerLine,
+    tempfile::TempDir,
+    Server,
+    ScriptedApproval,
+) {
     let (plans, _) = pending_then_posted_plans();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -1854,14 +1869,41 @@ async fn two_pass_call_with(
     scripted.answer(true);
     until_answered(&server, &line.batch_id).await;
     let hook = between(&server, &line);
-    let answer = BETWEEN_PASSES
+    let answer = CALL_STARTS
         .scope(
-            hook,
-            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+            starts,
+            BETWEEN_PASSES.scope(
+                hook,
+                SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+            ),
         )
         .await;
     let _ = sent(simulator);
     (answer, line, directory, server, scripted)
+}
+
+/// Both passes of a call, and the marks readback that spends the budget, take
+/// it from the call's start, not their own (V4 P3(1) on #889): the redeem-only
+/// pass is entered later, and a start taken afresh there would hand it a full
+/// ceiling it no longer has.
+#[tokio::test]
+async fn both_passes_of_a_call_take_their_budgets_from_the_calls_start() {
+    let starts: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Default::default();
+    let (answer, ..) = two_pass_call_recording(
+        |_, _| std::sync::Arc::new(|| std::thread::sleep(Duration::from_millis(25))),
+        std::sync::Arc::clone(&starts),
+    )
+    .await;
+    let starts = starts.lock().unwrap().clone();
+    assert_eq!(
+        starts.len(),
+        3,
+        "each pass's entry, then the marks readback that reads the budget: {answer}"
+    );
+    assert!(
+        starts.iter().all(|start| *start == starts[0]),
+        "a pass or the readback restarted the clock: {starts:?}"
+    );
 }
 
 /// An approval lost between the passes (here withdrawn, as an expiry landing
@@ -1964,6 +2006,7 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
                     evidence: evidence_from_runtime_read(
                         crate::tally::runtime::RuntimeReadEvidence::empty(),
                     ),
+                    call_started: std::time::Instant::now(),
                 },
             ),
         )

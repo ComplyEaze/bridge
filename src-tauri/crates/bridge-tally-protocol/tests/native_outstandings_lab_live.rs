@@ -234,7 +234,8 @@ fn an_empty_opening_balance_is_carried_as_unknown_not_zero() {
 }
 
 /// The bill-wise flag decides the composition, so its refusals are pinned: a
-/// missing, empty or unknown flag refuses the read and never defaults.
+/// missing or self-closing flag refuses as missing, an empty or unknown one as
+/// invalid, and none of them defaults.
 #[test]
 fn a_missing_empty_or_unknown_bill_wise_flag_refuses_the_read() {
     let needle = "<ISBILLWISEON TYPE=\"Logical\">Yes</ISBILLWISEON>";
@@ -243,7 +244,7 @@ fn a_missing_empty_or_unknown_bill_wise_flag_refuses_the_read() {
         (
             "self-closing",
             "<ISBILLWISEON TYPE=\"Logical\"/>",
-            "ledger_bill_wise_flag_invalid",
+            "ledger_bill_wise_flag_missing",
         ),
         (
             "empty",

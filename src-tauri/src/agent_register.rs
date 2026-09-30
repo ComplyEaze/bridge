@@ -30,7 +30,6 @@ enum LedgerGroup {
 /// classification, so two listings that differ in any of it classify differently.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RegisterLedger {
-    parent: Option<String>,
     group: LedgerGroup,
     tax_type: Option<String>,
     head: GstDutyHeadObservation,
@@ -59,7 +58,6 @@ impl MasterIndex {
             let parent = record.ledger.parent.returned_text().map(str::to_string);
             let chain = groups.ancestry_chain(parent.as_deref());
             let ledger = RegisterLedger {
-                parent,
                 group: ledger_group(&chain),
                 tax_type: record.fields.tax_type.returned_text().map(str::to_string),
                 head: record.fields.gst_duty_head.clone(),

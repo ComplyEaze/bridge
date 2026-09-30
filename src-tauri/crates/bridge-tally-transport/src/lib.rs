@@ -4,7 +4,7 @@
 //! return is not evidence that Tally accepted an import or completed an export;
 //! callers must still validate the application envelope.
 
-use std::{net::IpAddr, time::Duration};
+use std::{net::IpAddr, sync::Arc, time::Duration};
 
 #[cfg(feature = "voucher-scan")]
 use bridge_tally_protocol::outstandings::VoucherOutstandingsRequestXml;
@@ -21,6 +21,12 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+
+mod wire_gate;
+pub use wire_gate::{
+    TallyWireGate, UngatedWire, WireLockHeld, WirePause, WireRefusal, WireRetryPolicy,
+    WireWaitBudget, WIRE_BUSY_RETRY_AFTER, WIRE_WAIT_MAX,
+};
 
 pub const STATUS_RESPONSE_MAX_BYTES: usize = 1024 * 1024;
 /// Maximum UTF-8 byte length of an XML source string accepted before UTF-16LE
@@ -263,6 +269,9 @@ pub enum TallyTransportError {
     UnsupportedContentEncoding,
     #[error("Tally response encoding was invalid ({code})")]
     InvalidEncoding { code: &'static str },
+    /// The endpoint's wire gate refused the send; nothing was sent.
+    #[error("Tally send was held back by the endpoint wire lock ({refusal:?})")]
+    WireRefused { refusal: WireRefusal },
 }
 
 impl TallyTransportError {
@@ -281,6 +290,7 @@ impl TallyTransportError {
             Self::ResponseReadFailed => "response_read_failed",
             Self::UnsupportedContentEncoding => "response_content_encoding_unsupported",
             Self::InvalidEncoding { .. } => "response_encoding_invalid",
+            Self::WireRefused { refusal } => refusal.safe_code(),
         }
     }
 }
@@ -329,6 +339,42 @@ pub struct TallyHttpTransport {
     config: TallyEndpointConfig,
     policy: TransportPolicy,
     client: Client,
+    /// Taken around every single send; see the `wire_gate` module invariant.
+    wire: Arc<dyn TallyWireGate>,
+    wire_retry: WireRetryPolicy,
+    /// The operation's shared wait budget, when this transport is scoped to
+    /// one ([`Self::for_operation`]); otherwise each send has its own.
+    wire_budget: Option<WireWaitBudget>,
+}
+
+/// A transport holding its endpoint's wire lock for exactly one send, from
+/// [`TallyHttpTransport::acquire_wire_lock`]. That send consumes it and
+/// releases the lock when it ends, however it ends; dropped unsent, it
+/// releases the lock too.
+pub struct WireHeldTransport<'a> {
+    transport: &'a TallyHttpTransport,
+    held: Box<dyn WireLockHeld>,
+}
+
+impl WireHeldTransport<'_> {
+    /// [`TallyHttpTransport::post_xml_decoded`] under the held lock: exactly
+    /// one send, with no further wait for the lock. A request that cannot be
+    /// prepared is refused before anything is sent.
+    pub async fn post_xml_decoded(
+        self,
+        xml: String,
+    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+        let Self { transport, held } = self;
+        let prepared = prepare_tally_xml_request(&xml, transport.policy.xml_request_max_bytes)?;
+        let url = endpoint_url(&transport.config, "/")?;
+        let response = transport
+            .send_prepared_decoded(prepared, url, transport.policy.xml_response_max_bytes)
+            .await;
+        // Released only once the response has been read to its end, or the
+        // send has failed.
+        drop(held);
+        response
+    }
 }
 
 impl TallyHttpTransport {
@@ -367,7 +413,68 @@ impl TallyHttpTransport {
             config,
             policy,
             client,
+            wire: Arc::new(UngatedWire),
+            wire_retry: WireRetryPolicy::DEFAULT,
+            wire_budget: None,
         })
+    }
+
+    /// Gate every send of this transport, and of its clones, on `gate`, trying
+    /// a busy gate again under `retry`. A transport built without this is
+    /// ungated ([`UngatedWire`]).
+    #[must_use]
+    pub fn with_wire_gate(mut self, gate: Arc<dyn TallyWireGate>, retry: WireRetryPolicy) -> Self {
+        self.wire = gate;
+        self.wire_retry = retry;
+        self.wire_budget = None;
+        self
+    }
+
+    /// A clone of this transport for one operation (#697 item (a)): every send
+    /// it makes, and every send of any clone of it, draws on `budget`, so the
+    /// operation waits for the wire lock at most that long in all, however
+    /// many sends it makes. Transports given clones of one budget share it.
+    ///
+    /// A transport that is not scoped gives each send a budget of its own (lab
+    /// tools and direct tests). The application scopes every operation at its
+    /// runtime's operation boundary.
+    #[must_use]
+    pub fn for_operation(&self, budget: WireWaitBudget) -> Self {
+        let mut scoped = self.clone();
+        scoped.wire_budget = Some(budget);
+        scoped
+    }
+
+    /// What is left of this transport's operation wait budget, or `None` when
+    /// it is not scoped to an operation.
+    pub fn wire_budget_remaining(&self) -> Option<Duration> {
+        self.wire_budget.as_ref().map(WireWaitBudget::remaining)
+    }
+
+    /// Take this endpoint's wire lock for one send, once: a lock still taken by
+    /// another holder is refused at once, never waited for. For a caller that
+    /// must do local work between taking the lock and sending (a durable record
+    /// of the attempt) and cannot afford a wait that lands between two of its
+    /// own checks; the lock is then spent on one send through the returned
+    /// [`WireHeldTransport`]. Anything that waits on another process must not
+    /// run while it is held.
+    pub async fn acquire_wire_lock(&self) -> Result<WireHeldTransport<'_>, TallyTransportError> {
+        let refused = |refusal| TallyTransportError::WireRefused { refusal };
+        let held = self.wire.try_acquire().map_err(refused)?;
+        Ok(WireHeldTransport {
+            transport: self,
+            held,
+        })
+    }
+
+    async fn wire_lock(&self) -> Result<Box<dyn WireLockHeld>, TallyTransportError> {
+        let budget = self
+            .wire_budget
+            .clone()
+            .unwrap_or_else(|| WireWaitBudget::new(self.wire_retry.total()));
+        wire_gate::acquire(&self.wire, self.wire_retry.delay(), &budget)
+            .await
+            .map_err(|refusal| TallyTransportError::WireRefused { refusal })
     }
 
     pub fn canonical_origin(&self) -> Result<String, TallyTransportError> {
@@ -376,6 +483,9 @@ impl TallyHttpTransport {
 
     pub async fn get_status(&self) -> Result<TallyHttpResponse, TallyTransportError> {
         let url = endpoint_url(&self.config, "/status")?;
+        // Held until this function returns: the response read to its end, or
+        // the send failed.
+        let _wire = self.wire_lock().await?;
         #[expect(
             clippy::disallowed_methods,
             reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
@@ -399,6 +509,7 @@ impl TallyHttpTransport {
         &self,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         let url = endpoint_url(&self.config, "/status")?;
+        let _wire = self.wire_lock().await?;
         #[expect(
             clippy::disallowed_methods,
             reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
@@ -423,6 +534,7 @@ impl TallyHttpTransport {
             prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let content_length = body.len();
         let url = endpoint_url(&self.config, "/")?;
+        let _wire = self.wire_lock().await?;
         #[expect(
             clippy::disallowed_methods,
             reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
@@ -474,10 +586,25 @@ impl TallyHttpTransport {
         xml: String,
         response_max_bytes: usize,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        let PreparedTallyXmlRequest { body, body_sha256 } =
-            prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
-        let content_length = body.len();
+        // The request is prepared before the lock is taken, so a request that
+        // cannot be sent never holds it.
+        let prepared = prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let url = endpoint_url(&self.config, "/")?;
+        let _wire = self.wire_lock().await?;
+        self.send_prepared_decoded(prepared, url, response_max_bytes)
+            .await
+    }
+
+    /// One send of a prepared request. The caller holds the wire lock for it
+    /// until this returns.
+    async fn send_prepared_decoded(
+        &self,
+        prepared: PreparedTallyXmlRequest,
+        url: Url,
+        response_max_bytes: usize,
+    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+        let PreparedTallyXmlRequest { body, body_sha256 } = prepared;
+        let content_length = body.len();
         #[expect(
             clippy::disallowed_methods,
             reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"

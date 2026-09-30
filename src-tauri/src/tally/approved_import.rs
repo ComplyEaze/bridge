@@ -545,6 +545,9 @@ pub(crate) mod test_seam {
         /// through [`ScriptedApproval::answer`], as a person who has not yet
         /// clicked would (#725). `approve` is then ignored.
         held: Option<Arc<tokio::sync::watch::Sender<Option<bool>>>>,
+        /// Signalled when a held post dialog opens, so a test waits for that
+        /// event rather than polling for it against a clock.
+        opened: Arc<tokio::sync::Notify>,
     }
 
     impl ScriptedApproval {
@@ -580,6 +583,22 @@ pub(crate) mod test_seam {
                 .is_some_and(|held| held.receiver_count() > 0)
         }
 
+        /// Resolves once a held post dialog has opened: its task is waiting
+        /// for an answer. A permit is kept, so it also resolves when the
+        /// dialog opened before this was awaited.
+        pub(crate) async fn opened(&self) {
+            self.opened.notified().await;
+        }
+
+        /// Resolves once an opened held post dialog has closed: its task took
+        /// an answer or was aborted. Await it only after [`Self::opened`]; a
+        /// dialog not yet open counts as closed.
+        pub(crate) async fn closed(&self) {
+            if let Some(held) = &self.held {
+                held.closed().await;
+            }
+        }
+
         /// Answer a held post dialog. Answering one that was closed (its task
         /// aborted) reaches nothing.
         pub(crate) fn answer(&self, approve: bool) {
@@ -597,6 +616,7 @@ pub(crate) mod test_seam {
                 review_counts: Arc::default(),
                 while_pending: None,
                 held: None,
+                opened: Arc::default(),
             }
         }
 
@@ -635,7 +655,11 @@ pub(crate) mod test_seam {
                     while_pending();
                 }
                 match &scripted.held {
-                    Some(held) => Err(held.subscribe()),
+                    Some(held) => {
+                        let waiting = held.subscribe();
+                        scripted.opened.notify_one();
+                        Err(waiting)
+                    }
                     None => Ok(scripted.approve),
                 }
             })

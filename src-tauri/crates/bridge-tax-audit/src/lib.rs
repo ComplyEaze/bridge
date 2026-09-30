@@ -1617,7 +1617,7 @@ pub fn tds_payees_on(
 
 /// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
 /// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
-/// `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
+/// `partners_40b_194t` and `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
 pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>> {
     if bound.statutory_dues.not_a_table {
         return Err(AuditError::Config(
@@ -1678,6 +1678,7 @@ pub fn partners_40b_194t_on(
         &engagement.period,
         &entity_type,
         &bound.partners,
+        &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
 }

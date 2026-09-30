@@ -392,7 +392,7 @@ fn a_half_written_last_line_is_read_again_once() {
     // It does not: the second read fails the same way, and says so.
     write(&path, &cut);
     let stuck = read_journal(directory.path(), || {});
-    assert!(matches!(stuck, Journal::NotRead(_)), "{stuck:?}");
+    assert_eq!(stuck, Journal::NotRead(JOURNAL_INVALID));
     // A journal that is whole is read once, with no second read.
     write(&path, &whole);
     let mut waited = false;

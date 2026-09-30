@@ -1942,8 +1942,10 @@ pub async fn export_party_ledger_master(
     mirror: State<'_, crate::LazyTallyMirror>,
 ) -> Result<String, TallyCommandError> {
     // One wire-lock wait budget for the whole command (#697).
-    with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime, mirror))
-        .await
+    with_operation_wire_budget(export_party_ledger_master_once(
+        app, request, runtime, mirror,
+    ))
+    .await
 }
 
 async fn export_party_ledger_master_once(

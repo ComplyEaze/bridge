@@ -611,7 +611,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "f9d14e0219a0692af01f5e3ced85e17627a607ea829c7057ecf98a542a1f47b2"
+      "sha256": "a01c81bfbd6e44eae8f9b74d666bc795404835030049ee378744681b40c61e71"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",

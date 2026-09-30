@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "4cc9f32f363acf3de1b7f1530aa08c26d15d46aaceb9ffc1eea1434a47c7a479"
+      "sha256": "9f3d1027fb3283930edb6a55bee0bfb5d698bed4585764940bdeb0ed3fe9162f"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -355,11 +355,11 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/model.rs",
-      "sha256": "308f1694ce35587c31f85c0f55bec78f7d59d818d62da6302213b1e80c9ecc2f"
+      "sha256": "66edeae691a43e6328b4e35245b056ce27371475f4311a2b4bd994357d63d92a"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/parser.rs",
-      "sha256": "46b89872d366e9a2bbbda7a61a0a09988531c8b2fe85fe71bc88176e6ec91979"
+      "sha256": "77ef4a21597f4e9ca8ba0a6109569aea365734f6bb7d24786876bcea88e0605a"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/request.rs",
@@ -371,7 +371,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs",
-      "sha256": "58bf5ffef1e877e9c68fa5e1551e56b3fb6b893b76ebd437ac6d03e909814863"
+      "sha256": "63bcbe9f424f4a1d37a615b4b980a0b258d667f3edc3f4bbcf7c8fc017224efd"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/parent_partition.rs",
@@ -591,15 +591,15 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_parse.rs",
-      "sha256": "b5f6a0162a2ae86bc97b73c7811f85ef26100e7fcc4f65bf85f0e10a8e9c3a15"
+      "sha256": "25fba5789fa6648098b6bd90f9be65c9497749f5574a484252bff13a264d6f62"
     },
     {
       "path": "src-tauri/src/agent_voucher_parse_tests.rs",
-      "sha256": "79d39efc0bf4eba5e936490ed0cc15f2265fd018a987c74fa1dfedaf6c65cc89"
+      "sha256": "58defb72145fef4249c1ed6a8211599771534ab16d69c7fe0464c91362fef34f"
     },
     {
       "path": "src-tauri/src/agent_voucher_scalars.rs",
-      "sha256": "e9b8d1bdb926f95325a80c48f452565d5e08d6ca7c7f5f9eaa8701ef78c3bf69"
+      "sha256": "dd2836fe0ff0ed7be7dad7b6b487a1c61d7f82ddfbf9b90c6d93f2ab58060f09"
     },
     {
       "path": "src-tauri/src/agent_voucher_type_class.rs",

@@ -413,6 +413,41 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
   `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
   voucher screen), because each of them sums, matches or verifies amounts.
 
+### Bill allocations in voucher reads
+
+Each ledger entry's `bill_allocations` lists its typed allocations: `reference`
+(`{"kind": "named", "name": ...}` or `{"kind": "on_account"}`), `bill_type` and
+`amount`. Since #945 an allocation also carries the bill's own date and credit
+period when Tally sends them (New Ref and Agst Ref allocations do):
+
+- `bill_date` is the bill's date (`YYYYMMDD`), which for an Agst Ref is the
+  original bill's date, not its voucher's. A malformed date refuses the read
+  (`bill_allocation_date_invalid`).
+- `credit_period` is `{"value": 30, "unit": "days"}` (units `days`, `weeks`,
+  `months`). A text that is not one of those (including `10000 Days`, above the
+  measured ceiling) is carried as `{"unit": "unrecognised", "text": ...}`, the
+  text cut to 40 characters (characters, not bytes) with `"truncated": true`
+  when it was cut. It is never read as a number of days and does not refuse the
+  window.
+- An element that is absent or empty is not observed: the key is omitted. It is
+  never `""` or a zero period. The On Account allocations in the live captures
+  carry no such element, or an empty one; if Tally sent a value it would be
+  carried like any other.
+- The unrecognised credit-period text is the only new free text from the book in
+  the output. (The allocation's `reference.name`, the voucher's narration and
+  party were already there.)
+- Like every other scalar the parser reads, a repeated `BILLDATE` or
+  `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
+  refuses the read as a protocol error (`agent_read_protocol_invalid`). So does a
+  malformed `BILLDATE`. Both reach every reader that shares the voucher parser,
+  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
+  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  screen. Write-side verification is not affected, because its fetch names no
+  allocation fields.
+- An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
+  if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
+  name, it refuses the read (`bill_allocation_field_missing`).
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it

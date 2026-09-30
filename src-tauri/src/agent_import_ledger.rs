@@ -313,9 +313,13 @@ pub(super) struct Settlement {
     /// Batches that were sent to Tally (a dispatch intent) or that a readback
     /// found posted: the ones the double-post checks look up.
     pub(super) sent_or_found: usize,
-    /// Batches with a dispatch intent whose latest verification is not
+    /// Batches with a dispatch intent whose latest status is not
     /// `posted_verified`, or that have no recorded response.
     pub(super) unsettled: usize,
+    /// Batches that were built and never sent nor found posted. Their saved
+    /// file is what `post_import` would send, so moving or deleting the folder
+    /// strands them.
+    pub(super) never_sent: usize,
 }
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
@@ -337,18 +341,22 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             match update.record_type {
                 StatusKind::DispatchIntent => progress.dispatched = true,
                 StatusKind::DispatchResponse => progress.responded = true,
-                StatusKind::VerificationStatus => {
-                    progress.verified = update.status == "posted_verified";
-                }
+                StatusKind::VerificationStatus => {}
             }
+            // The latest status of every kind is the batch's status, as
+            // `read_snapshot` takes it: a dispatch intent or a response after a
+            // hand-import's `posted_verified` makes the batch unverified again.
+            progress.verified = update.status == "posted_verified";
         }
     })?;
+    let sent_or_found = batches
+        .values()
+        .filter(|progress| progress.dispatched || progress.verified)
+        .count();
     Ok(Settlement {
         batches: batches.len(),
-        sent_or_found: batches
-            .values()
-            .filter(|progress| progress.dispatched || progress.verified)
-            .count(),
+        sent_or_found,
+        never_sent: batches.len() - sent_or_found,
         unsettled: batches
             .values()
             .filter(|progress| progress.dispatched && !(progress.responded && progress.verified))

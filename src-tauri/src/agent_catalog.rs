@@ -448,7 +448,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
                     ),
                     "local_data_report" => (
-                        "Reports what Bridge stores locally, by class, with counts, sizes, the age of the oldest file and whether its import journal is settled (how many batches were sent or found posted, and how many are not settled). Reads only Bridge's own local data folder, modifies and deletes none of the files it reports, and names no file path. It covers the MCP agent data folder, not the desktop app's own files. A journal or import files that Bridge still needs for a batch not yet settled are what a later deletion must keep, so never suggest removing them.",
+                        "Reports what Bridge stores locally, by class, with counts, sizes, the age of the oldest file and the state of its import journal: how many batches were sent or found posted, how many of those are not settled, and how many were built and never sent. Reads only Bridge's own local data folder and names no file path. It covers the MCP agent data folder, not the desktop app's own files. The import journal and the imports folder are Bridge's memory of what it already sent to Tally: never suggest deleting them.",
                         json!({"type":"object","additionalProperties":false}),
                     ),
                     "lab_read_inventory" => (

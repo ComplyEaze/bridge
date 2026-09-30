@@ -69,8 +69,21 @@ Cursor uses the same server object in `.cursor/mcp.json`:
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
-`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. For a command-line
+`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`,
+`egress_log`, and `local_data_report`. `local_data_report` (also
+`bridge_mcp --local-data-report [--show-paths]` on the command line) is a
+read-only report of what Bridge keeps in its agent data folder: per class
+(journal, import files, proofs, review records, approval notes, bank
+statements, the egress log, lab files, lock files, other) the file count, bytes
+and the age in days of the oldest file, symlinks it did not follow, and the
+import journal's state: batches, batches sent or found posted, how many of
+those are not settled (no recorded response, or the latest status is not
+`posted_verified`), and batches built and never sent. It reads the journal
+without the admission lock, names no file path (the command line adds the
+folder paths only with `--show-paths`), and does not cover the desktop app's own
+files. The journal and the `imports/` folder are Bridge's memory of what it
+already sent to Tally: archive the whole folder by moving it, never delete
+them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables

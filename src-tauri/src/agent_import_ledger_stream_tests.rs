@@ -483,13 +483,21 @@ fn settlement_counts_sent_and_unsettled_batches() {
     let mut found = batch("found", "n");
     found.status = "posted_verified".into();
     bytes.extend(record(&found));
+    // Verified by a hand import first, then posted natively: the dispatch
+    // intent and response make the batch unverified again until it is read back.
+    let hand_then_posted = batch("hand_then_posted", "n");
+    bytes.extend(record(&hand_then_posted));
+    bytes.extend(record(&status("hand_then_posted", "posted_verified")));
+    bytes.extend(record(&StatusRecord::dispatch(&hand_then_posted)));
+    bytes.extend(record(&response(&hand_then_posted)));
 
     assert_eq!(
         settlement(Cursor::new(bytes)).unwrap(),
         Settlement {
-            batches: 6,
-            sent_or_found: 5,
-            unsettled: 3
+            batches: 7,
+            sent_or_found: 6,
+            unsettled: 4,
+            never_sent: 1
         }
     );
     assert_eq!(
@@ -497,7 +505,8 @@ fn settlement_counts_sent_and_unsettled_batches() {
         Settlement {
             batches: 0,
             sent_or_found: 0,
-            unsettled: 0
+            unsettled: 0,
+            never_sent: 0
         }
     );
     assert_eq!(

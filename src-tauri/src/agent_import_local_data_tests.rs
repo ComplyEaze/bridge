@@ -1,6 +1,5 @@
 //! The local-data report reads and never writes (#local-data slice 1).
 use super::*;
-use std::io::Write;
 
 fn write(path: &Path, bytes: &[u8]) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -55,6 +54,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("bank-statements/s.json"), b"12345678901");
     write(&root.join("lab/x.request.xml"), b"123");
     write(&root.join("native-dispatch-leases/k.lock"), b"");
+    write(&root.join("misc/whatever.bin"), b"123456789012345");
     let report = build(root, None);
     assert_eq!(report.root, Root::Present);
     let expect = |name: &str, files: u64, bytes: u64| {
@@ -70,7 +70,25 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     expect("review_records", 3, 18);
     expect("bank_statements", 1, 11);
     expect("lab", 1, 3);
-    assert_eq!(report.links + report.multi_link + report.unreadable, 0);
+    assert_eq!(
+        report.other_directories, 1,
+        "an unknown folder is counted, not entered"
+    );
+    assert_eq!(report.links + report.unreadable, 0);
+}
+
+#[test]
+fn a_lock_folder_outside_the_data_folder_is_counted_too_and_not_twice() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("data");
+    let coordination = directory.path().join("shared");
+    write(&root.join("native-dispatch-leases/a.lock"), b"");
+    write(&coordination.join("native-dispatch-leases/b.lock"), b"");
+    let separate = build(&root, Some(&coordination));
+    assert_eq!(class(&separate, "locks").files, 2, "both lock folders");
+    // The default: the shared folder is the data folder itself.
+    let same = build(&root, Some(&root));
+    assert_eq!(class(&same, "locks").files, 1, "one folder, counted once");
 }
 
 #[cfg(unix)]
@@ -97,6 +115,21 @@ fn a_symlink_is_counted_and_never_followed() {
     assert_eq!(*class(&report, "bank_statements"), Class::default());
 }
 
+/// A data folder the person moved to another disk and linked back is followed
+/// (only that one link); the report must not read as empty.
+#[cfg(unix)]
+#[test]
+fn a_symlinked_data_folder_itself_is_followed() {
+    let directory = tempfile::tempdir().unwrap();
+    let real = directory.path().join("real");
+    write(&real.join("agent-egress.jsonl"), b"abcd");
+    let link = directory.path().join("Bridge");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    let report = build(&link, None);
+    assert_eq!(report.root, Root::Present);
+    assert_eq!(*class(&report, "egress_log"), Class { files: 1, bytes: 4 });
+}
+
 #[test]
 fn a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one() {
     let directory = tempfile::tempdir().unwrap();
@@ -111,7 +144,6 @@ fn a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one() {
         .values()
         .all(|class| *class == Class::default()));
     assert_eq!(empty.journal, Journal::Absent);
-    assert_eq!(empty.admission_lock, Lock::NotPresent);
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -123,27 +155,17 @@ fn a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one() {
         // Running as root would read it; the distinction only exists for a user.
         if unreadable.root != Root::Present {
             assert_eq!(unreadable.root, Root::Unreadable);
-            let text = render(&unreadable, None);
-            assert!(text.contains("NOT the same as empty"), "{text}");
         }
     }
 }
 
 #[test]
-fn the_report_changes_nothing_and_creates_no_lock() {
+fn the_report_changes_nothing_and_takes_no_lock() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     write(&root.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&root.join("agent-import-admission.lock"), b"");
     write(&root.join("imports/b.xml"), b"<x/>");
-    let listing = || {
-        let mut names = Vec::new();
-        for entry in walk(root) {
-            let metadata = fs::symlink_metadata(&entry).unwrap();
-            names.push((entry, metadata.len(), metadata.modified().unwrap()));
-        }
-        names.sort();
-        names
-    };
     fn walk(dir: &Path) -> Vec<PathBuf> {
         let mut out = Vec::new();
         for entry in fs::read_dir(dir).unwrap() {
@@ -155,71 +177,78 @@ fn the_report_changes_nothing_and_creates_no_lock() {
         }
         out
     }
+    let listing = || {
+        let mut names = Vec::new();
+        for entry in walk(root) {
+            let metadata = fs::symlink_metadata(&entry).unwrap();
+            names.push((entry, metadata.len(), metadata.modified().unwrap()));
+        }
+        names.sort();
+        names
+    };
     let before = listing();
-    let report = build(root, None);
-    assert_eq!(report.admission_lock, Lock::NotPresent);
-    assert!(
-        !root.join("agent-import-admission.lock").exists(),
-        "a probe must not create it"
-    );
-    // With no lock file the journal is still read, once.
-    assert!(matches!(report.journal, Journal::Read(_)));
-    assert_eq!(listing(), before);
-}
-
-#[test]
-fn a_busy_admission_lock_stops_the_journal_read() {
-    let directory = tempfile::tempdir().unwrap();
-    let root = directory.path();
-    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
-    let lock_path = root.join("agent-import-admission.lock");
-    write(&lock_path, b"");
+    // A process that holds the admission lock exclusively (a post in flight)
+    // must not stop the report, and the report must not disturb it.
     let holder = fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(&lock_path)
+        .open(root.join("agent-import-admission.lock"))
         .unwrap();
     holder.lock().unwrap();
     let report = build(root, None);
-    assert_eq!(report.admission_lock, Lock::Busy);
-    assert_eq!(report.journal, Journal::NotRead("admission_lock_busy"));
+    assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
+    assert!(
+        holder.try_lock().is_ok(),
+        "the report holds nothing: a re-lock by the holder still works"
+    );
     drop(holder);
-    let released = build(root, None);
-    assert_eq!(released.admission_lock, Lock::Free);
+    assert_eq!(listing(), before);
+    assert!(!root.join("agent-import-ledger.jsonl.tmp").exists());
+}
+
+#[test]
+fn the_journal_is_absent_unreadable_or_counted() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    assert_eq!(build(directory.path(), None).journal, Journal::Absent);
+    write(&path, b"not json\n");
     assert_eq!(
-        released.journal,
+        build(directory.path(), None).journal,
+        Journal::NotRead("journal_invalid_or_changing")
+    );
+    write(&path, &journal(true));
+    assert_eq!(
+        build(directory.path(), None).journal,
         Journal::Read(super::super::ledger::Settlement {
             batches: 1,
             sent_or_found: 1,
-            unsettled: 1
+            unsettled: 1,
+            never_sent: 0
+        })
+    );
+    write(&path, &journal(false));
+    assert_eq!(
+        build(directory.path(), None).journal,
+        Journal::Read(super::super::ledger::Settlement {
+            batches: 1,
+            sent_or_found: 0,
+            unsettled: 0,
+            never_sent: 1
         })
     );
 }
 
 #[test]
-fn an_invalid_journal_is_reported_as_unread_not_as_empty() {
-    let directory = tempfile::tempdir().unwrap();
-    write(
-        &directory.path().join("agent-import-ledger.jsonl"),
-        b"not json\n",
-    );
-    let report = build(directory.path(), None);
-    assert_eq!(report.journal, Journal::NotRead("journal_invalid"));
-}
-
-#[test]
-fn no_path_is_printed_unless_asked() {
+fn no_path_is_in_the_json_unless_asked() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     write(&root.join("imports/b.xml"), b"<x/>");
     let report = build(root, None);
-    let plain = render(&report, None);
+    let plain = to_json(&report, SystemTime::now(), None).to_string();
     assert!(!plain.contains(&*root.to_string_lossy()), "{plain}");
-    assert!(plain.contains("Nothing was changed or deleted"));
-    let shown = render(&report, Some((root, None)));
+    assert!(!plain.contains("path"), "{plain}");
+    let shown = to_json(&report, SystemTime::now(), Some((root, Some(root)))).to_string();
     assert!(shown.contains(&*root.to_string_lossy()), "{shown}");
-    assert!(plain.contains("import_files"));
-    std::io::stdout().flush().unwrap();
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {
@@ -239,7 +268,7 @@ fn server_over(directory: &Path) -> crate::agent::Server {
 }
 
 /// The tool answers with counts, sizes and ages and names no path, takes no
-/// arguments, and changes nothing (#local-data slice 1).
+/// arguments, and reads only (#local-data slice 1).
 #[tokio::test]
 async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     let directory = tempfile::tempdir().unwrap();
@@ -267,6 +296,7 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     assert_eq!(result["classes"]["bank_statements"]["oldest_days"], 40);
     assert_eq!(result["journal"]["state"], "read");
     assert_eq!(result["journal"]["not_settled"], 1);
+    assert_eq!(result["journal"]["built_never_sent"], 0);
     assert_eq!(result["desktop_app_files_covered"], false);
 
     let refused = server
@@ -288,17 +318,14 @@ fn ages_count_whole_days_and_never_go_negative() {
     );
 }
 
-/// A data folder the person moved to another disk and linked back is followed
-/// (only that one link); the report must not read as empty.
-#[cfg(unix)]
+/// The report must never take the admission lock or a lease: a lock held for the
+/// journal scan can make a post's response record fail to append (a
+/// non-blocking exclusive lock). Checked on the source, so a later edit that
+/// adds a lock call fails here.
 #[test]
-fn a_symlinked_data_folder_itself_is_followed() {
-    let directory = tempfile::tempdir().unwrap();
-    let real = directory.path().join("real");
-    write(&real.join("agent-egress.jsonl"), b"abcd");
-    let link = directory.path().join("Bridge");
-    std::os::unix::fs::symlink(&real, &link).unwrap();
-    let report = build(&link, None);
-    assert_eq!(report.root, Root::Present);
-    assert_eq!(*class(&report, "egress_log"), Class { files: 1, bytes: 4 });
+fn the_report_module_takes_no_lock() {
+    let source = include_str!("agent_import_local_data.rs");
+    for forbidden in [".try_lock", ".lock()", "lock_import_admission", "acquire("] {
+        assert!(!source.contains(forbidden), "{forbidden}");
+    }
 }

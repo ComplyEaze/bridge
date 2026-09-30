@@ -1823,19 +1823,20 @@ fn mask(value: &str) -> String {
 }
 
 /// `bridge_mcp --local-data-report [--show-paths]`: a read-only report of the
-/// local data Bridge keeps. `None` when the arguments are not this mode.
+/// local data Bridge keeps. `None` when the first argument is not this mode; a
+/// malformed use exits 2 with the usage, never starts the server.
 pub fn run_local_data_report_from_args(mut args: impl Iterator<Item = String>) -> Option<i32> {
     if args.next().as_deref() != Some("--local-data-report") {
         return None;
     }
-    let show_paths = match args.next().as_deref() {
-        None => false,
-        Some("--show-paths") => true,
-        Some(_) => return None,
+    let show_paths = match (args.next().as_deref(), args.next()) {
+        (None, _) => false,
+        (Some("--show-paths"), None) => true,
+        _ => {
+            eprintln!("usage: bridge_mcp --local-data-report [--show-paths]");
+            return Some(2);
+        }
     };
-    if args.next().is_some() {
-        return None;
-    }
     Some(agent_import::local_data::run(show_paths))
 }
 

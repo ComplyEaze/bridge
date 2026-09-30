@@ -76,12 +76,12 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
         return subprocess.run(
-            [str(SCRIPT), "321", "--repo", "lamemustafa/bridge", *extra_args],
+            [str(SCRIPT), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
             env=env,
             text=True,
@@ -113,6 +113,16 @@ class MergeGateControls(unittest.TestCase):
         return result
 
     # -- Baseline -----------------------------------------------------------
+
+    def test_the_organization_name_is_the_same_policy_as_the_old_account_name(self):
+        result = self.run_gate("pass", repo="ComplyEaze/bridge")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_any_other_repository_is_refused(self):
+        for repo in ("someone/bridge", "ComplyEaze/other", "complyeaze/bridge"):
+            result = self.run_gate("pass", repo=repo)
+            self.assertEqual(result.returncode, 2, repo + result.stdout + result.stderr)
+            self.assertIn("unsupported repository", result.stderr)
 
     def test_pass_scenario_may_merge(self):
         self.assert_pass("pass", "review evidence names the current head")

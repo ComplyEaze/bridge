@@ -248,6 +248,15 @@ test("a line naming a cfg the census run compiles differently is refused, howeve
   assert.equal(legal.status, 0, legal.stderr);
 });
 
+test("an FFI process or network function name is refused in src-tauri Rust, because its listed path is inert on Windows", { skip }, () => {
+  for (const line of ["use windows_sys::Win32::UI::Shell::ShellExecuteW;", "let _ = CreateProcessW(0);", "libc::posix_spawn(a, b);", "unsafe { getaddrinfo(a, b, c, d) };"]) {
+    const result = sandbox({ "src-tauri/src/lib.rs": `fn ok() {}\n${line}\n` }).run();
+    assertRefused(result, "src-tauri/src/lib.rs:2 names an FFI process or network function");
+  }
+  const legal = sandbox({ "src-tauri/src/lib.rs": "// ShellExecuteW in a comment\nfn ok() { let _ = SHGetKnownFolderPath; }\n" }).run();
+  assert.equal(legal.status, 0, legal.stderr);
+});
+
 test("a build script under another name is refused, in any spelling of the key", { skip }, () => {
   for (const toml of ['[package]\nname = "x"\nbuild = "setup.rs"\n', '[package]\n"build" = "setup.rs"\n', 'package.build = "setup.rs"\n', 'package = { name = "x", build = "setup.rs" }\n']) {
     const result = sandbox({ "src-tauri/crates/x/Cargo.toml": toml }).run();
@@ -430,6 +439,21 @@ test("a dependency's macro, a listed type and a listed path that resolves to not
   assertCensusRefused(census(probe(), "macOS", without), "src-tauri/clippy.toml: 1 listed path(s) that resolve to nothing of std::process::Commnad::new, 0 reviewed");
   // The dependency's own (non-member) call is not reported by clippy, so it is not in the capture.
   assert.ok(!probe().includes("nonmember_call"), "the capture holds no message for the non-member call");
+});
+
+test("a verbatim Windows path and a repeated unresolved-path message count as one row", () => {
+  // CI printed clippy.toml's path on Windows as //?/D:/a/... (a \\?\ verbatim path); this is that shape on this root.
+  const verbatimPath = `\\\\?\\${(root + "/src-tauri/clippy.toml").replaceAll("/", "\\")}`;
+  const verbatim = probe().replaceAll(`${root}/src-tauri/clippy.toml`, JSON.stringify(verbatimPath).slice(1, -1));
+  assert.ok(verbatim.includes("?"), "the path was rewritten");
+  const result = census(verbatim, "macOS", PROBE_PINS);
+  assert.equal(result.status, 0, result.stderr);
+  // clippy reports an unresolved path once per crate; the census counts it once however many crates.
+  const typo = probe().split("\n").find((line) => line.includes("does not refer to a reachable"));
+  const repeated = `${probe()}${typo}\n${typo}\n`;
+  assert.notEqual(repeated, probe());
+  const again = census(repeated, "macOS", PROBE_PINS);
+  assert.equal(again.status, 0, again.stderr);
 });
 
 test("a message about a listed path that is not located in clippy.toml is not counted", () => {

@@ -80,3 +80,24 @@ Run on 2026-09-30 with clippy 1.96.0 on macOS (arm64), on this repository's `src
   run re-linted (24 s) and reported the same 15 firings.
 - A `pub fn` under `#[allow(clippy::all, warnings)]` in the app crate that called `std::process::Command::new`
   was reported (1 more firing), so the census refused it; the file was restored afterwards.
+
+## First Windows CI run (evidence for the Windows list, not a capture)
+
+The census step failed on the first `windows-latest` run because the Windows list was empty, and printed
+what it observed (the JSON itself was not kept). The Windows list in `scripts/tally-egress-census.json`
+was generated from those printed rows, then read against the source:
+
+- The seven firing rows equal the macOS rows: four sends in the transport, three test-server sockets,
+  two AXAL sends, four document-upload sends, the approval-dialog helper, and the one file-manager reveal
+  for this OS (`explorer`, the `cfg(target_os = "windows")` site in `commands.rs`).
+- cargo printed the absolute path of `src-tauri/clippy.toml` in the verbatim form `\\?\D:\a\bridge\bridge\...`
+  (`//?/D:/a/bridge/bridge/...` after the census replaced backslashes), which the census did not strip;
+  it does now, and the test that covers it derives that shape by substitution.
+- Nine listed paths were reported as "does not refer to a reachable function" on Windows: `libc::posix_spawn`,
+  `libc::posix_spawnp`, `libc::getaddrinfo` and windows-sys's `ShellExecuteW`, `ShellExecuteA`,
+  `ShellExecuteExW`, `CreateProcessW`, `CreateProcessA` and `WinExec`, although the app crate depends on
+  windows-sys with the Shell and Threading features. The cause is not measured. Clippy reports each once per
+  crate (counts of 1, 4 and 5 were printed), so the census counts each once. These entries are inert on
+  Windows; the static half refuses those function names in src-tauri Rust instead.
+- The macOS native job on the same push passed its census against the macOS list, so that list matches a
+  second, independent run.

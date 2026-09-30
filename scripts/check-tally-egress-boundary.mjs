@@ -91,6 +91,13 @@
 //    its call site, and a typo in a listed path is reported as a warning located
 //    in clippy.toml, which the census counts. A proc-macro's expansion was not
 //    measured.
+//  - Nine listed FFI paths are inert on Windows: the first Windows run reported
+//    libc::posix_spawn, posix_spawnp and getaddrinfo and windows-sys's
+//    ShellExecuteW, ShellExecuteA, ShellExecuteExW, CreateProcessW,
+//    CreateProcessA and WinExec as resolving to nothing (windows-sys is a
+//    dependency of the app crate with the Shell and Threading features, and the
+//    cause is unmeasured). The census pins them as inert, so they are not seen
+//    firing; the static half refuses those function names in src-tauri Rust.
 //  - Egress routes that name no listed method: a direct dependency on `tower`
 //    is refused, but reqwest's `blocking` client and any other crate's send
 //    method are outside the lists. tauri.conf.json (the app's windows and its
@@ -152,7 +159,8 @@ function firingFile(message) {
   let span = message.spans.find((candidate) => candidate.is_primary);
   while (span?.expansion?.span) span = span.expansion.span;
   if (!span) return null;
-  const name = span.file_name.replaceAll("\\", "/");
+  // Windows prints an absolute path as `\\?\D:\...`, seen in CI as `//?/D:/...` here.
+  const name = span.file_name.replaceAll("\\", "/").replace(/^\/\/\?\//, "");
   const here = root.replaceAll("\\", "/");
   // A Windows drive letter may differ in case between cargo's path and this script's own.
   if (name.toLowerCase().startsWith(here.toLowerCase())) return posix.normalize(name.slice(here.length));
@@ -192,7 +200,9 @@ function censusViolations(text, os, pins) {
     if (!method || !file) return [`an egress lint message could not be read: ${JSON.stringify(entry.message.message.slice(0, 120))}`];
     if (!listed && !file.endsWith("/clippy.toml")) continue;
     const key = `${file}\t${method}`;
-    seen.set(key, (seen.get(key) ?? 0) + 1);
+    // clippy reports an unresolved path once per crate, so how often depends on the crate count;
+    // it counts once. A firing counts each time.
+    seen.set(key, listed ? (seen.get(key) ?? 0) + 1 : 1);
   }
   const violations = [];
   // An empty list would let a run that fired nothing pass, so it is a failure that still prints
@@ -449,13 +459,22 @@ for (const path of settings.stdout.split("\n").filter(Boolean)) {
 // word). The one file that names them in strings is src-tauri/tests/approval_seam_gate.rs, whose
 // inputs to another scanner they are: only its lines of exactly that form are skipped.
 const DIFFERS = /\bclippy\b(?!\s*::)|\bdebug_assertions\b|\bpanic\s*=|[(,]\s*dev\s*[),]|^\s*dev\s*[,)]*\s*$/;
+// The FFI process and network functions in clippy.toml resolve to nothing on the Windows runner
+// (measured in CI: libc's posix_spawn, posix_spawnp and getaddrinfo, and windows-sys's ShellExecute*,
+// CreateProcess* and WinExec), so a call to one is invisible to the census there. Their bare names
+// are refused instead.
+const FFI_EGRESS = /\b(?:ShellExecute[AWEx]*|CreateProcess[AW]?|WinExec|posix_spawnp?|getaddrinfo|execv|execvp|execve)\b/;
 const NAMES_THEM_IN_STRINGS = "src-tauri/tests/approval_seam_gate.rs";
 const STRING_INPUT = /^\s*"#\[cfg\(not\(debug_assertions\)\)\]\\n[^"]*",$/;
 for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs"))) {
   for (const [index, line] of readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).entries()) {
     if (path === NAMES_THEM_IN_STRINGS && STRING_INPUT.test(line)) continue;
-    if (!/^\s*\/\//.test(line) && DIFFERS.test(line)) {
+    if (/^\s*\/\//.test(line)) continue;
+    if (DIFFERS.test(line)) {
       egressViolations.push(`${path}:${index + 1} names clippy, dev, debug_assertions or a panic cfg, which the census run compiles differently from the shipped build`);
+    }
+    if (FFI_EGRESS.test(line)) {
+      egressViolations.push(`${path}:${index + 1} names an FFI process or network function that the lints cannot see on Windows (its listed path does not resolve there)`);
     }
   }
 }

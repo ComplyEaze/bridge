@@ -2003,6 +2003,100 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
     assert_eq!((ledgers, parents), (rows.len() as u64, 1_353));
 }
 
+/// The complement part is planned when the catalogue's own count of the
+/// ledgers it must reach is at most the ledgers one part may hold; one more is
+/// refused by the plan, before any master request is built (#679).
+#[test]
+fn a_complement_at_the_ledger_limit_is_planned_and_one_more_is_refused() {
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, ParentPartitionError,
+    };
+    let limits = super::parent_partition_limits();
+    let plan = |odd: u64| {
+        let mut rows = vec![("Named".to_owned(), "guid-named".to_owned(), Some("P"))];
+        for index in 0..odd {
+            rows.push((format!("Odd {index}"), format!("guid-odd-{index}"), None));
+        }
+        ParentPartition::plan(
+            rows.iter().map(|(name, guid, parent)| {
+                (
+                    name.as_str(),
+                    guid.as_str(),
+                    parent.map_or(ParentObservation::Unsupported, ParentObservation::Named),
+                )
+            }),
+            limits,
+        )
+    };
+    let at_limit = plan(limits.max_ledgers_per_part).unwrap();
+    let complement = at_limit.parts().last().unwrap();
+    assert!(complement.is_complement());
+    assert_eq!(complement.ledger_count(), limits.max_ledgers_per_part);
+    assert_eq!(
+        plan(limits.max_ledgers_per_part + 1).unwrap_err(),
+        ParentPartitionError::ParentOverBudget {
+            ledgers: limits.max_ledgers_per_part + 1
+        }
+    );
+}
+
+/// Only a parent part's answer past the response cap is named as one: a
+/// whole-book read has no filter to blame, and another transport failure keeps
+/// its own name. The transport error stays in the chain (#679).
+#[test]
+fn only_a_parent_parts_oversized_response_is_named_as_one() {
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
+    let partition = ParentPartition::plan(
+        [("Ledger", "guid", ParentObservation::Named("P"))],
+        super::parent_partition_limits(),
+    )
+    .unwrap();
+    let part = partition.parts().first();
+    let too_large = || {
+        anyhow::Error::new(super::TallyTransportError::ResponseTooLarge {
+            limit: 1,
+            declared_by_peer: true,
+        })
+    };
+    let named = super::parent_part_response_error(part, too_large());
+    assert!(matches!(
+        named.downcast_ref::<super::PartyLedgerMasterSourceValidationError>(),
+        Some(super::PartyLedgerMasterSourceValidationError::ParentPartResponseTooLarge { .. })
+    ));
+    assert!(named.chain().any(|cause| matches!(
+        cause.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::ResponseTooLarge { .. })
+    )));
+    let whole = super::parent_part_response_error(None, too_large());
+    assert!(matches!(
+        whole.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::ResponseTooLarge { .. })
+    ));
+    // A pair that failed on its second response carries the first one's
+    // evidence at the root; naming the error keeps it there for the caller's
+    // merge.
+    let failed_pair = super::with_read_evidence(
+        too_large(),
+        super::RuntimeReadEvidence::single("request", "sha".into(), 10),
+    );
+    let merged = super::with_read_evidence(
+        super::parent_part_response_error(part, failed_pair),
+        super::RuntimeReadEvidence::single("earlier", "sha-earlier".into(), 5),
+    );
+    let failure = merged
+        .downcast_ref::<crate::tally::runtime::RuntimeReadFailure>()
+        .unwrap();
+    assert_eq!(failure.evidence.bytes, 15);
+    let timed_out = super::parent_part_response_error(
+        part,
+        anyhow::Error::new(super::TallyTransportError::RequestTimedOut),
+    );
+    assert!(matches!(
+        timed_out.downcast_ref::<super::TallyTransportError>(),
+        Some(super::TallyTransportError::RequestTimedOut)
+    ));
+}
+
 /// A parent-partition refusal surfaces under its own safe code, so an agent
 /// can tell "one parent is too large" from a validation failure (#679).
 #[test]

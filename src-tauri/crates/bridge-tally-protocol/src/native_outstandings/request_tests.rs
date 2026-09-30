@@ -307,3 +307,85 @@ fn native_voucher_export_request_is_bounded_by_a_date_filter() {
     assert!(!voucher_xml.contains("<REPORT>"));
     assert!(!voucher_xml.contains("<REPORT "));
 }
+
+fn one_part(parents: &[&str]) -> crate::parent_partition::ParentPart {
+    let rows = parents
+        .iter()
+        .enumerate()
+        .map(|(index, parent)| {
+            (
+                format!("l{index}"),
+                format!("g{index}"),
+                (*parent).to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let partition = crate::parent_partition::ParentPartition::plan(
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                crate::parent_partition::ParentObservation::from(Some(parent.as_str())),
+            )
+        }),
+        crate::parent_partition::PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 100,
+            max_parts: 1,
+        },
+    )
+    .unwrap();
+    partition.parts()[0].clone()
+}
+
+fn strip_parent_filter(xml: &str) -> String {
+    let start = xml.find("<SYSTEM ").expect("formula present");
+    let end = xml.find("</SYSTEM>").unwrap() + "</SYSTEM>".len();
+    format!("{}{}", &xml[..start], &xml[end..]).replace("<FILTERS>BridgeParentPart</FILTERS>", "")
+}
+
+/// bridge#679: a parent part adds one formula and one filter reference to the
+/// otherwise unchanged request, and an unfiltered request carries neither.
+#[test]
+fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
+            .unwrap();
+    let snapshot =
+        NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let part = one_part(&["Sundry Debtors", "Duties & Taxes"]);
+
+    let whole_master = render_party_ledger_master_request("Co", &export);
+    let whole_balance = render_native_ledger_snapshot_request("Co", &snapshot);
+    for whole in [&whole_master, &whole_balance] {
+        assert!(!whole.contains("<SYSTEM"));
+        assert!(!whole.contains("<FILTERS>"));
+    }
+
+    let master = render_party_ledger_master_request_for_parents("Co", &export, &part);
+    let balance = render_native_ledger_snapshot_request_for_parents("Co", &snapshot, &part);
+    for (filtered, whole) in [(&master, &whole_master), (&balance, &whole_balance)] {
+        assert_eq!(strip_parent_filter(filtered), *whole);
+        assert_eq!(filtered.matches("<SYSTEM ").count(), 1);
+        assert_eq!(filtered.matches("<FILTERS>").count(), 1);
+        assert!(filtered.contains(
+            r#"<TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeParentPart">$Parent = "Duties &amp; Taxes" OR $Parent = "Sundry Debtors"</SYSTEM><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">"#
+        ));
+        assert!(filtered
+            .contains("</COMPUTE><FILTERS>BridgeParentPart</FILTERS></COLLECTION></TDLMESSAGE>"));
+    }
+}
+
+#[test]
+fn the_reserved_root_part_carries_tallys_own_root_literal() {
+    let from = TallyDate::parse("20250401").unwrap();
+    let to = TallyDate::parse("20260401").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let root = format!("{} Primary", crate::TALLY_SANITIZED_ROOT_MARKER);
+    let xml = render_party_ledger_master_request_for_parents("Co", &export, &one_part(&[&root]));
+    assert!(xml.contains(r#"NAME="BridgeParentPart">$Parent = "&#4; Primary"</SYSTEM>"#));
+    assert!(!xml.contains('\u{fffd}'));
+}

@@ -542,6 +542,27 @@ book (the whole party-ledger master) and 12.0 s on the second (the whole balance
 10,000-mark reach for the count as measured limits: they are Bridge's own choices, set above the
 row cost seen here.
 
+**Bridge's parent partition (#679) is CODE, live unproven.** A counted book that does not fit one read
+is split by the parent groups the catalogue names: packed first-fit-decreasing by ledger count into
+parts of at most 4,266 ledgers and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
+`$Parent = "a" OR $Parent = "b"` filter measured above, with the reserved root written as
+`&#4; Primary`. Each part is read as its master pair then its balance pair inside one extent bracket,
+and every catalogue ledger must come back exactly once, from its own part, with the catalogue's name
+and parent, or the whole call is refused. The routing is by count, not by mark: any mark whose
+catalogue Bridge can bound is counted, and a count over 4,266 is read in parts. The catalogue is
+bounded before it is sent (mark times 1,400 bytes, at most 32,000,000, a mark of 22,857), because a
+response past the transport's 32 MiB cap is cut off mid-read and the connection dropped with the
+rest unread, which is an abandoned read. On one real book the largest parents hold about 2,000, 1,900
+and 1,500 ledgers (rounded), all under a part's 4,266, so a parent too large for a part is not the
+constraint there; a book with about 1,350 parents, most holding a few ledgers, is why parts are
+packed by ledger count. The 200-parent limit is set from a measurement on the synthetic book of 4,339
+ledgers: an `OR` of 1, 8, 50 and 200 parents answered every time with exactly the parents named (VERIFIED
+for that book; 0.1 to 0.6 s). Nothing longer is measured, so 200 is the cap and a longer formula is
+UNVERIFIED. The 12-part limit, Tally's cost of evaluating an `OR` over thousands of ledgers and any
+limit on its length are Bridge's own choices, UNVERIFIED against Tally. Whether the catalogue's and the master's parent text
+always agree byte for byte is UNVERIFIED; if they differ the read fails closed as
+`parent_part_row_differs_from_catalogue`.
+
 ## 11a. Scale measurements — 11,287-voucher corpus
 
 **VERIFIED 2026-07-29** on a generated production-shaped corpus: 25 customers and 15

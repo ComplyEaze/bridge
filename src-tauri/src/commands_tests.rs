@@ -705,6 +705,7 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
             master_alter_id: 30_000,
             estimated_bytes: 42_000_000,
             limit_bytes: 32_000_000,
+            mark_limit: 400_000,
         }),
         RuntimeReadEvidence::empty(),
     ));
@@ -718,6 +719,56 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
         RuntimeReadEvidence::empty(),
     ));
     assert_eq!(other.code, "response_validation_failed");
+
+    // The census's refusals (#679) keep their own codes, not an endpoint failure.
+    for (error, code) in [
+        (
+            Validation::LedgerCountDiffers {
+                expected: 8,
+                observed: 9,
+            },
+            "ledger_count_differs",
+        ),
+        (
+            Validation::LedgerSpan {
+                source: bridge_tally_protocol::ledger_census::LedgerCensusError::CensusEmpty,
+            },
+            "ledger_span_census_empty",
+        ),
+        (
+            Validation::CountedCatalogueTooLarge {
+                ledgers: 23_000,
+                estimated_bytes: 32_200_000,
+                limit_bytes: 32_000_000,
+            },
+            "ledger_count_catalogue_too_large",
+        ),
+        (
+            Validation::LedgerSpanSliceResponseTooLarge {
+                source: anyhow::anyhow!("past the cap"),
+            },
+            "ledger_span_slice_response_too_large",
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(with_read_evidence(
+            anyhow::Error::new(error),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(mapped.code, code);
+        let size_refusal = matches!(
+            code,
+            "ledger_count_catalogue_too_large" | "ledger_span_slice_response_too_large"
+        );
+        assert_eq!(
+            mapped.category,
+            if size_refusal {
+                "Response size"
+            } else {
+                "Response validation"
+            }
+        );
+        assert!(!mapped.local_state_changed);
+    }
 }
 
 /// bridge#551: the desktop party/ledger export withholds a workbook that would

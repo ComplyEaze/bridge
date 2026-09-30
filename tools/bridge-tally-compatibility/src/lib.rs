@@ -347,7 +347,16 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value
 // break out of the element it belongs to.
-pub const MAX_SURFACE_FILES: usize = 291;
+// `src-tauri/src/db/migrations/0028_schedule_iii_grouping_events.sql` (bridge#737)
+// is required by `REQUIRED_SURFACE_DIRECTORIES`. It creates the append-only
+// store of a CA's Schedule III grouping decisions, which decides which head an
+// exported Schedule III view presents a ledger under; a defect there could
+// apply, or silently drop, a CA's recorded decision.
+// `src-tauri/src/db/grouping_decisions.rs` (bridge#737) reads that store back,
+// refusing the whole set when one row cannot be parsed, and folds it into the
+// decisions an export applies; a defect there could present a ledger under a
+// head the CA did not choose.
+pub const MAX_SURFACE_FILES: usize = 293;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

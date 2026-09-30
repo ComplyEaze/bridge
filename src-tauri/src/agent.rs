@@ -1352,8 +1352,8 @@ impl Server {
     }
 
     /// What Bridge stores locally, by class: counts, sizes, ages and whether the
-    /// import journal is settled. Reads only Bridge's own data folder and names
-    /// no path: the result enters the AI conversation. The call is logged in the
+    /// import journal is settled. Reads Bridge's own data folder and the per-user
+    /// lease-lock folder, and names no path: the result enters the AI conversation. The call is logged in the
     /// egress log like any tool call.
     fn local_data_report(&self) -> Result<ToolOutcome, String> {
         let payload = agent_import::local_data::tool_payload(&self.settings.data_dir);

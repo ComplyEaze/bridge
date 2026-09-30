@@ -76,7 +76,8 @@ fn files_are_classed_by_name_and_sizes_add_up() {
         "an unknown folder is counted, not entered"
     );
     assert_eq!(report.interrupted_writes, 1, "the publication folder");
-    assert_eq!(report.links + report.unreadable, 0);
+    assert_eq!(report.links + report.special_files + report.unreadable, 0);
+    assert!(report.folders_not_read.is_empty() && !report.entry_cap_reached);
 }
 
 #[test]
@@ -222,7 +223,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
     write(&path, b"not json\n");
     assert_eq!(
         build(directory.path(), None).journal,
-        Journal::NotRead("journal_invalid_or_changing")
+        Journal::NotRead(JOURNAL_INVALID)
     );
     write(&path, &journal(true));
     assert_eq!(
@@ -232,7 +233,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 1,
             unsettled: 1,
             unsettled_no_response: 1,
-            never_sent: 0
+            no_dispatch_never_verified: 0
         })
     );
     write(&path, &journal(false));
@@ -243,7 +244,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
-            never_sent: 1
+            no_dispatch_never_verified: 1
         })
     );
 }
@@ -308,7 +309,7 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     assert_eq!(result["journal"]["not_settled"], 1);
     assert_eq!(result["journal"]["not_settled_no_response"], 1);
     assert_eq!(result["journal"]["not_settled_not_verified"], 0);
-    assert_eq!(result["journal"]["built_never_sent"], 0);
+    assert_eq!(result["journal"]["no_dispatch_never_verified"], 0);
     assert_eq!(result["app_files_outside_this_folder_covered"], false);
 
     let refused = server
@@ -332,12 +333,153 @@ fn ages_count_whole_days_and_never_go_negative() {
 
 /// The report must never take the admission lock or a lease: a lock held for the
 /// journal scan can make a post's response record fail to append (a
-/// non-blocking exclusive lock). Checked on the source, so a later edit that
-/// adds a lock call fails here.
+/// non-blocking exclusive lock). Checked on the source of the report and of the
+/// two helpers it reads through (the journal scan and the file open), so a later
+/// edit that adds a lock call to any of them fails here.
 #[test]
-fn the_report_module_takes_no_lock() {
-    let source = include_str!("agent_import_local_data.rs");
-    for forbidden in [".try_lock", ".lock()", "lock_import_admission", "acquire("] {
-        assert!(!source.contains(forbidden), "{forbidden}");
+fn the_report_and_what_it_reads_through_take_no_lock() {
+    let sources = [
+        ("report", include_str!("agent_import_local_data.rs")),
+        ("journal scan", include_str!("agent_import_ledger.rs")),
+        ("file open", include_str!("local_files/file.rs")),
+    ];
+    for (name, source) in sources {
+        // The report names the admission lock file to count it; it never opens it.
+        for forbidden in [
+            ".try_lock",
+            ".lock(",
+            ".lock_shared",
+            ".unlock",
+            "lock_import_admission",
+            "acquire(",
+            "flock",
+            "LockFileEx",
+        ] {
+            assert!(!source.contains(forbidden), "{name}: {forbidden}");
+        }
     }
+}
+
+/// A journal that exists but cannot be opened is `journal_unreadable`, not
+/// absent and not invalid: a symlink is refused by the no-follow open, on any
+/// user, so this does not depend on file permissions.
+#[cfg(unix)]
+#[test]
+fn a_journal_that_cannot_be_opened_is_unreadable_and_not_absent() {
+    let directory = tempfile::tempdir().unwrap();
+    let real = directory.path().join("real.jsonl");
+    write(&real, &journal(true));
+    std::os::unix::fs::symlink(&real, directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    assert_eq!(
+        build(directory.path(), None).journal,
+        Journal::NotRead(JOURNAL_UNREADABLE)
+    );
+}
+
+/// A last line half written when the report read it is read again once; it
+/// heals if the writer has finished, and is reported invalid if it has not.
+#[test]
+fn a_half_written_last_line_is_read_again_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let whole = journal(true);
+    let mut cut = whole.clone();
+    cut.extend_from_slice(b"{\"record_type\":\"dispat");
+    write(&path, &cut);
+    // The writer finishes between the two reads.
+    let healed = read_journal(directory.path(), || fs::write(&path, &whole).unwrap());
+    assert!(matches!(healed, Journal::Read(_)), "{healed:?}");
+    // It does not: the second read fails the same way, and says so.
+    write(&path, &cut);
+    let stuck = read_journal(directory.path(), || {});
+    assert!(matches!(stuck, Journal::NotRead(_)), "{stuck:?}");
+    // A journal that is whole is read once, with no second read.
+    write(&path, &whole);
+    let mut waited = false;
+    assert!(matches!(
+        read_journal(directory.path(), || waited = true),
+        Journal::Read(_)
+    ));
+    assert!(!waited);
+}
+
+/// A folder that exists but cannot be listed is named, not read as empty. A file
+/// where the folder should be fails the listing on any user.
+#[test]
+fn a_folder_that_cannot_be_listed_is_named_and_not_read_as_empty() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    write(&root.join("imports"), b"not a folder");
+    write(&root.join("bank-statements/s.json"), b"12345");
+    let report = build(root, None);
+    assert_eq!(report.folders_not_read, ["imports"]);
+    assert_eq!(class(&report, "bank_statements").files, 1);
+    let json = to_json(&report, SystemTime::now(), None);
+    assert_eq!(
+        json["folders_that_could_not_be_listed"],
+        serde_json::json!(["imports"])
+    );
+    assert_eq!(json["entry_cap_reached"], false);
+}
+
+/// Sockets, pipes and devices are counted apart from symlinks.
+#[cfg(unix)]
+#[test]
+fn a_socket_is_not_a_symlink_and_is_not_a_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let _listener = std::os::unix::net::UnixListener::bind(root.join("s.sock")).unwrap();
+    let report = build(root, None);
+    assert_eq!(report.special_files, 1);
+    assert_eq!(report.links, 0);
+    assert_eq!(*class(&report, "other"), Class::default());
+}
+
+/// The exit status says whether the report is complete.
+#[test]
+fn the_exit_status_is_zero_only_for_a_complete_report() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), None);
+    assert_eq!(exit_status(&report, true), 0);
+    assert_eq!(exit_status(&report, false), 1);
+    report.journal = Journal::NotRead(JOURNAL_UNREADABLE);
+    assert_eq!(exit_status(&report, true), 3);
+    report.journal = Journal::Absent;
+    report.unreadable = 1;
+    assert_eq!(exit_status(&report, true), 3);
+    report.unreadable = 0;
+    report.folders_not_read.push("imports");
+    assert_eq!(exit_status(&report, true), 3);
+    report.folders_not_read.clear();
+    report.entry_cap_reached = true;
+    assert_eq!(exit_status(&report, true), 3);
+    report.entry_cap_reached = false;
+    report.root = Root::Unreadable;
+    assert_eq!(exit_status(&report, true), 2);
+    report.root = Root::Missing;
+    assert_eq!(exit_status(&report, true), 0);
+}
+
+/// A folder with more entries than the cap is listed up to the cap and reported
+/// as capped, not as complete.
+#[test]
+fn a_folder_past_the_entry_cap_is_reported_as_capped() {
+    let directory = tempfile::tempdir().unwrap();
+    for name in ["a", "b", "c"] {
+        write(&directory.path().join("lab").join(name), b"1");
+    }
+    let mut report = build(directory.path(), None);
+    assert!(!report.entry_cap_reached);
+    assert_eq!(class(&report, "lab").files, 3);
+    report = build(&directory.path().join("absent"), None);
+    scan_directory(
+        &mut report,
+        "lab",
+        &directory.path().join("lab"),
+        |_| "lab",
+        &[],
+        2,
+    );
+    assert!(report.entry_cap_reached);
+    assert_eq!(class(&report, "lab").files, 2);
 }

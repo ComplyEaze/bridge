@@ -318,9 +318,12 @@ pub(super) struct Settlement {
     pub(super) unsettled: usize,
     /// Of `unsettled`, the batches with no recorded response.
     pub(super) unsettled_no_response: usize,
-    /// Batches that were never sent nor found posted. Their saved file is what
+    /// Batches with no recorded dispatch that were never found posted. That
+    /// includes a batch imported by hand whose verification is incomplete, which
+    /// may well be in Tally: this is what the journal holds, not what Tally
+    /// holds, and no deletion may rest on it. Their saved file is what
     /// `post_import` would send, so moving or deleting the folder strands them.
-    pub(super) never_sent: usize,
+    pub(super) no_dispatch_never_verified: usize,
 }
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
@@ -365,7 +368,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     Ok(Settlement {
         batches: batches.len(),
         sent_or_found,
-        never_sent: batches.len() - sent_or_found,
+        no_dispatch_never_verified: batches.len() - sent_or_found,
         unsettled_no_response: unsettled
             .clone()
             .filter(|progress| !progress.responded)

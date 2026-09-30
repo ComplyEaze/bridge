@@ -515,11 +515,19 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow is manual so publishing
-it remains an explicit maintainer action. Once GitHub Pages is configured for
-this repository, it resolves GitHub Release assets by exact release tag and
-labels prerelease downloads as unsigned previews. It does not proxy Tally,
-create an account, or run a cloud relay.
+`site/` is a small static installer page. Its workflow runs when a maintainer
+dispatches it, and again when a maintainer-dispatched preview publication in
+this repository finishes successfully, so the page's release snapshot follows
+the release without a second step. The job requires the publication run's event
+and repository, because the trigger matches a workflow by name only. A release
+published with the workflow token starts no workflow of its own, which is why
+the follow-up is wired to the publication run. A successful publication also
+deploys any `site/` change already merged to the default branch but not yet
+deployed, so text on the default branch is text that goes live.
+Once GitHub Pages is configured for this repository, the page offers a
+preview by its tag name and complete asset set, whether or not GitHub marks the
+release a prerelease, and labels every download as an unsigned preview. It does
+not proxy Tally, create an account, or run a cloud relay.
 
 ## Release rhythm and notes
 
@@ -555,7 +563,11 @@ patch for a fix-only release:
 
 `node scripts/next-version.mjs` proposes the version:
 - It reads the pull requests squash-merged since the last `mcp-preview-*` or
-  `v*` tag, from `git log`.
+  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+  `HEAD` would count an unmerged working branch's commits as direct pushes).
+  It refuses when `origin/master` here is not origin's current master, or when
+  the version files here differ from that commit's, so a stale branch cannot
+  propose a bump twice. Run `git fetch --tags origin` first.
 - It classifies each by its own labels together with the labels of the issues
   it closes, the highest kind winning.
 - It refuses, and names them, while any pull request is unclassified. Expect
@@ -563,6 +575,9 @@ patch for a fix-only release:
   labelled issue. Label them, or choose the level yourself with `--level`,
   which the output records and warns about when it is lower than the labels
   imply. `--level` cannot release nothing.
+- It refuses an unknown flag, a repeated flag, a stray argument, and the
+  `--level=minor` form (write `--level minor`), rather than ignoring them. A `gh` failure or a
+  60-second stall ends the run with one line naming the command.
 - It refuses when the version files already differ from the last release tag,
   which is the state after a version pull request merges and before its tag
   exists.
@@ -587,8 +602,12 @@ disagree.
 2. **Safer or fixed.** Refusals, safety checks and bug fixes, described by
    what the user sees.
 3. **Known limits.** Name what still does not work, and link the issue.
-4. **All changes.** Paste GitHub's generated list here. `.github/release.yml`
-   groups it by the existing `type:*` labels.
+4. **All changes.** GitHub's generated list, grouped by the existing `type:*`
+   labels through `.github/release.yml`. The publish workflow appends it; do
+   not paste it by hand.
+
+   On the release page the written parts come first, then the standard
+   unsigned-preview text, then this generated list.
 
 **`CHANGELOG.md`**
 
@@ -596,6 +615,34 @@ disagree.
   written from the merged pull requests since the last build.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
+- `CHANGELOG.md` is the one source for the notes. The publish workflow takes
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
+  puts it above the unsigned-preview text, and appends GitHub's list. The
+  install page's "What changed" page renders the same file when the install
+  page is deployed, so a changelog edit reaches the site with the next
+  deploy, not when the file changes.
+  Neither step can stop a release or a deploy; each warns and falls back, so a
+  missing section shows as a warning in the run, not as a failed release.
+- The page's look belongs to a tracked template, `site/changelog.template.html`,
+  which holds the line `<!-- changelog -->` exactly once. The generator puts a
+  version index and the sections there and writes `site/changelog.html`, which
+  is ignored by git and never edited by hand. Each section has an `id` (`v0-3-0`,
+  or `unreleased`), a `data-version`, and `data-latest="true"` on the newest
+  published one. With no template, or one without the marker, the deploy uses
+  a plain built-in page and never fails.
+- At cut time, in the pull request that bumps the version: rename the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
+  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  release carries the `[Unreleased]` text instead (with a warning), which may
+  describe changes that build does not have, so read the release body; if that
+  is empty too, only the standard text and GitHub's list. Headings must read
+  `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
+  closed, or another level-two heading, is reported as a warning in the run.
+- The install page shows this file's headings, paragraphs and bullets, so a
+  claim added here is a claim on the public site. Fenced code is left out, and
+  tables and quotes show as plain text. Escape nothing by hand: the renderer
+  escapes all text and links only `https://` addresses and `#123` issue
+  numbers.
 
 **Writing rules for notes, the install page and posts**
 

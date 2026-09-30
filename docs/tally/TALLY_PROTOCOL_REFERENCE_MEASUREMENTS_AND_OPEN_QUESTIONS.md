@@ -996,7 +996,7 @@ during a scan. This catches the observed rename without treating a stable GUID a
 that the ledger master itself stayed unchanged.
 
 This establishes only a GUI rename on the observed TallyPrime Edit Log EDU profile. XML
-rename behaviour, other releases, and other configurations remain unverified.
+rename behaviour, other releases, and other configurations remain unverified (a gateway rename by `Alter` on Gold is measured in §9.4).
 
 **VERIFIED 2026-09-11; one synthetic company on TallyPrime 7.1 licensed Silver
 (`education_mode: false`), read through `StandardLedgerCatalogV1`.** Two of the axes named above
@@ -1055,7 +1055,7 @@ generalisations from a single company, and the rule behind them is not establish
   outside the master set differ between two captures of the same company for reasons this reference
   cannot yet explain. That is a stronger reason to compare identity than the withdrawn one.
 
-**UNVERIFIED — XML-driven rename.** Neither capture used one; both renames were performed in the
+**UNVERIFIED — XML-driven rename (a gateway rename by `Alter` on Gold is measured in §9.4).** Neither capture used one; both renames were performed in the
 UI. Deletion was not exercised at all. Per P6, neither may be built upon.
 
 ### 12a.10 An opening bill keeps a date before `BOOKSFROM` — **VERIFIED 2026-09-22; single captured book**
@@ -1141,10 +1141,11 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-21 | §11c after the bridge#520 rectify: every census is bounded before it is sent (one date census when the mark fits one, otherwise AlterID spans of 8,192 sized against the whole cap; a mark needing more than 256 spans is refused as `voucher_window_book_too_large`); parts are admitted against the census and their union; the read allowance is spent at dispatch; a divided read is bracketed on `ALTVCHID` and `ALTMSTID`; a replay carries and closes against the first read's witness; the pre-post check refuses a window the bound would divide. Added §11c.5, the first live evidence (licensed 7.1 Silver lab): census and span shapes, `ALTVCHID` as a count bound and on every voucher change, a ledger rename moving only `ALTMSTID`, and end-to-end timings. |
 | 2026-09-23 | Added §12a.10: two opening bills in a licensed TallyPrime 7.1 Bills Receivable capture are dated and due the day before the book's `BOOKSFROM`, so `BOOKSFROM` does not bound a Bills row's dates (bridge#612). Earlier dates, a due date before its bill, and bills dated after the as-of date are not measured. |
 | 2026-09-25 | §11c.5: added the `ALTVCHID` step on multi-voucher gateway imports and on screen edits (PARTIAL: one run each, lab scripts, not Bridge's post path), the basis of `post_import`'s reported `target_voucher_step`. |
-| 2026-09-25 | §9.13: a scoped correction recording two licensed TallyPrime 7.1 Gold field runs of Bridge-built Payment, Receipt and Contra files sent over the gateway by a script, with `verify_import` returning `posted_verified` (VERIFIED on one book; PARTIAL on a second, where larger reads failed, bridge#485). §3.1 and §5.3's import-verification note now cite it. Native `post_import` on Gold is still not observed. |
+| 2026-09-25 | §9.13: a scoped correction recording two licensed TallyPrime 7.1 Gold field runs of Bridge-built Payment, Receipt and Contra files sent over the gateway by a script, with `verify_import` returning `posted_verified` (VERIFIED on one book; PARTIAL on a second, where larger reads failed, bridge#485). §3.1 and §5.3's import-verification note now cite it. Native `post_import` on Gold was still not observed as of that date (see the 2026-09-28 row). |
 | 2026-09-26 | §9.14: "an upsert omitting `REFERENCE` kept the stored value" moves from PARTIAL to VERIFIED for a gateway-written `REFERENCE` on licensed 7.1 Silver, on a second independent run through Bridge's own amendment file (bridge#239). A `REFERENCE` typed in Tally's screens remains unmeasured. |
 | 2026-09-26 | §6.3: a custom-report FIELD without `<TYPE>Amount</TYPE>` returned money as a display string (sign dropped, digits grouped); with it, signed. One variable, licensed 7.1 Silver, PARTIAL |
 | 2026-09-26 | §9.4e: fold-equal ledgers (a trailing CR LF, and case) coexist, and an import binds the exact name in both creation orders; the fold-only case is open. Licensed 7.1 Silver, PARTIAL |
 | 2026-09-26 | §11c.5: the multi-voucher step through Bridge's own post path (50 and 200, one run each) is VERIFIED; and what screen actions move `ALTVCHID` and `ALTMSTID`, with the fields the import-verification read cannot see. |
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |
+| 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (about 300 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (about 120 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |

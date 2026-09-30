@@ -68,8 +68,13 @@ pub(in crate::agent) enum Entry {
     Fresh,
     /// The second pass of a call, from the top, to redeem the approval its
     /// own Join just found, keeping that call's evidence. It may only
-    /// redeem: it never asks, so it can never show a second dialog.
-    RedeemOnly { evidence: Evidence },
+    /// redeem: it never asks, so it can never show a second dialog. It also
+    /// keeps that call's start, so every budget in the second pass is
+    /// measured from the call and not from the pass.
+    RedeemOnly {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What a post's checked body came to: an answer, or an approval its Join
@@ -85,7 +90,10 @@ enum Step {
 /// pass (#725 slice 2.0). The passes run one after the other, never nested.
 pub(in crate::agent) enum Pass {
     Done(ToolOutcome),
-    Redeem { evidence: Evidence },
+    Redeem {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What waiting on a dialog came to.
@@ -103,6 +111,46 @@ fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
     approval::CALL_BUDGET
         .saturating_sub(call_started.elapsed())
         .max(approval::MIN_DIALOG_WAIT)
+}
+
+/// Kept back from the call's ceiling for what a post still does after its
+/// marks readback: the verification readback took 12.1 s at 200 vouchers, the
+/// largest batch measured live, plus the spacing between the requests
+/// (`approval::MEASURED_POST`).
+/// Only lock waits are bounded: the retry's own send, and the wire waits of the
+/// checks after it (each at most the policy total), are not counted, so the
+/// call can pass its ceiling by about that much and stay under the host limit.
+const AFTER_READ_REST_OF_POST: std::time::Duration = std::time::Duration::from_secs(13);
+/// A retry with less to wait than this is not worth its send.
+const AFTER_READ_MIN_RETRY_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The wire wait for the one retry of the marks readback after a sent post
+/// (#884): the policy's own total, cut to what the call has left of its
+/// ceiling once the rest of the post is kept back. `None` when too little is
+/// left to be worth another wait, so a slow call is never stretched past the
+/// ceiling by the retry.
+fn after_read_retry_budget(
+    elapsed: std::time::Duration,
+    policy_total: std::time::Duration,
+) -> Option<std::time::Duration> {
+    let left = approval::CALL_CEILING
+        .saturating_sub(elapsed)
+        .saturating_sub(AFTER_READ_REST_OF_POST);
+    (left >= AFTER_READ_MIN_RETRY_WAIT).then(|| left.min(policy_total))
+}
+
+/// Why the marks readback after a sent post failed: the transport's own safe
+/// code when it has one (a busy wire lock is `tally_endpoint_busy`), so a
+/// doubt says the read was held back and never that the step moved wrongly.
+fn after_read_cause(error: &anyhow::Error) -> &'static str {
+    error
+        .chain()
+        .find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                .map(bridge_tally_transport::TallyTransportError::safe_code)
+        })
+        .unwrap_or("marks_readback_failed")
 }
 
 /// Wait up to `budget` for the person's answer, stopping at once if the call
@@ -203,12 +251,34 @@ impl Server {
     /// The marks readback after a sent post. It gets a wire wait of its own:
     /// the admission reads may have spent the call's budget, and a marks read
     /// refused as busy after a sent post would record a lasting doubt on a
-    /// clean batch (#697).
+    /// clean batch (#697). A busy refusal has waited that whole budget, so it
+    /// is tried once more with a second, cut to what the call has left of its
+    /// ceiling (#884); a refusal that survives is returned as it is.
     async fn read_marks_after_post(
         &self,
         request: crate::tally::agent_read_request::AgentReadRequest,
+        call_started: std::time::Instant,
     ) -> anyhow::Result<String> {
-        crate::tally::runtime::with_operation_wire_budget(
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
+        let first = crate::tally::runtime::with_operation_wire_budget(
+            self.runtime
+                .read_company_marks_once(self.tally_config(), request.clone()),
+        )
+        .await;
+        let busy = first.as_ref().err().is_some_and(|error| {
+            crate::endpoint_wire::wire_refusal(error)
+                == Some(bridge_tally_transport::WireRefusal::Busy)
+        });
+        let policy_total = self.runtime.wire_gate_config().retry().total();
+        let Some(budget) = busy
+            .then(|| after_read_retry_budget(call_started.elapsed(), policy_total))
+            .flatten()
+        else {
+            return first;
+        };
+        crate::tally::runtime::with_operation_wire_budget_of(
+            budget,
             self.runtime
                 .read_company_marks_once(self.tally_config(), request),
         )
@@ -368,11 +438,22 @@ impl Server {
             Pass::Done(outcome) => Ok(outcome),
             // At most one more pass: a redeem-only pass never joins, so it
             // never hands on another redeem.
-            Pass::Redeem { evidence } => {
+            Pass::Redeem {
+                evidence,
+                call_started,
+            } => {
                 #[cfg(test)]
                 let _ = BETWEEN_PASSES.try_with(|between| between());
                 match self
-                    .post_import_entry(args, expected_sha256, scope, Entry::RedeemOnly { evidence })
+                    .post_import_entry(
+                        args,
+                        expected_sha256,
+                        scope,
+                        Entry::RedeemOnly {
+                            evidence,
+                            call_started,
+                        },
+                    )
                     .await?
                 {
                     Pass::Done(outcome) => Ok(outcome),
@@ -392,11 +473,15 @@ impl Server {
         scope: PostScope,
         entry: Entry,
     ) -> Result<Pass, ToolFailure> {
-        let call_started = std::time::Instant::now();
-        let carried = match entry {
-            Entry::Fresh => None,
-            Entry::RedeemOnly { evidence } => Some(evidence),
+        let (carried, call_started) = match entry {
+            Entry::Fresh => (None, std::time::Instant::now()),
+            Entry::RedeemOnly {
+                evidence,
+                call_started,
+            } => (Some(evidence), call_started),
         };
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
@@ -1025,11 +1110,16 @@ impl Server {
             // Where the voucher went (#574), read only once the journal write has
             // been attempted, so a slow or failed read delays nothing that records
             // the post. A failed read is reported, never guessed.
-            let marks_after = self
-                .read_marks_after_post(company_marks_request.clone())
-                .await
-                .ok()
-                .and_then(|marks| location::parse_all_company_marks(&marks).ok());
+            let marks_read = self
+                .read_marks_after_post(company_marks_request.clone(), call_started)
+                .await;
+            let (marks_after, after_read_cause) = match marks_read {
+                Ok(marks) => match location::parse_all_company_marks(&marks) {
+                    Ok(rows) => (Some(rows), None),
+                    Err(_) => (None, Some("marks_readback_unparsed")),
+                },
+                Err(error) => (None, Some(after_read_cause(&error))),
+            };
             post_location = Some(location::classify_post_location(
                 &location::parse_all_company_marks(&posted.company_marks_before)
                     .unwrap_or_default(),
@@ -1038,12 +1128,19 @@ impl Server {
                 &company.name,
                 reported_created,
             ));
+            if let (Some(cause), Some(location)) = (after_read_cause, post_location.as_mut()) {
+                location["after_read_failure"] = json!(cause);
+            }
             // A batch is clean only if the target's voucher mark moved by
             // exactly what Tally created; recorded durably, before anything
             // else can fail, so no later readback can lose it.
             if line.vouchers.len() > 1 {
                 if let Some(located) = &post_location {
-                    self.record_batch_step_verdict(batch_id, &located["target_voucher_step"]);
+                    self.record_batch_step_verdict_caused(
+                        batch_id,
+                        &located["target_voucher_step"],
+                        located["after_read_failure"].as_str(),
+                    );
                 }
             }
             journaled?;
@@ -1085,6 +1182,7 @@ impl Server {
             Ok(Step::Redeem) => {
                 return Ok(Pass::Redeem {
                     evidence: accumulated,
+                    call_started,
                 })
             }
             Ok(Step::Done(outcome)) => Ok(*outcome),
@@ -1733,6 +1831,8 @@ tokio::task_local! {
     /// Test-only: run between a call's two passes (#725 slice 2.0), as a
     /// cancel, an expiry or another route's post landing there would.
     pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Test-only: the start each pass of a post call took its budgets from.
+    pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
 }
 
 /// A fresh random REMOTEID for one native post.

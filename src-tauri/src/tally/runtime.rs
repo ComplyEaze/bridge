@@ -2991,6 +2991,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3014,6 +3015,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| read.listing)
@@ -3036,6 +3038,7 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
+                ReadRetryPolicy::transient_default(),
             )
             .await?;
         let Some(groups) = read.groups else {
@@ -3065,6 +3068,10 @@ impl TallyRuntime {
             Some(from),
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            // Sent once. A catalogue that outlived its deadline is abandoned, and
+            // sending it again queues more work behind a gateway still building
+            // the response: agent voucher reads take the same rule (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3077,13 +3084,15 @@ impl TallyRuntime {
         opening_date: Option<TallyDate>,
         read_groups: bool,
         currency_gate: LedgerCurrencyGate,
+        retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
             config,
             ReadOperation::MasterExport,
-            ReadRetryPolicy::transient_default(),
+            // The caller's: a movement sends its catalogue once (#485, #937).
+            retry,
             move |client| {
                 let identity = identity.clone();
                 let opening_date = opening_date.clone();

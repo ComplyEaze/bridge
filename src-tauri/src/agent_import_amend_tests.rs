@@ -1023,14 +1023,8 @@ async fn assert_build_refused_for_a_row_already_sent(server: &Server, input: &Va
     let step = result["error"]["next_step"].as_str().unwrap();
     assert!(step.contains("amends_batch_id"), "{step}");
     assert!(step.contains("whatever ledger it names"), "{step}");
-    assert!(
-        step.contains("comparing it with this row by hand"),
-        "{step}"
-    );
-    assert!(
-        step.contains("a correction, not a different event"),
-        "{step}"
-    );
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
     assert!(step.contains("Never rename a statement row"), "{step}");
     assert!(!step.contains("import the file"), "{step}");
     assert!(!step.contains("import by hand"), "{step}");

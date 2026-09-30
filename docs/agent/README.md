@@ -553,7 +553,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    under the lock (#876). Two vouchers are the same row when they share a
    transaction id and either the id is the `st-YYYYMMDD-<16 hex>` form a
    bank-statement build derives (it survives a change of ledger) or their date
-   and amounts agree. Do not rebuild the row: verify the
+   and amounts agree. Do not rebuild the row (except as the exit for a repeated hand-typed id below says): verify the
    earlier batch, which the error's `blocking_batch_id` names (it can be absent
    when the journal was busy for the lookup; then verify the company's recent
    batches). For an overlapping statement, rebuild without the rows already
@@ -569,13 +569,15 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
    of the same statement (other amount formatting or narration wrapping) derives
    different ids and is not seen; a hand-typed id reused for a genuinely
-   different event is refused too. The next step is advice, not a control: a
-   different ledger or narration is a correction of the posted voucher, not a
-   different event; only if the user, comparing the existing voucher in Tally
-   by hand, says it is a second real transaction not in the book is it rebuilt
-   under a new id. Bridge does not check that judgement (for a
-   `posted_verified` voucher `verify_import` returns no date, amounts, ledgers
-   or narration), and nothing binds the user's answer to the rebuild. A statement row that is re-entered inline
+   different event is refused too. The next step is advice, not a control: the
+   agent does not decide whether the refused row is the same transaction as the
+   posted voucher or a second real one that shares its id, date and amounts. It
+   asks the user to open the existing voucher in Tally, compare, and say which.
+   If it is the same and its ledger or narration is wrong, the posted voucher is
+   corrected in Tally (or amended, for a batch imported by hand); if it is a
+   second real transaction, it is rebuilt under a new id. Bridge does not check
+   that answer (for a `posted_verified` voucher `verify_import` returns no date,
+   amounts, ledgers or narration), and nothing binds it to the rebuild. A statement row that is re-entered inline
    under any other id, including a `st-` id with a suffix, is a hand-typed id
    and is not seen; two Bridge installs on one company keep separate
    journals. The check at build is a point in time: a batch posted

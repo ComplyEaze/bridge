@@ -943,7 +943,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "516b902b993d2de0d372f11eee39933c2b880aa703262398399ed8bcdcb3a7be"
+      "sha256": "8ad25a5e6effb2de5cd8e0982a24da405347d61589a7337156e4fd708f8c1281"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",

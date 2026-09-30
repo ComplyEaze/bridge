@@ -27,9 +27,9 @@
 //    compile-time property -- cargo will not link a crate against reqwest
 //    unless its Cargo.toml says so -- but it only sees crate boundaries. It
 //    cannot see what a crate that *is* allowed to depend on reqwest
-//    (`bridge`, the app crate, which needs it for the Tally connection
-//    wrapper -- see the note above APP_CRATE) does with that dependency
-//    inside its own files. It follows normal, build and dev
+//    (`bridge`, the app crate, which declares it as a dev-dependency for the
+//    Tally connection test helpers -- see the note above APP_CRATE) does with
+//    that dependency inside its own files. It follows normal, build and dev
 //    edges alike: a dev- or build-dependency on reqwest in a crate outside
 //    the allow-list is refused too, since a test double or build script
 //    that can open a connection is still egress from a developer's machine.
@@ -99,9 +99,11 @@ const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 //
 // Do not read "app crate" as "Tauri only". src/bin/bridge_mcp.rs links
 // bridge_lib, and scripts/package-mcpb.mjs ships bridge_mcp as the extension
-// binary, so this reqwest edge is compiled into the artifact a user installs,
-// not just into the desktop app. Source check 2 below keeps it confined to the
-// Tally connection files.
+// binary, so what the app crate compiles is in the artifact a user installs,
+// not just in the desktop app. Its own reqwest edge is a dev-dependency and is
+// not compiled into either; only bridge-tally-transport's edge is. Source check
+// 2 below keeps the app crate's mentions confined to the Tally connection
+// files.
 //
 // The standard this gate is modelled on is the Tally transport's own loopback
 // guard, which is stronger than a file allow-list: `endpoint_url` special-cases

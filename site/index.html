@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Install ComplyEaze Bridge, the local connector that lets Claude Desktop read the TallyPrime books on your own computer." />
+    <meta name="description" content="Install ComplyEaze Bridge, the TallyPrime MCP server that lets Claude Desktop read the TallyPrime books on your own computer." />
     <title>ComplyEaze Bridge for Claude Desktop</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2323603f'/%3E%3Cpath d='M6 19c4.5-7 15.5-7 20 0' stroke='%23fff' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 19v5M16 14.2V24M26 19v5' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./styles.css" />
@@ -22,7 +22,7 @@
         <h1 id="page-title">Ask Claude who owes you, and how old the bills are.</h1>
         <p class="lede">ComplyEaze Bridge reads the TallyPrime already running on this computer, over Tally's own local gateway: outstanding receivables and payables with ageing, and a trial balance, ledger movement or vouchers for a date range you choose.</p>
         <p class="support-line">Posting is off by default. When you turn on voucher posting in the extension settings, it posts one voucher at a time, and each posting waits for your approval in a separate dialog. The assistant cannot approve it.</p>
-        <p class="support-line"><strong>Preview packages:</strong> Windows x64 and Apple Silicon Mac. Intel Mac and other platforms are not yet qualified; read each release's notes for its host-validation status.</p>
+        <p class="support-line"><strong>Packages for</strong> Windows x64 and Apple Silicon Mac. Intel Mac and other platforms are not yet qualified; read each release's notes for what has been tried.</p>
       </section>
 
       <section class="release-panel" aria-labelledby="download-title">
@@ -33,7 +33,7 @@
           <p id="release-status" class="release-status" role="status">Checking releases…</p>
         </div>
         <noscript><p class="channel-note">The download buttons need JavaScript. Without it, open the <a href="https://github.com/lamemustafa/bridge/releases">releases page</a>, take the newest mcp-preview release that lists a <code>.mcpb</code> for your computer, and compare it with the matching <code>.sha256</code> file.</p></noscript>
-        <p id="channel-note" class="channel-note">Unsigned previews are for evaluation. Review the checksum and release notes before opening one.</p>
+        <p id="channel-note" class="channel-note">Not yet code-signed; your computer may warn you before opening it. Compare the checksum with the .sha256 file on the release.</p>
         <div class="downloads">
           <a class="download-option" data-platform="windows-x64" aria-disabled="true">
             <span>Download for Windows</span>

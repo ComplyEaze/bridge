@@ -569,11 +569,13 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
    of the same statement (other amount formatting or narration wrapping) derives
    different ids and is not seen; a hand-typed id reused for a genuinely
-   different event is refused too. The next step is advice, not a control: the
-   agent asks the user to open the existing voucher in Tally and compare it by
-   hand, and Bridge does not check that judgement (`verify_import` does not
-   return the voucher's date, amounts or narration, and nothing binds the
-   user's answer to the rebuild). A statement row that is re-entered inline
+   different event is refused too. The next step is advice, not a control: a
+   different ledger or narration is a correction of the posted voucher, not a
+   different event; only if the user, comparing the existing voucher in Tally
+   by hand, says it is a second real transaction not in the book is it rebuilt
+   under a new id. Bridge does not check that judgement (for a
+   `posted_verified` voucher `verify_import` returns no date, amounts, ledgers
+   or narration), and nothing binds the user's answer to the rebuild. A statement row that is re-entered inline
    under any other id, including a `st-` id with a suffix, is a hand-typed id
    and is not seen; two Bridge installs on one company keep separate
    journals. The check at build is a point in time: a batch posted

@@ -33,8 +33,10 @@ contain customer data in release artifacts.
   masters under `docs/brand/` are the ComplyEaze Bridge logo and icons: the "y"
   of ComplyEaze drawn as an auditor's tick. They were drawn as SVG code by
   Claude (Anthropic) for ComplyEaze on 30 September 2026; no stock artwork was
-  used. The letters are the Outfit typeface (Copyright 2021 The Outfit Project
-  Authors, SIL Open Font License 1.1) converted to outlines; no font file is
+  used. The logo artwork was drawn with Claude (Anthropic) at the direction of
+  the project owner, who chose among variants and directed its revisions. The
+  letters are the Outfit typeface (Copyright 2021 The Outfit Project Authors,
+  SIL Open Font License 1.1) converted to outlines; no font file is
   distributed. The raster, ICO and ICNS files under `src-tauri/icons/` are
   rendered from `src-tauri/app-icon.svg`, except the 16 px entries of
   `icon.ico` and `icon.icns`, which are rendered from

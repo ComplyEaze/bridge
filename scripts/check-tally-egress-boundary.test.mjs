@@ -198,25 +198,55 @@ test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, 
 
 test("a clippy cfg in src-tauri Rust is refused with its line", { skip }, () => {
   const result = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(clippy))]\nfn hidden() {}\n" }).run();
-  assertRefused(result, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently");
+  assertRefused(result, "src-tauri/src/lib.rs:2 " + DIFFERENT);
 });
 
-test("a cfg the census run compiles differently from the shipped build is refused", { skip }, () => {
-  for (const cfg of ["#[cfg(not(dev))]", "#[cfg_attr(dev, allow(dead_code))]", "#[cfg(not(debug_assertions))]", "if cfg!(debug_assertions) {", '#[cfg(panic = "abort")]']) {
-    const result = sandbox({ "src-tauri/src/lib.rs": `fn ok() {}\n${cfg}\nfn hidden() {}\n` }).run();
-    assertRefused(result, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently from the shipped build");
+const DIFFERENT = "names clippy, dev, debug_assertions or a panic cfg, which the census run compiles differently";
+
+test("a line naming a cfg the census run compiles differently is refused, however it is spelled", { skip }, () => {
+  const spellings = [
+    "#[cfg(not(dev))]",
+    "#[cfg_attr(dev, allow(dead_code))]",
+    "#[cfg(not(debug_assertions))]",
+    "if cfg!(debug_assertions) {",
+    '#[cfg(panic = "abort")]',
+    // Each of these defeated a scan that parsed the attribute.
+    '#[cfg(any(feature = "]", not(debug_assertions)))]',
+    "#[cfg(all(/* ] */ not(dev)))]",
+    `#[cfg(${" ".repeat(500)}not(dev))]`,
+    "macro_rules! m { ($c:meta, $i:item) => { #[cfg($c)] $i }; }\nm!(not(debug_assertions), fn hidden() {});",
+  ];
+  for (const text of spellings) {
+    const result = sandbox({ "src-tauri/src/lib.rs": `fn ok() {}\n${text}\nfn hidden() {}\n` }).run();
+    assertRefused(result, `src-tauri/src/lib.rs:`);
+    assert.ok(result.stderr.includes(DIFFERENT), `${JSON.stringify(text.slice(0, 40))}: ${result.stderr}`);
   }
-  // An attribute split over lines is read as one.
+  // A cfg split over lines is refused on the line that names the word.
   const split = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(\n    debug_assertions\n))]\nfn hidden() {}\n" }).run();
-  assertRefused(split, "src-tauri/src/lib.rs:2 names a cfg the census run compiles differently");
-  // A tests/ module inside src/ ships with the crate, an integration test does not.
-  const inSrc = sandbox({ "src-tauri/src/x/tests/y.rs": "#[cfg(not(debug_assertions))]\nfn hidden() {}\n" }).run();
-  assertRefused(inSrc, "src-tauri/src/x/tests/y.rs:1 names a cfg the census run compiles differently");
-  const integration = sandbox({ "src-tauri/tests/y.rs": "#[cfg(not(debug_assertions))]\nfn fine() {}\n" }).run();
-  assert.equal(integration.status, 0, integration.stderr);
-  // A feature that only contains the word, and a plain cfg, stay legal.
-  const legal = sandbox({ "src-tauri/src/lib.rs": '#[cfg(target_os = "macos")]\nfn ok() {}\n#[cfg(feature = "voucher-scan")]\nfn also_ok() {}\n' }).run();
+  assertRefused(split, "src-tauri/src/lib.rs:3 " + DIFFERENT);
+  const splitDev = sandbox({ "src-tauri/src/lib.rs": "fn ok() {}\n#[cfg(not(\n    dev\n))]\nfn hidden() {}\n" }).run();
+  assertRefused(splitDev, "src-tauri/src/lib.rs:3 " + DIFFERENT);
+  // A tests/ file is scanned too: it can be pulled into shipped code with #[path].
+  const helper = sandbox({ "src-tauri/tests/helper.rs": "#[cfg(not(debug_assertions))]\nfn hidden() {}\n" }).run();
+  assertRefused(helper, "src-tauri/tests/helper.rs:1 " + DIFFERENT);
+  // The one file that holds the words in strings is exempt by name; a comment line is skipped.
+  const exempt = sandbox({
+    "src-tauri/tests/approval_seam_gate.rs": '"#[cfg(not(debug_assertions))]"\n',
+    "src-tauri/src/lib.rs": "// #[cfg(not(dev))] is only a comment here\nfn ok() {}\n",
+  }).run();
+  assert.equal(exempt.status, 0, exempt.stderr);
+  // Plain cfgs stay legal, and so does prose that says `dev` (a path, a dev-dependency, a script name).
+  const legal = sandbox({
+    "src-tauri/src/lib.rs":
+      '#[cfg(target_os = "macos")]\nfn ok() {}\n#[cfg(feature = "dev-tools")]\nfn also_ok() {}\nconst A: &str = "cat > /dev/null; pnpm run dev";\n' +
+      '#[expect(clippy::disallowed_methods, reason = "a dev-dependency only")]\nfn fine() {}\n',
+  }).run();
   assert.equal(legal.status, 0, legal.stderr);
+});
+
+test("a build script under another name is refused", { skip }, () => {
+  const result = sandbox({ "src-tauri/crates/x/Cargo.toml": '[package]\nname = "x"\nbuild = "setup.rs"\n' }).run();
+  assertRefused(result, "src-tauri/crates/x/Cargo.toml sets a build script by name");
 });
 
 test("a tracked cargo config is refused", { skip }, () => {
@@ -323,7 +353,8 @@ test("an empty file, a non-JSON line and an unreadable lint message are refused"
   assertCensusRefused(census(unreadable), "an egress lint message could not be read");
 });
 
-test("paths as cargo prints them on Windows, below a crates/ member, or absolute, name the same repository files", () => {
+// These shapes are derived from the capture by string substitution, not captured on Windows.
+test("paths in the shapes cargo prints on Windows, below a crates/ member, or absolute, name the same repository files", () => {
   const withOther = (path) => captured().replaceAll('"file_name":"src/other.rs"', `"file_name":${JSON.stringify(path)}`);
   const other = (file) => ({ macOS: [CAPTURE_PINS.macOS[0], CAPTURE_PINS.macOS[1], [file, "std::process::Command::new", 1]] });
   const cases = [
@@ -338,12 +369,13 @@ test("paths as cargo prints them on Windows, below a crates/ member, or absolute
   }
 });
 
-test("a second build-finished line and a different lint code are refused", () => {
+test("a second build-finished line is refused, and a firing without its lint code still counts", () => {
   const finishedLine = captured().split("\n").find((line) => line.includes('"build-finished"'));
   assertCensusRefused(census(`${captured()}${finishedLine}\n`), "(build-finished: [true,true])");
-  const renamed = captured().replaceAll('"code":"clippy::disallowed_methods"', '"code":"clippy::disallowed_names"');
+  // The message text counts even when its code is missing or different, so a changed code cannot hide a firing.
+  const renamed = captured().replaceAll('"code":{"code":"clippy::disallowed_methods","explanation":null}', '"code":null');
   assert.notEqual(renamed, captured(), "the capture has lint codes to change");
-  assertCensusRefused(census(renamed), "0 egress-lint firing(s) of std::process::Command::new, 2 reviewed");
+  assert.equal(census(renamed).status, 0);
 });
 
 test("a list that could match a silent run is refused: a zero count, a repeated key, a malformed row", () => {
@@ -384,6 +416,14 @@ test("a dependency's macro, a listed type and a listed path that resolves to not
   assertCensusRefused(census(probe(), "macOS", without), "src-tauri/clippy.toml: 1 listed path(s) that resolve to nothing of std::process::Commnad::new, 0 reviewed");
   // The dependency's own (non-member) call is not reported by clippy, so it is not in the capture.
   assert.ok(!probe().includes("nonmember_call"), "the capture holds no message for the non-member call");
+});
+
+test("a message about a listed path that is not located in clippy.toml is not counted", () => {
+  const elsewhere = probe().replaceAll(`${root}/src-tauri/clippy.toml`, `${root}/src-tauri/src/lib.rs`);
+  assert.notEqual(elsewhere, probe(), "the capture places the message in clippy.toml");
+  const result = census(elsewhere, "macOS", { macOS: PROBE_PINS.macOS.slice(0, 2) });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /2 reviewed firing\(s\) in 2 place\(s\)/);
 });
 
 test("an OS with no reviewed list is refused", () => {

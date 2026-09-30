@@ -45,14 +45,15 @@
 //    text scan cannot see. A reviewed call site carries
 //    `#[expect(clippy::disallowed_methods, reason = "...")]`. CI's native job
 //    then runs clippy over the shipped targets with the two egress lints forced
-//    to warn, which no attribute, group allow, `-A` or lint table can turn off,
+//    to warn, which no group allow, `-A` or lint table can turn off (measured),
 //    and this script (`--census FILE OS`) requires that what fired match
 //    scripts/tally-egress-census.json exactly, per OS. rustc measures what
 //    fires, so no source syntax can hide a call in the code the run compiles.
 //    Beside it, static checks keep the configuration in place: the digest of
 //    clippy.toml, no second clippy.toml, no CLIPPY_CONF_DIR or CLIPPY_ARGS in
 //    any tracked file, no cargo config, every build.rs under src-tauri pinned
-//    by digest, and no cfg the run compiles differently from the shipped build.
+//    by digest and no build script under another name, and no line naming a
+//    cfg the run compiles differently from the shipped build.
 //
 // 3. A deny-list of network-capable crates and Tauri plugins, read from both
 //    Cargo.lock files and the JS manifests.
@@ -71,11 +72,12 @@
 //    concern, and the CSP does not govern a top-level navigation.
 //  - The census sees only code its clippy run compiles: the shipped targets
 //    (`--lib --bins`, dev profile) of the workspace members, with default
-//    features, on Windows and macOS (arm64 only; an x86_64 macOS build ships).
-//    Not seen: code under a cfg the run compiles differently from the shipped
-//    build (attributes naming `clippy`, `dev`, `debug_assertions` or a `panic`
-//    cfg are refused, a cfg assembled some other way, or a profile difference
-//    not named, is not); features the run does not enable (voucher-scan, the
+//    features, on Windows and macOS (arm64 only; scripts/package-mcpb.mjs lists
+//    an x86_64 macOS target the census never lints, although README.md says
+//    Intel Macs are unsupported). Not seen: code under a cfg the run compiles
+//    differently from the shipped build (lines naming `clippy`, `dev`,
+//    `debug_assertions` or `panic =` are refused; a cfg spelled some other way,
+//    or a profile difference not named, is not); features the run does not enable (voucher-scan, the
 //    calibration harness, lab-writes and bridge-tally-protocol's evidence
 //    features); Linux-only code; path dependencies that are not workspace
 //    members (clippy does not lint them; measured); and tests, examples and
@@ -146,7 +148,9 @@ function firingFile(message) {
   while (span?.expansion?.span) span = span.expansion.span;
   if (!span) return null;
   const name = span.file_name.replaceAll("\\", "/");
-  if (name.startsWith(root.replaceAll("\\", "/"))) return posix.normalize(name.slice(root.length));
+  const here = root.replaceAll("\\", "/");
+  // A Windows drive letter may differ in case between cargo's path and this script's own.
+  if (name.toLowerCase().startsWith(here.toLowerCase())) return posix.normalize(name.slice(here.length));
   return /^(?:[A-Za-z]:)?\//.test(name) ? name : posix.normalize(`src-tauri/${name}`);
 }
 
@@ -175,7 +179,7 @@ function censusViolations(text, os, pins) {
     }
     if (entry.reason === "build-finished") finished.push(entry.success);
     if (entry.reason !== "compiler-message") continue;
-    const listed = EGRESS_LINTS.includes(entry.message?.code?.code);
+    const listed = EGRESS_LINTS.includes(entry.message?.code?.code) || FIRING.test(entry.message?.message ?? "");
     const unreachable = UNREACHABLE.test(entry.message?.message ?? "");
     if (!listed && !unreachable) continue;
     const method = entry.message.message.match(listed ? FIRING : UNREACHABLE)?.[1];
@@ -431,41 +435,27 @@ for (const path of settings.stdout.split("\n").filter(Boolean)) {
 // Code the census run does not compile is not seen: code under a `clippy` cfg (it only ever
 // compiles under clippy, so the run that would see it skips it), under `dev` (tauri-build sets it
 // unless the shipped `custom-protocol` feature is on), under `debug_assertions`, or under a `panic`
-// cfg. A comment line is skipped; a trailing comment or a string that says the word is a loud false
-// alarm. An attribute is read from `cfg` to the first `]`, `{` or `;` (at most 400 characters), so
-// one split over lines is read too. Integration tests (a crate's tests/ directory) are separate
-// crates the census run never compiles; a tests/ module inside src/ is not exempt.
-const DIFFERS = /\b(?:dev|debug_assertions)\b|\bpanic\s*=/;
-const integrationTest = /^src-tauri\/(?:crates\/[^/]+\/)?tests\//;
-for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs") && !integrationTest.test(name))) {
-  const lines = readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).map((line) => (/^\s*\/\//.test(line) ? "" : line));
-  const starts = [];
-  let offset = 0;
-  for (const line of lines) {
-    starts.push(offset);
-    offset += line.length + 1;
-  }
-  const lineAt = (index) => {
-    let low = 0;
-    let high = starts.length - 1;
-    while (low < high) {
-      const mid = (low + high + 1) >> 1;
-      if (starts[mid] <= index) low = mid;
-      else high = mid - 1;
+// cfg. A source scan cannot parse an attribute soundly (a `]` in a string, a comment or a macro
+// that builds it defeats one), so no attribute is parsed: the words are refused in any tracked
+// src-tauri Rust line that is not a `//` comment, tests included, since a test file can be pulled
+// into shipped code with `#[path]`. `dev` is common in prose and paths (`/dev/null`, a
+// dev-dependency), so it counts only as a list item (`(dev)`, `, dev,`) or alone on a line; the
+// others count anywhere. The cost is loud false alarms (a block comment or a string that says a
+// word). The one file that names them in strings is src-tauri/tests/approval_seam_gate.rs, whose
+// inputs to another scanner they are.
+const DIFFERS = /\bclippy\b(?!\s*::)|\bdebug_assertions\b|\bpanic\s*=|[(,]\s*dev\s*[),]|^\s*dev\s*[,)]*\s*$/;
+const NAMES_THEM_IN_STRINGS = "src-tauri/tests/approval_seam_gate.rs";
+for (const path of tracked.filter((name) => name.startsWith("src-tauri/") && name.endsWith(".rs") && name !== NAMES_THEM_IN_STRINGS)) {
+  for (const [index, line] of readFileSync(`${root}${path}`, "utf8").split(/\r?\n/).entries()) {
+    if (!/^\s*\/\//.test(line) && DIFFERS.test(line)) {
+      egressViolations.push(`${path}:${index + 1} names clippy, dev, debug_assertions or a panic cfg, which the census run compiles differently from the shipped build`);
     }
-    return low + 1;
-  };
-  const flagged = new Set();
-  for (const [index, line] of lines.entries()) {
-    if (/\bclippy\b(?!\s*::)/.test(line)) flagged.add(index + 1);
   }
-  const body = lines.join("\n");
-  for (const match of body.matchAll(/\bcfg/g)) {
-    const attribute = body.slice(match.index, match.index + 400).split(/[\]{;]/, 1)[0];
-    if (DIFFERS.test(attribute)) flagged.add(lineAt(match.index));
-  }
-  for (const line of [...flagged].sort((x, y) => x - y)) {
-    egressViolations.push(`${path}:${line} names a cfg the census run compiles differently from the shipped build (clippy, dev, debug_assertions, panic)`);
+}
+// A build script under another name (`build = "setup.rs"`) escapes the digest pins above.
+for (const path of tracked.filter((name) => /^src-tauri\/(?:.*\/)?Cargo\.toml$/.test(name))) {
+  if (/^\s*build\s*=/m.test(readFileSync(`${root}${path}`, "utf8"))) {
+    egressViolations.push(`${path} sets a build script by name; only the default build.rs, pinned by digest above, is allowed`);
   }
 }
 

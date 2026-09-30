@@ -48,7 +48,9 @@ macro call the primary span is in `src/lib.rs` and its outermost expansion site 
 the census reports the expansion site.
 
 What it does not show: paths on Windows, a workspace member below a `crates/` directory, or any of
-the other methods in `src-tauri/clippy.toml`. The census tests derive no such variants from it.
+the other methods in `src-tauri/clippy.toml`. The census tests derive Windows-style, `crates/`-member and
+absolute path variants from it by string substitution; none was captured on Windows, so the Windows path shape
+is authored, and the first Windows CI run is the first real evidence for it.
 
 ## Measurements on the same crate (not committed as captures)
 

@@ -44,36 +44,55 @@ function assertReleaseWorkflow(release) {
   assertUnconditional(packageJob, "package job");
   assertUnconditional(publish, "publish job");
   assert.equal(packageJob.needs, "release-admission", "package must wait for release admission");
-  assert.equal(publish.needs, "package", "publication must wait for both package archives");
   assert.equal(publish.permissions.contents, "write", "only publication receives contents write permission");
-  // Build attestations: only the package job may mint the identity token and write attestations;
-  // publication may read them to verify, and nothing else gets either.
+  // Build attestations. The package jobs run dependency build scripts, so they stay read-only. Only
+  // the attest job, which downloads the two archives and runs no repository code, may mint the
+  // identity token and write attestations; publication may only read them.
   assert.deepEqual(release.permissions, { contents: "read" }, "the workflow default stays read-only");
+  assert.deepEqual(packageJob.permissions, { contents: "read" }, "the jobs that build hold no token-minting permission");
+  const attestJob = release.jobs.attest;
+  assert.ok(attestJob, "an attest job must be present");
+  assertUnconditional(attestJob, "attest job");
+  assert.equal(attestJob.needs, "package", "attestation waits for both package archives");
   assert.deepEqual(
-    packageJob.permissions,
+    attestJob.permissions,
     { contents: "read", "id-token": "write", attestations: "write" },
-    "the package job alone may create attestations",
+    "the attest job alone may create attestations",
   );
+  assert.deepEqual(publish.needs, ["package", "attest"], "publication waits for the archives and their attestations");
   assert.deepEqual(publish.permissions, { contents: "write", attestations: "read" }, "publication may only read attestations");
   assert.equal(admission.permissions, undefined, "admission keeps the default read-only permissions");
-  const build = step(packageJob, "Validate, archive, and exercise the real MCPB");
-  const attest = step(packageJob, "Attest where this archive was built");
-  assertUnconditional(attest, "attestation step");
-  assert.equal(attest["continue-on-error"], undefined, "no archive is published without its attestation");
-  assert.match(attest.uses, /^actions\/attest@[0-9a-f]{40}$/, "the attestation action is pinned by full commit SHA");
-  assert.equal(
-    attest.with["subject-path"],
-    "release-assets/bridge-tally-${{ inputs.release_tag }}-${{ matrix.platform }}.mcpb",
-    "the attested file is the exact archive that is uploaded",
+  assert.equal(packageJob.steps.some((candidate) => candidate.uses?.startsWith("actions/attest@")), false, "no attestation is made where dependency build scripts run");
+  // The attest job runs no repository code: no checkout, no install, no build, only pinned actions and one script.
+  assert.deepEqual(
+    attestJob.steps.map((candidate) => candidate.uses?.replace(/@[0-9a-f]{40}.*/, "@sha") ?? candidate.name),
+    ["actions/download-artifact@sha", "Check each archive against the digest its package job recorded", "actions/attest@sha"],
+    "the attest job downloads, checks digests and attests, and does nothing else",
   );
-  assert.deepEqual(Object.keys(attest.with), ["subject-path"], "no other attestation input is set");
-  // No other step key (env, shell, working-directory, timeout) may change how these steps run.
+  const [download, check, attest] = attestJob.steps;
+  for (const candidate of attestJob.steps) {
+    assertUnconditional(candidate, "attest job step");
+    assert.equal(candidate["continue-on-error"], undefined, "no archive is published without its attestation");
+  }
+  assert.match(download.uses, /^actions\/download-artifact@[0-9a-f]{40}$/);
+  assert.deepEqual(download.with, { pattern: "mcpb-preview-*", path: "release-assets", "merge-multiple": true });
+  assert.deepEqual(Object.keys(check).sort(), ["env", "name", "run", "shell"], "the digest check sets nothing else");
+  assert.deepEqual(check.env, { RELEASE_TAG: "${{ inputs.release_tag }}" });
+  assert.match(check.run, /set -euo pipefail/);
+  assert.match(check.run, /sha256sum "\$asset"/);
+  assert.match(check.run, /jq -r \.sha256 "\$asset\.provenance\.json"/);
+  assert.match(check.run, /"\$actual" != "\$listed" \|\| "\$actual" != "\$recorded"/);
+  assert.match(check.run, /exit 1/);
+  assert.match(attest.uses, /^actions\/attest@[0-9a-f]{40}$/, "the attestation action is pinned by full commit SHA");
   assert.deepEqual(Object.keys(attest).sort(), ["name", "uses", "with"], "the attestation step sets nothing else");
-  const packageNames = packageJob.steps.map((candidate) => candidate.name ?? candidate.uses);
-  const uploadIndex = packageJob.steps.findIndex((candidate) => candidate.uses?.startsWith("actions/upload-artifact@"));
-  assert.ok(
-    packageJob.steps.indexOf(build) < packageJob.steps.indexOf(attest) && packageJob.steps.indexOf(attest) < uploadIndex,
-    `the archive is attested after it is built and tested and before it is uploaded (${packageNames.join(" > ")})`,
+  assert.deepEqual(Object.keys(attest.with), ["subject-path"], "no other attestation input is set");
+  assert.deepEqual(
+    attest.with["subject-path"].trim().split("\n"),
+    [
+      "release-assets/bridge-tally-${{ inputs.release_tag }}-windows-x64.mcpb",
+      "release-assets/bridge-tally-${{ inputs.release_tag }}-macos-arm64.mcpb",
+    ],
+    "the attested files are exactly the two archives that publication verifies",
   );
   const verify = step(publish, "Verify each archive against its build attestation");
   assertUnconditional(verify, "attestation verification step");
@@ -86,21 +105,19 @@ function assertReleaseWorkflow(release) {
       "set -euo pipefail",
       "for platform in windows-x64 macos-arm64; do",
       'asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"',
-      'gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA"',
+      'gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA" --source-ref "refs/heads/$DEFAULT_BRANCH" --deny-self-hosted-runners',
       "done",
     ],
   );
   assert.deepEqual(Object.keys(verify).sort(), ["env", "name", "run", "shell"], "the verification step sets nothing else");
   assert.equal(verify.shell, "bash");
-  assert.deepEqual(
-    verify.env,
-    {
-      GH_TOKEN: "${{ github.token }}",
-      RELEASE_TAG: "${{ inputs.release_tag }}",
-      REPOSITORY: "${{ github.repository }}",
-      SOURCE_SHA: "${{ github.sha }}",
-    },
-  );
+  assert.deepEqual(verify.env, {
+    GH_TOKEN: "${{ github.token }}",
+    RELEASE_TAG: "${{ inputs.release_tag }}",
+    REPOSITORY: "${{ github.repository }}",
+    SOURCE_SHA: "${{ github.sha }}",
+    DEFAULT_BRANCH: "${{ github.event.repository.default_branch }}",
+  });
   const publishNames = publish.steps.map((candidate) => candidate.name ?? candidate.uses);
   assert.ok(
     publishNames.indexOf(verify.name) < publishNames.indexOf("Create the immutable GitHub preview release"),
@@ -345,16 +362,24 @@ test("publication workflow checks reject disabled or misplaced controls", async 
   assert.throws(() => assertReleaseWorkflow(disabledAdmission), /must not be conditional/);
 
   const attestContinues = structuredClone(release);
-  step(attestContinues.jobs.package, "Attest where this archive was built")["continue-on-error"] = true;
-  assert.throws(() => assertReleaseWorkflow(attestContinues), /attestation step must not continue after failure/);
+  attestContinues.jobs.attest.steps[2]["continue-on-error"] = true;
+  assert.throws(() => assertReleaseWorkflow(attestContinues), /attest job step must not continue after failure/);
 
   const attestUnpinned = structuredClone(release);
-  step(attestUnpinned.jobs.package, "Attest where this archive was built").uses = "actions/attest@v4";
-  assert.throws(() => assertReleaseWorkflow(attestUnpinned), /pinned by full commit SHA/);
+  attestUnpinned.jobs.attest.steps[2].uses = "actions/attest@v4";
+  assert.throws(() => assertReleaseWorkflow(attestUnpinned), /the attest job downloads, checks digests and attests/);
+
+  const packageMintsTokens = structuredClone(release);
+  packageMintsTokens.jobs.package.permissions["id-token"] = "write";
+  assert.throws(() => assertReleaseWorkflow(packageMintsTokens), /jobs that build hold no token-minting permission/);
 
   const publishMintsTokens = structuredClone(release);
   publishMintsTokens.jobs["publish-preview"].permissions["id-token"] = "write";
   assert.throws(() => assertReleaseWorkflow(publishMintsTokens), /publication may only read attestations/);
+
+  const attestChecksOut = structuredClone(release);
+  attestChecksOut.jobs.attest.steps.unshift({ uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" });
+  assert.throws(() => assertReleaseWorkflow(attestChecksOut), /the attest job downloads, checks digests and attests/);
 
   const verifyNeverFails = structuredClone(release);
   step(verifyNeverFails.jobs["publish-preview"], "Verify each archive against its build attestation").run += " || true\n";
@@ -412,6 +437,6 @@ test("unsigned preview notes state the host-validation scope and remaining gaps"
   assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains outstanding/);
   assert.match(notes, /Intel Mac is not qualified/);
   // The attestation line is scoped: where and by what a file was built, never a signature or a safety claim.
-  assert.match(notes, /gh attestation verify <file>\.mcpb --repo lamemustafa\/bridge/);
-  assert.match(notes, /It is not a code signature and does not\nshow the code is safe\./);
+  assert.match(notes, /gh attestation verify <file>\.mcpb --repo lamemustafa\/bridge --signer-workflow\s+lamemustafa\/bridge\/\.github\/workflows\/release-mcpb-preview\.yml --source-ref\s+refs\/heads\/master --deny-self-hosted-runners/);
+  assert.match(notes, /It is not a code\s+signature and does not show the code is safe\./);
 });

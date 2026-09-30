@@ -42,12 +42,8 @@ jobs:
     needs: release-admission
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    # id-token and attestations let this job sign a build attestation for the archive it built
-    # (Sigstore, through GitHub). They are granted to this job only; publication does not get them.
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -122,13 +118,6 @@ jobs:
           "$python_command" scripts/check-mcpb-bundle.test.py
           "$python_command" scripts/check-mcpb-bundle.py "release-assets/$asset" --output "release-assets/$asset.smoke.json"
           node scripts/write-mcpb-release-metadata.mjs "release-assets/$asset" "$RELEASE_TAG" "$PLATFORM" "$GITHUB_SHA"
-      # Records which workflow run and commit built these exact bytes. It is not a code signature:
-      # no client checks it yet, and it does not show the code is safe. It stops the release if it
-      # cannot be made, so no archive is published claiming it.
-      - name: Attest where this archive was built
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-path: release-assets/bridge-tally-${{ inputs.release_tag }}-${{ matrix.platform }}.mcpb
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mcpb-preview-${{ matrix.platform }}
@@ -136,9 +125,54 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # The only job that can mint an identity token. It runs no repository code and installs nothing:
+  # it downloads the two archives the package jobs built, checks each against the digest the
+  # package job wrote beside it, and attests them. The package jobs, which run dependency build
+  # scripts, hold contents: read only. The attestation records which workflow run and commit
+  # produced these bytes. It is not a code signature, no client checks it yet, and it does not
+  # show the code is safe.
+  attest:
+    name: Attest the built archives
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mcpb-preview-*
+          path: release-assets
+          merge-multiple: true
+      - name: Check each archive against the digest its package job recorded
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          for platform in windows-x64 macos-arm64; do
+            asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"
+            test -f "$asset"
+            actual="$(sha256sum "$asset" | cut -d' ' -f1)"
+            listed="$(cut -d' ' -f1 "$asset.sha256")"
+            recorded="$(jq -r .sha256 "$asset.provenance.json")"
+            if [[ "$actual" != "$listed" || "$actual" != "$recorded" ]]; then
+              echo "digest mismatch for $asset: file $actual, .sha256 $listed, provenance $recorded"
+              exit 1
+            fi
+          done
+      - name: Attest where these archives were built
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-assets/bridge-tally-${{ inputs.release_tag }}-windows-x64.mcpb
+            release-assets/bridge-tally-${{ inputs.release_tag }}-macos-arm64.mcpb
+
   publish-preview:
     name: Publish durable unsigned preview assets
-    needs: package
+    needs: [package, attest]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -167,8 +201,8 @@ jobs:
             test -f "$asset.smoke.json"
           done
       # The archives crossed an artifact upload and download between jobs. Check the downloaded bytes
-      # against the attestation the package job signed for them, requiring this workflow and this
-      # commit as the source, before anything is published.
+      # against the attestation the attest job signed for them, requiring this workflow, this
+      # commit, the default branch and a GitHub-hosted runner, before anything is published.
       - name: Verify each archive against its build attestation
         shell: bash
         env:
@@ -176,11 +210,12 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
           REPOSITORY: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
           for platform in windows-x64 macos-arm64; do
             asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"
-            gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA"
+            gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA" --source-ref "refs/heads/$DEFAULT_BRANCH" --deny-self-hosted-runners
           done
       # The notes come from CHANGELOG.md, the file the install page's changelog also renders. A
       # missing or unreadable section never stops the release: it warns and publishes the standard

@@ -144,7 +144,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ], "334e9b024f21894dc86c517dc7a85be6ab8e42cb77c35bbe2a056c8821d18198"],
+  ], "b0f27a021c9d0fe13a3021a2177a3e649b5afa33e7e90e6738e4f7fd9b72fee4"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);

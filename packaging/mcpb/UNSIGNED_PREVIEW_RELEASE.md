@@ -8,9 +8,11 @@ identify the exact archive and source commit.
 
 Build attestation: each archive has a GitHub build attestation. To check that a
 file you downloaded is the one this repository's release workflow built, run
-`gh attestation verify <file>.mcpb --repo lamemustafa/bridge` (the GitHub CLI
-needs to be signed in). It shows which workflow run and commit built the file. It is not a code signature and does not
-show the code is safe.
+`gh attestation verify <file>.mcpb --repo lamemustafa/bridge --signer-workflow
+lamemustafa/bridge/.github/workflows/release-mcpb-preview.yml --source-ref
+refs/heads/master --deny-self-hosted-runners` (the GitHub CLI needs to be signed
+in). It shows which workflow run and commit built the file. It is not a code
+signature and does not show the code is safe.
 
 Validation scope: the preview workflow builds and smoke-tests the packaged
 stdio server on hosted Windows x64 and Apple Silicon Mac runners. That proves

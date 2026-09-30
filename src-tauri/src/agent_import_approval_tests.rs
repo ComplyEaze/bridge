@@ -2111,6 +2111,28 @@ async fn a_wrong_company_does_not_strand_a_click() {
     assert_refused_and_slot_freed(clicked, &refused, "import_batch_company_mismatch");
 }
 
+/// A refusal inside the checked body, but before `begin()` (here the saved file
+/// no longer matches its record), withdraws a click the same way (#857): the
+/// widened `revoke_unredeemed` reaches it too.
+#[tokio::test]
+async fn a_changed_file_before_the_approval_step_does_not_strand_a_click() {
+    let clicked = clicked_while_no_call_waits().await;
+    std::fs::write(
+        clicked
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", clicked.line.batch_id)),
+        b"<ENVELOPE/>",
+    )
+    .unwrap();
+    let refused = clicked
+        .server
+        .call_tool("post_import", clicked.args.clone())
+        .await;
+    assert_refused_and_slot_freed(clicked, &refused, "import_batch_changed");
+}
+
 const OTHER_COMPANY_GUID: &str = "00000000-0000-4000-8000-0000000000aa";
 
 /// The desktop's journal-only post holds no agent approval: its early refusal

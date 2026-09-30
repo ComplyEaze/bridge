@@ -42,6 +42,7 @@ pub mod jsonex;
 #[cfg(feature = "jsonex-request-builder")]
 pub mod jsonex_request;
 mod native_ledger_collection;
+pub mod native_masters;
 pub mod native_outstandings;
 pub mod native_statement_reports;
 pub mod native_trial_balance;

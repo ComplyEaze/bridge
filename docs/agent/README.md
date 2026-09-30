@@ -68,9 +68,9 @@ Cursor uses the same server object in `.cursor/mcp.json`:
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
-`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. For a command-line
+`ledger_masters`, `ledger_movement`, `trial_balance`, `masters`,
+`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
+`read_evidence`, and `egress_log`. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -211,6 +211,66 @@ It may include dormant ledgers hidden by Tally's screen. Paired response,
 company, mode and extent checks detect observed changes, but do not prove an
 atomic snapshot or voucher-level reconciliation. Keep the company quiet during
 reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
+
+### Masters
+
+Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
+`units`, `stock_groups` or `groups`. It lists a company's masters of that
+kind, for example a voucher type's numbering method (`automatic`, `manual` or
+`default`, as Tally reports it) and its `active` and `optional` flags. Each row
+carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
+`decimal_places` and `simple`. A `groups` row carries `name`,
+`parent` and `reserved_name` only, as the group snapshot returns them, and a
+parent that is Tally's reserved root keeps its marker form, as in
+`trial_balance`. Alias names are not returned.
+
+The read runs inside the same company, mode and identity brackets as
+`trial_balance`, with the book extent read before and after (they must be
+equal) and the collection read twice and compared. Education mode is refused.
+`offset` and `limit` restrict output, not the source read; a first page holds
+its read in memory and a later page continues from it while the extent is
+unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
+`trial_balance` does.
+
+Godowns, units and stock groups are read whole only when the master-alteration
+mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
+mark counts the masters of every kind, so a book with few of this kind can be
+refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
+1,160 for stock groups; a larger book is refused before any collection request
+as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes`). Retrying refuses again. The two stock-heavy client books
+measured had marks of about 100,000 and 300,000 (protocol reference §12a.12),
+so books like them refuse these three kinds. `voucher_types` and `groups` have no size check
+before the read: voucher types keep the policy of Bridge's other voucher-type
+read, and groups that of the group read `profit_and_loss` and `balance_sheet`
+make.
+
+The size rests on premises that are checked after the read, not assumed. For
+every kind but `groups`, each row's length is checked against the assumed
+worst-case row (`masters_row_exceeds_bound`), and the rows, their AlterIDs and
+the response size (each collection is read twice, and the size check runs after
+both reads) are checked against the mark and the admitted size: more rows
+than the mark, an AlterID above it, a repeated AlterID or an oversize response
+refuses the whole read as `masters_bound_premise_violated`, unless the closing
+extent shows the book moved, which is reported instead
+(`masters_extent_changed`). A response Bridge
+cannot read refuses with a `masters_*` cause.
+
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
+(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+`Default`, `Automatic` and `Manual` are the only numbering methods observed; any
+other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
+`default` is Tally's reported value, not evidence that a type numbers
+automatically. The company's voucher-type count (`NUMVOUCHERTYPES`) did not
+equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book it
+equalled the number-series count (inferred to count series, unmeasured), so the
+rows are not checked against it. The completeness of the voucher-type list is
+unverified: absence from it is not evidence that a voucher type is absent from
+the book. The size bound rests on assumed limits (128
+characters a name, four aliases a master) that no capture has measured; a row
+that breaks them refuses the read as `masters_row_exceeds_bound`. Master names
+are not masked by `mask_parties`: they are not party names. No counts or hints
+(the company's `NUM*` fields), stock items or writes are part of this tool.
 
 ### Profit and Loss and Balance Sheet
 

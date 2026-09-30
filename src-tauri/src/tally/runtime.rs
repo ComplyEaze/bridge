@@ -61,6 +61,14 @@ use tokio_util::sync::CancellationToken;
 
 const MAX_ENDPOINT_SESSIONS: usize = 32;
 
+#[path = "runtime_masters.rs"]
+mod masters;
+pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
+
+#[cfg(test)]
+#[path = "runtime_masters_tests.rs"]
+mod masters_tests;
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;

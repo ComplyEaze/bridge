@@ -1135,6 +1135,35 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 
 ---
 
+### 12a.12 Master collections on licensed 7.1
+
+**VERIFIED 2026-09-30, licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from two synthetic companies. Two stock-heavy client books were read only for the figures marked "by role", and nothing from them is committed. One run of each request. **Confidence: PARTIAL.**
+
+- **Four kinds read as one collection each.** Voucher types, godowns, units and stock groups can each be read as one `TYPE=Collection` export with `<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>` (the group snapshot's compute).
+  - Every row of every kind carried the computed GUID, equal to the company's.
+  - A collection with rows came back as one `COLLECTION` element.
+  - **A kind with no master:** on a synthetic book without inventory, units and stock groups returned `STATUS` 1 with a present, empty `COLLECTION` element (its `ISMSTDEPTYPE` and `MSTDEPTYPE` attributes, no rows). It was not absent and not an empty envelope. Godowns returned one row.
+  - Fixtures and exact requests: `tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`.
+- **Numbering method.** `NUMBERINGMETHOD` is a direct child of each voucher-type row when fetched on `List of VoucherTypes`.
+  - It adds about 130 bytes per row: on a client book, by role, the same request without it was 37.8 KB for 24 types, and 40.9 KB with it.
+  - Values seen: `Default`, `Automatic` and `Manual` on a synthetic book (24/1/1), and `Automatic` and `Manual` on a client book.
+  - What `Default` means for numbering is unmeasured, and a value outside these is unmeasured. Bridge reports the value raw rather than refusing it.
+  - `PREVENTDUPLICATES` was not returned by this shape.
+- **The company's voucher-type count is not the row count.** The `Company` collection's `NUMVOUCHERTYPES` did not equal the voucher-type rows returned: 35 against 26 on a synthetic book, and 33 against 24 on a client book. On that client book it equalled `NUMVOUCHERNUMBERSERIES` (33), so it may count number series. That is an inference, unmeasured.
+- **Names and aliases.** Voucher-type, godown and stock-group rows carry `LANGUAGENAME.LIST`, so aliases add names without a fixed limit. The synthetic book's unit rows did not carry it.
+  - A whole read can only be sized by assuming a longest name and an alias count.
+  - Bridge checks each row's length against that assumption after the read, and refuses a row beyond it.
+- **Every captured row had its own AlterID at or under the book's mark.** On both synthetic books the AlterIDs were distinct and the largest sat under `ALTMSTID`: 269 against 289 on one, and 100 against 242 on the other (the one godown). Bridge sizes a read from this premise and refuses a response that breaks it. **Confidence: PARTIAL.**
+- **Master marks run far past the counts.** The two client books had master-alteration marks (`ALTMSTID`) of about 100,000 and 300,000 (rounded, by role), against a few thousand ledgers. A size estimate from the mark refuses both.
+- **Not measured:**
+  - a numbering value other than the three seen;
+  - what `Default` numbering does on import;
+  - a book whose masters were copied from another company (whether row GUIDs keep the source prefix);
+  - how a deletion moves `ALTMSTID`;
+  - Education and Gold.
+
+---
+
 ## 13. Open questions
 
 | Question | Why it matters |

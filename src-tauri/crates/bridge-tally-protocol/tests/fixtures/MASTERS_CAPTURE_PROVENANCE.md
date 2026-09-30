@@ -10,7 +10,7 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 - **Encoding:** responses are **BOM-less UTF-16LE**, exactly as received. Requests are the exact bytes sent: **UTF-16LE with a BOM**. `.gitattributes` marks this tree `-text`.
 - **Request shape:**
   - Voucher types: the production `render_native_voucher_type_export_request` text with `ISACTIVE, ISOPTIONAL, NUMBERINGMETHOD` added to its `FETCH`, and the `BRIDGECOMPANYGUID` compute that the group and ledger snapshots already send.
-  - Godowns, units and stock groups: a collection of that type (`ISMODIFY="No"`) with the fields in the table, and the same compute.
+  - Godowns, units and stock groups: a collection of that type (`ISMODIFY="No"`) with `NAME, PARENT, GUID, MASTERID, ALTERID` (godowns and stock groups) or `NAME, GUID, MASTERID, ALTERID, ORIGINALNAME, DECIMALPLACES, ISSIMPLEUNIT` (units), and the same compute.
   - No filter, no dates, no `$$` function other than `$$SysName:XML`.
 - **What the captures show:**
   - Every row of every kind carries `BRIDGECOMPANYGUID` equal to the company's GUID.

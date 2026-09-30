@@ -3520,3 +3520,34 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
         .lines()
         .all(|record| !record.contains("dispatch_intent")));
 }
+
+/// On a response budget too small for remediation the rows and the next step are
+/// withheld, as `cause` is, and the refusal keeps its code (#901): the added
+/// fields cannot turn it into the oversize answer.
+#[tokio::test]
+async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_a_book_holding_a_twin()))
+            .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET - 1,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    });
+    let (_line, args) = saved_batch(&server);
+    let refused = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert!(error.get("preexisting_txn_ids").is_none(), "{refused}");
+    assert!(error.get("next_step").is_none(), "{refused}");
+}

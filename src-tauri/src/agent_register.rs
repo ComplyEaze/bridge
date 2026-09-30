@@ -327,6 +327,38 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
     row
 }
 
+/// The marks the window was planned against, the marks its own read observed (only a divided
+/// read reports any) and the marks read after it must all be the ones the masters were pinned
+/// under; any difference means the book moved while the window was read.
+fn window_drift(
+    pinned: CompanyMarks,
+    observed_by_window: Option<CompanyMarks>,
+    closing: CompanyMarks,
+) -> Option<&'static str> {
+    (closing != pinned || observed_by_window.is_some_and(|marks| marks != pinned))
+        .then_some("voucher_window_changed_during_read")
+}
+
+/// The masters read after the window must be the masters read before it, in everything that
+/// decides a classification, and under the same marks.
+fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> bool {
+    second.index != first.index || second.marks != first.marks
+}
+
+/// One page of the register: the rows from `offset`, at most `limit`, whether more remain and
+/// where the next page starts.
+fn paginate(rows: Vec<Value>, offset: usize, limit: usize) -> (Vec<Value>, bool, Option<usize>) {
+    let total = rows.len();
+    let page = rows
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<_>>();
+    let truncated = offset.saturating_add(page.len()) < total;
+    let next_offset = truncated.then_some(offset + page.len());
+    (page, truncated, next_offset)
+}
+
 /// The masters as one read saw them, with the marks the read was pinned under.
 struct RegisterMasters {
     index: MasterIndex,
@@ -368,20 +400,19 @@ impl Server {
             let (vouchers, masters) =
                 parse_company_marks(&marks_xml, identity.company_guid())?;
             let closing = CompanyMarks { vouchers, masters };
-            if closing != first.marks
-                || window
-                    .witness
-                    .as_ref()
-                    .is_some_and(|witness| witness.marks != first.marks)
-            {
-                return Err("voucher_window_changed_during_read".to_string().into());
+            if let Some(code) = window_drift(
+                first.marks,
+                window.witness.as_ref().map(|witness| witness.marks),
+                closing,
+            ) {
+                return Err(code.to_string().into());
             }
             // The two marks can be unchanged by an edit that does not move them (a duty head
             // or a parent changed in Tally's own screens is unmeasured), so the masters are
             // read again and must classify exactly as they did.
             let second = self.read_register_masters(&identity).await?;
             evidence = combine_evidence(evidence.clone(), second.evidence.clone());
-            if second.index != first.index || second.marks != first.marks {
+            if masters_drifted(&first, &second) {
                 return Err("ledger_snapshot_drifted".to_string().into());
             }
             let mut state = "complete";
@@ -410,15 +441,11 @@ impl Server {
             let limit =
                 arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
             let total = page.rows.len();
-            let rows = page
-                .rows
+            let (rows, truncated, next_offset) = paginate(page.rows, offset, limit);
+            let rows = rows
                 .into_iter()
-                .skip(offset)
-                .take(limit)
                 .map(|row| redact_value(mark_register_row(row), self.settings.redaction))
                 .collect::<Vec<_>>();
-            let truncated = offset.saturating_add(rows.len()) < total;
-            let next_offset = truncated.then_some(offset + rows.len());
             let payload = json!({
                 "company": company_json(&company, std::slice::from_ref(&company)),
                 "result": {

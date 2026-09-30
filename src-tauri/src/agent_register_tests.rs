@@ -460,3 +460,96 @@ fn a_side_list_of_exactly_the_cap_is_not_truncated() {
     );
     assert_eq!(bounded["listed_truncated"], false);
 }
+
+fn masters_read(marks: CompanyMarks, index: MasterIndex) -> RegisterMasters {
+    RegisterMasters {
+        index,
+        marks,
+        evidence: Evidence {
+            request_sha256: String::new(),
+            response_sha256: String::new(),
+            bytes: 0,
+            state: "complete",
+            read_at: None,
+            duration_ms: None,
+            reason_code: None,
+        },
+    }
+}
+
+const PINNED: CompanyMarks = CompanyMarks {
+    vouchers: 54,
+    masters: 120,
+};
+
+#[test]
+fn a_window_whose_marks_are_unchanged_is_stable() {
+    assert_eq!(window_drift(PINNED, None, PINNED), None);
+    assert_eq!(window_drift(PINNED, Some(PINNED), PINNED), None);
+}
+
+#[test]
+fn a_window_is_refused_when_either_mark_moved_before_or_after_it() {
+    let moved_voucher = CompanyMarks {
+        vouchers: 55,
+        ..PINNED
+    };
+    let moved_master = CompanyMarks {
+        masters: 121,
+        ..PINNED
+    };
+    for closing in [moved_voucher, moved_master] {
+        assert_eq!(
+            window_drift(PINNED, None, closing),
+            Some("voucher_window_changed_during_read"),
+            "{closing:?}"
+        );
+    }
+    // The window's own observation disagrees with the marks the masters were pinned under.
+    assert_eq!(
+        window_drift(PINNED, Some(moved_master), PINNED),
+        Some("voucher_window_changed_during_read")
+    );
+}
+
+#[test]
+fn masters_read_again_must_match_in_classification_and_marks() {
+    let first = masters_read(PINNED, captured_index());
+    assert!(!masters_drifted(
+        &first,
+        &masters_read(PINNED, captured_index())
+    ));
+    assert!(masters_drifted(
+        &first,
+        &masters_read(
+            CompanyMarks {
+                masters: 121,
+                ..PINNED
+            },
+            captured_index()
+        )
+    ));
+    let mut masters = captured_masters();
+    masters
+        .iter_mut()
+        .find(|record| record.ledger.name == "Input CGST")
+        .unwrap()
+        .fields
+        .gst_duty_head = GstDutyHeadObservation::Absent;
+    let rehead = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    assert!(masters_drifted(&first, &masters_read(PINNED, rehead)));
+}
+
+#[test]
+fn a_page_says_where_the_next_one_starts() {
+    let rows: Vec<Value> = (0..5).map(|n| json!({"n": n})).collect();
+    let (page, truncated, next) = paginate(rows.clone(), 0, 2);
+    assert_eq!((page.len(), truncated, next), (2, true, Some(2)));
+    let (page, truncated, next) = paginate(rows.clone(), 4, 2);
+    assert_eq!((page.len(), truncated, next), (1, false, None));
+    let (page, truncated, next) = paginate(rows.clone(), 5, 2);
+    assert_eq!((page.len(), truncated, next), (0, false, None));
+    let (page, truncated, next) = paginate(rows, 2, 3);
+    assert_eq!(page[0]["n"], 2);
+    assert_eq!((page.len(), truncated, next), (3, false, None));
+}

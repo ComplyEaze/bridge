@@ -64,7 +64,7 @@ impl PartyLedgerMasterSource {
     pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
         (self.last_voucher_date > self.to).then(|| {
             format!(
-                "Vouchers dated after {} (latest in Tally: {}) are not included in these balances. Review them in Tally before relying on this workbook.",
+                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook.",
                 self.to.as_str(),
                 self.last_voucher_date.as_str()
             )

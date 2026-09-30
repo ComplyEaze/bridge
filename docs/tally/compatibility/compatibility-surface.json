@@ -807,11 +807,11 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master.rs",
-      "sha256": "01303dbd292856caae1139e8620012413398338a171556da96438f11c5d28eb3"
+      "sha256": "da5f010d8420a66cb4c72992f4e73262d92d062c57d02652f6225543c06852d6"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_tests.rs",
-      "sha256": "81c092a69cda326875f481ae129341116b99f575debdd2461310e40da8532d49"
+      "sha256": "e1e019ae7d2e52e547b5660bba1071b20d2006e0cbd42fd4c2f51bc8d5bda4c2"
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx.rs",
@@ -819,7 +819,7 @@
     },
     {
       "path": "src-tauri/src/reports/party_ledger_master_xlsx_tests.rs",
-      "sha256": "e81b592c6cee13bdbe62c0acdc43a8bc0b092b228b90bb42360134fd721164da"
+      "sha256": "4cf1c4a081d55e6f95a3d701b668d93e20c66399e4c29d334174a176c8bc0c64"
     },
     {
       "path": "src-tauri/src/reports/party_statement.rs",

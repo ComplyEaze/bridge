@@ -195,6 +195,8 @@ fn party_master_snapshot_ends_near_today_when_a_voucher_is_dated_far_ahead() {
     // boundary after today (30 Sep: the 1st) is what is requested.
     assert_eq!(snapshot_to("50261231", "20260930"), "20261001");
     assert_eq!(snapshot_to("20270115", "20260930"), "20261001");
+    // Today on an admissible boundary ends the snapshot there, not on the next one.
+    assert_eq!(snapshot_to("50261231", "20260831"), "20260831");
 }
 
 #[test]

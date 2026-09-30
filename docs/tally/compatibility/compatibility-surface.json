@@ -415,7 +415,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/src/wire_gate.rs",
-      "sha256": "c60000ec4bfaf91eaa00196a674ca3bdff6cc442af2b9474ea46fc0a0983a7cf"
+      "sha256": "255fc1085dfd6d99a5da9fdc19d7c5fd3813cf3d74b670a10094b300eb16932b"
     },
     {
       "path": "src-tauri/crates/bridge-tally-transport/tests/http_transport.rs",

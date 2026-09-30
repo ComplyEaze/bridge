@@ -4,6 +4,7 @@ const LIMITS: PartitionLimits = PartitionLimits {
     max_ledgers_per_part: 10,
     max_parents_per_part: 3,
     max_parts: 4,
+    max_complement_formula_bytes: 1_000,
 };
 
 fn rows(spec: &[(&str, u64)]) -> Vec<(String, String, Option<String>)> {
@@ -131,7 +132,7 @@ fn a_ledger_without_a_parent_is_refused() {
 }
 
 #[test]
-fn ledgers_whose_parent_cannot_be_carried_are_counted_not_called_parentless() {
+fn ledgers_whose_parent_cannot_be_carried_form_the_complement_not_a_parentless_refusal() {
     let mut all = rows(&[("A", 1)]);
     let unsupported = ["u1", "u2", "u3"].map(|name| (name, format!("guid-{name}")));
     let mut observed = all
@@ -147,12 +148,11 @@ fn ledgers_whose_parent_cannot_be_carried_are_counted_not_called_parentless() {
     for (name, guid) in &unsupported {
         observed.push((name, guid.as_str(), ParentObservation::Unsupported));
     }
-    let error = ParentPartition::plan(observed, LIMITS).unwrap_err();
-    assert_eq!(
-        error,
-        ParentPartitionError::ParentNameUnsupported { ledgers: 3 }
-    );
-    assert_eq!(error.safe_code(), "parent_name_unsupported");
+    let partition = ParentPartition::plan(observed, LIMITS).unwrap();
+    assert_eq!(partition.parts().len(), 2);
+    assert!(!partition.parts()[0].is_complement());
+    assert!(partition.parts()[1].is_complement());
+    assert_eq!(partition.parts()[1].ledger_count(), 3);
     all.push(("orphan".into(), "guid-orphan".into(), None));
     assert_eq!(
         plan(&all, LIMITS).unwrap_err(),
@@ -166,9 +166,170 @@ fn unsupported_named_parents_are_counted_across_the_whole_catalogue() {
     all.push(("t1".into(), "guid-t1".into(), Some("tab\there".into())));
     all.push(("t2".into(), "guid-t2".into(), Some("tab\there".into())));
     all.push(("q1".into(), "guid-q1".into(), Some("a\"b".into())));
+    let partition = plan(&all, LIMITS).unwrap();
+    assert_eq!(partition.parts().len(), 2);
+    assert_eq!(partition.parts()[1].ledger_count(), 3);
+}
+
+#[test]
+fn a_book_whose_every_parent_is_unsupported_is_refused_with_the_count() {
+    let all = vec![
+        ("t1".into(), "guid-t1".into(), Some("tab\there".into())),
+        ("t2".into(), "guid-t2".into(), Some("tab\there".into())),
+    ];
+    let error = plan(&all, LIMITS).unwrap_err();
+    assert_eq!(
+        error,
+        ParentPartitionError::ParentNameUnsupported { ledgers: 2 }
+    );
+    assert_eq!(error.safe_code(), "parent_name_unsupported");
+}
+
+#[test]
+fn a_complement_over_the_ledger_limit_is_refused_not_split() {
+    let mut all = rows(&[("A", 1)]);
+    for index in 0..11 {
+        all.push((
+            format!("t{index}"),
+            format!("guid-t{index}"),
+            Some("tab\there".into()),
+        ));
+    }
     assert_eq!(
         plan(&all, LIMITS).unwrap_err(),
-        ParentPartitionError::ParentNameUnsupported { ledgers: 3 }
+        ParentPartitionError::ParentOverBudget { ledgers: 11 }
+    );
+    assert!(plan(&with_unsupported(&[("A", 1)], 10), LIMITS)
+        .unwrap()
+        .parts()
+        .last()
+        .unwrap()
+        .is_complement());
+}
+
+fn with_unsupported(
+    spec: &[(&str, u64)],
+    unsupported: u64,
+) -> Vec<(String, String, Option<String>)> {
+    let mut all = rows(spec);
+    for index in 0..unsupported {
+        all.push((
+            format!("t{index}"),
+            format!("guid-t{index}"),
+            Some("tab\there".into()),
+        ));
+    }
+    all
+}
+
+#[test]
+fn the_complement_names_every_named_parent_in_not_chunks_applied_together() {
+    let spec = (0..7)
+        .map(|index| (format!("P{index}"), 1u64))
+        .collect::<Vec<_>>();
+    let spec_ref = spec
+        .iter()
+        .map(|(name, count)| (name.as_str(), *count))
+        .collect::<Vec<_>>();
+    let partition = plan(&with_unsupported(&spec_ref, 2), LIMITS).unwrap();
+    let complement = partition.parts().last().unwrap();
+    assert!(complement.is_complement());
+    assert_eq!(complement.parents().len(), 7);
+    let formulas = complement.formulas();
+    assert_eq!(
+        formulas
+            .iter()
+            .map(|formula| formula.name.as_str())
+            .collect::<Vec<_>>(),
+        ["BridgeNot0", "BridgeNot1", "BridgeNot2"]
+    );
+    assert_eq!(
+        formulas[0].text,
+        "NOT ($Parent = \"P0\" OR $Parent = \"P1\" OR $Parent = \"P2\")"
+    );
+    assert_eq!(formulas[2].text, "NOT ($Parent = \"P6\")");
+    let named = partition
+        .parts()
+        .iter()
+        .filter(|part| !part.is_complement())
+        .flat_map(|part| part.parents().iter())
+        .collect::<HashSet<_>>();
+    assert_eq!(named.len(), 7);
+    assert!(complement
+        .parents()
+        .iter()
+        .all(|parent| named.contains(parent)));
+}
+
+#[test]
+fn a_complement_filter_over_the_byte_limit_is_refused() {
+    let limits = PartitionLimits {
+        max_complement_formula_bytes: 20,
+        ..LIMITS
+    };
+    assert_eq!(
+        plan(&with_unsupported(&[("A", 1), ("B", 1)], 1), limits).unwrap_err(),
+        ParentPartitionError::ComplementOverBudget
+    );
+}
+
+#[test]
+fn the_complement_part_is_the_last_part_and_a_named_part_has_one_formula() {
+    let partition = plan(&with_unsupported(&[("A", 1)], 1), LIMITS).unwrap();
+    let named = partition.parts()[0].formulas();
+    assert_eq!(named.len(), 1);
+    assert_eq!(named[0].name, PARENT_FORMULA_NAME);
+    assert!(partition.parts()[1].is_complement());
+}
+
+#[test]
+fn complement_rows_are_accepted_by_guid_and_name_with_any_unexcluded_parent() {
+    let partition = plan(&with_unsupported(&[("A", 1), ("B", 1)], 2), LIMITS).unwrap();
+    let mut coverage = partition.coverage();
+    coverage
+        .accept(0, "guid-A-0", "A-ledger-0", Some("A"))
+        .unwrap();
+    coverage
+        .accept(0, "guid-B-0", "B-ledger-0", Some("B"))
+        .unwrap();
+    coverage.accept(1, "guid-t0", "t0", None).unwrap();
+    coverage
+        .accept(1, "guid-t1", "t1", Some("tab\there"))
+        .unwrap();
+    coverage.finish().unwrap();
+}
+
+#[test]
+fn a_complement_row_under_a_named_parent_or_in_the_wrong_part_is_refused() {
+    let partition = plan(&with_unsupported(&[("A", 1)], 2), LIMITS).unwrap();
+    let mut coverage = partition.coverage();
+    assert_eq!(
+        coverage.accept(1, "guid-t0", "t0", Some("A")).unwrap_err(),
+        ParentPartitionError::RowDiffersFromCatalogue
+    );
+    assert_eq!(
+        coverage.accept(0, "guid-t0", "t0", None).unwrap_err(),
+        ParentPartitionError::RowOutsideParts
+    );
+    assert_eq!(
+        coverage
+            .accept(1, "guid-A-0", "A-ledger-0", Some("A"))
+            .unwrap_err(),
+        ParentPartitionError::RowOutsideParts
+    );
+}
+
+#[test]
+fn a_missing_complement_row_fails_finish() {
+    let partition = plan(&with_unsupported(&[("A", 1)], 2), LIMITS).unwrap();
+    let mut coverage = partition.coverage();
+    coverage
+        .accept(0, "guid-A-0", "A-ledger-0", Some("A"))
+        .unwrap();
+    coverage.accept(1, "guid-t0", "t0", None).unwrap();
+    assert_eq!(
+        coverage.finish().unwrap_err(),
+        ParentPartitionError::RowsMissing
     );
 }
 
@@ -229,7 +390,7 @@ fn formula_escapes_xml_once_and_joins_with_or() {
     .unwrap();
     assert_eq!(partition.parts().len(), 1);
     assert_eq!(
-        partition.parts()[0].formula(),
+        partition.parts()[0].formulas()[0].text,
         "$Parent = \"Bank &lt;A&gt;\" OR $Parent = \"Duties &amp; Taxes\""
     );
 }
@@ -238,7 +399,10 @@ fn formula_escapes_xml_once_and_joins_with_or() {
 fn the_reserved_root_is_written_as_tally_writes_it() {
     let root = format!("{TALLY_SANITIZED_ROOT_MARKER} Primary");
     let partition = plan(&[("l1".into(), "g1".into(), Some(root.clone()))], LIMITS).unwrap();
-    assert_eq!(partition.parts()[0].formula(), "$Parent = \"&#4; Primary\"");
+    assert_eq!(
+        partition.parts()[0].formulas()[0].text,
+        "$Parent = \"&#4; Primary\""
+    );
     let mut coverage = partition.coverage();
     coverage.accept(0, "g1", "l1", Some(&root)).unwrap();
     coverage.finish().unwrap();
@@ -247,7 +411,7 @@ fn the_reserved_root_is_written_as_tally_writes_it() {
 #[test]
 fn a_single_parent_formula_has_no_or() {
     let partition = plan(&rows(&[("A", 1)]), LIMITS).unwrap();
-    assert_eq!(partition.parts()[0].formula(), "$Parent = \"A\"");
+    assert_eq!(partition.parts()[0].formulas()[0].text, "$Parent = \"A\"");
 }
 
 fn covered(all: &[(String, String, Option<String>)]) -> (ParentPartition, PartitionCoverage) {
@@ -376,6 +540,8 @@ fn every_error_has_a_distinct_safe_code() {
         ParentPartitionError::DuplicateLedgerIdentity,
         ParentPartitionError::ParentOverBudget { ledgers: 1 },
         ParentPartitionError::TooManyParts { parts: 1 },
+        ParentPartitionError::ComplementOverBudget,
+        ParentPartitionError::PartRowCountDiffers,
         ParentPartitionError::RowOutsideParts,
         ParentPartitionError::RowNotInCatalogue,
         ParentPartitionError::RowDiffersFromCatalogue,
@@ -385,4 +551,22 @@ fn every_error_has_a_distinct_safe_code() {
     .map(ParentPartitionError::safe_code);
     let unique = codes.iter().collect::<HashSet<_>>();
     assert_eq!(unique.len(), codes.len());
+}
+
+#[test]
+fn a_part_accepts_only_its_catalogue_row_count() {
+    let partition = plan(&rows(&[("A", 2)]), LIMITS).unwrap();
+    let part = &partition.parts()[0];
+    assert_eq!(part.check_row_count(2), Ok(()));
+    for wrong in [0, 1, 3] {
+        assert_eq!(
+            part.check_row_count(wrong),
+            Err(ParentPartitionError::PartRowCountDiffers),
+            "{wrong}"
+        );
+    }
+    assert_eq!(
+        ParentPartitionError::PartRowCountDiffers.safe_code(),
+        "parent_part_row_count_differs"
+    );
 }

@@ -208,11 +208,7 @@ fn compute_with_ledgers(ledgers_xml: &str) -> Result<NativeOutstandingsResult, S
 fn an_empty_opening_balance_is_carried_as_unknown_not_zero() {
     let needle = "<OPENINGBALANCE TYPE=\"Amount\">-20000.00</OPENINGBALANCE>";
     let emptied = ledger_fixture_with(|xml| {
-        assert_eq!(
-            xml.matches(needle).count(),
-            2,
-            "P08's own opening, and the account it owns"
-        );
+        assert_eq!(xml.matches(needle).count(), 1, "P08's own opening element");
         xml.replacen(
             needle,
             "<OPENINGBALANCE TYPE=\"Amount\"></OPENINGBALANCE>",

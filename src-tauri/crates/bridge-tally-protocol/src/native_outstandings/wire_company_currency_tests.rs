@@ -167,6 +167,51 @@ fn the_company_currency_name_fails_closed() {
         ),
         Err(NativeOutstandingsError::TallyReportedFailure)
     );
+    // A missing, self-closing or empty STATUS is no answer (bridge#717).
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = xml.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, xml);
+        assert_eq!(
+            parse_company_currency_name(&silent, FOREX_GUID),
+            Err(NativeOutstandingsError::StatusAbsent),
+            "{absent:?}"
+        );
+        // Cut off after it, the response is unterminated, not absent.
+        let cut = xml.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            parse_company_currency_name(&silent[..cut], FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_envelope_unterminated"
+            )),
+            "{absent:?} cut off"
+        );
+    }
+    // An empty body is no envelope at all, not one without a STATUS.
+    for empty in ["", " \r\n"] {
+        assert_eq!(
+            parse_company_currency_name(empty, FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_envelope_missing"
+            )),
+            "{empty:?}"
+        );
+    }
+    // A second STATUS, empty or not and in either order, is refused.
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        let doubled = xml.replacen("<STATUS>1</STATUS>", repeated, 1);
+        assert_eq!(
+            parse_company_currency_name(&doubled, FOREX_GUID),
+            Err(NativeOutstandingsError::InvalidResponse(
+                "company_currency_status_repeated"
+            )),
+            "{repeated:?}"
+        );
+    }
 }
 
 /// bridge#551, from captures only: FOREX's currency read with `ORIGINALNAME`

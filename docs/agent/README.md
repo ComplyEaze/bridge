@@ -568,8 +568,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    the date or amounts, is not seen, and a hand-typed id in the
    `st-YYYYMMDD-<16 hex>` form is matched on the id alone; a different export
    of the same statement (other amount formatting or narration wrapping) derives
-   different ids and is not seen; two Bridge installs on one company keep
-   separate journals. The check at build is a point in time: a batch posted
+   different ids and is not seen; a hand-typed id reused for a genuinely
+   different event is refused too, and only after the user has seen the existing
+   voucher and said yes may it be rebuilt under a new transaction id (never one with a `st-` id, which names
+   the same bank row whatever its ledger); two Bridge installs on one company
+   keep separate journals. The check at build is a point in time: a batch posted
    natively after this one was built sees it only as built, so a file already
    written can still be imported by hand after that post, and two hand imports
    of one file are not seen at all. A build that is an amendment is not checked,

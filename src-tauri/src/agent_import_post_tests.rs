@@ -426,6 +426,8 @@ fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
     let step = error["next_step"].as_str().unwrap();
     assert!(step.contains("Never rebuild a row"), "{step}");
     assert!(step.contains("recent batches"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("only after their explicit yes"), "{step}");
     assert!(error.get("blocking_batch_id").is_none());
 }
 

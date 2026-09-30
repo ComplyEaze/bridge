@@ -411,6 +411,72 @@ async fn a_remoteid_the_journal_records_is_refused_before_any_tally_request() {
     assert_eq!(journal(directory.path()), before);
 }
 
+/// #876: a row another batch of the company already sent to Tally is refused
+/// from the journal alone, before any Tally request and before the person is
+/// asked; nothing is appended.
+#[tokio::test]
+async fn a_row_another_batch_already_sent_is_refused_before_any_tally_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    journal_an_earlier_intent(&server, &line, Uuid::new_v4());
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_txn_already_posted",
+        "{response}"
+    );
+    let next_step = response["structuredContent"]["result"]["error"]["next_step"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(next_step.contains("verify_import"), "{response}");
+    assert!(next_step.contains("Never rebuild"), "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["blocking_batch_id"],
+        "bridge-00000000-0000-4000-8000-000000000584",
+        "{response}"
+    );
+    assert!(
+        next_step.contains("bridge-00000000-0000-4000-8000-000000000584"),
+        "{response}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// #876: the same row sent by another batch while the dialog is open is
+/// refused under the admission lock, before this post's intent, and nothing is
+/// sent.
+#[tokio::test]
+async fn a_row_another_batch_sends_while_approval_is_pending_is_never_sent() {
+    let result = refused_under_the_admission_lock(
+        |path, line| {
+            let mut earlier = line.clone();
+            earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000586".into();
+            append_record(path, &earlier);
+            append_record(
+                path,
+                &ledger::StatusRecord::dispatch_native(&earlier, "c".repeat(64), Uuid::new_v4()),
+            );
+        },
+        "import_txn_already_posted",
+        json!(false),
+        0,
+    )
+    .await;
+    assert_eq!(
+        result["error"]["blocking_batch_id"], "bridge-00000000-0000-4000-8000-000000000586",
+        "{result}"
+    );
+}
+
 /// While the dialog is open, another process journals an intent carrying
 /// `injected`; this post mints `minted`. Returns the response, the requests
 /// Tally received, where the POST would be, and the batches with an intent.
@@ -427,6 +493,9 @@ async fn race_an_intent_during_approval(
     let (line, args) = saved_batch(&server);
     let mut earlier = line.clone();
     earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
+    // Another transaction, so only the REMOTEID can make this a refusal (#876).
+    earlier.txn_ids = vec!["journal-585".into()];
+    earlier.vouchers[0].bridge_txn_id = "journal-585".into();
     let mut appended = serde_json::to_vec(&earlier).unwrap();
     appended.push(b'\n');
     appended.extend(
@@ -475,7 +544,7 @@ async fn refused_under_the_admission_lock(
     code: &str,
     attempted: Value,
     intents: usize,
-) {
+) -> Value {
     let mut plans = before_approval();
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
@@ -503,6 +572,7 @@ async fn refused_under_the_admission_lock(
         })
         .count();
     assert_eq!(recorded, intents, "no intent from this post: {response}");
+    result.clone()
 }
 
 fn append_record(path: &std::path::Path, record: &impl serde::Serialize) {
@@ -618,6 +688,9 @@ async fn race_a_batch_id_during_approval(
     earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
     earlier.vouchers.truncate(1);
     earlier.txn_ids.truncate(1);
+    // Another transaction, so only the REMOTEID can make this a refusal (#876).
+    earlier.txn_ids = vec!["journal-585".into()];
+    earlier.vouchers[0].bridge_txn_id = "journal-585".into();
     let mut appended = serde_json::to_vec(&earlier).unwrap();
     appended.push(b'\n');
     appended.extend(

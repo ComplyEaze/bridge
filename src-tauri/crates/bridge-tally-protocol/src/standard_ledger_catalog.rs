@@ -172,6 +172,10 @@ struct StandardLedgerCatalogEntry {
     /// single hop is all the ancestry one catalog response carries; a caller
     /// that needs the group's own identity must read the Group collection.
     parent: Option<String>,
+    /// The catalogue returned a `PARENT` this parse would not carry (see
+    /// `safe_standard_ledger_parent`), so `parent` is `None` although the
+    /// ledger has one.
+    parent_unsupported: bool,
 }
 
 impl StandardLedgerCatalog {
@@ -185,6 +189,22 @@ impl StandardLedgerCatalog {
         self.entries
             .iter()
             .map(|entry| (entry.name.as_str(), entry.parent.as_deref()))
+    }
+
+    /// Each ledger's name, GUID and immediate parent, for planning parent
+    /// parts and checking the parts' rows against this catalogue (bridge#679).
+    pub fn identified_parents(
+        &self,
+    ) -> impl Iterator<Item = (&str, &str, crate::parent_partition::ParentObservation<'_>)> {
+        use crate::parent_partition::ParentObservation;
+        self.entries.iter().map(|entry| {
+            let parent = if entry.parent_unsupported {
+                ParentObservation::Unsupported
+            } else {
+                entry.parent.as_deref().into()
+            };
+            (entry.name.as_str(), entry.guid.as_str(), parent)
+        })
     }
 
     pub fn bind_selected(
@@ -282,6 +302,7 @@ pub fn parse_standard_ledger_catalog_with_identities(
                     .parent
                     .nonempty_returned_text()
                     .map(str::to_string),
+                parent_unsupported: row.parent_unsupported,
             })
             .collect(),
     })
@@ -306,6 +327,7 @@ pub fn parse_standard_ledger_catalog(
 struct StandardLedgerCatalogRow {
     ledger: TallyLedger,
     guid: String,
+    parent_unsupported: bool,
 }
 
 fn parse_standard_ledger_catalog_rows(
@@ -379,6 +401,7 @@ fn parse_standard_ledger_catalog_rows(
                         opening_balance: None,
                     },
                     guid: ledger_guid,
+                    parent_unsupported: observed.parent_unsupported,
                 });
             }
             Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
@@ -404,6 +427,7 @@ struct StandardLedgerIdentityRow {
     ledger_name: Option<String>,
     ledger_guid: Option<String>,
     parent: PartyLedgerMasterFieldObservation,
+    parent_unsupported: bool,
 }
 
 fn parse_standard_ledger_identity_row(
@@ -423,6 +447,7 @@ fn parse_standard_ledger_identity_row(
     let mut ledger_guid = None;
     let mut parent = PartyLedgerMasterFieldObservation::NotObserved;
     let mut parent_seen = false;
+    let mut parent_unsupported = false;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
@@ -501,7 +526,10 @@ fn parse_standard_ledger_identity_row(
                         parent = match read_identifier_text(reader, child.name())? {
                             Some(value) => match safe_standard_ledger_parent(&value) {
                                 Some(value) => PartyLedgerMasterFieldObservation::Returned(value),
-                                None => PartyLedgerMasterFieldObservation::NotObserved,
+                                None => {
+                                    parent_unsupported = true;
+                                    PartyLedgerMasterFieldObservation::NotObserved
+                                }
                             },
                             None => PartyLedgerMasterFieldObservation::Returned(String::new()),
                         };
@@ -560,6 +588,7 @@ fn parse_standard_ledger_identity_row(
         ledger_name,
         ledger_guid,
         parent,
+        parent_unsupported,
     })
 }
 

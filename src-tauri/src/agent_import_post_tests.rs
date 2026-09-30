@@ -407,6 +407,32 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
     assert!(other["result"]["error"].get("next_step").is_none());
 }
 
+/// #876: a refused row says not to rebuild it, even when the blocking batch
+/// could not be named.
+#[test]
+fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
+    let mut payload = reconciliation_failure_payload(
+        "bridge-test",
+        Some(false),
+        None,
+        "import_txn_already_posted",
+    );
+    name_blocking_batch(&mut payload, None);
+    let error = &payload["result"]["error"];
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .contains("Nothing was sent"));
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.contains("Never rebuild a row"), "{step}");
+    assert!(step.contains("recent batches"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
+    assert!(step.contains("Never rename a statement row"), "{step}");
+    assert!(error.get("blocking_batch_id").is_none());
+}
+
 /// A wire refusal replaces a generic failure code with the refusal's own, but
 /// never the code that tells the caller not to rebuild an unknown post.
 #[test]

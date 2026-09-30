@@ -656,9 +656,15 @@ impl Server {
     ) -> Result<ListingSnapshot, ToolFailure> {
         let (rows, groups, extent, read_evidence, frame) = match &kind {
             ListingKind::Compliance { gstin_as_of } => {
+                let today = TallyDate::parse(tally_host_today())
+                    .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
                 let listing = self
                     .runtime
-                    .fetch_agent_party_ledger_masters_with_evidence(self.tally_config(), identity)
+                    .fetch_agent_party_ledger_masters_with_evidence(
+                        self.tally_config(),
+                        identity,
+                        today,
+                    )
                     .await
                     .map_err(|error| {
                         ToolFailure::from_runtime("party_ledger_master_read_failed", error)

@@ -10,6 +10,7 @@
 use bridge_tally_primitives::TallyDate;
 
 use crate::outstandings_shared::DateBoundaryProfile;
+use crate::parent_partition::ParentPart;
 use crate::xml_text::escape_text as xml_escape;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,12 +169,62 @@ pub fn render_native_ledger_snapshot_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_native_ledger_snapshot(company, period, None)
+}
+
+/// The same snapshot restricted to the ledgers under one [`ParentPart`]'s
+/// parents (bridge#679). Rows are byte-identical to the unfiltered read's rows
+/// for those parents (TALLY_PROTOCOL_REFERENCE section 11e).
+pub fn render_native_ledger_snapshot_request_for_parents(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    part: &ParentPart,
+) -> String {
+    render_native_ledger_snapshot(company, period, Some(part))
+}
+
+fn render_native_ledger_snapshot(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    part: Option<&ParentPart>,
+) -> String {
+    let (formula, filters) = parent_filter_parts(part);
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>NAME, PARENT, CLOSINGBALANCE, OPENINGBALANCE, ISBILLWISEON, CURRENCYNAME</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>NAME, PARENT, CLOSINGBALANCE, OPENINGBALANCE, ISBILLWISEON, CURRENCYNAME</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),
     )
+}
+
+/// The `SYSTEM` formulas and `FILTERS` element for a parent part, both empty
+/// for the unfiltered read so its bytes do not change. The formula text is
+/// built and escaped by [`ParentPart::formulas`]; it holds no `$$` function,
+/// so section 6.1's space hazard does not apply. Several formulas are listed
+/// comma-separated and all apply (AND), which is how the complement part's
+/// `NOT (...)` chunks combine (section 11e).
+fn parent_filter_parts(part: Option<&ParentPart>) -> (String, String) {
+    match part {
+        None => (String::new(), String::new()),
+        Some(part) => {
+            let formulas = part.formulas();
+            let systems = formulas
+                .iter()
+                .map(|formula| {
+                    format!(
+                        r#"<SYSTEM TYPE="Formulae" NAME="{}">{}</SYSTEM>"#,
+                        formula.name, formula.text
+                    )
+                })
+                .collect::<String>();
+            let names = formulas
+                .iter()
+                .map(|formula| formula.name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            (systems, format!("<FILTERS>{names}</FILTERS>"))
+        }
+    }
 }
 
 /// Renders a native `List of Ledgers` collection for ordinary ledger export.
@@ -196,6 +247,7 @@ pub fn render_native_ledger_export_request(
         period,
         "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, OPENINGBALANCE",
         false,
+        None,
     )
 }
 
@@ -206,11 +258,30 @@ pub fn render_party_ledger_master_request(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
+    render_party_ledger_master(company, period, None)
+}
+
+/// The compliance master read restricted to the ledgers under one
+/// [`ParentPart`]'s parents (bridge#679).
+pub fn render_party_ledger_master_request_for_parents(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+    part: &ParentPart,
+) -> String {
+    render_party_ledger_master(company, period, Some(part))
+}
+
+fn render_party_ledger_master(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+    part: Option<&ParentPart>,
+) -> String {
     render_native_ledger_collection_request(
         company,
         period,
         "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST",
         true,
+        part,
     )
 }
 
@@ -219,14 +290,16 @@ fn render_native_ledger_collection_request(
     period: &NativeLedgerExportPeriod,
     fetch: &str,
     include_response_company_guid: bool,
+    part: Option<&ParentPart>,
 ) -> String {
+    let (formula, filters) = parent_filter_parts(part);
     let response_company_guid = if include_response_company_guid {
         "<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>"
     } else {
         ""
     };
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>{fetch}</FETCH>{response_company_guid}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>{fetch}</FETCH>{response_company_guid}{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),

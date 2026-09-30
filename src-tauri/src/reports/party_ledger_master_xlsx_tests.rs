@@ -17,6 +17,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         currency_decimal_places: decimal_places,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Three decimal customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -79,6 +80,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -145,6 +147,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer balance".to_string(),
             parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
@@ -222,6 +225,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "a".repeat(64),
@@ -275,6 +279,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Parent observation".to_string(),
             parent,
@@ -354,4 +359,50 @@ fn explicitly_empty_parent_renders_an_empty_group_cell() {
         !cell_has_value,
         "an explicitly empty parent must not write a Group-cell value"
     );
+}
+
+fn workbook_text(source: PartyLedgerMasterSource) -> String {
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut text = String::new();
+    for name in [
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/sharedStrings.xml",
+    ] {
+        std::io::Read::read_to_string(&mut archive.by_name(name).unwrap(), &mut text).unwrap();
+    }
+    text
+}
+
+#[test]
+fn a_later_dated_voucher_is_said_beside_the_balance_date_and_in_the_read_period() {
+    let mut source = source_with_precision(2);
+    source.to = TallyDate::parse("20261001").unwrap();
+    source.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    let text = workbook_text(source);
+    let note = "Vouchers dated after 20261001 (the book's last voucher date is 50261231) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.";
+    // Once on the ledger sheet (beside the date), once in the Schedule III read period.
+    assert_eq!(text.matches(note).count(), 2, "{text}");
+    assert!(text.contains(&format!(
+        "Read period: 20260401 to 20261001. No prior-year values were requested or inferred. {note}"
+    )));
+}
+
+#[test]
+fn no_later_dated_voucher_adds_nothing_to_the_workbook() {
+    for last in ["20260731", "20260630"] {
+        let mut source = source_with_precision(2);
+        source.last_voucher_date = TallyDate::parse(last).unwrap();
+        let text = workbook_text(source);
+        assert!(!text.contains("Vouchers dated after"), "{last}");
+        assert!(text.contains(
+            "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
+        ));
+        assert!(
+            !text.contains("No prior-year values were requested or inferred. "),
+            "{last}"
+        );
+    }
 }

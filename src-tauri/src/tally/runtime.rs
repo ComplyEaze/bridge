@@ -3192,10 +3192,16 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        today: TallyDate,
     ) -> anyhow::Result<PartyLedgerMasterSource> {
-        self.fetch_party_ledger_master_source_with_evidence(config, identity, currency_assertion)
-            .await
-            .map(|(source, _)| source)
+        self.fetch_party_ledger_master_source_with_evidence(
+            config,
+            identity,
+            currency_assertion,
+            today,
+        )
+        .await
+        .map(|(source, _)| source)
     }
 
     async fn fetch_party_ledger_master_source_with_evidence(
@@ -3203,6 +3209,7 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        today: TallyDate,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
@@ -3213,6 +3220,7 @@ impl TallyRuntime {
             move |client| {
                 let identity = identity.clone();
                 let currency_assertion = currency_assertion.clone();
+                let today = today.clone();
                 async move {
                     let mut evidence = RuntimeReadEvidence::empty();
                     let result = async {
@@ -3225,6 +3233,7 @@ impl TallyRuntime {
                                 &identity,
                                 boundary_profile,
                                 currency_assertion,
+                                &today,
                             )
                             .await?;
                         evidence =
@@ -3260,6 +3269,7 @@ impl TallyRuntime {
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
+        today: TallyDate,
     ) -> anyhow::Result<PartyLedgerMasterListing> {
         // The classified read admits a book with several Currency masters
         // when Tally identifies an INR base (bridge#551); the source then
@@ -3282,7 +3292,7 @@ impl TallyRuntime {
             })?
             .into_compliance_assertion();
         let (source, source_evidence) = self
-            .fetch_party_ledger_master_source_with_evidence(config, identity, assertion)
+            .fetch_party_ledger_master_source_with_evidence(config, identity, assertion, today)
             .await
             .map_err(|error| with_read_evidence(error, currency_evidence.clone()))?;
         let evidence = currency_evidence.combine(source_evidence);

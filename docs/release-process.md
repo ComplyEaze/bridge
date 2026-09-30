@@ -534,6 +534,24 @@ published with the workflow token starts no workflow of its own, which is why
 the follow-up is wired to the publication run. A successful publication also
 deploys any `site/` change already merged to the default branch but not yet
 deployed, so text on the default branch is text that goes live.
+Site text is a public claim, so it follows the same rule as release notes:
+say only what has been proven on the build a person can download.
+
+- A pull request that changes text under `site/` says so in its body, quoting
+  the changed sentence, and the reviewer reads it against the evidence for the
+  claim (the platforms tested, the unsigned-preview label, what the product does
+  not do). A claim the release notes could not make does not belong on the site.
+- Each deploy writes "Site text changed since the last deploy" to its run
+  summary: the files and the diff under `site/` between the last commit that
+  was deployed successfully and the one being deployed. The diff is cut at 300
+  lines of 400 characters, and files generated during the deploy (the release
+  list and the changelog page) are not compared. Read it after every deploy,
+  manual or publication-triggered; a wrong sentence is fixed by a new deploy.
+  It only informs. It reads the deployment history with the workflow token, and
+  if that read, the comparison or its two-minute limit fails, the step warns
+  and the deploy continues, so a missing summary is not a reason to stop a
+  release.
+
 Once GitHub Pages is configured for this repository, the page offers a
 preview by its tag name and complete asset set, whether or not GitHub marks the
 release a prerelease, and labels every download as an unsigned preview. It does

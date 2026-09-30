@@ -46,6 +46,66 @@ function assertReleaseWorkflow(release) {
   assert.equal(packageJob.needs, "release-admission", "package must wait for release admission");
   assert.equal(publish.needs, "package", "publication must wait for both package archives");
   assert.equal(publish.permissions.contents, "write", "only publication receives contents write permission");
+  // Build attestations: only the package job may mint the identity token and write attestations;
+  // publication may read them to verify, and nothing else gets either.
+  assert.deepEqual(release.permissions, { contents: "read" }, "the workflow default stays read-only");
+  assert.deepEqual(
+    packageJob.permissions,
+    { contents: "read", "id-token": "write", attestations: "write" },
+    "the package job alone may create attestations",
+  );
+  assert.deepEqual(publish.permissions, { contents: "write", attestations: "read" }, "publication may only read attestations");
+  assert.equal(admission.permissions, undefined, "admission keeps the default read-only permissions");
+  const build = step(packageJob, "Validate, archive, and exercise the real MCPB");
+  const attest = step(packageJob, "Attest where this archive was built");
+  assertUnconditional(attest, "attestation step");
+  assert.equal(attest["continue-on-error"], undefined, "no archive is published without its attestation");
+  assert.match(attest.uses, /^actions\/attest@[0-9a-f]{40}$/, "the attestation action is pinned by full commit SHA");
+  assert.equal(
+    attest.with["subject-path"],
+    "release-assets/bridge-tally-${{ inputs.release_tag }}-${{ matrix.platform }}.mcpb",
+    "the attested file is the exact archive that is uploaded",
+  );
+  assert.deepEqual(Object.keys(attest.with), ["subject-path"], "no other attestation input is set");
+  // No other step key (env, shell, working-directory, timeout) may change how these steps run.
+  assert.deepEqual(Object.keys(attest).sort(), ["name", "uses", "with"], "the attestation step sets nothing else");
+  const packageNames = packageJob.steps.map((candidate) => candidate.name ?? candidate.uses);
+  const uploadIndex = packageJob.steps.findIndex((candidate) => candidate.uses?.startsWith("actions/upload-artifact@"));
+  assert.ok(
+    packageJob.steps.indexOf(build) < packageJob.steps.indexOf(attest) && packageJob.steps.indexOf(attest) < uploadIndex,
+    `the archive is attested after it is built and tested and before it is uploaded (${packageNames.join(" > ")})`,
+  );
+  const verify = step(publish, "Verify each archive against its build attestation");
+  assertUnconditional(verify, "attestation verification step");
+  assert.equal(verify["continue-on-error"], undefined);
+  // The whole script is pinned line by line: a trailing `|| true`, a commented-out command, a
+  // third platform or a different asset name would each turn the gate off or point it elsewhere.
+  assert.deepEqual(
+    verify.run.trim().split("\n").map((line) => line.trim()),
+    [
+      "set -euo pipefail",
+      "for platform in windows-x64 macos-arm64; do",
+      'asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"',
+      'gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA"',
+      "done",
+    ],
+  );
+  assert.deepEqual(Object.keys(verify).sort(), ["env", "name", "run", "shell"], "the verification step sets nothing else");
+  assert.equal(verify.shell, "bash");
+  assert.deepEqual(
+    verify.env,
+    {
+      GH_TOKEN: "${{ github.token }}",
+      RELEASE_TAG: "${{ inputs.release_tag }}",
+      REPOSITORY: "${{ github.repository }}",
+      SOURCE_SHA: "${{ github.sha }}",
+    },
+  );
+  const publishNames = publish.steps.map((candidate) => candidate.name ?? candidate.uses);
+  assert.ok(
+    publishNames.indexOf(verify.name) < publishNames.indexOf("Create the immutable GitHub preview release"),
+    "archives are verified against their attestations before the release is created",
+  );
 
   const admissionStep = step(admission, "Require reviewed source and a matching immutable preview version");
   assertUnconditional(admissionStep, "release admission step");
@@ -284,6 +344,22 @@ test("publication workflow checks reject disabled or misplaced controls", async 
   ).if = false;
   assert.throws(() => assertReleaseWorkflow(disabledAdmission), /must not be conditional/);
 
+  const attestContinues = structuredClone(release);
+  step(attestContinues.jobs.package, "Attest where this archive was built")["continue-on-error"] = true;
+  assert.throws(() => assertReleaseWorkflow(attestContinues), /attestation step must not continue after failure/);
+
+  const attestUnpinned = structuredClone(release);
+  step(attestUnpinned.jobs.package, "Attest where this archive was built").uses = "actions/attest@v4";
+  assert.throws(() => assertReleaseWorkflow(attestUnpinned), /pinned by full commit SHA/);
+
+  const publishMintsTokens = structuredClone(release);
+  publishMintsTokens.jobs["publish-preview"].permissions["id-token"] = "write";
+  assert.throws(() => assertReleaseWorkflow(publishMintsTokens), /publication may only read attestations/);
+
+  const verifyNeverFails = structuredClone(release);
+  step(verifyNeverFails.jobs["publish-preview"], "Verify each archive against its build attestation").run += " || true\n";
+  assert.throws(() => assertReleaseWorkflow(verifyNeverFails), assert.AssertionError);
+
   const admissionContinues = structuredClone(release);
   admissionContinues.jobs["release-admission"]["continue-on-error"] = true;
   assert.throws(() => assertReleaseWorkflow(admissionContinues), /must not continue after failure/);
@@ -335,4 +411,7 @@ test("unsigned preview notes state the host-validation scope and remaining gaps"
   assert.match(notes, /does not establish\nlive Tally behaviour or Claude Desktop conversational tool calls/);
   assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains outstanding/);
   assert.match(notes, /Intel Mac is not qualified/);
+  // The attestation line is scoped: where and by what a file was built, never a signature or a safety claim.
+  assert.match(notes, /gh attestation verify <file>\.mcpb --repo lamemustafa\/bridge/);
+  assert.match(notes, /It is not a code signature and does not\nshow the code is safe\./);
 });

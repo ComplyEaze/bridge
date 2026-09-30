@@ -306,6 +306,74 @@ fn lab_tools_env_enabled() -> bool {
     false
 }
 
+/// Appended to every read tool's description. Each response, read or write,
+/// appends one metadata-only receipt to the local egress log before it is sent
+/// (`agent_delivery.rs`); the receipt holds fingerprints and counts, never rows.
+/// So a read changes nothing in Tally and nothing the user acts on, but it is
+/// not free of a local write, and the description says so.
+pub(super) const READ_RECEIPT_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
+const BUILD_IMPORT_SENTENCE: &str = "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally.";
+const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally.";
+const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally.";
+const ACKNOWLEDGE_SENTENCE: &str = "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally.";
+
+/// What a shipped (non-lab) tool does beyond answering, which decides its MCP
+/// annotations. A host reads an absent annotation as "not read-only,
+/// destructive, open-world", so every shipped tool is classified here and a test
+/// requires it. An artifact that changes what a later tool does, admits or
+/// authorises (a prepared import file, parsed proposals, proof files, a verified
+/// baseline, an acknowledgement) is a write; the per-call receipt is audit
+/// metadata no tool decides on, and is not.
+/// Every tool talks only to the loopback Tally and the local folder, so none is
+/// open-world.
+#[derive(Clone, Copy)]
+pub(super) enum ToolEffect {
+    Read,
+    /// Writes a local file the user or a later tool relies on, adding new files
+    /// only; nothing to Tally. The sentence is appended to the description.
+    LocalWrite(&'static str),
+    /// As `LocalWrite`, but it also replaces a file it wrote earlier (a newer
+    /// verification replaces the batch's saved proof), so the MCP definition of
+    /// "additive updates only" does not hold and it is marked destructive.
+    LocalRewrite(&'static str),
+    /// Posts one voucher into Tally after the native approval.
+    TallyPost,
+}
+
+impl ToolEffect {
+    pub(super) fn of(name: &str) -> Option<Self> {
+        Some(match name {
+            "tally_status" | "list_companies" | "voucher_schema" | "validate_masters"
+            | "outstandings" | "ledger_masters" | "ledger_movement" | "trial_balance"
+            | "profit_and_loss" | "balance_sheet" | "vouchers" | "voucher_presence"
+            | "changed_since" | "read_evidence" | "egress_log" => Self::Read,
+            "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
+            "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
+            "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
+            "acknowledge_post_review" => Self::LocalRewrite(ACKNOWLEDGE_SENTENCE),
+            "post_import" => Self::TallyPost,
+            _ => return None,
+        })
+    }
+
+    fn annotations(self) -> Value {
+        match self {
+            Self::Read => {
+                json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::LocalWrite(_) => {
+                json!({"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::LocalRewrite(_) => {
+                json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
+            }
+            Self::TallyPost => {
+                json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":false})
+            }
+        }
+    }
+}
+
 // Retain the internal schema while bounded change enumeration is unqualified.
 pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
@@ -340,9 +408,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
     Value::Array(
         names
             .into_iter()
-            // Verification is a read-only recovery capability. Keep it
-            // available when Journal generation/posting is disabled so an
-            // uncertain saved batch can still be checked safely.
+            // Verification is a recovery capability: it reads Tally and saves local
+            // proof files, and writes nothing to Tally. Keep it available when
+            // Journal generation/posting is disabled so an uncertain saved batch
+            // can still be checked safely.
             // Parsing a statement only prepares an import, and its summary
             // carries counterparty names, so it is opted into with imports.
             .filter(|name| {
@@ -463,16 +532,17 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object", "additionalProperties": false}),
                     ),
                 };
+                let effect = ToolEffect::of(name);
+                let description = match effect {
+                    Some(ToolEffect::Read) => format!("{description} {READ_RECEIPT_SENTENCE}"),
+                    Some(ToolEffect::LocalWrite(sentence) | ToolEffect::LocalRewrite(sentence)) => {
+                        format!("{description} {sentence}")
+                    }
+                    Some(ToolEffect::TallyPost) | None => description.to_string(),
+                };
                 let mut tool = json!({"name": name, "description": description, "inputSchema": input_schema});
-                if name == "post_import" {
-                    tool["annotations"] = json!({"readOnlyHint":false,"destructiveHint":true,"idempotentHint":false,"openWorldHint":true});
-                }
-                if name == "acknowledge_post_review" {
-                    // It writes one local record and nothing to Tally.
-                    tool["annotations"] = json!({"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":true});
-                }
-                if name == "parse_bank_statement" {
-                    tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false});
+                if let Some(effect) = effect {
+                    tool["annotations"] = effect.annotations();
                 }
                 if name == "lab_read_inventory" {
                     tool["annotations"] = json!({"readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true});

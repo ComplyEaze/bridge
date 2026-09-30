@@ -369,8 +369,9 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 
 ## Voucher-file preparation and verification
 
-The MCPB extension exposes `verify_import` by default as a read-only recovery
-tool, and `build_import_xml` by default because it always sets
+The MCPB extension exposes `verify_import` by default as a recovery tool (it
+reads Tally, saves local proof files and writes nothing to Tally), and
+`build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
 Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
@@ -882,7 +883,7 @@ sent directly as Tally's upsert key. Reused labels in independent batches theref
 have different wire identities, so rebuilding after losing the batch journal
 creates a new identity and does not deduplicate the business event.
 
-**An unknown outcome requires read-only reconciliation for every voucher type.**
+**An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not
 re-import or rebuild the same business event, including a `Journal`. The
 controlled repeat observation returned `CREATED=0, ALTERED=1` and left one

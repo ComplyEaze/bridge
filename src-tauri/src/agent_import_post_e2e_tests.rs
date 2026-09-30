@@ -3516,6 +3516,7 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
         step.contains("build the batch again and Bridge checks the book again"),
         "{step}"
     );
+    assert!(step.contains("never change a row"), "{step}");
     assert_eq!(
         refused["structuredContent"]["result"]["attempt_recorded"], false,
         "{refused}"

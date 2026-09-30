@@ -543,7 +543,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    regular one (an optional or post-dated one is the user's call) and the same
    bank row, and leave the row out. If the voucher cannot be found, build the
    batch again so Bridge checks the book again (it refuses again if the voucher
-   is there): the row is not entered by hand on a failed search. Only a
+   is there): the row is not entered by hand on a failed search, and if it is refused again the user decides; a row is never changed to get it past the check. Only a
    genuinely different transaction that shares the fingerprint of a voucher
    that was opened and confirmed is entered in Tally by hand. Build the other
    rows again so they post; a rebuilt batch can be refused again, naming rows

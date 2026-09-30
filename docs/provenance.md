@@ -30,9 +30,21 @@ contain customer data in release artifacts.
   diagnostic tooling contributed under Apache-2.0; no upstream implementation
   is copied into them.
 - `src-tauri/app-icon.svg` is the project-authored source icon contributed by
-  the repository owner under Apache-2.0.
+  the repository owner under Apache-2.0. It is the ComplyEaze Bridge mark: the
+  "y" of ComplyEaze drawn as an auditor's tick, on a cobalt tile. It was drawn
+  geometrically for the owner in September 2026; no stock artwork and no AI
+  image generator was used.
 - Raster, ICO, and ICNS files under `src-tauri/icons/` are generated derivatives
-  of that vector source and carry the same project license.
+  of that vector source and carry the same project license. The 16 px entries
+  of `icon.ico` and `icon.icns` are rendered from `docs/brand/svg/favicon.svg`,
+  the same mark drawn on the 16 px grid.
+- `docs/brand/svg/` holds the brand masters (wordmark, lockups, icon tiles and
+  favicons), contributed by the repository owner under Apache-2.0. Their letters
+  are the Outfit typeface (Copyright 2021 The Outfit Project Authors, SIL Open
+  Font License 1.1) converted to outlines; no font file is distributed.
+  Apache-2.0 grants no trademark rights (section 6): the ComplyEaze and
+  ComplyEaze Bridge names and marks remain the owner's, and
+  `docs/brand/README.md` states how they may be used.
 - Tally XML and JSON files under `src-tauri/crates/tally-protocol-simulator/`
   and `src-tauri/crates/bridge-tally-protocol/tests/fixtures/` are
   project-authored synthetic interoperability fixtures contributed under

@@ -453,6 +453,8 @@ pub(crate) enum UnderLockRefusal {
     RemoteIdReused,
     #[error("import_batch_changed")]
     BatchChanged,
+    #[error("import_txn_already_posted")]
+    TxnAlreadyPosted,
 }
 
 impl UnderLockRefusal {
@@ -462,6 +464,7 @@ impl UnderLockRefusal {
             Self::AlreadyAttempted => "import_already_attempted",
             Self::RemoteIdReused => "import_remote_id_reused",
             Self::BatchChanged => "import_batch_changed",
+            Self::TxnAlreadyPosted => "import_txn_already_posted",
         }
     }
 }

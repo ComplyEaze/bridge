@@ -152,6 +152,7 @@ async fn refusal(
             &identity,
             DateBoundaryProfile::ModeAgnostic,
             assertion,
+            &TallyDate::parse("20990101").unwrap(),
         ),
     )
     .await

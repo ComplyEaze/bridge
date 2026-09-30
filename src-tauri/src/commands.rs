@@ -333,18 +333,18 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
 /// Adds report context only after the shared runtime mapper has removed
 /// transport and internal details from the operator-facing text.
 fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
-    // Sized before the master request was sent (#637): not a validation
+    // Sized before any ledger request was sent (#637, #679): not a validation
     // failure, and retrying the unchanged export cannot help.
     if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
-            Some(PartyLedgerMasterSourceValidationError::TooLarge { .. })
+            Some(PartyLedgerMasterSourceValidationError::CatalogueTooLarge { .. })
         )
     }) {
         return tally_command_error(
-            "ledger_masters_too_large",
+            "ledger_catalogue_too_large",
             "Response size",
-            "Bridge withheld the party/ledger master: the compliance read is over the size Bridge will request, because a read of that size has left Tally unable to answer. Bridge sized it by the ledgers a catalogue read counted, or, when the company's master-alteration mark was too high to count within budget, by the mark itself, an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
+            "Bridge withheld the party/ledger master: the company's master-alteration mark is too high for Bridge to count its ledgers within the response limit, and a response past the limit is cut off mid-read, which can leave Tally unable to answer. The mark is an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
             "after_change",
             false,
             "Do not retry the unchanged export: it refuses again.",
@@ -1902,8 +1902,9 @@ async fn export_party_ledger_master_once(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
+    let today = host_today()?;
     let source = runtime
-        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion)
+        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion, today)
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(
@@ -2015,19 +2016,22 @@ async fn fetch_selected_ledger_entries_once(
 fn requested_outstandings_as_of(
     explicit_as_of: Option<TallyDate>,
 ) -> Result<TallyDate, TallyCommandError> {
-    explicit_as_of
-        .map(Ok)
-        .unwrap_or_else(|| TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()))
-        .map_err(|_| {
-            tally_command_error(
-                "current_date_invalid",
-                "Bridge application",
-                "Bridge could not construct today's outstandings date.",
-                "after_change",
-                false,
-                "Check the workstation date and time, then repeat the read-only action.",
-            )
-        })
+    explicit_as_of.map(Ok).unwrap_or_else(host_today)
+}
+
+/// The Bridge host's calendar date: Tally is local to it, so accounting-day
+/// defaults use its calendar rather than UTC's.
+fn host_today() -> Result<TallyDate, TallyCommandError> {
+    TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()).map_err(|_| {
+        tally_command_error(
+            "current_date_invalid",
+            "Bridge application",
+            "Bridge could not construct today's date.",
+            "after_change",
+            false,
+            "Check the workstation date and time, then repeat the read-only action.",
+        )
+    })
 }
 
 #[tauri::command]

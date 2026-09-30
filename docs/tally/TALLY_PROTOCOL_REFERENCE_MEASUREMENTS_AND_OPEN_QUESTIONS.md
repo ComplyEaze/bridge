@@ -639,7 +639,7 @@ sizes nothing, and the result of a counted read says which it was (`ledger_count
 **A company name of 150 characters is stored whole, and a request naming it is handled (bridge#917) — PARTIAL, one company, one release.**
 On 1 Oct 2026, on the licensed 7.1 Silver holding 31 lab companies, the Company collection fetched with `Name, GUID,
 NUMLEDGERS` (the request above, 992 bytes, answered 200 in 18,696 bytes, status 1, 31 rows) gave the lab company its owner
-created with the longest name they could type a `NAME` attribute and a `NAME` element of 150 characters, 150 UTF-8 bytes, equal, with
+says they created with the longest name they could type (the owner's account) a `NAME` attribute and a `NAME` element of 150 characters, 150 UTF-8 bytes, equal, with
 no XML escape. That is the stored length, not Tally's limit: it is the limit only if more was typed and Tally cut it, which
 is UNVERIFIED. A census slice request naming that company in `SVCURRENTCOMPANY` (2,174 bytes, `$AlterID > 0 AND $AlterID <=
 100`) answered 200, status 1, a complete envelope of 4,716 bytes in 0.06 s with the company's two ledgers, each row
@@ -650,11 +650,13 @@ not its name, so a long company name changes the size of the request, not of a r
 **A census row carries the ledger's name twice, or three times for a reserved ledger — PARTIAL, two rows.**
 On the same answer the row of the ledger `Cash` (a 4-character name, `RESERVEDNAME` empty) was 396 characters, a fixed part of
 388 plus two copies of the name, against 391 in the pinned capture (Bridge's constant of 415 keeps its margin over both), and
-the row of `Profit & Loss A/c` (a built-in ledger, 17 characters, `RESERVEDNAME` equal to the name) carried the name
-three times: its `NAME` attribute, its `RESERVEDNAME` attribute and its `NAME` element, 451 characters. Built-in ledgers have
-fixed short names and a name a user gives cannot be reserved, so `2 x (415 + 12 x 128)` (two copies, six characters each)
-still bounds a user-named ledger's row; that a ledger a user named never has a `RESERVEDNAME`, and what an alias adds, are
-not measured. The longest ledger and group names Tally accepts, and whether its limit counts characters or bytes, are not
+the row of `Profit & Loss A/c` (a built-in ledger, 17 characters, 21 once escaped, `RESERVEDNAME` equal to the name) carried the name
+three times: its `NAME` attribute, its `RESERVEDNAME` attribute and its `NAME` element, 451 characters, the same 388 fixed plus three
+copies of the escaped name. If a ledger a user names never has a `RESERVEDNAME` (not measured), `2 x (415 + 12 x 128)` (two
+copies, six characters each) bounds a user-named ledger's row. Not measured: whether a built-in ledger a user renames to a long
+name keeps its `RESERVEDNAME` and so carries three copies (such a row could pass that bound: three copies of a 128-character name
+at six characters each is about 2,300 characters before the fixed part, against the 27 characters of margin between the pinned 415 and the measured
+388), and what an alias adds. The longest ledger and group names Tally accepts, and whether its limit counts characters or bytes, are not
 measured (bridge#917: they need writes to a synthetic company).
 
 **Not established** for the census: that AlterIDs are distinct across a book's ledgers (a slice's row

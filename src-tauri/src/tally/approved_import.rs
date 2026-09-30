@@ -1044,7 +1044,10 @@ pub(crate) mod test_seam {
     #[cfg(windows)]
     #[test]
     fn each_windows_dialog_names_a_batch_by_its_count() {
-        assert_eq!(super::post_question(ONE), "ComplyEaze Bridge — post this voucher?");
+        assert_eq!(
+            super::post_question(ONE),
+            "ComplyEaze Bridge — post this voucher?"
+        );
         assert_eq!(
             super::post_question(count(200)),
             "ComplyEaze Bridge — post 200 vouchers?"
@@ -1349,7 +1352,9 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 fn review_question(count: VoucherCount) -> String {
     match count.batch() {
         None => "ComplyEaze Bridge — record that you reviewed this voucher?".into(),
-        Some(count) => format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?"),
+        Some(count) => {
+            format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?")
+        }
     }
 }
 
@@ -1381,7 +1386,10 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 #[cfg(not(windows))]
 fn post_words(count: VoucherCount) -> (String, String) {
     match count.batch() {
-        None => ("ComplyEaze Bridge — approve one voucher".into(), POST_LABEL.into()),
+        None => (
+            "ComplyEaze Bridge — approve one voucher".into(),
+            POST_LABEL.into(),
+        ),
         Some(count) => (
             format!("ComplyEaze Bridge — approve {count} vouchers"),
             format!("Post {count} vouchers"),

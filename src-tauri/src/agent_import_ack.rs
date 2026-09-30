@@ -678,7 +678,9 @@ fn batch_review_preview(
         "Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed these {} vouchers in Tally.",
         rows.len()
     ));
-    text.push("They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,".into());
+    text.push(
+        "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,".into(),
+    );
     text.push("and the batch still reads reconciliation_required.".into());
     let preview = text.join("\n");
     if text.len() > post::BATCH_REVIEW_MAX_LINES

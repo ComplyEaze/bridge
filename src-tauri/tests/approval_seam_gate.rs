@@ -689,7 +689,10 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
 const POST_WORDS: &str = r#"#[cfg(not(windows))]
 fn post_words(count: VoucherCount) -> (String, String) {
     match count.batch() {
-        None => ("ComplyEaze Bridge — approve one voucher".into(), POST_LABEL.into()),
+        None => (
+            "ComplyEaze Bridge — approve one voucher".into(),
+            POST_LABEL.into(),
+        ),
         Some(count) => (
             format!("ComplyEaze Bridge — approve {count} vouchers"),
             format!("Post {count} vouchers"),
@@ -711,7 +714,9 @@ const REVIEW_QUESTION: &str = r#"#[cfg(windows)]
 fn review_question(count: VoucherCount) -> String {
     match count.batch() {
         None => "ComplyEaze Bridge — record that you reviewed this voucher?".into(),
-        Some(count) => format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?"),
+        Some(count) => {
+            format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?")
+        }
     }
 }"#;
 

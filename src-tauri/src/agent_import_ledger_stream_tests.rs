@@ -490,13 +490,23 @@ fn settlement_counts_sent_and_unsettled_batches() {
     bytes.extend(record(&status("hand_then_posted", "posted_verified")));
     bytes.extend(record(&StatusRecord::dispatch(&hand_then_posted)));
     bytes.extend(record(&response(&hand_then_posted)));
+    // Found posted by a hand import, then a later readback reads incomplete,
+    // never dispatched: still found, so the double-post memory of it counts.
+    let found_then_incomplete = batch("found_then_incomplete", "n");
+    bytes.extend(record(&found_then_incomplete));
+    bytes.extend(record(&status("found_then_incomplete", "posted_verified")));
+    bytes.extend(record(&status(
+        "found_then_incomplete",
+        "verification_incomplete",
+    )));
 
     assert_eq!(
         settlement(Cursor::new(bytes)).unwrap(),
         Settlement {
-            batches: 7,
-            sent_or_found: 6,
+            batches: 8,
+            sent_or_found: 7,
             unsettled: 4,
+            unsettled_no_response: 2,
             never_sent: 1
         }
     );
@@ -506,6 +516,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             batches: 0,
             sent_or_found: 0,
             unsettled: 0,
+            unsettled_no_response: 0,
             never_sent: 0
         }
     );

@@ -55,6 +55,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("lab/x.request.xml"), b"123");
     write(&root.join("native-dispatch-leases/k.lock"), b"");
     write(&root.join("misc/whatever.bin"), b"123456789012345");
+    write(&root.join("imports/.proof-publication/update.json"), b"{}");
     let report = build(root, None);
     assert_eq!(report.root, Root::Present);
     let expect = |name: &str, files: u64, bytes: u64| {
@@ -74,6 +75,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
         report.other_directories, 1,
         "an unknown folder is counted, not entered"
     );
+    assert_eq!(report.interrupted_writes, 1, "the publication folder");
     assert_eq!(report.links + report.unreadable, 0);
 }
 
@@ -197,11 +199,17 @@ fn the_report_changes_nothing_and_takes_no_lock() {
     holder.lock().unwrap();
     let report = build(root, None);
     assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
-    assert!(
-        holder.try_lock().is_ok(),
-        "the report holds nothing: a re-lock by the holder still works"
-    );
     drop(holder);
+    let second = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(root.join("agent-import-admission.lock"))
+        .unwrap();
+    assert!(
+        second.try_lock().is_ok(),
+        "the report keeps no lock: a fresh handle takes it"
+    );
+    drop(second);
     assert_eq!(listing(), before);
     assert!(!root.join("agent-import-ledger.jsonl.tmp").exists());
 }
@@ -223,6 +231,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             batches: 1,
             sent_or_found: 1,
             unsettled: 1,
+            unsettled_no_response: 1,
             never_sent: 0
         })
     );
@@ -233,6 +242,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             batches: 1,
             sent_or_found: 0,
             unsettled: 0,
+            unsettled_no_response: 0,
             never_sent: 1
         })
     );
@@ -296,8 +306,10 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
     assert_eq!(result["classes"]["bank_statements"]["oldest_days"], 40);
     assert_eq!(result["journal"]["state"], "read");
     assert_eq!(result["journal"]["not_settled"], 1);
+    assert_eq!(result["journal"]["not_settled_no_response"], 1);
+    assert_eq!(result["journal"]["not_settled_not_verified"], 0);
     assert_eq!(result["journal"]["built_never_sent"], 0);
-    assert_eq!(result["desktop_app_files_covered"], false);
+    assert_eq!(result["app_files_outside_this_folder_covered"], false);
 
     let refused = server
         .call_tool("local_data_report", serde_json::json!({"path": "/"}))

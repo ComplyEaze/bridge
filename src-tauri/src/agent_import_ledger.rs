@@ -310,15 +310,16 @@ pub(super) fn remote_ids_recorded(
 pub(super) struct Settlement {
     /// Distinct batches in the journal.
     pub(super) batches: usize,
-    /// Batches that were sent to Tally (a dispatch intent) or that a readback
-    /// found posted: the ones the double-post checks look up.
+    /// Batches Bridge sent to Tally (a dispatch intent) or that a readback
+    /// found posted at some point.
     pub(super) sent_or_found: usize,
-    /// Batches with a dispatch intent whose latest status is not
-    /// `posted_verified`, or that have no recorded response.
+    /// Batches with a dispatch intent that are not settled: no recorded
+    /// response, or a response but the latest status is not `posted_verified`.
     pub(super) unsettled: usize,
-    /// Batches that were built and never sent nor found posted. Their saved
-    /// file is what `post_import` would send, so moving or deleting the folder
-    /// strands them.
+    /// Of `unsettled`, the batches with no recorded response.
+    pub(super) unsettled_no_response: usize,
+    /// Batches that were never sent nor found posted. Their saved file is what
+    /// `post_import` would send, so moving or deleting the folder strands them.
     pub(super) never_sent: usize,
 }
 
@@ -328,13 +329,17 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     struct Progress {
         dispatched: bool,
         responded: bool,
+        /// The latest status is `posted_verified`.
         verified: bool,
+        /// A readback found the batch posted at some point.
+        found: bool,
     }
     let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
-            batches.entry(batch.batch_id.clone()).or_default().verified =
-                batch.status == "posted_verified";
+            let progress = batches.entry(batch.batch_id.clone()).or_default();
+            progress.verified = batch.status == "posted_verified";
+            progress.found |= progress.verified;
         }
         Record::Status(update) => {
             let progress = batches.entry(update.batch_id.clone()).or_default();
@@ -347,20 +352,25 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             // `read_snapshot` takes it: a dispatch intent or a response after a
             // hand-import's `posted_verified` makes the batch unverified again.
             progress.verified = update.status == "posted_verified";
+            progress.found |= progress.verified;
         }
     })?;
     let sent_or_found = batches
         .values()
-        .filter(|progress| progress.dispatched || progress.verified)
+        .filter(|progress| progress.dispatched || progress.found)
         .count();
+    let unsettled = batches
+        .values()
+        .filter(|progress| progress.dispatched && !(progress.responded && progress.verified));
     Ok(Settlement {
         batches: batches.len(),
         sent_or_found,
         never_sent: batches.len() - sent_or_found,
-        unsettled: batches
-            .values()
-            .filter(|progress| progress.dispatched && !(progress.responded && progress.verified))
+        unsettled_no_response: unsettled
+            .clone()
+            .filter(|progress| !progress.responded)
             .count(),
+        unsettled: unsettled.count(),
     })
 }
 

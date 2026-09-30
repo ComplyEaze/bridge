@@ -77,11 +77,15 @@ read-only report of what Bridge keeps in its agent data folder: per class
 statements, the egress log, lab files, lock files, other) the file count, bytes
 and the age in days of the oldest file, symlinks it did not follow, and the
 import journal's state: batches, batches sent or found posted, how many of
-those are not settled (no recorded response, or the latest status is not
-`posted_verified`), and batches built and never sent. It reads the journal
+those are not settled (with no recorded response, or with a response but a
+latest status that is not `posted_verified`: a post Tally rejected stays not
+settled), batches built and never sent (not sent by Bridge and never found
+posted), and interrupted-write folders that Bridge must recover before it builds
+or reads. It reads the journal
 without the admission lock, names no file path (the command line adds the
-folder paths only with `--show-paths`), and does not cover the desktop app's own
-files. The journal and the `imports/` folder are Bridge's memory of what it
+folder paths only with `--show-paths`), and does not cover files outside this
+folder (the desktop app's other settings, its mirror database and logs). Its
+own call is logged in the egress log like any tool call. The journal and the `imports/` folder are Bridge's memory of what it
 already sent to Tally: archive the whole folder by moving it, never delete
 them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes

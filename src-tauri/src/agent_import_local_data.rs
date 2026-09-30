@@ -44,6 +44,9 @@ pub(super) struct Report {
     pub(super) links: u64,
     /// Folders the report does not know and did not enter.
     pub(super) other_directories: u64,
+    /// Publication folders in `imports/`: what an interrupted write leaves. Bridge
+    /// refuses to build or read until it has recovered them.
+    pub(super) interrupted_writes: u64,
     /// Entries whose metadata could not be read.
     pub(super) unreadable: u64,
     pub(super) journal: Journal,
@@ -101,6 +104,8 @@ fn import_class(name: &str) -> &'static str {
     }
 }
 
+type ClassOf = fn(&str) -> &'static str;
+
 fn is_link(path: &Path) -> bool {
     fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
 }
@@ -131,7 +136,9 @@ fn scan_directory(
         let name = name.to_string_lossy();
         match fs::symlink_metadata(entry.path()) {
             Ok(metadata) if metadata.is_dir() => {
-                if !known_directories.contains(&&*name) && !name.starts_with('.') {
+                if name == ".proof-publication" || name == ".build-publication" {
+                    report.interrupted_writes += 1;
+                } else if !known_directories.contains(&&*name) {
                     report.other_directories += 1;
                 }
             }
@@ -154,6 +161,7 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         oldest: BTreeMap::new(),
         links: 0,
         other_directories: 0,
+        interrupted_writes: 0,
         unreadable: 0,
         journal: Journal::Absent,
     };
@@ -189,7 +197,7 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         ],
     );
     // A subfolder that is a symlink was counted as a link by the scan above.
-    let subfolders: [(&str, fn(&str) -> &'static str); 3] = [
+    let subfolders: [(&str, ClassOf); 3] = [
         ("imports", import_class),
         ("bank-statements", |_| "bank_statements"),
         ("lab", |_| "lab"),
@@ -289,6 +297,8 @@ pub(super) fn to_json(
             "batches": settlement.batches,
             "sent_or_found_posted": settlement.sent_or_found,
             "not_settled": settlement.unsettled,
+            "not_settled_no_response": settlement.unsettled_no_response,
+            "not_settled_not_verified": settlement.unsettled - settlement.unsettled_no_response,
             "built_never_sent": settlement.never_sent,
         }),
     };
@@ -297,9 +307,10 @@ pub(super) fn to_json(
         "classes": classes,
         "symlinks_not_followed": report.links,
         "other_directories_not_entered": report.other_directories,
+        "interrupted_write_folders": report.interrupted_writes,
         "entries_that_could_not_be_read": report.unreadable,
         "journal": journal,
-        "desktop_app_files_covered": false,
+        "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {
         value["folder_path"] = json!(folder.display().to_string());
@@ -310,7 +321,8 @@ pub(super) fn to_json(
     value
 }
 
-/// The `local_data_report` tool's payload for `root`: no path, nothing changed.
+/// The `local_data_report` tool's payload for `root`: no path, and no file of the
+/// folder is changed (the call itself is logged like any tool call).
 /// The coordination folder is the default one.
 pub(in crate::agent) fn tool_payload(root: &Path) -> serde_json::Value {
     let coordination = crate::local_files::paths::default_dispatch_coordination_dir();

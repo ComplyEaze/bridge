@@ -1352,8 +1352,9 @@ impl Server {
     }
 
     /// What Bridge stores locally, by class: counts, sizes, ages and whether the
-    /// import journal is settled. Reads only Bridge's own data folder, changes
-    /// nothing and names no path: the result enters the AI conversation.
+    /// import journal is settled. Reads only Bridge's own data folder and names
+    /// no path: the result enters the AI conversation. The call is logged in the
+    /// egress log like any tool call.
     fn local_data_report(&self, args: &Value) -> Result<ToolOutcome, String> {
         if args.as_object().is_some_and(|object| !object.is_empty()) {
             return Err("argument_schema_invalid".to_string());

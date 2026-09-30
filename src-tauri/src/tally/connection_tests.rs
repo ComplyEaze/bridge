@@ -85,6 +85,7 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
         DateBoundaryProfile::ModeAgnostic,
         TallyDate::parse("20260401").unwrap(),
         TallyDate::parse("20260731").unwrap(),
+        &TallyDate::parse("20990101").unwrap(),
     )
     .unwrap();
     let requests = [
@@ -165,10 +166,53 @@ fn party_master_snapshot_uses_the_next_common_admissible_boundary() {
         DateBoundaryProfile::ModeAgnostic,
         TallyDate::parse("20260401").unwrap(),
         TallyDate::parse("20260415").unwrap(),
+        &TallyDate::parse("20260930").unwrap(),
     )
     .expect("the derived common boundary is valid");
     assert_eq!(period.to().as_str(), "20260501");
     assert!(period.to() >= &TallyDate::parse("20260415").unwrap());
+}
+
+/// The closing date of the party-master balance snapshot, for a book from
+/// 20260401, by the extent's last voucher date and the host's today (#875).
+fn snapshot_to(last_voucher_date: &str, today: &str) -> String {
+    party_ledger_master_balance_period(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse(last_voucher_date).unwrap(),
+        &TallyDate::parse(today).unwrap(),
+    )
+    .expect("a valid period")
+    .to()
+    .as_str()
+    .to_owned()
+}
+
+#[test]
+fn party_master_snapshot_ends_near_today_when_a_voucher_is_dated_far_ahead() {
+    // A year-5000s last voucher date sits on day 31, so without the clamp it
+    // would pass through unchanged as the closing boundary. The next admissible
+    // boundary after today (30 Sep: the 1st) is what is requested.
+    assert_eq!(snapshot_to("50261231", "20260930"), "20261001");
+    assert_eq!(snapshot_to("20270115", "20260930"), "20261001");
+    // Today on an admissible boundary ends the snapshot there, not on the next one.
+    assert_eq!(snapshot_to("50261231", "20260831"), "20260831");
+}
+
+#[test]
+fn party_master_snapshot_is_unchanged_without_a_later_dated_voucher() {
+    // Last voucher before, on and (a book read years later) well before today:
+    // the clamp changes nothing, including a stray date that is exactly today.
+    assert_eq!(snapshot_to("20260415", "20260930"), "20260501");
+    assert_eq!(snapshot_to("20260930", "20260930"), "20261001");
+    assert_eq!(snapshot_to("20260731", "20990101"), "20260731");
+}
+
+#[test]
+fn party_master_snapshot_never_ends_before_the_books_begin() {
+    // A host clock before `books_from` (a book for a coming year) must not make
+    // an inverted period: the snapshot falls back to the start of the books.
+    assert_eq!(snapshot_to("20260731", "20260325"), "20260401");
 }
 
 #[test]
@@ -1817,77 +1861,174 @@ async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous(
     assert!(post_xml.text.contains("<ID>BridgeCompanyExtent</ID>"));
 }
 
-/// A mark whose master estimate fits is admitted with no count read; one more
-/// needs the count, and past the mark the catalogue can be read within budget
-/// (10,000) it is refused on the mark alone, saying no ledgers were counted
-/// (#637, #668). The limits are the constants' own quotients, so a changed
-/// constant moves them and the test still pins each side of each.
+/// A mark whose master estimate fits is admitted with no count read; any more
+/// is counted first, up to the largest mark whose catalogue fits the response
+/// limit, and past that it is refused before anything is sent, naming the mark
+/// (#637, #668, #679). The limits are the constants' own quotients, so a
+/// changed constant moves them and the test still pins each side of each.
 #[test]
-fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_mark() {
-    let budget = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED;
-    let master_limit = budget / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
-    let count_limit = budget / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
-    assert_eq!((master_limit, count_limit), (4_266, 10_000));
+fn the_compliance_read_admits_by_mark_asks_for_a_count_then_refuses_on_the_catalogue() {
+    let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+        / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
+    let count_limit = super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+        / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
+    assert_eq!((master_limit, count_limit), (4_266, 22_857));
     assert_eq!(
         super::admit_compliance_master_read(master_limit, None).unwrap(),
         super::ComplianceAdmission::Admitted
     );
-    assert_eq!(
-        super::admit_compliance_master_read(master_limit + 1, None).unwrap(),
-        super::ComplianceAdmission::CountFirst
-    );
-    assert_eq!(
-        super::admit_compliance_master_read(count_limit, None).unwrap(),
-        super::ComplianceAdmission::CountFirst
-    );
-    match super::admit_compliance_master_read(count_limit + 1, None) {
-        Err(super::PartyLedgerMasterSourceValidationError::TooLarge {
-            master_alter_id,
-            counted_ledgers,
-            estimated_bytes,
-            budget_bytes,
-        }) => {
-            assert_eq!(master_alter_id, count_limit + 1);
-            assert_eq!(counted_ledgers, None);
-            assert_eq!(
+    for mark in [master_limit + 1, 10_001, 20_000, count_limit] {
+        assert_eq!(
+            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::ComplianceAdmission::CountFirst,
+            "mark {mark}"
+        );
+    }
+    for mark in [count_limit + 1, 1_000_000] {
+        match super::admit_compliance_master_read(mark, None) {
+            Err(super::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
+                master_alter_id,
                 estimated_bytes,
-                (count_limit + 1) * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
-            );
-            assert_eq!(budget_bytes, budget);
+                limit_bytes,
+            }) => {
+                assert_eq!(master_alter_id, mark);
+                assert_eq!(
+                    estimated_bytes,
+                    mark * super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL
+                );
+                assert_eq!(
+                    limit_bytes,
+                    super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+                );
+            }
+            other => panic!("expected a catalogue refusal on the mark, got {other:?}"),
         }
-        other => panic!("expected a size refusal on the mark, got {other:?}"),
     }
 }
 
-/// With a count, the count decides: as many ledgers as fit are admitted and
-/// one more is refused carrying the count and the estimate it produced.
+/// The catalogue is bounded before it is sent because a response past the
+/// transport's cap is cut off mid-read (#679), so the bound must sit under that
+/// cap. A catalogue read of a real book of about 9,500 ledgers came to about
+/// 11.6 MB against a mark of about 20,000, which must still be counted.
 #[test]
-fn a_counted_compliance_read_is_admitted_at_the_master_limit_and_refused_one_over() {
+fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark() {
+    assert!(
+        super::LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED
+            < bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(20_000, None).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+}
+
+/// A book of about a thousand and a half parents, most with a single ledger,
+/// is planned into eight parts by ledger count, not refused for its
+/// parent count (#679): the shape of a real book of about 9,500 ledgers.
+/// More parts than Bridge will send is refused at the real limits: thirteen
+/// groups of 2,134 ledgers cannot share a part (two are 4,268, over 4,266), so
+/// they need thirteen against a ceiling of twelve.
+#[test]
+fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
+    use bridge_tally_protocol::parent_partition::{
+        ParentObservation, ParentPartition, ParentPartitionError,
+    };
+    let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
+    for parent in 0..13 {
+        for _ in 0..2_134 {
+            let index = rows.len();
+            rows.push((
+                format!("Ledger {index}"),
+                format!("guid-{index}"),
+                Some(format!("Parent {parent}")),
+            ));
+        }
+    }
+    let error = ParentPartition::plan(
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        }),
+        super::parent_partition_limits(),
+    )
+    .unwrap_err();
+    assert_eq!(error, ParentPartitionError::TooManyParts { parts: 13 });
+    assert_eq!(error.safe_code(), "parent_partition_too_many_parts");
+}
+
+#[test]
+fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
+    let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
+    let mut add = |parent: String, count: usize| {
+        for _ in 0..count {
+            let index = rows.len();
+            rows.push((
+                format!("Ledger {index}"),
+                format!("guid-{index}"),
+                Some(parent.clone()),
+            ));
+        }
+    };
+    for (index, count) in [2_000, 1_900, 1_500].into_iter().enumerate() {
+        add(format!("Big Parent {index}"), count);
+    }
+    for index in 0..1_350 {
+        add(format!("Small Parent {index}"), 3);
+    }
+    let partition = ParentPartition::plan(
+        rows.iter().map(|(name, guid, parent)| {
+            (
+                name.as_str(),
+                guid.as_str(),
+                ParentObservation::from(parent.as_deref()),
+            )
+        }),
+        super::parent_partition_limits(),
+    )
+    .unwrap();
+    let limits = super::parent_partition_limits();
+    assert!(partition.parts().len() <= 8, "{}", partition.parts().len());
+    let mut ledgers = 0;
+    let mut parents = 0;
+    for part in partition.parts() {
+        assert!(part.ledger_count() <= limits.max_ledgers_per_part);
+        assert!(part.parents().len() <= limits.max_parents_per_part);
+        ledgers += part.ledger_count();
+        parents += part.parents().len();
+    }
+    assert_eq!((ledgers, parents), (rows.len() as u64, 1_353));
+}
+
+/// A parent-partition refusal surfaces under its own safe code, so an agent
+/// can tell "one parent is too large" from a validation failure (#679).
+#[test]
+fn a_parent_partition_refusal_keeps_its_own_safe_code() {
+    use bridge_tally_protocol::parent_partition::ParentPartitionError;
+    let error = super::PartyLedgerMasterSourceValidationError::ParentPartition {
+        source: ParentPartitionError::ParentOverBudget { ledgers: 4_267 },
+    };
+    assert_eq!(error.safe_code(), "parent_over_budget");
+}
+
+/// With a count, the count decides: as many ledgers as fit are admitted whole
+/// and one more is read in parts, whatever the mark (#679).
+#[test]
+fn a_counted_compliance_read_is_whole_at_the_master_limit_and_in_parts_one_over() {
     let master_limit = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
         / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
-    assert_eq!(
-        super::admit_compliance_master_read(9_000, Some(master_limit)).unwrap(),
-        super::ComplianceAdmission::Admitted
-    );
-    match super::admit_compliance_master_read(9_000, Some(master_limit + 1)) {
-        Err(super::PartyLedgerMasterSourceValidationError::TooLarge {
-            master_alter_id,
-            counted_ledgers,
-            estimated_bytes,
-            budget_bytes,
-        }) => {
-            assert_eq!(master_alter_id, 9_000);
-            assert_eq!(counted_ledgers, Some(master_limit + 1));
-            assert_eq!(
-                estimated_bytes,
-                (master_limit + 1) * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
-            );
-            assert_eq!(
-                budget_bytes,
-                super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
-            );
-        }
-        other => panic!("expected a size refusal on the count, got {other:?}"),
+    for mark in [9_000, 1_000_000] {
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(master_limit)).unwrap(),
+            super::ComplianceAdmission::Admitted
+        );
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(master_limit + 1)).unwrap(),
+            super::ComplianceAdmission::InParts
+        );
     }
 }
 

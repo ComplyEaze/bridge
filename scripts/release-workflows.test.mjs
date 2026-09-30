@@ -144,6 +144,133 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   assert.match(incomplete.stderr, /no installable mcp-preview release/);
 });
 
+// Runs the summary step's own shell in a shallow clone, as the deploy job's checkout is, with `gh`
+// replaced by a function that answers the two Deployments API reads the step makes by applying the
+// step's real --jq filters to fixtures. `deployments` is newest first: each has the commit it
+// deployed ("self" is the commit being deployed, "first" an earlier one, "unknown" one that cannot
+// be fetched) and its statuses, newest first.
+function runSiteSummaryStep(run, { deployments, changeSite }) {
+  const dir = mkdtempSync(join(tmpdir(), "bridge-site-summary-"));
+  const env = { PATH: process.env.PATH, HOME: dir, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (cwd, ...args) => {
+    const result = spawnSync("git", args, { cwd, encoding: "utf8", env });
+    assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+  const origin = join(dir, "origin");
+  const seed = join(dir, "seed");
+  mkdirSync(seed);
+  git(seed, "init", "-q", "-b", "master");
+  mkdirSync(join(seed, "site"));
+  writeFileSync(join(seed, "site", "index.html"), "<p>one</p>\n");
+  git(seed, "add", ".");
+  git(seed, "commit", "-q", "-m", "first");
+  const first = git(seed, "rev-parse", "HEAD");
+  writeFileSync(join(seed, "README.md"), "outside site\n");
+  if (changeSite) writeFileSync(join(seed, "site", "index.html"), changeSite);
+  git(seed, "add", ".");
+  git(seed, "commit", "-q", "-m", "second");
+  const second = git(seed, "rev-parse", "HEAD");
+  git(dir, "clone", "-q", "--bare", seed, origin);
+  git(origin, "config", "uploadpack.allowAnySHA1InWant", "true");
+  const work = join(dir, "work");
+  git(dir, "clone", "-q", "--depth=1", `file://${origin}`, work);
+  const shas = { self: second, first, unknown: "0123456789abcdef0123456789abcdef01234567" };
+  writeFileSync(join(dir, "deployments.json"), JSON.stringify(deployments.map((deployment, index) => ({ id: 900 + index, sha: shas[deployment.sha] }))));
+  deployments.forEach((deployment, index) => writeFileSync(join(dir, `statuses-${900 + index}.json`), JSON.stringify(deployment.states.map((state) => ({ state })))));
+  deployments.forEach((deployment, index) => deployment.failsAfterPrinting && writeFileSync(join(dir, `statuses-${900 + index}.fail`), ""));
+  writeFileSync(join(dir, "summary.md"), "");
+  // Each item is its own page, as `gh api --paginate` prints them with a per-page --jq, so a step
+  // that does not collect every page, or does not pass --paginate, fails here.
+  const script = `gh() { [ "$1" = api ] && [ "$2" = --paginate ] && [ "$4" = --jq ] || exit 97; case "$3" in
+    repos/example/bridge/deployments\\?environment=github-pages\\&per_page=100) jq -c '.[] | [.]' "${dir}/deployments.json" | while IFS= read -r page; do printf '%s' "$page" | jq -r "$5"; done ;;
+    repos/example/bridge/deployments/*/statuses\\?per_page=100) id="\${3#*/deployments/}"; id="\${id%%/*}"; jq -c '.[] | [.]' "${dir}/statuses-\${id}.json" | { while IFS= read -r page; do printf '%s' "$page" | jq -r "$5" || exit 141; sleep 0.01; done; [ ! -e "${dir}/statuses-\${id}.fail" ] || exit 1; } ;;
+    *) exit 97 ;;
+  esac; }\n${run}`;
+  const result = spawnSync("bash", ["-c", script], { cwd: work, encoding: "utf8", env: { ...env, REPOSITORY: "example/bridge", RUNNER_TEMP: dir, GITHUB_SHA: second, GITHUB_STEP_SUMMARY: join(dir, "summary.md") } });
+  const summary = readFileSync(join(dir, "summary.md"), "utf8");
+  rmSync(dir, { recursive: true, force: true });
+  return { status: result.status, stderr: result.stderr, summary };
+}
+
+test("the site summary step is informational, permitted to read deployments, and shows what would go live", async (t) => {
+  if (spawnSync("jq", ["--version"]).status !== 0) {
+    t.skip("jq is not installed on this host; the deploy runner has it");
+    return;
+  }
+  const page = await workflow("../.github/workflows/deploy-install-page.yml");
+  assert.equal(page.permissions.deployments, "read");
+  const summary = step(page.jobs.deploy, "Summarize site changes since the last deploy");
+  assert.equal(summary["continue-on-error"], true, "a failed summary must not stop the deploy");
+  assert.equal(typeof summary["timeout-minutes"], "number", "a hung summary must time out inside the step, where continue-on-error applies");
+  assert.ok(summary["timeout-minutes"] <= 5);
+  assert.equal(summary.if, undefined);
+  const names = page.jobs.deploy.steps.map((candidate) => candidate.name ?? candidate.uses);
+  assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/deploy-pages@")), "the summary is written before the deploy");
+
+  // This job's own deployment already exists and lists first; a failed one never went live.
+  const own = { sha: "self", states: ["queued", "waiting"] };
+  const failed = { sha: "unknown", states: ["failure", "queued"] };
+  const live = { sha: "first", states: ["success", "in_progress", "queued"] };
+
+  const changed = runSiteSummaryStep(summary.run, { deployments: [own, failed, live], changeSite: "<p>two</p>\n```\n" });
+  assert.equal(changed.status, 0, changed.stderr);
+  assert.match(changed.summary, /site\/index\.html/);
+  assert.match(changed.summary, /^-<p>one<\/p>$/m);
+  assert.match(changed.summary, /^\+<p>two<\/p>$/m);
+  assert.doesNotMatch(changed.summary, /outside site|README/, "only site/ is compared, in the file list and the diff");
+  assert.match(changed.summary, /^~~~~diff\n[\s\S]*^\+```\n[\s\S]*^~~~~$/m, "a diff line with a code fence stays inside the summary's fence");
+
+  // An earlier successful deployment of this same commit (a re-run) is not "the last deploy": the
+  // comparison goes on to the first different commit rather than reporting that nothing changed.
+  const rerun = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "self", states: ["success"] }, live], changeSite: "<p>two</p>\n" });
+  assert.equal(rerun.status, 0, rerun.stderr);
+  assert.match(rerun.summary, /^\+<p>two<\/p>$/m, "a successful deployment of this commit is skipped");
+
+  // Only a deployment whose NEWEST status is success went live. An older success under a newer
+  // failure or inactive status (superseded or torn down) is not the last deploy.
+  const superseded = { sha: "unknown", states: ["inactive", "success"] };
+  const notLive = runSiteSummaryStep(summary.run, { deployments: [own, superseded, { sha: "unknown", states: ["failure", "success"] }, live], changeSite: "<p>two</p>\n" });
+  assert.equal(notLive.status, 0, notLive.stderr);
+  assert.match(notLive.summary, /^\+<p>two<\/p>$/m, "an older success under a newer status is skipped, not compared");
+
+  // A `gh` that dies after printing must fail the step (pipefail), which only warns, and must not
+  // read as "nothing to compare" or compare against an older commit.
+  const dies = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "unknown", states: ["success"], failsAfterPrinting: true }, live], changeSite: "<p>two</p>\n" });
+  assert.notEqual(dies.status, 0, "a failed statuses read stops the step; continue-on-error turns that into a warning");
+  assert.equal(dies.summary, "", "nothing is written from a partial read");
+
+  const unchanged = runSiteSummaryStep(summary.run, { deployments: [own, live] });
+  assert.equal(unchanged.status, 0, unchanged.stderr);
+  assert.match(unchanged.summary, /Nothing under `site\/` differs from /);
+  assert.doesNotMatch(unchanged.summary, /~~~~diff/);
+
+  for (const deployments of [[], [own], [own, failed]]) {
+    const none = runSiteSummaryStep(summary.run, { deployments });
+    assert.equal(none.status, 0, none.stderr);
+    assert.match(none.summary, /No earlier successful deployment of another commit was found/);
+  }
+
+  // The last successful deployment can sit far down a long history of failed ones; a first page of
+  // any size would miss it and report nothing to compare.
+  const buried = runSiteSummaryStep(summary.run, { deployments: [own, ...Array.from({ length: 120 }, () => failed), live], changeSite: "<p>two</p>\n" });
+  assert.equal(buried.status, 0, buried.stderr);
+  assert.match(buried.summary, /^\+<p>two<\/p>$/m, "a successful deployment past the first 100 is still found");
+
+  const unfetchable = runSiteSummaryStep(summary.run, { deployments: [own, { sha: "unknown", states: ["success"] }] });
+  assert.equal(unfetchable.status, 0, unfetchable.stderr);
+  assert.match(unfetchable.summary, /could not be fetched, so nothing was compared/);
+
+  const long = runSiteSummaryStep(summary.run, { deployments: [own, live], changeSite: Array.from({ length: 400 }, (_, i) => `<p>line ${i}</p>`).join("\n") + "\n" });
+  assert.equal(long.status, 0, long.stderr);
+  assert.match(long.summary, /The diff is cut at 300 lines of 400 characters/);
+  assert.doesNotMatch(long.summary, /line 399/);
+
+  const wide = runSiteSummaryStep(summary.run, { deployments: [own, live], changeSite: `<p>${"x".repeat(5000)}</p>\n` });
+  assert.equal(wide.status, 0, wide.stderr);
+  assert.ok(wide.summary.length < 3000, `a 5,000-character line is cut, not copied whole (${wide.summary.length})`);
+});
+
 test("publication workflows enforce their parsed trigger, dependency, branch, and platform controls", async () => {
   assertReleaseWorkflow(await workflow("../.github/workflows/release-mcpb-preview.yml"));
   assertInstallPageWorkflow(await workflow("../.github/workflows/deploy-install-page.yml"));

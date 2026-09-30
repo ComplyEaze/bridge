@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
   pages: write
   id-token: write
 
@@ -60,6 +61,54 @@ jobs:
       # failure writes a page that links to the releases; it never stops the deploy.
       - name: Render the changelog page
         run: node scripts/release-notes.mjs page --changelog CHANGELOG.md --template site/changelog.template.html --out site/changelog.html
+      # The page text is a public claim, and a deploy publishes every merged site/ change at once.
+      # This lists what differs from the last successfully deployed commit in the run summary so a
+      # maintainer can read it. This job's own deployment already exists and lists first, and a
+      # failed one never went live, so only a finished successful deployment of another commit
+      # counts. It only informs: a failure or timeout here warns and never stops the deploy.
+      - name: Summarize site changes since the last deploy
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Newest first. --paginate reads every page, so the last successful deployment is found
+          # however many failed or repeated ones sit above it.
+          candidates="$(gh api --paginate "repos/${REPOSITORY}/deployments?environment=github-pages&per_page=100" --jq '.[] | [.id, .sha] | @tsv')"
+          previous=""
+          while read -r id sha; do
+            [ -n "${id}" ] && [ "${sha}" != "${GITHUB_SHA}" ] || continue
+            # Statuses are newest first; sed reads them all, so the first line is the latest state.
+            state="$(gh api --paginate "repos/${REPOSITORY}/deployments/${id}/statuses?per_page=100" --jq '.[].state' | sed -n 1p)"
+            if [ "${state}" = "success" ]; then previous="${sha}"; break; fi
+          done <<< "${candidates}"
+          {
+            echo "### Site text changed since the last deploy"
+            echo
+            if [ -z "${previous}" ]; then
+              echo "No earlier successful deployment of another commit was found, so there is nothing to compare."
+            elif ! git fetch --quiet --depth=1 origin "${previous}"; then
+              echo "The last deployed commit ${previous:0:12} could not be fetched, so nothing was compared."
+            elif git diff --quiet "${previous}" HEAD -- site/; then
+              echo "Nothing under \`site/\` differs from ${previous:0:12}."
+            else
+              echo "Compared with the last deployed commit ${previous:0:12}. Files generated during the deploy, such as the release list and the changelog page, are not compared."
+              echo
+              git diff --stat "${previous}" HEAD -- site/
+              echo
+              echo "Read these lines; site text is a public claim (docs/release-process.md)."
+              echo
+              echo '~~~~diff'
+              git diff --unified=1 "${previous}" HEAD -- site/ > "${RUNNER_TEMP}/site.diff"
+              head -n 300 "${RUNNER_TEMP}/site.diff" | cut -c1-400
+              echo '~~~~'
+              if [ "$(wc -l < "${RUNNER_TEMP}/site.diff")" -gt 300 ]; then
+                echo "The diff is cut at 300 lines of 400 characters; run \`git diff ${previous:0:12} HEAD -- site/\` for the rest."
+              fi
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

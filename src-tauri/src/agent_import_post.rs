@@ -68,8 +68,13 @@ pub(in crate::agent) enum Entry {
     Fresh,
     /// The second pass of a call, from the top, to redeem the approval its
     /// own Join just found, keeping that call's evidence. It may only
-    /// redeem: it never asks, so it can never show a second dialog.
-    RedeemOnly { evidence: Evidence },
+    /// redeem: it never asks, so it can never show a second dialog. It also
+    /// keeps that call's start, so every budget in the second pass is
+    /// measured from the call and not from the pass.
+    RedeemOnly {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What a post's checked body came to: an answer, or an approval its Join
@@ -85,7 +90,10 @@ enum Step {
 /// pass (#725 slice 2.0). The passes run one after the other, never nested.
 pub(in crate::agent) enum Pass {
     Done(ToolOutcome),
-    Redeem { evidence: Evidence },
+    Redeem {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
 }
 
 /// What waiting on a dialog came to.
@@ -251,6 +259,8 @@ impl Server {
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: std::time::Instant,
     ) -> anyhow::Result<String> {
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
         let first = crate::tally::runtime::with_operation_wire_budget(
             self.runtime
                 .read_company_marks_once(self.tally_config(), request.clone()),
@@ -428,11 +438,22 @@ impl Server {
             Pass::Done(outcome) => Ok(outcome),
             // At most one more pass: a redeem-only pass never joins, so it
             // never hands on another redeem.
-            Pass::Redeem { evidence } => {
+            Pass::Redeem {
+                evidence,
+                call_started,
+            } => {
                 #[cfg(test)]
                 let _ = BETWEEN_PASSES.try_with(|between| between());
                 match self
-                    .post_import_entry(args, expected_sha256, scope, Entry::RedeemOnly { evidence })
+                    .post_import_entry(
+                        args,
+                        expected_sha256,
+                        scope,
+                        Entry::RedeemOnly {
+                            evidence,
+                            call_started,
+                        },
+                    )
                     .await?
                 {
                     Pass::Done(outcome) => Ok(outcome),
@@ -452,11 +473,15 @@ impl Server {
         scope: PostScope,
         entry: Entry,
     ) -> Result<Pass, ToolFailure> {
-        let call_started = std::time::Instant::now();
-        let carried = match entry {
-            Entry::Fresh => None,
-            Entry::RedeemOnly { evidence } => Some(evidence),
+        let (carried, call_started) = match entry {
+            Entry::Fresh => (None, std::time::Instant::now()),
+            Entry::RedeemOnly {
+                evidence,
+                call_started,
+            } => (Some(evidence), call_started),
         };
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
@@ -602,6 +627,16 @@ impl Server {
             };
             if recorded {
                 return Err("import_remote_id_reused".to_string().into());
+            }
+            // A row another batch already sent to Tally is refused here too,
+            // before the person is asked to approve it (#876); the check that
+            // binds runs under the exclusive lock as the intent is written.
+            let row_posted = {
+                let _lock = self.lock_import_admission_shared()?;
+                self.import_rows_already_posted_while_admitted(&line)?
+            };
+            if row_posted.is_some() {
+                return Err("import_txn_already_posted".to_string().into());
             }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
@@ -870,6 +905,15 @@ impl Server {
                         {
                             return Err(BeforeDispatchError::Refused(
                                 UnderLockRefusal::BatchChanged,
+                            ));
+                        }
+                        if self
+                            .import_rows_already_posted_while_admitted(&line)
+                            .map_err(BeforeDispatchError::Other)?
+                            .is_some()
+                        {
+                            return Err(BeforeDispatchError::Refused(
+                                UnderLockRefusal::TxnAlreadyPosted,
                             ));
                         }
                         // Spent here, once, under this lock and before the
@@ -1157,6 +1201,7 @@ impl Server {
             Ok(Step::Redeem) => {
                 return Ok(Pass::Redeem {
                     evidence: accumulated,
+                    call_started,
                 })
             }
             Ok(Step::Done(outcome)) => Ok(*outcome),
@@ -1197,6 +1242,19 @@ impl Server {
                     if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
+                }
+                // Name the earlier batch to verify. Both refusal paths land
+                // here; the journal only grows, so a later read finds one unless a later
+                // record of that batch replaced its row set, or the lock or the read failed
+                // (both swallowed here), and then no batch is named.
+                if outcome.payload["result"]["error"]["code"] == "import_txn_already_posted" {
+                    let blocking = snapshot.as_ref().and_then(|current| {
+                        let _lock = self.lock_import_admission_shared().ok()?;
+                        self.import_rows_already_posted_while_admitted(&current.batch)
+                            .ok()
+                            .flatten()
+                    });
+                    name_blocking_batch(&mut outcome.payload, blocking.as_deref());
                 }
                 if let Some(located) = post_location {
                     outcome.payload["result"]["post_location"] = located;
@@ -1336,6 +1394,19 @@ const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its 
 /// The same, when whether the post was sent could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
+/// What a caller does when another batch already sent, or was found to have
+/// posted, a row of this one (#876). Tally's counters for a rejected send are
+/// not proof that the row is absent now, so Bridge never lifts the block itself.
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
+
+fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
+    let Some(id) = blocking else { return };
+    payload["result"]["error"]["blocking_batch_id"] = json!(id);
+    payload["result"]["error"]["next_step"] = json!(format!(
+        "{TXN_ALREADY_POSTED_NEXT_STEP} The earlier batch is {id}."
+    ));
+}
+
 fn reconciliation_failure_payload(
     batch_id: &str,
     attempted: Option<bool>,
@@ -1350,6 +1421,10 @@ fn reconciliation_failure_payload(
     // words that do not claim a send, since verify_import is right either way.
     // A recorded non-attempt (`Some(false)`) offers no step: its message says
     // no attempt was recorded.
+    if code == "import_txn_already_posted" {
+        payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
+        payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
     if code == "tally_endpoint_busy" {
         payload["result"]["error"]["retry_after_s"] =
             json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
@@ -1805,6 +1880,8 @@ tokio::task_local! {
     /// Test-only: run between a call's two passes (#725 slice 2.0), as a
     /// cancel, an expiry or another route's post landing there would.
     pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Test-only: the start each pass of a post call took its budgets from.
+    pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
 }
 
 /// A fresh random REMOTEID for one native post.

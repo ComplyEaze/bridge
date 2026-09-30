@@ -2107,10 +2107,10 @@ fn admit_part<T: WindowRow>(
         // an unhonoured filter or a deletion looks like, more is a creation,
         // and equal counts mean the part returned different vouchers.
         let mut failure = refused(PART_CENSUS_MISMATCH);
-        failure.counts = Some(RowCounts {
+        failure.counts = Some(Box::new(RowCounts {
             returned: observed.len() as u64,
             counted: expected.len() as u64,
-        });
+        }));
         Err(failure)
     }
 }

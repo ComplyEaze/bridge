@@ -51,7 +51,7 @@
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
-      "sha256": "042bc1430186f54aff7cedee5b793c597e7d2a96db4b60936d647092163b83ef"
+      "sha256": "5bbb07c5156eb59f5b6389fa154a71ce76b91127411ab2f0c029586592cc2173"
     },
     {
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md",
@@ -283,7 +283,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs",
-      "sha256": "655ddbe0a10c23f06d32e9977b53106a734e8e0d81e3f29984957ad3aa34dd9a"
+      "sha256": "019b7ca8458d60b57f9ece0106d7005b67f2635198a21af32e6655fa38175ece"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs",
@@ -303,7 +303,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs",
-      "sha256": "ef7deac0bdbe32210b58dbf9ba306038a2b55072d2cfabf36825c7c64b87ac31"
+      "sha256": "7726ed1fc278eeaf723a732652c374cd44037a4d53b7f9f7bd8baad527c17fbb"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/model.rs",
@@ -311,7 +311,7 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/request.rs",
-      "sha256": "20e93e35344ba063c2ac12e81369735c8b9a23283a422121cf4542c7ce71b443"
+      "sha256": "56aa8f7456c30feeb48c6ef436c2b03d0c55dddd62d42fd906b64bd678825bdd"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/wire.rs",
@@ -370,8 +370,12 @@
       "sha256": "58bf5ffef1e877e9c68fa5e1551e56b3fb6b893b76ebd437ac6d03e909814863"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/parent_partition.rs",
+      "sha256": "45e0d99dfab6fbc9660009847658e56559c629e999cfed0a98579556bde12f94"
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs",
-      "sha256": "8450b31d046703d1768cd31f39d7c863490cac68aeebd003799752451d7680ec"
+      "sha256": "b4205356cd2d9496d3105e4b3eba2498135b9f14901a1bda562c8398acadff87"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/text_encoding.rs",
@@ -447,7 +451,7 @@
     },
     {
       "path": "src-tauri/src/agent.rs",
-      "sha256": "052bdfd8d90e238c5977e827901f86c007063ea8a0d0450a5875e35669522c40"
+      "sha256": "8bf56715c7a737545206b3c5683834db1d9ee6322e58dc94a40da7a34ba4bc56"
     },
     {
       "path": "src-tauri/src/agent_bank_statement.rs",
@@ -455,7 +459,7 @@
     },
     {
       "path": "src-tauri/src/agent_catalog.rs",
-      "sha256": "79de7f76d9561f5369635038a20483268c30ce77f7671fb80992f5930d0da086"
+      "sha256": "5a261c9962c24e23efe2eed0bf282af945df6cfa8b5a1968ec1321bd3eea9d0c"
     },
     {
       "path": "src-tauri/src/agent_change_parse.rs",
@@ -599,7 +603,7 @@
     },
     {
       "path": "src-tauri/src/agent_voucher_window.rs",
-      "sha256": "4852786a931fa5d08b8f8307302980ad41cce11dbcbf8b20924cd30df8f1c352"
+      "sha256": "b2b283bf9afc42a43cc69126501e711c230a284d12e19417d86f0bc73fb98eed"
     },
     {
       "path": "src-tauri/src/agent_vouchers.rs",
@@ -611,7 +615,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "85aead264e19b0ebeb00cab935a84a3dbeeaa8cccba23d0bf7b0f0db46041f5c"
+      "sha256": "ddb4adb47481415632f8662790ebe3057ed10b53e50b4e9246aaf8e1024d5dfd"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -939,7 +943,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "985b9f83c95b145e3cede8aff52f96af82871044759d2a7f4eb6266fd0ac8b32"
+      "sha256": "039c21ca9ff9bfd9d363751f9ef3ba784e6295cf2cfc9774f6995259a302c069"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",
@@ -1131,7 +1135,7 @@
     },
     {
       "path": "tools/bridge-tally-compatibility/src/lib.rs",
-      "sha256": "623d31461bf10bc406eee78bae6dc6ba7bbad27ff1f5946461a63e06d27f2738"
+      "sha256": "f232058869783078bb2669b9014fbd1810777d9239f52bc90264e57bc105dc82"
     },
     {
       "path": "tools/bridge-tally-compatibility/src/main.rs",

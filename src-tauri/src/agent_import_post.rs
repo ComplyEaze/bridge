@@ -508,6 +508,8 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
+        // The batch's own transaction ids found already in the book (#901).
+        let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -635,7 +637,11 @@ impl Server {
             // the lease sends before posting (§11c).
             let before = self.verify_import_for_post(args).await?;
             accumulated = combine_evidence(accumulated.clone(), before.evidence);
-            require_absent_verification_result(&before.payload["result"], line.vouchers.len())?;
+            require_absent_verification_result(&before.payload["result"], line.vouchers.len())
+                .map_err(|code| {
+                    preexisting_txn_ids = Some(present_txn_ids(&before.payload["result"]));
+                    code
+                })?;
             let payload = ImportPayload {
                 company_guid: line.company_guid.clone(),
                 vouchers: line.vouchers.clone(),
@@ -1234,6 +1240,9 @@ impl Server {
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
                 }
+                if let Some(ids) = preexisting_txn_ids {
+                    name_preexisting_rows(&mut outcome.payload, &ids);
+                }
                 if let Some(ledgers) = ledgers_changed {
                     name_changed_ledgers(&mut outcome.payload, &ledgers);
                 } else {
@@ -1580,6 +1589,33 @@ fn require_absent_verification_result(result: &Value, voucher_count: usize) -> R
         return Err("import_preexisting_identity".into());
     }
     Ok(())
+}
+
+/// The transaction ids of the batch's vouchers the readback did not find absent
+/// (#901): each already matches a voucher in the book that this batch did not
+/// post.
+fn present_txn_ids(result: &Value) -> Vec<String> {
+    result["vouchers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|voucher| voucher["status"] != "not_found")
+        .filter_map(|voucher| voucher["bridge_txn_id"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// What to do when a batch's rows are already in the book, or look like rows
+/// that are (#901). It names no amount, ledger or narration.
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each match a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Confirm from the statement whether each is a different bank row. If it is the same row it is already in the book: leave it out. If it is a different row that only looks the same (two same-day payments of one amount to one ledger), leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+
+/// Name the rows of the batch that are already in the book, with the way on.
+fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
+    if txn_ids.is_empty() {
+        return;
+    }
+    let error = &mut payload["result"]["error"];
+    error["preexisting_txn_ids"] = json!(txn_ids);
+    error["next_step"] = json!(PREEXISTING_ROWS_NEXT_STEP);
 }
 
 /// The aim check on the snapshot the queue read last before the POST (#574).

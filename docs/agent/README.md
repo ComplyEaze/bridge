@@ -533,7 +533,15 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    (it may be under a new name) with `validate_masters` before building again.
    A batch built before this record existed is refused with
    `import_batch_predates_ledger_binding`, before any Tally request; build it
-   again. Any other read inside the queue that fails before the post is refused
+   again. Before approval, the post reads the book and refuses a batch with
+   `import_preexisting_identity` when any of its vouchers already matches a
+   voucher in the book that it did not post (an earlier batch's twin, or one
+   entered by hand). `error.preexisting_txn_ids` names those rows; nothing is
+   sent and no attempt is recorded. Confirm from the statement whether each is
+   a different bank row; leave it out, enter a different one in Tally by hand,
+   and build the other rows again so they post. Cut inline batches on whole
+   days, so same-day rows of one amount are not split across batches. The same
+   refusal inside the queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
    the post can be re-run. Checked under the admission lock as the attempt is
    about to be recorded, a batch no longer in the journal, already attempted,

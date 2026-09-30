@@ -3459,3 +3459,64 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
         );
     }
 }
+
+/// A voucher the book already holds that matches the saved batch's row by
+/// accounting fingerprint (date, type, ledgers, amounts, sides) but was posted by
+/// no batch of this journal: entered by hand, before the batch's pre-import mark.
+fn a_hand_entered_twin_of_the_saved_row() -> String {
+    format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <VOUCHER REMOTEID=\"{GUID}-00000005\"><DATE>20260901</DATE><VOUCHERNUMBER>5</VOUCHERNUMBER>\
+         <VOUCHERTYPENAME>Journal</VOUCHERTYPENAME><GUID>{GUID}-00000005</GUID><MASTERID>5</MASTERID>\
+         <ALTERID>5</ALTERID><NARRATION>Entered by hand</NARRATION>\
+         <ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>Cash</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+    )
+}
+
+/// The reads up to the absence check, on a book that already holds the twin.
+fn before_approval_on_a_book_holding_a_twin() -> Vec<ScenarioPlan> {
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(a_hand_entered_twin_of_the_saved_row()));
+    plans.extend(paired(a_hand_entered_twin_of_the_saved_row()));
+    plans.extend(probe());
+    plans
+}
+
+/// A batch one of whose rows the book already holds is refused before the dialog
+/// and names that row, with the way on (#901). Before, the answer was a bare
+/// code an agent could not act on.
+#[tokio::test]
+async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_a_book_holding_a_twin()))
+            .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    let refused = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert_eq!(
+        error["preexisting_txn_ids"],
+        json!(["journal-583"]),
+        "{refused}"
+    );
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.contains("preexisting_txn_ids"), "{step}");
+    assert!(step.contains("on whole days"), "{step}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["attempt_recorded"], false,
+        "{refused}"
+    );
+    assert!(String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .all(|record| !record.contains("dispatch_intent")));
+}

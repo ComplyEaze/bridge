@@ -2483,3 +2483,33 @@ fn an_unreadable_batch_record_keeps_the_step_pending_and_blocks_the_baseline() {
     server.record_masters_verdict_for("batch-c", json!({"state":"unchanged"}), true);
     assert!(super::super::read_verified_baseline_for(&imports, "batch-c", 2).is_some());
 }
+
+/// Only the rows the readback did not find absent are named, by their ids alone.
+#[test]
+fn only_present_rows_are_named_and_a_clean_result_names_none() {
+    let result = json!({"vouchers":[
+        {"bridge_txn_id":"t1","status":"not_found"},
+        {"bridge_txn_id":"t2","status":"not_attributable","marker":"accounting_fingerprint"},
+        {"bridge_txn_id":"t3","status":"duplicate_fingerprint","matches":2},
+        {"status":"posted_verified"},
+    ]});
+    assert_eq!(present_txn_ids(&result), ["t2", "t3"]);
+    assert!(
+        present_txn_ids(&json!({"vouchers":[{"bridge_txn_id":"t1","status":"not_found"}]}))
+            .is_empty()
+    );
+    assert!(present_txn_ids(&json!({})).is_empty());
+
+    let mut payload = json!({"result":{"error":{"code":"import_preexisting_identity"}}});
+    name_preexisting_rows(&mut payload, &[]);
+    assert!(payload["result"]["error"].get("next_step").is_none());
+    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()]);
+    assert_eq!(
+        payload["result"]["error"]["preexisting_txn_ids"],
+        json!(["t2", "t3"])
+    );
+    assert!(payload["result"]["error"]["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("error.preexisting_txn_ids"));
+}

@@ -486,7 +486,15 @@ async fn the_marks_readback_after_a_post_waits_on_a_budget_of_its_own() {
             .await;
         assert!(busy(spent));
         let started = Instant::now();
-        let after = server.read_marks_after_post(request()).await;
+        // A call with no time left, so this measures one budget.
+        let after = server
+            .read_marks_after_post(
+                request(),
+                Instant::now()
+                    .checked_sub(Duration::from_secs(44))
+                    .unwrap_or_else(Instant::now),
+            )
+            .await;
         assert!(busy(after));
         assert!(
             started.elapsed() >= budget,
@@ -494,6 +502,155 @@ async fn the_marks_readback_after_a_post_waits_on_a_budget_of_its_own() {
         );
     })
     .await;
+}
+
+/// The retry of the marks readback after a sent post (#884) never stretches
+/// the call past its ceiling: whatever has elapsed, what elapsed, the wait and
+/// the rest of the post fit under it, and a call with little left retries not
+/// at all. The slowest measured live post took about 21 s from its answer.
+#[test]
+fn the_after_read_retry_budget_keeps_the_call_under_its_ceiling() {
+    use std::time::Duration;
+    let policy = bridge_tally_transport::WireRetryPolicy::DEFAULT.total();
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(18), policy),
+        Some(policy)
+    );
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(25), policy),
+        Some(Duration::from_secs(7))
+    );
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(31), policy),
+        Some(Duration::from_secs(1))
+    );
+    for elapsed in [Duration::from_millis(31_001), Duration::from_secs(90)] {
+        assert_eq!(after_read_retry_budget(elapsed, policy), None);
+    }
+    for millis in (0..=60_000).step_by(50) {
+        let elapsed = Duration::from_millis(millis);
+        if let Some(budget) = after_read_retry_budget(elapsed, policy) {
+            assert!(budget <= policy && budget >= AFTER_READ_MIN_RETRY_WAIT);
+            assert!(elapsed + budget + AFTER_READ_REST_OF_POST <= approval::CALL_CEILING);
+        }
+    }
+    assert!(approval::CALL_CEILING + Duration::from_secs(10) <= Duration::from_secs(60));
+}
+
+/// A busy wire lock on the marks readback after a sent post is tried once
+/// more, on a fresh wait budget (#884): a lock freed after the first budget
+/// but within the second is not a lasting doubt. A lock that stays held is
+/// still refused, once, after both waits; a call with no time left retries
+/// nothing. The port has nothing listening, so a read that gets through the
+/// wire fails as a connection failure, which is how it shows here.
+#[tokio::test]
+async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
+    use crate::endpoint_wire::{wire_refusal, FileWireGate};
+    use bridge_tally_transport::{TallyWireGate, WireRefusal, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let budget = Duration::from_millis(600);
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire.clone());
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let hold = || {
+        FileWireGate::new(wire.root().clone(), endpoint.clone())
+            .try_acquire()
+            .unwrap()
+    };
+    let busy = |result: &anyhow::Result<String>| {
+        wire_refusal(result.as_ref().expect_err("the read sends nothing"))
+            == Some(WireRefusal::Busy)
+    };
+
+    // Freed after the first budget, inside the second: the retry gets through.
+    let held = hold();
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(budget + Duration::from_millis(300)).await;
+        drop(held);
+    });
+    let started = Instant::now();
+    let result = server
+        .read_marks_after_post(request(), Instant::now())
+        .await;
+    assert!(started.elapsed() >= budget);
+    assert!(!busy(&result), "the retry must reach the wire: {result:?}");
+    release.await.unwrap();
+
+    // Held throughout: refused once, after both budgets, never a third.
+    let _held = hold();
+    let started = Instant::now();
+    let result = server
+        .read_marks_after_post(request(), Instant::now())
+        .await;
+    assert!(busy(&result));
+    assert!(started.elapsed() >= budget * 2);
+    assert!(started.elapsed() < budget * 3);
+
+    // A call with no time left waits its first budget and nothing more.
+    let spent = Instant::now()
+        .checked_sub(Duration::from_secs(44))
+        .unwrap_or_else(Instant::now);
+    let started = Instant::now();
+    let result = server.read_marks_after_post(request(), spent).await;
+    assert!(busy(&result));
+    assert!(started.elapsed() >= budget && started.elapsed() < budget * 2);
+}
+
+/// A marks readback that failed after a sent post is named in the recorded
+/// step doubt (#884): the doubt says the read was held back, and the verdict
+/// stays doubt.
+#[test]
+fn a_failed_marks_readback_is_named_in_the_step_doubt() {
+    let refused = anyhow::Error::new(bridge_tally_transport::TallyTransportError::WireRefused {
+        refusal: bridge_tally_transport::WireRefusal::Busy,
+    })
+    .context("marks readback");
+    assert_eq!(after_read_cause(&refused), "tally_endpoint_busy");
+    assert_eq!(
+        after_read_cause(&anyhow::anyhow!("something else")),
+        "marks_readback_failed"
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let server = records_server(directory.path());
+    server.record_post_checks_pending("batch-a", true).unwrap();
+    server.record_batch_step_verdict_caused("batch-a", &Value::Null, Some("tally_endpoint_busy"));
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(super::super::batch_step_doubt_path(&imports, "batch-a")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["state"], "unmatched");
+    assert_eq!(doubt["cause"], "tally_endpoint_busy");
+    let recorded = server.record_masters_verdict_for("batch-a", json!({"state":"unchanged"}), true);
+    assert_eq!(
+        post_doubt(Some(&recorded), 2).map(|(code, _)| code),
+        Some("batch_step_unconfirmed")
+    );
+    // A verdict with no cause carries none.
+    let other = tempfile::tempdir().unwrap();
+    let server = records_server(other.path());
+    server.record_post_checks_pending("batch-b", true).unwrap();
+    server.record_batch_step_verdict_caused("batch-b", &Value::Null, None);
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(super::super::batch_step_doubt_path(
+            &server.imports_dir().unwrap(),
+            "batch-b",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(doubt.get("cause").is_none());
 }
 
 #[test]

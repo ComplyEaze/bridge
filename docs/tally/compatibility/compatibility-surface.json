@@ -615,7 +615,7 @@
     },
     {
       "path": "src-tauri/src/commands.rs",
-      "sha256": "f617cf7482c3b97c4cf3f98d0eca8378b7a91c542e316fef4a16a0a2f0718fb9"
+      "sha256": "ddb4adb47481415632f8662790ebe3057ed10b53e50b4e9246aaf8e1024d5dfd"
     },
     {
       "path": "src-tauri/src/commands_trial_balance.rs",
@@ -943,7 +943,7 @@
     },
     {
       "path": "src-tauri/src/tally/connection.rs",
-      "sha256": "f198dffc84f7dac7f7b4a200e110db5d8d74ffdb746566fde8d4715067f7ba4c"
+      "sha256": "039c21ca9ff9bfd9d363751f9ef3ba784e6295cf2cfc9774f6995259a302c069"
     },
     {
       "path": "src-tauri/src/tally/connector.rs",

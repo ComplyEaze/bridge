@@ -514,3 +514,32 @@ fn an_unallocated_row_carries_its_composition_and_opening_through_the_json_and_r
     // The party name is what redaction masks; the composition fields stay.
     assert_ne!(json["party"], "Synthetic Debtor");
 }
+
+#[test]
+fn the_outstandings_description_says_what_decides_receivable_and_payable() {
+    // Tally's Bills Receivable and Bills Payable reports scope by the sign of each
+    // bill's balance and carry no bill type, so a customer's advance lands under
+    // payable. A reader who takes "payable" as "owed to suppliers" is wrong by
+    // the advances and credit notes; the description is what an agent reads.
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "follow the sign of each bill's balance",
+        "not the type of party",
+        "a customer's advance or a credit note raised to a customer appears under payable",
+        "a supplier's advance or a debit note raised to a supplier under receivable",
+        "That holds for an advance or a note kept as its own bill",
+        "an on-account advance goes to the unallocated figure instead",
+        "a credit note set against an open invoice reduces that invoice",
+        "Measured on one synthetic book (TallyPrime Silver 7.1)",
+        "Read a bill's `kind` as a direction",
+        "net into one figure",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}

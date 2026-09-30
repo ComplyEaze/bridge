@@ -1277,6 +1277,9 @@ pub(crate) struct PartyLedgerMasterListing {
         Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
     /// Base-currency ledgers set aside because a balance is a currency composite.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted the book was checked against the
+    /// company's own ledger count (#938); `None` when no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
     /// The master request's SVFROMDATE (the admitted BOOKSFROM).
     pub(crate) opening_as_of: TallyDate,
     pub(crate) extent: CompanyBookExtent,
@@ -3332,6 +3335,7 @@ impl TallyRuntime {
         let groups = source.groups.clone();
         let foreign = source.foreign_currency_ledgers_excluded.clone();
         let mixed = source.mixed_currency_ledgers_excluded.clone();
+        let count_cross_check = source.count_cross_check;
         // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
         let opening_as_of = source.from.clone();
         let records = source
@@ -3352,6 +3356,7 @@ impl TallyRuntime {
             groups,
             foreign_currency_ledgers_excluded: foreign,
             mixed_currency_ledgers_excluded: mixed,
+            count_cross_check,
             opening_as_of,
             extent,
             evidence,

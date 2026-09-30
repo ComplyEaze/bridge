@@ -50,6 +50,8 @@ exist.
 - **A source build turns writing off by default.** Preparing a file needs
   `BRIDGE_AGENT_ENABLE_IMPORT`; posting additionally needs
   `BRIDGE_AGENT_ENABLE_WRITES`, which grants both.
+- **A source build also needs `BRIDGE_TERMS_ACCEPTED=true`.** The extension asks
+  for that as its "I accept" setting; without it every tool refuses.
 
 With writing on:
 

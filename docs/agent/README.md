@@ -8,7 +8,7 @@ The developer configuration below remains for supported client integrations.
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
 parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the two limits under *Approved voucher posting* below;
+off by default because of the three limits under *Approved voucher posting* below;
 the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
 separate native approval for each new attempt. Command-line installations
 retain explicit environment switches.
@@ -18,6 +18,17 @@ Build and run it with Rust 1.96:
 ```sh
 rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
 ```
+
+Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
+(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
+is on, Bridge appends a line per terms version (version, time, source) to
+`terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
+can each add one), and refuses if that file cannot be read or written. This is a local
+record that the gate opened, not a security boundary and not proof of who accepted, when
+they ticked the box, or which text they saw. A value of `true` set by hand names no
+version, so it also opens the gate for a later terms version: re-read the Terms whenever
+the version changes.
 
 Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
@@ -54,23 +65,25 @@ Claude Desktop example:
   "mcpServers": {
     "bridge-tally": {
       "command": "/absolute/path/to/bridge_mcp",
-      "env": {"BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
+      "env": {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
     }
   }
 }
 ```
 
-Cursor uses the same server object in `.cursor/mcp.json`:
+Cursor uses the same server object in `.cursor/mcp.json`, with the same
+`BRIDGE_TERMS_ACCEPTED` setting:
 
 ```json
-{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp"}}}
+{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
 `balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. For a command-line
+`egress_log`. (`profit_and_loss` and `balance_sheet` are in source but not in
+the 0.3.0 release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -124,7 +137,17 @@ an empty slice is the answer a closed or absent company gives too) or a slice pa
 limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
 read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
 would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
-count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. After the
+slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
+(`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
+higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
+company or held something other than a plain number; a count that is equal, lower or absent never admits
+or sizes anything, and the
+result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
+`company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
+on three books only (one synthetic with its answer captured in the tree, two real books read by
+another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
 census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
@@ -419,8 +442,10 @@ The four rest on different observations, and each build reports its own in
   Account, and a build that names a counterparty warns so.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file, and only an unnumbered single-voucher
-`Journal` batch is eligible for native posting.
+licence mode, or manually imported file. In the MCPB extension an unnumbered
+Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
+per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
+that turns that on.
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -496,7 +521,8 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal dispatch. Unsupported:
+selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
 not live-Tally qualification or a claim that every Tally configuration or
@@ -670,7 +696,9 @@ its separate checks cannot lock out Tally UI edits or other importers. Concurren
 external changes are outside this preview's validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
-approval. If dispatch has already begun, cancellation cannot undo Tally's
+approval. (The tool call itself returns "approval pending" after about 40 seconds
+and the dialog stays open (for up to the two minutes); calling `post_import`
+again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.
@@ -904,6 +932,22 @@ parts add up to the totals. A row saved without a composition (older saved data)
 counts under `composition_not_observed`, which appears only when such a row exists.
 Each row is about 100 bytes wider than before, so under a byte cap a page can now
 hold fewer rows and `next_offset` can move; no figure changes.
+
+`receivable` and `payable` follow the sign of each bill's balance, as Tally's own
+Bills Receivable and Bills Payable reports scope them, not the type of party, and
+those reports carry no bill type. A customer's advance, or a credit note raised to
+a customer, appears under `payable`; a supplier's advance, or a debit note raised
+to a supplier, appears under `receivable`. That holds for an advance or a note
+kept as its own bill: an on-account advance goes to `unallocated` instead, and a
+credit note set against an open invoice reduces that invoice. It was measured on one
+synthetic book (TallyPrime Silver 7.1). An open bill's `kind` is therefore a
+direction, not "owed by a customer" or "owed to a supplier": with a 50,000
+supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
+`payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
+of an `unallocated` amount is the sign of the party's net unallocated balance, so
+an on-account receipt and an on-account payment on one party net into one figure.
+Separating advances, credit and debit notes and on-account amounts by their
+voucher's bill type is tracked in #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

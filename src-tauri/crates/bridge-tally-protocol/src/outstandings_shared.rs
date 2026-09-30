@@ -713,6 +713,101 @@ fn render_company_book_extent_with_contract(
     )
 }
 
+// --- The company's own count of its ledgers (bridge#938). ---
+
+const COMPANY_LEDGER_COUNT_COLLECTION_NAME: &str = "BridgeCompanyLedgerCountV1";
+const COMPANY_LEDGER_COUNT_FETCH: &str = "Name, GUID, NUMLEDGERS";
+
+/// The request for Tally's own count of a company's ledgers: the same Company
+/// collection shape as the company extent, fetching only the company's name and
+/// GUID and its `NUMLEDGERS`. It is deliberately not part of the extent request,
+/// which every reader shares and whose equality is the read bracket.
+pub fn render_company_ledger_count_request(company: &str) -> String {
+    render_company_book_extent_with_contract(
+        company,
+        COMPANY_LEDGER_COUNT_COLLECTION_NAME,
+        COMPANY_LEDGER_COUNT_FETCH,
+    )
+}
+
+/// Tally's own count of a company's ledgers (`NUMLEDGERS` of the Company
+/// object). A cross-check on another count, never a count to size a read from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompanyLedgerCount(u64);
+
+impl CompanyLedgerCount {
+    pub fn get(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Deserialize)]
+struct LedgerCountCollection {
+    #[serde(rename = "COMPANY", default)]
+    companies: Vec<RawLedgerCountCompany>,
+}
+
+#[derive(Deserialize)]
+struct RawLedgerCountCompany {
+    #[serde(rename = "@NAME")]
+    attribute_name: String,
+    #[serde(rename = "NAME")]
+    name: Value,
+    #[serde(rename = "GUID")]
+    guid: Value,
+    #[serde(rename = "NUMLEDGERS", default)]
+    num_ledgers: Option<Value>,
+}
+
+/// Parses the response to [`render_company_ledger_count_request`] for one
+/// company. `Ok(None)` is a well-formed answer that carries no `NUMLEDGERS`
+/// (the cross-check is then unavailable, not failed); a value that is present
+/// but is not a plain non-negative integer is refused, as is a response for
+/// another company, for no company, or for one matching more than one row.
+pub fn parse_company_ledger_count(
+    xml: &str,
+    expected_name: &str,
+    expected_guid: &str,
+) -> Result<Option<CompanyLedgerCount>, OutstandingsError> {
+    require_complete_envelope(xml)?;
+    let sanitized = sanitize_invalid_numeric_references(xml);
+    let parsed: Envelope<LedgerCountCollection> = quick_xml::de::from_str(&sanitized)
+        .map_err(|_| OutstandingsError::InvalidResponse("company_ledger_count_xml_invalid"))?;
+    require_success(&parsed.header)?;
+    let mut matching = parsed
+        .body
+        .data
+        .collection
+        .companies
+        .into_iter()
+        .filter(|raw| raw.guid.text.trim().eq_ignore_ascii_case(expected_guid));
+    let raw = matching
+        .next()
+        .ok_or(OutstandingsError::CompanyIdentityMismatch)?;
+    if matching.next().is_some() {
+        return Err(OutstandingsError::InvalidResponse(
+            "company_identity_ambiguous",
+        ));
+    }
+    let name = raw.name.text.trim();
+    if raw.attribute_name != name || name != expected_name {
+        return Err(OutstandingsError::CompanyIdentityMismatch);
+    }
+    let Some(value) = raw.num_ledgers else {
+        return Ok(None);
+    };
+    let digits = value.text.trim();
+    if !(1..=12).contains(&digits.len()) || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(OutstandingsError::InvalidResponse(
+            "company_ledger_count_invalid",
+        ));
+    }
+    digits
+        .parse::<u64>()
+        .map(|count| Some(CompanyLedgerCount(count)))
+        .map_err(|_| OutstandingsError::InvalidResponse("company_ledger_count_invalid"))
+}
+
 #[cfg(test)]
 #[path = "outstandings_shared_tests.rs"]
 mod tests;

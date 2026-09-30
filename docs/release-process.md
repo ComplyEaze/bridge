@@ -711,3 +711,5 @@ disagree.
    the same version or checksum.
 5. Preserve release notes explaining impact, upgrade/rollback steps, and the
    last known-good version without including customer data.
+
+<!-- Merge-queue canary, 30 Sep 2026: this comment tests the queue and can be removed. -->

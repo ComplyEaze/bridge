@@ -1135,7 +1135,7 @@
     },
     {
       "path": "tools/bridge-tally-compatibility/src/lib.rs",
-      "sha256": "f232058869783078bb2669b9014fbd1810777d9239f52bc90264e57bc105dc82"
+      "sha256": "0b5a341ab6fa694796bfba6457c588c1c73566713826d8093986cfefc6b59e40"
     },
     {
       "path": "tools/bridge-tally-compatibility/src/main.rs",

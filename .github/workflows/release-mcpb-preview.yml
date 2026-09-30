@@ -178,7 +178,10 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          # A failed lookup refuses the release; it never reads as "not found". `released` and
+          # `found` are assigned before they are tested, so a failing command stops the step.
+          released="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
+          if grep -Fxq -- "$RELEASE_TAG" <<<"$released"; then
             echo "refusing to replace existing release assets for $RELEASE_TAG"
             exit 1
           fi
@@ -189,7 +192,8 @@ jobs:
           version="${version#mcp-v}"
           for other in "mcp-preview-$version" "mcp-v$version"; do
             [[ "$other" == "$RELEASE_TAG" ]] && continue
-            if [[ -n "$(git ls-remote --tags origin "refs/tags/$other")" ]]; then
+            found="$(git ls-remote --tags origin "refs/tags/$other")"
+            if [[ -n "$found" ]] || grep -Fxq -- "$other" <<<"$released"; then
               echo "refusing to publish: version $version already has the tag $other"
               exit 1
             fi

@@ -114,14 +114,24 @@ pub struct LedgerSnapshotEntry {
 
 /// A party's unallocated residual: the gap between the ledger's own
 /// `CLOSINGBALANCE` and the sum of everything the Bills Receivable/Payable
-/// reports show as open bills for that party. Because the native reports
-/// only ever list named bills, a non-zero residual is exactly the party's
-/// on-account exposure — money the ledger balance carries with no bill
+/// reports show as open bills for that party. The reports list only named
+/// bills, so the residual is money the ledger balance carries with no bill
 /// reference at all, and therefore no truthful bill age.
+///
+/// It is NOT "the on-account amount". On a ledger that keeps no bills it is
+/// the whole balance; on a bill-wise ledger it is the net of the on-account
+/// entries and of any opening balance not allocated to a reference, and the
+/// bills reports alone cannot separate those (a live book, #945). `bill_wise_on`
+/// and `opening_balance` are the ledger's own values, carried so a reader can
+/// see which case it is; nothing here infers the components.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartyResidual {
     pub party: String,
     pub amount: ExactDecimal,
+    /// The ledger's `ISBILLWISEON`.
+    pub bill_wise_on: bool,
+    /// The ledger's own opening balance, as the snapshot read it.
+    pub opening_balance: ExactDecimal,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,7 +139,8 @@ pub struct NativeOutstandingsResult {
     pub report: OutstandingsReport,
     pub residuals: Vec<PartyResidual>,
     /// Sum of the absolute magnitude of every party residual: the total
-    /// unallocated (on-account) exposure the bill-level reports cannot see.
+    /// unallocated exposure the bill-level reports cannot see (not only
+    /// on-account: see [`PartyResidual`]).
     pub residual_total: ExactDecimal,
     /// The outcome of independently comparing Tally's `BILLOVERDUE` values
     /// with Bridge's due-date ageing. It is never used as ageing's source of

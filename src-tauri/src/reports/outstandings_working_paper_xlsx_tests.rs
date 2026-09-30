@@ -37,6 +37,9 @@ fn paper() -> OutstandingsWorkingPaper {
             party: "=FORMULA Party".to_string(),
             amount: decimal("10"),
             direction: ExposureDirection::Receivable,
+            ledger_bill_wise: None,
+            opening_balance: None,
+            composition: None,
         }],
     })
     .expect("synthetic paper builds")

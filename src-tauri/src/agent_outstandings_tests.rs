@@ -15,6 +15,9 @@ fn opposing_unallocated_direction_is_preserved_and_only_gross_exposure_is_ranked
         party: "Synthetic Party".into(),
         amount: bridge_tally_core::ExactDecimal::parse("30").unwrap(),
         direction: ExposureDirection::Payable,
+        ledger_bill_wise: None,
+        opening_balance: None,
+        composition: None,
     }];
     let ranked = ranked_parties_from_exposure(&bills, &unallocated, 1).unwrap();
     let party = &ranked[0];
@@ -31,7 +34,7 @@ fn opposing_unallocated_direction_is_preserved_and_only_gross_exposure_is_ranked
     let residuals = unallocated_totals_from_parties(&unallocated).unwrap();
     assert_eq!(
         residuals,
-        json!({"receivable":"0", "payable":"30", "gross_unallocated":"30"})
+        json!({"receivable":"0", "payable":"30", "gross_unallocated":"30", "by_composition": {"not_bill_wise_ledger":{"receivable":"0","payable":"0"}, "bill_wise_ledger_components_not_separated":{"receivable":"0","payable":"0"}, "composition_not_observed":{"receivable":"0","payable":"30"}}})
     );
     let billed = outstanding_totals_from_open_bills(&bills).unwrap();
     assert_eq!(billed["scope"], "open_bills_only");
@@ -428,4 +431,89 @@ async fn mcp_outstandings_set_a_mixed_party_aside_with_its_bills() {
         !text.contains("FX-USD-ON-INR-1"),
         "the mixed party's bill is listed"
     );
+}
+
+#[test]
+fn unallocated_totals_split_by_composition_and_the_parts_add_up() {
+    use crate::tally::UnallocatedComposition::{
+        BillWiseLedgerComponentsNotSeparated, NotBillWiseLedger,
+    };
+    let party =
+        |name: &str,
+         amount: &str,
+         direction: ExposureDirection,
+         composition: Option<crate::tally::UnallocatedComposition>| UnallocatedParty {
+            party: name.into(),
+            amount: bridge_tally_core::ExactDecimal::parse(amount).unwrap(),
+            direction,
+            ledger_bill_wise: composition.map(|c| c != NotBillWiseLedger),
+            opening_balance: None,
+            composition,
+        };
+    let parties = [
+        party(
+            "A",
+            "7500",
+            ExposureDirection::Receivable,
+            Some(NotBillWiseLedger),
+        ),
+        party(
+            "B",
+            "20000",
+            ExposureDirection::Receivable,
+            Some(BillWiseLedgerComponentsNotSeparated),
+        ),
+        party(
+            "C",
+            "3000",
+            ExposureDirection::Payable,
+            Some(BillWiseLedgerComponentsNotSeparated),
+        ),
+        party("D", "100", ExposureDirection::Receivable, None),
+    ];
+    let totals = unallocated_totals_from_parties(&parties).unwrap();
+    assert_eq!(totals["receivable"], "27600");
+    assert_eq!(totals["payable"], "3000");
+    let split = &totals["by_composition"];
+    assert_eq!(
+        split["not_bill_wise_ledger"],
+        json!({"receivable": "7500", "payable": "0"})
+    );
+    assert_eq!(
+        split["bill_wise_ledger_components_not_separated"],
+        json!({"receivable": "20000", "payable": "3000"})
+    );
+    // A row with no composition is neither hidden nor folded into another one.
+    assert_eq!(
+        split["composition_not_observed"],
+        json!({"receivable": "100", "payable": "0"})
+    );
+    let text = totals.to_string().to_ascii_lowercase();
+    assert!(!text.contains("on_account") && !text.contains("on account"));
+    // With no row lacking a composition, that key is absent.
+    let without = unallocated_totals_from_parties(&parties[..3]).unwrap();
+    assert!(without["by_composition"]
+        .get("composition_not_observed")
+        .is_none());
+}
+
+#[test]
+fn an_unallocated_row_carries_its_composition_and_opening_through_the_json_and_redaction() {
+    use crate::tally::UnallocatedComposition::NotBillWiseLedger;
+    let row = UnallocatedParty {
+        party: "Synthetic Debtor".into(),
+        amount: bridge_tally_core::ExactDecimal::parse("7500").unwrap(),
+        direction: ExposureDirection::Receivable,
+        ledger_bill_wise: Some(false),
+        opening_balance: Some(bridge_tally_core::ExactDecimal::parse("-100.00").unwrap()),
+        composition: Some(NotBillWiseLedger),
+    };
+    let json = redact_value(unallocated_party_json(&row), Redaction::MaskParties);
+    assert_eq!(json["ledger_bill_wise"], false);
+    assert_eq!(json["opening_balance"], "-100.00");
+    assert_eq!(json["composition"], "not_bill_wise_ledger");
+    assert_eq!(json["amount"], "7500");
+    assert_eq!(json["direction"], "receivable");
+    // The party name is what redaction masks; the composition fields stay.
+    assert_ne!(json["party"], "Synthetic Debtor");
 }

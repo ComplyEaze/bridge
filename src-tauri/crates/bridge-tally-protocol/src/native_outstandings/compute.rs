@@ -39,7 +39,7 @@ pub struct NativeMasterSnapshot<'a> {
     pub groups: NativeGroupSnapshot<'a>,
 }
 
-/// Computes a drop-in [`OutstandingsReport`] plus on-account residual
+/// Computes a drop-in [`OutstandingsReport`] plus unallocated residual
 /// evidence from the native Bills Receivable/Payable rows and the ledger
 /// snapshot, per TALLY_PROTOCOL_REFERENCE ground truth captured 2026-08-07.
 ///
@@ -390,11 +390,12 @@ fn implied_as_of_date(
 
 /// Per-party residual: `ledger CLOSINGBALANCE - sum(receivable BILLCL) -
 /// sum(payable BILLCL)`. The native Bills Receivable/Payable reports only
-/// ever list NAMED bills, so any non-zero residual on a party ledger is
-/// exactly that party's on-account exposure — present in the ledger balance
-/// but invisible to (and therefore unaged by) the bill-level reports. A
-/// Sundry Debtor/Creditor with bill-wise tracking disabled has no bill rows
-/// by construction, so its entire balance is such a residual.
+/// ever list NAMED bills, so a non-zero residual on a party ledger is money
+/// present in the ledger balance but invisible to (and therefore unaged by)
+/// the bill-level reports. It is not necessarily on-account: a ledger with
+/// bill-wise tracking disabled has no bill rows by construction, so its whole
+/// balance is the residual, and on a bill-wise ledger the on-account entries
+/// and an unreferenced opening are not told apart here (#945).
 fn compute_residuals(
     receivable_rows: &[NativeBillRow],
     payable_rows: &[NativeBillRow],
@@ -455,6 +456,8 @@ fn compute_residuals(
         residuals.push(PartyResidual {
             party: ledger.name.clone(),
             amount: residual,
+            bill_wise_on: ledger.bill_wise_on,
+            opening_balance: ledger.opening_balance.clone(),
         });
     }
     Ok((residuals, residual_total, has_unaged_receivable))

@@ -23,6 +23,9 @@ fn unallocated(party: &str, amount: &str) -> UnallocatedParty {
         party: party.to_string(),
         amount: ExactDecimal::parse(amount).unwrap(),
         direction: ExposureDirection::Receivable,
+        ledger_bill_wise: None,
+        opening_balance: None,
+        composition: None,
     }
 }
 

@@ -143,7 +143,7 @@ pub fn render_native_bills_request(
 }
 
 /// Renders a request for the `List of Ledgers` collection, overridden to
-/// fetch exactly the fields the on-account residual computation needs, plus
+/// fetch exactly the fields the unallocated residual computation needs, plus
 /// Tally's computed `BRIDGECOMPANYGUID` so the party/ledger export can bind
 /// this specific response to its selected company: `NAME`, `PARENT`, `CLOSINGBALANCE`,
 /// `OPENINGBALANCE`, `ISBILLWISEON`, and `CURRENCYNAME`, the ledger's own
@@ -159,7 +159,7 @@ pub fn render_native_bills_request(
 /// TALLY_PROTOCOL_REFERENCE §7 (corrected 2026-08-24). The bills reports are
 /// as-of scoped too, so if this request omitted the period the residual
 /// `CLOSINGBALANCE - sum(BILLCL)` would subtract historical bills from a
-/// current balance and silently report a wrong on-account figure at every
+/// current balance and silently report a wrong unallocated figure at every
 /// as-of except today's -- the failure would be invisible in a test that only
 /// ever asks for now.
 ///

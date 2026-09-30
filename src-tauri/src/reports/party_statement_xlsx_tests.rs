@@ -77,6 +77,9 @@ fn renders_a_non_empty_workbook_for_a_billed_and_unallocated_party() {
         party: "Aarav Textiles".to_string(),
         amount: ExactDecimal::parse("300.00").unwrap(),
         direction: ExposureDirection::Receivable,
+        ledger_bill_wise: None,
+        opening_balance: None,
+        composition: None,
     }];
     let statement =
         build_party_statement("Lab Co", "20260808", "Aarav Textiles", &bills, &unallocated)
@@ -95,6 +98,9 @@ fn renders_a_workbook_for_a_party_with_no_bills() {
         party: "On Account Only".to_string(),
         amount: ExactDecimal::parse("42.00").unwrap(),
         direction: ExposureDirection::Receivable,
+        ledger_bill_wise: None,
+        opening_balance: None,
+        composition: None,
     }];
     let statement =
         build_party_statement("Lab Co", "20260808", "On Account Only", &[], &unallocated).unwrap();
@@ -108,6 +114,9 @@ fn renders_unallocated_direction_in_the_workbook_text() {
         party: "On Account Only".to_string(),
         amount: ExactDecimal::parse("42.00").unwrap(),
         direction: ExposureDirection::Payable,
+        ledger_bill_wise: None,
+        opening_balance: None,
+        composition: None,
     }];
     let statement =
         build_party_statement("Lab Co", "20260808", "On Account Only", &[], &unallocated).unwrap();

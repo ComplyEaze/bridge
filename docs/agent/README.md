@@ -865,9 +865,23 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
-`unallocated.totals` contains `receivable`, `payable`, and `gross_unallocated`.
+`unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
+`by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
 been removed. Gross exposure is not net money due.
+
+Each `unallocated.parties[]` row says what the ledger data can and cannot say about
+its amount, without reading vouchers (#945). `ledger_bill_wise` is the ledger's own
+`ISBILLWISEON` and `opening_balance` is its own opening balance, shown and never
+interpreted; it keeps Tally's sign (a debit opening is negative) while `amount` is a
+magnitude and `direction` says which side. `composition` is `not_bill_wise_ledger`
+when the ledger's bill-wise flag is off (it keeps no bills, and the label follows the
+flag alone) and `bill_wise_ledger_components_not_separated` for what is left on a
+bill-wise ledger after its named bills: on-account entries, an opening balance not
+allocated to a reference, notes with no reference and anything else all land there
+and are not told apart, because the bills reports carry none of them. No unallocated
+figure is labelled on-account. Advances and credit or debit notes kept as their own
+bills are in the bills, not here.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

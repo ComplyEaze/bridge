@@ -6,7 +6,7 @@ const platforms = ["windows-x64", "macos-arm64"];
 // installable from this page when that happens.
 export function isInstallablePreview(release) {
   return !release.draft
-    && /^mcp-(?:preview-|v)[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z]+)*$/.test(release.tag_name)
+    && /^mcp-(?:preview-|v)[0-9]+\.[0-9]+\.[0-9]+$/.test(release.tag_name)
     && platforms.every((platform) => releaseAssets(release, platform));
 }
 

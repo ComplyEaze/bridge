@@ -8,7 +8,7 @@ const root = resolve(import.meta.dirname, "..");
 // Two forms are accepted: the current `mcp-vX.Y.Z` and the older `mcp-preview-X.Y.Z`, which the
 // published 0.2.0 and 0.3.0 use. Keep the pattern equal to the other consumers (see
 // scripts/release-tag-forms.test.mjs).
-const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 
 export function previewVersion(releaseTag) {
   const match = previewTag.exec(releaseTag);

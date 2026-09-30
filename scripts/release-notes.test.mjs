@@ -47,7 +47,8 @@ const changelog = [
 
 test("release tags map to changelog versions", () => {
   assert.equal(versionFromTag("mcp-preview-0.3.0"), "0.3.0");
-  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), "1.2.3-rc.1");
+  assert.equal(versionFromTag("mcp-v0.4.0"), "0.4.0");
+  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), undefined, "a release is exactly X.Y.Z");
   assert.equal(versionFromTag("v0.1.0"), undefined);
   assert.equal(versionFromTag("mcp-preview-0.3"), undefined);
 });

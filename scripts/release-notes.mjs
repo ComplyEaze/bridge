@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 
 const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
 // The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
-const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;
 const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;
 const fenceLine = /^\s*(`{3,}|~{3,})(.*)$/;

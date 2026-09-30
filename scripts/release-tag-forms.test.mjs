@@ -21,11 +21,8 @@ import { assetName, isInstallablePreview } from "../site/release-catalog.mjs";
 const ACCEPTED = [
   ["mcp-v0.4.0", "0.4.0"],
   ["mcp-v1.20.300", "1.20.300"],
-  ["mcp-v0.4.0-rc.1", "0.4.0-rc.1"],
-  ["mcp-v0.4.0.beta", "0.4.0.beta"],
   ["mcp-preview-0.3.0", "0.3.0"],
   ["mcp-preview-0.2.0", "0.2.0"],
-  ["mcp-preview-0.4.0-beta.1", "0.4.0-beta.1"],
 ];
 const REJECTED = [
   "",
@@ -53,6 +50,11 @@ const REJECTED = [
   "mcp-v0..4.0",
   "mcp-v0.4.0-",
   "mcp-v0.4.0-a_b",
+  "mcp-v0.4.0-rc.1", // exactly X.Y.Z: the manifest carries no prerelease suffix
+  "mcp-v0.4.0.beta",
+  "mcp-v0.4.0.1",
+  "mcp-v1.2.3.4",
+  "mcp-preview-0.4.0-beta.1",
   "refs/tags/mcp-v0.4.0",
 ];
 
@@ -126,7 +128,7 @@ test("the newest tag is found across both forms and the bootstrap tag", () => {
   assert.equal(latestReleaseTag(["v0.1.0", "mcp-preview-0.3.0", "mcp-v0.4.0"]), "mcp-v0.4.0");
   assert.equal(latestReleaseTag(["mcp-v0.4.0", "mcp-preview-0.10.0", "mcp-preview-0.9.1"]), "mcp-preview-0.10.0");
   assert.equal(latestReleaseTag(["mcp-v0.4.0", "mcp-v0.10.0", "mcp-v0.9.1"]), "mcp-v0.10.0");
-  assert.equal(latestReleaseTag(["mcp-v0.4.0-rc.1", "other"]), null, "a prerelease suffix is not ordered");
+  assert.equal(latestReleaseTag(["mcp-v0.4.0-rc.1", "mcp-v0.4.0.1", "other"]), null, "only exactly X.Y.Z is a release");
   assert.equal(latestReleaseTag(["refs/tags/v9.9.9", "xmcp-v9.9.9", "mcp-v9.9.9 ", "mcp-v0.4.0"]), "mcp-v0.4.0", "a tag with a junk prefix or suffix is ignored");
   assert.equal(latestReleaseTag([]), null);
 });

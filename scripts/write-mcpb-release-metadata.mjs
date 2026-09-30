@@ -6,7 +6,7 @@ import { basename, dirname, resolve } from "node:path";
 
 export async function writeMcpbReleaseMetadata({ archivePath, channel, platform, releaseTag, sourceSha }) {
   // The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
-  if (!/^mcp-(?:preview-|v)[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*$/.test(releaseTag)) {
+  if (!/^mcp-(?:preview-|v)[0-9]+\.[0-9]+\.[0-9]+$/.test(releaseTag)) {
     throw new Error("release tag must be an immutable mcp-v or mcp-preview- semantic version");
   }
   if (channel !== "preview-unsigned") {

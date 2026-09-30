@@ -297,5 +297,7 @@ for private reporting and handling requirements.
 
 Bridge is licensed under the [Apache License, Version 2.0](./LICENSE).
 Attribution notices are provided in [NOTICE](./NOTICE).
+The ComplyEaze logo and icon files are not licensed under Apache-2.0; see
+[NOTICE](./NOTICE) and [TRADEMARKS.md](./TRADEMARKS.md).
 The historical `v0.1.0` release remains under the MIT license shipped with
 that tag; current development source is version `0.3.0` under Apache-2.0.

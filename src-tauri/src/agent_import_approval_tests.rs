@@ -14,6 +14,10 @@ use crate::tally::agent_read_request::AgentReadRequest;
 use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
 use tokio::io::{AsyncWriteExt, BufReader};
 
+/// Bounds a wait on an event, only so that a hang fails instead of stalling
+/// the run: nothing here is paced by it.
+const HANG_GUARD: Duration = Duration::from_secs(120);
+
 fn result(response: &Value) -> &Value {
     &response["structuredContent"]["result"]
 }
@@ -566,7 +570,9 @@ async fn a_click_after_revocation_approves_nothing() {
 /// A call withdrawn while it waits on the dialog stops waiting at once,
 /// answers `request_cancelled` rather than `pending`, and closes the dialog it
 /// had started.
-#[tokio::test]
+// current_thread, which `closed()` relies on: the dialog's task finishes in
+// the poll that closes it, before this task runs again.
+#[tokio::test(flavor = "current_thread")]
 async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -579,16 +585,14 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
         SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
     );
     let cancel = async {
-        while !scripted.is_waiting() {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+        scripted.opened().await;
         withdrawn.cancel();
     };
-    // Bounded: a call that ends before its dialog opens leaves `cancel` waiting.
-    let (response, ()) =
-        tokio::time::timeout(Duration::from_secs(5), async { tokio::join!(post, cancel) })
-            .await
-            .expect("the withdrawn call stops");
+    // A call that ends before its dialog opens leaves `cancel` waiting; the
+    // bound only stops a hang, since every wait here is on an event.
+    let (response, ()) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(post, cancel) })
+        .await
+        .expect("the withdrawn call stops");
     let observed = sent(simulator);
     assert_eq!(
         result(&response)["error"]["code"],
@@ -608,7 +612,9 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
 /// call itself, so the answer and the cancellation are both ready when it is
 /// next polled; repeated, since the pick between two ready arms is what is
 /// under test.
-#[tokio::test]
+// current_thread, which `closed()` relies on: the dialog's task finishes in
+// the poll that closes it, before this task runs again.
+#[tokio::test(flavor = "current_thread")]
 async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
     for _ in 0..16 {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
@@ -626,24 +632,24 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
             withdrawn.clone(),
             SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
         ));
-        tokio::time::timeout(Duration::from_secs(5), async {
+        // Every wait is on an event, so a slow runner only slows the test;
+        // the bound stops a hang.
+        tokio::time::timeout(HANG_GUARD, async {
             // Drive the call until its dialog is open.
-            while !scripted.is_waiting() {
-                tokio::select! {
-                    biased;
-                    response = &mut post => panic!("the call ended early: {response}"),
-                    () = tokio::time::sleep(Duration::from_millis(1)) => {}
-                }
+            tokio::select! {
+                biased;
+                response = &mut post => panic!("the call ended early: {response}"),
+                () = scripted.opened() => {}
             }
-            // Answer, and let the dialog's task finish, without polling the call.
+            // Answer, and let the dialog's task take it, without polling the
+            // call. On this current-thread runtime the task drops its end of
+            // the answer and runs to its end in one poll, so once `closed`
+            // resolves its answer is ready for the call's next poll.
             scripted.answer(true);
-            while scripted.is_waiting() {
-                tokio::time::sleep(Duration::from_millis(1)).await;
-            }
+            scripted.closed().await;
         })
         .await
         .expect("the dialog opened and its task took the answer");
-        tokio::time::sleep(Duration::from_millis(10)).await;
         withdrawn.cancel();
         let response = post.await;
         let _ = sent(simulator);
@@ -1632,6 +1638,26 @@ fn build_and_post_agree_on_what_fits_the_dialog() {
     assert!(admit_saved_voucher(&seven, &endpoint, PostScope::Vouchers, 1).is_ok());
 }
 
+/// An approval answered for a call already withdrawn is not kept for the next
+/// call: the refusal under the lock, on its own, apart from the biased wait.
+#[tokio::test]
+async fn an_approval_is_not_held_for_a_withdrawn_call() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    let binding = binding_of(&line, "Synthetic preview");
+    let (request, answered, native) = granted(&line, 1).await;
+    let withdrawn = tokio_util::sync::CancellationToken::new();
+    withdrawn.cancel();
+    let held = crate::tally::runtime::TOOL_CANCELLATION
+        .scope(withdrawn, async {
+            approvals.hold_approved(&line.batch_id, binding, request, native, answered)
+        })
+        .await;
+    assert_eq!(held.err().as_deref(), Some("request_cancelled"));
+    assert!(!approvals.holds(&line.batch_id));
+}
+
 /// A call re-entered to redeem that finds nothing to redeem (revoked between
 /// its Join and the re-entry) is refused, asks nobody and sends nothing (#725
 /// slice 2.0). It can never fall back to asking, which would show the person a
@@ -1654,6 +1680,7 @@ async fn a_redeem_only_entry_with_nothing_held_is_refused_and_asks_nobody() {
                     evidence: evidence_from_runtime_read(
                         crate::tally::runtime::RuntimeReadEvidence::empty(),
                     ),
+                    call_started: std::time::Instant::now(),
                 },
             ),
         )
@@ -1818,6 +1845,20 @@ async fn two_pass_call_with(
     Server,
     ScriptedApproval,
 ) {
+    two_pass_call_recording(between, Default::default()).await
+}
+
+/// `two_pass_call_with`, noting the start each pass took its budgets from.
+async fn two_pass_call_recording(
+    between: impl FnOnce(&Server, &ImportLedgerLine) -> Between,
+    starts: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>,
+) -> (
+    Value,
+    ImportLedgerLine,
+    tempfile::TempDir,
+    Server,
+    ScriptedApproval,
+) {
     let (plans, _) = pending_then_posted_plans();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -1828,14 +1869,41 @@ async fn two_pass_call_with(
     scripted.answer(true);
     until_answered(&server, &line.batch_id).await;
     let hook = between(&server, &line);
-    let answer = BETWEEN_PASSES
+    let answer = CALL_STARTS
         .scope(
-            hook,
-            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+            starts,
+            BETWEEN_PASSES.scope(
+                hook,
+                SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+            ),
         )
         .await;
     let _ = sent(simulator);
     (answer, line, directory, server, scripted)
+}
+
+/// Both passes of a call, and the marks readback that spends the budget, take
+/// it from the call's start, not their own (V4 P3(1) on #889): the redeem-only
+/// pass is entered later, and a start taken afresh there would hand it a full
+/// ceiling it no longer has.
+#[tokio::test]
+async fn both_passes_of_a_call_take_their_budgets_from_the_calls_start() {
+    let starts: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Default::default();
+    let (answer, ..) = two_pass_call_recording(
+        |_, _| std::sync::Arc::new(|| std::thread::sleep(Duration::from_millis(25))),
+        std::sync::Arc::clone(&starts),
+    )
+    .await;
+    let starts = starts.lock().unwrap().clone();
+    assert_eq!(
+        starts.len(),
+        3,
+        "each pass's entry, then the marks readback that reads the budget: {answer}"
+    );
+    assert!(
+        starts.iter().all(|start| *start == starts[0]),
+        "a pass or the readback restarted the clock: {starts:?}"
+    );
 }
 
 /// An approval lost between the passes (here withdrawn, as an expiry landing
@@ -1938,6 +2006,7 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
                     evidence: evidence_from_runtime_read(
                         crate::tally::runtime::RuntimeReadEvidence::empty(),
                     ),
+                    call_started: std::time::Instant::now(),
                 },
             ),
         )

@@ -113,11 +113,11 @@ impl Server {
         let result = tokio::task::spawn_blocking(move || run(&request, &data_dir, max_bytes))
             .await
             .map_err(|_| "statement_task_failed".to_string())??;
-        let bytes = serde_json::to_vec(&result).map_or(0, |bytes| bytes.len());
+        let (response_sha256, bytes) = returned_evidence(&result, self.settings.redaction);
         Ok(ToolOutcome {
             evidence: Evidence {
                 request_sha256: sha256_hex(b"parse_bank_statement"),
-                response_sha256: sha256_json(&result),
+                response_sha256,
                 bytes,
                 state: "complete",
                 read_at: None,
@@ -363,6 +363,20 @@ fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Valu
         &file_sha256,
         max_bytes,
     ))
+}
+
+/// A parse result's hash and size as the caller receives it: redacted by the
+/// same function, for the same tool, that redacts the response, so the two
+/// cannot differ.
+fn returned_evidence(result: &Value, redaction: Redaction) -> (String, usize) {
+    let returned = redact_tool_response(
+        "parse_bank_statement",
+        json!({ "result": result }),
+        redaction,
+    )["result"]
+        .take();
+    let bytes = serde_json::to_vec(&returned).map_or(0, |bytes| bytes.len());
+    (sha256_json(&returned), bytes)
 }
 
 fn account_last4(account_number: &str) -> String {

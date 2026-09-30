@@ -15,8 +15,9 @@ Intel Mac and other platforms are not qualified. Package availability
 is not a host-validation claim; read each release's notes for its current
 runtime gaps.
 
-An **unsigned preview** is labelled as a prerelease and is only for evaluation;
-it is not signed or notarized. Each archive has a same-named `.sha256` file and
+An **unsigned preview** is published as a GitHub prerelease, and the newest one
+may later be marked Latest. Either way it is only for evaluation; it is not
+signed or notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
@@ -40,8 +41,9 @@ actually on.
 
 ## Install and configure
 
-1. Open the `.mcpb` file. If it does not open Claude Desktop, use **Settings →
-   Extensions → Advanced settings → Install Extension…** and choose the file.
+1. In Claude Desktop, use **Settings → Extensions → Advanced settings →
+   Install Extension…** and choose the `.mcpb` file. Opening the file directly
+   may also work on your computer.
 2. Keep **Tally host** as `localhost`. Bridge accepts only a local loopback
    endpoint. On a Mac, Tally must already be available there through a local
    Windows VM or organization-approved local forwarding. A separate PC or a

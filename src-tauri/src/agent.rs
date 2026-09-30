@@ -408,8 +408,10 @@ struct ToolFailure {
     /// is known. `code` keeps naming what failed.
     cause: Option<&'static str>,
     /// How many rows a refused read returned against how many it was counted
-    /// to hold, when the refusal is that disagreement. Numbers only.
-    counts: Option<RowCounts>,
+    /// to hold, when the refusal is that disagreement. Numbers only; boxed to
+    /// keep the refusal under clippy's 128-byte large-error limit on every
+    /// other path.
+    counts: Option<Box<RowCounts>>,
     /// What each request of a window read cost up to its failure (#595), when
     /// the failure came out of one. Data-free.
     window_timings: Option<Box<WindowReadTimings>>,

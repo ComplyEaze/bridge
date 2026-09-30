@@ -1581,6 +1581,10 @@ fn the_agent_preview_says_when_the_post_happens() {
     // The product is named in full in every line the person reads, in a
     // single voucher's dialog and in a batch's.
     for text in [&single, &batch] {
+        assert!(
+            text.contains("ComplyEaze Bridge"),
+            "the product is not named at all: {text}"
+        );
         for (at, _) in text.match_indices("Bridge") {
             assert!(
                 text[..at].ends_with("ComplyEaze "),

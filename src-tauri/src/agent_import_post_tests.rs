@@ -33,6 +33,10 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
 /// The product is named "ComplyEaze Bridge" in every line a person reads in a
 /// dialog: each "Bridge" in `text` follows "ComplyEaze ".
 fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
     for (at, _) in text.match_indices("Bridge") {
         assert!(
             text[..at].ends_with("ComplyEaze "),
@@ -1653,6 +1657,114 @@ fn a_bank_preview_is_refused_at_each_cap_rather_than_truncated() {
         admit_fresh_saved_voucher(&payment_with(1, |_| "N".repeat(90)), &endpoint).unwrap_err(),
         "import_review_too_large"
     );
+}
+
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// `count` distinct names, each `base`, its own index as a letter, and its share
+/// of `pad` more `filler` characters.
+fn padded_names(count: usize, base: &str, filler: &str, pad: usize) -> Vec<String> {
+    (0..count)
+        .map(|index| {
+            format!(
+                "{base}{}{}",
+                char::from_u32(0x0915 + index as u32).expect("a Devanagari letter"),
+                filler.repeat(pad / count + usize::from(index < pad % count))
+            )
+        })
+        .collect()
+}
+
+/// A batch of two Payments over the same `parties` ledgers named by `names`, in
+/// the company `company`.
+fn payment_batch_with(names: &[String], company: &str) -> ImportLedgerLine {
+    let mut line = payment_with(names.len(), |index| names[index].clone());
+    line.company.as_mut().unwrap().name = company.into();
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "journal-test-2".into();
+    line.vouchers.push(second);
+    line.txn_ids.push("journal-test-2".into());
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// One Payment of seven entries whose text lines (entry names, narration and
+/// reference) all grow with `pad`, one character at a time.
+fn grown_payment(pad: usize) -> ImportLedgerLine {
+    let names = padded_names(9, "N", "N", pad);
+    let mut line = payment_with(6, |index| names[index].clone());
+    line.vouchers[0].narration = Some(names[7].clone());
+    line.vouchers[0].reference = Some(names[8].clone());
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// The dialog's character caps (1,600 for one voucher, 3,200 and 7,000 bytes for
+/// a batch) sit above what the line caps let a preview reach: 24 lines of at most
+/// 100 characters for one voucher, 40 for a batch, with the fixed lines short.
+/// Growing every free-text line to its width (entry names, narration, reference,
+/// the company name), the largest preview that fits stays under the character
+/// cap, so the characters branding added cannot push a fitting preview over it.
+/// The line caps are what refuse, loudly: the width and line tests above pin
+/// those at N and N+1. The sizes are measured, not derived: a change that lets a
+/// preview grow past them fails here and needs its own boundary test.
+#[test]
+fn the_post_previews_stay_under_the_character_and_byte_caps_at_full_width() {
+    let (_, endpoint) = batch();
+    let (single, refusal) = largest_fit(
+        |pad| admit_fresh_saved_voucher(&grown_payment(pad), &endpoint),
+        9 * 89,
+    );
+    // A name past the line width is what refuses, not a character cap.
+    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+    assert_eq!(single.lines().count(), 24, "{single}");
+    assert!(
+        single.chars().count() < 1_600,
+        "{} characters",
+        single.chars().count()
+    );
+    for (filler, base) in [("N", "P"), ("न", "न")] {
+        let (batch, refusal) = largest_fit(
+            |pad| {
+                let names = padded_names(22, base, filler, pad);
+                let company = "C".repeat(60);
+                review_preview_with(&payment_batch_with(&names, &company), &endpoint, &[])
+            },
+            22 * 88,
+        );
+        assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+        assert_eq!(batch.lines().count(), 40, "{batch}");
+        assert!(
+            batch.chars().count() < BATCH_REVIEW_MAX_CHARS,
+            "{} characters",
+            batch.chars().count()
+        );
+        assert!(
+            batch.len() < BATCH_REVIEW_MAX_BYTES,
+            "{} bytes",
+            batch.len()
+        );
+    }
 }
 
 fn captured_currencies(bytes: &[u8]) -> String {

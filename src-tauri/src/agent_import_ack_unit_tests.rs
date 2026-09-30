@@ -19,6 +19,10 @@ fn row_json(entries: usize, narration: &str) -> Value {
 /// The product is named "ComplyEaze Bridge" in every line a person reads in a
 /// dialog: each "Bridge" in `text` follows "ComplyEaze ".
 fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
     for (at, _) in text.match_indices("Bridge") {
         assert!(
             text[..at].ends_with("ComplyEaze "),
@@ -56,6 +60,12 @@ fn the_review_shows_the_doubt_and_the_voucher() {
         "{preview}"
     );
     every_bridge_is_the_brand(&preview);
+    assert!(
+        preview.contains(
+            "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required."
+        ),
+        "{preview}"
+    );
     assert!(
         preview.contains(&format!("Choosing \"{REVIEW_BUTTON}\"")),
         "names the button the platform shows: {preview}"
@@ -525,7 +535,7 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         "I reviewed these 3 vouchers in Tally.",
         "reconciliation_required",
         "ComplyEaze Bridge posted them, but cannot confirm that only they",
-        "\" ComplyEaze Bridge changes nothing in Tally,",
+        "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
@@ -831,4 +841,120 @@ fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
         let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
         assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
     }
+}
+
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// `count` distinct ledger names, each `base`, its own index as a letter, and
+/// its share of `pad` more `filler` characters.
+fn padded_names(count: usize, base: &str, filler: &str, pad: usize) -> Vec<String> {
+    (0..count)
+        .map(|index| {
+            format!(
+                "{base}{}{}",
+                char::from_u32(0x0915 + index as u32).expect("a Devanagari letter"),
+                filler.repeat(pad / count + usize::from(index < pad % count))
+            )
+        })
+        .collect()
+}
+
+/// A voucher as read back with one entry per name and this narration.
+fn row_named(names: &[String], narration: &str) -> ReadVoucher {
+    let mut voucher = row_json(names.len(), narration);
+    for (index, name) in names.iter().enumerate() {
+        voucher["amounts"][index]["ledger"] = json!(name);
+    }
+    serde_json::from_value(voucher).unwrap()
+}
+
+/// A batch review of one voucher whose twenty-six ledger names grow with `pad`.
+fn batch_review_grown(pad: usize, base: &str, filler: &str) -> Result<String, String> {
+    let line = posted_batch(2);
+    let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    let names = padded_names(26, base, filler, pad);
+    let rows = [row_named(&names, "Paid")];
+    let rows = rows.iter().collect::<Vec<_>>();
+    batch_review_preview(&line, DoubtKind::BatchStep, "Books", &step, &rows)
+}
+
+/// The batch review's 3,200-character cap is exact: twenty-six ledger lines (40
+/// lines in all) grown a character at a time fit at exactly 3,200 characters and
+/// one more is refused. Branding the dialog text added characters to this
+/// preview, so the boundary is pinned: what sits at it is refused loudly, never
+/// cut.
+#[test]
+fn a_batch_review_fits_at_exactly_3200_characters_and_not_one_more() {
+    let (fit, refusal) = largest_fit(|pad| batch_review_grown(pad, "L", "N"), 26 * 88);
+    assert_eq!(fit.chars().count(), 3_200, "{fit}");
+    assert_eq!(fit.lines().count(), 40, "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+}
+
+/// The batch review's 7,000-byte cap binds before its character cap when the
+/// ledger names are three-byte letters: grown a letter at a time, the review
+/// fits up to the last size within 7,000 bytes (each step adds three) and the
+/// next is refused, at fewer than 3,200 characters. Branding added bytes to
+/// this preview too, so this boundary is pinned as well.
+#[test]
+fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
+    let (fit, refusal) = largest_fit(|pad| batch_review_grown(pad, "न", "न"), 26 * 88);
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    let bytes = fit.len();
+    assert!(
+        bytes <= post::BATCH_REVIEW_MAX_BYTES && bytes + 3 > post::BATCH_REVIEW_MAX_BYTES,
+        "{bytes} bytes"
+    );
+    assert!(
+        fit.chars().count() < 3_200,
+        "{} characters",
+        fit.chars().count()
+    );
+}
+
+/// The single review's 1,600-character cap sits above what its 24 lines of at
+/// most 100 characters reach with the free-text lines grown to their width (ten
+/// entry names and the narration): under it, so the characters branding added
+/// cannot push a fitting review over it. Measured, not derived.
+#[test]
+fn a_single_review_stays_under_the_character_cap_at_full_width() {
+    let (fit, _) = largest_fit(
+        |pad| {
+            let names = padded_names(11, "L", "N", pad);
+            let company = "C".repeat(50);
+            review_preview(
+                BATCH,
+                MARKER,
+                &company,
+                &doubt(),
+                &row_named(&names[..9], &names[10]),
+            )
+        },
+        11 * 88,
+    );
+    assert!(
+        fit.chars().count() < 1_600,
+        "{} characters",
+        fit.chars().count()
+    );
 }

@@ -200,6 +200,24 @@ runtime checks exercised six-, eight- and eleven-ledger synthetic companies;
 they do not qualify Education mode, other currencies, account types or
 production books.
 
+**An empty amount is not a zero, measured again (2026-10-01, one synthetic
+dense book, TallyPrime 7.1 Silver).** For one ledger that carried no debit in any
+window, the native Trial Balance returned an explicit `0.00` debit for a one-day
+and a one-week window and an empty debit element for the one-month window, which
+the agent tool reports as `present_empty`. `ledger_movement` reported a debit of
+`0` for all three. A caller that compares the two must treat the empty state
+explicitly and never read it as zero.
+
+**Cost against `ledger_movement` (same book and ledger, one run each).** The
+native Trial Balance took 26 sends and 1 to 2 seconds for each of the three
+windows. `ledger_movement` took 90, 126 and 186 sends and about 7, 14 and 30
+seconds for windows holding about 80, 570 and 2,460 vouchers of that ledger: its
+cost grows with the window, because each part is read twice for the snapshot
+comparison, while the Trial Balance does not. The two agreed on the ledger's
+opening, debit, credit and closing in all three windows. That book has a
+one-sided ledger and, as far as these reads show, no optional, cancelled or
+post-dated vouchers, so agreement is not shown for a book that has them.
+
 #### Parent follow-up query contract
 
 The retained-capture parent query is an exact row selector, not a qualified

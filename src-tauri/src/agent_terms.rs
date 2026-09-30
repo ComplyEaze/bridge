@@ -7,7 +7,7 @@
 //! Tally. `initialize` and `tools/list` still answer, so the host shows the tools and the user
 //! reads the reason in the chat rather than in a generic "server disconnected".
 //!
-//! An absent, empty or unrecognised value is "not accepted". When it is on, one line per terms
+//! An absent, empty or unrecognised value is "not accepted". When it is on, a line per terms
 //! version is appended to `terms-acceptance.jsonl` in the data folder (version, time, source); if
 //! that line cannot be written the server refuses too, the same fail-closed rule the receipt log
 //! has. Nothing here is sent anywhere.
@@ -31,7 +31,7 @@ pub(super) const TERMS_VERSION: &str = "2026-10";
 /// The environment variable the manifest maps the accept-terms setting to.
 pub(super) const TERMS_ENV: &str = "BRIDGE_TERMS_ACCEPTED";
 const RECORD_FILE: &str = "terms-acceptance.jsonl";
-/// The record file holds one line per terms version; this bounds the tail read.
+/// The record file holds a line per terms version; this bounds the tail read.
 const RECORD_SCAN_LINES: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

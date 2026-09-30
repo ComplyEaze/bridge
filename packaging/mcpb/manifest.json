@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.1",
+  "manifest_version": "0.2",
   "name": "bridge-tally",
   "display_name": "ComplyEaze Bridge",
   "version": "0.3.0",
@@ -8,12 +8,14 @@
     "name": "Bridge contributors"
   },
   "license": "Apache-2.0",
+  "privacy_policies": ["https://bridge.complyeaze.com/privacy"],
   "server": {
     "type": "binary",
     "entry_point": "bin/bridge_mcp",
     "mcp_config": {
       "command": "${__dirname}/bin/bridge_mcp",
       "env": {
+        "BRIDGE_TERMS_ACCEPTED": "${user_config.accept_terms_2026_10}",
         "BRIDGE_TALLY_HOST": "${user_config.host}",
         "BRIDGE_TALLY_PORT": "${user_config.port}",
         "BRIDGE_AGENT_REDACTION": "${user_config.redaction}",
@@ -23,6 +25,13 @@
     }
   },
   "user_config": {
+    "accept_terms_2026_10": {
+      "type": "boolean",
+      "title": "I accept the ComplyEaze Bridge Terms of Use (version 1.0)",
+      "description": "Required. Bridge refuses every tool call until you accept. Terms of Use: https://bridge.complyeaze.com/terms. How Bridge handles information: https://bridge.complyeaze.com/privacy.",
+      "required": true,
+      "default": false
+    },
     "host": {
       "type": "string",
       "title": "Tally host",
@@ -46,7 +55,7 @@
     "enable_writes": {
       "type": "boolean",
       "title": "Allow voucher posting (Journal, Payment, Receipt, Contra)",
-      "description": "Off by default. Turning this on lets the connector post one approved Journal, Payment, Receipt or Contra into Tally at a time. Three known limits remain. Tally aims an import at a company by name and cannot bind it to a GUID: Bridge's last request before the post refuses unless exactly one loaded company has the target's GUID and name and no other has the same name ignoring case and spacing (bridge#607), but a company renamed to, or loaded under, that name or one differing only in case or spacing in the moment after the check could still receive the voucher; Bridge may flag afterwards that the companies changed, but cannot always say where it went, and cannot prevent it (accepted residual, bridge#574). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally (bridge#579). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger; Bridge marks it as needing reconciliation when it sees the ledger now resolves to a different master, but not every such change is seen (bridge#623). Leave it off unless you accept that risk. It also lets you record, in a separate native dialog, that you reviewed a posted voucher whose ledgers changed master; that writes nothing to Tally. Reads, bank-statement parsing and voucher file preparation are available either way.",
+      "description": "Off by default. Turning this on lets the connector post one approved Journal, Payment, Receipt or Contra into Tally at a time. Three known limits remain. Tally aims an import at a company by name and cannot bind it to a GUID: Bridge's last request before the post refuses unless exactly one loaded company has the target's GUID and name and no other has the same name ignoring case and spacing (bridge#607), but a company renamed to, or loaded under, that name or one differing only in case or spacing in the moment after the check could still receive the voucher; Bridge may flag afterwards that the companies changed, but cannot always say where it went, and cannot prevent it (accepted residual, bridge#574). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally (bridge#579). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger; Bridge marks it as needing reconciliation when it sees the ledger now resolves to a different master, but not every such change is seen (bridge#623). Leave it off unless you accept that risk. Turning this on confirms that you accept section 9 of the Terms of Use (AI assistants, posting and approvals). It also lets you record, in a separate native dialog, that you reviewed a posted voucher whose ledgers changed master; that writes nothing to Tally. Reads, bank-statement parsing and voucher file preparation are available either way.",
       "default": false
     }
   }

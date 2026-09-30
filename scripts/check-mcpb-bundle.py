@@ -200,9 +200,17 @@ def run_bounded(command, payload, environment, timeout=15):
 
 def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
-    require(set(mappings) == {"BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT", "BRIDGE_AGENT_REDACTION",
-                              "BRIDGE_AGENT_ENABLE_IMPORT", "BRIDGE_AGENT_ENABLE_WRITES"},
+    require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
+                              "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
+                              "BRIDGE_AGENT_ENABLE_WRITES"},
             "unexpected_environment_mapping")
+    # The Terms of Use are accepted by the user, never by default: the setting is required and
+    # off, and the server refuses every tool until it is on (see agent_terms.rs).
+    terms = manifest["user_config"].get("accept_terms_2026_10", {})
+    require(terms.get("type") == "boolean" and terms.get("required") is True
+            and terms.get("default") is False, "terms_setting_must_be_required_and_off")
+    require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10}",
+            "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
     writes = manifest["user_config"].get("enable_writes", {})
     require(writes.get("type") == "boolean" and isinstance(writes.get("default"), bool),
@@ -260,9 +268,33 @@ def smoke(archive, repository):
         destination = Path(temporary) / "bundle"
         manifest, binary = unpack_bundle(archive, destination, repository)
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_"))}
+                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_", "BRIDGE_TERMS_"))}
         environment.update(resolve_environment(manifest))
         environment["BRIDGE_AGENT_DATA_DIR"] = str(Path(temporary) / "data")
+        # With the manifest's defaults the Terms of Use are not accepted: the server must still
+        # answer initialize and tools/list, and refuse a tool call in band. Own data folder, so
+        # this run's receipts do not mix with the accepted run's below.
+        require(environment["BRIDGE_TERMS_ACCEPTED"] == "false", "terms_must_default_to_not_accepted")
+        refused_requests = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-06-18", "capabilities": {},
+                "clientInfo": {"name": "bridge-mcpb-smoke", "version": "1.0.0"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "voucher_schema", "arguments": {}}},
+        ]
+        refused_command = manifest["server"]["mcp_config"]["command"].replace("${__dirname}", str(destination))
+        refused_output, _ = run_bounded(
+            [refused_command],
+            b"".join(json.dumps(request).encode() + b"\n" for request in refused_requests),
+            dict(environment, BRIDGE_AGENT_DATA_DIR=str(Path(temporary) / "data-refused")))
+        refused = [json.loads(line) for line in refused_output.splitlines()]
+        require([reply.get("id") for reply in refused] == [1, 2, 3], "terms_refusal_response_ids")
+        require(bool(refused[1]["result"]["tools"]), "terms_refusal_hid_the_tool_list")
+        require(refused[2]["result"]["structuredContent"]["result"]["error"]["code"] == "terms_not_accepted",
+                "terms_refusal_missing")
+        environment["BRIDGE_TERMS_ACCEPTED"] = "true"
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
                 "protocolVersion": "2025-06-18", "capabilities": {},

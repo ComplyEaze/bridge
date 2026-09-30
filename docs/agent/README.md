@@ -19,6 +19,13 @@ Build and run it with Rust 1.96:
 rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
 ```
 
+Every tool refuses, in band, until the Terms of Use are accepted: set
+`BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this as
+its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
+is on, Bridge appends one line per terms version (version, time, source) to
+`terms-acceptance.jsonl` in its data folder, and refuses if that line cannot be
+written. This is a record of consent, not a security boundary.
+
 Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
@@ -54,7 +61,7 @@ Claude Desktop example:
   "mcpServers": {
     "bridge-tally": {
       "command": "/absolute/path/to/bridge_mcp",
-      "env": {"BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
+      "env": {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
     }
   }
 }

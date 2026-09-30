@@ -15,14 +15,3 @@ docs/tally/compatibility/fixtures/** -text
 scripts/fixtures/** -text
 tools/bridge-tally-compatibility/tests/fixtures/** -text
 
-# Since bridge#760 the surface stores only per-file hashes, so concurrent PRs
-# that touch DIFFERENT pinned files merge without conflict, here and on GitHub.
-# This driver handles what is left: both sides changing the pin list or the
-# claims. It reconciles those lists with a three-way merge and writes them --
-# see scripts/reseal-merge-driver.mjs
-# for exactly what it will and will not auto-resolve, and see
-# docs/release-process.md ("Merge driver (local only)") for the one-time
-# `git config` line this needs and, importantly, why it does NOT change what
-# GitHub's server-side PR merge reports.
-docs/tally/compatibility/compatibility-surface.json merge=bridge-compat-reseal
-docs/tally/compatibility/compatibility-matrix.json merge=bridge-compat-reseal

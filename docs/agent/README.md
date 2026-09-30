@@ -362,7 +362,12 @@ valid empty collection remains distinguishable from invalid discovery.
 
 Lists the Purchase and Debit Note vouchers of a date window that touch a ledger
 under Duties & Taxes (#969), and says per entry what the books record. Nothing is
-posted and nothing is inferred.
+posted and nothing is inferred. It is a register of the books, not a GST return:
+it does not decide input tax credit eligibility or blocked credit, matches
+nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
+only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+classify an item invoice's purchase as taxable, and never sums tax across heads
+or vouchers.
 
 - **Rows are selected by the ledger, not the voucher type.** A voucher is a
   candidate when one of its entries is on a ledger whose nearest predefined

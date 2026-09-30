@@ -76,7 +76,7 @@ Each line names the pull requests it comes from.
   depends on hyper, or if reqwest, hyper or a raw socket call is named in the
   app's source outside the Tally connection files. The unused delivery types in the portable core crate (no network code)
   went with it. The feature can be rebuilt from the git history if it is needed
-  again (#PR).
+  again (#914).
 
 ## [0.3.0] - 2026-09-26
 

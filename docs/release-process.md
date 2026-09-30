@@ -591,6 +591,10 @@ It checks every file first and writes none if one fails. Then:
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
+5. After the release is published, change the README sentences that name the
+   published preview by its tag (search the README for `mcp-preview-`), and
+   check that the install page and the repository description name the same
+   build.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.

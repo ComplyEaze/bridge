@@ -119,7 +119,7 @@ If instead it hangs without answering, Tally may simply be busy behind
 another request — wait and retry rather than changing the setting.
 
 An **unsigned evaluation preview** of the Claude Desktop extension is published
-as [`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0).
+as [`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.3.0).
 Follow the [installation guide](./docs/agent/INSTALL.md) to install and configure
 it. Before you do, know what it is and is not:
 
@@ -155,7 +155,7 @@ database operations.
 ## First useful result
 
 An unsigned evaluation preview of the Claude Desktop extension is published as
-[`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0);
+[`mcp-preview-0.3.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.3.0);
 install it with the [installation guide](./docs/agent/INSTALL.md). For source
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).

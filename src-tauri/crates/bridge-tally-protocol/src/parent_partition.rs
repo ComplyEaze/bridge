@@ -25,8 +25,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{xml_text::escape_text, TALLY_SANITIZED_ROOT_MARKER};
 
-/// The name of the `SYSTEM` formula a part request adds to the collection.
+/// The name of the `SYSTEM` formula a named part request adds to the
+/// collection.
 pub const PARENT_FORMULA_NAME: &str = "BridgeParentPart";
+
+/// The stem of the `SYSTEM` formulas a complement part request adds
+/// (`BridgeNot0`, `BridgeNot1`, ...), one per chunk of excluded parents.
+const COMPLEMENT_FORMULA_STEM: &str = "BridgeNot";
 
 /// The reserved account root as it is written in a request: Tally's own
 /// `&#4; Primary`, the form its exports carry (section 1.1(d), section 11e).
@@ -52,6 +57,13 @@ pub enum ParentPartitionError {
     ParentOverBudget { ledgers: u64 },
     /// The parents need more parts than the limit allows.
     TooManyParts { parts: u64 },
+    /// The complement part's `NOT` formulas would exceed the request-size limit.
+    ComplementOverBudget,
+    /// A part answered a different number of ledgers than the catalogue holds
+    /// under its parents. Checked as soon as the part's master is read, so a
+    /// filter that did not do what was asked ends the read after that master:
+    /// the part's balance and every later request are never sent.
+    PartRowCountDiffers,
     /// A part answered a row whose parent is not one of that part's parents.
     RowOutsideParts,
     /// A part answered a row the catalogue does not hold.
@@ -74,6 +86,8 @@ impl ParentPartitionError {
             Self::DuplicateLedgerIdentity => "parent_partition_duplicate_ledger_identity",
             Self::ParentOverBudget { .. } => "parent_over_budget",
             Self::TooManyParts { .. } => "parent_partition_too_many_parts",
+            Self::ComplementOverBudget => "parent_complement_over_budget",
+            Self::PartRowCountDiffers => "parent_part_row_count_differs",
             Self::RowOutsideParts => "parent_part_row_outside_parents",
             Self::RowNotInCatalogue => "parent_part_row_not_in_catalogue",
             Self::RowDiffersFromCatalogue => "parent_part_row_differs_from_catalogue",
@@ -91,6 +105,12 @@ impl std::fmt::Display for ParentPartitionError {
             Self::DuplicateLedgerIdentity => "the ledger catalogue repeats a ledger GUID",
             Self::ParentOverBudget { .. } => "one parent group holds more ledgers than a part may",
             Self::TooManyParts { .. } => "the parent groups need more parts than allowed",
+            Self::ComplementOverBudget => {
+                "the filter that reaches the remaining ledgers is larger than allowed"
+            }
+            Self::PartRowCountDiffers => {
+                "a part returned a different number of ledgers than the catalogue holds"
+            }
             Self::RowOutsideParts => "a part returned a ledger outside its parent groups",
             Self::RowNotInCatalogue => "a part returned a ledger the catalogue does not hold",
             Self::RowDiffersFromCatalogue => {
@@ -180,21 +200,48 @@ pub struct PartitionLimits {
     pub max_ledgers_per_part: u64,
     /// Most parents one part's formula may name.
     pub max_parents_per_part: usize,
-    /// Most parts a book may need.
+    /// Most parts a book may need, not counting the complement part.
     pub max_parts: usize,
+    /// Most bytes of `NOT` formula text the complement part may carry.
+    pub max_complement_formula_bytes: usize,
 }
 
-/// One filtered read: the parents its formula names and the ledgers the
-/// catalogue says they hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PartKind {
+    /// Reads the ledgers under the part's parents.
+    Named,
+    /// Reads the ledgers under none of the part's parents: the ledgers whose
+    /// parent no formula can name. Its formulas are `NOT (...)` over chunks of
+    /// at most `terms_per_formula` parents, all applied together (AND).
+    Complement { terms_per_formula: usize },
+}
+
+/// One `SYSTEM` formula a part request adds, and the name its `FILTERS` list
+/// refers to it by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartFormula {
+    pub name: String,
+    pub text: String,
+}
+
+/// One filtered read: the parents its formula names (or, for the complement,
+/// excludes) and the ledgers the catalogue says it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParentPart {
     parents: Vec<ParentName>,
     ledger_count: u64,
+    kind: PartKind,
 }
 
 impl ParentPart {
+    /// The parents the part reads, or for the complement part the parents it
+    /// leaves out.
     pub fn parents(&self) -> &[ParentName] {
         &self.parents
+    }
+
+    pub fn is_complement(&self) -> bool {
+        matches!(self.kind, PartKind::Complement { .. })
     }
 
     /// The ledgers the catalogue holds under this part's parents.
@@ -202,20 +249,54 @@ impl ParentPart {
         self.ledger_count
     }
 
-    /// The formula text: `$Parent = "A" OR $Parent = "B"`.
-    pub fn formula(&self) -> String {
-        self.parents
-            .iter()
-            .map(|parent| format!("$Parent = \"{}\"", parent.request_literal()))
-            .collect::<Vec<_>>()
-            .join(" OR ")
+    /// Whether a master response of `rows` ledgers is the count the catalogue
+    /// holds under this part's parents. A filter Tally did not apply as asked
+    /// answers more or fewer, and the run must stop before the next request.
+    pub fn check_row_count(&self, rows: usize) -> Result<(), ParentPartitionError> {
+        if u64::try_from(rows) == Ok(self.ledger_count) {
+            Ok(())
+        } else {
+            Err(ParentPartitionError::PartRowCountDiffers)
+        }
     }
+
+    /// The formulas the request adds. A named part has one,
+    /// `$Parent = "A" OR $Parent = "B"`. The complement has one
+    /// `NOT ($Parent = "A" OR ...)` per chunk of excluded parents, and the
+    /// request applies them together, so a ledger must clear every one.
+    pub fn formulas(&self) -> Vec<PartFormula> {
+        match self.kind {
+            PartKind::Named => vec![PartFormula {
+                name: PARENT_FORMULA_NAME.to_owned(),
+                text: or_of(&self.parents),
+            }],
+            PartKind::Complement { terms_per_formula } => self
+                .parents
+                .chunks(terms_per_formula)
+                .enumerate()
+                .map(|(index, chunk)| PartFormula {
+                    name: format!("{COMPLEMENT_FORMULA_STEM}{index}"),
+                    text: format!("NOT ({})", or_of(chunk)),
+                })
+                .collect(),
+        }
+    }
+}
+
+fn or_of(parents: &[ParentName]) -> String {
+    parents
+        .iter()
+        .map(|parent| format!("$Parent = \"{}\"", parent.request_literal()))
+        .collect::<Vec<_>>()
+        .join(" OR ")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ExpectedRow {
     name: String,
-    parent: String,
+    /// `None` for a ledger whose parent the catalogue could not carry: its
+    /// only known property is that it is not under a named parent.
+    parent: Option<String>,
     part: usize,
 }
 
@@ -224,45 +305,40 @@ struct ExpectedRow {
 pub struct ParentPartition {
     parts: Vec<ParentPart>,
     expected: HashMap<String, ExpectedRow>,
+    excluded: HashSet<String>,
 }
 
 impl ParentPartition {
     /// Plans the parts for a catalogue's rows, `(name, guid, immediate
     /// parent)`, packing parents largest first into the first part with room.
     /// Deterministic: the same rows give the same parts in any input order.
+    ///
+    /// Ledgers whose parent cannot be named are not refused: they form one
+    /// extra, last, complement part that reads every ledger under none of the
+    /// named parents. The coverage proof still requires each catalogue ledger
+    /// exactly once.
     pub fn plan<'a>(
         rows: impl IntoIterator<Item = (&'a str, &'a str, ParentObservation<'a>)>,
         limits: PartitionLimits,
     ) -> Result<Self, ParentPartitionError> {
         let mut counts = BTreeMap::<ParentName, u64>::new();
-        let mut rows_by_guid = HashMap::<String, (String, ParentName)>::new();
+        let mut rows_by_guid = HashMap::<String, (String, Option<ParentName>)>::new();
         let mut unsupported = 0u64;
         for (name, guid, parent) in rows {
             let parent = match parent {
                 ParentObservation::Absent => return Err(ParentPartitionError::LedgerWithoutParent),
-                ParentObservation::Unsupported => {
-                    unsupported += 1;
-                    continue;
-                }
-                ParentObservation::Named(text) => match ParentName::parse(text) {
-                    Ok(parent) => parent,
-                    Err(_) => {
-                        unsupported += 1;
-                        continue;
-                    }
-                },
+                ParentObservation::Unsupported => None,
+                ParentObservation::Named(text) => ParentName::parse(text).ok(),
             };
-            *counts.entry(parent.clone()).or_default() += 1;
+            match &parent {
+                Some(parent) => *counts.entry(parent.clone()).or_default() += 1,
+                None => unsupported += 1,
+            }
             let previous =
                 rows_by_guid.insert(guid.to_ascii_lowercase(), (name.to_owned(), parent));
             if previous.is_some() {
                 return Err(ParentPartitionError::DuplicateLedgerIdentity);
             }
-        }
-        if unsupported > 0 {
-            return Err(ParentPartitionError::ParentNameUnsupported {
-                ledgers: unsupported,
-            });
         }
         let mut ordered = counts.into_iter().collect::<Vec<_>>();
         ordered.sort_by(|(left_name, left), (right_name, right)| {
@@ -285,6 +361,7 @@ impl ParentPartition {
                 None => parts.push(ParentPart {
                     parents: vec![parent],
                     ledger_count: ledgers,
+                    kind: PartKind::Named,
                 }),
             }
         }
@@ -301,21 +378,70 @@ impl ParentPartition {
             .enumerate()
             .flat_map(|(index, part)| part.parents.iter().map(move |parent| (parent, index)))
             .collect::<HashMap<_, _>>();
+        let mut excluded = HashSet::new();
+        let mut complement_part = None;
+        let complement_index = parts.len();
+        if unsupported > 0 {
+            if part_of.is_empty() {
+                return Err(ParentPartitionError::ParentNameUnsupported {
+                    ledgers: unsupported,
+                });
+            }
+            if unsupported > limits.max_ledgers_per_part {
+                return Err(ParentPartitionError::ParentOverBudget {
+                    ledgers: unsupported,
+                });
+            }
+            let mut every_named = part_of
+                .keys()
+                .map(|parent| (*parent).clone())
+                .collect::<Vec<_>>();
+            every_named.sort();
+            excluded = every_named
+                .iter()
+                .map(|parent| parent.as_catalogue_text().to_owned())
+                .collect();
+            let complement = ParentPart {
+                parents: every_named,
+                ledger_count: unsupported,
+                kind: PartKind::Complement {
+                    terms_per_formula: limits.max_parents_per_part,
+                },
+            };
+            let bytes = complement
+                .formulas()
+                .iter()
+                .map(|formula| formula.text.len())
+                .sum::<usize>();
+            if bytes > limits.max_complement_formula_bytes {
+                return Err(ParentPartitionError::ComplementOverBudget);
+            }
+            complement_part = Some(complement);
+        }
         let expected = rows_by_guid
             .into_iter()
             .map(|(guid, (name, parent))| {
-                let part = part_of[&parent];
-                (
-                    guid,
-                    ExpectedRow {
+                let row = match parent {
+                    Some(parent) => ExpectedRow {
                         name,
-                        parent: parent.as_catalogue_text().to_owned(),
-                        part,
+                        part: part_of[&parent],
+                        parent: Some(parent.as_catalogue_text().to_owned()),
                     },
-                )
+                    None => ExpectedRow {
+                        name,
+                        part: complement_index,
+                        parent: None,
+                    },
+                };
+                (guid, row)
             })
             .collect();
-        Ok(Self { parts, expected })
+        parts.extend(complement_part);
+        Ok(Self {
+            parts,
+            expected,
+            excluded,
+        })
     }
 
     pub fn parts(&self) -> &[ParentPart] {
@@ -327,6 +453,7 @@ impl ParentPartition {
         PartitionCoverage {
             remaining: self.expected.clone(),
             seen: HashSet::new(),
+            excluded: self.excluded.clone(),
         }
     }
 }
@@ -338,12 +465,14 @@ impl ParentPartition {
 pub struct PartitionCoverage {
     remaining: HashMap<String, ExpectedRow>,
     seen: HashSet<String>,
+    excluded: HashSet<String>,
 }
 
 impl PartitionCoverage {
     /// `part` is the index into [`ParentPartition::parts`] the row came from;
     /// `parent` is the row's immediate parent as the part's response carried
-    /// it, `None` when it named none.
+    /// it, `None` when it named none. A complement row is accepted with any
+    /// parent that is not one of the named ones.
     pub fn accept(
         &mut self,
         part: usize,
@@ -362,7 +491,11 @@ impl PartitionCoverage {
         if expected.part != part {
             return Err(ParentPartitionError::RowOutsideParts);
         }
-        if expected.name != name || Some(expected.parent.as_str()) != parent {
+        let parent_matches = match &expected.parent {
+            Some(expected_parent) => Some(expected_parent.as_str()) == parent,
+            None => parent.is_none_or(|parent| !self.excluded.contains(parent)),
+        };
+        if expected.name != name || !parent_matches {
             return Err(ParentPartitionError::RowDiffersFromCatalogue);
         }
         self.remaining.remove(&key);

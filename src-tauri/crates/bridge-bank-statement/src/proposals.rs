@@ -200,6 +200,21 @@ fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {
     format!("st-{:04}{:02}{:02}-{hex}", date.year, date.month, date.day)
 }
 
+/// Whether `id` has the form `transaction_id` produces: `st-`, the row's date
+/// as eight digits, `-`, and sixteen lower-case hex digits. Such an id hashes
+/// the account, date, amounts, running balance and narration, so two rows share
+/// one only when the statement printed them identically.
+pub fn is_statement_txn_id(id: &str) -> bool {
+    let bytes = id.as_bytes();
+    bytes.len() == 28
+        && id.starts_with("st-")
+        && bytes[3..11].iter().all(u8::is_ascii_digit)
+        && bytes[11] == b'-'
+        && bytes[12..]
+            .iter()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 fn admissible_text(text: &str, limit: usize) -> bool {
     text.chars().count() <= limit
         && !text

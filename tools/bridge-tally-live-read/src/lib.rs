@@ -44,6 +44,10 @@ Education waits for the Collection-based reads (Phase 2 Unit A); use a licensed 
 const CONFIG_SCHEMA_VERSION: u16 = 1;
 const FIXTURE_SCHEMA_VERSION: u16 = 1;
 const MAX_LOCAL_INPUT_BYTES: usize = 64 * 1024;
+/// The authored pin list. It is not itself pinned, but it decides what is guarded, so the drift
+/// check covers it too: an uncommitted edit that drops a pin would otherwise shrink the guard.
+pub(crate) const SURFACE_RELATIVE_PATH: &str =
+    "docs/tally/compatibility/compatibility-surface.json";
 const NETWORK_CONSENT_TTL_MS: i64 = 5 * 60 * 1000;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -166,8 +170,7 @@ impl LiveRunInputs {
             serde_json::from_slice(&fixture_bytes).map_err(|_| error("fixture_invalid"))?;
         validate_fixture(&fixture)?;
 
-        let surface_path =
-            repository_root.join("docs/tally/compatibility/compatibility-surface.json");
+        let surface_path = repository_root.join(SURFACE_RELATIVE_PATH);
         let surface = resolve_surface_refusing_drift(
             &repository_root,
             &read_bounded(&surface_path, MAX_ARTIFACT_BYTES, "surface_unavailable")?,
@@ -1144,17 +1147,72 @@ fn read_bounded(path: &Path, maximum: usize, code: &'static str) -> Result<Vec<u
     fs::read(path).map_err(|_| error(code))
 }
 
-fn git_output(repository_root: &Path, arguments: &[&str]) -> Result<String, LiveReadError> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(repository_root)
-        .args(arguments)
-        .output()
-        .map_err(|_| error("git_unavailable"))?;
+/// Variables that redirect git to another repository, index, object store or configuration. A
+/// collector started from a git hook or a wrapper inherits some of them, and git would then answer
+/// for a different checkout than the one whose pinned files are being hashed.
+const GIT_REDIRECTING_ENVIRONMENT: [&str; 12] = [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+];
+
+/// Every git call goes through this: `git -C <root>` with the redirecting variables removed.
+fn git_command(repository_root: &Path) -> Command {
+    let mut command = Command::new("git");
+    command.arg("-C").arg(repository_root);
+    for name in GIT_REDIRECTING_ENVIRONMENT {
+        command.env_remove(name);
+    }
+    command
+}
+
+/// Runs git and returns its raw stdout; any spawn failure, non-zero exit or output over the bound
+/// is an error, never an empty answer. `stdin` is fed to the child when given.
+fn git_raw_output(
+    repository_root: &Path,
+    arguments: &[&str],
+    stdin: Option<&[u8]>,
+) -> Result<Vec<u8>, LiveReadError> {
+    let mut command = git_command(repository_root);
+    command.args(arguments);
+    let output = match stdin {
+        None => command.output().map_err(|_| error("git_unavailable"))?,
+        Some(input) => {
+            use std::process::Stdio;
+            let mut child = command
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .map_err(|_| error("git_unavailable"))?;
+            child
+                .stdin
+                .take()
+                .ok_or_else(|| error("git_query_failed"))?
+                .write_all(input)
+                .map_err(|_| error("git_query_failed"))?;
+            child
+                .wait_with_output()
+                .map_err(|_| error("git_query_failed"))?
+        }
+    };
     if !output.status.success() || output.stdout.len() > MAX_LOCAL_INPUT_BYTES {
         return Err(error("git_query_failed"));
     }
-    String::from_utf8(output.stdout)
+    Ok(output.stdout)
+}
+
+fn git_output(repository_root: &Path, arguments: &[&str]) -> Result<String, LiveReadError> {
+    String::from_utf8(git_raw_output(repository_root, arguments, None)?)
         .map(|value| value.trim().to_string())
         .map_err(|_| error("git_query_failed"))
 }
@@ -1222,7 +1280,7 @@ fn validate_current_surface(
     repository_root: &Path,
     expected_manifest_sha256: &str,
 ) -> Result<(), LiveReadError> {
-    let path = repository_root.join("docs/tally/compatibility/compatibility-surface.json");
+    let path = repository_root.join(SURFACE_RELATIVE_PATH);
     let surface = resolve_surface_refusing_drift(
         repository_root,
         &read_bounded(&path, MAX_ARTIFACT_BYTES, "surface_unavailable")?,
@@ -1236,11 +1294,16 @@ fn validate_current_surface(
 }
 
 /// Resolves the surface (the digest is computed from the live bytes of every pinned file) and
-/// refuses when any pinned path differs from HEAD, in the index or in the working tree. Schema 2
+/// refuses when the bytes of any pinned file differ from the blob committed at `HEAD`. Schema 2
 /// refused a drifted pinned file through its stored hash (`surface_changed`); schema 3 stores no
 /// hash, so without this refusal a live Tally session could run on edited pinned code and the
-/// mismatch would surface only at the gate afterwards. A pinned file is tracked, so untracked
-/// files are not considered here (the run metadata still records the whole tree's dirtiness).
+/// mismatch would surface only at the gate afterwards.
+///
+/// What this does NOT do: the reference is `HEAD`, not reviewed master. It refuses uncommitted
+/// edits to pinned files; a committed but not yet reviewed edit to a pinned request builder runs
+/// against live Tally, and is caught only at `scripts/merge-gate.sh` (the acknowledgement and the
+/// review that names the file). Schema 2's reference was the stored hash, which a reseal in the
+/// same pull request also moved, so that case was not caught before either.
 pub(crate) fn resolve_surface_refusing_drift(
     repository_root: &Path,
     surface_bytes: &[u8],
@@ -1251,29 +1314,87 @@ pub(crate) fn resolve_surface_refusing_drift(
     let surface = pins
         .resolve(repository_root)
         .map_err(|_| error(invalid_code))?;
-    let paths: Vec<&str> = pins.files.iter().map(|pin| pin.path.as_str()).collect();
-    refuse_drifted_paths(repository_root, &paths, drifted_code)?;
+    refuse_drifted_paths(repository_root, &paths_to_guard(&pins), drifted_code)?;
     Ok(surface)
 }
 
-/// Refuses when any of `paths` differs from `HEAD` in the index or working tree. Paths are taken
-/// literally, so a name containing `[`, `*`, `?` or a leading `:` cannot match another file. A file
-/// marked `assume-unchanged` or `skip-worktree` reads as clean here; the gate still sees its bytes.
+/// Every pinned path, then the pin list itself unless it is already pinned.
+fn paths_to_guard(pins: &SurfacePins) -> Vec<&str> {
+    let mut paths: Vec<&str> = pins.files.iter().map(|pin| pin.path.as_str()).collect();
+    if !paths.contains(&SURFACE_RELATIVE_PATH) {
+        paths.push(SURFACE_RELATIVE_PATH);
+    }
+    paths
+}
+
+/// Refuses unless every one of `paths` is a regular tracked file at `HEAD` whose bytes on disk are
+/// exactly the committed blob. Compared by `git hash-object --no-filters` against `git ls-tree`,
+/// not by `git status`, which answers "clean" for `assume-unchanged` and `skip-worktree` files,
+/// for edits hidden by clean filters or line-ending rules after `git add`, and on a stale stat
+/// cache. A path missing from `HEAD` (untracked, ignored, never committed), a symlink, or a tree
+/// that is not the repository at `repository_root` (an archive extract inside another checkout)
+/// refuses too. Paths are taken literally, and git runs without the redirecting environment.
 fn refuse_drifted_paths(
     repository_root: &Path,
     paths: &[&str],
     drifted_code: &'static str,
 ) -> Result<(), LiveReadError> {
-    let mut arguments = vec![
-        "--literal-pathspecs",
-        "status",
-        "--porcelain",
-        "--untracked-files=no",
-        "--",
-    ];
+    let refuse = || error(drifted_code);
+    // git answers for the repository it finds; it must be the one at `repository_root`.
+    let toplevel = git_output(repository_root, &["rev-parse", "--show-toplevel"])?;
+    let canonical_root = fs::canonicalize(repository_root).map_err(|_| refuse())?;
+    if fs::canonicalize(&toplevel).map_err(|_| refuse())? != canonical_root {
+        return Err(refuse());
+    }
+    if paths.is_empty() || paths.iter().any(|path| path.contains(['\n', '\0'])) {
+        return Err(refuse());
+    }
+
+    let mut arguments = vec!["--literal-pathspecs", "ls-tree", "-z", "HEAD", "--"];
     arguments.extend(paths);
-    if !git_output(repository_root, &arguments)?.is_empty() {
-        return Err(error(drifted_code));
+    let listing = git_raw_output(repository_root, &arguments, None)?;
+    let mut committed = std::collections::BTreeMap::new();
+    for entry in listing
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+    {
+        let entry = std::str::from_utf8(entry).map_err(|_| refuse())?;
+        let (meta, name) = entry.split_once('\t').ok_or_else(refuse)?;
+        let mut fields = meta.split(' ');
+        let (mode, kind, blob) = (fields.next(), fields.next(), fields.next());
+        // A regular file only: a symlink (120000) or a submodule would hash something else.
+        if !matches!(mode, Some("100644" | "100755")) || kind != Some("blob") {
+            return Err(refuse());
+        }
+        committed.insert(name, blob.ok_or_else(refuse)?);
+    }
+    let mut input = Vec::new();
+    for path in paths {
+        if !committed.contains_key(path) {
+            return Err(refuse());
+        }
+        input.extend_from_slice(path.as_bytes());
+        input.push(b'\n');
+    }
+    let hashes = git_raw_output(
+        repository_root,
+        &[
+            "--literal-pathspecs",
+            "hash-object",
+            "--no-filters",
+            "--stdin-paths",
+        ],
+        Some(&input),
+    )?;
+    let hashes = String::from_utf8(hashes).map_err(|_| refuse())?;
+    let mut actual = hashes.lines();
+    for path in paths {
+        if actual.next() != committed.get(path).copied() {
+            return Err(refuse());
+        }
+    }
+    if actual.next().is_some() {
+        return Err(refuse());
     }
     Ok(())
 }

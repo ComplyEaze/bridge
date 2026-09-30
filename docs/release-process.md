@@ -32,19 +32,27 @@ compatibility gate is involved.
 **Enforcement today.** The GitHub check is report-only: it prints
 `WOULD FAIL: <reason>` and exits 0, so it does not block a merge. The blocking
 leg is `scripts/merge-gate.sh`, a local tool run by whoever merges (the
-orchestrator), not CI. Making the CI check enforcing is a later one-line change to
-`ci.yml`, which is itself a pinned file and needs its own acknowledgement.
+orchestrator), not CI. The one exception is a push to master, which is always
+enforced (below). Making the pull request check enforcing is a later change to two
+pinned files: drop `--report-only` from the step in
+`.github/workflows/ci.yml` and change the exact step text that
+`scripts/check-ci-workflow-consistency.mjs` requires, both pinned, with their own
+acknowledgement.
 
 What this trades away, stated plainly. Under schema 2 the required
 `Tally portable core` job failed a pull request, and again the master push, when a
 pinned file's bytes differed from its stored hash. Nothing stored remains to
-compare, so no CI run can now go red on an unacknowledged pinned change after the
-fact: a pull request merged without `scripts/merge-gate.sh` reaches master with
-every check green, and while the check is report-only that holds even on the pull
-request. When enforcement is switched on, the pull request check will fail, but the
-master push run will still only check that acknowledgement files are well formed.
-Detecting a bypass after merge means comparing a merged pinned change with its
-acknowledgement file by hand.
+compare, so that job can no longer fail on a changed pinned file. On a pull request,
+while the check is report-only, a change merged without `scripts/merge-gate.sh`
+reaches master with every check green. What restores the after-the-fact tripwire: a
+push to master is checked like a pull request and is never report-only. The landed
+commit (`HEAD^1..HEAD`, one squashed pull request, attributed by the `(#N)` in its
+subject) must carry exactly the acknowledgement its pinned changes need, and the
+master run goes red if it does not. This covers the base race: `merge-gate.sh` reads
+the pin list when it runs but the merge binds only the head, so another pull request
+that pins a file after this one was gated lets an unacknowledged change land; the
+master run then fails instead of nobody noticing. It does not stop the merge, and a
+red master needs an acknowledgement-only follow-up pull request to clear.
 
 #### What the surface is
 
@@ -122,8 +130,10 @@ looked at in the review.
   - `merge_group` (once a merge queue exists): checks each first-parent commit in
     `base_sha..head_sha` against its own acknowledgement, and fails closed when a
     commit cannot be attributed to one pull request.
-  - `push` and `workflow_dispatch`: the diff is already merged, so it only
-    validates that every file in the acknowledgements directory is well formed.
+  - `push` (master): the landed commit is checked like a pull request, `HEAD^1..HEAD`
+    attributed by the `(#N)` in its subject, and a failure is never report-only. It
+    also validates that every file in the acknowledgements directory is well formed.
+  - `workflow_dispatch`: only the acknowledgements directory is validated.
   The checker runs from the pull request's own tree, so a pull request could weaken
   it; that is why the script and `ci.yml` are pinned, which makes the change
   visible and acknowledged. A change that makes the checker skip itself shows no
@@ -147,8 +157,9 @@ looked at in the review.
 The digest is the same one schema 2 produced for the same bytes, so an
 attestation or receipt made against the old surface stays valid exactly as long
 as no pinned byte changes and the pin list is unchanged (adding or removing a pin
-moves the digest too). Adding the two gate scripts as pins, in the cut-over itself,
-moved the digest once. Print the current digest with
+moves the digest too). Adding four pins (`.gitattributes`, the acknowledgement checker,
+`scripts/merge-gate.sh` and `scripts/check-ci-workflow-consistency.mjs`) in the
+cut-over itself moved the digest once. Print the current digest with
 `cargo run -p bridge-tally-compatibility -- surface-digest docs/tally/compatibility/compatibility-surface.json .`
 (the `surface-digest` subcommand resolves the surface the same way the gate does).
 
@@ -157,9 +168,20 @@ Two byte changes have no pinned path in a diff, and are closed differently. A
 `working-tree-encoding` rules) changes the bytes a pinned file is hashed as, so the
 acknowledgement checks refuse any nested `.gitattributes` outright. A pinned path
 that is, or sits under, a symbolic link would make the digest follow an unpinned
-target, so `resolve` refuses it (`surface_file_symlink`). Known, unclosed: a file
-marked `assume-unchanged` or `skip-worktree` reads as clean to the live-read drift
-refusal; the gate still hashes its bytes. A pull request stacked on another carries
+target, so `resolve` refuses it (`surface_file_symlink`).
+
+The live-read collectors (`bridge-tally-live-read` and its native outstandings
+qualification) refuse to start unless every pinned file on disk is byte-identical
+to the blob committed at `HEAD` (`git hash-object --no-filters` against
+`git ls-tree`, so `assume-unchanged`, `skip-worktree`, clean filters, line-ending
+rules and a stale stat cache cannot hide an edit; an untracked or ignored pin, a
+symlink or a tree that is not the repository at the root refuses; git runs
+without `GIT_DIR` and the other redirecting variables). The reference is `HEAD`,
+not reviewed master: this refuses uncommitted edits only. A committed but not yet
+reviewed edit to a pinned request builder runs against live Tally, and is caught
+at `scripts/merge-gate.sh`, where the acknowledgement and the review name the file.
+Schema 2's reference was the stored hash, which a reseal in the same pull request
+moved too, so that case was not caught before either. A pull request stacked on another carries
 its own acknowledgement, so when the child merges into the parent branch and the
 parent then goes to master, it holds two. Fold them into the parent's `pr-<N>.txt`
 (the union of the two path lists) before the parent merges; both checkers require

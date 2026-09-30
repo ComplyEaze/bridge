@@ -10,6 +10,11 @@
 //
 // Exit 0: pass, or --report-only (prints "WOULD FAIL: ..."). Exit 1: a rule failed, or git could
 // not answer (fail closed). Exit 2: bad command-line usage.
+// A `push` event (master) is the one mode --report-only does not soften: the commit that landed is
+// checked like a pull request, HEAD^1..HEAD attributed by the `(#N)` in its subject (each squash
+// commit is one pull request), and an unacknowledged pinned change turns the master run red. That
+// is the after-the-fact tripwire the stored hashes used to give; merge-gate.sh reads the base when
+// it runs but the merge binds only the head, so a base that moved in between is caught here.
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
@@ -260,7 +265,22 @@ function mergeGroup(opts, env) {
   }
 }
 
-// push / workflow_dispatch: the diff is already merged, so only check the acks are well formed.
+// push (master): the commit that landed is one squashed pull request, named by `(#N)` (or
+// "Merge pull request #N") in its subject. Same rules as a pull request, and never report-only.
+function pushedCommit() {
+  try {
+    const subject = git("log", "-1", "--format=%s", "HEAD", "--").trim();
+    const named = /\(#([1-9][0-9]*)\)$/.exec(subject) ?? /^Merge pull request #([1-9][0-9]*)\b/.exec(subject);
+    git("rev-parse", "--verify", "HEAD^1");
+    const number = named ? Number(named[1]) : NaN;
+    return { ...evaluate("push HEAD^1..HEAD", "HEAD^1", "HEAD", number), strict: true };
+  } catch (error) {
+    return { ...failure("push HEAD^1..HEAD", error), strict: true };
+  }
+}
+
+// workflow_dispatch (and the second half of push): the diff is already merged, so check the acks
+// directory is well formed.
 function acksDirectory() {
   try {
     const names = git("ls-tree", "-r", "--name-only", "-z", "HEAD", "--", ACK_DIR).split("\0").filter(Boolean);
@@ -300,7 +320,9 @@ export function main(argv, env) {
     console.error(`${error.message}\nusage: check-surface-ack.mjs --mode pull_request|merge_group|push [--report-only] [--pr N] [--base REV]`);
     return 2;
   }
-  const results = { pull_request: pullRequest, merge_group: mergeGroup }[opts.mode]?.(opts, env) ?? acksDirectory();
+  const results =
+    { pull_request: pullRequest, merge_group: mergeGroup }[opts.mode]?.(opts, env) ??
+    (opts.mode === "push" && env.GITHUB_EVENT_NAME !== "workflow_dispatch" ? [pushedCommit(), ...acksDirectory()] : acksDirectory());
   for (const r of results) {
     const list = r.touched.length ? `${r.touched.length}: ${r.touched.join(", ")}` : "none";
     console.log(`[${r.label}] touched pinned files (${list})`);
@@ -311,11 +333,12 @@ export function main(argv, env) {
     return 0;
   }
   const reasons = failed.flatMap((r) => r.reasons);
-  console.log(`${opts.reportOnly ? "WOULD FAIL" : "surface ack check FAILED"}: ${reasons.join("; ")}`);
+  const blocking = !opts.reportOnly || failed.some((r) => r.strict);
+  console.log(`${blocking ? "surface ack check FAILED" : "WOULD FAIL"}: ${reasons.join("; ")}`);
   // Report-only exits 0, which a green check cannot tell from a pass (a git failure looks the same),
   // so surface it as a workflow annotation as well.
-  if (opts.reportOnly) console.log(`::warning title=Surface acknowledgement (report-only)::${annotationSafe(reasons.join("; "))}`);
-  return opts.reportOnly ? 0 : 1;
+  if (!blocking) console.log(`::warning title=Surface acknowledgement (report-only)::${annotationSafe(reasons.join("; "))}`);
+  return blocking ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

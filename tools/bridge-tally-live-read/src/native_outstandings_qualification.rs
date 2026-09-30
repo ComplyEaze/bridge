@@ -47,7 +47,7 @@ use thiserror::Error;
 use super::{
     canonical_join, current_architecture, current_platform, encoding, git_output, read_bounded,
     read_loopback, resolve_surface_refusing_drift, save_receipt_no_replace, sha256_hex,
-    valid_commit, valid_release, valid_slug, MAX_LOCAL_INPUT_BYTES,
+    valid_commit, valid_release, valid_slug, MAX_LOCAL_INPUT_BYTES, SURFACE_RELATIVE_PATH,
 };
 
 const CONFIG_SCHEMA_VERSION: u16 = 1;
@@ -394,8 +394,7 @@ impl LoadedNativeOutstandingsProbe {
         }
         let ui_before = load_ui(&ui_before_path, "native_probe_ui_before_unavailable")?;
 
-        let surface_path =
-            repository_root.join("docs/tally/compatibility/compatibility-surface.json");
+        let surface_path = repository_root.join(SURFACE_RELATIVE_PATH);
         let surface = resolve_surface_refusing_drift(
             &repository_root,
             &read_bounded(

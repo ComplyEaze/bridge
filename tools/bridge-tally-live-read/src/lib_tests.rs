@@ -1,4 +1,5 @@
 use super::*;
+use bridge_tally_compatibility::SurfacePin;
 use tally_protocol_simulator::{Fixture, ScenarioPlan, Simulator, WireEncoding};
 
 const SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -350,62 +351,265 @@ async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_th
 }
 
 fn git_in(directory: &Path, arguments: &[&str]) {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(directory)
+    let status = git_command(directory)
         .args(["-c", "user.name=t", "-c", "user.email=t@example.invalid"])
         .args(arguments)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()
         .unwrap();
     assert!(status.success(), "git {arguments:?} failed");
 }
 
+fn status_is_clean(directory: &Path) -> bool {
+    git_output(directory, &["status", "--porcelain"])
+        .unwrap()
+        .is_empty()
+}
+
+/// A throwaway repository with `a.rs` ("one\n") and `[b].rs` committed, removed on drop.
+struct Repo(PathBuf);
+
+impl Repo {
+    fn new(label: &str) -> Self {
+        let directory = std::env::temp_dir().join(format!(
+            "bridge-live-read-drift-{label}-{}-{}",
+            std::process::id(),
+            now_unix_ms().unwrap()
+        ));
+        fs::create_dir(&directory).unwrap();
+        git_in(&directory, &["init", "-q"]);
+        fs::write(directory.join("a.rs"), b"one\n").unwrap();
+        fs::write(directory.join("[b].rs"), b"two\n").unwrap();
+        fs::write(directory.join("b.rs"), b"three\n").unwrap();
+        git_in(&directory, &["add", "."]);
+        git_in(&directory, &["commit", "-q", "-m", "base"]);
+        Self(directory)
+    }
+
+    fn check(&self, paths: &[&str]) -> Result<(), LiveReadError> {
+        refuse_drifted_paths(&self.0, paths, "surface_changed")
+    }
+}
+
+impl Drop for Repo {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+const DRIFT: Result<(), LiveReadError> = Err(LiveReadError {
+    code: "surface_changed",
+});
+
 #[test]
-fn a_drifted_pinned_path_is_refused_and_a_clean_or_untracked_one_is_not() {
-    let directory = std::env::temp_dir().join(format!(
-        "bridge-live-read-drift-test-{}-{}",
-        std::process::id(),
-        now_unix_ms().unwrap()
-    ));
-    fs::create_dir(&directory).unwrap();
-    git_in(&directory, &["init", "-q"]);
-    fs::write(directory.join("a.rs"), b"one").unwrap();
-    fs::write(directory.join("[b].rs"), b"two").unwrap();
-    fs::write(directory.join("b.rs"), b"three").unwrap();
-    git_in(&directory, &["add", "."]);
-    git_in(&directory, &["commit", "-q", "-m", "base"]);
+fn clean_committed_pins_pass_and_an_edit_of_any_kind_is_refused() {
+    let repo = Repo::new("edit");
+    assert_eq!(repo.check(&["a.rs", "[b].rs"]), Ok(()));
+    // Pathspecs are literal: "[b].rs" must not stand for "b.rs".
+    fs::write(repo.0.join("b.rs"), b"changed\n").unwrap();
+    assert_eq!(repo.check(&["[b].rs"]), Ok(()));
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    assert_eq!(repo.check(&["a.rs", "[b].rs"]), DRIFT);
+    // A staged edit counts too.
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
 
-    let clean = refuse_drifted_paths(&directory, &["a.rs", "[b].rs"], "surface_changed");
-    // An untracked file is not drift: only tracked pinned paths are compared with HEAD.
-    fs::write(directory.join("untracked.rs"), b"new").unwrap();
-    let untracked = refuse_drifted_paths(&directory, &["untracked.rs"], "surface_changed");
+#[test]
+fn an_index_flag_cannot_hide_an_edit() {
+    for flag in ["--assume-unchanged", "--skip-worktree"] {
+        let repo = Repo::new("flag");
+        git_in(&repo.0, &["update-index", flag, "a.rs"]);
+        fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+        assert!(
+            status_is_clean(&repo.0),
+            "premise: git status is fooled by {flag}"
+        );
+        assert_eq!(repo.check(&["a.rs"]), DRIFT, "{flag}");
+    }
+}
 
-    // A working-tree edit to one pinned file is drift; an edit only to the file a glob would have
-    // matched is not, because pathspecs are literal ("[b].rs" must not match "b.rs").
-    fs::write(directory.join("b.rs"), b"changed").unwrap();
-    let glob = refuse_drifted_paths(&directory, &["[b].rs"], "surface_changed");
-    fs::write(directory.join("a.rs"), b"edited").unwrap();
-    let drifted = refuse_drifted_paths(&directory, &["a.rs", "[b].rs"], "surface_changed");
-    // A staged change counts too.
-    git_in(&directory, &["checkout", "-q", "--", "a.rs"]);
-    fs::write(directory.join("a.rs"), b"staged").unwrap();
-    git_in(&directory, &["add", "a.rs"]);
-    let staged = refuse_drifted_paths(&directory, &["a.rs"], "surface_changed");
-    // A failed git query is an error, not a clean answer.
-    let not_a_repository = std::env::temp_dir().join(format!(
+#[test]
+fn a_line_ending_rule_after_git_add_cannot_hide_an_edit() {
+    let repo = Repo::new("eol");
+    fs::write(repo.0.join(".git/info/attributes"), b"a.rs text eol=lf\n").unwrap();
+    fs::write(repo.0.join("a.rs"), b"one\r\n").unwrap();
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: the CRLF edit normalises to the committed blob"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_clean_filter_after_git_add_cannot_hide_an_edit() {
+    let repo = Repo::new("filter");
+    fs::write(
+        repo.0.join(".git/info/attributes"),
+        b"a.rs filter=restore\n",
+    )
+    .unwrap();
+    git_in(
+        &repo.0,
+        &["config", "filter.restore.clean", "sed s/edited/one/"],
+    );
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    git_in(&repo.0, &["add", "a.rs"]);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: the filter maps the edit back to the committed blob"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[test]
+fn a_stale_stat_cache_cannot_hide_a_same_size_edit() {
+    let repo = Repo::new("stat");
+    git_in(&repo.0, &["config", "core.checkStat", "minimal"]);
+    // An old mtime, so the index entry is not "racily clean" (git re-reads those regardless).
+    let modified = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    let set_modified = |when| {
+        fs::OpenOptions::new()
+            .write(true)
+            .open(repo.0.join("a.rs"))
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    };
+    set_modified(modified);
+    git_in(&repo.0, &["add", "a.rs"]);
+    fs::write(repo.0.join("a.rs"), b"two\n").unwrap();
+    set_modified(modified);
+    assert!(
+        status_is_clean(&repo.0),
+        "premise: same size and mtime, so git status is fooled"
+    );
+    assert_eq!(repo.check(&["a.rs"]), DRIFT);
+}
+
+#[test]
+fn an_untracked_ignored_or_uncommitted_pin_is_refused() {
+    let repo = Repo::new("untracked");
+    fs::write(repo.0.join("untracked.rs"), b"new\n").unwrap();
+    assert_eq!(repo.check(&["untracked.rs"]), DRIFT);
+    fs::write(repo.0.join(".gitignore"), b"ignored.rs\n").unwrap();
+    fs::write(repo.0.join("ignored.rs"), b"new\n").unwrap();
+    assert_eq!(repo.check(&["ignored.rs"]), DRIFT);
+    // Added to the index but not committed: not at HEAD.
+    git_in(&repo.0, &["add", "untracked.rs"]);
+    assert_eq!(repo.check(&["untracked.rs"]), DRIFT);
+    // A committed pin that is gone from disk is an error, never a clean answer.
+    fs::remove_file(repo.0.join("a.rs")).unwrap();
+    assert!(repo.check(&["a.rs"]).is_err());
+}
+
+#[test]
+fn a_pin_spelled_in_another_case_is_refused() {
+    // On a case-insensitive filesystem the file would still be read; git does not know the name.
+    let repo = Repo::new("case");
+    assert_eq!(repo.check(&["A.rs"]), DRIFT);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_committed_symlink_is_refused() {
+    let repo = Repo::new("symlink");
+    std::os::unix::fs::symlink("a.rs", repo.0.join("link.rs")).unwrap();
+    git_in(&repo.0, &["add", "link.rs"]);
+    git_in(&repo.0, &["commit", "-q", "-m", "link"]);
+    assert_eq!(repo.check(&["link.rs"]), DRIFT);
+}
+
+#[test]
+fn a_tree_that_is_not_the_repository_git_answers_for_is_refused() {
+    let repo = Repo::new("nested");
+    // An archive extract: same file names, no .git of its own, inside another repository.
+    let nested = repo.0.join("extract");
+    fs::create_dir(&nested).unwrap();
+    fs::write(nested.join("a.rs"), b"one\n").unwrap();
+    assert_eq!(
+        refuse_drifted_paths(&nested, &["a.rs"], "surface_changed"),
+        DRIFT
+    );
+    // A directory that is no repository at all is a failed query.
+    let outside = std::env::temp_dir().join(format!(
         "bridge-live-read-drift-none-{}-{}",
         std::process::id(),
         now_unix_ms().unwrap()
     ));
-    fs::create_dir(&not_a_repository).unwrap();
-    let failed = refuse_drifted_paths(&not_a_repository, &["a.rs"], "surface_changed");
+    fs::create_dir(&outside).unwrap();
+    let failed = refuse_drifted_paths(&outside, &["a.rs"], "surface_changed");
+    fs::remove_dir_all(&outside).unwrap();
+    assert!(failed.is_err());
+}
 
-    fs::remove_dir_all(&directory).unwrap();
-    fs::remove_dir_all(&not_a_repository).unwrap();
-    assert_eq!(clean, Ok(()));
-    assert_eq!(untracked, Ok(()));
-    assert_eq!(glob, Ok(()));
-    assert_eq!(drifted, Err(error("surface_changed")));
-    assert_eq!(staged, Err(error("surface_changed")));
-    assert_eq!(failed, Err(error("git_query_failed")));
+#[test]
+fn an_inherited_git_environment_cannot_redirect_the_check() {
+    use std::sync::Mutex;
+    static ENVIRONMENT: Mutex<()> = Mutex::new(());
+    let _guard = ENVIRONMENT
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let repo = Repo::new("env-checkout");
+    let elsewhere = Repo::new("env-elsewhere");
+    fs::write(elsewhere.0.join("a.rs"), b"edited\n").unwrap();
+    // The variables point at a checkout whose pinned file differs; the check must ignore them.
+    std::env::set_var("GIT_DIR", elsewhere.0.join(".git"));
+    std::env::set_var("GIT_WORK_TREE", &elsewhere.0);
+    std::env::set_var("GIT_INDEX_FILE", elsewhere.0.join(".git/index"));
+    let clean_checkout = repo.check(&["a.rs"]);
+    fs::write(repo.0.join("a.rs"), b"edited\n").unwrap();
+    let edited_checkout = repo.check(&["a.rs"]);
+    for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
+        std::env::remove_var(name);
+    }
+    assert_eq!(clean_checkout, Ok(()));
+    assert_eq!(edited_checkout, DRIFT);
+}
+
+#[test]
+fn every_git_call_runs_without_the_redirecting_environment() {
+    let command = git_command(Path::new("."));
+    let removed: Vec<_> = command
+        .get_envs()
+        .filter(|(_, value)| value.is_none())
+        .map(|(name, _)| name.to_string_lossy().into_owned())
+        .collect();
+    for name in GIT_REDIRECTING_ENVIRONMENT {
+        assert!(
+            removed.iter().any(|removed| removed == name),
+            "{name} not removed"
+        );
+    }
+}
+
+#[test]
+fn the_pin_list_itself_is_drift_checked() {
+    let pins = SurfacePins {
+        schema_version: 3,
+        files: vec![SurfacePin {
+            path: "a.rs".to_string(),
+            reason: None,
+        }],
+    };
+    assert_eq!(paths_to_guard(&pins), vec!["a.rs", SURFACE_RELATIVE_PATH]);
+    // The pin list is checked like any pin: an uncommitted edit that drops an entry refuses.
+    let repo = Repo::new("pinlist");
+    let directory = repo.0.join("docs/tally/compatibility");
+    fs::create_dir_all(&directory).unwrap();
+    let list = directory.join("compatibility-surface.json");
+    fs::write(
+        &list,
+        b"{\"schema_version\":3,\"files\":[{\"path\":\"a.rs\"}]}\n",
+    )
+    .unwrap();
+    git_in(&repo.0, &["add", "."]);
+    git_in(&repo.0, &["commit", "-q", "-m", "list"]);
+    let paths = paths_to_guard(&pins);
+    assert_eq!(repo.check(&paths), Ok(()));
+    fs::write(&list, b"{\"schema_version\":3,\"files\":[]}\n").unwrap();
+    assert_eq!(repo.check(&paths), DRIFT);
 }

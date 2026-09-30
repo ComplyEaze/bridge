@@ -164,7 +164,8 @@ jobs:
       - run: node scripts/check-ci-workflow-consistency.mjs
       # A pull request that changes a pinned file, or the pin list, adds its own
       # acknowledgement file (docs/release-process.md). Report-only until the rule has
-      # run on real pull requests: it prints WOULD FAIL and exits 0.
+      # run on real pull requests: it prints WOULD FAIL and exits 0. A push to master is
+      # the exception: the landed commit is always enforced, whatever the flag says.
       - name: Check the surface acknowledgement
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}

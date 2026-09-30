@@ -532,23 +532,62 @@ test("merge_group mode fails closed when a commit cannot be attributed to exactl
   assert.equal(noBase.status, 1);
 });
 
-test("push and workflow_dispatch modes only validate that the acks directory is well formed", () => {
+test("workflow_dispatch only validates that the acks directory is well formed", () => {
   const r = prRepo();
   r.write("a.txt", "changed\n");
-  r.ackFile(7, ["a.txt"]);
-  r.commit("good ack");
-  for (const mode of ["push", "workflow_dispatch"]) assert.equal(cli(r.dir, ["--mode", mode]).status, 0);
+  r.commit("pinned change with no ack at all");
+  assert.equal(cli(r.dir, ["--mode", "workflow_dispatch"]).status, 0);
+  assert.equal(cli(r.dir, ["--mode", "push"], { GITHUB_EVENT_NAME: "workflow_dispatch" }).status, 0, "a push-mode run started by workflow_dispatch is not a landed pull request");
   r.write(`${ACK_DIR}pr-8.txt`, `b.txt\nreviewer: octocat\n# ${"ab".repeat(32)}\n`);
   r.commit("hex ack");
-  const hex = cli(r.dir, ["--mode", "push"]);
+  const hex = cli(r.dir, ["--mode", "workflow_dispatch"]);
   assert.equal(hex.status, 1);
   assert.match(hex.stdout, /pr-8\.txt: contains a 64-hex token/);
-  assert.equal(cli(r.dir, ["--mode", "push", "--report-only"]).status, 0);
+  assert.equal(cli(r.dir, ["--mode", "workflow_dispatch", "--report-only"]).status, 0);
   r.write(`${ACK_DIR}pr-8.txt`, "b.txt\nreviewer: octocat\n");
   r.write(`${ACK_DIR}my-branch.txt`, "b.txt\nreviewer: octocat\n");
   r.commit("badly named ack");
-  assert.match(cli(r.dir, ["--mode", "push"]).stdout, /my-branch\.txt: not named pr-<N>\.txt/);
-  assert.equal(cli(makeRepo().dir, ["--mode", "push"]).status, 1, "a directory that is not a git repository or has no commits fails closed");
+  assert.match(cli(r.dir, ["--mode", "workflow_dispatch"]).stdout, /my-branch\.txt: not named pr-<N>\.txt/);
+  assert.equal(cli(makeRepo().dir, ["--mode", "workflow_dispatch"]).status, 1, "a directory that is not a git repository or has no commits fails closed");
+});
+
+test("push mode checks the landed commit like a pull request and is never report-only", () => {
+  const r = prRepo();
+  // A pinned change with its ack, named by the squash subject.
+  r.write("a.txt", "changed\n");
+  r.ackFile(7, ["a.txt"]);
+  r.commit("Change a (#7)");
+  const ok = cli(r.dir, ["--mode", "push"]);
+  assert.equal(ok.status, 0, ok.stdout);
+  assert.match(ok.stdout, /\[push HEAD\^1\.\.HEAD\] touched pinned files \(1: a\.txt\)/);
+  // The base race: another pull request pinned b.txt after this one was gated, and this one
+  // edited b.txt with no ack. Every check at gate time was green; the master run must be red.
+  r.write("b.txt", "changed\n");
+  r.commit("Change b (#9)");
+  const race = cli(r.dir, ["--mode", "push"]);
+  assert.equal(race.status, 1);
+  assert.match(race.stdout, /exactly one ack must be added; found 0/);
+  assert.equal(cli(r.dir, ["--mode", "push", "--report-only"]).status, 1, "report-only does not soften a landed commit");
+  assert.doesNotMatch(cli(r.dir, ["--mode", "push", "--report-only"]).stdout, /::warning/);
+  // A commit that cannot be attributed to a pull request, with a pinned change, fails closed.
+  r.write("b.txt", "again\n");
+  r.commit("direct push with no number");
+  assert.match(cli(r.dir, ["--mode", "push"]).stdout, /pull request number is not known/);
+  // An unpinned change needs neither an ack nor a number.
+  r.write("other.txt", "changed\n");
+  r.commit("unpinned change");
+  assert.equal(cli(r.dir, ["--mode", "push"]).status, 0);
+  // A landed commit with a malformed ack, or a stray ack, is red too.
+  r.write(`${ACK_DIR}pr-12.txt`, "b.txt\nreviewer: octocat\n");
+  r.commit("stray ack (#12)");
+  assert.match(cli(r.dir, ["--mode", "push"]).stdout, /ack was added but no pinned path changed/);
+  // A repository with one commit has no HEAD^1: fails closed, as does a directory with no commits.
+  const one = makeRepo();
+  one.surface([{ path: "a.txt" }]);
+  one.write("a.txt", "a\n");
+  one.commit("only (#1)");
+  assert.equal(cli(one.dir, ["--mode", "push"]).status, 1);
+  assert.equal(cli(makeRepo().dir, ["--mode", "push"]).status, 1);
 });
 
 test("bad usage exits 2", () => {

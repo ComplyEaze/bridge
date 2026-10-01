@@ -7,7 +7,8 @@ use super::stock_summary::{
     admit_stock_summary_size, check_stock_premise, stock_summary_period, StockSummaryRead,
 };
 use super::trial_balance_tests::{
-    companies, config, decode, education, extents, identity, pair, status, xml, GUID,
+    companies as captured_companies, config, decode, education, extents as captured_extents, pair,
+    status, xml, GUID,
 };
 use super::*;
 use bridge_tally_protocol::native_masters::MASTERS_RESPONSE_BUDGET_BYTES;
@@ -22,9 +23,60 @@ use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator}
 /// The synthetic book the stock captures came from. Its GUID is replaced by the
 /// test double's company, so a captured collection binds to it.
 const CAPTURE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
-/// The test company's books start on 20260401 (the captured extent).
-const AS_OF: &str = "20260731";
+/// The only date stock has been measured at: the end of the financial year the
+/// captures were taken over, 20250401 to 20260331.
+const AS_OF: &str = "20260331";
 const TODAY: &str = "20260930";
+/// The test company's books start here. The captured extent says 20260401, which
+/// would put the captures' period before the books; its row in the companies
+/// list and its extent are moved a year back together, as the identity bracket
+/// compares them.
+const BOOKS_FROM: &str = "20250401";
+
+/// `text` with the test company's `BOOKSFROM` moved to [`BOOKS_FROM`], inside
+/// that company's own row only.
+fn with_books_from(text: String) -> String {
+    let from = "<BOOKSFROM TYPE=\"Date\">20260401</BOOKSFROM>";
+    let at = text.find(GUID).expect("the test company is listed");
+    let start = text[..at].rfind("<COMPANY ").unwrap();
+    let end = at + text[at..].find("</COMPANY>").unwrap();
+    let row = &text[start..end];
+    assert_eq!(row.matches(from).count(), 1);
+    format!(
+        "{}{}{}",
+        &text[..start],
+        row.replace(
+            from,
+            &format!("<BOOKSFROM TYPE=\"Date\">{BOOKS_FROM}</BOOKSFROM>")
+        ),
+        &text[end..]
+    )
+}
+
+fn companies() -> String {
+    with_books_from(captured_companies())
+}
+
+fn extents() -> String {
+    with_books_from(captured_extents())
+}
+
+/// The test company as its identity bracket verifies it.
+fn identity() -> VerifiedCompanyIdentity {
+    let companies = parse_companies_from_collection(&companies()).unwrap();
+    let row = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(GUID))
+        .unwrap();
+    VerifiedCompanyIdentity::from_observed_companies(
+        row.name.clone(),
+        GUID.into(),
+        row.company_number.clone().unwrap(),
+        row.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap()
+}
 
 fn items() -> String {
     decode(include_bytes!(
@@ -190,18 +242,18 @@ fn body_hash(request: &str) -> String {
     ))
 }
 
-/// The three requests a read of the test company sends over 20260401 to 20260731.
+/// The three requests a read of the test company sends over 20250401 to 20260331.
 fn sent_requests() -> [String; 3] {
     let name = identity().display_name().to_string();
     let period = stock_summary_period(
         DateBoundaryProfile::ModeAgnostic,
         &StockSummaryAsOf::new(TallyDate::parse(AS_OF).unwrap()).unwrap(),
-        &TallyDate::parse("20260401").unwrap(),
+        &TallyDate::parse(BOOKS_FROM).unwrap(),
         &TallyDate::parse(TODAY).unwrap(),
     )
     .unwrap();
     let company = ValidatedCompanyName::new(name.as_str()).unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260731").unwrap();
+    let range = ValidatedDateRange::new("20250401", "20260331").unwrap();
     [
         render_company_inventory_flags_request(&name, GUID).unwrap(),
         ReadOnlyProfile::AuditStockItemsV1 {
@@ -235,7 +287,7 @@ async fn a_whole_read_ties_through_every_bracket_and_sends_the_builders_requests
 
     let (read, extent) = result.unwrap();
     assert_eq!(observed.len(), WHOLE_READ);
-    assert_eq!(read.from, date("20260401"));
+    assert_eq!(read.from, date("20250401"));
     assert_eq!(read.to, date(AS_OF));
     assert_eq!(read.inventory.integrated, NativeFlag::Yes);
     assert_eq!(read.inventory.inventory_on, NativeFlag::Yes);
@@ -287,37 +339,24 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
         )
     };
     let pair = |from: &str, to: &str| (from.to_string(), to.to_string());
-    // A January as-of is in the financial year that began the April before.
-    assert_eq!(
-        admitted("20260131", "20240401", "20260930"),
-        pair("20250401", "20260131")
-    );
+    // A 31 March is the end of the financial year that began the April before.
     assert_eq!(
         admitted("20260331", "20240401", "20260930"),
         pair("20250401", "20260331")
     );
-    // April onward is the year that began on the 1st of that April.
     assert_eq!(
-        admitted("20260731", "20240401", "20260930"),
-        pair("20260401", "20260731")
-    );
-    assert_eq!(
-        admitted("20251231", "20240401", "20260930"),
-        pair("20250401", "20251231")
-    );
-    assert_eq!(
-        admitted("20260401", "20240401", "20260930"),
-        pair("20260401", "20260401")
+        admitted("20250331", "20240401", "20260930"),
+        pair("20240401", "20250331")
     );
     // The books' start, if it is later than the year's start.
     assert_eq!(
-        admitted("20260731", "20260515", "20260930"),
-        pair("20260515", "20260731")
+        admitted("20260331", "20250515", "20260930"),
+        pair("20250515", "20260331")
     );
     // As of the host's today is admitted.
     assert_eq!(
-        admitted("20260731", "20240401", "20260731"),
-        pair("20260401", "20260731")
+        admitted("20260331", "20240401", "20260331"),
+        pair("20250401", "20260331")
     );
     // Before the books, and after today, refuse.
     assert!(matches!(
@@ -332,7 +371,7 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
     assert!(matches!(
         period(
             DateBoundaryProfile::ModeAgnostic,
-            "20261031",
+            "20270331",
             "20240401",
             "20260930"
         ),
@@ -342,8 +381,8 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
     // start that is not a boundary the profile accepts is not honoured.
     let refused = period(
         DateBoundaryProfile::EducationRestricted,
-        "20260731",
-        "20260515",
+        "20260331",
+        "20250515",
         "20260930",
     );
     assert!(matches!(
@@ -542,7 +581,7 @@ async fn a_flags_answer_that_is_not_one_row_of_this_company_is_refused_before_an
 
 #[tokio::test]
 async fn an_as_of_before_the_books_or_after_today_is_refused_after_the_opening_extent() {
-    let (result, observed) = run_at(opening(extents()), "20260331", TODAY).await;
+    let (result, observed) = run_at(opening(extents()), "20250331", TODAY).await;
     let error = result.err().expect("refused");
     assert!(matches!(
         cause::<StockSummaryReadError>(&error),
@@ -550,7 +589,7 @@ async fn an_as_of_before_the_books_or_after_today_is_refused_after_the_opening_e
     ));
     assert_eq!(observed.len(), AT_OPENING_EXTENT);
 
-    let (result, observed) = run_at(opening(extents()), AS_OF, "20260630").await;
+    let (result, observed) = run_at(opening(extents()), AS_OF, "20260301").await;
     let error = result.err().expect("refused");
     assert!(matches!(
         cause::<StockSummaryReadError>(&error),

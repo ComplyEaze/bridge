@@ -85,9 +85,9 @@ fn decimal(text: &str) -> ExactDecimal {
     ExactDecimal::parse(text).expect("a plain decimal")
 }
 
-fn quantity_of(magnitude: &str, unit: &str) -> Option<NativeStockQuantity> {
+fn quantity_of(amount: &str, unit: &str) -> Option<NativeStockQuantity> {
     Some(NativeStockQuantity {
-        magnitude: decimal(magnitude),
+        amount: decimal(amount),
         unit: unit.to_string(),
     })
 }
@@ -1197,10 +1197,21 @@ fn totals_of(items: &str) -> NativeStockTotals {
     NativeStockTotals::of(&parse(items).unwrap().rows).unwrap()
 }
 
+/// The totals of the captured items after `edit` has been applied to each
+/// parsed row: the capture's text is untouched, only the parsed quantities and
+/// values change.
+fn totals_after(edit: impl Fn(&mut NativeStockItem)) -> NativeStockTotals {
+    let mut rows = parse(&items_response()).unwrap().rows;
+    rows.iter_mut().for_each(edit);
+    NativeStockTotals::of(&rows).unwrap()
+}
+
 #[test]
-fn the_totals_count_each_kind_of_item_and_withhold_a_sum_that_leaves_out_stock() {
+fn the_totals_count_each_kind_of_item_and_withhold_a_sum_with_an_unexplained_empty_value() {
     let totals = totals_of(&items_response());
-    // Zero Stock Item holds -50 Kgs with no value, so the sum is withheld.
+    // Four closing values are empty: Zero Stock Item holds -50 Kgs with none,
+    // and three items have neither a quantity nor a value. None of them has a
+    // quantity of zero, so the sum is withheld.
     assert_eq!(
         totals,
         NativeStockTotals {
@@ -1213,7 +1224,8 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_that_leaves_out_stock()
             partial: true,
         }
     );
-    // Without a quantity, that item holds no stock: the sum is the tie's.
+    // An empty quantity does not explain an empty value: blanking Zero Stock
+    // Item's quantity too leaves the sum withheld.
     let unstocked = replaced(
         &items_response(),
         "<CLOSINGBALANCE TYPE=\"Quantity\">-50.000 Kgs</CLOSINGBALANCE>",
@@ -1227,36 +1239,85 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_that_leaves_out_stock()
             zero_quantity_count: 0,
             empty_closing_quantity_count: 4,
             empty_closing_value_count: 4,
+            value_sum: None,
+            partial: true,
+        }
+    );
+    // A closing quantity that is present and zero is the one thing that
+    // explains an empty value: with all four at zero the sum is the tie's.
+    let zero = |item: &mut NativeStockItem| {
+        if item.closing.value.is_none() {
+            item.closing.quantity = quantity_of("0.000", "Nos");
+        }
+    };
+    assert_eq!(
+        totals_after(zero),
+        NativeStockTotals {
+            item_count: 11,
+            negative_closing_quantity_count: 0,
+            zero_quantity_count: 4,
+            empty_closing_quantity_count: 0,
+            empty_closing_value_count: 4,
             value_sum: Some(decimal("3000.01")),
             partial: false,
         }
     );
-    // A stocked item's value blanked: the sum is withheld again.
-    let blanked = replaced(
-        &unstocked,
-        "<CLOSINGVALUE TYPE=\"Amount\">2500.00</CLOSINGVALUE>",
-        "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>",
-    );
-    let totals = totals_of(&blanked);
+    // One of the four with no quantity again: the sum is withheld again.
+    let one_without_quantity = totals_after(|item| {
+        zero(item);
+        if item.name == "Label Roll" {
+            item.closing.quantity = None;
+        }
+    });
     assert_eq!(
         (
-            totals.partial,
-            totals.value_sum,
-            totals.empty_closing_value_count
+            one_without_quantity.partial,
+            one_without_quantity.value_sum,
+            one_without_quantity.zero_quantity_count,
+            one_without_quantity.empty_closing_quantity_count,
+        ),
+        (true, None, 3, 1)
+    );
+    // A stocked item's value blanked on top of the zeros: withheld.
+    let stocked_blank = totals_after(|item| {
+        zero(item);
+        if item.name == "Carton Box Small" {
+            item.closing.value = None;
+        }
+    });
+    assert_eq!(
+        (
+            stocked_blank.partial,
+            stocked_blank.value_sum,
+            stocked_blank.empty_closing_value_count
         ),
         (true, None, 5)
     );
-    // The same value blanked on an item whose quantity is zero is not a gap.
-    let zero = replaced(
-        &blanked,
-        "<CLOSINGBALANCE TYPE=\"Quantity\"> 100 Box</CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\">0 Box</CLOSINGBALANCE>",
-    );
-    let totals = totals_of(&zero);
+}
+
+#[test]
+fn a_book_whose_closing_quantities_and_values_are_all_empty_has_no_value_sum() {
+    // Every item with no quantity and no value: nothing says any holds none,
+    // so the sum is not zero, it is withheld.
+    let totals = totals_after(|item| {
+        item.closing.quantity = None;
+        item.closing.value = None;
+    });
     assert_eq!(
-        (totals.partial, totals.value_sum, totals.zero_quantity_count),
-        (false, Some(decimal("500.01")), 1)
+        totals,
+        NativeStockTotals {
+            item_count: 11,
+            negative_closing_quantity_count: 0,
+            zero_quantity_count: 0,
+            empty_closing_quantity_count: 11,
+            empty_closing_value_count: 11,
+            value_sum: None,
+            partial: true,
+        }
     );
+    let json = serde_json::to_value(&totals).unwrap();
+    assert_eq!(json["value_sum"], serde_json::Value::Null);
+    assert_eq!(json["partial"], true);
 }
 
 #[test]
@@ -1270,8 +1331,8 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
             "guid": format!("{COMPANY}-0000010c"),
             "parent": "Raw Chemicals",
             "base_unit": "Kgs",
-            "opening": {"quantity": {"magnitude": "200.000", "unit": "Kgs"}, "value": "9000.00"},
-            "closing": {"quantity": {"magnitude": "400.000", "unit": "Kgs"}, "value": "-1000.00"},
+            "opening": {"quantity": {"amount": "200.000", "unit": "Kgs"}, "value": "9000.00"},
+            "closing": {"quantity": {"amount": "400.000", "unit": "Kgs"}, "value": "-1000.00"},
         })
     );
     let empty = serde_json::to_value(item(&items, "Cleaning Kit B")).unwrap();
@@ -1294,21 +1355,28 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
 }
 
 #[test]
-fn only_day_one_two_or_thirty_one_is_a_supported_as_of() {
-    for day in ["01", "02", "31"] {
-        let date = TallyDate::parse(format!("202607{day}")).unwrap();
+fn only_a_31_march_is_an_as_of_that_can_be_constructed() {
+    // The financial-year end is the one date measured for stock, in any year.
+    for date in ["20260331", "20250331"] {
+        let date = TallyDate::parse(date).unwrap();
         assert_eq!(StockSummaryAsOf::new(date.clone()).unwrap().date(), &date);
     }
-    for day in ["03", "15", "30"] {
+    // Every other date is the typed refusal: another month's 31st and the
+    // first two days the boundary rule of other reads admits included; and a
+    // 31 March look-alike in another month or on another day.
+    for date in [
+        "20260731", "20260401", "20260402", "20260101", "20260301", "20260330", "20261231",
+        "20260930",
+    ] {
         assert_eq!(
-            StockSummaryAsOf::new(TallyDate::parse(format!("202606{day}")).unwrap()),
-            Err(NativeStockError::AsOfUnsupported),
-            "{day}"
+            StockSummaryAsOf::new(TallyDate::parse(date).unwrap()),
+            Err(NativeStockError::AsOfNotMeasured),
+            "{date}"
         );
     }
     assert_eq!(
-        NativeStockError::AsOfUnsupported.code(),
-        "stock_summary_as_of_unsupported"
+        NativeStockError::AsOfNotMeasured.code(),
+        "stock_summary_as_of_not_measured"
     );
 }
 
@@ -1330,7 +1398,7 @@ fn every_code_carries_the_stock_prefix_but_the_company_flags_refusals() {
         NativeStockError::ValueUnparseable,
         NativeStockError::ReportAmountInvalid,
         NativeStockError::SumInvalid,
-        NativeStockError::AsOfUnsupported,
+        NativeStockError::AsOfNotMeasured,
     ] {
         assert!(error.code().starts_with("stock_"), "{error:?}");
     }

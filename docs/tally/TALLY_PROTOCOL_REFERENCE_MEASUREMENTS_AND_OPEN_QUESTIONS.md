@@ -1256,13 +1256,13 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - `LANGUAGENAME.LIST` (aliases) was present on all eleven rows, each with one name. The largest row was 654 UTF-16 units with its line ends (641 without the carriage returns), names included.
 - **The Stock Summary by name.** `<ID>Stock Summary</ID>` in §12a.1's shape (`TYPE=Data`, the statements' envelope) returned no `HEADER` or `STATUS`, and one `DSPACCNAME` / `DSPSTKINFO` pair per top-level stock group (three here).
   - A pair's amount is `DSPSTKINFO/DSPSTKCL/DSPCLAMTA`. `DSPCLQTY` and `DSPCLRATE` sat beside it, empty. The amounts were `18750.00`, `14500.00` and `-30249.99`.
-  - **The report's closing amounts summed to the stock items' `CLOSINGVALUE` sum exactly (`3000.01`).** The same equality held on a client book, by role, at the same period end. It is measured at a financial year end only (`31-Mar`); an arbitrary `SVTODATE` is unmeasured for stock, so `stock_summary` admits only day 1, 2 or 31.
+  - **The report's closing amounts summed to the stock items' `CLOSINGVALUE` sum exactly (`3000.01`).** The same equality held on a client book, by role, at the same period end. It is measured at one financial year end only: 31 March 2026, the period 20250401 to 20260331. Other years' 31 March share that request shape but not the measurement, and any other `SVTODATE` is unmeasured for stock, so `stock_summary` admits only a 31 March `as_of` and refuses any other date as `stock_summary_as_of_not_measured`.
   - An empty `<ENVELOPE/>` (§12a.11) is not a total of zero: it is an answer that cannot be told from a report Tally did not render, and is not compared.
 - **The company's inventory flags.** The `Company` collection with its `FETCH` extended by `ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON` (and seven `NUM*` counts) and one single-term filter, `$GUID = "<the company's GUID>"`, returned exactly that company's row (§12a.7: without the filter every loaded company is returned). The three flags were `Yes`. `NUMSTOCKITEMS`, `NUMGODOWNS` and `NUMUNITS` equalled the rows of the stock items, godowns and units captures; `NUMVOUCHERTYPES` did not equal the voucher-type rows (§12a.12).
 - **Cost, by role, on a stock-heavy client book (several thousand items; figures rounded).** The Stock Summary report took about 1.5 s (about 150 KB, a few hundred top-level lines). One span of 2,000 items took about 1 s (about 3 MB). Bridge does not read stock items on such a book: its master-alteration mark is far above the admitted size (§12a.12).
 - **Not measured:**
   - a book whose inventory is not integrated with the accounts (what the report and the items then show);
-  - an `SVTODATE` that is not a financial year end or a day 1, 2 or 31;
+  - an `SVTODATE` other than 31 March 2026 (another year's 31 March, a day 1 or 2, any other date);
   - a quantity in a compound unit, or one with a unit that has a space;
   - the report with a godown or batch split, and the explode flag;
   - a foreign-currency book;

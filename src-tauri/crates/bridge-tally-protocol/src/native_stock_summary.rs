@@ -99,19 +99,21 @@ pub fn render_native_stock_summary_request(
     render_built_in_report_request("Stock Summary", company, period)
 }
 
-/// The date a stock summary is read as of. Only day 1, 2 or 31 of a month is
-/// admitted: an arbitrary `SVTODATE` is unmeasured for stock (it could be
-/// silently widened by Tally), and the report tie-out is measured only at a
-/// financial year end.
+/// The date a stock summary is read as of. Only a 31 March is constructible,
+/// because only a 31 March period end (a financial-year end) has been measured
+/// for stock, the report tie-out included. Any other date, one that the boundary
+/// rule of Bridge's other reads would admit included, is refused as
+/// [`NativeStockError::AsOfNotMeasured`]. Other dates will be admitted in a later
+/// change, once captures back them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StockSummaryAsOf(TallyDate);
 
 impl StockSummaryAsOf {
     pub fn new(date: TallyDate) -> Result<Self, NativeStockError> {
-        if matches!(&date.as_str()[6..8], "01" | "02" | "31") {
+        if matches!(&date.as_str()[4..8], "0331") {
             Ok(Self(date))
         } else {
-            Err(NativeStockError::AsOfUnsupported)
+            Err(NativeStockError::AsOfNotMeasured)
         }
     }
 
@@ -137,11 +139,11 @@ pub struct NativeInventoryFlags {
     pub batchwise: NativeFlag,
 }
 
-/// A quantity as Tally writes it, `<number> <unit>`. The magnitude keeps its
-/// sign.
+/// A quantity as Tally writes it, `<number> <unit>`. The amount is signed: it
+/// keeps the sign Tally sent, so a negative stock is a negative amount.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeStockQuantity {
-    pub magnitude: ExactDecimal,
+    pub amount: ExactDecimal,
     pub unit: String,
 }
 
@@ -198,7 +200,8 @@ pub enum NativeStockError {
     ValueUnparseable,
     ReportAmountInvalid,
     SumInvalid,
-    AsOfUnsupported,
+    /// The `as_of` is not a 31 March, the only date measured for stock.
+    AsOfNotMeasured,
 }
 
 impl NativeStockError {
@@ -226,7 +229,7 @@ impl NativeStockError {
             Self::ValueUnparseable => "stock_value_unparseable",
             Self::ReportAmountInvalid => "stock_report_amount_invalid",
             Self::SumInvalid => "stock_value_sum_invalid",
-            Self::AsOfUnsupported => "stock_summary_as_of_unsupported",
+            Self::AsOfNotMeasured => "stock_summary_as_of_not_measured",
         }
     }
 }
@@ -598,17 +601,16 @@ fn quantity(text: Option<String>) -> Result<Option<NativeStockQuantity>, NativeS
     if text.is_empty() {
         return Ok(None);
     }
-    let (magnitude, unit) = text
+    let (amount, unit) = text
         .split_once(' ')
         .ok_or(NativeStockError::QuantityUnparseable)?;
     if unit.is_empty() || unit.chars().any(char::is_whitespace) {
         return Err(NativeStockError::QuantityUnparseable);
     }
     within_name_bound(unit)?;
-    let magnitude =
-        ExactDecimal::parse(magnitude).map_err(|_| NativeStockError::QuantityUnparseable)?;
+    let amount = ExactDecimal::parse(amount).map_err(|_| NativeStockError::QuantityUnparseable)?;
     Ok(Some(NativeStockQuantity {
-        magnitude,
+        amount,
         unit: unit.to_string(),
     }))
 }
@@ -876,9 +878,11 @@ pub struct NativeStockTotals {
     /// Items whose closing quantity element was empty or absent: not zero.
     pub empty_closing_quantity_count: usize,
     pub empty_closing_value_count: usize,
-    /// The sum of the closing values, or `None` (with `partial`) when an item
-    /// with a non-zero closing quantity has an empty closing value: a sum that
-    /// leaves out an item that holds stock is not the stock's value.
+    /// The sum of the closing values, or `None` (with `partial`) whenever an
+    /// item's closing value is empty, unless its closing quantity is present and
+    /// zero: an empty value is not zero, so a sum that leaves one out is not the
+    /// stock's value, and an item whose quantity is empty or non-zero may hold
+    /// stock.
     pub value_sum: Option<ExactDecimal>,
     pub partial: bool,
 }
@@ -895,25 +899,26 @@ impl NativeStockTotals {
             partial: false,
         };
         for item in items {
-            let holds_stock = match &item.closing.quantity {
+            let zero_quantity = match &item.closing.quantity {
                 None => {
                     totals.empty_closing_quantity_count += 1;
                     false
                 }
-                Some(quantity) if quantity.magnitude.is_zero() => {
+                Some(quantity) if quantity.amount.is_zero() => {
                     totals.zero_quantity_count += 1;
-                    false
+                    true
                 }
                 Some(quantity) => {
-                    if quantity.magnitude.is_negative() {
+                    if quantity.amount.is_negative() {
                         totals.negative_closing_quantity_count += 1;
                     }
-                    true
+                    false
                 }
             };
             if item.closing.value.is_none() {
                 totals.empty_closing_value_count += 1;
-                totals.partial |= holds_stock;
+                // An empty value is a gap unless the item is known to hold none.
+                totals.partial |= !zero_quantity;
             }
         }
         if !totals.partial {

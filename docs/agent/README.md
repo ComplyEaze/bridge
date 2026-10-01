@@ -82,8 +82,9 @@ The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `masters`, `stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, and `egress_log`. (`masters`, `profit_and_loss` and
-`balance_sheet` are in source but not in the 0.3.0 release.) For a command-line
+`read_evidence`, and `egress_log`. (`masters`, `stock_summary`,
+`profit_and_loss` and `balance_sheet` are in source but not in the 0.3.0
+release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -330,25 +331,33 @@ are not masked: they are configuration labels, not counterparties.
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
 closing stock quantity and value per stock item, whether inventory is integrated
 with the accounts, and how many items have a negative closing quantity, checked
-against Tally's own Stock Summary total. `as_of` must be day 1, 2 or 31 of a
-month (anything else is refused as `stock_summary_as_of_unsupported` before any
-request: an arbitrary date is unmeasured for stock), not before the book's start
-and not after today. The period is the financial year containing `as_of`, from
-1 April, or the book's start if that is later.
+against Tally's own Stock Summary total. `as_of` must be a 31 March (a
+financial-year end), the only date measured for stock, and not before the book's
+start or after today. Any other date is refused as
+`stock_summary_as_of_not_measured` before any request, and retrying the same date
+refuses again. The only period measured is the period ending 31 March 2026
+(FY 2025-26); other years' 31 March share its request shape but not its
+measurement. The period is the financial year containing `as_of`, from 1 April,
+or the book's start if that is later.
 
 Each item carries `name`, `guid`, `parent`, `base_unit`, `opening` and `closing`;
-`opening` and `closing` hold `quantity` (`magnitude`, with its sign, and `unit`)
-and `value` (a plain signed decimal exactly as Tally sends it: the sign is kept,
-never flipped, and not interpreted). Either is `null` where Tally sent none, which is not zero, and is
-counted in `totals` (`empty_closing_quantity_count`, `empty_closing_value_count`).
-`totals` also holds `item_count`, `negative_closing_quantity_count` (company
-totals at `as_of`: batch, godown and in-year negatives are not counted),
-`zero_quantity_count`, and `value_sum`, which is `null` with `partial` true when an
-item that holds stock has no closing value. `inventory` reports `integrated`,
-`inventory_on` and `batchwise` as `yes`, `no` or `unknown`, and `basis` says what
-the items are: the valuation the books carry as closing stock when inventory is
-integrated, and otherwise Tally's item valuation, not reconciled to the Balance
-Sheet's Stock-in-Hand ledger.
+`opening` and `closing` hold `quantity` (`amount`, signed as Tally sent it, and
+`unit`) and `value` (a plain signed decimal exactly as Tally sends it: the sign is
+kept, never flipped, and not interpreted). Either is `null` where Tally sent none,
+which is not zero: an empty opening quantity or value is returned as `null` and not
+counted, and an empty closing one is returned as `null` and counted in `totals`
+(`empty_closing_quantity_count`, `empty_closing_value_count`). `totals` also holds
+`item_count`, `negative_closing_quantity_count` (company totals at `as_of`: batch,
+godown and in-year negatives are not counted), `zero_quantity_count`, and
+`value_sum`, which is `null` with `partial` true whenever an item's closing value
+is empty, unless its closing quantity is present and zero; a book whose closing
+quantities and values are all empty has no sum, not a sum of zero. `inventory`
+reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
+and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
+that these are the stock items' closing values exactly as Tally sends them, and that
+how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
+measured. It then says either that they sum to Tally's own Stock Summary total, or
+that they were NOT checked against it, with the reason.
 
 `tie_out` compares the sum of the items' closing values with the sum of Tally's own
 Stock Summary (its top-level groups). If they are equal it is `matched`. If the
@@ -357,7 +366,11 @@ report is empty, unknown or has only empty amounts it is `not_checked` with a
 differ the result is `not_established` with reason `tally_stock_summary_differs`
 and both totals, and no item is returned. `items` (one to fifty GUIDs) filters the
 returned rows from the held read; a GUID that is not found is listed under
-`items_not_found`. `totals` and `tie_out` always cover the whole book.
+`items_not_found`. `totals` and `tie_out` always cover the whole book. The tie-out
+compares the grand total only, so `matched` can stand beside `partial: true` when
+some items have no closing value. A differing read is not held: a later page
+continues only from an earlier read of the same date that matched, if one is still
+held, and otherwise reads afresh.
 
 The read runs inside the same company, mode and identity brackets as `masters`:
 the company's inventory flags (a Company collection filtered to the company's GUID),
@@ -368,10 +381,10 @@ item is read; an absent flag is reported `unknown` and does not refuse. `offset`
 `limit`, `snapshot` and `snapshot_id` behave as in `masters`.
 
 Small books only. The items are read whole only when the master-alteration mark
-(`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16 MB, which admits
+(`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
 a mark of at most 874. A larger book is refused before any item request as
 `stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes`), and retrying refuses again. Typical stock-heavy client books refuse
+`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
 today (the two measured had marks of about 100,000 and 300,000, protocol reference
 §12a.12), until a counted read lands. After a read, the row count and the response
 size are checked against the mark and the admitted size, and a breach refuses the
@@ -384,8 +397,18 @@ Evidence: one synthetic book on one licensed TallyPrime 7.1
 protocol reference §12a.13), and the tie once on a client book. The size bound
 rests on the same assumed limits as `masters` (128 characters a name, four aliases)
 and a fixed-size allowance for a row that one synthetic book has measured. No godown
-or batch split and no rates are returned. Item names are not masked by `mask_parties`:
-they are not party names.
+or batch split and no rates are returned.
+
+A company split by year, whose sibling companies share the GUID, is refused: the
+company-flags read requires exactly one Company row for the GUID
+(`company_flags_not_one_row`). A quantity whose unit has a space in it or is
+compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes
+such units is unmeasured.
+
+Under `mask_parties`, an item's `parent` is masked like a party name, because it is
+a stock-group name and a supplier-named stock group can carry a party's name;
+Tally's reserved root as a parent is a fixed marker and is left as it is. Item
+names are not masked: they are not party names.
 
 ### Profit and Loss and Balance Sheet
 

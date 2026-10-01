@@ -3,12 +3,17 @@ use super::trial_balance::page_boundary;
 use super::*;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::native_stock_summary::{
-    NativeFlag, NativeInventoryFlags, NativeStockGate, NativeStockTotals, StockSummaryAsOf,
+    NativeFlag, NativeInventoryFlags, NativeStockGate, NativeStockItem, NativeStockTotals,
+    StockSummaryAsOf,
 };
 use std::collections::HashSet;
 
 /// The most items one call may name; the published schema states the same bound.
 const MAX_ITEM_FILTER: usize = 50;
+
+/// The longest GUID `items` may name, in characters; the published schema's
+/// `maxLength` is the same.
+const MAX_ITEM_GUID_CHARS: usize = 64;
 
 const VERIFICATION: &str = "stable_paired_sources_with_company_mode_and_extent_guards";
 
@@ -92,7 +97,7 @@ impl Server {
                                     "verification": VERIFICATION,
                                     "limitations": [
                                         "The items' closing-value sum differs from Tally's own Stock Summary total, so no item is returned: a figure Tally contradicts is not shown",
-                                        "Nothing is held to continue from; call again to read afresh",
+                                        "This read is not held: a later page continues only from an earlier read of the same date that matched, if one is still held; call again with offset 0 to read afresh",
                                     ],
                                 },
                             }),
@@ -130,7 +135,7 @@ impl Server {
                         ),
                     ),
                 };
-                let rows = items.iter().map(|item| json!(item)).collect::<Vec<_>>();
+                let rows = items.iter().map(stock_row).collect::<Vec<_>>();
                 self.hold_listing(ListingSnapshot::new(
                     &identity,
                     listing,
@@ -187,10 +192,13 @@ impl Server {
         result["limitations"] = json!([
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "Company totals at `as_of` only, with no godown or batch split: `negative_closing_quantity_count` does not count batch, godown or in-year negatives",
-            "An empty quantity or value is not zero: each is counted (`empty_closing_quantity_count`, `empty_closing_value_count`), and `value_sum` is null with `partial` true when an item that holds stock has no closing value",
+            "An empty quantity or value is not zero: an empty opening one is returned as null and not counted; an empty closing one is returned as null and counted (`empty_closing_quantity_count`, `empty_closing_value_count`), and `value_sum` is null with `partial` true whenever an item's closing value is empty, unless its closing quantity is present and zero",
             "`totals` and `tie_out` cover the whole book, whatever `items` filters",
+            "The tie-out compares the grand total only, so `matched` can stand beside `partial: true` when some items have no closing value",
+            "A quantity whose unit has a space in it or is compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes such units is unmeasured",
+            "A company split by year, whose sibling companies share its GUID, is refused (`company_flags_not_one_row`)",
             "Small books only: a book whose master-alteration mark is over the admitted size is refused before any item is read",
-            "Stock item names are not masked by mask_parties: they are not party names",
+            "Stock item names are not masked by mask_parties: they are not party names. An item's `parent` is a stock-group name, which can carry a party's name, so it is masked; Tally's reserved root as a parent is left as it is",
         ]);
         if !not_found.is_empty() {
             result["items_not_found"] = json!(not_found);
@@ -207,9 +215,9 @@ impl Server {
     }
 }
 
-/// The item GUIDs named by `items`: one to fifty, each nonblank and unique
-/// ignoring ASCII case. An unknown GUID is not an error here; the result lists
-/// it under `items_not_found`.
+/// The item GUIDs named by `items`: one to fifty, each nonblank, at most
+/// sixty-four characters and unique ignoring ASCII case. An unknown GUID is not
+/// an error here; the result lists it under `items_not_found`.
 fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
     let Some(value) = args.get("items") else {
         return Ok(None);
@@ -225,7 +233,9 @@ fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
         .map(|value| {
             let guid = value
                 .as_str()
-                .filter(|guid| !guid.trim().is_empty())
+                .filter(|guid| {
+                    !guid.trim().is_empty() && guid.chars().count() <= MAX_ITEM_GUID_CHARS
+                })
                 .ok_or_else(invalid)?;
             seen.insert(guid.to_ascii_lowercase())
                 .then(|| guid.to_string())
@@ -235,27 +245,43 @@ fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
         .map(Some)
 }
 
-/// What the items are, given whether Tally says inventory is integrated with
-/// the accounts, and, when the report could not be compared, that they are not
-/// checked.
+/// What the items are, as Tally reported them: what it said of
+/// `ISINTEGRATED`, and that how the books use these values is not measured. Then
+/// exactly one of two sentences: that the items' closing values sum to Tally's
+/// own Stock Summary total, or that they were not checked against it, with the
+/// reason.
 fn inventory_basis(integrated: NativeFlag, unchecked: Option<&str>) -> String {
-    let basis = match integrated {
-        NativeFlag::Yes => {
-            "the books carry this item valuation as closing stock (Tally's Stock Summary ties to it)"
-        }
-        NativeFlag::No => {
-            "the Balance Sheet uses the Stock-in-Hand ledger's entered closing stock; this is Tally's item valuation and is NOT reconciled to it"
-        }
-        NativeFlag::Unknown => {
-            "Tally did not say whether inventory is integrated with the accounts, so whether the books carry this item valuation as closing stock is unknown"
+    let reported = match integrated {
+        NativeFlag::Yes => "Tally reported ISINTEGRATED Yes",
+        NativeFlag::No => "Tally reported ISINTEGRATED No",
+        NativeFlag::Unknown => "Tally did not send ISINTEGRATED",
+    };
+    let checked = match unchecked {
+        None => "The items' closing values sum to Tally's own Stock Summary total.".to_string(),
+        Some(reason) => {
+            format!("They were NOT checked against Tally's own Stock Summary total ({reason}).")
         }
     };
-    match unchecked {
-        None => basis.to_string(),
-        Some(reason) => format!(
-            "{basis}. These figures were NOT checked against Tally's own Stock Summary total ({reason})"
-        ),
+    format!(
+        "{reported}. These are the stock items' closing values exactly as Tally sends them; how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. {checked}"
+    )
+}
+
+/// One item as the tool returns it. `parent` is a stock-group name, which can
+/// carry a party's name (supplier-named groups), so it goes out under the
+/// party-name marker, as `masters` does for stock groups; Tally's reserved root
+/// is a fixed string and stays plain. An absent parent stays null, and the item's
+/// own `name` is not marked.
+fn stock_row(item: &NativeStockItem) -> Value {
+    let mut row = json!(item);
+    if item
+        .parent
+        .as_deref()
+        .is_some_and(|parent| !bridge_tally_protocol::is_tally_reserved_root(parent))
+    {
+        mark_party_field(&mut row, "parent");
     }
+    row
 }
 
 /// Everything a page reports besides its items, held with the first page's read.

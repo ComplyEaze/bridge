@@ -421,10 +421,26 @@ jobs:
           "$(command -v python3 || command -v python)" scripts/fetch-pdfium.py
           --platform ${{ runner.os == 'Windows' && 'windows-x64' || 'macos-arm64' }}
           --dest "$RUNNER_TEMP/pdfium" --github-env "$GITHUB_ENV"
+      # Nine tests, selected on the workspace build above and run on both systems: in
+      # bridge-bank-statement's pdf_tests, a_union_bank_statement_reads_one_row_per_line,
+      # an_owner_password_only_statement_opens_with_its_owner_password,
+      # malformed_input_is_refused_not_parsed and
+      # pdfium_reproduces_poppler_rows_on_the_synthetic_hdfc_statement; in the bridge lib,
+      # a_parsed_statement_builds_an_import_file_by_proposals_id and four agent::bank_statement
+      # tests (a_union_bank_statement_parses_without_printed_totals,
+      # mask_parties_masks_every_name_in_the_summary,
+      # only_the_summary_leaves_and_the_password_appears_nowhere,
+      # refusals_name_a_category_and_a_row_never_the_statement). `--no-tests fail` makes a
+      # filter that selects nothing fail the step, so a rename cannot silently turn the step
+      # into a pass. A `-p` build resolves features differently from `--workspace`, so the
+      # earlier `cargo test -p` pair recompiled six workspace crates (about 55 s on macOS)
+      # to run them. One command also means a failure is the step's exit code: on Windows the
+      # old pair ran under pwsh, which reports only the last command's status.
       - name: Test PDF extraction through PDFium
-        run: |
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p bridge-bank-statement --no-fail-fast -- --ignored
-          cargo test --locked --manifest-path src-tauri/Cargo.toml -p bridge --lib --no-fail-fast -- --ignored bank_statement a_parsed_statement_builds_an_import_file_by_proposals_id
+        run: >-
+          cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
+          --workspace --no-fail-fast --retries 0 --test-threads num-cpus --no-tests fail --run-ignored ignored-only
+          -E 'package(=bridge-bank-statement) | (package(=bridge) & kind(lib) & (test(~bank_statement) | test(~a_parsed_statement_builds_an_import_file_by_proposals_id)))'
       # Nextest does not execute doctests. Keep these as a separate required step.
       # bridge#583: the test-only approval seam must be visible to the scan
       # that proves shipped binaries lack it. This reuses the unit-test build

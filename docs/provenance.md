@@ -41,8 +41,9 @@ contain customer data in release artifacts.
   rendered from `src-tauri/app-icon.svg`, except the 16 px entries of
   `icon.ico` and `icon.icns`, which are rendered from
   `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid).
-  ComplyEaze™ and ComplyEaze Bridge™, and the related logos and visual
-  identity, are trade marks of SPMS Comply Eaze Solutions LLP (ComplyEaze). The
+  ComplyEaze and ComplyEaze Bridge, and the related logos and visual
+  identity, are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze)
+  uses to identify its products. They are not registered trade marks. The
   Apache License 2.0 does not grant permission to use them, except to describe
   where the software came from and to reproduce the NOTICE file (section 6 of
   the license); see TRADEMARKS.md. The logo and icon files — docs/brand/,

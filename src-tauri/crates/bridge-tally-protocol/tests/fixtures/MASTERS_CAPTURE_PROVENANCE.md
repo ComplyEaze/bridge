@@ -7,6 +7,7 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 - **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, `education_mode=false`, `http://127.0.0.1:9001` (a lab instance).
 - **Date:** 2026-09-30, between 19:14:34 and 19:14:37 IST, one request at a time. `tally_status` was healthy before the first request and after every request. The company was confirmed loaded before anything was sent.
 - **Book:** `BRIDGE SHAPE LAB`, a synthetic lab company. Its book extent (`ALTMSTID` 289, `ALTVCHID` 111) was read before and after the four requests and was equal.
+- **Sender:** a lab capture script, not `bridge_mcp`. It sent the exact request bytes tabled below, one request at a time. Those bytes are the production renderers' own output: `every_request_is_byte_equal_to_its_committed_fixture` (`src/native_masters_tests.rs`) asserts that each renderer's output equals its committed request, so the responses answer the request Bridge sends.
 - **Encoding:** responses are **BOM-less UTF-16LE**, exactly as received. Requests are the exact bytes sent: **UTF-16LE with a BOM**. `.gitattributes` marks this tree `-text`.
 - **Request shape:**
   - Voucher types: the production `render_native_voucher_type_export_request` text with `ISACTIVE, ISOPTIONAL, NUMBERINGMETHOD` added to its `FETCH`, and the `BRIDGECOMPANYGUID` compute that the group and ledger snapshots already send.

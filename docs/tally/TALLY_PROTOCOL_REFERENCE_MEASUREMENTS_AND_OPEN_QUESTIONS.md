@@ -1207,7 +1207,7 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 - **Cost:** 0.14–0.72 s and 0.7–1.8 KB per request on the small book; **0.23 s and 1.8 KB for a one-month Balance Sheet on the 29,900-voucher book**. No full year was requested on the larger book.
 
 `<ID>Stock Summary</ID>` returned an empty `<ENVELOPE/>` on a company not known to hold inventory. An empty envelope cannot tell "no items" from "not rendered", so it is not read as zero. **Not measured:**
-- Stock Summary on a book with inventory, and closing stock's line in either statement;
+- closing stock's line in either statement (the Stock Summary on a book with inventory is §12a.13);
 - the explode flag;
 - a foreign-currency book;
 - Education and Gold.
@@ -1241,6 +1241,32 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - what `Default` numbering does on import;
   - a book whose masters were copied from another company (whether row GUIDs keep the source prefix);
   - how a deletion moves `ALTMSTID`;
+  - Education and Gold.
+
+---
+
+### 12a.13 Stock items and the Stock Summary by name on licensed 7.1
+
+**VERIFIED 2026-09-30, licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from one synthetic company with integrated inventory (11 items, 3 stock groups). The tie in the second bullet was also measured on one client book, by role, and nothing from it is committed. One run of each request. **Confidence: PARTIAL.** This extends §12a.11, where `Stock Summary` returned an empty envelope on a book not known to hold inventory, to a book with inventory.
+
+- **Stock items as one collection.** The `AuditStockItemsV1` request (`TYPE=Collection`, `StockItem`, `FETCH` of `NAME, GUID, PARENT, BASEUNITS, OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE`, over a financial year) returned one `COLLECTION` with one `STOCKITEM` row per item. Fixtures and exact requests: `tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`.
+  - The row GUID carried the company's GUID as its prefix. There is no computed `BRIDGECOMPANYGUID` on this request, so the GUID prefix is the row's only binding to its company.
+  - A quantity is `<number> <unit>` (`100 Box`, `400.000 Kgs`), sent with a leading space; a negative one has no space (`-50.000 Kgs`). A value is a plain signed decimal with no grouping or symbol. **Both signs appeared among items holding a positive quantity** (`100 Box` with `2500.00`, `400.000 Kgs` with `-1000.00`), so Bridge keeps the sign as sent and does not interpret it; what makes a stock value negative on this book is unmeasured.
+  - An empty quantity or value element means nothing was sent, and is not zero: three items carried an empty closing quantity and an empty closing value, and one item carried `-50.000 Kgs` with an empty closing value. An opening value of `0.00` was sent as a value.
+  - `LANGUAGENAME.LIST` (aliases) was present on all eleven rows, each with one name. The largest row was 654 UTF-16 units with its line ends (641 without the carriage returns), names included.
+- **The Stock Summary by name.** `<ID>Stock Summary</ID>` in §12a.1's shape (`TYPE=Data`, the statements' envelope) returned no `HEADER` or `STATUS`, and one `DSPACCNAME` / `DSPSTKINFO` pair per top-level stock group (three here).
+  - A pair's amount is `DSPSTKINFO/DSPSTKCL/DSPCLAMTA`. `DSPCLQTY` and `DSPCLRATE` sat beside it, empty. The amounts were `18750.00`, `14500.00` and `-30249.99`.
+  - **The report's closing amounts summed to the stock items' `CLOSINGVALUE` sum exactly (`3000.01`).** The same equality held on a client book, by role, at the same period end. It is measured at one financial year end only: 31 March 2026, the period 20250401 to 20260331. Other years' 31 March share that request shape but not the measurement, and any other `SVTODATE` is unmeasured for stock, so `stock_summary` admits only a 31 March `as_of` and refuses any other date as `stock_summary_as_of_not_measured`.
+  - An empty `<ENVELOPE/>` (§12a.11) is not a total of zero: it is an answer that cannot be told from a report Tally did not render, and is not compared.
+- **The company's inventory flags.** The `Company` collection with its `FETCH` extended by `ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON` (and seven `NUM*` counts) and one single-term filter, `$GUID = "<the company's GUID>"`, returned exactly that company's row (§12a.7: without the filter every loaded company is returned). The three flags were `Yes`. `NUMSTOCKITEMS`, `NUMGODOWNS` and `NUMUNITS` equalled the rows of the stock items, godowns and units captures; `NUMVOUCHERTYPES` did not equal the voucher-type rows (§12a.12).
+- **Cost, by role, on a stock-heavy client book (several thousand items; figures rounded).** The Stock Summary report took about 1.5 s (about 150 KB, a few hundred top-level lines). One span of 2,000 items took about 1 s (about 3 MB). Bridge does not read stock items on such a book: its master-alteration mark is far above the admitted size (§12a.12).
+- **Not measured:**
+  - a book whose inventory is not integrated with the accounts (what the report and the items then show);
+  - an `SVTODATE` other than 31 March 2026 (another year's 31 March, a day 1 or 2, any other date);
+  - the date a stock item's `OPENINGBALANCE` and `OPENINGVALUE` are as at: the captured book's `BOOKSFROM` (20250401) equals the request's `SVFROMDATE`, so this capture cannot tell an opening at the period start from one at the books' beginning. `stock_summary` reads and validates both and returns neither;
+  - a quantity in a compound unit, or one with a unit that has a space;
+  - the report with a godown or batch split, and the explode flag;
+  - a foreign-currency book;
   - Education and Gold.
 
 ---

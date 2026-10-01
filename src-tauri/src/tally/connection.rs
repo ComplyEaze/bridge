@@ -676,6 +676,10 @@ pub(crate) enum PairedReadValidationError {
     MastersCollection,
     #[error("Tally company book changed during masters read")]
     MastersExtent,
+    #[error("Tally stock collection changed between paired reads")]
+    StockSummaryCollection,
+    #[error("Tally company book changed during stock summary read")]
+    StockSummaryExtent,
 }
 
 impl PairedReadValidationError {
@@ -698,6 +702,8 @@ impl PairedReadValidationError {
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
             Self::MastersCollection => "masters_collection_changed",
             Self::MastersExtent => "masters_extent_changed",
+            Self::StockSummaryCollection => "stock_summary_collection_changed",
+            Self::StockSummaryExtent => "stock_summary_extent_changed",
         }
     }
 }

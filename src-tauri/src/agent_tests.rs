@@ -1,5 +1,6 @@
 use super::egress::EGRESS_TAIL_CHUNK_BYTES;
 use super::*;
+use std::collections::BTreeSet;
 use std::fs::OpenOptions;
 use std::io::Write;
 use tally_protocol_simulator::{
@@ -577,7 +578,7 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 #[test]
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
-    let samples = BTreeMap::from([
+    let samples = [
         ("tally_status", json!({"product":"TallyPrime"})),
         (
             "list_companies",
@@ -643,10 +644,74 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "differences":[{"field":"party","proposed":"Customer One","observed":"Supplier Two"}],
             }))]}),
         ),
+        (
+            "parse_bank_statement",
+            json!({
+                "cash_questions":[{"printed_as":party_name("Customer One")}],
+                "counterparties":[{"party":party_name("Customer One"),"also_printed_as":[party_name("Supplier Two")],"ledger":party_name("Entry Ledger")}],
+                "ledgers_to_validate":[party_name("Entry Ledger")],
+            }),
+        ),
+        (
+            "post_import",
+            json!({"error":{"ledgers_changed":[party_name("Customer One"),party_name("Supplier Two")]}}),
+        ),
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
+    ];
+    // Tools whose results carry no value marked as a party name, written out by
+    // hand: a tool in neither this list nor the samples fails the check below by
+    // name, so a new tool must either be given a sample or be listed here
+    // deliberately. `acknowledge_post_review` writes one local record and its
+    // module marks no party name; `local_data_report` returns only static
+    // strings, counts, sizes and whole days.
+    #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
+    let mut without_a_sample = vec!["acknowledge_post_review", "local_data_report"];
+    // The lab-only tools, compiled in with the `lab-writes` feature, are not
+    // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
+    // import tools were not examined (#999).
+    #[cfg(feature = "lab-writes")]
+    without_a_sample.extend([
+        "lab_import_masters",
+        "lab_import_vouchers",
+        "lab_read_inventory",
     ]);
-    assert_eq!(samples.len(), 19);
+    let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
+    assert_eq!(
+        sampled.len(),
+        sampled.iter().collect::<BTreeSet<_>>().len(),
+        "a tool has two samples: {sampled:?}"
+    );
+    let covered = sampled
+        .iter()
+        .chain(&without_a_sample)
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        covered.len(),
+        covered.iter().collect::<BTreeSet<_>>().len(),
+        "a tool is both sampled and listed without a sample: {covered:?}"
+    );
+    let registered = super::catalog::registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
+        .collect::<BTreeSet<_>>();
+    let covered = covered
+        .iter()
+        .map(|tool| tool.to_string())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        registered.difference(&covered).collect::<Vec<_>>(),
+        Vec::<&String>::new(),
+        "a registered tool has no sample and is not listed as needing none"
+    );
+    assert_eq!(
+        covered.difference(&registered).collect::<Vec<_>>(),
+        Vec::<&String>::new(),
+        "a sample or exemption names a tool that is not registered"
+    );
     for (tool, sample) in samples {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);

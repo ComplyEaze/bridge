@@ -1214,6 +1214,37 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 
 ---
 
+### 12a.12 Master collections on licensed 7.1
+
+**Measured 2026-09-30 on licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from two synthetic companies. Two stock-heavy client books were read only for the figures marked "by role", and nothing from them is committed. One run of each request. **Confidence: PARTIAL**
+
+- **Four kinds read as one collection each.** Voucher types, godowns, units and stock groups can each be read as one `TYPE=Collection` export with `<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>` (the group snapshot's compute).
+  - Every row of every kind carried the computed GUID, equal to the company's.
+  - A collection with rows came back as one `COLLECTION` element.
+  - **A kind with no master:** on a synthetic book without inventory, units and stock groups returned `STATUS` 1 with a present, empty `COLLECTION` element (its `ISMSTDEPTYPE` and `MSTDEPTYPE` attributes, no rows). It was not absent and not an empty envelope. Godowns returned one row, the company's default location; whether a company can answer with no godown is unmeasured, so a zero-row godown answer is admitted like the other inventory kinds (voucher types are refused, because every company has predefined ones).
+  - Bridge refuses a zero-row `voucher_types` answer (`masters_voucher_types_empty`), because every company has predefined voucher types. That is a rule Bridge applies, not a measurement: every captured voucher-type answer had rows.
+  - Fixtures and exact requests: `tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`.
+- **Numbering method.** `NUMBERINGMETHOD` is a direct child of each voucher-type row when fetched on `List of VoucherTypes`.
+  - `NUMBERINGMETHOD` alone adds about 130 bytes per row: on a client book, by role, the same request without it was about 38 KB for 24 types, and about 41 KB with it.
+  - Bridge's request adds four things to `List of VoucherTypes`: `ISACTIVE`, `ISOPTIONAL`, `NUMBERINGMETHOD` and the `BRIDGECOMPANYGUID` compute. In the committed synthetic capture they add about 500 bytes per row (UTF-16, a row counted from its opening to its closing tag, line ends and indentation included), so its rows average about 1,700 bytes against about 1,200 in production's `List of VoucherTypes` capture, roughly 40% larger. Apart from those four tags the rows carry the same tags as production's, so the row population is the same.
+  - Values seen: `Default`, `Automatic` and `Manual` on a synthetic book (24/1/1), and `Automatic` and `Manual` on a client book.
+  - What `Default` means for numbering is unmeasured, and a value outside these is unmeasured. Bridge reports the value raw rather than refusing it.
+  - `PREVENTDUPLICATES` was not returned by this shape.
+- **The company's voucher-type count is not the row count.** The `Company` collection's `NUMVOUCHERTYPES` did not equal the voucher-type rows returned: 35 against 26 on a synthetic book, and 33 against 24 on a client book. On that client book it equalled `NUMVOUCHERNUMBERSERIES` (33), so it may count number series. That is an inference, unmeasured.
+- **Names and aliases.** Voucher-type, godown and stock-group rows carry `LANGUAGENAME.LIST`, so aliases add names without a fixed limit. The synthetic book's unit rows did not carry it.
+  - A whole read can only be sized by assuming a longest name and an alias count.
+  - Bridge checks each row's length against that assumption after the read, and refuses a row beyond it.
+- **Every captured row had its own AlterID at or under the book's mark.** On both synthetic books the AlterIDs were distinct and the largest sat under `ALTMSTID`: 269 against 289 on one, and 100 against 242 on the other (the one godown). For godowns, units and stock groups, Bridge sizes a read from this premise before sending it, and refuses a response that breaks it. Voucher types have no size check before the read and are checked after it (rows, AlterIDs and response size), and groups are not checked at all.
+- **Master marks run far past the counts.** The two client books had master-alteration marks (`ALTMSTID`) of about 100,000 and 300,000 (rounded, by role), against a few thousand ledgers. A size estimate from the mark refuses both, and any book whose mark is above about 1,150 (the admission limits for godowns, units and stock groups are 1,152, 1,168 and 1,160) refuses those three kinds. How common such marks are across live books is unmeasured; both client books measured refuse.
+- **Not measured:**
+  - a numbering value other than the three seen;
+  - what `Default` numbering does on import;
+  - a book whose masters were copied from another company (whether row GUIDs keep the source prefix);
+  - how a deletion moves `ALTMSTID`;
+  - Education and Gold.
+
+---
+
 ## 13. Open questions
 
 | Question | Why it matters |

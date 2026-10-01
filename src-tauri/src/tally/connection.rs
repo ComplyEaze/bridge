@@ -341,7 +341,10 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// averaged over more than one request, so 16 MB is about one 20 s request at
 /// that average, right at the deadline. A basic ledger read of about 22 MB
 /// completed on the same book in 7-11 s.
-const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 = 16_000_000;
+///
+/// One constant with the masters read's budget, in the protocol crate.
+const COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED: u64 =
+    bridge_tally_protocol::native_masters::MASTERS_RESPONSE_BUDGET_BYTES as u64;
 
 /// Bytes one ledger is estimated to add to the balance-free ledger catalogue
 /// response that counts a marked book's ledgers (#668). PARTIAL: a synthetic
@@ -461,12 +464,18 @@ fn parent_partition_limits() -> PartitionLimits {
 /// figures as arguments so the boundary is tested exactly, whatever the
 /// measured constants become.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ComplianceEstimate {
-    estimated_bytes: u64,
-    fits: bool,
+pub(crate) struct ComplianceEstimate {
+    pub(crate) estimated_bytes: u64,
+    pub(crate) fits: bool,
 }
 
-fn compliance_estimate(count: u64, bytes_per_ledger: u64, budget_bytes: u64) -> ComplianceEstimate {
+/// Also sizes the masters read (`runtime_masters.rs`), which shares this
+/// budget.
+pub(crate) fn compliance_estimate(
+    count: u64,
+    bytes_per_ledger: u64,
+    budget_bytes: u64,
+) -> ComplianceEstimate {
     let estimated_bytes = count.saturating_mul(bytes_per_ledger);
     ComplianceEstimate {
         estimated_bytes,
@@ -663,6 +672,10 @@ pub(crate) enum PairedReadValidationError {
     CurrencyExtent,
     #[error("Tally company changed between the currency read and the master read")]
     CurrencyToMasterExtent,
+    #[error("Tally masters collection changed between paired reads")]
+    MastersCollection,
+    #[error("Tally company book changed during masters read")]
+    MastersExtent,
 }
 
 impl PairedReadValidationError {
@@ -683,6 +696,8 @@ impl PairedReadValidationError {
             Self::NativeStatement => "native_statement_changed",
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
+            Self::MastersCollection => "masters_collection_changed",
+            Self::MastersExtent => "masters_extent_changed",
         }
     }
 }

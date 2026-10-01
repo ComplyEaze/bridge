@@ -93,6 +93,68 @@ fn a_reopened_bill_ties_to_its_native_balance_and_a_settled_control_ties_to_zero
     );
 }
 
+/// The other two parties of the capture: each of their four bills was opened,
+/// settled to zero and reopened, and ties to the native balance the module's
+/// table gives (written from the seed amounts, like party 01's), with the
+/// three allocations of its opening, settlement and reopening.
+#[test]
+fn every_reopened_bill_of_the_other_two_parties_ties_to_its_native_balance() {
+    let rows = reopen_rows();
+    for (party, bills) in [
+        (
+            "RO Party 02",
+            [("RO-INV-001", "400"), ("RO-INV-004", "900")],
+        ),
+        (
+            "RO Party 03",
+            [("RO-INV-002", "600"), ("RO-INV-005", "1200")],
+        ),
+    ] {
+        let natives = bills
+            .iter()
+            .map(|(reference, amount)| {
+                open_bill(
+                    party,
+                    reference,
+                    BILL_DATE,
+                    amount,
+                    ExposureDirection::Receivable,
+                )
+            })
+            .collect::<Vec<_>>();
+        let entries = entries_for_party(&rows, party).unwrap();
+        let trails = bill_trails(party, None, &entries, &natives).unwrap();
+        let summary = trails
+            .iter()
+            .map(|outcome| match outcome {
+                BillOutcome::Tied(trail) => (
+                    trail.reference.clone(),
+                    trail.balance.as_str().to_string(),
+                    trail.listed_open,
+                    trail.entries.iter().map(|e| e.kind).collect::<Vec<_>>(),
+                ),
+                other => panic!("{party}: expected every bill to tie, got {}", other.state()),
+            })
+            .collect::<Vec<_>>();
+        let expected = bills
+            .iter()
+            .map(|(reference, amount)| {
+                (
+                    reference.to_string(),
+                    format!("-{amount}"),
+                    true,
+                    vec![
+                        AllocationKind::NewRef,
+                        AllocationKind::AgstRef,
+                        AllocationKind::AgstRef,
+                    ],
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(summary, expected, "{party}");
+    }
+}
+
 #[test]
 fn the_trail_lists_its_allocations_oldest_first_with_the_original_bill_date() {
     let rows = reopen_rows();

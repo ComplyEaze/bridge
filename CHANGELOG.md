@@ -31,6 +31,14 @@ Each line names the pull requests it comes from.
   Tally's sign, as in the Trial Balance: stock held is a negative number.
   Quantities are not returned yet, because nothing checks them. Only a
   31 March and small books are read (#980, #979, #1001).
+- Read a register of the tax in the books for sales: the Sales and Credit Note
+  vouchers of a date window that touch a Duties & Taxes ledger, with each
+  entry's tax taken only from the GST duty head on that ledger's master, never
+  from a name or an amount. It reads as the purchase register does. It was
+  measured on two imported Sales item invoices and one Sales voucher in lab
+  books; credit notes, an inter-state line, a tax Tally computes itself, a sale
+  typed on Tally's screen and several currencies are not measured, and the tool
+  says so (#1009).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read

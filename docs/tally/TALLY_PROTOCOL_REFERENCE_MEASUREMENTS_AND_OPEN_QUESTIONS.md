@@ -1243,6 +1243,30 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - how a deletion moves `ALTMSTID`;
   - Education and Gold.
 
+### 12a.13 One party's bill trail, tied to the native balance
+
+**PARTIAL: observed by read-back on one seeded synthetic book** (TallyPrime Silver 7.1, `BRIDGE OUTSTANDINGS LAB`,
+seeded by this project; seeded data is not evidence about a client book). Each row below was read
+from Tally's own Bills Receivable and Bills Payable reports and from the vouchers' bill allocations
+at one as-of date, and the `outstandings` party detail (#945) ties the two. The captures committed
+with that change are the voucher window and the two bills reports; the on-account netting and the
+unreferenced-opening rows rest on read-backs through Bridge that are not captured as fixtures:
+
+| What was measured | Result |
+| --- | --- |
+| The same bill reference on two parties | two rows in one Bills Receivable report, so a bill is identified by its party as well as its reference |
+| A reference reused by the same party a year later | stored as an `Agst Ref` carrying the original bill's date (see 12a.2), so within one party a reference is one continuing bill |
+| A journal that moves a bill from one party to another | the voucher's own party field names the first (debit) ledger, while the `Agst Ref` sits on another ledger's entry, so allocations belong to the party of the entry they sit on, not of the voucher's party field |
+| An on-account receipt and an on-account payment on one party | they net into one unallocated figure |
+| A note or an on-account entry with no reference | it appears only in the party's unallocated residual (closing balance less its named bills), never as a bill |
+| A referenced opening balance | it is a bill, with no voucher; an unreferenced opening is residual only |
+| An advance or a pending note with a reference | listed as a named bill in the report of the opposite direction, with no type label (12a.1) |
+
+**Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
+voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
+term in the request would be lossless for the journal above (it was not tried, which is why the
+party detail reads the whole window and filters by each entry's own ledger).
+
 ---
 
 ## 13. Open questions
@@ -1292,3 +1316,4 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-30 | §11e: the `$AlterID > a AND $AlterID <= b` filter on `List of Ledgers` (GUID-only fetch) on three licensed 7.1 Silver books, marks 5,547, 102,161 and 316,028: slices hold at most their width, their union equals the catalogue, an empty slice is a well-formed 2,994-byte answer. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the Company collection's `NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`): present on all 31 loaded lab companies, equal to the ledger catalogue and census counts on a 4,339-ledger synthetic book, and to the census counts of two real books read by another lane. PARTIAL (bridge#938) |
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
+| 2026-10-01 | §12a.13: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |

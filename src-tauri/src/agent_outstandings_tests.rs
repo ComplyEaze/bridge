@@ -90,6 +90,7 @@ fn the_foreign_balance_refusal_names_its_ledger_under_redaction() {
 /// the native read's four sources given, and FOREX's own extent capture when
 /// `extent` is given (else a generic lab extent): every scripted response is
 /// served.
+#[allow(clippy::too_many_arguments)]
 async fn forex_outstandings(
     extent: Option<&[u8]>,
     receivable: &[u8],
@@ -98,6 +99,7 @@ async fn forex_outstandings(
     ledgers: &[u8],
     as_of: &str,
     redaction: Redaction,
+    extra_arguments: Value,
 ) -> Value {
     use tally_protocol_simulator::{
         Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -182,10 +184,14 @@ async fn forex_outstandings(
         batch_post_enabled: false,
     });
     let response = server
-        .call_tool(
-            "outstandings",
-            json!({"company_guid":"b14e9b2d-8a63-4779-804d-25d59eb787eb","as_of":as_of}),
-        )
+        .call_tool("outstandings", {
+            let mut arguments =
+                json!({"company_guid":"b14e9b2d-8a63-4779-804d-25d59eb787eb","as_of":as_of});
+            for (key, value) in extra_arguments.as_object().into_iter().flatten() {
+                arguments[key] = value.clone();
+            }
+            arguments
+        })
         .await;
     assert_eq!(simulator.finish().unwrap().len(), plan_count);
     response
@@ -214,6 +220,7 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
         ),
         "20250930",
         Redaction::MaskParties,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -305,6 +312,7 @@ async fn a_book_with_only_mixed_ledgers_set_aside_is_still_partial() {
         &rupees_only,
         "20260915",
         Redaction::None,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -385,6 +393,7 @@ async fn mcp_outstandings_set_a_mixed_party_aside_with_its_bills() {
         ),
         "20260915",
         Redaction::None,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -542,4 +551,84 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
     ] {
         assert!(description.contains(needle), "missing: {needle}");
     }
+}
+
+/// The party detail's conflicting arguments are refused before any read: the
+/// tool names the code before any request is attempted.
+#[tokio::test]
+async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() {
+    // Nothing listens here. A refusal that came after a read would carry a
+    // connection error's code, so the expected refusal code below is also the
+    // proof that no request was attempted.
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 1,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let guid = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+    for (extra, code) in [
+        (json!({"party": "P"}), "party_requires_detail"),
+        (json!({"detail": "bill_trail"}), "detail_requires_party"),
+        // The schema's enum refuses an unknown kind before the handler runs;
+        // `invalid_detail` is the handler's own guard behind it.
+        (
+            json!({"party": "P", "detail": "everything"}),
+            "argument_invalid:detail",
+        ),
+        (
+            json!({"party": "P", "detail": "unadjusted", "reference": "R"}),
+            "reference_requires_bill_trail",
+        ),
+    ] {
+        let mut arguments = json!({"company_guid": guid});
+        for (key, value) in extra.as_object().unwrap() {
+            arguments[key] = value.clone();
+        }
+        let response = server.call_tool("outstandings", arguments).await;
+        assert_eq!(response["isError"], true, "{extra}: {response}");
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{extra}"
+        );
+    }
+}
+
+/// A party detail is tied against the whole book's bills, so a partial read
+/// (here: ledgers kept in another currency) refuses it rather than tying
+/// against a subset.
+#[tokio::test]
+async fn mcp_outstandings_refuse_a_party_detail_on_a_partial_read() {
+    let response = forex_outstandings(
+        None,
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::None,
+        json!({"party": "BRIDGE FX DEBTOR A", "detail": "bill_trail"}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "detail_requires_a_complete_read"
+    );
 }

@@ -1,0 +1,744 @@
+//! The bill trail and the unadjusted detail for one party (#945 slice C).
+//!
+//! Both are read from voucher rows already read and validated, and each is
+//! tied out against what Tally's own bills reports and the ledger snapshot
+//! said at the same as-of date:
+//!
+//! - a bill's trail is every allocation of one reference on the party's
+//!   ledger, oldest first; its signed sum must equal that bill's balance in
+//!   the native report, or zero for a bill the report no longer lists;
+//! - the unadjusted detail lists the party's on-account, advance and pending
+//!   note allocations; the signed sum of the on-account ones must equal the
+//!   party's unallocated residual.
+//!
+//! Nothing here merges or guesses. A bill whose identity cannot be matched to
+//! exactly one native row is `bill_identity_ambiguous`, a sum that does not tie
+//! is `trail_does_not_tie` with both numbers, and a residual the vouchers do
+//! not explain is `residual_not_explained_by_vouchers` with the difference;
+//! whether that difference equals the ledger's opening balance is stated as a
+//! fact and never called an opening. A [`BillTrail`] exists only for a bill
+//! that tied (its constructor is private).
+use super::vouchers::VoucherComposites;
+use super::*;
+use bridge_tally_core::ExactDecimal;
+use std::collections::BTreeMap;
+
+/// A refusal to build a trail: the rows are not shaped as a trail needs, and a
+/// guess would put a wrong allocation in front of an accountant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct TrailRefusal(pub(super) &'static str);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AllocationKind {
+    NewRef,
+    AgstRef,
+    Advance,
+    OnAccount,
+}
+
+impl AllocationKind {
+    fn parse(text: &str) -> Result<Self, TrailRefusal> {
+        match text.trim() {
+            "New Ref" => Ok(Self::NewRef),
+            "Agst Ref" => Ok(Self::AgstRef),
+            "Advance" => Ok(Self::Advance),
+            "On Account" => Ok(Self::OnAccount),
+            _ => Err(TrailRefusal("trail_allocation_type_unknown")),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::NewRef => "New Ref",
+            Self::AgstRef => "Agst Ref",
+            Self::Advance => "Advance",
+            Self::OnAccount => "On Account",
+        }
+    }
+}
+
+/// One allocation of the party's ledger, with the voucher that carries it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct TrailEntry {
+    pub(super) date: String,
+    pub(super) voucher_type: String,
+    pub(super) voucher_number: Option<String>,
+    pub(super) guid: String,
+    pub(super) kind: AllocationKind,
+    /// `None` for On Account.
+    pub(super) reference: Option<String>,
+    /// The bill's own date: the voucher's on a New Ref or Advance, the
+    /// original bill's on an Agst Ref. Absent only on On Account.
+    pub(super) bill_date: Option<String>,
+    /// Signed as Tally writes it: a debit is negative.
+    pub(super) amount: ExactDecimal,
+}
+
+impl TrailEntry {
+    fn json(&self) -> Value {
+        json!({
+            "date": self.date,
+            "voucher_type": self.voucher_type,
+            "voucher_number": self.voucher_number,
+            "guid": self.guid,
+            "allocation_type": self.kind.label(),
+            "amount": self.amount.as_str(),
+            "bill_date": self.bill_date,
+        })
+    }
+}
+
+/// The party's allocations in `rows`, in voucher order. Cancelled and optional
+/// vouchers are left out, as Tally's own reports leave them out. Only entries
+/// on `party`'s ledger count: a voucher's own party field is not consulted, so
+/// an allocation on a second party's ledger in the same voucher is that
+/// party's.
+pub(super) fn entries_for_party(
+    rows: &[Value],
+    party: &str,
+) -> Result<Vec<TrailEntry>, TrailRefusal> {
+    let mut entries = Vec::new();
+    for row in rows {
+        if row.get("cancelled").and_then(Value::as_bool) == Some(true)
+            || row.get("optional").and_then(Value::as_bool) == Some(true)
+        {
+            continue;
+        }
+        let date = row
+            .get("date")
+            .and_then(Value::as_str)
+            .ok_or(TrailRefusal("trail_voucher_malformed"))?;
+        let voucher_type = row
+            .get("voucher_type")
+            .and_then(Value::as_str)
+            .ok_or(TrailRefusal("trail_voucher_malformed"))?;
+        let guid = row
+            .get("guid")
+            .and_then(Value::as_str)
+            .ok_or(TrailRefusal("trail_voucher_malformed"))?;
+        let voucher_number = row
+            .get("voucher_number")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        let amounts = row
+            .get("amounts")
+            .and_then(Value::as_array)
+            .ok_or(TrailRefusal("trail_voucher_malformed"))?;
+        for amount in amounts {
+            if amount.get("ledger").and_then(Value::as_str) != Some(party) {
+                continue;
+            }
+            let allocations = amount
+                .get("bill_allocations")
+                .and_then(Value::as_array)
+                .ok_or(TrailRefusal("trail_voucher_malformed"))?;
+            for allocation in allocations {
+                let kind = AllocationKind::parse(
+                    allocation
+                        .get("bill_type")
+                        .and_then(Value::as_str)
+                        .ok_or(TrailRefusal("trail_voucher_malformed"))?,
+                )?;
+                let value = ExactDecimal::parse(
+                    allocation
+                        .get("amount")
+                        .and_then(Value::as_str)
+                        .ok_or(TrailRefusal("trail_voucher_malformed"))?,
+                )
+                .map_err(|_| TrailRefusal("trail_amount_invalid"))?;
+                let reference = match (kind, allocation.pointer("/reference/name")) {
+                    (AllocationKind::OnAccount, _) => None,
+                    (_, Some(Value::String(name))) if !name.trim().is_empty() => Some(name.clone()),
+                    _ => return Err(TrailRefusal("trail_reference_missing")),
+                };
+                let bill_date = allocation
+                    .get("bill_date")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+                if kind != AllocationKind::OnAccount && bill_date.is_none() {
+                    return Err(TrailRefusal("trail_bill_date_missing"));
+                }
+                entries.push(TrailEntry {
+                    date: date.to_string(),
+                    voucher_type: voucher_type.to_string(),
+                    voucher_number: voucher_number.clone(),
+                    guid: guid.to_string(),
+                    kind,
+                    reference,
+                    bill_date,
+                    amount: value,
+                });
+            }
+        }
+    }
+    // Oldest first, as the output promises; the sort is stable, so vouchers of
+    // one day keep the order the window read returned them in.
+    entries.sort_by(|left, right| left.date.cmp(&right.date));
+    Ok(entries)
+}
+
+/// Tally's signed balance for an open bill: the native row carries a magnitude
+/// and the report (direction) it came from, and a debit balance is negative.
+fn signed_native(bill: &OpenBillRow) -> Result<ExactDecimal, TrailRefusal> {
+    match bill.kind {
+        ExposureDirection::Receivable => ExactDecimal::zero()
+            .checked_subtract(&bill.amount)
+            .map_err(|_| TrailRefusal("trail_amount_invalid")),
+        ExposureDirection::Payable => Ok(bill.amount.clone()),
+    }
+}
+
+fn sum(entries: &[&TrailEntry]) -> Result<ExactDecimal, TrailRefusal> {
+    entries
+        .iter()
+        .try_fold(ExactDecimal::zero(), |total, entry| {
+            total
+                .checked_add(&entry.amount)
+                .map_err(|_| TrailRefusal("trail_amount_invalid"))
+        })
+}
+
+/// A bill whose trail tied out. It cannot be built any other way.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct BillTrail {
+    reference: String,
+    bill_date: String,
+    entries: Vec<TrailEntry>,
+    balance: ExactDecimal,
+    /// `true` when Tally's own report lists the bill (open); `false` when the
+    /// trail sums to zero and the report no longer lists it.
+    listed_open: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum BillOutcome {
+    Tied(BillTrail),
+    DoesNotTie {
+        reference: String,
+        bill_date: String,
+        entries: Vec<TrailEntry>,
+        trail_sum: ExactDecimal,
+        native: Option<ExactDecimal>,
+    },
+    Ambiguous {
+        reference: String,
+        bill_dates_in_vouchers: Vec<String>,
+        /// The bill date of each native row Tally lists for the reference,
+        /// so a one-row mismatch shows both dates.
+        native_bill_dates: Vec<String>,
+        native_rows: usize,
+        entries: Vec<TrailEntry>,
+    },
+}
+
+impl BillOutcome {
+    #[cfg(test)]
+    pub(super) fn state(&self) -> &'static str {
+        match self {
+            Self::Tied(_) => "tied",
+            Self::DoesNotTie { .. } => "trail_does_not_tie",
+            Self::Ambiguous { .. } => "bill_identity_ambiguous",
+        }
+    }
+
+    fn reference(&self) -> &str {
+        match self {
+            Self::Tied(trail) => &trail.reference,
+            Self::DoesNotTie { reference, .. } | Self::Ambiguous { reference, .. } => reference,
+        }
+    }
+
+    pub(super) fn json(&self, party: Value) -> Value {
+        match self {
+            Self::Tied(trail) => json!({
+                "party": party,
+                "reference": trail.reference,
+                "bill_date": trail.bill_date,
+                "state": "tied",
+                "open": trail.listed_open,
+                "balance": trail.balance.as_str(),
+                "allocations": trail.entries.iter().map(TrailEntry::json).collect::<Vec<_>>(),
+            }),
+            Self::DoesNotTie {
+                reference,
+                bill_date,
+                entries,
+                trail_sum,
+                native,
+            } => json!({
+                "party": party,
+                "reference": reference,
+                "bill_date": bill_date,
+                "state": "trail_does_not_tie",
+                "trail_sum": trail_sum.as_str(),
+                "native_balance": native.as_ref().map(ExactDecimal::as_str),
+                "allocations": entries.iter().map(TrailEntry::json).collect::<Vec<_>>(),
+            }),
+            Self::Ambiguous {
+                reference,
+                bill_dates_in_vouchers,
+                native_bill_dates,
+                native_rows,
+                entries,
+            } => json!({
+                "party": party,
+                "reference": reference,
+                "state": "bill_identity_ambiguous",
+                "bill_dates_in_vouchers": bill_dates_in_vouchers,
+                "native_bill_dates": native_bill_dates,
+                "native_rows": native_rows,
+                "allocations": entries.iter().map(TrailEntry::json).collect::<Vec<_>>(),
+            }),
+        }
+    }
+}
+
+/// The trail of every named bill of `party` in `entries` (or of one
+/// `reference`), each tied to `native_bills` (the party's rows of Tally's own
+/// bills reports at the same as-of). Bills come back ordered by reference.
+pub(super) fn bill_trails(
+    party: &str,
+    reference: Option<&str>,
+    entries: &[TrailEntry],
+    native_bills: &[OpenBillRow],
+) -> Result<Vec<BillOutcome>, TrailRefusal> {
+    let mut by_reference = BTreeMap::<&str, Vec<&TrailEntry>>::new();
+    for entry in entries {
+        if let Some(name) = entry.reference.as_deref() {
+            if reference.is_none_or(|wanted| wanted == name) {
+                by_reference.entry(name).or_default().push(entry);
+            }
+        }
+    }
+    // A reference asked for that no voucher in the window carries, but the
+    // native report lists, is still a bill: its trail is empty and cannot tie.
+    if let Some(wanted) = reference {
+        by_reference.entry(wanted).or_default();
+    }
+    let mut out = Vec::new();
+    let mut seen = std::collections::BTreeSet::<String>::new();
+    for (name, group) in by_reference {
+        seen.insert(name.to_string());
+        let natives = native_bills
+            .iter()
+            .filter(|bill| bill.party == party && bill.reference == name)
+            .collect::<Vec<_>>();
+        let mut bill_dates = group
+            .iter()
+            .filter_map(|entry| entry.bill_date.clone())
+            .collect::<Vec<_>>();
+        bill_dates.sort();
+        bill_dates.dedup();
+        let owned = group
+            .iter()
+            .map(|entry| (*entry).clone())
+            .collect::<Vec<_>>();
+        if group.is_empty() && natives.is_empty() {
+            // Nothing to show and nothing to tie: the reference is unknown here.
+            continue;
+        }
+        if bill_dates.len() > 1 || natives.len() > 1 {
+            out.push(BillOutcome::Ambiguous {
+                reference: name.to_string(),
+                bill_dates_in_vouchers: bill_dates,
+                native_bill_dates: natives.iter().map(|n| n.bill_date.clone()).collect(),
+                native_rows: natives.len(),
+                entries: owned,
+            });
+            continue;
+        }
+        let trail_sum = sum(&group)?;
+        let bill_date = bill_dates.first().cloned().unwrap_or_default();
+        match natives.first() {
+            Some(native) => {
+                if !group.is_empty() && native.bill_date != bill_date {
+                    // One native row, but it is not this bill: its date differs
+                    // from the allocations' own bill date.
+                    out.push(BillOutcome::Ambiguous {
+                        reference: name.to_string(),
+                        bill_dates_in_vouchers: bill_dates,
+                        native_bill_dates: vec![native.bill_date.clone()],
+                        native_rows: 1,
+                        entries: owned,
+                    });
+                    continue;
+                }
+                let signed = signed_native(native)?;
+                if signed.numeric_eq(&trail_sum) && !group.is_empty() {
+                    out.push(BillOutcome::Tied(BillTrail {
+                        reference: name.to_string(),
+                        bill_date: native.bill_date.clone(),
+                        entries: owned,
+                        balance: trail_sum,
+                        listed_open: true,
+                    }));
+                } else {
+                    out.push(BillOutcome::DoesNotTie {
+                        reference: name.to_string(),
+                        bill_date: native.bill_date.clone(),
+                        entries: owned,
+                        trail_sum,
+                        native: Some(signed),
+                    });
+                }
+            }
+            None => {
+                if trail_sum.is_zero() {
+                    out.push(BillOutcome::Tied(BillTrail {
+                        reference: name.to_string(),
+                        bill_date,
+                        entries: owned,
+                        balance: trail_sum,
+                        listed_open: false,
+                    }));
+                } else {
+                    out.push(BillOutcome::DoesNotTie {
+                        reference: name.to_string(),
+                        bill_date,
+                        entries: owned,
+                        trail_sum,
+                        native: None,
+                    });
+                }
+            }
+        }
+    }
+    // A bill Tally's report lists for the party that no voucher in the window
+    // allocates to (an opening bill, which lives on the ledger, or a window that
+    // starts after the bill) still appears: with no allocations it cannot tie.
+    // Several rows for one reference are ambiguous here exactly as they are
+    // when vouchers carry the reference, never one shown and the rest dropped.
+    let mut native_only = BTreeMap::<&str, Vec<&OpenBillRow>>::new();
+    for native in native_bills.iter().filter(|bill| {
+        bill.party == party
+            && !seen.contains(&bill.reference)
+            && reference.is_none_or(|wanted| wanted == bill.reference)
+    }) {
+        native_only
+            .entry(native.reference.as_str())
+            .or_default()
+            .push(native);
+    }
+    for (name, natives) in native_only {
+        match natives.as_slice() {
+            [native] => out.push(BillOutcome::DoesNotTie {
+                reference: name.to_string(),
+                bill_date: native.bill_date.clone(),
+                entries: Vec::new(),
+                trail_sum: ExactDecimal::zero(),
+                native: Some(signed_native(native)?),
+            }),
+            _ => out.push(BillOutcome::Ambiguous {
+                reference: name.to_string(),
+                bill_dates_in_vouchers: Vec::new(),
+                native_bill_dates: natives.iter().map(|n| n.bill_date.clone()).collect(),
+                native_rows: natives.len(),
+                entries: Vec::new(),
+            }),
+        }
+    }
+    out.sort_by(|left, right| left.reference().cmp(right.reference()));
+    if reference.is_some() && out.is_empty() {
+        // Neither a voucher in the window nor Tally's report knows it for this
+        // party: an empty list would read as "a party with no bills".
+        return Err(TrailRefusal("bill_reference_not_found"));
+    }
+    Ok(out)
+}
+
+/// The unadjusted detail of one party, with its tie-out.
+pub(super) struct UnadjustedDetail {
+    pub(super) state: &'static str,
+    /// The signed residual (closing balance minus the named bills), `0` when the
+    /// party has no unallocated row.
+    pub(super) residual: ExactDecimal,
+    pub(super) on_account_sum: ExactDecimal,
+    /// `residual - on_account_sum`, present only when it is not zero.
+    pub(super) difference: Option<ExactDecimal>,
+    /// Whether that difference equals the ledger's own opening balance. A fact
+    /// about two numbers, not a claim about what the difference is.
+    pub(super) difference_equals_opening_balance: Option<bool>,
+    pub(super) rows: Vec<(&'static str, TrailEntry)>,
+}
+
+impl UnadjustedDetail {
+    pub(super) fn json(&self) -> Value {
+        let mut value = json!({
+            "state": self.state,
+            "residual": self.residual.as_str(),
+            "on_account_sum": self.on_account_sum.as_str(),
+            "rows": self.rows.iter().map(|(class, entry)| {
+                let mut row = entry.json();
+                row["class"] = json!(class);
+                if let Some(reference) = &entry.reference {
+                    row["reference"] = json!(reference);
+                }
+                row
+            }).collect::<Vec<_>>(),
+        });
+        if let Some(difference) = &self.difference {
+            value["difference"] = json!(difference.as_str());
+        }
+        if let Some(equals) = self.difference_equals_opening_balance {
+            value["difference_equals_opening_balance"] = json!(equals);
+        }
+        value
+    }
+}
+
+/// On-account, advance and pending-note rows of `party`, tied against its
+/// unallocated residual. A party on a ledger that keeps no bills returns state
+/// `not_bill_wise_ledger` and no rows: its vouchers carry no allocations to list.
+pub(super) fn unadjusted_detail(
+    entries: &[TrailEntry],
+    native_bills: &[OpenBillRow],
+    party: &str,
+    unallocated: Option<&UnallocatedParty>,
+) -> Result<UnadjustedDetail, TrailRefusal> {
+    let residual = match unallocated {
+        None => ExactDecimal::zero(),
+        Some(row) => match row.direction {
+            ExposureDirection::Receivable => ExactDecimal::zero()
+                .checked_subtract(&row.amount)
+                .map_err(|_| TrailRefusal("trail_amount_invalid"))?,
+            ExposureDirection::Payable => row.amount.clone(),
+        },
+    };
+    if unallocated.and_then(|row| row.composition)
+        == Some(crate::tally::UnallocatedComposition::NotBillWiseLedger)
+    {
+        return Ok(UnadjustedDetail {
+            state: "not_bill_wise_ledger",
+            residual,
+            on_account_sum: ExactDecimal::zero(),
+            difference: None,
+            difference_equals_opening_balance: None,
+            rows: Vec::new(),
+        });
+    }
+    let mut rows = Vec::new();
+    let mut on_account = Vec::<&TrailEntry>::new();
+    for entry in entries {
+        match entry.kind {
+            AllocationKind::OnAccount => {
+                rows.push(("on_account", entry.clone()));
+                on_account.push(entry);
+            }
+            AllocationKind::Advance => rows.push(("advance", entry.clone())),
+            AllocationKind::NewRef
+                if matches!(entry.voucher_type.as_str(), "Credit Note" | "Debit Note")
+                    && entry.reference.as_deref().is_some_and(|reference| {
+                        native_bills
+                            .iter()
+                            .any(|bill| bill.party == party && bill.reference == reference)
+                    }) =>
+            {
+                rows.push(("pending_note_with_reference", entry.clone()));
+            }
+            _ => {}
+        }
+    }
+    let on_account_sum = sum(&on_account)?;
+    let difference = residual
+        .checked_subtract(&on_account_sum)
+        .map_err(|_| TrailRefusal("trail_amount_invalid"))?;
+    let opening = unallocated.and_then(|row| row.opening_balance.as_ref());
+    let (state, difference, equals) = if difference.is_zero() {
+        ("tied", None, None)
+    } else {
+        let equals = opening.map(|opening| opening.numeric_eq(&difference));
+        (
+            "residual_not_explained_by_vouchers",
+            Some(difference),
+            equals,
+        )
+    };
+    Ok(UnadjustedDetail {
+        state,
+        residual,
+        on_account_sum,
+        difference,
+        difference_equals_opening_balance: equals,
+        rows,
+    })
+}
+
+/// The most allocation rows one detail answer carries. Past it the read is
+/// refused (`trail_too_large`; narrow it with `reference`) instead of cut, so a
+/// trail is never a silently partial one.
+const MAX_DETAIL_ROWS: usize = 500;
+
+/// Allocations a bill-trail answer carries, whatever each bill's state.
+pub(super) fn trail_row_count(bills: &[BillOutcome]) -> usize {
+    bills
+        .iter()
+        .map(|bill| match bill {
+            BillOutcome::Tied(trail) => trail.entries.len(),
+            BillOutcome::DoesNotTie { entries, .. } | BillOutcome::Ambiguous { entries, .. } => {
+                entries.len()
+            }
+        })
+        .sum()
+}
+
+/// Refuse, never cut, an answer of more than [`MAX_DETAIL_ROWS`] allocations.
+pub(super) fn within_detail_cap(rows: usize) -> Result<(), TrailRefusal> {
+    if rows > MAX_DETAIL_ROWS {
+        return Err(TrailRefusal("trail_too_large"));
+    }
+    Ok(())
+}
+
+/// Parse the three optional arguments of `outstandings` that ask for a party
+/// detail, before any read: the codes are the tool's refusals.
+pub(super) fn parse_detail_request(
+    party: Option<&str>,
+    detail: Option<&str>,
+    reference: Option<&str>,
+) -> Result<Option<DetailKind>, &'static str> {
+    let kind = match (party, detail) {
+        (None, None) => None,
+        (Some(_), Some("bill_trail")) => Some(DetailKind::BillTrail),
+        (Some(_), Some("unadjusted")) => Some(DetailKind::Unadjusted),
+        (Some(_), None) => return Err("party_requires_detail"),
+        (None, Some(_)) => return Err("detail_requires_party"),
+        (Some(_), Some(_)) => return Err("invalid_detail"),
+    };
+    if reference.is_some() && kind != Some(DetailKind::BillTrail) {
+        return Err("reference_requires_bill_trail");
+    }
+    Ok(kind)
+}
+
+/// Where the party's voucher window starts: the books' beginning, or, for a
+/// named bill, the earliest bill date Tally's report lists for that reference
+/// (the earliest, so that two rows of one reference never lose the older one's
+/// allocations).
+pub(super) fn trail_window_start(
+    kind: DetailKind,
+    reference: Option<&str>,
+    party: &str,
+    open_bills: &[OpenBillRow],
+    books_from: &str,
+) -> String {
+    match (kind, reference) {
+        // An opening bill can carry a date before the books begin (reference
+        // 12a.10); a window before the books is not one Bridge reads.
+        (DetailKind::BillTrail, Some(reference)) => open_bills
+            .iter()
+            .filter(|bill| bill.party == party && bill.reference == reference)
+            .map(|bill| bill.bill_date.clone())
+            .min()
+            .filter(|date| date.as_str() > books_from)
+            .unwrap_or_else(|| books_from.to_string()),
+        _ => books_from.to_string(),
+    }
+}
+
+/// What `outstandings` was asked for beyond the book-wide figures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DetailKind {
+    BillTrail,
+    Unadjusted,
+}
+
+impl Server {
+    /// Reads the party's vouchers for the window the detail needs and builds it.
+    ///
+    /// `open_bills` and `unallocated` are the book-wide native figures already
+    /// read at `as_of`, so the vouchers and the report are tied at one date. The
+    /// window is the party's whole history up to `as_of` (from the books'
+    /// beginning, or from the bill's own date for one named open bill), read
+    /// through the same guarded window read `vouchers` uses, and filtered to the
+    /// party on the client: nothing here trusts a voucher's own party field.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn outstandings_detail(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &TallyCompany,
+        as_of: &str,
+        party_argument: &str,
+        kind: DetailKind,
+        reference: Option<&str>,
+        open_bills: &[OpenBillRow],
+        unallocated: &[UnallocatedParty],
+    ) -> Result<(Value, Evidence), ToolFailure> {
+        let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
+        let party = resolve_ledger_name(catalogue.iter().map(String::as_str), party_argument)?;
+        let books_from = company
+            .books_from
+            .clone()
+            .ok_or_else(|| ToolFailure::from("trail_books_from_missing".to_string()))?;
+        let from = trail_window_start(kind, reference, &party, open_bills, &books_from);
+        if from.as_str() > as_of {
+            return Err("invalid_date_range".to_string().into());
+        }
+        let read = self
+            .read_entry_window_rows(
+                identity,
+                &company.name,
+                &from,
+                as_of,
+                VoucherReadShape::EntryWildcard,
+                VoucherComposites::Refuse,
+            )
+            .await?;
+        evidence = combine_evidence(evidence, read.all_evidence());
+        let late = |failure: ToolFailure| with_evidence(failure, &evidence);
+        let rows = read
+            .rows
+            .into_iter()
+            .map(VoucherRow::into_filter_row)
+            .collect::<Vec<_>>();
+        let vouchers_read = rows.len();
+        let rows = validate_then_filter_voucher_rows(rows, &from, as_of, None)
+            .map_err(|code| late(ToolFailure::from(code)))?;
+        let entries = entries_for_party(&rows, &party)
+            .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+        let party_json = redact_value(party_name_value(party.clone()), self.settings.redaction);
+        let window = json!({"from": from, "to": as_of, "company_vouchers_read": vouchers_read});
+        let detail = match kind {
+            DetailKind::BillTrail => {
+                let bills = bill_trails(&party, reference, &entries, open_bills)
+                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+                within_detail_cap(trail_row_count(&bills))
+                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+                json!({
+                    "kind": "bill_trail",
+                    "party": party_json,
+                    "as_of": as_of,
+                    "window": window,
+                    "bills": bills.iter().map(|bill| bill.json(party_json.clone())).collect::<Vec<_>>(),
+                })
+            }
+            DetailKind::Unadjusted => {
+                let row = unallocated.iter().find(|row| row.party == party);
+                let detail = unadjusted_detail(&entries, open_bills, &party, row)
+                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+                within_detail_cap(detail.rows.len())
+                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+                let mut value = detail.json();
+                value["kind"] = json!("unadjusted");
+                value["party"] = party_json;
+                value["as_of"] = json!(as_of);
+                value["window"] = window;
+                value
+            }
+        };
+        Ok((detail, evidence))
+    }
+}
+
+/// A refusal that follows the voucher read keeps that read's evidence, with
+/// whatever the failure already carried.
+pub(super) fn with_evidence(mut failure: ToolFailure, evidence: &Evidence) -> ToolFailure {
+    failure.evidence = Some(Box::new(match failure.evidence.take() {
+        Some(own) => combine_evidence(evidence.clone(), *own),
+        None => evidence.clone(),
+    }));
+    failure
+}
+
+#[cfg(test)]
+#[path = "agent_bill_trail_tests.rs"]
+mod tests;

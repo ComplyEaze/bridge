@@ -4,6 +4,17 @@ use super::*;
 impl Server {
     pub(super) async fn outstandings(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
+        // The party detail (#945 slice C): parsed before any read, so a
+        // conflicting request costs nothing.
+        let party_argument = optional_string(args, "party")?;
+        let detail_argument = optional_string(args, "detail")?;
+        let reference_argument = optional_string(args, "reference")?;
+        let detail_request = super::bill_trail::parse_detail_request(
+            party_argument.as_deref(),
+            detail_argument.as_deref(),
+            reference_argument.as_deref(),
+        )
+        .map_err(|code| ToolFailure::from(code.to_string()))?;
         let (company, identity, mut result_evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
             let as_of = optional_string(args, "as_of")?
@@ -30,6 +41,7 @@ impl Server {
                 .map_err(|error| ToolFailure::from_runtime("company_currency_probe_failed", error))?;
             result_evidence = combine_evidence(result_evidence.clone(), evidence_from_runtime_read(currency.evidence()));
             let assertion = currency.admit_inr_classified().map_err(str::to_string)?;
+            let as_of_date = to.as_str().to_string();
             let (load, outstandings_evidence) = self
                 .runtime
                 .fetch_agent_outstandings_with_evidence(
@@ -96,10 +108,38 @@ impl Server {
                     statement_unallocated_by_party,
                     ..
                 } => {
+                    let mut detail = None;
+                    if let (Some(kind), Some(party)) = (detail_request, &party_argument) {
+                        let (value, detail_evidence) = self
+                            .outstandings_detail(
+                                &identity,
+                                &company,
+                                &as_of_date,
+                                party,
+                                kind,
+                                reference_argument.as_deref(),
+                                &statement_open_bills,
+                                &statement_unallocated_by_party,
+                            )
+                            .await?;
+                        result_evidence = combine_evidence(result_evidence.clone(), detail_evidence);
+                        detail = Some(value);
+                    }
                     let (mut figures, truncated) =
                         figures(statement_open_bills, statement_unallocated_by_party)?;
                     figures["state"] = json!("complete");
+                    if let Some(detail) = detail {
+                        figures["detail"] = detail;
+                    }
                     (figures, truncated)
+                }
+                OutstandingsLoadResult::Partial { .. }
+                | OutstandingsLoadResult::BaseCurrencyLedgersOnly { .. }
+                    if detail_request.is_some() =>
+                {
+                    // The bills a party detail is tied against are not the whole
+                    // book's here, so nothing is tied and nothing is shown.
+                    return Err("detail_requires_a_complete_read".to_string().into());
                 }
                 OutstandingsLoadResult::Partial { reason, .. } => {
                     result_evidence.state = "partial";

@@ -46,6 +46,8 @@ mod ledgers;
 #[path = "agent_masters.rs"]
 mod masters;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+#[path = "agent_bill_trail.rs"]
+mod bill_trail;
 #[path = "agent_outstandings.rs"]
 mod outstandings;
 #[path = "agent_presence.rs"]

@@ -126,7 +126,10 @@ impl Server {
                 let (items, frame): (&[NativeStockItem], Value) = match &read.gate {
                     NativeStockGate::RowsBelowItemCount { rows, tally_count } => {
                         return Err(rows_below_item_count(*rows, *tally_count)
-                            .with_prior_evidence(combine_evidence(prior.clone(), read_evidence.clone())));
+                            .with_prior_evidence(combine_evidence(
+                                prior.clone(),
+                                read_evidence.clone(),
+                            )));
                     }
                     // The report has a total the items do not add up to: a
                     // figure Tally contradicts is not shown.

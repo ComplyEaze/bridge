@@ -1,6 +1,9 @@
-//! Native `stock_summary` reads: the company's inventory flags, its stock
-//! items with their closing quantity and value, and Tally's own Stock Summary
-//! report, whose top-level lines' sum gates the items.
+//! Native `stock_summary` reads: the company's inventory flags and its own
+//! stock item count, its stock items with their closing value, and Tally's own
+//! Stock Summary report. Items are returned only when their closing values add
+//! up to the report's top-level lines and are not fewer than the count
+//! ([`gate_stock_summary`]). A quantity is read and never returned: nothing
+//! checks it.
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
 //! (`tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`; PARTIAL), and, by role, one
@@ -65,8 +68,9 @@ const _: () = assert!(stock_item_worst_row_bytes() < MASTERS_RESPONSE_BUDGET_BYT
 /// the company's counts, and one single-term filter, `$GUID = "<GUID>"`: a
 /// `Company` collection ignores `SVCURRENTCOMPANY` and returns every loaded
 /// company (§12a.7), so the filter is what makes the response this company's
-/// alone. The counts are fetched, so the request stays byte-equal to the
-/// committed capture, but not read. A GUID that could break the formula's
+/// alone. Of the counts it fetches, only the stock item count is read
+/// ([`NativeStockItemCount`]); the rest stay in the request so that it is
+/// byte-equal to the committed capture. A GUID that could break the formula's
 /// string is refused, not escaped.
 ///
 /// The formula is named `BridgeR3CompanyGuid`, an internal lab-capture name,
@@ -482,7 +486,13 @@ const ITEM_FIELDS: [&str; 8] = [
     "NAME",
 ];
 
-const FLAG_FIELDS: [&str; 4] = ["GUID", "ISINTEGRATED", "ISINVENTORYON", "ISBATCHWISEON"];
+const FLAG_FIELDS: [&str; 5] = [
+    "GUID",
+    "ISINTEGRATED",
+    "ISINVENTORYON",
+    "ISBATCHWISEON",
+    "NUMSTOCKITEMS",
+];
 
 /// The `wanted` children of the row now open, by upper-case name, up to the
 /// row's closing tag. Aliases under `LANGUAGENAME.LIST` are counted per row and
@@ -542,7 +552,8 @@ fn read_row_fields(
 /// `GUID` equals `company_guid` is admitted: none, several (a year-split
 /// sibling shares the GUID, §9.11b) or another company's refuse
 /// `company_flags_not_one_row`. A flag is `Yes`, `No`, or `Unknown` when absent
-/// or empty; any other text refuses. The `NUM*` counts are not read.
+/// or empty; any other text refuses. The stock item count is read as
+/// [`item_count`] reads it; the other `NUM*` counts are not read.
 pub fn parse_company_inventory_flags(
     response: &str,
     company_guid: &str,
@@ -566,8 +577,24 @@ pub fn parse_company_inventory_flags(
             inventory_on: flag(&mut fields, "ISINVENTORYON", "is_inventory_on")?,
             batchwise: flag(&mut fields, "ISBATCHWISEON", "is_batchwise_on")?,
         },
-        item_count: NativeStockItemCount::Unavailable,
+        item_count: item_count(fields.remove("NUMSTOCKITEMS")),
     })
+}
+
+/// Tally's own stock item count: plain digits after trimming (Tally writes a
+/// non-zero count with a leading space, ` 11`, and zero as `0`). Missing,
+/// empty, signed, grouped, fractional or too large for a count: unavailable,
+/// never zero. It does not refuse here: the gate decides what a read without a
+/// count is.
+fn item_count(text: Option<String>) -> NativeStockItemCount {
+    text.as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|text| text.parse::<u64>().ok())
+        .map_or(
+            NativeStockItemCount::Unavailable,
+            NativeStockItemCount::Reported,
+        )
 }
 
 fn flag(
@@ -639,18 +666,27 @@ fn position(
     value_key: &'static str,
 ) -> Result<NativeStockPosition, NativeStockError> {
     Ok(NativeStockPosition {
-        quantity: match quantity(fields.remove(quantity_key))? {
-            Some(quantity) => NativeQuantityRead::Read(quantity),
-            None => NativeQuantityRead::Empty,
+        quantity: match quantity(fields.remove(quantity_key)) {
+            Ok(Some(quantity)) => NativeQuantityRead::Read(quantity),
+            Ok(None) => NativeQuantityRead::Empty,
+            // Outside the grammar (a compound unit, a unit with a space in
+            // it): unread, and the row is still read. No quantity is returned.
+            Err(NativeStockError::QuantityUnparseable) => NativeQuantityRead::Unread,
+            // A unit over the name bound breaks the row-size premise, which
+            // is not about the grammar: it still refuses.
+            Err(error) => return Err(error),
         },
         value: value(fields.remove(value_key))?,
     })
 }
 
-/// `^-?[0-9]+(\.[0-9]+)? <unit>$` after trimming, where the unit is one or
-/// more non-space characters (letters and dots: `U.` was seen live). An empty
-/// or absent element is `None`; anything else that does not match, a double
-/// space or a unit with a space in it included, refuses.
+/// The strict quantity grammar: `^-?[0-9]+(\.[0-9]+)? <unit>$` after trimming,
+/// where the unit is one or more non-space characters (letters and dots: `U.`
+/// was seen live). An empty or absent element is `None`; anything else that
+/// does not match, a double space or a unit with a space in it included,
+/// refuses. The row reader turns that refusal into an unread quantity
+/// ([`position`]); a quantity must pass this grammar before one is ever
+/// returned.
 fn quantity(text: Option<String>) -> Result<Option<NativeStockQuantity>, NativeStockError> {
     let Some(text) = text else {
         return Ok(None);
@@ -697,15 +733,16 @@ pub enum NativeStockReport {
     /// An empty `ENVELOPE`: not told apart from a report Tally did not render
     /// (§12a.11), so never read as zero.
     Empty,
-    /// A bare `RESPONSE`: Tally did not recognise the report name (§12a.1).
-    UnknownReport,
 }
 
 /// Parses the Stock Summary response (§12a.1, §12a.13): no `HEADER` or `STATUS`;
 /// top-level children alternate `DSPACCNAME` then `DSPSTKINFO` and nothing else;
 /// each `DSPSTKINFO` holds one `DSPSTKCL` whose `DSPCLAMTA` is a plain signed
-/// decimal or empty. A `LINEERROR` or `ERROR` refuses; a bare `RESPONSE` and an
-/// empty envelope are answers ([`NativeStockReport`]), not refusals.
+/// decimal or empty. A `LINEERROR` or `ERROR` refuses, and so does a bare
+/// `RESPONSE` (Tally did not recognise the report name, §12a.1), as the
+/// statements parser refuses it; an empty envelope is an answer
+/// ([`NativeStockReport::Empty`]). The total is written at the scale of the
+/// amounts it adds.
 pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport, NativeStockError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
@@ -715,8 +752,8 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
     let mut envelope_closed = false;
     let mut expect_info = false;
     let mut pairs = 0_usize;
-    let mut total: Option<ExactDecimal> = None;
-    let (mut present, mut empty) = (0_usize, 0_usize);
+    let mut amounts = Vec::<ExactDecimal>::new();
+    let mut empty = 0_usize;
     loop {
         match reader.read_event().map_err(|_| malformed_xml())? {
             Event::Start(element) => {
@@ -724,7 +761,7 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
                 if !root_seen {
                     match name.as_slice() {
                         b"ENVELOPE" => root_seen = true,
-                        b"RESPONSE" => return Ok(NativeStockReport::UnknownReport),
+                        b"RESPONSE" => return Err(NativeStockError::ReportUnknown),
                         _ => return Err(report_shape("stock_report_root_not_envelope")),
                     }
                     continue;
@@ -740,15 +777,7 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
                     }
                     b"DSPSTKINFO" if expect_info => {
                         match read_report_info(&mut reader)? {
-                            Some(amount) => {
-                                present += 1;
-                                total = Some(match total {
-                                    None => amount,
-                                    Some(sum) => sum
-                                        .checked_add(&amount)
-                                        .map_err(|_| NativeStockError::SumInvalid)?,
-                                });
-                            }
+                            Some(amount) => amounts.push(amount),
                             None => empty += 1,
                         }
                         pairs += 1;
@@ -765,7 +794,7 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
                             root_seen = true;
                             envelope_closed = true;
                         }
-                        b"RESPONSE" => return Ok(NativeStockReport::UnknownReport),
+                        b"RESPONSE" => return Err(NativeStockError::ReportUnknown),
                         _ => return Err(report_shape("stock_report_root_not_envelope")),
                     }
                     continue;
@@ -796,8 +825,12 @@ pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport,
         NativeStockReport::Empty
     } else {
         NativeStockReport::Lines {
-            total,
-            present,
+            total: if amounts.is_empty() {
+                None
+            } else {
+                Some(sum_at_scale(amounts.iter())?)
+            },
+            present: amounts.len(),
             empty,
         }
     })
@@ -964,12 +997,36 @@ impl NativeStockTotals {
 }
 
 /// The sum of the closing values that are present (an empty one is left out,
-/// not counted as zero).
+/// not counted as zero), at the scale of the values it adds.
 fn present_closing_value_sum(items: &[NativeStockItem]) -> Result<ExactDecimal, NativeStockError> {
-    items
-        .iter()
-        .filter_map(|item| item.closing.value.as_ref())
-        .try_fold(ExactDecimal::zero(), |sum, value| sum.checked_add(value))
+    sum_at_scale(items.iter().filter_map(|item| item.closing.value.as_ref()))
+}
+
+/// The signed sum of `values`, written with as many decimal places as the
+/// widest of them: `2500.00` and `500.00` are `3000.00`, not `3000`. No value
+/// at all sums to `0`.
+fn sum_at_scale<'a>(
+    values: impl Iterator<Item = &'a ExactDecimal>,
+) -> Result<ExactDecimal, NativeStockError> {
+    let decimals = |text: &str| {
+        text.split_once('.')
+            .map_or(0, |(_, fraction)| fraction.len())
+    };
+    let mut scale = 0_usize;
+    let mut sum = ExactDecimal::zero();
+    for value in values {
+        scale = scale.max(decimals(value.as_str()));
+        sum = sum
+            .checked_add(value)
+            .map_err(|_| NativeStockError::SumInvalid)?;
+    }
+    let text = sum.as_str();
+    let missing = scale - decimals(text).min(scale);
+    if missing == 0 {
+        return Ok(sum);
+    }
+    let point = if text.contains('.') { "" } else { "." };
+    ExactDecimal::parse(format!("{text}{point}{}", "0".repeat(missing)))
         .map_err(|_| NativeStockError::SumInvalid)
 }
 
@@ -1024,48 +1081,78 @@ pub enum NativeStockGate {
 }
 
 /// Decides what a read established from the rows, Tally's own item count and
-/// the report.
+/// the report. In order:
+///
+/// 1. no count: nothing says whether every item was read, so the read refuses;
+/// 2. fewer rows than the count: its own outcome, before any comparison;
+/// 3. no rows, a count of zero and an empty report: no stock items;
+/// 4. the report has a total: the items' closing values must add up to it, with
+///    at least one value on their side (two empty sides never match);
+/// 5. the report shows no amount: a non-zero sum on the items' side is not
+///    confirmed, and anything else was not comparable. Tally's Stock Summary
+///    has no line for a group worth zero, so a sum of zero against an empty
+///    report is not a contradiction.
+///
+/// A present `0.00` is a value. More rows than the count is not a refusal: each
+/// row is this company's by its GUID.
 pub fn gate_stock_summary(
     items: Vec<NativeStockItem>,
     item_count: NativeStockItemCount,
     report: &NativeStockReport,
 ) -> Result<NativeStockGate, NativeStockError> {
-    // SKELETON: the comparison as it was before the count and the withholding
-    // rules; the item count is not consulted yet.
-    let tally_count = match item_count {
-        NativeStockItemCount::Reported(count) => count,
-        NativeStockItemCount::Unavailable => items.len() as u64,
+    let NativeStockItemCount::Reported(tally_count) = item_count else {
+        return Err(NativeStockError::ItemCountUnavailable);
     };
-    let totals = NativeStockTotals::of(&items)?;
-    let (report_total, report_empty_amounts) = match report {
+    let rows = items.len();
+    let rows_counted = u64::try_from(rows).unwrap_or(u64::MAX);
+    if rows_counted < tally_count {
+        return Ok(NativeStockGate::RowsBelowItemCount { rows, tally_count });
+    }
+    let item_count = NativeItemCountCrossCheck {
+        status: if rows_counted == tally_count {
+            NativeItemCountStatus::Matched
+        } else {
+            NativeItemCountStatus::CompanyCountLower
+        },
+        rows,
+        tally_count,
+    };
+    // `None` when no item carries a closing value: there is no figure on the
+    // items' side, which is not a sum of zero.
+    let items_total = if items.iter().any(|item| item.closing.value.is_some()) {
+        Some(present_closing_value_sum(&items)?)
+    } else {
+        None
+    };
+    Ok(match report {
         NativeStockReport::Lines {
-            total: Some(total),
+            total: Some(report_total),
             empty,
             ..
-        } => (total, *empty),
-        NativeStockReport::Lines { total: None, .. }
-        | NativeStockReport::Empty
-        | NativeStockReport::UnknownReport => return Ok(NativeStockGate::NotComparable),
-    };
-    let items_total = present_closing_value_sum(&items)?;
-    if items_total.numeric_eq(report_total) {
-        Ok(NativeStockGate::ValueTotalMatched {
-            item_count: NativeItemCountCrossCheck {
-                status: NativeItemCountStatus::Matched,
-                rows: items.len(),
-                tally_count,
+        } => match items_total {
+            Some(sum) if sum.numeric_eq(report_total) => NativeStockGate::ValueTotalMatched {
+                totals: NativeStockTotals::of(&items)?,
+                items,
+                total: report_total.clone(),
+                report_empty_amounts: *empty,
+                item_count,
             },
-            items,
-            totals,
-            total: report_total.clone(),
-            report_empty_amounts,
-        })
-    } else {
-        Ok(NativeStockGate::Differs {
-            items_total: Some(items_total),
-            report_total: report_total.clone(),
-        })
-    }
+            None if report_total.is_zero() => NativeStockGate::NotComparable,
+            items_total => NativeStockGate::Differs {
+                items_total,
+                report_total: report_total.clone(),
+            },
+        },
+        NativeStockReport::Empty if rows == 0 && tally_count == 0 => NativeStockGate::NoStockItems,
+        NativeStockReport::Lines { total: None, .. } | NativeStockReport::Empty => {
+            match items_total {
+                Some(sum) if !sum.is_zero() => {
+                    NativeStockGate::ReportShowsNoValue { items_total: sum }
+                }
+                _ => NativeStockGate::NotComparable,
+            }
+        }
+    })
 }
 
 #[cfg(test)]

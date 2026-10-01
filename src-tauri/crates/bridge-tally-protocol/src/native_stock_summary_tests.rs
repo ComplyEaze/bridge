@@ -299,7 +299,10 @@ fn the_flags_capture_reads_each_flag_from_its_own_element() {
 fn the_item_count_is_a_plain_number_trimmed_or_it_is_unavailable_never_zero() {
     // The capture: ` 11`, with the leading space Tally writes on a non-zero
     // count. Eleven is also the number of rows in the items capture.
-    assert_eq!(count_of(&flags_response()), NativeStockItemCount::Reported(11));
+    assert_eq!(
+        count_of(&flags_response()),
+        NativeStockItemCount::Reported(11)
+    );
     assert_eq!(parse(&items_response()).unwrap().rows.len(), 11);
     // Edits of captured text. Zero is a count, written with no space.
     for (text, expected) in [
@@ -507,7 +510,11 @@ fn a_quantity_is_a_number_a_single_space_and_a_unit_or_nothing_or_unread() {
         "Kgs 5",
         "5 \u{a0}Kgs",
     ] {
-        assert_eq!(closing(Some(text)), Ok(NativeQuantityRead::Unread), "{text:?}");
+        assert_eq!(
+            closing(Some(text)),
+            Ok(NativeQuantityRead::Unread),
+            "{text:?}"
+        );
         assert_eq!(
             quantity(Some(text.to_string())),
             Err(NativeStockError::QuantityUnparseable),
@@ -1108,7 +1115,10 @@ fn a_report_tally_did_not_recognise_is_the_reads_error_not_an_answer() {
         gate_with(&items_response(), ELEVEN, &unknown),
         Err(NativeStockError::ReportUnknown)
     );
-    assert_eq!(NativeStockError::ReportUnknown.code(), "stock_report_unknown");
+    assert_eq!(
+        NativeStockError::ReportUnknown.code(),
+        "stock_report_unknown"
+    );
 }
 
 #[test]
@@ -1182,7 +1192,11 @@ fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not
     // It comes before the comparison: a report that differs does not hide it.
     let differs = report_with_amounts(["1.00", "14500.00", "-30249.99"]);
     assert_eq!(
-        gate_with(&items_response(), NativeStockItemCount::Reported(12), &differs),
+        gate_with(
+            &items_response(),
+            NativeStockItemCount::Reported(12),
+            &differs
+        ),
         Ok(NativeStockGate::RowsBelowItemCount {
             rows: 11,
             tally_count: 12
@@ -1602,7 +1616,10 @@ fn a_quantity_bridge_could_not_read_is_counted_and_refuses_nothing() {
     assert_eq!(items.rows[0].closing.quantity, NativeQuantityRead::Unread);
     assert_eq!(items.rows[0].closing.value, Some(decimal("2500.00")));
     assert_eq!(totals_of(&compound).closing_quantity_unread_count, 1);
-    assert_eq!(totals_of(&items_response()).closing_quantity_unread_count, 0);
+    assert_eq!(
+        totals_of(&items_response()).closing_quantity_unread_count,
+        0
+    );
     // And the read still ties: the value total is untouched by it.
     assert!(matches!(
         gate(&compound, &report_response()),

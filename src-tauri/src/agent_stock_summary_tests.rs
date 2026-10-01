@@ -564,7 +564,11 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     // No quantity leaves, on any item or in the totals: nothing checks one.
     for item in page["items"].as_array().unwrap() {
         assert_eq!(
-            item["closing"].as_object().unwrap().keys().collect::<Vec<_>>(),
+            item["closing"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
             ["value"],
             "{item}"
         );
@@ -781,7 +785,10 @@ fn assert_withheld(response: &Value, reason: &str) {
     assert_eq!(page["period"], json!({"from":"20250401","to":"20260331"}));
     assert_eq!(response["structuredContent"]["truncated"], false);
     // Withheld is said where an agent looks first, as `vouchers` does.
-    assert_eq!(response["structuredContent"]["evidence"]["state"], "partial");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
     assert_eq!(
         response["structuredContent"]["evidence"]["reason_code"],
         reason
@@ -789,7 +796,10 @@ fn assert_withheld(response: &Value, reason: &str) {
     // The next step is in band, and it never asks for the same read again.
     let remediation = page["remediation"].as_str().unwrap();
     assert!(!remediation.is_empty());
-    assert!(!remediation.to_lowercase().contains("call again"), "{remediation}");
+    assert!(
+        !remediation.to_lowercase().contains("call again"),
+        "{remediation}"
+    );
     assert!(!remediation.contains("offset 0"), "{remediation}");
 }
 
@@ -1058,7 +1068,10 @@ async fn a_book_with_no_stock_items_is_an_answer_with_an_empty_list() {
     assert!(page["basis"].as_str().unwrap().starts_with(
         "This company has no stock items: Tally's own item count is 0, the stock item list is empty and Tally's Stock Summary is empty."
     ));
-    assert_eq!(response["structuredContent"]["evidence"]["state"], "complete");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "complete"
+    );
     assert_eq!(response["structuredContent"]["truncated"], false);
     // It is an answer, so it is held like one.
     let id = page["snapshot"]["id"].as_str().unwrap().to_string();
@@ -1157,9 +1170,11 @@ async fn more_rows_than_tallys_item_count_is_read_and_says_so() {
 #[tokio::test]
 async fn a_stock_summary_tally_does_not_recognise_refuses_with_its_next_step() {
     let book = Book {
-        report: report()
-            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
-            .replacen("</ENVELOPE>", "</RESPONSE>", 1),
+        report: report().replacen("<ENVELOPE>", "<RESPONSE>", 1).replacen(
+            "</ENVELOPE>",
+            "</RESPONSE>",
+            1,
+        ),
         ..Book::captured()
     };
     let mut plans = book.through_flags(14, MARK);

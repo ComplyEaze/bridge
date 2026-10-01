@@ -474,13 +474,7 @@ impl ListingSnapshots {
     /// Holds a first page's read, replacing any earlier one for the same
     /// company and kind, and evicting the oldest until the cap holds.
     fn hold(&mut self, snapshot: Arc<ListingSnapshot>) {
-        self.purge_expired();
-        self.held.retain(|held| {
-            !(held
-                .company_guid
-                .eq_ignore_ascii_case(&snapshot.company_guid)
-                && held.kind == snapshot.kind)
-        });
+        self.drop_kind(&snapshot.company_guid, &snapshot.kind);
         if snapshot.bytes > self.max_bytes {
             return;
         }
@@ -497,6 +491,14 @@ impl ListingSnapshots {
             self.held.remove(oldest);
         }
         self.held.push(snapshot);
+    }
+
+    /// Drops the snapshot of one company and kind, if one is held.
+    fn drop_kind(&mut self, company_guid: &str, kind: &ListingKind) {
+        self.purge_expired();
+        self.held.retain(|held| {
+            !(held.company_guid.eq_ignore_ascii_case(company_guid) && held.kind == *kind)
+        });
     }
 
     /// The unexpired snapshot for this company and kind, if one is held.
@@ -657,6 +659,21 @@ impl Server {
             .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
             .hold(snapshot.clone());
         Ok(snapshot)
+    }
+
+    /// Drops the held snapshot of one listing. A read that may end without
+    /// holding anything calls it before reading afresh, so that an earlier
+    /// answer is never served after a newer read gave a different one.
+    pub(super) fn drop_listing(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        kind: &ListingKind,
+    ) -> Result<(), ToolFailure> {
+        self.listings
+            .lock()
+            .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
+            .drop_kind(identity.company_guid(), kind);
+        Ok(())
     }
 
     /// Drops every ledger listing snapshot of a company. Every write this

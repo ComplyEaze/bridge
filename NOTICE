@@ -8,7 +8,7 @@ are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze) uses to
 identify its products. They are not registered trade marks. The Apache
 License 2.0 does not grant permission to use them, except to describe where the
 software came from and to reproduce the NOTICE file (section 6 of the license);
-see TRADEMARKS.md. The logo and icon files — docs/brand/,
+see TRADEMARKS.md. The logo and icon files — docs/brand/, site/brand/,
 src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are not
 licensed under Apache-2.0: all rights in them are reserved. They are included
 so that official builds carry the ComplyEaze Bridge identity. A fork or
@@ -56,3 +56,18 @@ Portions of this software are copyright (c) The FreeType Project
 (www.freetype.org). All rights reserved.
 
 This software is based in part on the work of the Independent JPEG Group.
+
+-------------------------------------------------------------------------------
+Website (site/)
+
+The website in site/ includes third-party files that are not part of the
+desktop app or the MCP bundle:
+
+three.js r186 (site/vendor/three/three.bundle.min.js, a bundled and minified
+subset), Copyright 2010-2026 Three.js Authors, under the MIT License; the
+licence text is in site/vendor/three/LICENSE.
+
+The fonts Bricolage Grotesque, Geist and Geist Mono (site/fonts/*.woff2,
+subsets), each under the SIL Open Font License 1.1; the licence texts, with
+their copyright notices, are in site/fonts/OFL-bricolage-grotesque.txt,
+site/fonts/OFL-geist.txt and site/fonts/OFL-geist-mono.txt.

@@ -38,10 +38,12 @@ ComplyEaze Bridge tool can approve it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. The extension is
-  built from the same source library as the desktop app, which still contains a
-  document-upload feature and an AXAL sign-in. No published build exposes them,
-  and no tool of the extension reaches them (see section 3). They are being
-  removed ([#914](https://github.com/ComplyEaze/bridge/pull/914)).
+  built from the same source library as the desktop app, which in release 0.3.0
+  still contains a document-upload feature and an AXAL sign-in. In that
+  release no tool of the extension reaches them (see section 3). They were
+  removed from the source after 0.3.0
+  ([#914](https://github.com/ComplyEaze/bridge/pull/914)) and are absent from
+  the next release.
 
 ## 3. Which network destinations can it contact?
 
@@ -49,11 +51,15 @@ ComplyEaze Bridge tool can approve it.
   transport. It accepts only a loopback address (any `127.x.x.x` address, or
   `::1`) or the name `localhost`, which it maps to `127.0.0.1` without a DNS
   lookup. It refuses anything else, uses no proxy and follows no redirects.
-- The extension is built from the same source library as the desktop app. That
-  library also contains two HTTPS clients for the desktop app, an AXAL sign-in
-  and a document upload, whose default destination is `complyeaze.com`. No tool
-  of the extension calls them. That rests on reading how the code is wired; no
-  CI check enforces it.
+- The extension is built from the same source library as the desktop app. In
+  release 0.3.0 that library also contains two HTTPS clients for the desktop
+  app, an AXAL sign-in and a document upload, whose default destination is
+  `complyeaze.com`. The 0.3.0 extension's server binary does not call them. That
+  rests on reading how the code is wired; no CI check enforced it for 0.3.0.
+- After 0.3.0, [#914](https://github.com/ComplyEaze/bridge/pull/914) removed
+  both clients from the source. At that change no `complyeaze.com` address
+  remains in the app's source, and the Tally transport is the only code in it
+  that uses an HTTP client. The next release will not contain them.
 - The [egress check](../scripts/check-tally-egress-boundary.mjs) in CI limits
   which source files may create an HTTP client. Its header lists what it does
   not prove, including network use by native libraries such as PDFium and

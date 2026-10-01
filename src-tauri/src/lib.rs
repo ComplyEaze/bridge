@@ -1,14 +1,11 @@
 /// Read-only MCP server implementation, shared by the standalone binary.
 pub mod agent;
-pub mod axal;
 pub mod client_group_label_migration;
 pub mod client_groups;
 pub mod commands;
 pub mod db;
-pub mod documents;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
-pub mod export_registry;
 pub mod gst;
 pub(crate) mod local_files;
 // Crate-internal only: the previously separate `bridge-tally-observability` crate had exactly
@@ -107,7 +104,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
         .manage(sync::coordinator::SnapshotCoordinator::default())
         .setup(|app| {
             let app_data_directory = app.path().app_data_dir()?;
-            export_registry::init(&app_data_directory);
             app.manage(LazyTallyMirror::new(app_data_directory));
             #[cfg(target_os = "macos")]
             install_macos_cocoa_termination_guard(app.handle())?;
@@ -178,12 +174,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::fetch_tally_outstandings,
             commands::fetch_selected_ledger_entries,
             commands::prepare_gst_return_draft,
-            commands::validate_axal_credentials,
-            commands::check_axal_connection_status,
-            commands::revoke_axal_credential_session,
-            commands::scan_document_paths,
-            commands::sync_documents_to_axal,
-            commands::revoke_document_authorizations,
             source_draft::desktop_pick_source_draft,
             source_draft::desktop_open_source_draft,
             source_draft::desktop_save_source_draft,
@@ -198,8 +188,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::desktop_pick_journal_for_review,
             commands::desktop_post_reviewed_journal,
             commands::desktop_reconcile_reviewed_journal,
-            commands::select_document_files,
-            commands::select_document_folder
         ])
         .build(make_context())
         .expect("failed to build Bridge");

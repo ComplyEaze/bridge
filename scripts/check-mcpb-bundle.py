@@ -16,15 +16,38 @@ import zipfile
 
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
-    "tally_status", "list_companies", "voucher_schema", "validate_masters", "outstandings",
-    "ledger_masters", "ledger_movement", "trial_balance", "masters", "stock_summary", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "local_data_report", "verify_import",
+    "balance_sheet",
+    "egress_log",
+    "ledger_masters",
+    "ledger_movement",
+    "list_companies",
+    "local_data_report",
+    "masters",
+    "outstandings",
+    "profit_and_loss",
+    "purchase_register",
+    "read_evidence",
+    "stock_summary",
+    "tally_status",
+    "trial_balance",
+    "validate_masters",
+    "verify_import",
+    "voucher_presence",
+    "voucher_schema",
+    "vouchers",
 }
 # The bundle always enables file preparation and bank-statement parsing; they
 # write nothing to Tally. Posting, and recording a person's review of a doubted
 # post (bridge#239), are the tools behind the user's switch, and it is off by
 # default while the limits recorded on bridge#574 and bridge#579 remain.
-IMPORT_TOOLS = {"build_import_xml", "parse_bank_statement"}
-POSTING_TOOLS = {"post_import", "acknowledge_post_review"}
+IMPORT_TOOLS = {
+    "build_import_xml",
+    "parse_bank_statement",
+}
+POSTING_TOOLS = {
+    "acknowledge_post_review",
+    "post_import",
+}
 
 
 def expected_tools(environment):

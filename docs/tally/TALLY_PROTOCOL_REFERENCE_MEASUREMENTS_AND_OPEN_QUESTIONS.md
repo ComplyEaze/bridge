@@ -199,7 +199,10 @@ request is predicted over a budget well below the cap.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
      data part; a census span's row count is fixed by construction, so its only uncertainty is the
-     per-row figure, measured live at 2.42–2.72 KB (§11c.5). A full census is about 22 MB.
+     per-row figure, measured live at 2.42–2.72 KB on earlier books (§11c.5) and at about
+     3.27 KB on the wire (about 1.64 KB decoded) on a book with a mark of about 1.03M (PARTIAL,
+     30-Sep-2026, bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
+     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED.
    - The cost is a census count proportional to the **book**, not the window: a mark of 250,000 is
      31 census requests however short the window. It is a cost in elapsed time, not in gateway
      safety: every request stays bounded, so a caller that abandons the read leaves at most one
@@ -230,6 +233,10 @@ request is predicted over a budget well below the cap.
    - `voucher_window_too_many_reads` — the read would dispatch more than 128 data requests. The
      allowance is spent **when a request is dispatched**, not when a plan is made, so a part divided
      after Tally could not serve it — and the failed attempt itself — count against it.
+     The refusal carries `reads.needed_at_least` against `reads.allowed`. A census read in several
+     AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
+     default figure (the allowed requests times the vouchers one request holds at it, which every
+     first plan uses), so that certain refusal costs no further census span (#945).
    - `voucher_window_book_too_large` — the book's mark needs more than 256 census spans (a mark above
      about 2.1 million). A **product limit**: narrowing the window does not help, because the census
      walks the book's AlterIDs whatever the window.
@@ -324,7 +331,7 @@ book (read-only there). The request strings were the branch's own at `cf618c00`.
 
 | Check | Result |
 | --- | --- |
-| Census row | `DATE` and `ALTERID` are direct children of `VOUCHER`; 2.42–2.72 KB per row in UTF-16 on every book (about forty default fields come with each row); an empty window parses to zero rows with `CMPINFO`'s `<VOUCHER>0</VOUCHER>` not counted |
+| Census row | `DATE` and `ALTERID` are direct children of `VOUCHER`; 2.42–2.72 KB per row in UTF-16 on the earlier books, and about 3.27 KB on one later book (§11c.3; about forty default fields come with each row); an empty window parses to zero rows with `CMPINFO`'s `<VOUCHER>0</VOUCHER>` not counted |
 | Census count equals the full read | yes, on every whole-day window tried, in every shape |
 | `ALTVCHID` as a count bound | the count never exceeded the mark and no AlterID exceeded it, on every book: 67/90, 2,790/2,797, 29,900/29,900, and 23,634 against 249,948; a company with no vouchers omits `ALTVCHID` |
 | AlterID spans, three shapes | three contiguous spans of one day, in the entry-wildcard, movement and import-verification shapes, on three books: disjoint, their union equal to the unspanned read and to the census, no row outside its span; every read under 1.6 s |
@@ -1243,15 +1250,13 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - how a deletion moves `ALTMSTID`;
   - Education and Gold.
 
----
-
 ### 12a.13 Stock items and the Stock Summary by name on licensed 7.1
 
 **VERIFIED 2026-09-30, licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from one synthetic company with integrated inventory (11 items, 3 stock groups). The tie in the second bullet was also measured on one client book, by role, and nothing from it is committed. One run of each request. **Confidence: PARTIAL.** This extends §12a.11, where `Stock Summary` returned an empty envelope on a book not known to hold inventory, to a book with inventory.
 
 - **Stock items as one collection.** The `AuditStockItemsV1` request (`TYPE=Collection`, `StockItem`, `FETCH` of `NAME, GUID, PARENT, BASEUNITS, OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE`, over a financial year) returned one `COLLECTION` with one `STOCKITEM` row per item. Fixtures and exact requests: `tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`.
   - The row GUID carried the company's GUID as its prefix. There is no computed `BRIDGECOMPANYGUID` on this request, so the GUID prefix is the row's only binding to its company.
-  - A quantity is `<number> <unit>` (`100 Box`, `400.000 Kgs`), sent with a leading space; a negative one has no space (`-50.000 Kgs`). A value is a plain signed decimal with no grouping or symbol. **Both signs appeared among items holding a positive quantity** (`100 Box` with `2500.00`, `400.000 Kgs` with `-1000.00`), so Bridge keeps the sign as sent and does not interpret it; what makes a stock value negative on this book is unmeasured.
+  - A quantity is `<number> <unit>` (`100 Box`, `400.000 Kgs`), sent with a leading space; a negative one has no space (`-50.000 Kgs`). A value is a plain signed decimal with no grouping or symbol. **Both signs appeared among items holding a positive quantity** (`100 Box` with `2500.00`, `400.000 Kgs` with `-1000.00`). Bridge keeps the sign as sent. By the sign measurement below, `-1000.00` is stock held and `2500.00` is a value Tally's screen shows as negative; how this book's values came to be positive is not recorded.
   - An empty quantity or value element means nothing was sent, and is not zero: three items carried an empty closing quantity and an empty closing value, and one item carried `-50.000 Kgs` with an empty closing value. An opening value of `0.00` was sent as a value.
   - `LANGUAGENAME.LIST` (aliases) was present on all eleven rows, each with one name. The largest row was 654 UTF-16 units with its line ends (641 without the carriage returns), names included.
 - **The Stock Summary by name.** `<ID>Stock Summary</ID>` in §12a.1's shape (`TYPE=Data`, the statements' envelope) returned no `HEADER` or `STATUS`, and one `DSPACCNAME` / `DSPSTKINFO` pair per top-level stock group (three here).
@@ -1259,15 +1264,70 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - **The report's closing amounts summed to the stock items' `CLOSINGVALUE` sum exactly (`3000.01`).** The same equality held on a client book, by role, at the same period end. It is measured at one financial year end only: 31 March 2026, the period 20250401 to 20260331. Other years' 31 March share that request shape but not the measurement, and any other `SVTODATE` is unmeasured for stock, so `stock_summary` admits only a 31 March `as_of` and refuses any other date as `stock_summary_as_of_not_measured`.
   - An empty `<ENVELOPE/>` (§12a.11) is not a total of zero: it is an answer that cannot be told from a report Tally did not render, and is not compared.
 - **The company's inventory flags.** The `Company` collection with its `FETCH` extended by `ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON` (and seven `NUM*` counts) and one single-term filter, `$GUID = "<the company's GUID>"`, returned exactly that company's row (§12a.7: without the filter every loaded company is returned). The three flags were `Yes`. `NUMSTOCKITEMS`, `NUMGODOWNS` and `NUMUNITS` equalled the rows of the stock items, godowns and units captures; `NUMVOUCHERTYPES` did not equal the voucher-type rows (§12a.12).
+- **The sign of a stock value (2026-10-01; VERIFIED on one synthetic company, licensed TallyPrime 7.1 Silver, against Tally's own Stock Summary screen as read by the book's owner).** A negative value on the wire is a debit: stock held.
+  - A stock item imported with `OPENINGVALUE` `-50.00` (5 units at 10.00) read back with a closing value of `-50.00`, and Tally's screen showed it as 5 units at 10.00, value 50.00.
+  - A stock item imported with `OPENINGVALUE` `50.00` read back as `50.00`, and the screen showed `(-)50.00`.
+  - The report total read as `5584.56` while the screen's grand total showed `(-)5,584.56`: the same magnitude, the opposite presentation.
+  - A purchase whose goods line was sent as a debit (`-300.00`) moved its item's value from `500.00` to `200.00`.
+  - So an importer that sends a positive opening value creates what Tally shows as negative stock value, and the Stock Summary report nets signed values exactly as the item collection does.
+  - `stock_summary` keeps the wire sign, as the Trial Balance does (a debit is negative), and says so. Not measured: other releases, a book with several currencies, and a value that arises only from vouchers with no opening.
+- **The stock item count after a delete (2026-10-01; PARTIAL: one sample, licensed TallyPrime 7.1 Silver).** On one synthetic company, after one stock item with no vouchers was deleted on Tally's own screen, `NUMSTOCKITEMS` fell from 11 to 10 and equalled the stock item rows read (10); the master alteration mark rose by one. The count was read with the flags request's own bytes, and the rows through a build of master. `stock_summary` refuses a read whose rows differ from this count in either direction (`stock_summary_item_count_differs`): a count that disagrees is not counting the list that was read. An equal count is a cross-check, not proof of a complete list.
+- **A company with inventory on and no stock item (2026-10-01; PARTIAL: one synthetic company, licensed TallyPrime 7.1 Silver, captured through `bridge_mcp`).** `NUMSTOCKITEMS` was written `0`, with no leading space (a non-zero count has one, ` 11`). The stock items collection came back with `STATUS` 1 and a present, empty `COLLECTION`. The Stock Summary came back as `<ENVELOPE></ENVELOPE>`. `stock_summary` answers `no_stock_items` only when all three agree. The same run re-took the three requests on the first company through `bridge_mcp`: the answers were byte-identical to the captures of 2026-09-30.
 - **Cost, by role, on a stock-heavy client book (several thousand items; figures rounded).** The Stock Summary report took about 1.5 s (about 150 KB, a few hundred top-level lines). One span of 2,000 items took about 1 s (about 3 MB). Bridge does not read stock items on such a book: its master-alteration mark is far above the admitted size (§12a.12).
 - **Not measured:**
   - a book whose inventory is not integrated with the accounts (what the report and the items then show);
   - an `SVTODATE` other than 31 March 2026 (another year's 31 March, a day 1 or 2, any other date);
   - the date a stock item's `OPENINGBALANCE` and `OPENINGVALUE` are as at: the captured book's `BOOKSFROM` (20250401) equals the request's `SVFROMDATE`, so this capture cannot tell an opening at the period start from one at the books' beginning. `stock_summary` reads and validates both and returns neither;
   - a quantity in a compound unit, or one with a unit that has a space;
+  - the stock item count after a delete of an item with vouchers, after a merged or altered item, and on other releases;
   - the report with a godown or batch split, and the explode flag;
   - a foreign-currency book;
   - Education and Gold.
+
+---
+
+### 12a.14 One party's bill trail, tied to the native balance
+
+**PARTIAL: observed by read-back on one seeded synthetic book** (TallyPrime Silver 7.1, `BRIDGE OUTSTANDINGS LAB`,
+seeded by this project; seeded data is not evidence about a client book). Each row below was read
+from Tally's own Bills Receivable and Bills Payable reports and from the vouchers' bill allocations
+at one as-of date, and the `outstandings` party detail (#945) ties the two. The captures committed
+with that change are the voucher window, the two bills reports, and the responses of two whole
+`outstandings` calls with a party detail (`native-outstandings-detail-*`, with an ordered record of
+each call's 66 requests): an `unadjusted` detail of the on-account debtor, tied (on-account sum and
+residual both 3,000), and a `bill_trail` of one named bill, tied. Every response body is kept byte
+for byte (UTF-16LE with no byte-order mark, as received; the status read as received) except three
+listings, the company list, the book extent and the company marks, which answer for every loaded
+company and are trimmed to this company's row, with the untrimmed size and hash in their records.
+The HTTP heads are described in the sequence records, not kept. The unreferenced-opening row rests
+on a read-back through ComplyEaze Bridge that is not captured as a fixture:
+
+| What was measured | Result |
+| --- | --- |
+| The same bill reference on two parties | two rows in one Bills Receivable report, so a bill is identified by its party as well as its reference |
+| A reference reused by the same party a year later | stored as an `Agst Ref` carrying the original bill's date (see 12a.2), so within one party a reference is one continuing bill |
+| A journal that moves a bill from one party to another | the voucher's own party field names the first (debit) ledger, while the `Agst Ref` sits on another ledger's entry, so allocations belong to the party of the entry they sit on, not of the voucher's party field |
+| An on-account receipt and an on-account payment on one party | they net into one unallocated figure |
+| A note or an on-account entry with no reference | it appears only in the party's unallocated residual (closing balance less its named bills), never as a bill |
+| A referenced opening balance | it is a bill, with no voucher; an unreferenced opening is residual only |
+| An advance or a pending note with a reference | listed as a named bill in the report of the opposite direction, with no type label (12a.1) |
+
+**Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
+voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
+term in the request would be lossless for the journal above (it was not tried, which is why the
+party detail reads the whole window and filters by each entry's own ledger); the cost of that
+whole-window read on a large book.
+
+**What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
+extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
+changes that compensate, or allocations that net to zero, can still tie. An unadjusted `tied`
+means the on-account sum equals the residual, not that the residual's composition is proven. One
+unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
+tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
+having no residual row, never as a residual of zero, and an empty voucher read is reported as
+such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
+unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open
+balance for its reference beside it, rather than netting allocations on an unverified rule.
 
 ---
 
@@ -1314,7 +1374,12 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |
 | 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (about 300 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (about 120 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |
+| 2026-09-30 | §11c.3: a full census span is about 22 to 27 MB, not 22 MB: the census row measured about 3.27 KB on the wire on a book with a mark of about 1.03M. PARTIAL (bridge#899) |
 | 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as up to seven formulas, and for a seven-formula request of about 110 KB whose extra names were fictitious. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the `$AlterID > a AND $AlterID <= b` filter on `List of Ledgers` (GUID-only fetch) on three licensed 7.1 Silver books, marks 5,547, 102,161 and 316,028: slices hold at most their width, their union equals the catalogue, an empty slice is a well-formed 2,994-byte answer. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the Company collection's `NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`): present on all 31 loaded lab companies, equal to the ledger catalogue and census counts on a 4,339-ledger synthetic book, and to the census counts of two real books read by another lane. PARTIAL (bridge#938) |
+| 2026-10-01 | §12a.13: a company with inventory on and no stock item, captured through `bridge_mcp` (count `0`, an empty collection, an empty Stock Summary envelope), and the 2026-09-30 stock captures reproduced byte for byte through `bridge_mcp`. PARTIAL, one company each |
+| 2026-10-01 | §12a.13: the sign of a stock value: a negative wire value is stock held and shows as positive on Tally's Stock Summary screen; a positive one shows as `(-)`. VERIFIED on one synthetic licensed 7.1 Silver company against Tally's own screen |
+| 2026-10-01 | §12a.13: the Company collection's `NUMSTOCKITEMS` after one stock item was deleted on Tally's own screen: it fell by one and equalled the rows read, on one synthetic licensed 7.1 Silver company. PARTIAL, one sample |
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
+| 2026-10-01 | §12a.14: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |

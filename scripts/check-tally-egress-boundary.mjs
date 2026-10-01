@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Locks in the README's central privacy promise (README.md, 'What it does not do'):
+// Bridge reads Tally over a local connection and hands what it reads to the
+// assistant you are talking to; nothing in the Tally path sends it to a
+// server of ours.
 //
-//   "Your Tally data is never uploaded. Bridge reads it over a local
-//   connection and hands it to the assistant you are talking to; nothing in
-//   the Tally path sends it to a server of ours."
+// Bridge's own code has one network client: the loopback Tally transport. An
+// earlier unfinished document-upload feature and AXAL sign-in (axal.rs,
+// documents.rs) were removed, so this gate now allows only the Tally transport
+// to depend on an HTTP client in its shipped dependencies, and refuses any
+// other send site through its lint census. It checks where network code may
+// live; it does not by itself prove that no data leaves the machine.
 //
-// and the separation promise for the upload-capable parts of the app
-// (README.md, 'One part of the app does upload'):
-//
-//   "Bridge also contains a document feature that uploads files you choose
-//   to ComplyEaze cloud storage, and an AXAL sign-in. Those are separate and
-//   user-initiated, and share no code with the Tally path described here"
-//
-// Before this gate, both sentences were prose: nothing stopped a new
-// `reqwest` call site from landing anywhere in the tree, including inside
-// the Tally read/write path itself.
+// Before this gate, the promise was prose: nothing stopped a new `reqwest`
+// call site from landing anywhere in the tree, including inside the Tally
+// read/write path itself.
 //
 // Two checks, deliberately different in what they can see:
 //
@@ -26,13 +25,16 @@
 //    compile-time property -- cargo will not link a crate against reqwest
 //    unless its Cargo.toml says so -- but it only sees crate boundaries. It
 //    cannot see what a crate that *is* allowed to depend on reqwest
-//    (`bridge`, the app crate, which legitimately needs it for
-//    axal.rs/documents.rs -- see the note above APP_CRATE: both ship in the
-//    extension binary too, not only in the desktop app) does with that
-//    dependency inside its own files. It follows normal, build and dev
+//    (`bridge`, the app crate, which declares it as a dev-dependency for the
+//    Tally connection test helpers -- see the note above APP_CRATE) does with
+//    that dependency inside its own files. It follows normal, build and dev
 //    edges alike: a dev- or build-dependency on reqwest in a crate outside
 //    the allow-list is refused too, since a test double or build script
 //    that can open a connection is still egress from a developer's machine.
+//    The tree is read twice: over every edge kind, and over normal and build
+//    edges only, which are the ones that go into what a user installs. The
+//    app crate is pinned out of the second set, so moving reqwest from its
+//    [dev-dependencies] back into [dependencies] is refused.
 //    It resolves every target platform, so a Windows- or macOS-only
 //    dependency is seen from the Linux CI job. The sets are pinned exactly and the tree must be seen: a crate that
 //    drops out, a missing root line, a failed `cargo` or an unparseable line
@@ -256,19 +258,20 @@ if (censusFlag !== -1) {
 // declare reqwest *directly*, not which crates reach it transitively.
 const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 
-// `bridge` is the app crate. It legitimately depends on reqwest directly for
-// two things that are NOT the Tally path: axal.rs (AXAL sign-in / cloud
-// storage) and documents.rs (the document upload feature). The README paragraph
-// 'One part of the app does upload' names both explicitly as the parts of the
-// app that DO upload.
+// `bridge` is the app crate. It names reqwest only in test helpers for the
+// Tally connection wrapper (under cfg(test) in src/tally/connection.rs, and in
+// src/tally/connection_tests.rs), so it declares reqwest as a dev-dependency.
+// Every real request to Tally goes through bridge-tally-transport, which
+// reaches Tally itself over loopback. The app crate has no other network
+// destination; an earlier unfinished document-upload feature and AXAL sign-in
+// (axal.rs, documents.rs) were removed.
 //
-// Do not read "app crate" as "Tauri only". Both modules are declared
-// unconditionally in lib.rs, with no cfg(feature) gate; src/bin/bridge_mcp.rs
-// links bridge_lib; and scripts/package-mcpb.mjs ships bridge_mcp as the
-// extension binary. So this reqwest edge is compiled into the artifact a user
-// installs, not just into the desktop app. The honest claim is "present and
-// unreachable from the agent surface", not "absent" -- and "unreachable" is
-// what the lint check below exists to keep true.
+// Do not read "app crate" as "Tauri only". src/bin/bridge_mcp.rs links
+// bridge_lib, and scripts/package-mcpb.mjs ships bridge_mcp as the extension
+// binary, so what the app crate compiles is in the artifact a user installs,
+// not just in the desktop app. Its own reqwest edge is a dev-dependency and is
+// not compiled into either; only bridge-tally-transport's edge is. The lint
+// census below keeps the app crate's send sites at none.
 //
 // The standard this gate is modelled on is the Tally transport's own loopback
 // guard, which is stronger than a file allow-list: `endpoint_url` special-cases
@@ -279,7 +282,16 @@ const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 // it. Where a future control can be written that way, prefer it to a list.
 const APP_CRATE = "bridge";
 
-function directDependents(manifestPath, packageName) {
+// The edge kinds read from `cargo tree`. Every edge, dev included, is pinned
+// so that a test double that can open a connection is still refused; the
+// shipped edges (normal and build) are pinned separately, because those are the
+// ones that go into the artifacts a user installs (a build edge only runs at
+// build time, but it is refused all the same). A dependency that is dev-only
+// today must not be able to move into [dependencies] unnoticed.
+const ALL_EDGES = "normal,build,dev";
+const SHIPPED_EDGES = "normal,build";
+
+function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
   const result = spawnSync(
     "cargo",
     [
@@ -293,7 +305,7 @@ function directDependents(manifestPath, packageName) {
       "--depth",
       "1",
       "--edges",
-      "normal,build,dev",
+      edges,
       // Every platform, not only the host: CI runs on Linux, and a
       // `[target.'cfg(windows)'.dependencies]` edge is otherwise invisible.
       "--target",
@@ -355,16 +367,22 @@ function directDependents(manifestPath, packageName) {
 // to open a connection that names no linted method. The list is not exhaustive.
 const LOWER_LEVEL_NETWORK = { h2: [], "hyper-util": [], socket2: [], mio: [], "tower-service": [], tower: [] };
 
+//
+// `expected` is read over every edge kind; `shipped` over normal and build edges
+// only. The app crate names reqwest only in test helpers, so it appears in the
+// first and not the second.
 const workspaces = [
   {
     label: "src-tauri",
     manifestPath: "src-tauri/Cargo.toml",
     expected: { reqwest: [APP_CRATE, TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
+    shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
   },
   {
     label: "tools",
     manifestPath: "tools/Cargo.toml",
     expected: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
+    shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
   },
 ];
 
@@ -389,6 +407,24 @@ for (const workspace of workspaces) {
           "pinned set in scripts/check-tally-egress-boundary.mjs only after confirming which.",
       );
     }
+    // The same question over the edges that ship. A crate that is dev-only
+    // above must not gain a normal or build edge.
+    const shippedExpected = [...workspace.shipped[packageName]].sort();
+    const shippedActual = directDependents(workspace.manifestPath, packageName, SHIPPED_EDGES);
+    const shippedGained = shippedActual.filter((name) => !shippedExpected.includes(name));
+    const shippedLost = shippedExpected.filter((name) => !shippedActual.includes(name));
+    if (shippedGained.length) {
+      egressViolations.push(
+        `${workspace.label}: crate(s) gained a direct ${packageName} dependency on a normal or build edge outside ` +
+          `the pinned shipped set (${shippedExpected.join(", ") || "none"}): ${shippedGained.join(", ")}`,
+      );
+    }
+    if (shippedLost.length) {
+      egressViolations.push(
+        `${workspace.label}: pinned crate(s) no longer show a direct ${packageName} dependency on a normal or build ` +
+          `edge: ${shippedLost.join(", ")}. Either the tree was not read in full or the dependency moved.`,
+      );
+    }
   }
 }
 
@@ -406,7 +442,7 @@ function trackedFiles() {
 
 // Clippy reads the nearest clippy.toml, so a second one under src-tauri would replace these lists
 // for its crate, and CLIPPY_CONF_DIR would point it elsewhere. An edit to the lists needs review.
-const CLIPPY_CONFIG_DIGEST = "b0545bfeb20c2ef9881c497470e927c746e7a57714ca1c9088b8ca707e7c144f";
+const CLIPPY_CONFIG_DIGEST = "fc420715900ce441d19d3e34115844033ebeb9d4c3ace1e6b4c67f43dc8091c6";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
@@ -514,7 +550,7 @@ for (const manifest of ["package.json", "pnpm-lock.yaml"]) {
 if (egressViolations.length) {
   throw new Error(
     "Tally-path egress boundary violated -- this protects the README promise " +
-      '"Your Tally data is never uploaded ... nothing in the Tally path sends it to a server of ours" ' +
+      '"The Tally path uploads nothing to ComplyEaze ... nothing in the Tally path sends it to a server of ours" ' +
       "(README.md, 'What it does not do'):\n" +
       egressViolations.map((violation) => `- ${violation}`).join("\n"),
   );

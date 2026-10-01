@@ -503,28 +503,6 @@ h2 {
   min-width: 260px;
 }
 
-.document-toolbar {
-  align-items: end;
-}
-
-.selected-paths {
-  margin-bottom: 18px;
-}
-
-.path-list {
-  display: grid;
-  gap: 8px;
-}
-
-.path-list div {
-  background: #f6f8f5;
-  border: 1px solid #edf1ee;
-  border-radius: 8px;
-  color: #172026;
-  overflow-wrap: anywhere;
-  padding: 10px 12px;
-}
-
 .toolbar button {
   background: #27352e;
   color: white;
@@ -544,10 +522,6 @@ h2 {
 
 .single-panel-grid {
   grid-template-columns: minmax(320px, 760px);
-}
-
-.data-grid {
-  margin-top: 18px;
 }
 
 .panel {
@@ -1846,10 +1820,6 @@ dd {
   animation: spin 0.9s linear infinite;
 }
 
-.pulse-icon {
-  animation: pulse-icon 1s ease-in-out infinite;
-}
-
 button:disabled {
   cursor: not-allowed;
   opacity: 0.78;
@@ -1868,19 +1838,6 @@ summary:focus-visible,
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes pulse-icon {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.96);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1);
   }
 }
 

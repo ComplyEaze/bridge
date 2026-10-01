@@ -4,7 +4,7 @@
 > and the stored per-file hashes. Where this proposal says "surface reseal", read
 > "the compatibility-surface acknowledgement": a pull request that changes a pinned
 > file now adds `docs/tally/compatibility/acks/pr-<N>.txt`, which
-> `scripts/merge-gate.sh` and the report-only `scripts/check-surface-ack.mjs` check
+> `scripts/merge-gate.sh` and `scripts/check-surface-ack.mjs` (enforcing in CI) check
 > (`docs/release-process.md`). The body below is kept as written.
 
 `scripts/merge-gate.sh` was cut from a 3977-line manual CLI tool that gated

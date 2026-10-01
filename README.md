@@ -181,25 +181,14 @@ With writing on:
 
 ## The desktop app
 
-**The extension is built from the same source library as the desktop app,
-which still contains a document-upload feature and an AXAL sign-in.** No
-published build exposes them and no tool of the extension reaches them. They
-are being removed ([#914](https://github.com/ComplyEaze/bridge/pull/914)).
-No desktop installer is published. See
-[Security and privacy](./docs/security-and-privacy.md).
-
-A folder you choose to sync can also hold files Bridge exported from Tally,
-such as party statements. Bridge records the content hash of each party
-statement batch it writes (the statements and their manifest), and the document
-feature lists any file with a recorded hash as skipped and does not upload it,
-even if it was renamed or moved. A copy that has changed in any way, even by
-being opened and saved again in Excel, has another hash and is treated as your
-own file. Bridge remembers about the last 20,000 files it exported. If two
-copies of Bridge are open and both export when that record is full, one
-export can go unrecorded; keep one copy open while exporting. Not yet
-recognised: exports Bridge wrote before this version, and the working paper,
-single statement, outstandings CSV, trial balance and ledger master saved to
-your Downloads folder (bridge#833). Move those out of a synced folder yourself.
+**The extension is built from the same source library as the desktop app.**
+The published 0.3.0 package still contains an unfinished document-upload
+feature and an AXAL sign-in. In that package no tool of the extension reaches
+them. The source after 0.3.0 no longer has them
+([#914](https://github.com/ComplyEaze/bridge/pull/914)), so the next release
+will not contain them; in that source the only network client in ComplyEaze
+Bridge's own code connects to Tally on your own computer. No desktop installer
+is published. See [Security and privacy](./docs/security-and-privacy.md).
 
 ## Before you use it with client data
 
@@ -260,8 +249,8 @@ The rest of this file is for people working on Bridge. The repository is
 self-contained: build and development commands resolve files relative to the
 clone, not to a developer-specific directory. It holds a Tauri desktop
 application and the MCPB packaging path for Claude Desktop, with
-React/TypeScript and Rust components for Tally, document, sync, and local
-database operations.
+React/TypeScript and Rust components for Tally and local database
+operations.
 
 ## First useful result
 
@@ -350,7 +339,7 @@ corepack pnpm run cargo:check
 corepack pnpm run tauri:build
 ```
 
-Also manually exercise the affected Tally, document, and sync workflows.
+Also manually exercise the affected Tally workflows.
 Vendor integrations may require host-specific software even though repository
 paths and project commands are portable.
 
@@ -361,20 +350,6 @@ compromised:
 
 - Tally connections are loopback-only (`localhost`, `127.0.0.0/8`, or `::1`).
   Remote plaintext Tally hosts are intentionally rejected.
-- AXAL credentials are sent only to the exact `https://complyeaze.com` origin
-  by default. Self-hosted deployments must set
-  `BRIDGE_AXAL_ALLOWED_ORIGINS` before Bridge starts to a comma-separated list
-  of exact HTTPS origins such as `https://bridge.example`. Entries cannot
-  contain paths, credentials, queries, or fragments.
-- Documents must be selected with Bridge's native file or folder picker. Scan
-  IDs are short-lived and native-only paths are never returned to the webview.
-  Presigned uploads are limited to `https://complyeaze.com` by default; set
-  `BRIDGE_DOCUMENT_UPLOAD_ALLOWED_ORIGINS` to the exact comma-separated HTTPS
-  storage origins used by your AXAL deployment.
-
-These environment variables are process configuration, not checkout paths;
-the same policy applies on Windows and macOS. Restart Bridge after changing
-them.
 
 ## Privacy and safe diagnostics
 

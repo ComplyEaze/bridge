@@ -1,0 +1,15 @@
+{
+  "source": "Live TallyPrime Silver 7.1 answer to GET /status, the liveness read Bridge sends between its paired reads, recorded by a serial read-only relay during an `outstandings` party-detail call made through a debug `bridge_mcp` built from commit 3f097e8654bb389126b7e7a0002d0cc8cce2601f",
+  "observed_date": "2026-10-01",
+  "source_response_bytes": 51,
+  "source_response_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+  "source_request_bytes": 0,
+  "request_rendered_by": "GET /status with no body (the transport's status read)",
+  "fixture_bytes": 51,
+  "fixture_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800",
+  "encoding": "ASCII, as received",
+  "transformation": [],
+  "content": "The gateway's running line. Every one of the 58 status reads of the two calls and of the status calls around them returned these bytes.",
+  "provenance_limit": "One gateway on one build. The HTTP head is not part of the fixture.",
+  "sensitivity_review": "No company, party or credential: a fixed product string."
+}

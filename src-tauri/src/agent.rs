@@ -48,6 +48,8 @@ mod masters;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+#[path = "agent_bill_trail.rs"]
+mod bill_trail;
 #[path = "agent_outstandings.rs"]
 mod outstandings;
 #[path = "agent_presence.rs"]
@@ -58,6 +60,8 @@ mod vouchers;
 use outstandings::*;
 #[path = "agent_movement.rs"]
 mod movement;
+#[path = "agent_register.rs"]
+mod register;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -452,6 +456,62 @@ struct ToolFailure {
     /// one (bridge#625, bridge#664). Boxed to keep the refusal small on every
     /// other path.
     candidates: Option<Box<Candidates>>,
+    /// What the refusal says about the read it depends on (#945): why that
+    /// read was not complete, or how many requests it needed. Codes and
+    /// numbers only; both in one box to keep the refusal under clippy's
+    /// 128-byte large-error limit.
+    read_detail: Option<Box<ReadDetail>>,
+}
+
+/// See [`ToolFailure::read_detail`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ReadDetail {
+    /// The partial result's own reason, kept beside a refusal that needed a
+    /// complete read instead of being replaced by its code.
+    incomplete_read: Option<IncompleteRead>,
+    /// How many data requests a refused window read needed, at least, against
+    /// the allowance it may spend.
+    planned_reads: Option<PlannedReads>,
+}
+
+impl ToolFailure {
+    /// The planned size of a refused window read, when it is one.
+    #[cfg(test)]
+    fn planned_reads(&self) -> Option<&PlannedReads> {
+        self.read_detail.as_ref()?.planned_reads.as_ref()
+    }
+
+    fn with_planned_reads(mut self, reads: PlannedReads) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .planned_reads = Some(reads);
+        self
+    }
+
+    fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .incomplete_read = Some(read);
+        self
+    }
+}
+
+/// A window read refused as needing more requests than one call may spend:
+/// `needed_at_least` (exact when the plan was made, a lower bound when the
+/// census stopped early) against `allowed`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PlannedReads {
+    needed_at_least: usize,
+    allowed: usize,
+}
+
+/// The reason a partial read gave, carried by a refusal that needed a complete
+/// one: its scalar `partial_reason` and, where the result derives them, its
+/// `partial_reasons`. Codes only, never a name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IncompleteRead {
+    partial_reason: String,
+    partial_reasons: Vec<&'static str>,
 }
 
 /// The types a refusal offers instead, and the name the caller asked for when
@@ -617,6 +677,7 @@ impl From<String> for ToolFailure {
             unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
+            read_detail: None,
         }
     }
 }
@@ -741,6 +802,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and ledger_movement do not support it yet (#716). Retrying this read refuses \
              again.",
         ),
+        "register_ledger_currency_excluded" => Some(
+            "A voucher in this window touches a ledger that the compliance read of the ledger \
+             masters set aside because it is kept in another currency (or its balance is a \
+             currency composite), so purchase_register cannot classify the voucher and refuses \
+             the whole window rather than leave it out. Narrow from and to so the window holds \
+             no such voucher, or read it with `vouchers`. Retrying the same window refuses \
+             again.",
+        ),
+        "register_master_mark_unavailable" => Some(
+            "Tally did not report the company's master-alteration mark, which purchase_register \
+             needs to bind the ledger masters to the voucher window. It cannot be answered \
+             from this book as Tally reports it; `ledger_masters` with fields=compliance and \
+             `vouchers` still read it separately.",
+        ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
@@ -780,6 +855,31 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
              this call refuses again.",
+        ),
+        // The stock summary read whose rows differ from Tally's own item count
+        // (`counts` carries both numbers).
+        "stock_summary_item_count_differs" => Some(
+            "Tally's own count of this company's stock items (`counts.counted`) differs from \
+             the number Bridge read (`counts.returned`), so nothing is returned: with fewer \
+             rows the list may be incomplete, and with more rows the count is not counting \
+             the list Bridge read. The book did not change during the read, so the same call \
+             now gives the same refusal. Give the user both numbers and ask them to open the \
+             Stock Summary in Tally for this company; why they differ is not known. Once the \
+             user has looked, the next call is stock_summary with the same `company_guid` \
+             and `as_of`.",
+        ),
+        // Causes, reached through `stock_summary_read_failed`.
+        "stock_report_unknown" => Some(
+            "Tally answered Bridge's request for its Stock Summary without the report, both \
+             times it was asked, so stock values cannot be checked and nothing is returned. \
+             Bridge cannot tell why. The book did not change during the read, so do not retry. \
+             Tell the user Bridge could not read stock from this Tally and that the Stock \
+             Summary in Tally itself is the place to read it.",
+        ),
+        "stock_item_count_unavailable" => Some(
+            "Tally gave no usable count of this company's stock items, both times it was asked, \
+             so Bridge cannot tell whether it read every item and returns nothing. Do not \
+             retry. Tell the user that stock for this company has to be read in Tally itself.",
         ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
@@ -968,6 +1068,52 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
         ),
+        // The `outstandings` party detail (#945) refuses, never cuts, an answer
+        // over its row limit; each kind has its own code and its own remedy.
+        "trail_too_large" => Some(
+            "The party's bill trail has more than 500 allocations, so it was refused rather \
+             than cut. Ask for one bill at a time with `reference`, using a reference that \
+             `open_bills` lists for the party.",
+        ),
+        // The party detail's window read needs more requests than one call may
+        // spend (`reads` gives how many against how many). Refused, never read
+        // in part; `window` lists any part already read before the refusal.
+        "trail_window_too_large" => Some(
+            "The company's vouchers from the start of the books to as_of, which a bill trail \
+             reads to find the party's allocations, need more requests than one call may \
+             spend (`reads.needed_at_least` against `reads.allowed`), so the bill trail was \
+             refused rather than read in part; `window` lists any part already read. Ask for \
+             one bill with `reference`, using a reference that `open_bills` lists for the \
+             party: the read then starts at that bill's date, so a recent bill reads less. \
+             The same call refuses again.",
+        ),
+        "named_bill_window_too_large" => Some(
+            "The company's vouchers from the named bill's earliest date in Tally's bills \
+             reports (or from the start of the books, when they do not list it) to as_of \
+             need more requests than one call may spend (`reads.needed_at_least` against `reads.allowed`), so \
+             the bill's trail was refused rather than read in part; `window` lists any part \
+             already read. Nothing narrows it further, so this bill's trail is not available \
+             on this book. The party's vouchers, with their bill allocations, can still be \
+             read untied with `vouchers` and `ledger` over shorter date windows. The same call \
+             refuses again.",
+        ),
+        "unadjusted_window_too_large" => Some(
+            "The company's vouchers from the start of the books to as_of, which the \
+             unadjusted detail reads to find the party's allocations, need more requests than \
+             one call may spend (`reads.needed_at_least` against `reads.allowed`), so it was \
+             refused rather than read in part; `window` lists any part already read. Nothing \
+             narrows it, because it needs every voucher from the start of the books, so it is \
+             not available for this party on this book. The party's vouchers, with their bill \
+             allocations, can still be read untied with `vouchers` and `ledger` over shorter \
+             date windows. The same call refuses again.",
+        ),
+        "unadjusted_detail_too_large" => Some(
+            "The party's unadjusted detail has more than 500 on-account, advance and pending \
+             note rows, so it was refused rather than cut, and no argument narrows it: \
+             `reference` applies only to `bill_trail`. The detail is not available for this \
+             party. Its vouchers, with their bill allocations, can still be read with \
+             `vouchers` and `ledger` over shorter date windows, without the tie-out.",
+        ),
         // #697: every Bridge process sends to one Tally one request at a time.
         "tally_endpoint_busy" => Some(
             "Another Bridge window or AI client was talking to this Tally for the whole \
@@ -1134,6 +1280,7 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
+            read_detail: None,
         }
     }
 
@@ -1267,6 +1414,7 @@ impl Server {
                 unsupported_parent_ledgers,
                 unanswered,
                 candidates,
+                read_detail,
             }) => {
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
@@ -1363,6 +1511,27 @@ impl Server {
                         }
                     }
                 }
+                // The partial read's own reason, under the same budget rule:
+                // a few codes, kept beside the refusal's code.
+                let (incomplete_read, planned_reads) = read_detail
+                    .map(|detail| (detail.incomplete_read, detail.planned_reads))
+                    .unwrap_or_default();
+                if let Some(read) = incomplete_read {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["partial_reason"] = json!(read.partial_reason);
+                        if !read.partial_reasons.is_empty() {
+                            error["partial_reasons"] = json!(read.partial_reasons);
+                        }
+                    }
+                }
+                if let Some(reads) = planned_reads {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["reads"] = json!({
+                            "needed_at_least": reads.needed_at_least,
+                            "allowed": reads.allowed,
+                        });
+                    }
+                }
                 if let Some(counts) = counts {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["counts"] =
@@ -1372,10 +1541,12 @@ impl Server {
                 // Same budget rule again, and the per-part list, which grows
                 // with the window, is given up first: it is kept only while it
                 // takes at most a quarter of the response budget. Only the
-                // `vouchers` tool reports it (#595); the other tools that read a
-                // window keep their refusal shape.
+                // `vouchers` tool (#595) and the `outstandings` party detail
+                // (#945), whose window can be refused after parts were read,
+                // report it; the other tools that read a window keep their
+                // refusal shape.
                 if let Some(timings) = window_timings {
-                    if name == "vouchers"
+                    if matches!(name, "vouchers" | "outstandings")
                         && self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
                     {
                         error["window"] =
@@ -1550,6 +1721,7 @@ impl Server {
             "changed_since" => self.changed_since(args).await,
             "outstandings" => self.outstandings(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
+            "purchase_register" => self.purchase_register(args).await,
             "trial_balance" => self.trial_balance(args).await,
             "masters" => self.masters(args).await,
             "stock_summary" => self.stock_summary(args).await,

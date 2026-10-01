@@ -254,6 +254,44 @@ class MergeGateControls(unittest.TestCase):
     def test_pin_removed_with_a_removed_pin_line_passes(self):
         self.assert_pass("pin-removed-with-line", "all pinned paths touched")
 
+    # -- Branch history: a pin the branch added and then lost ----------------------
+
+    def test_a_pin_the_branch_added_and_lost_blocks_without_a_removed_pin_line(self):
+        self.assert_blocked(
+            "history-own-pin-lost-undeclared",
+            "pinned by a commit of this PR but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line: src/own.rs",
+        )
+
+    def test_a_pin_the_branch_added_and_lost_passes_when_the_withdrawal_is_declared(self):
+        self.assert_pass("history-own-pin-lost-declared", "all pinned paths touched")
+
+    def test_a_lost_pin_named_as_a_path_in_the_ack_blocks(self):
+        self.assert_blocked("history-own-pin-lost-ack-names-the-path", "lists path(s) the PR does not touch: src/own.rs")
+
+    def test_a_lost_pin_needs_an_ack_even_when_nothing_else_pinned_changed(self):
+        self.assert_blocked("history-own-pin-lost-no-ack", "pinned path(s) touched")
+
+    def test_a_pin_the_branch_added_and_kept_is_not_withdrawn(self):
+        self.assert_pass("history-pin-kept-at-the-head", "all pinned paths touched")
+
+    def test_a_merge_commit_is_compared_with_all_of_its_parents(self):
+        self.assert_pass("history-merge-parent-compared-with-all", "all pinned paths touched")
+
+    def test_an_out_of_order_list_in_an_older_branch_commit_passes_once_the_head_list_is_sorted(self):
+        self.assert_pass("history-out-of-order-then-sorted", "all pinned paths touched")
+
+    def test_the_same_out_of_order_history_blocks_when_the_pin_is_then_dropped(self):
+        self.assert_blocked(
+            "history-out-of-order-then-dropped",
+            "pinned by a commit of this PR but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line: src/own.rs",
+        )
+
+    def test_the_same_out_of_order_history_passes_when_the_withdrawal_is_declared(self):
+        self.assert_pass("history-out-of-order-then-dropped-declared", "all pinned paths touched")
+
+    def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
+        self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")
 

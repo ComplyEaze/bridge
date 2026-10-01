@@ -2359,57 +2359,6 @@ pub async fn prepare_gst_return_draft(request: GstDraftRequest) -> Result<GstRet
 }
 
 #[tauri::command]
-pub async fn validate_axal_credentials(
-    credentials: crate::axal::AxalCredentials,
-) -> Result<crate::axal::AxalSessionResponse, String> {
-    crate::axal::establish_credential_session(credentials)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn check_axal_connection_status(
-    credential_session_id: String,
-) -> Result<crate::axal::ConnectionStatusResponse, String> {
-    crate::axal::check_connection_status(&credential_session_id)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn revoke_axal_credential_session(credential_session_id: String) -> Result<(), String> {
-    crate::axal::revoke_credential_session(&credential_session_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn scan_document_paths(
-    request: crate::documents::ScanDocumentsRequest,
-) -> Result<crate::documents::ScanDocumentsResponse, String> {
-    crate::documents::scan_documents(request)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn sync_documents_to_axal(
-    request: crate::documents::SyncDocumentsRequest,
-) -> Result<crate::documents::SyncDocumentsResponse, String> {
-    crate::documents::sync_documents(request)
-        .await
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn revoke_document_authorizations(
-    selection_ids: Vec<String>,
-    scan_session_id: Option<String>,
-) -> Result<(), String> {
-    crate::documents::revoke_document_authorizations(&selection_ids, scan_session_id.as_deref())
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub async fn desktop_pick_journal_for_review(
     config: TallyConfig,
     runtime: State<'_, TallyRuntime>,
@@ -2445,35 +2394,6 @@ pub async fn desktop_reconcile_reviewed_journal(
     ))
     .await
     .map_err(desktop_journal_command_error)
-}
-
-#[tauri::command]
-pub async fn select_document_files() -> Result<Vec<crate::documents::SelectedDocumentPath>, String>
-{
-    tokio::task::spawn_blocking(|| {
-        let paths = rfd::FileDialog::new()
-            .set_title("Select documents")
-            .pick_files()
-            .unwrap_or_default();
-        crate::documents::authorize_selected_paths(paths).map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| format!("File picker failed: {error}"))?
-}
-
-#[tauri::command]
-pub async fn select_document_folder() -> Result<Vec<crate::documents::SelectedDocumentPath>, String>
-{
-    tokio::task::spawn_blocking(|| {
-        let paths = rfd::FileDialog::new()
-            .set_title("Select document folder")
-            .pick_folder()
-            .into_iter()
-            .collect::<Vec<_>>();
-        crate::documents::authorize_selected_paths(paths).map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| format!("Folder picker failed: {error}"))?
 }
 
 #[cfg(test)]

@@ -29,32 +29,34 @@ an acknowledgement. Adding or removing a declared part also changes the pin list
 see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
 compatibility gate is involved.
 
-**Enforcement today.** The GitHub check is report-only: it prints
-`WOULD FAIL: <reason>` and exits 0, so it does not block a merge. The blocking
-leg is `scripts/merge-gate.sh`, a local tool run by whoever merges (the
-orchestrator), not CI. The one exception is a push to master, which is always
-enforced (below). Making the pull request check enforcing is a later change to two
-pinned files: drop `--report-only` from the step in
-`.github/workflows/ci.yml` and change the exact step text that
-`scripts/check-ci-workflow-consistency.mjs` requires, both pinned, with their own
-acknowledgement.
+**Enforcement.** The GitHub check enforces. On a pull request and in the merge
+queue, the `workflow-consistency` job fails with
+`surface ack check FAILED: <reason>` when a pinned path changed without its
+acknowledgement file, or the acknowledgement is wrong, edited or unneeded, and
+that job is part of `Required checks`. A push to master is enforced the same way
+(below). `scripts/merge-gate.sh`, run locally by whoever merges, is a second,
+independent check of the same rule. The step first ran with `--report-only`,
+which printed `WOULD FAIL: <reason>` and exited 0; the script
+still accepts that flag for local use, but the CI step must not carry it, and
+`scripts/check-ci-workflow-consistency.mjs` pins the step's exact text so that
+putting it back is a pinned change with its own acknowledgement.
 
 What this trades away, stated plainly. Under schema 2 the required
 `Tally portable core` job failed a pull request, and again the master push, when a
 pinned file's bytes differed from its stored hash. Nothing stored remains to
-compare, so that job can no longer fail on a changed pinned file. On a pull request,
-while the check is report-only, a change merged without `scripts/merge-gate.sh`
-reaches master with every check green. What restores the after-the-fact tripwire: a
-push to master is checked like a pull request and is never report-only. Every
-first-parent commit the push landed (`before..HEAD`, `before` from the event payload;
-each one a squashed pull request, attributed by the `(#N)` in its subject) must carry
-exactly the acknowledgement its pinned changes need, and the master run goes red if
-any does not. A push whose `before` is missing, new or not an ancestor of HEAD (a
-force-push) cannot be verified and fails. This covers the base race: `merge-gate.sh` reads
-the pin list when it runs but the merge binds only the head, so another pull request
-that pins a file after this one was gated lets an unacknowledged change land; the
-master run then fails instead of nobody noticing. It does not stop the merge, and a
-red master needs an acknowledgement-only follow-up pull request to clear.
+compare, so nothing can fail on a byte difference; the acknowledgement replaces it.
+It is procedural assurance, not authentication: a missing or wrong file fails the
+check, but a hand-written file that names the right paths and a reviewer passes it,
+so the review is what stands behind it. The base race is still real: the pin list
+is read when the check runs but the merge binds only the head, so another pull
+request that pins a file after this one was checked lets an unacknowledged change
+land. A push to master is checked like a pull request and is never report-only.
+Every first-parent commit the push landed (`before..HEAD`, `before` from the event
+payload; each one a squashed pull request, attributed by the `(#N)` in its
+subject) must carry exactly the acknowledgement its pinned changes need, and the
+master run goes red if any does not. A push whose `before` is missing, new or not
+an ancestor of HEAD (a force-push) cannot be verified and fails. That red master
+needs an acknowledgement-only follow-up pull request to clear.
 
 #### What the surface is
 
@@ -116,6 +118,16 @@ reviewer: some-github-login
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
 - The branch name is not the file name, so a lane branch is fine.
+- The number is known only once the pull request is open, so the first run of a
+  pull request that touches a pinned path fails with `found 0` until
+  `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
+  the pull request, then push the file.
+- Dependency-update pull requests (Dependabot's npm, cargo and GitHub Actions
+  updates) change pinned files (`package.json`, `pnpm-lock.yaml`,
+  `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and pinned workflows), so each
+  one fails `Required checks` until a person pushes its `pr-<N>.txt`. The local
+  merge gate already asked for the same file; the difference is that CI now
+  reports it too.
 
 The `reviewer:` login is procedural assurance, not authentication: the file is
 written by hand and proves nothing by itself. What it records is that a named
@@ -125,22 +137,22 @@ looked at in the review.
 **What checks it**
 
 - CI runs `scripts/check-surface-ack.mjs` in the `workflow-consistency` job. It
-  reports a missing, wrong, edited or unneeded acknowledgement, but is
-  report-only today (see above). Its modes:
+  fails on a missing, wrong, edited or unneeded acknowledgement (see above).
+  Its modes:
   - `pull_request`: diffs the merge commit against its first parent (`HEAD^1`),
     after asserting that `HEAD^2` equals the pull request's head commit.
-  - `merge_group` (once a merge queue exists): checks each first-parent commit in
+  - `merge_group`: checks each first-parent commit in
     `base_sha..head_sha` against its own acknowledgement, and fails closed when a
     commit cannot be attributed to one pull request.
   - `push` (master): every first-parent commit in `before..HEAD` is checked like a
-    pull request, each attributed by the `(#N)` in its subject, and a failure is never
-    report-only; a missing, all-zero or non-ancestor `before` fails closed. It also
+    pull request, each attributed by the `(#N)` in its subject, and `--report-only`
+    never softens a failure; a missing, all-zero or non-ancestor `before` fails closed. It also
     validates that every file in the acknowledgements directory is well formed.
   - `workflow_dispatch`: only the acknowledgements directory is validated.
   The checker runs from the pull request's own tree, so a pull request could weaken
   it; that is why the script and `ci.yml` are pinned, which makes the change
   visible and acknowledged. A change that makes the checker skip itself shows no
-  `WOULD FAIL` in its own pull request run, so the pin alone does not make it red
+  failure in its own pull request run, so the pin alone does not make it red
   in CI; `scripts/merge-gate.sh`, which is also pinned (with
   `scripts/check-ci-workflow-consistency.mjs`, which enforces the step's shape), is
   what sees it. Run the gate from a checkout of the base branch, not from the pull
@@ -152,6 +164,29 @@ looked at in the review.
   master commit that added a pin is not reported as indeterminate. It also
   requires a review or comment that names the head commit, the acknowledgement
   path and every touched path. The `reviewer:` login must be that review's author.
+- **Branch history, in both checks.** The diff against the base cannot see a pin
+  the branch added and then lost, for example when a merge of master is resolved by
+  taking master's pin list: at the head the list equals the base's. So
+  `scripts/check-surface-ack.mjs` and `scripts/merge-gate.sh` also read the pin list at
+  every commit of the pull request and at each commit's parents (a merge is compared
+  with all of them, never the first only). A path that a commit pins and none of its
+  parents pinned, and that is in neither the base list nor the head list, counts as a
+  removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
+  pin must be restored. In an older commit only the paths matter, so both read them
+  leniently (valid JSON with a `files` array whose rows each have a path string); the
+  strict rules (sorted, unique, exact keys, schema) stay as they are for the list at
+  the head and at the base, so a branch is never stuck because an old commit had its
+  list out of order. Both fail closed on a shallow clone and on a commit whose list
+  cannot be read at all (the script fails, the gate is indeterminate). The CI step
+  blocks (it no longer runs with `--report-only`, so a finding fails the job), and the
+  merge gate blocks too. A pin that follows a rename inside the branch (one commit pins a new
+  file, a later one renames it and moves the pin) reports the old name as withdrawn:
+  declare it with one `removed-pin:` line for the old name. What these checks cannot
+  see: a pin lost in a rebase, a force-push, an amend or a squash before the push
+  leaves no history to read, and the merge group and the push to master each check one
+  squash commit, which has no branch history, so there the pull-request-time check
+  and the merge gate are the control. Only a stay-pinned guard test covers a rewritten
+  history, and only for the pins it names.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed
@@ -523,7 +558,8 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow runs when a maintainer
+`site/` is the static website (home, Download, Releases and Changelog). Its
+workflow runs when a maintainer
 dispatches it, and again when a maintainer-dispatched preview publication in
 this repository finishes successfully, so the page's release snapshot follows
 the release without a second step. The job requires the publication run's event

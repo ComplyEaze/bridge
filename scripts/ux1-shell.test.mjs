@@ -22,6 +22,12 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.match(app, /Settings/);
   const nav = app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>"));
   assert.doesNotMatch(nav, /GST Returns|DSC Token|Documents|AXAL Backend|Evidence dashboard/);
+  // The document-upload and AXAL screens are gone from the source, not only
+  // from the navigation, and no view or state in the app names them.
+  assert.doesNotMatch(app, /AxalScreen|DocumentsScreen|AxalConnectionStatus|"axal"|"documents"/);
+  for (const removed of ["AxalScreen.tsx", "DocumentsScreen.tsx"]) {
+    await assert.rejects(readFile(new URL(`../src/${removed}`, import.meta.url)), { code: "ENOENT" });
+  }
   assert.match(app, /loadEndpointReconnectHint/);
   assert.match(endpointHint, /host: "localhost"/);
   assert.match(endpointHint, /port: 9000/);

@@ -19,6 +19,9 @@ use crate::native_outstandings::{
     render_native_group_snapshot_request, NativeLedgerSnapshotPeriod,
 };
 use crate::native_statement_reports::{render_native_statement_request, NativeStatementKind};
+use crate::native_stock_summary::{
+    render_company_inventory_flags_request, render_native_stock_summary_request,
+};
 use crate::native_trial_balance::render_native_trial_balance_request;
 use crate::outstandings_shared::{render_company_book_extent, DateBoundaryProfile};
 use crate::xml_read_profiles::compatibility::ledgers_request;
@@ -81,6 +84,15 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         (
             "native_statement_reports::render_native_statement_request",
             render_native_statement_request(NativeStatementKind::BalanceSheet, NAME, &period),
+        ),
+        (
+            "native_stock_summary::render_company_inventory_flags_request",
+            render_company_inventory_flags_request(NAME, "3a6bd6e1-b835-4bff-89dd-8a6af138c346")
+                .unwrap(),
+        ),
+        (
+            "native_stock_summary::render_native_stock_summary_request",
+            render_native_stock_summary_request(NAME, &period),
         ),
         (
             "native_trial_balance::render_native_trial_balance_request",

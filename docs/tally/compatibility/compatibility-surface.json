@@ -277,6 +277,14 @@
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_statement_reports.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_stock_summary.rs",
+      "reason": "Stock summary read: renders the company inventory-flags, stock-item and Stock Summary report requests, parses them closed and binds every row to the selected company; its size constants decide which book is read whole. A defect returns another company's stock or admits a response one read cannot carry."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_stock_summary_tests.rs",
+      "reason": "Tests pinning the stock summary requests to their captured bytes and the parser's refusals, company binding and size arithmetic; a weakened test lets a stock summary defect ship unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/mod.rs"
     },
     {
@@ -471,6 +479,10 @@
     },
     {
       "path": "src-tauri/src/agent_statements.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_stock_summary.rs",
+      "reason": "The stock_summary tool: presents stock items with their closing quantity and value and states whether they tie to the sum of the top-level lines of Tally's own Stock Summary; a defect there shows stock that Tally's report contradicts, or hides the contradiction."
     },
     {
       "path": "src-tauri/src/agent_tests.rs"
@@ -776,6 +788,14 @@
     {
       "path": "src-tauri/src/tally/runtime_masters_tests.rs",
       "reason": "Tests pinning the masters read's bracket, size admission edges, post-read premise checks and failure order; a weakened test lets an unbounded or unbracketed masters read ship."
+    },
+    {
+      "path": "src-tauri/src/tally/runtime_stock_summary.rs",
+      "reason": "Runs the stock summary read: refuses a book without inventory and a date before its books begin or after today, admits the read only when the master mark bounds its response, and checks the read's premises afterwards; a defect sends a read one response cannot carry or accepts one that broke its premises."
+    },
+    {
+      "path": "src-tauri/src/tally/runtime_stock_summary_tests.rs",
+      "reason": "Tests for the stock summary runtime's refusals, size admission and post-read premise checks; a weakened test lets an unbounded or mis-bound stock read ship unseen."
     },
     {
       "path": "src-tauri/src/tally/runtime_trial_balance.rs"

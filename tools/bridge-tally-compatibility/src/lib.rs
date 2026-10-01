@@ -375,7 +375,7 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // Since schema 3 the reason for a pin added from now on lives in that pin's own entry (`reason`
 // in compatibility-surface.json), not as another paragraph here: two pull requests that each add a
 // pin no longer collide on this comment block, only on this constant when both raise it.
-pub const MAX_SURFACE_FILES: usize = 306;
+pub const MAX_SURFACE_FILES: usize = 311;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

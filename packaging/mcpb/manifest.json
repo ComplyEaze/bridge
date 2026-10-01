@@ -8,6 +8,7 @@
     "name": "Bridge contributors"
   },
   "license": "Apache-2.0",
+  "icon": "icon.png",
   "privacy_policies": ["https://bridge.complyeaze.com/privacy"],
   "server": {
     "type": "binary",

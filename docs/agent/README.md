@@ -495,6 +495,12 @@ too (#692).
   `closing_stock_not_derivable_from_trial_balance`,
   `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
   gross and net `tally_profit_and_loss_differs`.
+- **Top-level state.** `result.state` is `observed` only while this tool's
+  result is established (`profit_and_loss`: both `gross_result` and
+  `net_result`; `balance_sheet`: `carried`). Otherwise it is `not_established`
+  and `result.reason` carries the same reason code as the nested result; the
+  weaker result decides. It was always `observed` before (#984). No figure, gate
+  or withheld line changes.
 - **Limits.**
   - The gates are what catch what the Trial Balance cannot see, such as stock
     valued from stock items. No inventory book has been measured; one is

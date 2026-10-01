@@ -859,3 +859,193 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
     // The ledger the reason concerns is a party name, and is not carried.
     assert!(!error.to_string().contains("Ageing Customer A"), "{error}");
 }
+
+/// One recorded `outstandings` call with a party detail, replayed through the
+/// MCP tool on the scripted transport: every response served in the order
+/// the live gateway sent it, from the captures its sequence record names
+/// (#945, review P2.1). Returns the tool's response, the requests the
+/// simulator observed, and the record.
+async fn replay_recorded_detail_call(
+    record: &str,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
+    replay_recorded_call(record, |_| true, |arguments| arguments).await
+}
+
+/// [`replay_recorded_detail_call`] serving only the recorded requests `keep`
+/// admits, with the call's arguments passed through `arguments`.
+async fn replay_recorded_call(
+    record: &str,
+    keep: impl Fn(&Value) -> bool,
+    arguments: impl Fn(Value) -> Value,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let record: Value = serde_json::from_str(record).unwrap();
+    let directory_of_fixtures = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("crates/bridge-tally-protocol/tests/fixtures/agent");
+    let plans = record["requests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|request| keep(request))
+        .map(|request| match request["method"].as_str().unwrap() {
+            "GET" => ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
+                .with_framing(ResponseFraming::ContentLength),
+            _ => {
+                let bytes = std::fs::read(
+                    directory_of_fixtures.join(request["response_fixture"].as_str().unwrap()),
+                )
+                .unwrap();
+                let body = String::from_utf16(
+                    &bytes
+                        .chunks_exact(2)
+                        .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap();
+                ScenarioPlan::new(Fixture::SyntheticXml(body))
+                    .with_encoding(WireEncoding::Utf16Le)
+                    .with_framing(ResponseFraming::ContentLength)
+            }
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 2_000_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let response = server
+        .call_tool("outstandings", arguments(record["arguments"].clone()))
+        .await;
+    simulator.cancel();
+    let observed = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.cancelled)
+        .collect::<Vec<_>>();
+    (response, observed, record)
+}
+
+/// The replay sent exactly the recorded requests, each POST byte for byte as
+/// the live call sent it, and its `detail` is the live call's.
+fn assert_replay_matches_the_live_call(
+    response: &Value,
+    observed: &[tally_protocol_simulator::ObservedRequest],
+    record: &Value,
+) {
+    assert_eq!(response["isError"], false, "{response}");
+    let requests = record["requests"].as_array().unwrap();
+    assert_eq!(
+        observed.len(),
+        requests.len(),
+        "every recorded request, no more"
+    );
+    for (sent, recorded) in observed.iter().zip(requests) {
+        assert_eq!(sent.method, recorded["method"], "seq {}", recorded["seq"]);
+        if let Some(sha) = recorded["request_sha256"].as_str() {
+            assert_eq!(sent.request_body_sha256, sha, "seq {}", recorded["seq"]);
+        }
+    }
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["detail"], record["answer_detail"]);
+}
+
+/// Review P2.1: the `outstandings` tool with `detail: unadjusted`, replayed
+/// from the live call's captured responses, runs to the live call's own
+/// answer.
+#[tokio::test]
+async fn mcp_outstandings_answer_a_recorded_unadjusted_detail_as_the_live_call_did() {
+    let (response, observed, record) = replay_recorded_detail_call(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-unadjusted.json"
+    ))
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    assert_detail_reads_are_in_the_evidence(&response, &record).await;
+}
+
+/// Review P2.1: `detail: bill_trail` with a `reference`, replayed the same
+/// way: the named bill's window starts at its date, and the trail ties.
+#[tokio::test]
+async fn mcp_outstandings_answer_a_recorded_bill_trail_as_the_live_call_did() {
+    let (response, observed, record) = replay_recorded_detail_call(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-bill-trail.json"
+    ))
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    assert_detail_reads_are_in_the_evidence(&response, &record).await;
+}
+
+/// The call's evidence is the plain call's (the same recorded requests
+/// without the detail's) plus both bodies of each of the detail's own reads:
+/// the ledger catalogue, the company marks and the voucher window.
+async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Value) {
+    const DETAIL_READS: [&str; 3] = [
+        "List of Ledgers",
+        "Bridge Agent Company High Water",
+        "Bridge Agent Vouchers",
+    ];
+    let is_detail_read = |request: &Value| {
+        let seq = request["seq"].as_u64().unwrap();
+        (50..=65).contains(&seq)
+    };
+    let text = record.to_string();
+    let (plain, _, _) = replay_recorded_call(
+        &text,
+        |request| !is_detail_read(request),
+        |mut arguments| {
+            let arguments_map = arguments.as_object_mut().unwrap();
+            for key in ["party", "detail", "reference"] {
+                arguments_map.remove(key);
+            }
+            arguments
+        },
+    )
+    .await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    let directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("crates/bridge-tally-protocol/tests/fixtures/agent");
+    let detail_bytes: u64 = record["requests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|request| {
+            is_detail_read(request)
+                && request["method"] == "POST"
+                && DETAIL_READS.contains(&request["request_id"].as_str().unwrap_or_default())
+        })
+        // Each as the simulator serves it: the capture's text, encoded.
+        .map(|request| {
+            let bytes =
+                std::fs::read(directory.join(request["response_fixture"].as_str().unwrap()))
+                    .unwrap();
+            let body = String::from_utf16(
+                &bytes
+                    .chunks_exact(2)
+                    .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+            tally_protocol_simulator::encode(&body, tally_protocol_simulator::WireEncoding::Utf16Le)
+                .len() as u64
+        })
+        .sum();
+    let bytes = |value: &Value| {
+        value["structuredContent"]["evidence"]["bytes"]
+            .as_u64()
+            .unwrap()
+    };
+    assert_eq!(bytes(response), bytes(&plain) + detail_bytes);
+}

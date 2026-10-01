@@ -285,7 +285,13 @@ fn only_a_single_voucher_over_budget_is_refused() {
 fn a_window_needing_more_reads_than_allowed_is_refused() {
     let census = census_of(&[("20260401", 10), ("20260402", 10), ("20260403", 10)]);
     let refusal = plan("20260401", "20260403", &census, 100, 1000, 2).unwrap_err();
-    assert_eq!(refusal, PlanRefusal::TooManyReads { reads: 3 });
+    assert_eq!(
+        refusal,
+        PlanRefusal::TooManyReads {
+            reads: 3,
+            allowed: 2
+        }
+    );
     assert_eq!(refusal.code(), "voucher_window_too_many_reads");
 }
 
@@ -3987,4 +3993,237 @@ async fn a_withheld_voucher_is_admitted_through_a_divided_window() {
         .collect();
     assert_eq!(withheld, vec![Some(2)]);
     assert_eq!(outcome.reads.len(), 3);
+}
+
+/// Limits with the production budget (so one census holds 8,192 rows) under
+/// which the first plan reads `per_read` vouchers a request and may send one.
+fn one_read_of(per_read: u64) -> WindowReadLimits {
+    WindowReadLimits {
+        budget_bytes: WINDOW_READ_BUDGET_BYTES,
+        default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / per_read,
+        max_reads: 1,
+    }
+}
+
+/// #945: a census that has already counted more vouchers than the allowed
+/// requests can hold at the default figure is a certain refusal, so the read
+/// is refused there, before the census spans left. One voucher more than the
+/// allowance holds (N + 1) refuses after the first span.
+#[tokio::test]
+async fn a_census_past_what_the_allowed_reads_can_hold_stops_before_its_next_span() {
+    let limits = one_read_of(2);
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(three_vouchers())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 2,
+            allowed: 1,
+        })
+    );
+    // The first census span only: its second span, and every data request,
+    // was never sent.
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+    assert!(failure.evidence.is_some(), "the census read is kept");
+}
+
+/// At exactly what the allowance holds (N) the census goes on to its next
+/// span and the window is read.
+#[tokio::test]
+async fn a_census_at_what_the_allowed_reads_can_hold_is_finished_and_read() {
+    let limits = one_read_of(3);
+    let mut plans = paired(&xml_plan(three_vouchers()));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    assert_eq!(outcome.unwrap().rows.len(), 3);
+    assert_eq!(observed.len(), 18);
+}
+
+/// Limits with the production budget under which the first plan reads
+/// `per_read` vouchers a request and may send `allowed` of them.
+fn reads_of(per_read: u64, allowed: usize) -> WindowReadLimits {
+    WindowReadLimits {
+        max_reads: allowed,
+        ..one_read_of(per_read)
+    }
+}
+
+/// The early stop's bound is the allowance times what one request holds, not
+/// one request's worth: with three requests of one voucher each allowed, a
+/// first census span of three vouchers (N) does not stop the census. The read
+/// goes on to its second span and is refused there by the plan, which counts
+/// the window's parts exactly; a bound of one request's worth would have
+/// stopped after the first span.
+#[tokio::test]
+async fn a_census_at_the_allowance_times_one_requests_worth_goes_on_to_its_next_span() {
+    let limits = reads_of(1, 3);
+    let mut plans = paired(&xml_plan(three_vouchers()));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260731", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused by the plan");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            // The empty days either side, and the day's three vouchers at one
+            // a request: the plan tiles the window.
+            needed_at_least: 5,
+            allowed: 3,
+        })
+    );
+    // Both census spans: the census was not stopped.
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        12
+    );
+}
+
+/// One voucher over the allowance times one request's worth (N + 1), with two
+/// requests allowed, stops the census after its first span.
+#[tokio::test]
+async fn a_census_one_past_the_allowance_times_one_requests_worth_stops_with_two_allowed() {
+    let limits = reads_of(1, 2);
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(three_vouchers())),
+        ("20260731", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+}
+
+/// A census that goes over the allowance only on its last span is not
+/// stopped early: there is no span left to save, so it is finished and the
+/// plan refuses it with its exact count of parts. An early stop there would
+/// report only the vouchers' share of it.
+#[tokio::test]
+async fn a_census_over_the_allowance_only_on_its_last_span_is_refused_by_the_plan() {
+    let limits = reads_of(1, 1);
+    let mark = limits.census_capacity() + 1;
+    let mut plans = paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(1),
+        &[(mark, "20260801")],
+    ))));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260731", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(mark)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused by the plan");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            // The empty days either side and the day's two vouchers, one a
+            // request; an early stop would have said two.
+            needed_at_least: 4,
+            allowed: 1,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        12
+    );
+}
+
+/// #945: a part that measures heavier than the default re-plans the rest of
+/// the window under what is left of the allowance. When that is too few, the
+/// refusal counts the read as a whole: the requests already sent and the ones
+/// the rest still needs, against the read's whole allowance.
+#[tokio::test]
+async fn a_replan_refusal_counts_the_requests_already_sent() {
+    // One voucher measures `one`; the default is half that, so six fit a
+    // request before anything is measured and three after.
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let limits = WindowReadLimits {
+        budget_bytes: 3 * one,
+        default_bytes_per_voucher: one / 2,
+        max_reads: 2,
+    };
+    // Day one's voucher is its own part; day two's six are the second.
+    let census = WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260802"), 2),
+        (day("20260802"), 3),
+        (day("20260802"), 4),
+        (day("20260802"), 5),
+        (day("20260802"), 6),
+        (day("20260802"), 7),
+    ]);
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")]))),
+        ("20260801", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(census),
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    // One request sent, and day two now needs two more, against two in all.
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
 }

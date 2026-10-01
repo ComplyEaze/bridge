@@ -69,6 +69,14 @@ pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
 #[path = "runtime_masters_tests.rs"]
 mod masters_tests;
 
+#[path = "runtime_stock_summary.rs"]
+mod stock_summary;
+pub(crate) use stock_summary::StockSummaryReadError;
+
+#[cfg(test)]
+#[path = "runtime_stock_summary_tests.rs"]
+mod stock_summary_tests;
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;

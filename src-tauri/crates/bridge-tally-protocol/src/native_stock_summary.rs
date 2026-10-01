@@ -1,0 +1,1007 @@
+//! Native `stock_summary` reads: the company's inventory flags, its stock
+//! items with their closing quantity and value, and Tally's own Stock Summary
+//! report, whose top-level lines' sum gates the items.
+//!
+//! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
+//! (`tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`; PARTIAL), and, by role, one
+//! client book on which the report total equalled the items' closing-value sum
+//! (protocol reference §12a.13). How another release, another period end or a
+//! book whose inventory is not integrated answers is unmeasured.
+//!
+//! The parsers are closed and fail closed with a typed error (AGENTS.md P3),
+//! and read their collections with the masters parser's element helpers. The
+//! stock-item row is bound to its company by the GUID's company prefix and a
+//! valid suffix alone: this request has no computed `BRIDGECOMPANYGUID`, and
+//! nothing in the response otherwise names the company. Codes are prefixed
+//! `stock_`, except the company-flags refusals.
+use crate::native_ledger_guid_has_company_prefix;
+use crate::native_masters::{
+    name_attribute, path_is, read_language_names, read_text, refuse_error_element,
+    refuse_stray_text, skip_subtree, upper, within_name_bound, NativeMastersError,
+    MASTERS_ASSUMED_ALIASES, MASTERS_ASSUMED_NAME_CHARS, MASTERS_RESPONSE_BUDGET_BYTES,
+};
+use crate::native_outstandings::NativeLedgerSnapshotPeriod;
+use crate::native_statement_reports::render_built_in_report_request;
+use crate::native_trial_balance::guid_suffix_is_valid;
+use crate::outstandings_shared::COMPANY_EXTENT_V2_FETCH;
+use crate::tolerant_xml::sanitize_invalid_numeric_references;
+use crate::xml_text::escape_text as xml_escape;
+use bridge_tally_primitives::{ExactDecimal, TallyDate};
+use quick_xml::{
+    events::{BytesStart, Event},
+    Reader,
+};
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+
+/// Characters of one stock-item row that do not grow with its names. The
+/// largest SHAPE LAB row, counted from its opening to its closing tag with the
+/// capture's line ends and its names included, is 654 characters, so this
+/// carries headroom over that one synthetic book (PARTIAL).
+const STOCK_ITEM_FIXED_CHARS: usize = 700;
+
+/// Name-bearing texts of a stock-item row before its aliases, each assumed at
+/// most [`MASTERS_ASSUMED_NAME_CHARS`] and checked against that bound when
+/// read: the `NAME` and `RESERVEDNAME` attributes, a `NAME` element, `PARENT`,
+/// `BASEUNITS`, and the unit texts inside `OPENINGBALANCE` and
+/// `CLOSINGBALANCE`. Aliases in the language lists are counted separately, per
+/// row.
+const STOCK_ITEM_NAME_SLOTS: usize = 7;
+
+/// An assumed worst-case stock-item row, in UTF-16 bytes: the masters formula
+/// (`2 * (fixed + 6 * names * (slots + aliases))`) with this row's fixed
+/// characters and slots. The runtime multiplies it by the master mark to size a
+/// read before it, and the per-row span check counts UTF-16 units against half
+/// of it after.
+pub const fn stock_item_worst_row_bytes() -> usize {
+    2 * (STOCK_ITEM_FIXED_CHARS
+        + 6 * MASTERS_ASSUMED_NAME_CHARS * (STOCK_ITEM_NAME_SLOTS + MASTERS_ASSUMED_ALIASES))
+}
+
+const _: () = assert!(stock_item_worst_row_bytes() < MASTERS_RESPONSE_BUDGET_BYTES);
+
+/// The Company collection with its `FETCH` extended by the inventory flags and
+/// the company's counts, and one single-term filter, `$GUID = "<GUID>"`: a
+/// `Company` collection ignores `SVCURRENTCOMPANY` and returns every loaded
+/// company (§12a.7), so the filter is what makes the response this company's
+/// alone. The counts are fetched, so the request stays byte-equal to the
+/// committed capture, but not read. A GUID that could break the formula's
+/// string is refused, not escaped.
+///
+/// The formula is named `BridgeR3CompanyGuid`, an internal lab-capture name,
+/// because the request must stay byte-equal to the request Tally actually
+/// received; it is renamed together with a capture of this request through
+/// Bridge (bridge#979).
+pub fn render_company_inventory_flags_request(
+    company: &str,
+    company_guid: &str,
+) -> Result<String, NativeStockError> {
+    if company_guid.is_empty()
+        || !company_guid
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(NativeStockError::CompanyFlagsGuidUnsupported);
+    }
+    Ok(format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyBookExtentV2</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeR3CompanyGuid">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyBookExtentV2" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{COMPANY_EXTENT_V2_FETCH}, ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON, NUMLEDGERS, NUMGROUPS, NUMSTOCKITEMS, NUMSTOCKCATEGORIES, NUMGODOWNS, NUMUNITS, NUMVOUCHERTYPES</FETCH><FILTERS>BridgeR3CompanyGuid</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        company = xml_escape(company),
+    ))
+}
+
+/// The Stock Summary by report name, in the built-in statements' envelope
+/// (§12a.1), over the already-admitted period.
+pub fn render_native_stock_summary_request(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
+    render_built_in_report_request("Stock Summary", company, period)
+}
+
+/// The date a stock summary is read as of. Only a 31 March is constructible,
+/// because only a 31 March period end (a financial-year end) has been measured
+/// for stock, the report tie-out included. Any other date, one that the boundary
+/// rule of Bridge's other reads would admit included, is refused as
+/// [`NativeStockError::AsOfNotMeasured`]. Of the 31 Marches, only the period
+/// ending 31 March 2026 has been measured: another year's 31 March is admitted
+/// here, sharing the request shape but not the measurement. Other dates will be
+/// admitted in a later change, once captures back them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StockSummaryAsOf(TallyDate);
+
+impl StockSummaryAsOf {
+    pub fn new(date: TallyDate) -> Result<Self, NativeStockError> {
+        if matches!(&date.as_str()[4..8], "0331") {
+            Ok(Self(date))
+        } else {
+            Err(NativeStockError::AsOfNotMeasured)
+        }
+    }
+
+    pub fn date(&self) -> &TallyDate {
+        &self.0
+    }
+}
+
+/// Tally's `Yes` or `No` for a company flag, or neither.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeFlag {
+    Yes,
+    No,
+    /// Absent or empty: not read as `No`.
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct NativeInventoryFlags {
+    pub integrated: NativeFlag,
+    pub inventory_on: NativeFlag,
+    pub batchwise: NativeFlag,
+}
+
+/// A quantity as Tally writes it, `<number> <unit>`. The amount is signed: it
+/// keeps the sign Tally sent, so a negative stock is a negative amount.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NativeStockQuantity {
+    pub amount: ExactDecimal,
+    pub unit: String,
+}
+
+/// A quantity and a value, each `None` where Tally sent an empty or absent
+/// element: not zero.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NativeStockPosition {
+    pub quantity: Option<NativeStockQuantity>,
+    /// A plain signed decimal exactly as Tally sends it: the sign is kept,
+    /// never flipped, and not interpreted.
+    pub value: Option<ExactDecimal>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NativeStockItem {
+    pub name: String,
+    pub guid: String,
+    /// The `PARENT` text as read, the reserved-root marker included exactly as
+    /// the group snapshot keeps it; absent or blank is `None`.
+    pub parent: Option<String>,
+    pub base_unit: Option<String>,
+    /// Read and validated (a malformed opening quantity or value still refuses),
+    /// but never serialized: nothing checks it, and its as-at date is
+    /// unmeasured (the only capture's books start where its period starts).
+    #[serde(skip)]
+    pub opening: NativeStockPosition,
+    pub closing: NativeStockPosition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeStockItems {
+    pub rows: Vec<NativeStockItem>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeStockError {
+    /// A `STATUS` other than 1, or an `ERROR` or `LINEERROR` element.
+    TallyReportedFailure,
+    /// The envelope, a row or the report is not the closed shape; the code
+    /// names where.
+    Malformed(&'static str),
+    /// No `COLLECTION` at all. An empty one is a valid zero-row answer.
+    CollectionAbsent,
+    ForeignChild,
+    RowWithoutName,
+    /// The GUID is absent, or is not `<company GUID>-<eight hex digits>`.
+    RowGuidForeign,
+    DuplicateGuid,
+    DuplicateName,
+    /// A name or alias count, or a row's length, over the assumed bounds.
+    RowExceedsBound,
+    /// The GUID-filtered Company collection did not return exactly one row, or
+    /// its row is not this company's.
+    CompanyFlagsNotOneRow,
+    CompanyFlagsGuidUnsupported,
+    FlagInvalid(&'static str),
+    QuantityUnparseable,
+    ValueUnparseable,
+    ReportAmountInvalid,
+    SumInvalid,
+    /// The `as_of` is not a 31 March, the only date measured for stock.
+    AsOfNotMeasured,
+}
+
+impl NativeStockError {
+    /// The refusal's stable, data-free code.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::TallyReportedFailure => "stock_tally_reported_failure",
+            Self::Malformed(code) => code,
+            Self::CollectionAbsent => "stock_collection_absent",
+            Self::ForeignChild => "stock_foreign_child",
+            Self::RowWithoutName => "stock_row_without_name",
+            Self::RowGuidForeign => "stock_row_guid_foreign",
+            Self::DuplicateGuid => "stock_row_duplicate_guid",
+            Self::DuplicateName => "stock_row_duplicate_name",
+            Self::RowExceedsBound => "stock_row_exceeds_bound",
+            Self::CompanyFlagsNotOneRow => "company_flags_not_one_row",
+            Self::CompanyFlagsGuidUnsupported => "company_flags_guid_unsupported",
+            Self::FlagInvalid(field) => match *field {
+                "is_integrated" => "stock_flag_invalid:is_integrated",
+                "is_inventory_on" => "stock_flag_invalid:is_inventory_on",
+                "is_batchwise_on" => "stock_flag_invalid:is_batchwise_on",
+                _ => "stock_flag_invalid",
+            },
+            Self::QuantityUnparseable => "stock_quantity_unparseable",
+            Self::ValueUnparseable => "stock_value_unparseable",
+            Self::ReportAmountInvalid => "stock_report_amount_invalid",
+            Self::SumInvalid => "stock_value_sum_invalid",
+            Self::AsOfNotMeasured => "stock_summary_as_of_not_measured",
+        }
+    }
+}
+
+impl fmt::Display for NativeStockError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "native stock response invalid ({})", self.code())
+    }
+}
+
+impl std::error::Error for NativeStockError {}
+
+/// The masters helpers' refusals, under this module's codes.
+impl From<NativeMastersError> for NativeStockError {
+    fn from(error: NativeMastersError) -> Self {
+        match error {
+            NativeMastersError::TallyReportedFailure => Self::TallyReportedFailure,
+            NativeMastersError::RowWithoutName => Self::RowWithoutName,
+            NativeMastersError::RowExceedsBound => Self::RowExceedsBound,
+            NativeMastersError::Malformed(code) => Self::Malformed(stock_code(code)),
+            // Raised by the masters parser's own row rules, never by the
+            // helpers this module calls.
+            NativeMastersError::CollectionAbsent
+            | NativeMastersError::ForeignChild
+            | NativeMastersError::RowGuidForeign
+            | NativeMastersError::RowCompanyMismatch
+            | NativeMastersError::RowFieldInvalid(_)
+            | NativeMastersError::DuplicateGuid
+            | NativeMastersError::DuplicateName
+            | NativeMastersError::VoucherTypesEmpty => Self::Malformed("stock_response_malformed"),
+        }
+    }
+}
+
+/// Every `Malformed` code the shared helpers can raise, under this module's
+/// prefix.
+fn stock_code(masters_code: &'static str) -> &'static str {
+    match masters_code {
+        "masters_xml_malformed" => "stock_xml_malformed",
+        "masters_xml_invalid_encoding" => "stock_xml_invalid_encoding",
+        "masters_xml_invalid_escape" => "stock_xml_invalid_escape",
+        "masters_scalar_not_text_only" => "stock_scalar_not_text_only",
+        "masters_unexpected_text" => "stock_unexpected_text",
+        "masters_attribute_malformed" => "stock_attribute_malformed",
+        "masters_row_unterminated" => "stock_row_unterminated",
+        _ => "stock_response_malformed",
+    }
+}
+
+fn malformed_xml() -> NativeStockError {
+    NativeStockError::Malformed("stock_xml_malformed")
+}
+
+/// Reads one `COLLECTION` of `row_element` rows under a `STATUS` 1 envelope, as
+/// [`crate::native_masters::parse_native_masters`] does: an absent `COLLECTION`
+/// refuses and an empty one is zero rows; only `row_element` children; stray
+/// text refuses; an `ERROR` or `LINEERROR` anywhere keeps its meaning. `read_row`
+/// reads one row, up to and including its closing tag; when `max_row_units` is
+/// set, a row longer than that many UTF-16 units (opening to closing tag)
+/// refuses.
+fn read_collection<T>(
+    response: &str,
+    row_element: &[u8],
+    max_row_units: Option<usize>,
+    mut read_row: impl FnMut(&mut Reader<&[u8]>, &BytesStart<'_>) -> Result<T, NativeStockError>,
+) -> Result<Vec<T>, NativeStockError> {
+    let sanitized = sanitize_invalid_numeric_references(response);
+    let mut reader = Reader::from_str(&sanitized);
+    reader.config_mut().trim_text(false);
+    let mut path = Vec::<Vec<u8>>::new();
+    let mut root_seen = false;
+    let mut status: Option<String> = None;
+    let mut collections = 0_usize;
+    let mut rows = Vec::new();
+    loop {
+        let event_start = reader.buffer_position();
+        match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                if path.is_empty() && (root_seen || name != b"ENVELOPE") {
+                    return Err(NativeStockError::Malformed("stock_root_not_envelope"));
+                }
+                refuse_error_element(&name)?;
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    let text = read_text(&mut reader, element.name())?;
+                    let text = text.trim();
+                    // An empty STATUS is no answer: the envelope's end refuses it.
+                    if !text.is_empty() && text != "1" {
+                        return Err(NativeStockError::TallyReportedFailure);
+                    }
+                    record_status(&mut status, text.to_string())?;
+                    continue;
+                }
+                if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
+                    collections += 1;
+                } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) {
+                    if name != row_element {
+                        return Err(NativeStockError::ForeignChild);
+                    }
+                    let row = read_row(&mut reader, &element)?;
+                    if let Some(limit) = max_row_units {
+                        if row_units(&sanitized, event_start, reader.buffer_position()) > limit {
+                            return Err(NativeStockError::RowExceedsBound);
+                        }
+                    }
+                    rows.push(row);
+                    continue;
+                }
+                root_seen = true;
+                path.push(name);
+            }
+            Event::Empty(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                if path.is_empty() {
+                    return Err(NativeStockError::Malformed("stock_root_not_envelope"));
+                }
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    record_status(&mut status, String::new())?;
+                } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION"
+                {
+                    collections += 1;
+                } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) {
+                    return Err(if name == row_element {
+                        NativeStockError::Malformed("stock_row_empty")
+                    } else {
+                        NativeStockError::ForeignChild
+                    });
+                }
+            }
+            Event::End(_) => {
+                if path.pop().is_none() {
+                    return Err(NativeStockError::Malformed("stock_unexpected_close"));
+                }
+            }
+            Event::Text(text)
+                if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
+            {
+                refuse_stray_text(&text)?;
+            }
+            Event::CData(_) | Event::GeneralRef(_)
+                if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
+            {
+                return Err(NativeStockError::Malformed("stock_unexpected_text"));
+            }
+            Event::DocType(_) => {
+                return Err(NativeStockError::Malformed("stock_doctype_forbidden"))
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+    }
+    if !path.is_empty() {
+        return Err(NativeStockError::Malformed("stock_envelope_unterminated"));
+    }
+    if !root_seen {
+        return Err(NativeStockError::Malformed("stock_envelope_missing"));
+    }
+    if status.as_deref() != Some("1") {
+        return Err(NativeStockError::Malformed("stock_status_absent"));
+    }
+    match collections {
+        0 => Err(NativeStockError::CollectionAbsent),
+        1 => Ok(rows),
+        _ => Err(NativeStockError::Malformed("stock_collection_repeated")),
+    }
+}
+
+fn record_status(slot: &mut Option<String>, value: String) -> Result<(), NativeStockError> {
+    if slot.replace(value).is_some() {
+        return Err(NativeStockError::Malformed("stock_status_repeated"));
+    }
+    Ok(())
+}
+
+/// The row from its opening tag to its closing tag, in UTF-16 units (the unit
+/// the response is measured in); `usize::MAX` if the positions are not a span
+/// of `text`.
+fn row_units(text: &str, start: u64, end: u64) -> usize {
+    usize::try_from(start)
+        .ok()
+        .zip(usize::try_from(end).ok())
+        .and_then(|(start, end)| text.get(start..end))
+        .map_or(usize::MAX, |row| row.encode_utf16().count())
+}
+
+/// The scalar children a stock-item row's fields are read from, by upper-case
+/// name. One occurrence each; a repeat refuses. `NAME` is read only to check it
+/// against the name bound.
+const ITEM_FIELDS: [&str; 8] = [
+    "GUID",
+    "PARENT",
+    "BASEUNITS",
+    "OPENINGBALANCE",
+    "OPENINGVALUE",
+    "CLOSINGBALANCE",
+    "CLOSINGVALUE",
+    "NAME",
+];
+
+const FLAG_FIELDS: [&str; 4] = ["GUID", "ISINTEGRATED", "ISINVENTORYON", "ISBATCHWISEON"];
+
+/// The `wanted` children of the row now open, by upper-case name, up to the
+/// row's closing tag. Aliases under `LANGUAGENAME.LIST` are counted per row and
+/// refused past the assumed bound; any other child is skipped.
+fn read_row_fields(
+    reader: &mut Reader<&[u8]>,
+    row_element: &[u8],
+    wanted: &[&'static str],
+) -> Result<HashMap<&'static str, String>, NativeStockError> {
+    let field_of = |name: &[u8]| {
+        wanted
+            .iter()
+            .copied()
+            .find(|field| field.as_bytes() == name)
+    };
+    let mut fields = HashMap::<&'static str, String>::new();
+    let mut language_names = 0_usize;
+    loop {
+        match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(child) => {
+                let child_name = upper(child.name());
+                refuse_error_element(&child_name)?;
+                if child_name == b"LANGUAGENAME.LIST" {
+                    read_language_names(reader, &mut language_names)?;
+                } else if let Some(field) = field_of(child_name.as_slice()) {
+                    let text = read_text(reader, child.name())?;
+                    if fields.insert(field, text).is_some() {
+                        return Err(NativeStockError::Malformed("stock_row_field_repeated"));
+                    }
+                } else {
+                    skip_subtree(reader)?;
+                }
+            }
+            Event::Empty(child) => {
+                let child_name = upper(child.name());
+                refuse_error_element(&child_name)?;
+                if let Some(field) = field_of(child_name.as_slice()) {
+                    if fields.insert(field, String::new()).is_some() {
+                        return Err(NativeStockError::Malformed("stock_row_field_repeated"));
+                    }
+                }
+            }
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(row_element) => break,
+            Event::Text(text) => refuse_stray_text(&text)?,
+            Event::CData(_) | Event::GeneralRef(_) => {
+                return Err(NativeStockError::Malformed("stock_unexpected_text"))
+            }
+            Event::Eof => return Err(NativeStockError::Malformed("stock_row_unterminated")),
+            _ => {}
+        }
+    }
+    Ok(fields)
+}
+
+/// Parses the GUID-filtered Company collection of
+/// [`render_company_inventory_flags_request`]. Exactly one `COMPANY` row whose
+/// `GUID` equals `company_guid` is admitted: none, several (a year-split
+/// sibling shares the GUID, §9.11b) or another company's refuse
+/// `company_flags_not_one_row`. A flag is `Yes`, `No`, or `Unknown` when absent
+/// or empty; any other text refuses. The `NUM*` counts are not read.
+pub fn parse_company_inventory_flags(
+    response: &str,
+    company_guid: &str,
+) -> Result<NativeInventoryFlags, NativeStockError> {
+    let mut rows = read_collection(response, b"COMPANY", None, |reader, _element| {
+        read_row_fields(reader, b"COMPANY", &FLAG_FIELDS)
+    })?;
+    if rows.len() != 1 {
+        return Err(NativeStockError::CompanyFlagsNotOneRow);
+    }
+    let mut fields = rows.remove(0);
+    let bound = fields
+        .remove("GUID")
+        .is_some_and(|guid| guid.trim().eq_ignore_ascii_case(company_guid));
+    if !bound {
+        return Err(NativeStockError::CompanyFlagsNotOneRow);
+    }
+    Ok(NativeInventoryFlags {
+        integrated: flag(&mut fields, "ISINTEGRATED", "is_integrated")?,
+        inventory_on: flag(&mut fields, "ISINVENTORYON", "is_inventory_on")?,
+        batchwise: flag(&mut fields, "ISBATCHWISEON", "is_batchwise_on")?,
+    })
+}
+
+fn flag(
+    fields: &mut HashMap<&'static str, String>,
+    key: &'static str,
+    label: &'static str,
+) -> Result<NativeFlag, NativeStockError> {
+    match fields.remove(key).as_deref().map(str::trim) {
+        None | Some("") => Ok(NativeFlag::Unknown),
+        Some("Yes") => Ok(NativeFlag::Yes),
+        Some("No") => Ok(NativeFlag::No),
+        Some(_) => Err(NativeStockError::FlagInvalid(label)),
+    }
+}
+
+/// Parses the stock-items collection of `AuditStockItemsV1`. Refuses a row with
+/// no name, a GUID that is not `company_guid`'s (the row's only binding to its
+/// company), a repeated GUID or a name repeated ignoring ASCII case, a name,
+/// alias count or row length over the assumed bounds, and a quantity or value
+/// that does not read exactly (the whole read refuses, not the row).
+pub fn parse_native_stock_items(
+    response: &str,
+    company_guid: &str,
+) -> Result<NativeStockItems, NativeStockError> {
+    let mut guids = HashSet::new();
+    let mut names = HashSet::new();
+    let rows = read_collection(
+        response,
+        b"STOCKITEM",
+        Some(stock_item_worst_row_bytes() / 2),
+        |reader, element| {
+            let name = name_attribute(element)?;
+            let mut fields = read_row_fields(reader, b"STOCKITEM", &ITEM_FIELDS)?;
+            for field in ["NAME", "PARENT", "BASEUNITS"] {
+                if let Some(text) = fields.get(field) {
+                    within_name_bound(text)?;
+                }
+            }
+            let guid = fields
+                .remove("GUID")
+                .filter(|guid| {
+                    native_ledger_guid_has_company_prefix(guid, company_guid)
+                        && guid_suffix_is_valid(guid, company_guid)
+                })
+                .ok_or(NativeStockError::RowGuidForeign)?;
+            if !guids.insert(guid.to_ascii_lowercase()) {
+                return Err(NativeStockError::DuplicateGuid);
+            }
+            if !names.insert(name.to_ascii_lowercase()) {
+                return Err(NativeStockError::DuplicateName);
+            }
+            let non_blank = |text: String| Some(text).filter(|text| !text.trim().is_empty());
+            Ok(NativeStockItem {
+                name,
+                guid,
+                parent: fields.remove("PARENT").and_then(non_blank),
+                base_unit: fields.remove("BASEUNITS").and_then(non_blank),
+                opening: position(&mut fields, "OPENINGBALANCE", "OPENINGVALUE")?,
+                closing: position(&mut fields, "CLOSINGBALANCE", "CLOSINGVALUE")?,
+            })
+        },
+    )?;
+    Ok(NativeStockItems { rows })
+}
+
+fn position(
+    fields: &mut HashMap<&'static str, String>,
+    quantity_key: &'static str,
+    value_key: &'static str,
+) -> Result<NativeStockPosition, NativeStockError> {
+    Ok(NativeStockPosition {
+        quantity: quantity(fields.remove(quantity_key))?,
+        value: value(fields.remove(value_key))?,
+    })
+}
+
+/// `^-?[0-9]+(\.[0-9]+)? <unit>$` after trimming, where the unit is one or
+/// more non-space characters (letters and dots: `U.` was seen live). An empty
+/// or absent element is `None`; anything else that does not match, a double
+/// space or a unit with a space in it included, refuses.
+fn quantity(text: Option<String>) -> Result<Option<NativeStockQuantity>, NativeStockError> {
+    let Some(text) = text else {
+        return Ok(None);
+    };
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let (amount, unit) = text
+        .split_once(' ')
+        .ok_or(NativeStockError::QuantityUnparseable)?;
+    if unit.is_empty() || unit.chars().any(char::is_whitespace) {
+        return Err(NativeStockError::QuantityUnparseable);
+    }
+    within_name_bound(unit)?;
+    let amount = ExactDecimal::parse(amount).map_err(|_| NativeStockError::QuantityUnparseable)?;
+    Ok(Some(NativeStockQuantity {
+        amount,
+        unit: unit.to_string(),
+    }))
+}
+
+/// A plain signed decimal after trimming; an empty or absent element is `None`.
+fn value(text: Option<String>) -> Result<Option<ExactDecimal>, NativeStockError> {
+    match text.as_deref().map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(text) => ExactDecimal::parse(text)
+            .map(Some)
+            .map_err(|_| NativeStockError::ValueUnparseable),
+    }
+}
+
+/// Tally's own Stock Summary, as far as the gate needs it: the sum of its
+/// top-level closing amounts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeStockReport {
+    Lines {
+        /// The sum of the amounts present; `None` when every amount was empty.
+        total: Option<ExactDecimal>,
+        present: usize,
+        /// Amount elements that were empty: counted, never read as zero.
+        empty: usize,
+    },
+    /// An empty `ENVELOPE`: not told apart from a report Tally did not render
+    /// (§12a.11), so never read as zero.
+    Empty,
+    /// A bare `RESPONSE`: Tally did not recognise the report name (§12a.1).
+    UnknownReport,
+}
+
+/// Parses the Stock Summary response (§12a.1, §12a.13): no `HEADER` or `STATUS`;
+/// top-level children alternate `DSPACCNAME` then `DSPSTKINFO` and nothing else;
+/// each `DSPSTKINFO` holds one `DSPSTKCL` whose `DSPCLAMTA` is a plain signed
+/// decimal or empty. A `LINEERROR` or `ERROR` refuses; a bare `RESPONSE` and an
+/// empty envelope are answers ([`NativeStockReport`]), not refusals.
+pub fn parse_native_stock_summary_report(xml: &str) -> Result<NativeStockReport, NativeStockError> {
+    let sanitized = sanitize_invalid_numeric_references(xml);
+    let mut reader = Reader::from_str(&sanitized);
+    // Not trimmed: an entity splits a name into several text events.
+    reader.config_mut().trim_text(false);
+    let mut root_seen = false;
+    let mut envelope_closed = false;
+    let mut expect_info = false;
+    let mut pairs = 0_usize;
+    let mut total: Option<ExactDecimal> = None;
+    let (mut present, mut empty) = (0_usize, 0_usize);
+    loop {
+        match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                if !root_seen {
+                    match name.as_slice() {
+                        b"ENVELOPE" => root_seen = true,
+                        b"RESPONSE" => return Ok(NativeStockReport::UnknownReport),
+                        _ => return Err(report_shape("stock_report_root_not_envelope")),
+                    }
+                    continue;
+                }
+                if envelope_closed {
+                    return Err(report_shape("stock_report_trailing_content"));
+                }
+                refuse_error_element(&name)?;
+                match name.as_slice() {
+                    b"DSPACCNAME" if !expect_info => {
+                        read_report_name(&mut reader)?;
+                        expect_info = true;
+                    }
+                    b"DSPSTKINFO" if expect_info => {
+                        match read_report_info(&mut reader)? {
+                            Some(amount) => {
+                                present += 1;
+                                total = Some(match total {
+                                    None => amount,
+                                    Some(sum) => sum
+                                        .checked_add(&amount)
+                                        .map_err(|_| NativeStockError::SumInvalid)?,
+                                });
+                            }
+                            None => empty += 1,
+                        }
+                        pairs += 1;
+                        expect_info = false;
+                    }
+                    _ => return Err(report_shape("stock_report_unexpected_element")),
+                }
+            }
+            Event::Empty(element) => {
+                let name = upper(element.name());
+                if !root_seen {
+                    match name.as_slice() {
+                        b"ENVELOPE" => {
+                            root_seen = true;
+                            envelope_closed = true;
+                        }
+                        b"RESPONSE" => return Ok(NativeStockReport::UnknownReport),
+                        _ => return Err(report_shape("stock_report_root_not_envelope")),
+                    }
+                    continue;
+                }
+                refuse_error_element(&name)?;
+                return Err(report_shape("stock_report_unexpected_empty_element"));
+            }
+            Event::End(element) => {
+                if upper(element.name()) == b"ENVELOPE" && root_seen && !envelope_closed {
+                    envelope_closed = true;
+                } else {
+                    return Err(malformed_xml());
+                }
+            }
+            Event::Text(text) => refuse_stray_text(&text)?,
+            Event::Decl(_) | Event::Comment(_) => {}
+            Event::Eof => break,
+            _ => return Err(report_shape("stock_report_unexpected_content")),
+        }
+    }
+    if !root_seen || !envelope_closed {
+        return Err(report_shape("stock_report_envelope_unterminated"));
+    }
+    if expect_info {
+        return Err(report_shape("stock_report_name_without_info"));
+    }
+    Ok(if pairs == 0 {
+        NativeStockReport::Empty
+    } else {
+        NativeStockReport::Lines {
+            total,
+            present,
+            empty,
+        }
+    })
+}
+
+fn report_shape(code: &'static str) -> NativeStockError {
+    NativeStockError::Malformed(code)
+}
+
+/// `DSPACCNAME` holding exactly one non-blank `DSPDISPNAME` text element.
+fn read_report_name(reader: &mut Reader<&[u8]>) -> Result<(), NativeStockError> {
+    let mut named = false;
+    loop {
+        match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                if name != b"DSPDISPNAME" || named {
+                    return Err(report_shape("stock_report_name_shape"));
+                }
+                if read_text(reader, element.name())?.trim().is_empty() {
+                    return Err(report_shape("stock_report_name_empty"));
+                }
+                named = true;
+            }
+            Event::Empty(element) => {
+                refuse_error_element(&upper(element.name()))?;
+                return Err(report_shape("stock_report_name_shape"));
+            }
+            Event::End(element) if upper(element.name()) == b"DSPACCNAME" => {
+                return if named {
+                    Ok(())
+                } else {
+                    Err(report_shape("stock_report_name_missing"))
+                };
+            }
+            Event::Text(text) => refuse_stray_text(&text)?,
+            _ => return Err(report_shape("stock_report_name_shape")),
+        }
+    }
+}
+
+/// `DSPSTKINFO` holding exactly one `DSPSTKCL`; returns its closing amount, or
+/// `None` where that amount was empty.
+fn read_report_info(reader: &mut Reader<&[u8]>) -> Result<Option<ExactDecimal>, NativeStockError> {
+    let mut amount = None;
+    let mut closings = 0_usize;
+    loop {
+        match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                closings += 1;
+                if name != b"DSPSTKCL" || closings > 1 {
+                    return Err(report_shape("stock_report_info_shape"));
+                }
+                amount = read_report_closing(reader)?;
+            }
+            Event::Empty(element) => {
+                refuse_error_element(&upper(element.name()))?;
+                return Err(report_shape("stock_report_info_shape"));
+            }
+            Event::End(element) if upper(element.name()) == b"DSPSTKINFO" => {
+                return if closings == 1 {
+                    Ok(amount)
+                } else {
+                    Err(report_shape("stock_report_info_shape"))
+                };
+            }
+            Event::Text(text) => refuse_stray_text(&text)?,
+            _ => return Err(report_shape("stock_report_info_shape")),
+        }
+    }
+}
+
+/// `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`, each at most
+/// once and `DSPCLAMTA` exactly once. Only the amount is read.
+fn read_report_closing(
+    reader: &mut Reader<&[u8]>,
+) -> Result<Option<ExactDecimal>, NativeStockError> {
+    let mut amount = None;
+    let (mut amount_seen, mut quantity_seen, mut rate_seen) = (false, false, false);
+    loop {
+        let (name, text) = match reader.read_event().map_err(|_| malformed_xml())? {
+            Event::Start(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                (name, read_text(reader, element.name())?)
+            }
+            Event::Empty(element) => {
+                let name = upper(element.name());
+                refuse_error_element(&name)?;
+                (name, String::new())
+            }
+            Event::End(element) if upper(element.name()) == b"DSPSTKCL" => {
+                return if amount_seen {
+                    Ok(amount)
+                } else {
+                    Err(report_shape("stock_report_amount_missing"))
+                };
+            }
+            Event::Text(text) => {
+                refuse_stray_text(&text)?;
+                continue;
+            }
+            _ => return Err(report_shape("stock_report_closing_shape")),
+        };
+        match name.as_slice() {
+            b"DSPCLAMTA" if !amount_seen => {
+                amount_seen = true;
+                amount = match text.trim() {
+                    "" => None,
+                    text => Some(
+                        ExactDecimal::parse(text)
+                            .map_err(|_| NativeStockError::ReportAmountInvalid)?,
+                    ),
+                };
+            }
+            b"DSPCLQTY" if !quantity_seen => quantity_seen = true,
+            b"DSPCLRATE" if !rate_seen => rate_seen = true,
+            _ => return Err(report_shape("stock_report_closing_shape")),
+        }
+    }
+}
+
+/// What the items add up to, as a caller reports it beside them. Every count is
+/// over the company's items at the read's date; batch, godown and in-year
+/// negatives are not counted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NativeStockTotals {
+    pub item_count: usize,
+    /// Items whose company-total closing quantity is below zero.
+    pub negative_closing_quantity_count: usize,
+    /// Items whose closing quantity is present and equal to zero.
+    pub zero_quantity_count: usize,
+    /// Items whose closing quantity element was empty or absent: not zero.
+    pub empty_closing_quantity_count: usize,
+    pub empty_closing_value_count: usize,
+    /// The sum of the closing values, or `None` (with `partial`) whenever any
+    /// item's closing value is empty, whatever its quantity: an empty value is
+    /// not zero, and that a zero quantity makes it so is unmeasured (no capture
+    /// shows it). A book with no items at all has a sum of zero and is not
+    /// partial: a present, empty collection is zero rows.
+    pub value_sum: Option<ExactDecimal>,
+    pub partial: bool,
+}
+
+impl NativeStockTotals {
+    pub fn of(items: &[NativeStockItem]) -> Result<Self, NativeStockError> {
+        let mut totals = Self {
+            item_count: items.len(),
+            negative_closing_quantity_count: 0,
+            zero_quantity_count: 0,
+            empty_closing_quantity_count: 0,
+            empty_closing_value_count: 0,
+            value_sum: None,
+            partial: false,
+        };
+        for item in items {
+            match &item.closing.quantity {
+                None => totals.empty_closing_quantity_count += 1,
+                Some(quantity) if quantity.amount.is_zero() => totals.zero_quantity_count += 1,
+                Some(quantity) => {
+                    if quantity.amount.is_negative() {
+                        totals.negative_closing_quantity_count += 1;
+                    }
+                }
+            }
+            if item.closing.value.is_none() {
+                totals.empty_closing_value_count += 1;
+                totals.partial = true;
+            }
+        }
+        if !totals.partial {
+            totals.value_sum = Some(present_closing_value_sum(items)?);
+        }
+        Ok(totals)
+    }
+}
+
+/// The sum of the closing values that are present (an empty one is left out,
+/// not counted as zero).
+fn present_closing_value_sum(items: &[NativeStockItem]) -> Result<ExactDecimal, NativeStockError> {
+    items
+        .iter()
+        .filter_map(|item| item.closing.value.as_ref())
+        .try_fold(ExactDecimal::zero(), |sum, value| sum.checked_add(value))
+        .map_err(|_| NativeStockError::SumInvalid)
+}
+
+/// The items after the sum of the top-level lines of Tally's own Stock Summary
+/// has been compared with their closing values. Items are reachable only where Tally does not
+/// contradict them: `Differs` carries none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeStockGate {
+    Matched {
+        items: Vec<NativeStockItem>,
+        totals: NativeStockTotals,
+        /// The report's total, equal to the items' closing-value sum.
+        total: ExactDecimal,
+        /// The report's amount elements that were empty and left out of it.
+        report_empty_amounts: usize,
+    },
+    NotChecked {
+        items: Vec<NativeStockItem>,
+        totals: NativeStockTotals,
+        reason: &'static str,
+    },
+    Differs {
+        items_total: ExactDecimal,
+        report_total: ExactDecimal,
+    },
+}
+
+/// Compares the sum of the items' present closing values with the sum of the
+/// report's present amounts, numerically (`3000.01` equals `3000.010`). An
+/// empty report, an unknown one, or one whose amounts are all empty is not a
+/// comparison: the items are returned unchecked.
+pub fn gate_stock_summary(
+    items: Vec<NativeStockItem>,
+    report: &NativeStockReport,
+) -> Result<NativeStockGate, NativeStockError> {
+    let totals = NativeStockTotals::of(&items)?;
+    let unchecked = |items, reason| NativeStockGate::NotChecked {
+        items,
+        totals: totals.clone(),
+        reason,
+    };
+    let (report_total, report_empty_amounts) = match report {
+        NativeStockReport::Lines {
+            total: Some(total),
+            empty,
+            ..
+        } => (total, *empty),
+        NativeStockReport::Lines { total: None, .. } => {
+            return Ok(unchecked(items, "stock_report_amounts_all_empty"))
+        }
+        NativeStockReport::Empty => return Ok(unchecked(items, "stock_report_empty")),
+        NativeStockReport::UnknownReport => return Ok(unchecked(items, "stock_unknown_report")),
+    };
+    let items_total = present_closing_value_sum(&items)?;
+    if items_total.numeric_eq(report_total) {
+        Ok(NativeStockGate::Matched {
+            items,
+            totals,
+            total: report_total.clone(),
+            report_empty_amounts,
+        })
+    } else {
+        Ok(NativeStockGate::Differs {
+            items_total,
+            report_total: report_total.clone(),
+        })
+    }
+}
+
+#[cfg(test)]
+#[path = "native_stock_summary_tests.rs"]
+mod tests;

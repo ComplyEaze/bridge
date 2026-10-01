@@ -58,11 +58,15 @@ fn source() -> OutstandingsWorkingPaperSource {
                 party: "A Party".to_string(),
                 amount: decimal("7.00"),
                 direction: ExposureDirection::Receivable,
+                opening_balance: None,
+                composition: None,
             },
             UnallocatedParty {
                 party: "Unallocated Only".to_string(),
                 amount: decimal("10.00"),
                 direction: ExposureDirection::Payable,
+                opening_balance: None,
+                composition: None,
             },
         ],
     };

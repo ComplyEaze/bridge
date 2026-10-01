@@ -736,6 +736,22 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
             "ledger_span_census_empty",
         ),
         (
+            Validation::LedgerCountCompanyDiffers {
+                company: 9,
+                census: 5,
+            },
+            "ledger_count_company_differs",
+        ),
+        (
+            Validation::LedgerCountCompanyInvalid {
+                source:
+                    bridge_tally_protocol::outstandings_shared::OutstandingsError::InvalidResponse(
+                        "company_ledger_count_invalid",
+                    ),
+            },
+            "ledger_count_company_invalid",
+        ),
+        (
             Validation::CountedCatalogueTooLarge {
                 ledgers: 23_000,
                 estimated_bytes: 32_200_000,

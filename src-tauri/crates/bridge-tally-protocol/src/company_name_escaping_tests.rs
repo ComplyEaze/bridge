@@ -14,6 +14,7 @@ use quick_xml::events::Event;
 
 use bridge_tally_primitives::TallyDate;
 
+use crate::native_masters::{render_native_masters_request, NativeMasterKind};
 use crate::native_outstandings::{
     render_native_group_snapshot_request, NativeLedgerSnapshotPeriod,
 };
@@ -68,6 +69,10 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
         (
             "xml_read_profiles::compatibility::ledgers_request",
             ledgers_request(NAME),
+        ),
+        (
+            "native_masters::render_native_masters_request",
+            render_native_masters_request(NativeMasterKind::VoucherTypes, NAME),
         ),
         (
             "native_outstandings::render_native_group_snapshot_request",

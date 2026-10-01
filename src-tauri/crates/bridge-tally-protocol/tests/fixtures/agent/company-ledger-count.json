@@ -1,0 +1,17 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver read of the company ledger-count request, render_company_ledger_count_request(\"BRIDGE SIZE 2K\") (bridge#938): the Company collection fetching Name, GUID and NUMLEDGERS. The collection answers for every loaded company whatever SVCURRENTCOMPANY says; 31 companies were loaded and every row carried NUMLEDGERS",
+  "observed_date": "2026-09-30",
+  "source_response_bytes": 18694,
+  "source_response_sha256": "9813c94a0f7cba937b113ff5f39fa923e729bbb7b0397eb595393451571aa5ce",
+  "source_request_bytes": 992,
+  "source_request_sha256": "33c0144f052827ca8359e157f119147b5e7612f561639e27617d065dd90ac721",
+  "fixture_bytes": 4382,
+  "fixture_sha256": "931b7df7fe11d04407f7adc0fca5dc7e5f175d39f80b9150350d82a3a84a806f",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 3,
+  "transformation": [
+    "the company rows of 28 of the 31 loaded companies removed, leaving three synthetic lab companies (an ageing lab, a dense corpus and the 4,339-ledger size book); every byte of the envelope and of the kept rows is as captured, the separators between rows included"
+  ],
+  "provenance_limit": "A live response sent once (not a paired read) from a licensed TallyPrime 7.1 Silver holding only synthetic lab companies, 30 Sep 2026 22:33 IST, reads only. Establishes that this request is answered with a status 1 Company collection, that each row is NAME, GUID and NUMLEDGERS in that order with the count as ` <digits>` (a leading space), and that the count of the 4,339-ledger book equals the ledger catalogue and AlterID-span census counts of the same book (4,339); the same field was present on all 31 rows. It does not establish what NUMLEDGERS counts for a book with deleted or hidden ledgers, nor how any other Tally version answers; the rows of the other 28 companies are not in the fixture, so it is not the byte-exact response.",
+  "sensitivity_review": "Operator-created synthetic lab companies (names and GUIDs of lab companies only); the company names of the removed rows are not recorded anywhere in this tree; no GSTIN, PAN, email, phone, address, URL, credentials or machine paths."
+}

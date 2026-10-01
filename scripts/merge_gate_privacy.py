@@ -252,6 +252,31 @@ def customer_email_count(text):
 
 
 def redact_public_agent_attribution_trailer(message):
+    """Redact the known public-agent address from a terminal Git trailer.
+
+    A merge commit made with conflicts ends with git's own comment block
+    (``# Conflicts:`` and ``#<TAB>path`` lines) after the trailer. That block is
+    not part of the footer: it is peeled off, the trailer before it is treated as
+    terminal, and the block is returned unchanged so it is scanned like any other
+    text (an address placed in it is still counted).
+    """
+    if not isinstance(message, str):
+        return message
+    line_ending = terminal_trailer_line_ending(message)
+    if line_ending is None:
+        return _redact_terminal_trailer(message)
+    lines = message.split(line_ending)
+    index = len(lines)
+    while index > 0 and (lines[index - 1] == "" or lines[index - 1].startswith("#")):
+        index -= 1
+    comment_start = next((i for i in range(index, len(lines)) if lines[i].startswith("#")), None)
+    if comment_start is None:
+        return _redact_terminal_trailer(message)
+    core = line_ending.join(lines[:comment_start])
+    return _redact_terminal_trailer(core) + line_ending + line_ending.join(lines[comment_start:])
+
+
+def _redact_terminal_trailer(message):
     """Redact only the known public-agent address from a terminal Git trailer.
 
     A trailer-shaped line elsewhere in the commit message is ordinary scanned
@@ -399,6 +424,48 @@ def scan(text, head, fixture_provenance=None):
     return record
 
 
+MAX_EXPLAINED_HITS = 50
+
+
+def _where(label, line):
+    """A location label that cannot itself carry a home path, identifier or address shape."""
+    return redact_shapes(label)[:160] + (":%d" % line if line else "")
+
+
+def explain(document, head, fixture_provenance=None):
+    """Locate the lines that trip the scan, without reporting what matched.
+
+    ``document`` is ``{"sources": [{"label", "text"}], "added": [{"path", "line",
+    "text"}]}``: the PR metadata (title, body, each commit message, identity names)
+    and every added line with its destination and new-file line number (line 0 is
+    a destination path or file name). Each line is scanned on its own with the same
+    classifier as ``scan``; a hit reports only the location and the classifier's own
+    count-and-category messages, never a matched value or an excerpt. A finding
+    that needs context from several lines (a grouped number split over lines) does
+    not reproduce here and is reported as ``not_located``.
+    """
+    hits = []
+    truncated = 0
+
+    def check(where, text):
+        nonlocal truncated
+        record = scan(text, head, fixture_provenance)
+        messages = record["blockers"] + record["indeterminate"]
+        if not messages:
+            return
+        if len(hits) >= MAX_EXPLAINED_HITS:
+            truncated += 1
+        else:
+            hits.append({"where": where, "messages": messages})
+
+    for source in document["sources"]:
+        for number, line in enumerate(source["text"].split("\n"), 1):
+            check(_where(source["label"], number), line)
+    for item in document["added"]:
+        check(_where(item["path"], item["line"]), item["text"])
+    return {"hits": hits, "truncated": truncated}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--head")
@@ -407,6 +474,11 @@ def main(argv=None):
         "--redact-shapes", action="store_true",
         help="Redact identifier/digest/home-path/email shapes from stdin and "
         "print the result. No classification; no --head required.",
+    )
+    parser.add_argument(
+        "--explain", action="store_true",
+        help="Read {\"sources\": [...], \"added\": [...]} on stdin and print the locations "
+        "(never the values) of the lines that trip the scan. Needs --head.",
     )
     parser.add_argument(
         "--redact-public-agent-attribution-messages", action="store_true",
@@ -429,6 +501,23 @@ def main(argv=None):
         return 0
     if not args.head or not re.fullmatch(r"[0-9A-Fa-f]{40}", args.head):
         parser.error("--head must be a full 40-hex commit SHA")
+    if args.explain:
+        try:
+            document = json.load(sys.stdin)
+            ok = (
+                isinstance(document, dict)
+                and isinstance(document.get("sources"), list)
+                and all(isinstance(x, dict) and isinstance(x.get("label"), str) and isinstance(x.get("text"), str) for x in document["sources"])
+                and isinstance(document.get("added"), list)
+                and all(isinstance(x, dict) and isinstance(x.get("path"), str) and isinstance(x.get("text"), str)
+                        and isinstance(x.get("line"), int) and not isinstance(x.get("line"), bool) for x in document["added"])
+            )
+            if not ok:
+                parser.error("explain input is malformed")
+            print(json.dumps(explain(document, args.head.lower(), args.fixture_provenance), sort_keys=True))
+        except (UnicodeError, ValueError) as error:
+            parser.error(str(error))
+        return 0
     try:
         text = sys.stdin.read()
     except UnicodeError:

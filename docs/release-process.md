@@ -5,7 +5,7 @@ and macOS. A smoke bundle is not a production release.
 
 ## Supported build baseline
 
-- Source release line: `0.2.x` under Apache-2.0
+- Source release line: 0.2.0 and later under Apache-2.0 (`v0.1.0` was MIT)
 - Node.js: supported 24.x releases (>=24.15.0); CI uses `.node-version`
 - pnpm: the exact `packageManager` version in `package.json`
 - Rust: the exact channel and components in `rust-toolchain.toml`
@@ -411,6 +411,56 @@ corepack pnpm run license:all
 8. Confirm the `Dependency security` workflow passes and GitHub reports no open
    Dependabot or secret-scanning alerts.
 
+## Merge gate: privacy scan and binary attestations
+
+`scripts/merge-gate.sh` scans the PR title, body, every commit message, the
+author and committer names, the changed file names and every added line for
+developer-home paths, PEM envelopes, credentials, customer email addresses,
+UUIDs without provenance, identifier shapes (PAN, GSTIN, mobile numbers) and long
+digit runs. The scan counts what it finds and never prints a value.
+
+**Finding the line.** When the scan blocks or is indeterminate the gate also
+prints `at <where>: <categories>` for up to 50 lines, where `<where>` is `pr-title:1`,
+`pr-body:<line>`, `commit-message-<n>:<line>`, `commit-identity-names:<line>`, a changed
+file name, or `<file>:<new-file line>` for an added line. It reports the location and
+the classifier's own counts and never the matched text or an excerpt, so the output
+is safe to paste. Open the file at that line to decide whether it is synthetic.
+"No single line reproduces the privacy finding" means the hit needs several lines
+together (a number split over lines) or comes from the PR text as a whole.
+Synthetic test data still trips the shapes: any ten digits starting 6 to 9 reads as an
+identifier and any run of eleven or more digits as a long digit run, however obviously
+fake. The gate has no allowlist by
+design; write the synthetic value in a form the shapes do not match (letters in it,
+a shorter run, grouped digits), or have the merger read the listed lines and merge on
+that reading.
+
+**Merge commits.** A merge made with conflicts carries git's own comment block
+(`# Conflicts:` and `#<TAB>path` lines) after the `Co-Authored-By` trailer. The gate
+treats that trailing block as outside the trailer footer, so the public agent address
+before it is still redacted; an address placed inside the block is still counted. Even
+so, strip the block from a merge commit message (or edit it with `git commit`) so it
+carries no noise.
+
+**Binary files.** Git shows a file it reads as binary (a NUL byte, so every UTF-16
+fixture, images, archives) as `Binary files differ` or a `GIT binary patch`, with no
+text to scan. The gate cannot read those bytes, so it holds the PR until a human
+attests: the merger runs
+`scripts/merge-gate.sh <PR> --binary-review-sha <head> --independent-review-sha <head>`
+with the full 40-hex head SHA. The two flags are an operator's statement, never read
+from the PR body or from a comment, and each must equal the head the gate is running
+on, so a later push invalidates them.
+- `--binary-review-sha`: the merger states that they read every binary addition or
+  change (the bytes, not the file name), its ownership and licence, and its NOTICE
+  obligation. For a captured fixture this means its `PROVENANCE` entry matches the
+  bytes (`scripts/check-fixture-provenance.mjs`) and the capture is synthetic.
+- `--independent-review-sha`: a second person, who is not the author, states the same
+  reading of the same head.
+A review or comment by a reviewer (V4 included) is evidence for the merger, not the
+attestation: the gate does not look at comments for these flags. The gate lists the
+first eight binary paths in its message so the merger knows what to read. Letting a
+named review comment carry the attestation, as the acknowledgement review does, would
+be a separate change to the gate.
+
 ## Signing and publication
 
 - Windows production installers require an organization-controlled code-signing
@@ -460,9 +510,10 @@ two-platform preview lane. It produces the actual Windows x64 and macOS arm64
 MCPB archives, validates and launches each archive without contacting Tally,
 then publishes a durable **GitHub prerelease** only when every archive, checksum,
 payload-free smoke result, and source-provenance record is present. Preview tags
-must start with `mcp-preview-`; they cannot reuse a production `v*` tag. A
-preview is unsigned and must never be described as signed, notarized, or ready
-for production use.
+must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
+0.3.0); they cannot reuse a production `v*` tag. A
+build without publisher signing must never be described as signed, notarized,
+or ready for production use.
 
 This workflow intentionally has no production-signed channel. A raw MCPB
 archive is not a notarization-and-stapling carrier for the enclosed macOS
@@ -486,8 +537,8 @@ say only what has been proven on the build a person can download.
 
 - A pull request that changes text under `site/` says so in its body, quoting
   the changed sentence, and the reviewer reads it against the evidence for the
-  claim (the platforms tested, the unsigned-preview label, what the product does
-  not do). A claim the release notes could not make does not belong on the site.
+  claim (the platforms tested, the not-yet-code-signed label, what the product
+  does not do). A claim the release notes could not make does not belong on the site.
 - Each deploy writes "Site text changed since the last deploy" to its run
   summary: the files and the diff under `site/` between the last commit that
   was deployed successfully and the one being deployed. The diff is cut at 300
@@ -501,7 +552,7 @@ say only what has been proven on the build a person can download.
 
 Once GitHub Pages is configured for this repository, the page offers a
 preview by its tag name and complete asset set, whether or not GitHub marks the
-release a prerelease, and labels every download as an unsigned preview. It does
+release a prerelease, and labels every download as not yet code-signed. It does
 not proxy Tally, create an account, or run a cloud relay.
 
 ## Release rhythm and notes
@@ -511,7 +562,8 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut an `mcp-preview-*` build at most every two weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
+  weeks, and only when both of
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts.
 - The workflow publishes each preview as a prerelease. Once its checks are
@@ -537,8 +589,8 @@ patch for a fix-only release:
 | Documentation only (`documentation`) | no release | no release |
 
 `node scripts/next-version.mjs` proposes the version:
-- It reads the pull requests squash-merged since the last `mcp-preview-*` or
-  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+- It reads the pull requests squash-merged since the last `mcp-v*`,
+  `mcp-preview-*` or `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
   `HEAD` would count an unmerged working branch's commits as direct pushes).
   It refuses when `origin/master` here is not origin's current master, or when
   the version files here differ from that commit's, so a stale branch cannot
@@ -582,7 +634,7 @@ disagree.
    not paste it by hand.
 
    On the release page the written parts come first, then the standard
-   unsigned-preview text, then this generated list.
+   release-notes footer, then this generated list.
 
 **`CHANGELOG.md`**
 
@@ -591,8 +643,8 @@ disagree.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
-  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
-  puts it above the unsigned-preview text, and appends GitHub's list. The
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
+  puts it above the release-notes footer, and appends GitHub's list. The
   install page's "What changed" page renders the same file when the install
   page is deployed, so a changelog edit reaches the site with the next
   deploy, not when the file changes.
@@ -626,8 +678,13 @@ disagree.
   the README and the repository description must agree with the newest
   published build.
 - Make no accuracy claim without a published method and result.
-- Never say "signed" or "production" about an unsigned preview (see *Signing
-  and publication*).
+- Never say "signed", "notarized" or "ready for production use" about a build
+  without publisher signing (see *Signing and publication*).
+- User-facing text does not call a release a "preview" or say it is "for
+  evaluation only". It says what is true: still being developed, may contain
+  errors, try it on test data with backups, not yet code-signed, and what has
+  and has not been tried. Internal names (the `mcp-preview-*` tag, the workflow
+  and file names) are not user-facing text.
 - Put no customer, company or client names, no local paths, and no
   private-repository references in any note.
 - Before publishing, check the text for AI-writing patterns and unclear

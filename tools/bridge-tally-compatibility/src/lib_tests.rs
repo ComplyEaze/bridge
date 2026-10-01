@@ -934,10 +934,9 @@ fn real_tree_has_complete_migration_and_report_surface_coverage() {
     )
     .unwrap();
     // Resolving reads every pinned file and enforces the required files and directories.
-    let surface = pins.resolve(&repository_root).unwrap();
     // The cap is a fixed parse bound, not a count: the pin list may grow or shrink without
-    // touching it, so nothing here compares it with `surface.files.len()`.
-    assert!(!surface.files.is_empty());
+    // touching it, so nothing here compares it with the number of pins.
+    pins.resolve(&repository_root).unwrap();
 }
 
 #[test]

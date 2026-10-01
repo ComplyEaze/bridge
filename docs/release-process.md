@@ -218,6 +218,14 @@ acknowledgement file, which `workflow-consistency` enforces in CI on pull reques
 in the merge queue and on the push to master. A pull request that adds or removes a
 pin without its acknowledgement fails, whatever else it edits.
 
+One case no check can see: a branch adds a pin, and a later merge of master is
+resolved by taking master's pin list. Against the base the list is then unchanged, so
+the new file lands unpinned. Before the bound replaced the exact count, a reviewer
+comparing the constant with the pin count could notice the mismatch; that signal is
+gone. So a review of a pull request that touches the pin list compares the list with
+the last reviewed head as well as with the base, and names any pin that was present
+at the last reviewed head and is gone.
+
 #### What the coverage report shows
 
 `scripts/surface_coverage_report.py` prints a surface coverage report. Run it by

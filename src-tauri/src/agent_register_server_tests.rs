@@ -396,3 +396,210 @@ fn the_captured_sales_day_requests_are_the_window_request_the_code_sends() {
         );
     }
 }
+
+// A Credit Note day through `sales_register` and a Debit Note day through `purchase_register`,
+// each replayed from a live call on one synthetic company (see `note-days/PROVENANCE.md`). The
+// scripted transport follows the call's own sequence record: it answers each request, in order,
+// with the response bytes the record names, and the fingerprint of every request the code sends
+// must be the recorded one.
+
+const NOTE_DAYS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/crates/bridge-tally-protocol/tests/fixtures/note-days"
+);
+
+fn note_day_file(name: &str) -> Vec<u8> {
+    std::fs::read(format!("{NOTE_DAYS}/{name}")).unwrap_or_else(|error| panic!("{name}: {error}"))
+}
+
+fn note_day_json(name: &str) -> Value {
+    serde_json::from_slice(&note_day_file(name)).unwrap()
+}
+
+/// Replays one recorded call and returns the tool's response and its observed requests.
+async fn replay_note_day(day: &str) -> (Value, Value, Vec<String>) {
+    let sequence = note_day_json(&format!("{day}_note_day_sequence.json"));
+    let requests = sequence["requests"].as_array().unwrap();
+    assert_eq!(
+        requests.len(),
+        118,
+        "the record lists every request of the call"
+    );
+    let plans = requests
+        .iter()
+        .map(|request| {
+            if request["method"] == "GET" {
+                plan(Kind::Status, String::new())
+            } else {
+                let fixture = request["fixture"].as_str().unwrap();
+                plan(Kind::Window, utf16(&note_day_file(fixture)))
+            }
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            sequence["tool"].as_str().unwrap(),
+            sequence["arguments"].clone(),
+        )
+        .await;
+    let observed = simulator.finish().unwrap();
+    assert_eq!(
+        observed.len(),
+        requests.len(),
+        "every recorded request was sent, no more"
+    );
+    let mut wrong = Vec::new();
+    for (position, (sent, recorded)) in observed.iter().zip(requests).enumerate() {
+        let want = recorded["request_sha256"]
+            .as_str()
+            .unwrap_or_else(|| recorded_request_sha256(Kind::Status));
+        if sent.request_body_sha256 != want {
+            wrong.push(format!("request {position} is not the recorded one"));
+        }
+    }
+    (response, sequence, wrong)
+}
+
+#[tokio::test]
+async fn a_credit_note_day_replays_through_the_sales_register_with_the_signs_tally_sent() {
+    let (response, _, wrong) = replay_note_day("credit").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_observed"], 1);
+    assert_eq!(result["ledger_masters_observed"], 44);
+    for list in [
+        "other_voucher_types_touching_duties_taxes",
+        "unclassified_voucher_type",
+        "vouchers_with_unplaced_ledgers",
+        "sales_vouchers_without_duties_taxes_entry",
+    ] {
+        assert_eq!(result[list]["total"], 0, "{list}");
+    }
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Credit Note");
+    assert_eq!(row["voucher_number"], "1");
+    assert_eq!(row["is_invoice"], false);
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party"], "Shape Buyer 1");
+    assert_eq!(row["party_group"], "Sundry Debtors");
+    // The signs are Tally's: the party is positive and the sales and tax entries negative, the
+    // reverse of a Sales row, and nothing is netted or flipped.
+    assert_eq!(row["party_entries"][0]["amount"], "1180.00");
+    assert_eq!(
+        row["party_entries"][0]["bill_allocations"][0]["bill_type"],
+        "On Account"
+    );
+    assert_eq!(row["has_taxable_entry"], true);
+    assert_eq!(row["taxable_entries"][0]["ledger"], "Sales - Local");
+    assert_eq!(row["taxable_entries"][0]["amount"], "-1000.00");
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (tax[0]["head"].as_str(), tax[0]["amount"].as_str()),
+        (Some("cgst"), Some("-90.00"))
+    );
+    // This book's state-side head is `state_tax`; the other lab book's is `sgst_utgst`.
+    assert_eq!(
+        (tax[1]["head"].as_str(), tax[1]["raw_head"].as_str()),
+        (Some("state_tax"), Some("State Tax"))
+    );
+    assert_eq!(tax[1]["amount"], "-90.00");
+    assert!(row["other_entries"].as_array().unwrap().is_empty());
+    // A Credit Note in voucher view, on account, is a measured kind: no marker.
+    assert!(row.get("not_measured_live").is_none(), "{row}");
+    // What the live call returned, row for row, apart from the marker the first build
+    // put on every credit note and this one no longer puts on this kind.
+    let answer = note_day_json("credit_note_day_answer.json");
+    let mut live_row = answer["result"]["items"][0].clone();
+    assert_eq!(live_row["not_measured_live"], json!(["credit_note"]));
+    live_row
+        .as_object_mut()
+        .unwrap()
+        .remove("not_measured_live");
+    assert_eq!(row, &live_row);
+    assert_eq!(answer["result"]["ledger_masters_observed"], 44);
+}
+
+#[tokio::test]
+async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_tally_sent() {
+    let (response, _, wrong) = replay_note_day("debit").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_purchase_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Debit Note");
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party_group"], "Sundry Creditors");
+    assert_eq!(row["party_entries"][0]["amount"], "-1180.00");
+    assert_eq!(row["taxable_entries"][0]["amount"], "1000.00");
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (tax[0]["head"].as_str(), tax[0]["amount"].as_str()),
+        (Some("cgst"), Some("90.00"))
+    );
+    assert_eq!(
+        (tax[1]["head"].as_str(), tax[1]["amount"].as_str()),
+        (Some("state_tax"), Some("90.00"))
+    );
+    assert!(row.get("not_measured_live").is_none());
+    // The purchase register returns exactly what the live call did.
+    let answer = note_day_json("debit_note_day_answer.json");
+    assert_eq!(row, &answer["result"]["items"][0]);
+}
+
+/// Every request file of `note-days/` is a request one of the two calls sent, and every request
+/// a call sent has its file: the record's fingerprints and the files' own bytes agree.
+#[test]
+fn the_note_day_request_files_are_exactly_the_requests_the_two_calls_sent() {
+    use sha2::{Digest, Sha256};
+    use std::collections::BTreeSet;
+    let hex = |bytes: &[u8]| {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    let files = std::fs::read_dir(NOTE_DAYS)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.ends_with("_request.utf16le.xml"))
+        .collect::<Vec<_>>();
+    let mut on_disk = BTreeSet::new();
+    for name in &files {
+        let bytes = note_day_file(name);
+        assert_eq!(
+            &bytes[..2],
+            &[0xff, 0xfe],
+            "{name}: a byte-order mark, as sent"
+        );
+        on_disk.insert(hex(&bytes));
+    }
+    assert_eq!(
+        on_disk.len(),
+        files.len(),
+        "no two request files are the same request"
+    );
+    let mut sent = BTreeSet::new();
+    for day in ["credit", "debit"] {
+        let sequence = note_day_json(&format!("{day}_note_day_sequence.json"));
+        sent.extend(
+            sequence["requests"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|request| request["request_sha256"].as_str().map(str::to_string)),
+        );
+    }
+    assert_eq!(on_disk, sent);
+}

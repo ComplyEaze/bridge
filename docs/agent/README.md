@@ -737,7 +737,8 @@ rate or return section, and matches nothing against any portal.
   its CGST and state-tax heads and its sales ledger as the taxable entry. The
   voucher windows of the first two invoices are committed, and the parsed
   windows have exactly those entries (a test); the requests are the request the
-  code sends (a test). One Sales accounting voucher (not an invoice) is also
+  code sends (a test). The Credit Note day, and a Debit Note day through
+  `purchase_register`, are replayed end to end from their recorded calls (tests). One Sales accounting voucher (not an invoice) is also
   classified, in tests, against the ledger masters of the purchase register's
   lab book.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
@@ -746,6 +747,10 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
+- **The cost varies by book.** The same call sent 96 requests on a book with 8
+  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
+  voucher census and base-currency reads are added). The result does not report
+  the cost.
 - **The state-side head has two spellings.** It is `state_tax` (raw `State Tax`)
   on one measured book and `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
   recognised heads for the same side of the tax, so a caller must not look for

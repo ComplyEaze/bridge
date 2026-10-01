@@ -659,10 +659,73 @@ fn a_party_without_an_unallocated_row_has_no_residual_and_ties_nothing() {
         &entries,
         &[],
         &[other],
+        2,
     )
     .unwrap();
     assert_eq!(detail["state"], "no_residual_row_for_party");
     assert!(detail["residual"].is_null(), "{detail}");
+}
+
+/// A window read that returned no voucher at all is not corroborated, so it
+/// ties nothing and lists nothing: never `bills: []`, never a native bill that
+/// "does not tie" for want of vouchers, never a residual the vouchers "do not
+/// explain".
+#[test]
+fn a_window_that_returned_no_vouchers_is_its_own_state_and_ties_nothing() {
+    let natives = [open_bill(
+        "P",
+        "R",
+        "20260701",
+        "5",
+        ExposureDirection::Receivable,
+    )];
+    let residual = [unallocated(
+        "20000",
+        ExposureDirection::Receivable,
+        Some("-20000.00"),
+        UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
+    )];
+    for (kind, label) in [
+        (DetailKind::BillTrail, "bill_trail"),
+        (DetailKind::Unadjusted, "unadjusted"),
+    ] {
+        let detail =
+            party_detail(kind, "P", &json!("P"), None, &[], &natives, &residual, 0).unwrap();
+        assert_eq!(
+            detail,
+            json!({"kind": label, "state": "window_returned_no_vouchers"}),
+            "{label}"
+        );
+    }
+    // A reference asked for is not refused as unknown on an empty read either:
+    // nothing was read to know it by.
+    assert_eq!(
+        party_detail(
+            DetailKind::BillTrail,
+            "P",
+            &json!("P"),
+            Some("UNKNOWN"),
+            &[],
+            &[],
+            &[],
+            0
+        )
+        .unwrap()["state"],
+        "window_returned_no_vouchers"
+    );
+    // The same inputs with vouchers read do tie, or fail to.
+    let read = party_detail(
+        DetailKind::Unadjusted,
+        "P",
+        &json!("P"),
+        None,
+        &[],
+        &natives,
+        &residual,
+        3,
+    )
+    .unwrap();
+    assert_eq!(read["state"], "residual_not_explained_by_vouchers");
 }
 
 /// An empty bill list says in band why it is empty, and is never a bare `[]`.
@@ -677,6 +740,7 @@ fn an_empty_bill_trail_says_why_it_is_empty() {
             entries,
             &[],
             unallocated,
+            2,
         )
         .unwrap()
     };
@@ -713,6 +777,7 @@ fn an_empty_bill_trail_says_why_it_is_empty() {
             ExposureDirection::Receivable,
         )],
         &[],
+        1,
     )
     .unwrap();
     assert_eq!(listed["state"], "bills_listed");

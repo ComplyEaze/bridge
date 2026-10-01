@@ -712,6 +712,15 @@ pub(super) enum DetailKind {
     Unadjusted,
 }
 
+impl DetailKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::BillTrail => "bill_trail",
+            Self::Unadjusted => "unadjusted",
+        }
+    }
+}
+
 impl Server {
     /// Reads the party's vouchers for the window the detail needs and builds it.
     ///
@@ -775,6 +784,7 @@ impl Server {
             &entries,
             open_bills,
             unallocated,
+            vouchers_read,
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
@@ -787,6 +797,12 @@ impl Server {
 /// The detail object for one party, built from its allocations and the native
 /// figures read at the same as-of; the handler adds the party, the as-of and
 /// the window. Every state and refusal of the answer is decided here.
+///
+/// `vouchers_read` is how many vouchers the company window read returned. When
+/// it is zero nothing is tied and nothing is listed: an empty read is not
+/// corroborated here (the `vouchers` tool corroborates one with a wider read),
+/// so it is reported as `window_returned_no_vouchers`, never as a trail of no
+/// allocations or a residual the vouchers do not explain.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn party_detail(
     kind: DetailKind,
@@ -796,14 +812,21 @@ pub(super) fn party_detail(
     entries: &[TrailEntry],
     open_bills: &[OpenBillRow],
     unallocated: &[UnallocatedParty],
+    vouchers_read: usize,
 ) -> Result<Value, TrailRefusal> {
+    if vouchers_read == 0 {
+        return Ok(json!({
+            "kind": kind.label(),
+            "state": "window_returned_no_vouchers",
+        }));
+    }
     let row = unallocated.iter().find(|row| row.party == party);
     match kind {
         DetailKind::BillTrail => {
             let bills = bill_trails(party, reference, entries, open_bills)?;
             within_detail_cap(trail_row_count(&bills))?;
             Ok(json!({
-                "kind": "bill_trail",
+                "kind": kind.label(),
                 "state": bill_trail_state(&bills, row),
                 "bills": bills.iter().map(|bill| bill.json(party_json.clone())).collect::<Vec<_>>(),
             }))
@@ -812,7 +835,7 @@ pub(super) fn party_detail(
             let detail = unadjusted_detail(entries, open_bills, party, row)?;
             within_detail_cap(detail.rows.len())?;
             let mut value = detail.json();
-            value["kind"] = json!("unadjusted");
+            value["kind"] = json!(kind.label());
             Ok(value)
         }
     }

@@ -106,7 +106,9 @@ Silicon Mac.
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits
   (#485, #703)
-- Books with more than one currency, or a base currency other than INR
+- A base currency other than INR. On a book with several currencies: the
+  foreign-currency ledgers and vouchers themselves (they are set aside or
+  withheld, and named), ledger movement, the purchase register, and posting
 - Tally Cloud Access or any remote Tally host
 - Intel Macs, and a code-signed installer
 <!-- llms:end -->

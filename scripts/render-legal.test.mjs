@@ -90,7 +90,7 @@ test("inline: bold, code, links, bare URLs, unicode and escaping", () => {
   assert.equal(inner("See [the site](https://a.example/x) or https://b.example/y."), '<p>See <a href="https://a.example/x">the site</a> or <a href="https://b.example/y">https://b.example/y</a>.</p>');
   assert.equal(inner("(https://b.example/y), then more"), '<p>(<a href="https://b.example/y">https://b.example/y</a>), then more</p>');
   assert.equal(inner("**[a](https://x.example)** `_x_` snake_case"), '<p><strong><a href="https://x.example">a</a></strong> <code>_x_</code> snake_case</p>');
-  assert.equal(inner("¹²³⁴ ™ ₹ — ↔ →"), "<p>¹²³⁴ ™ ₹ — ↔ →</p>");
+  assert.equal(inner("¹²³⁴ § ₹ — ↔ →"), "<p>¹²³⁴ § ₹ — ↔ →</p>");
 });
 
 test("escaping covers <, &, quotes and apostrophes in text, code, link text and link targets", () => {

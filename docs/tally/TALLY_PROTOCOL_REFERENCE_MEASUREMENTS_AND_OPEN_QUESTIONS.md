@@ -199,7 +199,10 @@ request is predicted over a budget well below the cap.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
      data part; a census span's row count is fixed by construction, so its only uncertainty is the
-     per-row figure, measured live at 2.42–2.72 KB (§11c.5). A full census is about 22 MB.
+     per-row figure, measured live at 2.42–2.72 KB on earlier books (§11c.5) and at about
+     3.27 KB on the wire (about 1.64 KB decoded) on a book with a mark of about 1.03M (PARTIAL,
+     30-Sep-2026, bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
+     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED.
    - The cost is a census count proportional to the **book**, not the window: a mark of 250,000 is
      31 census requests however short the window. It is a cost in elapsed time, not in gateway
      safety: every request stays bounded, so a caller that abandons the read leaves at most one
@@ -324,7 +327,7 @@ book (read-only there). The request strings were the branch's own at `cf618c00`.
 
 | Check | Result |
 | --- | --- |
-| Census row | `DATE` and `ALTERID` are direct children of `VOUCHER`; 2.42–2.72 KB per row in UTF-16 on every book (about forty default fields come with each row); an empty window parses to zero rows with `CMPINFO`'s `<VOUCHER>0</VOUCHER>` not counted |
+| Census row | `DATE` and `ALTERID` are direct children of `VOUCHER`; 2.42–2.72 KB per row in UTF-16 on the earlier books, and about 3.27 KB on one later book (§11c.3; about forty default fields come with each row); an empty window parses to zero rows with `CMPINFO`'s `<VOUCHER>0</VOUCHER>` not counted |
 | Census count equals the full read | yes, on every whole-day window tried, in every shape |
 | `ALTVCHID` as a count bound | the count never exceeded the mark and no AlterID exceeded it, on every book: 67/90, 2,790/2,797, 29,900/29,900, and 23,634 against 249,948; a company with no vouchers omits `ALTVCHID` |
 | AlterID spans, three shapes | three contiguous spans of one day, in the entry-wildcard, movement and import-verification shapes, on three books: disjoint, their union equal to the unspanned read and to the census, no row outside its span; every read under 1.6 s |
@@ -1314,6 +1317,7 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-26 | §12a.11: Balance Sheet and Profit and Loss by name on licensed 7.1: structure, plain signed amounts, empty not zero, a trial-balance tie, cost. PARTIAL |
 | 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (about 300 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (about 120 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |
+| 2026-09-30 | §11c.3: a full census span is about 22 to 27 MB, not 22 MB: the census row measured about 3.27 KB on the wire on a book with a mark of about 1.03M. PARTIAL (bridge#899) |
 | 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as up to seven formulas, and for a seven-formula request of about 110 KB whose extra names were fictitious. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the `$AlterID > a AND $AlterID <= b` filter on `List of Ledgers` (GUID-only fetch) on three licensed 7.1 Silver books, marks 5,547, 102,161 and 316,028: slices hold at most their width, their union equals the catalogue, an empty slice is a well-formed 2,994-byte answer. PARTIAL (bridge#679) |
 | 2026-09-30 | §11e: the Company collection's `NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`): present on all 31 loaded lab companies, equal to the ledger catalogue and census counts on a 4,339-ledger synthetic book, and to the census counts of two real books read by another lane. PARTIAL (bridge#938) |

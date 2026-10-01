@@ -352,13 +352,20 @@ three values:
 - `not_established`: no item is returned (`items` is `null`). `reason` says why and
   `remediation` says what to do next:
   - `tally_stock_summary_differs`: the report has a total the items do not add up
-    to. `tie_out` shows what each side gave; neither figure is the stock value.
+    to.
   - `tally_stock_summary_shows_no_value`: the items carry a value and the report
     came back with no amount. An empty report is not told apart from one Tally did
     not render, so this is not called a contradiction.
   - `stock_values_not_comparable`: nothing could be compared (no item has a closing
     value, or the values add up to zero, and the report shows no amount or a total
     of zero).
+
+A `not_established` result carries `unchecked_comparison` in place of `tie_out`:
+its `state`, and what each side of the comparison that did not hold added up to
+(`items_closing_values_added`, and `tally_stock_summary_lines_added` when the
+report had a total). These are the only figures `stock_summary` returns unchecked.
+They are for investigation only (`use` says so); neither is a stock value or a
+total.
 
 **Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
 `checks` says per field what is `checked`, `not_checked` or `withheld`: the
@@ -395,8 +402,9 @@ closing value, and a match needs at least one value on the items' side and a tot
 on the report's.
 
 An item valued at zero or with no value adds nothing to either total, so only
-Tally's own stock item count vouches for it. Whether that count stays exact after
-an item is deleted is unmeasured, which is why `checks.item_list_complete` is
+Tally's own stock item count vouches for it. That count followed the one delete
+measured (one synthetic company, one sample: the protocol reference, §12a.13),
+which is not proof of a complete list, so `checks.item_list_complete` is
 `not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`: `matched`, or
 `company_count_lower` when Tally's count is below the rows read (every row is this
 company's, so the read goes on). The count is a cross-check, not a bound. A read

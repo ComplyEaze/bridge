@@ -581,8 +581,8 @@ pub fn parse_company_inventory_flags(
     })
 }
 
-/// Tally's own stock item count: plain digits after trimming (the committed
-/// capture writes it with a leading space, ` 11`). Missing,
+/// Tally's own stock item count (§12a.13): plain digits after trimming (the
+/// committed capture writes it with a leading space, ` 11`). Missing,
 /// empty, signed, grouped, fractional or too large for a count: unavailable,
 /// never zero. It does not refuse here: the gate decides what a read without a
 /// count is.

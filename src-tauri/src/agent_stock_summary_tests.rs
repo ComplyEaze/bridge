@@ -430,6 +430,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "closing_quantity_unread_count",
         "do not refuse the read",
         "A `not_established` result is not held for paging",
+        "These are the only figures this tool returns unchecked",
         "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
         "what a negative value means is unmeasured",
         "`not_established`",
@@ -782,6 +783,33 @@ fn assert_withheld(response: &Value, reason: &str) {
     assert!(page.get("totals").is_none(), "no figure derived from them");
     assert!(page.get("snapshot").is_none(), "nothing held");
     assert!(page.get("checks").is_none(), "nothing was checked");
+    // What was compared leaves under a name that says it is unchecked, never
+    // as a tie-out or a total.
+    assert!(page.get("tie_out").is_none(), "nothing tied");
+    let comparison = page["unchecked_comparison"].as_object().unwrap();
+    for key in comparison.keys() {
+        assert!(!key.contains("total") && !key.ends_with("sum"), "{key}");
+    }
+    if comparison.len() > 1 {
+        assert_eq!(comparison["use"], "investigation_only");
+        assert!(
+            comparison["note"]
+                .as_str()
+                .unwrap()
+                .contains("not the stock value")
+                || comparison["note"]
+                    .as_str()
+                    .unwrap()
+                    .contains("neither is the stock value")
+        );
+        assert!(page["limitations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line.as_str().unwrap().contains(
+                "Nothing checked it: it is for investigation only and is not a stock value or a total"
+            )));
+    }
     assert_eq!(page["as_of"], "20260331");
     assert_eq!(page["period"], json!({"from":"20250401","to":"20260331"}));
     assert_eq!(response["structuredContent"]["truncated"], false);
@@ -938,8 +966,14 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
     assert_withheld(&response, "tally_stock_summary_differs");
     let page = result(&response);
     assert_eq!(
-        page["tie_out"],
-        json!({"state":"differs","items_value_sum":"3000.01","report_total":"3000.02"})
+        page["unchecked_comparison"],
+        json!({
+            "state": "differs",
+            "use": "investigation_only",
+            "items_closing_values_added": "3000.01",
+            "tally_stock_summary_lines_added": "3000.02",
+            "note": "Two figures from Tally that disagree. Neither was confirmed and neither is the stock value.",
+        })
     );
     assert!(page["remediation"]
         .as_str()
@@ -1020,10 +1054,10 @@ async fn items_with_no_value_against_a_report_that_shows_one_is_a_contradiction_
     let one = OneServer::spawn(book.first_page(14, MARK));
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     assert_withheld(&response, "tally_stock_summary_differs");
-    assert_eq!(
-        result(&response)["tie_out"],
-        json!({"state":"differs","items_value_sum":null,"report_total":"3000.01"})
-    );
+    let comparison = &result(&response)["unchecked_comparison"];
+    assert_eq!(comparison["state"], "differs");
+    assert_eq!(comparison["items_closing_values_added"], Value::Null);
+    assert_eq!(comparison["tally_stock_summary_lines_added"], "3000.01");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1049,10 +1083,10 @@ async fn valued_items_against_a_report_with_no_amount_return_no_item_and_do_not_
         assert_withheld(&response, "tally_stock_summary_shows_no_value");
         let page = result(&response);
         // One figure, not two: there is no report total to show.
-        assert_eq!(
-            page["tie_out"],
-            json!({"state":"report_shows_no_value","items_value_sum":"3000.01"})
-        );
+        let comparison = &page["unchecked_comparison"];
+        assert_eq!(comparison["state"], "report_shows_no_value");
+        assert_eq!(comparison["items_closing_values_added"], "3000.01");
+        assert!(comparison.get("tally_stock_summary_lines_added").is_none());
         let remediation = page["remediation"].as_str().unwrap();
         assert!(remediation.contains(
             "Bridge cannot tell whether Tally left the report blank or it truly shows no stock"
@@ -1075,7 +1109,10 @@ async fn nothing_comparable_returns_no_item() {
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     assert_withheld(&response, "stock_values_not_comparable");
     let page = result(&response);
-    assert_eq!(page["tie_out"], json!({"state":"not_comparable"}));
+    assert_eq!(
+        page["unchecked_comparison"],
+        json!({"state":"not_comparable"})
+    );
     assert!(page["remediation"]
         .as_str()
         .unwrap()
@@ -1162,7 +1199,10 @@ async fn no_rows_without_a_count_of_zero_and_an_empty_report_is_not_that_answer(
     // No row was read, so the text does not say that stock items exist.
     let remediation = result(&response)["remediation"].as_str().unwrap();
     assert!(!remediation.contains("Stock items exist"), "{remediation}");
-    assert_eq!(result(&response)["tie_out"]["items_value_sum"], Value::Null);
+    assert_eq!(
+        result(&response)["unchecked_comparison"]["items_closing_values_added"],
+        Value::Null
+    );
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 

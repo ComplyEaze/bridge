@@ -65,7 +65,7 @@ impl Withheld {
     /// What a caller does next.
     fn remediation(self) -> &'static str {
         match self {
-            Self::Differs => "The closing values of the stock items Bridge read and Tally's own Stock Summary for the same period disagree (`tie_out` shows what each side gave; a side with no figure is null), so no item is returned. Do not retry: each was read twice and the book did not change. Give the user both sides and ask them to open the Stock Summary in Tally for `period`; present neither figure as the stock value.",
+            Self::Differs => "The closing values of the stock items Bridge read and Tally's own Stock Summary for the same period disagree (`unchecked_comparison` shows what each side added up to; a side with no figure is null), so no item is returned. Do not retry: each was read twice and the book did not change. Give the user both sides and ask them to open the Stock Summary in Tally for `period`; present neither figure as the stock value.",
             Self::ReportShowsNoValue => "Stock items exist and carry closing values, but Tally's Stock Summary for the same period came back with no amount, so nothing was confirmed and no item is returned. Bridge cannot tell whether Tally left the report blank or it truly shows no stock. Ask the user to open the Stock Summary in Tally for `period`: if it shows stock, Bridge cannot read it on this Tally and stock_summary should not be retried.",
             Self::NotComparable => "Nothing could be compared: there was no figure other than zero on either side. The stock items Bridge read carry no closing value or their values add up to zero, and Tally's Stock Summary for the period shows no amount or a total of zero. Bridge returns no stock rows it could not check. Do not retry: each was read twice and the book did not change. Tell the user stock for this period has to be read in Tally.",
         }
@@ -124,7 +124,11 @@ impl Server {
                     })?;
                 let read_evidence = evidence_from_runtime_read(read.evidence);
                 let integrated = read.inventory.integrated;
-                let withheld = |why: Withheld, tie_out: Value| {
+                // `comparison` is what the check that did not hold compared.
+                // Its figures are the only ones this tool returns unchecked:
+                // they leave under a name and a note that say so, never as
+                // `tie_out` or a total.
+                let withheld = |why: Withheld, comparison: Value| {
                     let mut evidence = combine_evidence(prior.clone(), read_evidence.clone());
                     // `items` is withheld: say so in the state an agent reads
                     // first, as `vouchers` and `outstandings` do.
@@ -140,11 +144,12 @@ impl Server {
                                 "company_guid": guid, "as_of": read.to,
                                 "period": {"from": read.from, "to": read.to},
                                 "inventory": read.inventory,
-                                "tie_out": tie_out,
+                                "unchecked_comparison": comparison,
                                 "items": null,
                                 "verification": VERIFICATION,
                                 "limitations": [
                                     "No stock row is returned unless its value total was compared with Tally's own Stock Summary and found equal",
+                                    "Any figure under `unchecked_comparison` is what the comparison that did not hold added up on each side. Nothing checked it: it is for investigation only and is not a stock value or a total",
                                     "This read is not held, and it replaces any earlier read of the same date: a later page reads afresh",
                                 ],
                             },
@@ -172,8 +177,10 @@ impl Server {
                             Withheld::Differs,
                             json!({
                                 "state": "differs",
-                                "items_value_sum": items_total,
-                                "report_total": report_total,
+                                "use": "investigation_only",
+                                "items_closing_values_added": items_total,
+                                "tally_stock_summary_lines_added": report_total,
+                                "note": "Two figures from Tally that disagree. Neither was confirmed and neither is the stock value.",
                             }),
                         ));
                     }
@@ -182,7 +189,9 @@ impl Server {
                             Withheld::ReportShowsNoValue,
                             json!({
                                 "state": "report_shows_no_value",
-                                "items_value_sum": items_total,
+                                "use": "investigation_only",
+                                "items_closing_values_added": items_total,
+                                "note": "What the items' closing values added up to. Tally's Stock Summary showed no amount to compare it with, so it was not confirmed and is not the stock value.",
                             }),
                         ));
                     }
@@ -332,9 +341,9 @@ fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
 }
 
 /// What a read with fewer rows than Tally's own item count becomes: a refusal,
-/// because the list may be incomplete. Whether a deleted item leaves Tally's
-/// count high on a healthy book is unmeasured; if it does, this and its one
-/// caller become a withheld result with its own reason.
+/// because the list may be incomplete. In the one delete measured the count
+/// fell with the rows (§12a.13), so a count above the rows is not what a
+/// healthy book is expected to show.
 fn rows_below_item_count(rows: usize, tally_count: u64) -> ToolFailure {
     ToolFailure {
         counts: Some(Box::new(RowCounts {
@@ -401,7 +410,7 @@ fn stock_frame(
             "Only the closing-value TOTAL is compared with Tally's own Stock Summary (`checks`): no item's value is checked on its own, so `value_total_matched` can stand beside `partial: true` when some items have no closing value",
             "Quantities are withheld: nothing checks them, so none is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
             "An empty closing value is not zero: it is returned as null and counted (`empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty. A value Tally sent as 0.00 is a value",
-            "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; that count refuses the read only when it is higher than the rows read, and whether it stays exact after an item is deleted is unmeasured (`checks.item_list_complete`)",
+            "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; that count refuses the read only when it is higher than the rows read. It followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
             "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
             "Values and their signs are exactly as Tally sends them: the one capture had items holding stock with a negative value beside others with a positive one, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
             "`totals`, `tie_out` and `item_count_cross_check` cover the whole book, whatever `items` filters",

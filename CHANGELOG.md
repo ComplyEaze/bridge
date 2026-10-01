@@ -12,7 +12,7 @@ chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-## [0.4.0] - [PLACEHOLDER: release date, not yet confirmed]
+## [0.4.0] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)
 

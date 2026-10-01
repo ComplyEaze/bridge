@@ -34,14 +34,13 @@ Each line names the pull requests it comes from.
 - Read a register of the tax in the books for sales: the Sales and Credit Note
   vouchers of a date window that touch a Duties & Taxes ledger, with each
   entry's tax taken only from the GST duty head on that ledger's master, never
-  from a name or an amount. It reads as the purchase register does. The read
-  was captured live, through the purchase register, on two days that each held
-  one imported Sales item invoice, and one Sales voucher was classified
-  against its book's ledger masters; `sales_register` itself has not yet been
-  run against a live Tally. A sale of a kind no capture covers (a credit note,
-  an inter-state line, an invoice voucher, a cancelled or optional sale) is
-  returned and marked `not_measured_live`, and the tool says what is not
-  measured (#1009).
+  from a name or an amount. It reads as the purchase register does. It was run
+  against a live Tally once per day on one synthetic company, for one taxed
+  Sales item invoice and one untaxed one. A credit note, an inter-state line, a
+  cancelled or optional sale, an unrecognised or missing duty head, more than
+  one voucher in a window, paging and a company with a registration were not
+  shown. A sale of a kind a row can show as unmeasured is marked
+  `not_measured_live`; the tool's text says what cannot be marked (#1009).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read

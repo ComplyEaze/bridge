@@ -967,13 +967,11 @@ fn the_sales_result_names_its_own_profile_classes_and_list() {
     // What no capture covers is said in the response, not only in the tool text.
     for named in [
         "measured for sales so far",
-        "(not classified end to end)",
+        "one live run per day on one synthetic company",
+        "not shown by any run: a credit note",
         "only where the row itself shows it",
         "not vouched for",
         "a recognised IGST head",
-        "the classification of a Sales item invoice",
-        "a Sales voucher with no entry on a Duties & Taxes ledger",
-        "credit notes",
         "REFERENCEDATE (not returned)",
         "`not_measured_live`",
     ] {
@@ -1110,7 +1108,7 @@ fn derived_sales_tail() -> String {
         ),
         (
             "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
-            "Measured so far: the voucher window of two Sales item invoices imported into one company (one untaxed, one with two plain credit entries on tax ledgers whose masters carry the heads CGST and SGST/UTGST; the goods line sits nested under the sales ledger's own entry), which the purchase register read and which no test classifies end to end; and the classification of one Sales accounting voucher (not an invoice) against the ledger masters of a second company. `sales_register` itself has not been run against a live Tally. Not measured: the classification of a Sales item invoice; a Sales voucher with no entry on a Duties & Taxes ledger; credit notes; an inter-state (IGST) line; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; optional, cancelled and post-dated sales; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, invoice_voucher_classification, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess, or sgst_utgst on a sale), a row whose invoice flag was not observed, and several currencies; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
+            "Measured so far: `sales_register` was run against a live Tally once per day on one synthetic company (TallyPrime 7.1 Silver) for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one was counted under `sales_vouchers_without_duties_taxes_entry`; and one Sales accounting voucher (not an invoice) was classified against the ledger masters of a second company. Not shown by any run: a credit note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess, or sgst_utgst on a sale), an invoice of another shape than the one run (for example several goods lines), and several currencies; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
         ),
     ];
     let mut text = shared.to_string();
@@ -1159,15 +1157,15 @@ fn the_sales_description_says_nothing_only_the_purchase_register_would() {
         "may hold the sales ledger in an inventory allocation instead; not measured",
         "the tool does not say why such a voucher carries no tax entry",
         "A Debit Note, including one issued to a customer, is not a sales row",
-        "`sales_register` itself has not been run against a live Tally",
-        "the classification of a Sales item invoice",
-        "a Sales voucher with no entry on a Duties & Taxes ledger",
+        "run against a live Tally once per day",
+        "Not shown by any run: a credit note",
+        "more than one voucher in a window",
         "REFERENCEDATE (not returned)",
         "`not_measured_live`",
         "only where the row itself shows the kind",
         "Kinds a row cannot show are never marked and are not vouched for",
         "a recognised IGST head",
-        "heads CGST and SGST/UTGST",
+        "its CGST and SGST/UTGST heads",
     ] {
         assert!(sales.contains(stated), "sales text lacks: {stated}");
     }
@@ -1188,7 +1186,6 @@ fn a_sales_row_of_a_kind_no_capture_covers_says_so_and_a_covered_one_does_not() 
         .find(|row| row["voucher_class"] == "Sales")
         .unwrap();
     let cases = [
-        ("is_invoice", json!(true), "invoice_voucher_classification"),
         ("cancelled", json!(true), "cancelled"),
         ("optional", json!(true), "optional"),
         ("post_dated", json!(true), "post_dated"),
@@ -1208,6 +1205,12 @@ fn a_sales_row_of_a_kind_no_capture_covers_says_so_and_a_covered_one_does_not() 
             "{key} should mark the row"
         );
     }
+    // An invoice-view voucher is not marked: one taxed and one untaxed item invoice were run live.
+    let mut invoice = sale.clone();
+    invoice["is_invoice"] = json!(true);
+    let page =
+        super::classify_register(RegisterKind::Sales, &captured_index(), &[invoice]).unwrap();
+    assert!(page.rows[0].get("not_measured_live").is_none());
     // The purchase register's rows never carry the field.
     let purchases = classify_register(&captured_index(), &rows).unwrap();
     assert!(purchases

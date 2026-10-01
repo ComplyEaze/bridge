@@ -346,8 +346,9 @@ impl ToolEffect {
             "tally_status" | "list_companies" | "voucher_schema" | "validate_masters"
             | "outstandings" | "ledger_masters" | "ledger_movement" | "purchase_register"
             | "trial_balance" | "profit_and_loss" | "balance_sheet" | "vouchers"
-            | "voucher_presence" | "changed_since" | "read_evidence" | "egress_log"
-            | "masters" => Self::Read,
+            | "voucher_presence" | "changed_since" | "read_evidence" | "egress_log" | "masters" => {
+                Self::Read
+            }
             "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
             "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
             "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),

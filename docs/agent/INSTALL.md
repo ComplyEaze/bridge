@@ -10,14 +10,16 @@ unavailable.
 Check the project's [GitHub Releases](https://github.com/lamemustafa/bridge/releases)
 for a compatible `.mcpb`. If no release asset is listed, use the [source MCP
 setup](./README.md) instead; the steps below apply only after a package is
-published. Preview packaging targets Windows x64 and Apple Silicon Mac (ARM64);
-Intel Mac and other platforms are not qualified. Package availability
+published. The packages target Windows x64 and Apple Silicon Mac (ARM64); Intel
+Mac and other platforms are not qualified. Package availability
 is not a host-validation claim; read each release's notes for its current
 runtime gaps.
 
-An **unsigned preview** is published as a GitHub prerelease, and the newest one
-may later be marked Latest. Either way it is only for evaluation; it is not
-signed or notarized. Each archive has a same-named `.sha256` file and
+Releases are published on GitHub, the newest listed first and normally marked
+Latest. ComplyEaze
+Bridge is still being developed, so a release may contain errors: try it on
+test data first and keep current backups. It is not yet code-signed or
+notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 

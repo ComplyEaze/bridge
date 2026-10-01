@@ -61,6 +61,13 @@ jobs:
       # failure writes a page that links to the releases; it never stops the deploy.
       - name: Render the changelog page
         run: node scripts/release-notes.mjs page --changelog CHANGELOG.md --template site/changelog.template.html --out site/changelog.html
+      # The Privacy Policy and the Terms of Use are rendered from docs/legal/. Unlike the changelog there
+      # is no fallback page: text the renderer does not support, or an unresolved marker, stops the deploy.
+      - name: Render the privacy policy and the terms of use
+        run: |
+          set -euo pipefail
+          node scripts/render-legal.mjs page --in docs/legal/privacy.md --template site/legal.template.html --out site/privacy.html
+          node scripts/render-legal.mjs page --in docs/legal/terms.md --template site/legal.template.html --out site/terms.html
       # The page text is a public claim, and a deploy publishes every merged site/ change at once.
       # This lists what differs from the last successfully deployed commit in the run summary so a
       # maintainer can read it. This job's own deployment already exists and lists first, and a

@@ -44,7 +44,8 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-and `drop_narration` drops narration. Neither setting removes amounts. Set the
+(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
+and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -80,10 +81,11 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `masters`,
+`ledger_masters`, `ledger_movement`, `trial_balance`, `masters`, `stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, and `egress_log`. (`masters`, `profit_and_loss` and
-`balance_sheet` are in source but not in the 0.3.0 release.) For a command-line
+`read_evidence`, and `egress_log`. (`masters`, `stock_summary`,
+`profit_and_loss` and `balance_sheet` are in source but not in the 0.3.0
+release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -324,6 +326,109 @@ are masked like a party name, because a job-work godown or a supplier-named
 stock group can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
+
+### Stock Summary
+
+Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
+closing stock quantity and value per stock item, whether inventory is integrated
+with the accounts, and how many items have a negative closing quantity. The items'
+closing values (not their quantities) are checked against the sum of the top-level
+lines of Tally's own Stock Summary. `as_of` must be a 31 March (a
+financial-year end), the only date measured for stock, and not before the book's
+start or after today. Any other date is refused as
+`stock_summary_as_of_not_measured` before any request, and retrying the same date
+refuses again. The only period measured is the period ending 31 March 2026
+(FY 2025-26); other years' 31 March share its request shape but not its
+measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
+or the book's start if that is later.
+
+Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
+holds `quantity` (`amount`, signed as Tally sent it, and `unit`) and `value` (a
+plain signed decimal exactly as Tally sends it: the sign is kept, never flipped,
+and not interpreted). Either is `null` where Tally sent none, which is not zero,
+and is counted in `totals` (`empty_closing_quantity_count`,
+`empty_closing_value_count`). The opening quantity and value are read but not
+returned, because their as-at date is unmeasured. Values and their signs are
+exactly as Tally sends them: the one capture had items with a positive quantity and
+a negative value, what the sign means is unmeasured, and `value_sum` adds the
+values as sent, signs included: `totals.value_sum_signs` is always
+`as_sent_meaning_unmeasured` beside it, whether or not `value_sum` is null, saying
+the values were added with the signs Tally sent and that what a negative value
+means is unmeasured. `totals` also holds
+`item_count`, `negative_closing_quantity_count` (company totals at `as_of`: batch,
+godown and in-year negatives are not counted), `zero_quantity_count`, and
+`value_sum`, which is `null` with `partial` true whenever any item's closing value
+is empty, whatever its quantity (that a zero quantity makes an empty value zero is
+unmeasured); a book whose closing values are all empty has no sum, not a sum of
+zero, and a book with no items has a `value_sum` of zero (a book with inventory on
+but no stock items has not been measured live). `inventory`
+reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
+and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
+that these are the stock items' closing values exactly as Tally sends them, and that
+how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
+measured. It then says either that they equal the sum of the top-level lines of
+Tally's own Stock Summary, or that they were NOT checked against it, with the
+reason.
+
+The top-level `state` is one of three values. `observed`: the items were returned
+and matched that sum. `unchecked`: the items were returned without having been
+compared with it (an empty, unknown or all-empty report), so `tie_out.state` is
+`not_checked` with its `reason`. `not_established`: the sum differs, and no item is returned.
+
+`tie_out` compares the sum of the items' closing values with the sum of the
+top-level lines of Tally's own Stock Summary. If they are equal it is `matched`. If the
+report is empty, unknown or has only empty amounts it is `not_checked` with a
+`reason`, the items are returned and `basis` says they are unchecked. If they
+differ the result is `not_established` with reason `tally_stock_summary_differs`
+and both totals, and no item is returned. `items` (one to fifty GUIDs) filters the
+returned rows from the held read; a GUID that is not found is listed under
+`items_not_found`. `totals` and `tie_out` always cover the whole book. The tie-out
+compares the grand total only, so `matched` can stand beside `partial: true` when
+some items have no closing value. A differing read is not held: a later page
+continues only from an earlier read of the same date that was returned (matched or
+not checked), if one is still held. On a later page (offset > 0) without a
+`snapshot_id`, the call otherwise reads afresh; with one, it is refused as
+`listing_snapshot_changed` (cause `snapshot_not_held`, or
+`book_changed_since_first_page` when the book moved). A first page always reads
+afresh.
+
+The read runs inside the same company, mode and identity brackets as `masters`:
+the company's inventory flags (a Company collection filtered to the company's GUID),
+the stock items and Tally's Stock Summary are each read twice and compared, the book
+extent is read before and after and must be equal, and Education mode is refused.
+A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before any
+item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
+`limit`, `snapshot` and `snapshot_id` behave as in `masters`.
+
+Small books only. The items are read whole only when the master-alteration mark
+(`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
+a mark of at most 874. A larger book is refused before any item request as
+`stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
+today (the two measured had marks of about 100,000 and 300,000, protocol reference
+§12a.12), until a counted read lands. After a read, the row count and the response
+size are checked against the mark and the admitted size, and a breach refuses the
+whole read as `stock_summary_bound_premise_violated`, unless the closing extent
+shows the book moved (`stock_summary_extent_changed`). The stock-item request does
+not fetch `ALTERID`, so the rows' AlterIDs are not checked as they are for `masters`.
+
+Evidence: one synthetic book on one licensed TallyPrime 7.1
+(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`,
+protocol reference §12a.13), and the tie once on a client book. The size bound
+rests on the same assumed limits as `masters` (128 characters a name, four aliases)
+and a fixed-size allowance for a row that one synthetic book has measured. No godown
+or batch split and no rates are returned.
+
+A company split by year, whose sibling companies share the GUID, is refused: the
+company-flags read requires exactly one Company row for the GUID
+(`company_flags_not_one_row`). A quantity whose unit has a space in it or is
+compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes
+such units is unmeasured.
+
+Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
+because stock-item and stock-group names are free text that can carry a customer's
+or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
+as it is. `guid` is not masked and is the identity the `items` filter uses.
 
 ### Profit and Loss and Balance Sheet
 
@@ -683,8 +788,11 @@ for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
 macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Gold or Education have not been
-established. What has been observed on licensed 7.1 Gold is `verify_import`
+interactive approval and native posting on Education have not been established.
+Native posts on licensed 7.1 Gold were captured once, in one session on a
+development build and one client book, with the approval step not recorded
+([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
+observed on licensed 7.1 Gold is `verify_import`
 returning `posted_verified` for Bridge-built Payment, Receipt and Contra files
 sent over the gateway by a script rather than by this tool. That was verified
 on one book, and partial on a second where larger reads failed (bridge#485); see
@@ -1084,7 +1192,7 @@ refused (`bill_reference_not_found`). The detail ignores `direction`, `top`, `of
 named bill's window never starts before the books. The vouchers and the bills reports are two
 reads whose extents are not compared: a voucher posted between them usually shows as
 `trail_does_not_tie`, but two changes that compensate, or allocations that net to zero, can still
-read `tied`. Measured on one synthetic book only (reference 12a.13); an `as_of` earlier than the
+read `tied`. Measured on one synthetic book only (reference 12a.14); an `as_of` earlier than the
 last voucher and post-dated vouchers were not measured.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own

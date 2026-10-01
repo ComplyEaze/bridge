@@ -46,6 +46,7 @@ mod native_ledger_collection;
 pub mod native_masters;
 pub mod native_outstandings;
 pub mod native_statement_reports;
+pub mod native_stock_summary;
 pub mod native_trial_balance;
 /// The legacy voucher-scan outstandings path: date/AlterID-partitioned
 /// wildcard voucher fetch, segment/witness completeness proofs, and bill

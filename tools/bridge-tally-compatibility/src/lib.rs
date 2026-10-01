@@ -30,17 +30,20 @@ pub const REVIEW_URL_PREFIXES: [&str; 2] = [
     "https://github.com/ComplyEaze/bridge/",
 ];
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
-/// Capacity deliberately reserved for one small cohesive surface change.
-pub const RESERVED_SURFACE_FILES: usize = 15;
-/// Bounded high enough for the additive Tally safety-migration, Trial Balance, selected-ledger evidence, and endpoint-reconnect
-/// helper surfaces while still rejecting an unexpectedly
-/// broad attestation surface.
+/// A fixed parse bound on the compatibility surface's pin list: a list longer than this is
+/// refused as `surface_file_count_invalid`. It is a bound against a runaway or malformed list, **not
+/// a count to maintain**: it is deliberately not kept equal to the number of pins, and adding or
+/// removing a pin does not touch it. What decides whether a pin may be added or removed is the pin's
+/// own `reason` in `compatibility-surface.json` and the acknowledgement file the pull request adds
+/// (`docs/release-process.md`, "Acknowledging a change to a pinned file"), which CI enforces.
+///
 /// Every file under the Tally migration and report directories is required by a
 /// directory rule; `src/` and the protocol crates remain judgment-pinned
-/// because their mixed-purpose directories do not have that invariant. The
-/// reserved capacity covers a small cohesive feature (source, tests, docs
-/// and manifest) but makes further unreviewed additions an explicit
-/// compatibility-surface decision.
+/// because their mixed-purpose directories do not have that invariant.
+///
+/// The history below was written while this constant tracked the pin count exactly (it was raised
+/// by hand with each pin). It is kept as the record of why each early pin exists; where it speaks
+/// of a raise, read "a pin added".
 ///
 /// **Raised eleven times, the first three by branches that did not see each
 /// other.** 210 to 211 on master for `src-tauri/src/agent_ledgers.rs`, 211 to
@@ -369,9 +372,9 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // journal the user keeps.
 //
 // Since schema 3 the reason for a pin added from now on lives in that pin's own entry (`reason`
-// in compatibility-surface.json), not as another paragraph here: two pull requests that each add a
-// pin no longer collide on this comment block, only on this constant when both raise it.
-pub const MAX_SURFACE_FILES: usize = 308;
+// in compatibility-surface.json), not as another paragraph here, and the bound below is no longer
+// raised with each pin, so two pull requests that each add a pin do not collide.
+pub const MAX_SURFACE_FILES: usize = 1024;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;

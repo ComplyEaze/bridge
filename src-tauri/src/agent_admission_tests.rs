@@ -96,6 +96,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "masters",
         "outstandings",
         "profit_and_loss",
+        "purchase_register",
         "read_evidence",
         "stock_summary",
         "tally_status",

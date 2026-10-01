@@ -217,6 +217,9 @@ async fn write_shaped_adapter_request_is_refused_before_any_transport() {
 #[path = "agent_voucher_selection_tests.rs"]
 mod selection_tests;
 
+#[path = "agent_bill_trail_glue_tests.rs"]
+mod bill_trail_glue_tests;
+
 #[tokio::test]
 async fn opening_mode_refusals_retain_probe_evidence_through_agent_mapping() {
     for (tool, args, code) in [

@@ -25,6 +25,7 @@ DEFAULT_TOOLS = {
     "masters",
     "outstandings",
     "profit_and_loss",
+    "purchase_register",
     "read_evidence",
     "stock_summary",
     "tally_status",

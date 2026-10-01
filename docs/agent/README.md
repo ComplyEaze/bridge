@@ -83,9 +83,39 @@ The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
 `ledger_masters`, `ledger_movement`, `trial_balance`, `masters`, `stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, and `egress_log`. (`masters`, `stock_summary`,
-`profit_and_loss` and `balance_sheet` are in source but not in the 0.3.0
-release.) For a command-line
+`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
+`profit_and_loss`, `balance_sheet` and `local_data_report` are in source but not
+in the 0.3.0 release.) `local_data_report` (also
+`bridge_mcp --local-data-report [--show-paths]` on the command line) is a
+read-only report of what Bridge keeps in its agent data folder: per class
+(journal, import files, proofs, review records, approval notes, bank
+statements, the egress log, lab files, lock files, other) the file count, bytes
+and the age in days of the oldest file, symlinks it did not follow, sockets
+and other special files it did not count, folders it could not list (named, not
+read as empty), and the import journal's state: batches, batches sent or found
+posted, how many of those are not settled (with no recorded response, or with a
+response but a latest status that is not `posted_verified`: a post Tally
+rejected stays not settled), batches with no recorded dispatch that were never
+found posted (`no_dispatch_never_verified`: this includes a batch imported by
+hand whose verification is incomplete, which may well be in Tally, so no
+deletion may rest on it), and interrupted-write folders that Bridge must recover
+before it builds or reads. A journal it could not read is reported as
+`journal_unreadable` (could not be opened), `journal_read_failed` or
+`journal_invalid` (refused twice, 100 ms apart), never as absent. It reads the
+journal without the admission lock, names no file path (the command line adds the
+folder paths only with `--show-paths`), and does not cover files outside this
+folder (the desktop app's other settings, its mirror database and logs); it also
+lists the per-user folder of dispatch lease locks (names, sizes and times only).
+Its own call is logged in the egress log like any tool call. On the command
+line the exit status is 0 for a complete report, 2 when the folder cannot be
+read, 3 when the report is incomplete (journal not read, an entry or folder
+that could not be read or listed, or a folder past the 100,000-entry listing cap:
+the report's `incomplete_reason` says which, and the tool's evidence is then
+`partial`), 1 when it could not be printed, and, for a malformed command line
+only, 2 with a usage line. The journal and the
+`imports/` folder are Bridge's memory of what it
+already sent to Tally: archive the whole folder by moving it, never delete
+them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables

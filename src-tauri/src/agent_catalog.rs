@@ -346,9 +346,8 @@ impl ToolEffect {
             "tally_status" | "list_companies" | "voucher_schema" | "validate_masters"
             | "outstandings" | "ledger_masters" | "ledger_movement" | "trial_balance"
             | "profit_and_loss" | "balance_sheet" | "vouchers" | "voucher_presence"
-            | "changed_since" | "read_evidence" | "egress_log" | "masters" | "stock_summary" => {
-                Self::Read
-            }
+            | "changed_since" | "read_evidence" | "egress_log" | "masters" | "stock_summary"
+            | "local_data_report" => Self::Read,
             "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
             "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
             "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
@@ -402,6 +401,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
         "changed_since",
         "read_evidence",
         "egress_log",
+        "local_data_report",
     ];
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_inventory");
@@ -526,6 +526,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     "read_evidence" | "egress_log" => (
                         "Return bounded local metadata-only read evidence or egress receipts.",
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
+                    ),
+                    "local_data_report" => (
+                        "Reports what Bridge stores locally, by class, with counts, sizes, the age of the oldest file and the state of its import journal: how many batches were sent or found posted, how many of those are not settled, and how many have no recorded dispatch and were never verified as posted (no_dispatch_never_verified: this can include a batch imported by hand, which may be in Tally, so never treat it as proof that a batch is absent). Reads Bridge's own local data folder and the per-user folder of dispatch lease locks (names, sizes and times) and names no file path. A folder, link or journal it could not read or enter is reported as such (incomplete_reason and folders_that_could_not_be_listed, and this call's evidence is partial), never as empty or absent. It covers the folder the MCP server and the desktop Journal flow share; the desktop app's other settings, its mirror database and logs live elsewhere and are not covered. The import journal and the imports folder are Bridge's memory of what it already sent to Tally: never suggest deleting them.",
+                        json!({"type":"object","additionalProperties":false}),
                     ),
                     "lab_read_inventory" => (
                         "LAB-ONLY. Compiled only behind the `lab-writes` feature and refuses unless BRIDGE_LAB_WRITES=1, BRIDGE_TALLY_PORT=9001, and BRIDGE_LAB_TARGET_GUID/BRIDGE_LAB_DENY_GUIDS are both set to well-formed GUIDs. This is a read: company_guid selects the company like any other read tool and is verified the same way (`company_identity_not_found`/`company_identity_ambiguous`), independent of the configured lab target -- the stronger loaded-company/deny-list guard applies only to a lab write batch, not a read. Read-only: units, godowns, stock groups and stock items (parent, base unit, opening qty/rate/value, GST/HSN fields as returned, unclassified), plus inventory entries per voucher for a date window. Reuses the same windowing and window_honoured corroboration as `vouchers`. No signed compatibility evidence exists yet for any inventory field on this Tally release/mode -- treat every value as exploratory.",

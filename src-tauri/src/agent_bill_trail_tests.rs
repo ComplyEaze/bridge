@@ -564,11 +564,16 @@ fn the_on_account_entries_of_a_party_sum_to_its_unallocated_residual() {
         UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
     );
     let detail = unadjusted_detail(&entries, &[], "P", Some(&residual)).unwrap();
-    assert_eq!(detail.state, "tied");
+    assert_eq!(detail.state(), "tied");
     assert!(detail.on_account_sum.numeric_eq(&decimal("3000")));
     assert_eq!(detail.rows.len(), 2);
     assert!(detail.rows.iter().all(|(class, _)| *class == "on_account"));
-    assert!(detail.difference.is_none());
+    assert_eq!(
+        detail.tie,
+        UnadjustedTie::Tied {
+            residual: decimal("3000")
+        }
+    );
 }
 
 #[test]
@@ -582,52 +587,136 @@ fn a_residual_the_vouchers_do_not_explain_is_reported_with_the_difference_and_th
         UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
     );
     let detail = unadjusted_detail(&[], &[], "P", Some(&residual)).unwrap();
-    assert_eq!(detail.state, "residual_not_explained_by_vouchers");
-    assert_eq!(detail.difference.as_ref().unwrap().as_str(), "-20000");
-    assert_eq!(detail.difference_equals_opening_balance, Some(true));
+    assert_eq!(
+        detail.tie,
+        UnadjustedTie::ResidualNotExplainedByVouchers {
+            residual: decimal("-20000"),
+            difference: decimal("-20000"),
+            equals_opening_balance: Some(true),
+        }
+    );
+    let opening_fact = |opening: Option<&str>| match unadjusted_detail(
+        &[],
+        &[],
+        "P",
+        Some(&unallocated(
+            "20000",
+            ExposureDirection::Receivable,
+            opening,
+            UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
+        )),
+    )
+    .unwrap()
+    .tie
+    {
+        UnadjustedTie::ResidualNotExplainedByVouchers {
+            equals_opening_balance,
+            ..
+        } => equals_opening_balance,
+        other => panic!("{other:?}"),
+    };
     // A different opening does not match.
-    let other = unallocated(
-        "20000",
-        ExposureDirection::Receivable,
-        Some("-100.00"),
-        UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
-    );
-    assert_eq!(
-        unadjusted_detail(&[], &[], "P", Some(&other))
-            .unwrap()
-            .difference_equals_opening_balance,
-        Some(false)
-    );
+    assert_eq!(opening_fact(Some("-100.00")), Some(false));
     // An opening Tally did not send is neither equal nor unequal.
-    let unknown = unallocated(
-        "20000",
-        ExposureDirection::Receivable,
-        None,
-        UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
-    );
-    assert_eq!(
-        unadjusted_detail(&[], &[], "P", Some(&unknown))
-            .unwrap()
-            .difference_equals_opening_balance,
-        None
-    );
+    assert_eq!(opening_fact(None), None);
     // The JSON never calls the difference an opening.
     let text = detail.json().to_string();
     assert!(text.contains("difference_equals_opening_balance"));
     assert!(!text.contains("unreferenced_opening"));
 }
 
+/// Absent is not zero: a ledger the snapshot lists no residual for (a bank,
+/// sales or capital ledger, a name that differs from the native row's, or a
+/// party whose residual is zero) is never `tied` against a residual of 0.
 #[test]
-fn a_party_without_an_unallocated_row_ties_when_it_has_no_on_account_entries() {
+fn a_party_without_an_unallocated_row_has_no_residual_and_ties_nothing() {
     let detail = unadjusted_detail(&[], &[], "P", None).unwrap();
-    assert_eq!(detail.state, "tied");
+    assert_eq!(detail.tie, UnadjustedTie::NoResidualRowForParty);
+    assert_eq!(detail.state(), "no_residual_row_for_party");
     assert!(detail.rows.is_empty());
-    // On-account entries that the residual does not contain do not tie.
+    let json = detail.json();
+    assert_eq!(json["state"], "no_residual_row_for_party");
+    assert!(json["residual"].is_null(), "{json}");
+    assert!(json.get("difference").is_none(), "{json}");
+    // On-account entries are still listed as read, and still tie nothing.
     let entries = entries_for_party(&on_account_rows(), "P").unwrap();
-    assert_eq!(
-        unadjusted_detail(&entries, &[], "P", None).unwrap().state,
-        "residual_not_explained_by_vouchers"
+    let detail = unadjusted_detail(&entries, &[], "P", None).unwrap();
+    assert_eq!(detail.tie, UnadjustedTie::NoResidualRowForParty);
+    assert_eq!(detail.rows.len(), 2);
+    assert!(detail.on_account_sum.numeric_eq(&decimal("3000")));
+    // A row found for another party is not this party's.
+    let other = unallocated(
+        "3000",
+        ExposureDirection::Payable,
+        Some("0.00"),
+        UnallocatedComposition::BillWiseLedgerComponentsNotSeparated,
     );
+    let detail = party_detail(
+        DetailKind::Unadjusted,
+        "Q",
+        &json!("Q"),
+        None,
+        &entries,
+        &[],
+        &[other],
+    )
+    .unwrap();
+    assert_eq!(detail["state"], "no_residual_row_for_party");
+    assert!(detail["residual"].is_null(), "{detail}");
+}
+
+/// An empty bill list says in band why it is empty, and is never a bare `[]`.
+#[test]
+fn an_empty_bill_trail_says_why_it_is_empty() {
+    let trail = |entries: &[TrailEntry], unallocated: &[UnallocatedParty]| {
+        party_detail(
+            DetailKind::BillTrail,
+            "P",
+            &json!("P"),
+            None,
+            entries,
+            &[],
+            unallocated,
+        )
+        .unwrap()
+    };
+    // Only on-account allocations, and no bill in Tally's report.
+    let entries = entries_for_party(&on_account_rows(), "P").unwrap();
+    let empty = trail(&entries, &[]);
+    assert_eq!(empty["bills"], json!([]));
+    assert_eq!(empty["state"], "no_named_bill_for_party");
+    // No allocation at all on this ledger.
+    assert_eq!(trail(&[], &[])["state"], "no_named_bill_for_party");
+    // The ledger snapshot says the ledger keeps no bills.
+    let not_bill_wise = unallocated(
+        "7500",
+        ExposureDirection::Receivable,
+        Some("0.00"),
+        UnallocatedComposition::NotBillWiseLedger,
+    );
+    assert_eq!(
+        trail(&[], &[not_bill_wise])["state"],
+        "not_bill_wise_ledger"
+    );
+    // A listed bill makes the answer a list.
+    let listed = party_detail(
+        DetailKind::BillTrail,
+        "P",
+        &json!("P"),
+        None,
+        &[],
+        &[open_bill(
+            "P",
+            "R",
+            "20260701",
+            "5",
+            ExposureDirection::Receivable,
+        )],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(listed["state"], "bills_listed");
+    assert_eq!(listed["bills"].as_array().unwrap().len(), 1);
 }
 
 #[test]
@@ -639,7 +728,7 @@ fn a_party_on_a_ledger_that_keeps_no_bills_returns_no_rows() {
         UnallocatedComposition::NotBillWiseLedger,
     );
     let detail = unadjusted_detail(&[], &[], "P", Some(&residual)).unwrap();
-    assert_eq!(detail.state, "not_bill_wise_ledger");
+    assert_eq!(detail.state(), "not_bill_wise_ledger");
     assert!(detail.rows.is_empty());
 }
 
@@ -1042,7 +1131,7 @@ fn the_unadjusted_detail_of_the_seeded_book_ties_where_the_vouchers_explain_the_
         let entries = entries_for_party(&rows, party).unwrap();
         let residual = lab_unallocated(party, amount, direction, "0.00", Mixed);
         let detail = unadjusted_detail(&entries, &natives, party, Some(&residual)).unwrap();
-        assert_eq!(detail.state, state, "{party}");
+        assert_eq!(detail.state(), state, "{party}");
         assert_eq!(
             detail
                 .rows
@@ -1062,10 +1151,10 @@ fn the_unadjusted_detail_of_the_seeded_book_ties_where_the_vouchers_explain_the_
             "{party}"
         );
     }
-    // P04 has an advance and no residual: listed, and nothing to explain.
+    // P04 has an advance and no residual row: listed, and nothing tied against a residual.
     let entries = entries_for_party(&rows, "OL P04 Advance Debtor").unwrap();
     let detail = unadjusted_detail(&entries, &natives, "OL P04 Advance Debtor", None).unwrap();
-    assert_eq!(detail.state, "tied");
+    assert_eq!(detail.state(), "no_residual_row_for_party");
     assert_eq!(
         detail.rows.iter().map(|(c, _)| *c).collect::<Vec<_>>(),
         ["advance"]
@@ -1086,8 +1175,13 @@ fn the_unadjusted_detail_of_the_seeded_book_ties_where_the_vouchers_explain_the_
         Some(&residual),
     )
     .unwrap();
-    assert_eq!(detail.state, "residual_not_explained_by_vouchers");
-    assert_eq!(detail.difference_equals_opening_balance, Some(true));
+    assert!(matches!(
+        detail.tie,
+        UnadjustedTie::ResidualNotExplainedByVouchers {
+            equals_opening_balance: Some(true),
+            ..
+        }
+    ));
     // P03: a ledger that keeps no bills.
     let party = "OL P03 Not Billwise Debtor";
     let residual = lab_unallocated(
@@ -1104,7 +1198,7 @@ fn the_unadjusted_detail_of_the_seeded_book_ties_where_the_vouchers_explain_the_
         Some(&residual),
     )
     .unwrap();
-    assert_eq!(detail.state, "not_bill_wise_ledger");
+    assert_eq!(detail.state(), "not_bill_wise_ledger");
 }
 
 // ---- review fixes: ordering, native-only duplicates, unknown reference, arguments, cap ----

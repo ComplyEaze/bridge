@@ -446,26 +446,68 @@ pub(super) fn bill_trails(
     Ok(out)
 }
 
+/// How the party's on-account sum compares with its unallocated residual. A
+/// residual exists only in the states where Tally's ledger snapshot listed a
+/// row for the party, so an absent row can never read as a zero one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum UnadjustedTie {
+    /// The ledger snapshot lists no unallocated amount for this ledger. A
+    /// party whose residual is zero (zero residuals are not listed), a ledger
+    /// that is not a party's and a name that matched no row are not told
+    /// apart, so nothing is tied and no residual is shown.
+    NoResidualRowForParty,
+    /// The ledger keeps no bills: its vouchers carry no allocations to list.
+    NotBillWiseLedger { residual: ExactDecimal },
+    /// The on-account sum equals the residual. Two equal figures, not a proven
+    /// composition: components that net to zero are not seen.
+    Tied { residual: ExactDecimal },
+    ResidualNotExplainedByVouchers {
+        residual: ExactDecimal,
+        /// `residual - on_account_sum`, never zero.
+        difference: ExactDecimal,
+        /// Whether that difference equals the ledger's own opening balance. A
+        /// fact about two numbers, not a claim about what the difference is;
+        /// `None` when Tally sent no opening.
+        equals_opening_balance: Option<bool>,
+    },
+}
+
+impl UnadjustedTie {
+    fn state(&self) -> &'static str {
+        match self {
+            Self::NoResidualRowForParty => "no_residual_row_for_party",
+            Self::NotBillWiseLedger { .. } => "not_bill_wise_ledger",
+            Self::Tied { .. } => "tied",
+            Self::ResidualNotExplainedByVouchers { .. } => "residual_not_explained_by_vouchers",
+        }
+    }
+
+    fn residual(&self) -> Option<&ExactDecimal> {
+        match self {
+            Self::NoResidualRowForParty => None,
+            Self::NotBillWiseLedger { residual }
+            | Self::Tied { residual }
+            | Self::ResidualNotExplainedByVouchers { residual, .. } => Some(residual),
+        }
+    }
+}
+
 /// The unadjusted detail of one party, with its tie-out.
 pub(super) struct UnadjustedDetail {
-    pub(super) state: &'static str,
-    /// The signed residual (closing balance minus the named bills), `0` when the
-    /// party has no unallocated row.
-    pub(super) residual: ExactDecimal,
+    pub(super) tie: UnadjustedTie,
     pub(super) on_account_sum: ExactDecimal,
-    /// `residual - on_account_sum`, present only when it is not zero.
-    pub(super) difference: Option<ExactDecimal>,
-    /// Whether that difference equals the ledger's own opening balance. A fact
-    /// about two numbers, not a claim about what the difference is.
-    pub(super) difference_equals_opening_balance: Option<bool>,
     pub(super) rows: Vec<(&'static str, TrailEntry)>,
 }
 
 impl UnadjustedDetail {
+    pub(super) fn state(&self) -> &'static str {
+        self.tie.state()
+    }
+
     pub(super) fn json(&self) -> Value {
         let mut value = json!({
-            "state": self.state,
-            "residual": self.residual.as_str(),
+            "state": self.state(),
+            "residual": self.tie.residual().map(ExactDecimal::as_str),
             "on_account_sum": self.on_account_sum.as_str(),
             "rows": self.rows.iter().map(|(class, entry)| {
                 let mut row = entry.json();
@@ -476,43 +518,47 @@ impl UnadjustedDetail {
                 row
             }).collect::<Vec<_>>(),
         });
-        if let Some(difference) = &self.difference {
+        if let UnadjustedTie::ResidualNotExplainedByVouchers {
+            difference,
+            equals_opening_balance,
+            ..
+        } = &self.tie
+        {
             value["difference"] = json!(difference.as_str());
-        }
-        if let Some(equals) = self.difference_equals_opening_balance {
-            value["difference_equals_opening_balance"] = json!(equals);
+            if let Some(equals) = equals_opening_balance {
+                value["difference_equals_opening_balance"] = json!(equals);
+            }
         }
         value
     }
 }
 
 /// On-account, advance and pending-note rows of `party`, tied against its
-/// unallocated residual. A party on a ledger that keeps no bills returns state
-/// `not_bill_wise_ledger` and no rows: its vouchers carry no allocations to list.
+/// unallocated residual when Tally's ledger snapshot lists one. A party on a
+/// ledger that keeps no bills returns state `not_bill_wise_ledger` and no rows:
+/// its vouchers carry no allocations to list.
 pub(super) fn unadjusted_detail(
     entries: &[TrailEntry],
     native_bills: &[OpenBillRow],
     party: &str,
     unallocated: Option<&UnallocatedParty>,
 ) -> Result<UnadjustedDetail, TrailRefusal> {
-    let residual = match unallocated {
-        None => ExactDecimal::zero(),
-        Some(row) => match row.direction {
+    let residual = unallocated
+        .map(|row| match row.direction {
             ExposureDirection::Receivable => ExactDecimal::zero()
                 .checked_subtract(&row.amount)
-                .map_err(|_| TrailRefusal("trail_amount_invalid"))?,
-            ExposureDirection::Payable => row.amount.clone(),
-        },
-    };
-    if unallocated.and_then(|row| row.composition)
-        == Some(crate::tally::UnallocatedComposition::NotBillWiseLedger)
+                .map_err(|_| TrailRefusal("trail_amount_invalid")),
+            ExposureDirection::Payable => Ok(row.amount.clone()),
+        })
+        .transpose()?;
+    if let (Some(residual), Some(crate::tally::UnallocatedComposition::NotBillWiseLedger)) =
+        (&residual, unallocated.and_then(|row| row.composition))
     {
         return Ok(UnadjustedDetail {
-            state: "not_bill_wise_ledger",
-            residual,
+            tie: UnadjustedTie::NotBillWiseLedger {
+                residual: residual.clone(),
+            },
             on_account_sum: ExactDecimal::zero(),
-            difference: None,
-            difference_equals_opening_balance: None,
             rows: Vec::new(),
         });
     }
@@ -539,28 +585,52 @@ pub(super) fn unadjusted_detail(
         }
     }
     let on_account_sum = sum(&on_account)?;
-    let difference = residual
-        .checked_subtract(&on_account_sum)
-        .map_err(|_| TrailRefusal("trail_amount_invalid"))?;
-    let opening = unallocated.and_then(|row| row.opening_balance.as_ref());
-    let (state, difference, equals) = if difference.is_zero() {
-        ("tied", None, None)
-    } else {
-        let equals = opening.map(|opening| opening.numeric_eq(&difference));
-        (
-            "residual_not_explained_by_vouchers",
-            Some(difference),
-            equals,
-        )
+    let tie = match residual {
+        None => UnadjustedTie::NoResidualRowForParty,
+        Some(residual) => {
+            let difference = residual
+                .checked_subtract(&on_account_sum)
+                .map_err(|_| TrailRefusal("trail_amount_invalid"))?;
+            if difference.is_zero() {
+                UnadjustedTie::Tied { residual }
+            } else {
+                let equals_opening_balance = unallocated
+                    .and_then(|row| row.opening_balance.as_ref())
+                    .map(|opening| opening.numeric_eq(&difference));
+                UnadjustedTie::ResidualNotExplainedByVouchers {
+                    residual,
+                    difference,
+                    equals_opening_balance,
+                }
+            }
+        }
     };
     Ok(UnadjustedDetail {
-        state,
-        residual,
+        tie,
         on_account_sum,
-        difference,
-        difference_equals_opening_balance: equals,
         rows,
     })
+}
+
+/// Why a bill-trail answer lists what it lists. An empty list is never left
+/// to read as a measured "this party has no bills".
+pub(super) fn bill_trail_state(
+    bills: &[BillOutcome],
+    unallocated: Option<&UnallocatedParty>,
+) -> &'static str {
+    if !bills.is_empty() {
+        "bills_listed"
+    } else if unallocated.and_then(|row| row.composition)
+        == Some(crate::tally::UnallocatedComposition::NotBillWiseLedger)
+    {
+        // The ledger snapshot says this ledger keeps no bills.
+        "not_bill_wise_ledger"
+    } else {
+        // No voucher read allocates a named bill on this ledger and Tally's
+        // bills reports list none for it: a ledger that keeps no bills, one
+        // that is not a party's and a party with no bills are not told apart.
+        "no_named_bill_for_party"
+    }
 }
 
 /// The most allocation rows one detail answer carries. Past it the read is
@@ -697,35 +767,54 @@ impl Server {
             .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         let party_json = redact_value(party_name_value(party.clone()), self.settings.redaction);
         let window = json!({"from": from, "to": as_of, "company_vouchers_read": vouchers_read});
-        let detail = match kind {
-            DetailKind::BillTrail => {
-                let bills = bill_trails(&party, reference, &entries, open_bills)
-                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
-                within_detail_cap(trail_row_count(&bills))
-                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
-                json!({
-                    "kind": "bill_trail",
-                    "party": party_json,
-                    "as_of": as_of,
-                    "window": window,
-                    "bills": bills.iter().map(|bill| bill.json(party_json.clone())).collect::<Vec<_>>(),
-                })
-            }
-            DetailKind::Unadjusted => {
-                let row = unallocated.iter().find(|row| row.party == party);
-                let detail = unadjusted_detail(&entries, open_bills, &party, row)
-                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
-                within_detail_cap(detail.rows.len())
-                    .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
-                let mut value = detail.json();
-                value["kind"] = json!("unadjusted");
-                value["party"] = party_json;
-                value["as_of"] = json!(as_of);
-                value["window"] = window;
-                value
-            }
-        };
+        let mut detail = party_detail(
+            kind,
+            &party,
+            &party_json,
+            reference,
+            &entries,
+            open_bills,
+            unallocated,
+        )
+        .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
+        detail["party"] = party_json;
+        detail["as_of"] = json!(as_of);
+        detail["window"] = window;
         Ok((detail, evidence))
+    }
+}
+
+/// The detail object for one party, built from its allocations and the native
+/// figures read at the same as-of; the handler adds the party, the as-of and
+/// the window. Every state and refusal of the answer is decided here.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn party_detail(
+    kind: DetailKind,
+    party: &str,
+    party_json: &Value,
+    reference: Option<&str>,
+    entries: &[TrailEntry],
+    open_bills: &[OpenBillRow],
+    unallocated: &[UnallocatedParty],
+) -> Result<Value, TrailRefusal> {
+    let row = unallocated.iter().find(|row| row.party == party);
+    match kind {
+        DetailKind::BillTrail => {
+            let bills = bill_trails(party, reference, entries, open_bills)?;
+            within_detail_cap(trail_row_count(&bills))?;
+            Ok(json!({
+                "kind": "bill_trail",
+                "state": bill_trail_state(&bills, row),
+                "bills": bills.iter().map(|bill| bill.json(party_json.clone())).collect::<Vec<_>>(),
+            }))
+        }
+        DetailKind::Unadjusted => {
+            let detail = unadjusted_detail(entries, open_bills, party, row)?;
+            within_detail_cap(detail.rows.len())?;
+            let mut value = detail.json();
+            value["kind"] = json!("unadjusted");
+            Ok(value)
+        }
     }
 }
 

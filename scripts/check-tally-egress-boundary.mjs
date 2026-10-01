@@ -442,7 +442,7 @@ function trackedFiles() {
 
 // Clippy reads the nearest clippy.toml, so a second one under src-tauri would replace these lists
 // for its crate, and CLIPPY_CONF_DIR would point it elsewhere. An edit to the lists needs review.
-const CLIPPY_CONFIG_DIGEST = "b0545bfeb20c2ef9881c497470e927c746e7a57714ca1c9088b8ca707e7c144f";
+const CLIPPY_CONFIG_DIGEST = "fc420715900ce441d19d3e34115844033ebeb9d4c3ace1e6b4c67f43dc8091c6";
 const clippyConfig = createHash("sha256").update(readFileSync(`${root}src-tauri/clippy.toml`)).digest("hex");
 if (clippyConfig !== CLIPPY_CONFIG_DIGEST) {
   egressViolations.push(`src-tauri/clippy.toml changed; review its egress lists, then set CLIPPY_CONFIG_DIGEST to ${clippyConfig}`);
@@ -550,7 +550,7 @@ for (const manifest of ["package.json", "pnpm-lock.yaml"]) {
 if (egressViolations.length) {
   throw new Error(
     "Tally-path egress boundary violated -- this protects the README promise " +
-      '"Your Tally data is never uploaded ... nothing in the Tally path sends it to a server of ours" ' +
+      '"The Tally path uploads nothing to ComplyEaze ... nothing in the Tally path sends it to a server of ours" ' +
       "(README.md, 'What it does not do'):\n" +
       egressViolations.map((violation) => `- ${violation}`).join("\n"),
   );

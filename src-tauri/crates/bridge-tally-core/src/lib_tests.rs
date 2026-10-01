@@ -120,3 +120,28 @@ fn record_provenance_rejects_noncanonical_hashes_and_alter_ids() {
     assert!(SourceAlterId::parse("contains whitespace").is_err());
     assert!(SourceAlterId::parse("alter:42").is_ok());
 }
+
+#[test]
+fn a_diagnostic_never_changes_a_batch_s_serialized_bytes() {
+    let plain = CoreAccountingBatch::default();
+    let mut diagnosed = CoreAccountingBatch::default();
+    diagnosed
+        .foreign_master_text_diagnostics
+        .push(ForeignMasterTextDiagnostic {
+            object_type: "ledger".to_string(),
+            source_id: "src-1".to_string(),
+            stored_name: "bad\u{7}name".to_string(),
+            likely_intended_spelling: None,
+        });
+    assert!(diagnosed.has_foreign_master_text_diagnostics());
+
+    assert_eq!(
+        serde_json::to_vec(&diagnosed).expect("serialize diagnosed batch"),
+        serde_json::to_vec(&plain).expect("serialize plain batch"),
+        "a diagnostic must never change the versioned batch payload"
+    );
+    assert_eq!(
+        serde_json::to_vec(&PackBatch::CoreAccounting(diagnosed)).expect("serialize wrapped batch"),
+        serde_json::to_vec(&PackBatch::CoreAccounting(plain)).expect("serialize wrapped plain"),
+    );
+}

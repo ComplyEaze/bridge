@@ -182,11 +182,13 @@ With writing on:
 ## The desktop app
 
 **The extension is built from the same source library as the desktop app.**
-That source has no document-upload feature and no AXAL sign-in
-([#914](https://github.com/ComplyEaze/bridge/pull/914) removed them). The only
-network client in ComplyEaze Bridge's own code connects to Tally on your own
-computer. No desktop installer is published. See
-[Security and privacy](./docs/security-and-privacy.md).
+The published 0.3.0 package still contains an unfinished document-upload
+feature and an AXAL sign-in. In that package no tool of the extension reaches
+them. The source after 0.3.0 no longer has them
+([#914](https://github.com/ComplyEaze/bridge/pull/914)), so the next release
+will not contain them; in that source the only network client in ComplyEaze
+Bridge's own code connects to Tally on your own computer. No desktop installer
+is published. See [Security and privacy](./docs/security-and-privacy.md).
 
 ## Before you use it with client data
 

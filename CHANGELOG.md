@@ -83,10 +83,14 @@ Each line names the pull requests it comes from.
   only network client in Bridge's own code connects to Tally on your own
   computer. The CI egress gate fails if a first-party crate other than the Tally
   transport depends on reqwest in its shipped dependencies (the app crate keeps
-  it only as a dev-dependency), if any first-party crate depends on hyper, or
-  if reqwest, hyper or a raw socket call is named in the app's source outside
-  the Tally connection files. The unused delivery types in the portable core crate (no network code)
-  went with it. The feature can be rebuilt from the git history if it is needed
+  it only as a dev-dependency) or if any first-party crate depends on hyper. It
+  also counts the calls that send, connect or start a process in library and
+  binary code, and refuses any outside the reviewed Tally files; test code is
+  not counted. The unused delivery types in the portable core crate (no network
+  code) went with it. The bulk party-statement export no longer records a hash
+  for each file it writes and no longer refuses to write a file it cannot
+  record; a record file left by an earlier development build is never read. The
+  feature can be rebuilt from the git history if it is needed
   again (#914).
 
 ## [0.3.0] - 2026-09-26

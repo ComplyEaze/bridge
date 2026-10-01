@@ -230,6 +230,10 @@ request is predicted over a budget well below the cap.
    - `voucher_window_too_many_reads` — the read would dispatch more than 128 data requests. The
      allowance is spent **when a request is dispatched**, not when a plan is made, so a part divided
      after Tally could not serve it — and the failed attempt itself — count against it.
+     The refusal carries `reads.needed_at_least` against `reads.allowed`. A census read in several
+     AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
+     default figure (the allowed requests times the vouchers one request holds at it, which every
+     first plan uses), so that certain refusal costs no further census span (#945).
    - `voucher_window_book_too_large` — the book's mark needs more than 256 census spans (a mark above
      about 2.1 million). A **product limit**: narrowing the window does not help, because the census
      walks the book's AlterIDs whatever the window.
@@ -1301,7 +1305,9 @@ means the on-account sum equals the residual, not that the residual's compositio
 unadjusted tie-out has no captured fixture: its residuals in the tests are typed from the seeded
 vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
 having no residual row, never as a residual of zero, and an empty voucher read is reported as
-such, never corroborated.
+such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
+unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open
+balance for its reference beside it, rather than netting allocations on an unverified rule.
 
 ---
 

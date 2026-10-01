@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
-import { mcpbHostTarget, packageMcpbArguments, pdfiumNotice, releaseMcpbBinaryPath, stageHostManifest, stagePdfium, verifyMcpbStage } from "./package-mcpb.mjs";
+import { mcpbHostTarget, mcpbIcon, packageMcpbArguments, pdfiumNotice, releaseMcpbBinaryPath, stageHostManifest, stageMcpbIcon, stagePdfium, verifyMcpbStage } from "./package-mcpb.mjs";
 
 const resources = [
   "LICENSE",
@@ -12,6 +12,8 @@ const resources = [
   "THIRD_PARTY_LICENSES.txt",
   "THIRD_PARTY_LICENSES_RUST.txt",
 ];
+
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 async function temporaryStage(t) {
   const stage = await mkdtemp(join(tmpdir(), "bridge-mcpb-stage-"));
@@ -25,6 +27,7 @@ async function writeBinary(stage, entryPoint) {
   const library = entryPoint.endsWith(".exe") ? "pdfium.dll" : "libpdfium.dylib";
   await writeFile(join(dirname(join(stage, entryPoint)), library), "packaging fixture");
   await writeFile(join(stage, pdfiumNotice), "packaging fixture");
+  await writeFile(join(stage, mcpbIcon), Buffer.concat([pngSignature, Buffer.from("icon fixture")]));
 }
 
 test("MCPB stage verifier requires every license and inventory resource", async (t) => {
@@ -37,6 +40,27 @@ test("MCPB stage verifier requires every license and inventory resource", async 
   const entryPoint = await stageHostManifest(stage, undefined, mcpbHostTarget("darwin", "arm64"));
   await writeBinary(stage, entryPoint);
   await verifyMcpbStage(stage);
+});
+
+test("MCPB stage carries the committed icon byte for byte, and the verifier refuses a missing or wrong one", async (t) => {
+  const stage = await temporaryStage(t);
+  await stageMcpbIcon(stage);
+  const committed = await readFile(resolve(import.meta.dirname, "..", "packaging", "mcpb", mcpbIcon));
+  assert.deepEqual(await readFile(join(stage, mcpbIcon)), committed);
+  assert.deepEqual(committed.subarray(0, 8), pngSignature);
+  for (const resource of resources) await writeFile(join(stage, resource), "packaging fixture");
+  const entryPoint = await stageHostManifest(stage, undefined, mcpbHostTarget("darwin", "arm64"));
+  await writeBinary(stage, entryPoint);
+  await verifyMcpbStage(stage);
+  await rm(join(stage, mcpbIcon));
+  await assert.rejects(() => verifyMcpbStage(stage), /missing the icon icon\.png/);
+  await writeFile(join(stage, mcpbIcon), "not a png");
+  await assert.rejects(() => verifyMcpbStage(stage), /not a PNG file/);
+  await writeFile(join(stage, mcpbIcon), Buffer.concat([pngSignature, Buffer.from("icon fixture")]));
+  const manifest = JSON.parse(await readFile(join(stage, "manifest.json"), "utf8"));
+  manifest.icon = "logo.png";
+  await writeFile(join(stage, "manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(() => verifyMcpbStage(stage), /must name its icon icon\.png/);
 });
 
 test("MCPB packaging reads the release binary", () => {
@@ -71,6 +95,7 @@ test("PDFium is staged beside the binary with its notice at the root, and the ve
     await writeFile(join(source, pdfiumNotice), "notice fixture");
     for (const resource of resources) await writeFile(join(stage, resource), "packaging fixture");
     const entryPoint = await stageHostManifest(stage, undefined, host);
+    await stageMcpbIcon(stage);
     await mkdir(dirname(join(stage, entryPoint)), { recursive: true });
     await writeFile(join(stage, entryPoint), "packaging fixture");
     await assert.rejects(() => verifyMcpbStage(stage), /PDFium library/);
@@ -98,6 +123,7 @@ test("every host manifest launches its bundled binary and maps user settings to 
     // preparation and bank-statement parsing stay on.
     assert.equal(manifest.user_config.enable_writes.default, false);
     assert.deepEqual(manifest.server.mcp_config.env, {
+      BRIDGE_TERMS_ACCEPTED: "${user_config.accept_terms_2026_10}",
       BRIDGE_TALLY_HOST: "${user_config.host}",
       BRIDGE_TALLY_PORT: "${user_config.port}",
       BRIDGE_AGENT_REDACTION: "${user_config.redaction}",

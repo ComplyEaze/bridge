@@ -139,6 +139,7 @@ where
                         tool: name.to_string(),
                         args_sha256: sha256_json(&arguments),
                         company_guid: None,
+                        request_trail: None,
                     });
                     Err("tool_not_found".to_string())
                 }
@@ -901,6 +902,7 @@ async fn cancel_queued_request<W: AsyncWrite + Unpin>(
             .get("company_guid")
             .and_then(Value::as_str)
             .map(str::to_string),
+        request_trail: None,
     });
     finish_response(
         server,
@@ -973,6 +975,7 @@ async fn refuse_pending_frame<W: AsyncWrite + Unpin>(
                     .get("company_guid")
                     .and_then(Value::as_str)
                     .map(str::to_string),
+                request_trail: None,
             },
             response,
         )

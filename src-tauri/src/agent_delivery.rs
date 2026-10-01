@@ -22,6 +22,10 @@ struct EgressReceipt<'a> {
     /// The error the response carried, by whitelist (bridge#799).
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<Value>,
+    /// What each Tally send of the call was and how it ended (#918): the last
+    /// 32 by kind, size, outcome and time, and a count of the rest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_trail: Option<Value>,
 }
 
 /// The most window parts a receipt keeps: the last ones sent, the rest
@@ -210,6 +214,7 @@ impl Server {
             error: structured.and_then(receipt_error).or_else(|| {
                 receipt_code(&response["error"]["message"]).map(|code| json!({ "code": code }))
             }),
+            request_trail: context.request_trail,
         };
         let line = serde_json::to_string(&receipt)
             .map_err(|_| "egress_record_write_failed".to_string())?;
@@ -247,6 +252,7 @@ impl Server {
             truncated: false,
             redaction_preset: self.settings.redaction.label(),
             error: None,
+            request_trail: None,
         };
         let line = serde_json::to_string(&receipt)
             .map_err(|_| "egress_record_write_failed".to_string())?;

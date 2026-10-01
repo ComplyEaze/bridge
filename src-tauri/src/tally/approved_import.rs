@@ -769,6 +769,10 @@ pub(crate) mod test_seam {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = directory.join(format!("stub-{}", NEXT.fetch_add(1, Ordering::Relaxed)));
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "test only: writes a stub executable through sh"
+        )]
         let mut writer = std::process::Command::new("sh")
             .arg("-c")
             .arg("cat > \"$1\" && chmod 755 \"$1\"")
@@ -1014,25 +1018,25 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::post_words(ONE),
             (
-                "Bridge — approve one voucher".to_string(),
+                "ComplyEaze Bridge — approve one voucher".to_string(),
                 "Post voucher".to_string()
             )
         );
         assert_eq!(
             super::post_words(count(200)),
             (
-                "Bridge — approve 200 vouchers".to_string(),
+                "ComplyEaze Bridge — approve 200 vouchers".to_string(),
                 "Post 200 vouchers".to_string()
             )
         );
         assert_eq!(super::post_words(count(2)).1, "Post 2 vouchers");
         assert_eq!(
             super::review_title(ONE),
-            "Bridge — record that you reviewed one voucher"
+            "ComplyEaze Bridge — record that you reviewed one voucher"
         );
         assert_eq!(
             super::review_title(count(50)),
-            "Bridge — record that you reviewed 50 vouchers"
+            "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
     }
 
@@ -1040,18 +1044,21 @@ pub(crate) mod test_seam {
     #[cfg(windows)]
     #[test]
     fn each_windows_dialog_names_a_batch_by_its_count() {
-        assert_eq!(super::post_question(ONE), "Bridge — post this voucher?");
+        assert_eq!(
+            super::post_question(ONE),
+            "ComplyEaze Bridge — post this voucher?"
+        );
         assert_eq!(
             super::post_question(count(200)),
-            "Bridge — post 200 vouchers?"
+            "ComplyEaze Bridge — post 200 vouchers?"
         );
         assert_eq!(
             super::review_question(ONE),
-            "Bridge — record that you reviewed this voucher?"
+            "ComplyEaze Bridge — record that you reviewed this voucher?"
         );
         assert_eq!(
             super::review_question(count(50)),
-            "Bridge — record that you reviewed these 50 vouchers?"
+            "ComplyEaze Bridge — record that you reviewed these 50 vouchers?"
         );
     }
 
@@ -1196,6 +1203,10 @@ async fn nonce_bound_dialog(
     preview: &str,
 ) -> Result<DialogAnswer, DialogFailure> {
     let nonce = uuid::Uuid::new_v4().to_string();
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the native approval dialog helper, a local executable reached over stdin and stdout, not the network"
+    )]
     let mut child = tokio::process::Command::new(executable)
         .arg(mode)
         .stdin(Stdio::piped())
@@ -1313,8 +1324,8 @@ fn dialog_input(input: &str) -> Option<(&str, VoucherCount, &str)> {
 #[cfg(not(windows))]
 fn review_title(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed one voucher".into(),
-        Some(count) => format!("Bridge — record that you reviewed {count} vouchers"),
+        None => "ComplyEaze Bridge — record that you reviewed one voucher".into(),
+        Some(count) => format!("ComplyEaze Bridge — record that you reviewed {count} vouchers"),
     }
 }
 
@@ -1340,8 +1351,10 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 #[cfg(windows)]
 fn review_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed this voucher?".into(),
-        Some(count) => format!("Bridge — record that you reviewed these {count} vouchers?"),
+        None => "ComplyEaze Bridge — record that you reviewed this voucher?".into(),
+        Some(count) => {
+            format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?")
+        }
     }
 }
 
@@ -1373,9 +1386,12 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
 #[cfg(not(windows))]
 fn post_words(count: VoucherCount) -> (String, String) {
     match count.batch() {
-        None => ("Bridge — approve one voucher".into(), POST_LABEL.into()),
+        None => (
+            "ComplyEaze Bridge — approve one voucher".into(),
+            POST_LABEL.into(),
+        ),
         Some(count) => (
-            format!("Bridge — approve {count} vouchers"),
+            format!("ComplyEaze Bridge — approve {count} vouchers"),
             format!("Post {count} vouchers"),
         ),
     }
@@ -1403,8 +1419,8 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
 #[cfg(windows)]
 fn post_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — post this voucher?".into(),
-        Some(count) => format!("Bridge — post {count} vouchers?"),
+        None => "ComplyEaze Bridge — post this voucher?".into(),
+        Some(count) => format!("ComplyEaze Bridge — post {count} vouchers?"),
     }
 }
 

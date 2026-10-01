@@ -1,4 +1,8 @@
 //! Local durable-state and MCP cancellation tests; no Tally responses are invented.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use std::io::Write;
 use std::{
@@ -17,6 +21,7 @@ fn stand_in_response() -> ToolResponse {
             tool: "post_import".into(),
             args_sha256: sha256_hex(b"post"),
             company_guid: None,
+            request_trail: None,
         },
         recovery_batch_id: None,
     }
@@ -106,6 +111,7 @@ fn completed_response() -> ToolResponse {
             tool: "post_import".into(),
             args_sha256: sha256_hex(b"post"),
             company_guid: Some(COMPANY.into()),
+            request_trail: None,
         },
         recovery_batch_id: Some(BATCH.into()),
     }

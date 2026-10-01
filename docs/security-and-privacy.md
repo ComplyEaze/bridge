@@ -73,6 +73,13 @@ ComplyEaze Bridge tool can approve it.
   the tool name, the time, the company's Tally GUID, fingerprints of the
   request and the response, the names (not the values) of the fields returned,
   and its size. It holds no row values.
+- **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
+  accept the ComplyEaze Bridge Terms of Use (version 2026-10) in its settings,
+  and every tool refuses with `terms_not_accepted` until you do. When the
+  server starts with the setting on, it appends a line with the terms version
+  and the time (once per version). If that line cannot be written, every tool
+  refuses with `terms_record_unavailable`. The line is a local record that the
+  setting was on, not proof of who accepted; it is not sent anywhere.
 - **An import journal** (`agent-import-ledger.jsonl`) and saved batch files
   (`imports/`): the vouchers ComplyEaze Bridge prepared or posted, with their dates,
   narrations, amounts and ledgers, and the proof-of-post files that hold what

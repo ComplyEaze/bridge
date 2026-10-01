@@ -644,19 +644,32 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
                 "differences":[{"field":"party","proposed":"Customer One","observed":"Supplier Two"}],
             }))]}),
         ),
+        (
+            "parse_bank_statement",
+            json!({
+                "cash_questions":[{"printed_as":party_name("Customer One")}],
+                "counterparties":[{"party":party_name("Customer One"),"also_printed_as":[party_name("Supplier Two")],"ledger":party_name("Entry Ledger")}],
+                "ledgers_to_validate":[party_name("Entry Ledger")],
+            }),
+        ),
+        (
+            "post_import",
+            json!({"error":{"ledgers_changed":[party_name("Customer One"),party_name("Supplier Two")]}}),
+        ),
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
     ];
-    // Tools that return no party name to mask, written out by hand: a tool in
-    // neither this list nor the samples fails the check below by name, so a new
-    // tool must either be given a sample or be listed here deliberately.
+    // Tools whose results carry no value marked as a party name, written out by
+    // hand: a tool in neither this list nor the samples fails the check below by
+    // name, so a new tool must either be given a sample or be listed here
+    // deliberately. `acknowledge_post_review` writes one local record and its
+    // module marks no party name; `local_data_report` returns only static
+    // strings, counts, sizes and whole days.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec![
-        "acknowledge_post_review",
-        "local_data_report",
-        "parse_bank_statement",
-        "post_import",
-    ];
+    let mut without_a_sample = vec!["acknowledge_post_review", "local_data_report"];
+    // The lab-only tools, compiled in with the `lab-writes` feature, are not
+    // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
+    // import tools were not examined (#999).
     #[cfg(feature = "lab-writes")]
     without_a_sample.extend([
         "lab_import_masters",

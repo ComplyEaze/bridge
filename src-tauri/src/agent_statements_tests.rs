@@ -12,6 +12,8 @@
 //! construction whenever `finish()` succeeds and proves nothing more. The
 //! derivation's figures are proven in `reports::statements`.
 use super::super::*;
+use super::{top_level, weakest};
+use crate::reports::statements::Established;
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -56,7 +58,11 @@ fn balance_sheet(current_assets: &str) -> String {
 }
 
 fn profit_and_loss() -> String {
-    "<ENVELOPE><DSPACCNAME><DSPDISPNAME>Sales Accounts</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>4027.00</BSMAINAMT></PLAMT></ENVELOPE>".to_string()
+    profit_and_loss_sales("4027.00")
+}
+
+fn profit_and_loss_sales(sales: &str) -> String {
+    format!("<ENVELOPE><DSPACCNAME><DSPDISPNAME>Sales Accounts</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT><BSMAINAMT>{sales}</BSMAINAMT></PLAMT></ENVELOPE>")
 }
 
 fn xml(text: String) -> ScenarioPlan {
@@ -76,6 +82,10 @@ fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
 /// A whole call: identity, then the Trial Balance bracket with the group tree,
 /// Tally's Balance Sheet and, for a P&L, Tally's Profit and Loss inside it.
 fn plans(current_assets: &str, with_profit_and_loss: bool) -> Vec<ScenarioPlan> {
+    plans_with(current_assets, with_profit_and_loss.then(profit_and_loss))
+}
+
+fn plans_with(current_assets: &str, profit_and_loss: Option<String>) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let currency = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
@@ -92,8 +102,8 @@ fn plans(current_assets: &str, with_profit_and_loss: bool) -> Vec<ScenarioPlan> 
     pair(&mut plans, xml(report));
     pair(&mut plans, xml(groups()));
     pair(&mut plans, xml(balance_sheet(current_assets)));
-    if with_profit_and_loss {
-        pair(&mut plans, xml(profit_and_loss()));
+    if let Some(profit_and_loss) = profit_and_loss {
+        pair(&mut plans, xml(profit_and_loss));
     }
     pair(&mut plans, xml(extents()));
     plans.extend([companies.clone(), status(), companies]);
@@ -240,4 +250,126 @@ async fn a_masked_response_hides_the_line_names_a_ledger_can_carry() {
         "group names stay readable: {text}"
     );
     assert!(!text.contains("Profit & Loss A/c"), "{text}");
+}
+
+/// The top-level `state` and `reason` on the parsed payload (#984): `observed`
+/// only when this tool's result is established, otherwise `not_established`
+/// with the reason the nested result carries.
+fn assert_top_level(result: &Value, state: &str, reason: Option<&str>) {
+    assert_eq!(result["state"], state, "{result}");
+    match reason {
+        Some(reason) => assert_eq!(result["reason"], reason, "{result}"),
+        None => assert!(result.get("reason").is_none(), "{result}"),
+    }
+}
+
+#[tokio::test]
+async fn an_established_profit_and_loss_is_observed_with_no_reason() {
+    let (response, _, _) = call("profit_and_loss", plans("-11027.00", true)).await;
+    let result = result(&response);
+    assert_top_level(result, "observed", None);
+    assert_eq!(result["result"]["net_result"]["state"], "established");
+}
+
+#[tokio::test]
+async fn an_established_balance_sheet_is_observed_with_no_reason() {
+    let (response, _, _) = call("balance_sheet", plans("-11027.00", false)).await;
+    let result = result(&response);
+    assert_top_level(result, "observed", None);
+    assert_eq!(
+        result["result"]["profit_and_loss"]["carried"]["state"],
+        "established"
+    );
+}
+
+#[tokio::test]
+async fn a_profit_and_loss_whose_balance_sheet_differs_is_not_established_at_the_top() {
+    let (response, _, _) = call("profit_and_loss", plans("-11026.00", true)).await;
+    let result = result(&response);
+    assert_top_level(
+        result,
+        "not_established",
+        Some("tally_balance_sheet_differs"),
+    );
+    assert_eq!(result["result"]["net_result"]["reason"], result["reason"]);
+}
+
+#[tokio::test]
+async fn a_balance_sheet_that_does_not_tie_is_not_established_at_the_top() {
+    let (response, _, _) = call("balance_sheet", plans("-11026.00", false)).await;
+    let result = result(&response);
+    assert_top_level(
+        result,
+        "not_established",
+        Some("tally_balance_sheet_differs"),
+    );
+    let carried = &result["result"]["profit_and_loss"]["carried"];
+    assert_eq!(carried["reason"], result["reason"]);
+}
+
+#[tokio::test]
+async fn a_profit_and_loss_that_differs_from_tallys_own_is_not_established_at_the_top() {
+    let plans = plans_with("-11027.00", Some(profit_and_loss_sales("4028.00")));
+    let (response, _, _) = call("profit_and_loss", plans).await;
+    let result = result(&response);
+    assert_top_level(
+        result,
+        "not_established",
+        Some("tally_profit_and_loss_differs"),
+    );
+    assert_eq!(result["result"]["net_result"]["reason"], result["reason"]);
+    assert!(result["lines"].is_null(), "{result}");
+}
+
+/// Every reason the derivation can refuse with, through the same decision the
+/// tool uses. The tool-level tests above reach only the two reasons the
+/// captured fixtures produce; the other three need a trial balance with a
+/// Stock-in-Hand balance, an unclassified ledger or no Profit & Loss ledger,
+/// none of which is captured in the tree.
+#[test]
+fn every_not_established_reason_is_carried_to_the_top() {
+    let not_established = |reason| Established::NotEstablished {
+        reason,
+        lines: Vec::new(),
+    };
+    for reason in [
+        "unclassified_ledger_carries_an_amount",
+        "closing_stock_not_derivable_from_trial_balance",
+        "profit_and_loss_ledger_not_returned",
+        "tally_balance_sheet_differs",
+        "tally_profit_and_loss_differs",
+    ] {
+        assert_eq!(
+            top_level(&not_established(reason)),
+            ("not_established", Some(reason))
+        );
+    }
+    let established = Established::Established {
+        value: bridge_tally_core::ExactDecimal::parse("1.00").unwrap(),
+    };
+    assert_eq!(top_level(&established), ("observed", None));
+}
+
+/// A tool that carries two results reports the weaker one (#984).
+#[test]
+fn the_weaker_of_two_results_decides_the_top() {
+    let established = Established::Established {
+        value: bridge_tally_core::ExactDecimal::parse("1.00").unwrap(),
+    };
+    let refused = Established::NotEstablished {
+        reason: "tally_profit_and_loss_differs",
+        lines: Vec::new(),
+    };
+    assert_eq!(
+        top_level(weakest(&[&established, &refused])).0,
+        "not_established"
+    );
+    assert_eq!(
+        top_level(weakest(&[&refused, &established])).0,
+        "not_established"
+    );
+    assert_eq!(
+        top_level(weakest(&[&established, &established])).0,
+        "observed"
+    );
 }

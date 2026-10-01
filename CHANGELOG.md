@@ -23,6 +23,13 @@ Each line names the pull requests it comes from.
   lines that differ are named. A book with stock items is expected to be
   refused, because no such book has been measured, and the tie-out itself has
   been measured on two synthetic books only (#774).
+- Read closing stock values per item. An item is returned only when the
+  values add up to Tally's own Stock Summary and Bridge read exactly as many
+  items as Tally's own count; otherwise no item is returned, with the reason and
+  the next step. A company with no stock items is told so. A value keeps
+  Tally's sign, as in the Trial Balance: stock held is a negative number.
+  Quantities are not returned yet, because nothing checks them. Only a
+  31 March and small books are read (#980, #979, #1001).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read
@@ -40,6 +47,11 @@ Each line names the pull requests it comes from.
 
 **Safer or fixed**
 
+- `profit_and_loss` and `balance_sheet` no longer open with `"state": "observed"`
+  when nothing was established. The top-level `state` is `observed` only when
+  the tool's result is established; otherwise it is `not_established`, with
+  the same `reason` as the nested result. This changes the tool's output; no
+  figure, check or withheld line changes (#984).
 - If you are slow at the approval window, the agent's call no longer waits
   on it. The agent is told the approval is pending and asks again. A click
   made while no call is waiting is posted by the next call, not one call later
@@ -54,8 +66,6 @@ Each line names the pull requests it comes from.
   covers (#755, #769, #809, #813, #831).
 - Tally's own error text on a rejected line is read safely, including text
   with an `&` in it (#763).
-- The desktop app's documents upload skips unchanged copies of the
-  party-statement batches it wrote (#847).
 - Each tool now says whether it changes anything. Reads are marked read-only
   and say they only record local receipt lines for the call, never book
   content. Some assistants may now run the read tools without asking each
@@ -74,6 +84,26 @@ Each line names the pull requests it comes from.
   #744, #788).
 - The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
   (#805).
+
+**Removed**
+
+- The unfinished document-sync feature is gone from the source, and so from
+  both the desktop app and the binary the Claude Desktop extension runs: the
+  AXAL sign-in, the code that scanned a folder and uploaded the files you chose
+  to ComplyEaze cloud storage, and the two hidden screens for them. No Bridge
+  tool could reach them, and no navigation led to them. After this change the
+  only network client in Bridge's own code connects to Tally on your own
+  computer. The CI egress gate fails if a first-party crate other than the Tally
+  transport depends on reqwest in its shipped dependencies (the app crate keeps
+  it only as a dev-dependency) or if any first-party crate depends on hyper. It
+  also counts the calls that send, connect or start a process in library and
+  binary code, and refuses any outside the reviewed Tally files; test code is
+  not counted. The unused delivery types in the portable core crate (no network
+  code) went with it. The bulk party-statement export no longer records a hash
+  for each file it writes and no longer refuses to write a file it cannot
+  record; a record file left by an earlier development build is never read. The
+  feature can be rebuilt from the git history if it is needed
+  again (#914).
 
 ## [0.3.0] - 2026-09-26
 

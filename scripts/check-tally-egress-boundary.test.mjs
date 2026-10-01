@@ -17,33 +17,45 @@ const root = fileURLToPath(new URL("../", import.meta.url)).slice(0, -1);
 const gate = fileURLToPath(new URL("./check-tally-egress-boundary.mjs", import.meta.url));
 const skip = process.platform === "win32" && "the stand-in cargo is a POSIX shell script";
 
-// Each call records its package, then prints `<workspace>.<package>.out`
-// from the row's directory, if the row wrote one. A call without
-// `--target all` fails, so the control row also guards that flag.
+// Each call records its workspace, package and edge set, then prints
+// `<workspace>.<package>.<kind>.out` from the row's directory, if the row wrote
+// one; kind is "all" for normal,build,dev and "shipped" for normal,build. A call
+// without `--target all` or with any other edge set fails, so the control row
+// also guards those flags.
 const STAND_IN = `#!/bin/sh
-manifest=""; package=""; target=""
+manifest=""; package=""; target=""; edges=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --manifest-path) manifest="$2"; shift ;;
     -p) package="$2"; shift ;;
     --target) target="$2"; shift ;;
+    --edges) edges="$2"; shift ;;
   esac
   shift
 done
-echo "\${manifest%%/*}.$package" >> "$0.calls"
+case "$edges" in
+  normal,build,dev) kind=all ;;
+  normal,build) kind=shipped ;;
+  *) echo "stand-in cargo: unexpected --edges '$edges'" >&2; exit 3 ;;
+esac
+echo "\${manifest%%/*}.$package.$kind" >> "$0.calls"
 if [ "$target" != "all" ]; then
   echo "stand-in cargo: expected --target all, got '$target'" >&2
   exit 2
 fi
-[ -f "$TREES/\${manifest%%/*}.$package.out" ] && cat "$TREES/\${manifest%%/*}.$package.out"
+[ -f "$TREES/\${manifest%%/*}.$package.$kind.out" ] && cat "$TREES/\${manifest%%/*}.$package.$kind.out"
 [ -n "$STAND_IN_STDERR" ] && echo "$STAND_IN_STDERR" >&2
 exit "\${STAND_IN_EXIT:-0}"
 `;
 
 // As printed by `cargo tree --invert --depth 1 --prefix none --format {p}
-// --target all` on 2026-09-26, with the repository root substituted.
+// --target all` on 2026-09-26 over every edge kind (`.all`), with the repository
+// root substituted. The rows over normal and build edges only (`.shipped`) are
+// those trees with the app crate's line removed from the reqwest tree, because
+// its reqwest edge is a dev-dependency; real cargo output on 2026-09-30
+// confirmed that shape.
 const todayTrees = (root) => {
-  const TODAY = {
+  const EVERY_EDGE = {
     "src-tauri.reqwest": [
       "reqwest v0.13.5",
       `bridge v0.2.0 (${root}/src-tauri)`,
@@ -59,18 +71,28 @@ const todayTrees = (root) => {
   };
   // The lower-level network crates, as printed on 2026-09-28: no first-party dependent in either workspace.
   for (const [workspace, reqwest] of [["src-tauri", "reqwest v0.13.5"], ["tools", "reqwest v0.13.4"]]) {
-    TODAY[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
-    TODAY[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
-    TODAY[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
-    TODAY[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
-    TODAY[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
-    TODAY[`${workspace}.tower`] = ["tower v0.5.3", reqwest, "tower-http v0.6.11"];
+    EVERY_EDGE[`${workspace}.h2`] = ["h2 v0.4.16", "hyper v1.11.0", reqwest];
+    EVERY_EDGE[`${workspace}.hyper-util`] = ["hyper-util v0.1.20", "hyper-rustls v0.27.9", reqwest];
+    EVERY_EDGE[`${workspace}.socket2`] = ["socket2 v0.6.5", "hyper-util v0.1.20", "tokio v1.53.1"];
+    EVERY_EDGE[`${workspace}.mio`] = ["mio v1.2.2", "tokio v1.53.1"];
+    EVERY_EDGE[`${workspace}.tower-service`] = ["tower-service v0.3.3", "hyper-rustls v0.27.9", "hyper-util v0.1.20", reqwest, "tower v0.5.3", "tower-http v0.6.11"];
+    EVERY_EDGE[`${workspace}.tower`] = ["tower v0.5.3", reqwest, "tower-http v0.6.11"];
+  }
+  const TODAY = {};
+  for (const [key, lines] of Object.entries(EVERY_EDGE)) {
+    TODAY[`${key}.all`] = lines;
+    TODAY[`${key}.shipped`] = key === "src-tauri.reqwest" ? lines.filter((line) => !line.startsWith("bridge v")) : lines;
   }
   return TODAY;
 };
 const TODAY = todayTrees(root);
+const APP_LINE = `bridge v0.2.0 (${root}/src-tauri)`;
+const TRANSPORT_LINE = `bridge-tally-transport v0.1.0 (${root}/src-tauri/crates/bridge-tally-transport)`;
 const EVERY_CALL = ["src-tauri", "tools"].flatMap((workspace) =>
-  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].map((name) => `${workspace}.${name}`),
+  ["reqwest", "hyper", "h2", "hyper-util", "socket2", "mio", "tower-service", "tower"].flatMap((name) => [
+    `${workspace}.${name}.all`,
+    `${workspace}.${name}.shipped`,
+  ]),
 );
 
 let bin;
@@ -100,7 +122,7 @@ function assertRefused(result, message) {
   assert.ok(!result.stdout.includes("is sealed"), result.stdout);
 }
 
-test("control: the trees cargo prints today pass, and every one is read", { skip }, () => {
+test("control: the trees cargo prints today pass, and every one is read over both edge sets", { skip }, () => {
   const result = runGate(TODAY);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
@@ -110,21 +132,21 @@ test("control: the trees cargo prints today pass, and every one is read", { skip
 test("an empty tree from a cargo that exits 0 fails closed", { skip }, () => {
   const result = runGate({});
   assertRefused(result, 'dependency tree for reqwest (src-tauri/Cargo.toml) did not start with reqwest; got "" (0 line(s))');
-  assert.deepEqual(result.calls, ["src-tauri.reqwest"]);
+  assert.deepEqual(result.calls, ["src-tauri.reqwest.all"]);
 });
 
 // hyper's pinned set is empty, so the pinned-set comparison cannot tell an
 // empty read from a clean one; only the root-line check refuses this.
 test("an empty hyper tree fails closed although its pinned set is empty", { skip }, () => {
-  const { "tools.hyper": _omitted, ...rest } = TODAY;
+  const { "tools.hyper.all": _omitted, ...rest } = TODAY;
   const result = runGate(rest);
   assertRefused(result, 'dependency tree for hyper (tools/Cargo.toml) did not start with hyper; got "" (0 line(s))');
   // It stops at the tree it could not read.
-  assert.deepEqual(result.calls, EVERY_CALL.slice(0, EVERY_CALL.indexOf("tools.hyper") + 1));
+  assert.deepEqual(result.calls, EVERY_CALL.slice(0, EVERY_CALL.indexOf("tools.hyper.all") + 1));
 });
 
 test("a tree with only its root line reports every pinned crate as lost", { skip }, () => {
-  const result = runGate({ ...TODAY, "src-tauri.reqwest": ["reqwest v0.13.5"] });
+  const result = runGate({ ...TODAY, "src-tauri.reqwest.all": ["reqwest v0.13.5"] });
   assertRefused(result, "src-tauri: pinned crate(s) no longer show a direct reqwest dependency: bridge, bridge-tally-transport.");
 });
 
@@ -138,19 +160,46 @@ test("cargo failing, even with 'did not match any packages', is not an empty wor
 
 test("a new first-party dependent is refused", { skip }, () => {
   const extra = `bridge-tally-protocol v0.1.0 (${root}/src-tauri/crates/bridge-tally-protocol)`;
-  const result = runGate({ ...TODAY, "tools.hyper": [...TODAY["tools.hyper"], extra] });
+  const result = runGate({ ...TODAY, "tools.hyper.all": [...TODAY["tools.hyper.all"], extra] });
   assertRefused(result, "tools: crate(s) gained a direct hyper dependency outside the pinned set (none): bridge-tally-protocol");
 });
 
 test("a first-party crate depending on a lower-level network crate is refused", { skip }, () => {
   const extra = `bridge v0.2.0 (${root}/src-tauri)`;
-  const result = runGate({ ...TODAY, "src-tauri.socket2": [...TODAY["src-tauri.socket2"], extra] });
+  const result = runGate({ ...TODAY, "src-tauri.socket2.all": [...TODAY["src-tauri.socket2.all"], extra] });
   assertRefused(result, "src-tauri: crate(s) gained a direct socket2 dependency outside the pinned set (none): bridge");
 });
 
 test("an unparseable line fails instead of being skipped", { skip }, () => {
-  const result = runGate({ ...TODAY, "tools.reqwest": [...TODAY["tools.reqwest"], "warning: something else"] });
+  const result = runGate({ ...TODAY, "tools.reqwest.all": [...TODAY["tools.reqwest.all"], "warning: something else"] });
   assertRefused(result, 'dependency tree for reqwest (tools/Cargo.toml) printed an unparseable line: "warning: something else"');
+});
+
+// The app crate's reqwest edge is dev-only. Moving it into [dependencies] adds
+// it to the tree over normal and build edges, which the gate pins separately.
+test("reqwest returning to the app crate's normal dependencies is refused", { skip }, () => {
+  const result = runGate({ ...TODAY, "src-tauri.reqwest.shipped": [...TODAY["src-tauri.reqwest.shipped"], APP_LINE] });
+  assertRefused(
+    result,
+    "src-tauri: crate(s) gained a direct reqwest dependency on a normal or build edge outside the pinned shipped set (bridge-tally-transport): bridge",
+  );
+});
+
+test("a hyper dependency on a shipped edge is refused even for the pinned transport", { skip }, () => {
+  const result = runGate({ ...TODAY, "src-tauri.hyper.shipped": [...TODAY["src-tauri.hyper.shipped"], TRANSPORT_LINE] });
+  assertRefused(
+    result,
+    "src-tauri: crate(s) gained a direct hyper dependency on a normal or build edge outside the pinned shipped set (none): bridge-tally-transport",
+  );
+});
+
+test("the transport losing its shipped reqwest edge is reported", { skip }, () => {
+  const shipped = TODAY["src-tauri.reqwest.shipped"].filter((line) => !line.startsWith("bridge-tally-transport"));
+  const result = runGate({ ...TODAY, "src-tauri.reqwest.shipped": shipped });
+  assertRefused(
+    result,
+    "src-tauri: pinned crate(s) no longer show a direct reqwest dependency on a normal or build edge: bridge-tally-transport.",
+  );
 });
 
 // ---------------------------------------------------------------------------

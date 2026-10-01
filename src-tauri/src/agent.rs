@@ -797,6 +797,31 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              a company with few stock items may be refused. A larger book refuses; retrying \
              this call refuses again.",
         ),
+        // The stock summary read whose rows differ from Tally's own item count
+        // (`counts` carries both numbers).
+        "stock_summary_item_count_differs" => Some(
+            "Tally's own count of this company's stock items (`counts.counted`) differs from \
+             the number Bridge read (`counts.returned`), so nothing is returned: with fewer \
+             rows the list may be incomplete, and with more rows the count is not counting \
+             the list Bridge read. The book did not change during the read, so the same call \
+             now gives the same refusal. Give the user both numbers and ask them to open the \
+             Stock Summary in Tally for this company; why they differ is not known. Once the \
+             user has looked, the next call is stock_summary with the same `company_guid` \
+             and `as_of`.",
+        ),
+        // Causes, reached through `stock_summary_read_failed`.
+        "stock_report_unknown" => Some(
+            "Tally answered Bridge's request for its Stock Summary without the report, both \
+             times it was asked, so stock values cannot be checked and nothing is returned. \
+             Bridge cannot tell why. The book did not change during the read, so do not retry. \
+             Tell the user Bridge could not read stock from this Tally and that the Stock \
+             Summary in Tally itself is the place to read it.",
+        ),
+        "stock_item_count_unavailable" => Some(
+            "Tally gave no usable count of this company's stock items, both times it was asked, \
+             so Bridge cannot tell whether it read every item and returns nothing. Do not \
+             retry. Tell the user that stock for this company has to be read in Tally itself.",
+        ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
             "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \

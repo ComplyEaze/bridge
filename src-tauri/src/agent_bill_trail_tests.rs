@@ -750,6 +750,7 @@ fn a_party_without_an_unallocated_row_has_no_residual_and_ties_nothing() {
         &[],
         &[other],
         2,
+        MAX_DETAIL_ROWS,
     )
     .unwrap();
     assert_eq!(detail["state"], "no_residual_row_for_party");
@@ -779,8 +780,18 @@ fn a_window_that_returned_no_vouchers_is_its_own_state_and_ties_nothing() {
         (DetailKind::BillTrail, "bill_trail"),
         (DetailKind::Unadjusted, "unadjusted"),
     ] {
-        let detail =
-            party_detail(kind, "P", &json!("P"), None, &[], &natives, &residual, 0).unwrap();
+        let detail = party_detail(
+            kind,
+            "P",
+            &json!("P"),
+            None,
+            &[],
+            &natives,
+            &residual,
+            0,
+            MAX_DETAIL_ROWS,
+        )
+        .unwrap();
         assert_eq!(
             detail,
             json!({"kind": label, "state": "window_returned_no_vouchers"}),
@@ -798,7 +809,8 @@ fn a_window_that_returned_no_vouchers_is_its_own_state_and_ties_nothing() {
             &[],
             &[],
             &[],
-            0
+            0,
+            MAX_DETAIL_ROWS
         )
         .unwrap()["state"],
         "window_returned_no_vouchers"
@@ -813,6 +825,7 @@ fn a_window_that_returned_no_vouchers_is_its_own_state_and_ties_nothing() {
         &natives,
         &residual,
         3,
+        MAX_DETAIL_ROWS,
     )
     .unwrap();
     assert_eq!(read["state"], "residual_not_explained_by_vouchers");
@@ -831,6 +844,7 @@ fn an_empty_bill_trail_says_why_it_is_empty() {
             &[],
             unallocated,
             2,
+            MAX_DETAIL_ROWS,
         )
         .unwrap()
     };
@@ -868,6 +882,7 @@ fn an_empty_bill_trail_says_why_it_is_empty() {
         )],
         &[],
         1,
+        MAX_DETAIL_ROWS,
     )
     .unwrap();
     assert_eq!(listed["state"], "bills_listed");
@@ -1541,10 +1556,57 @@ fn an_answer_of_more_than_five_hundred_allocations_is_refused_never_cut() {
         (DetailKind::BillTrail, "trail_too_large"),
         (DetailKind::Unadjusted, "unadjusted_detail_too_large"),
     ] {
-        assert_eq!(within_detail_cap(kind, 0), Ok(()));
-        assert_eq!(within_detail_cap(kind, 500), Ok(()));
-        assert_eq!(within_detail_cap(kind, 501), Err(TrailRefusal(code)));
+        assert_eq!(within_detail_cap(kind, 0, MAX_DETAIL_ROWS), Ok(()));
+        assert_eq!(within_detail_cap(kind, 500, MAX_DETAIL_ROWS), Ok(()));
+        assert_eq!(
+            within_detail_cap(kind, 501, MAX_DETAIL_ROWS),
+            Err(TrailRefusal(code))
+        );
     }
+}
+
+/// Both call sites of the row limit in `party_detail`: a bill trail counts
+/// every bill's allocations, the unadjusted detail its rows, and each refuses
+/// with its own code one row past the limit and answers at the limit.
+#[test]
+fn the_party_detail_refuses_above_its_row_limit_for_each_kind() {
+    let rows = reopen_rows();
+    let entries = entries_for_party(&rows, "RO Party 01").unwrap();
+    let trail = |cap| {
+        party_detail(
+            DetailKind::BillTrail,
+            "RO Party 01",
+            &json!("RO Party 01"),
+            None,
+            &entries,
+            &natives_for_party_01(),
+            &[],
+            rows.len(),
+            cap,
+        )
+    };
+    // Seven allocations over three bills (2 + 2 + 3).
+    assert_eq!(trail(6), Err(TrailRefusal("trail_too_large")));
+    assert_eq!(trail(7).unwrap()["state"], "bills_listed");
+    let entries = entries_for_party(&on_account_rows(), "P").unwrap();
+    let unadjusted = |cap| {
+        party_detail(
+            DetailKind::Unadjusted,
+            "P",
+            &json!("P"),
+            None,
+            &entries,
+            &[],
+            &[],
+            2,
+            cap,
+        )
+    };
+    assert_eq!(
+        unadjusted(1),
+        Err(TrailRefusal("unadjusted_detail_too_large"))
+    );
+    assert_eq!(unadjusted(2).unwrap()["rows"].as_array().unwrap().len(), 2);
 }
 
 /// The advice a refusal over the row limit carries can be followed: a bill
@@ -1688,7 +1750,11 @@ fn the_size_of_a_trail_answer_counts_every_bills_allocations_in_every_state() {
     ];
     assert_eq!(trail_row_count(&outcomes), 500);
     assert_eq!(
-        within_detail_cap(DetailKind::BillTrail, trail_row_count(&outcomes)),
+        within_detail_cap(
+            DetailKind::BillTrail,
+            trail_row_count(&outcomes),
+            MAX_DETAIL_ROWS
+        ),
         Ok(())
     );
     let mut more = outcomes;
@@ -1701,7 +1767,11 @@ fn the_size_of_a_trail_answer_counts_every_bills_allocations_in_every_state() {
     });
     assert_eq!(trail_row_count(&more), 501);
     assert_eq!(
-        within_detail_cap(DetailKind::BillTrail, trail_row_count(&more)),
+        within_detail_cap(
+            DetailKind::BillTrail,
+            trail_row_count(&more),
+            MAX_DETAIL_ROWS
+        ),
         Err(TrailRefusal("trail_too_large"))
     );
 }

@@ -676,11 +676,15 @@ pub(super) fn trail_row_count(bills: &[BillOutcome]) -> usize {
         .sum()
 }
 
-/// Refuse, never cut, an answer of more than [`MAX_DETAIL_ROWS`] rows, with the
+/// Refuse, never cut, an answer of more than `cap` ([`MAX_DETAIL_ROWS`]) rows, with the
 /// kind's own code: `reference` narrows a bill trail and nothing narrows the
 /// unadjusted detail, so the two refusals carry different advice.
-pub(super) fn within_detail_cap(kind: DetailKind, rows: usize) -> Result<(), TrailRefusal> {
-    if rows > MAX_DETAIL_ROWS {
+pub(super) fn within_detail_cap(
+    kind: DetailKind,
+    rows: usize,
+    cap: usize,
+) -> Result<(), TrailRefusal> {
+    if rows > cap {
         return Err(TrailRefusal(match kind {
             DetailKind::BillTrail => "trail_too_large",
             DetailKind::Unadjusted => "unadjusted_detail_too_large",
@@ -772,6 +776,35 @@ impl Server {
         open_bills: &[OpenBillRow],
         unallocated: &[UnallocatedParty],
     ) -> Result<(Value, Evidence), ToolFailure> {
+        self.outstandings_detail_within(
+            identity,
+            company,
+            as_of,
+            party_argument,
+            kind,
+            reference,
+            open_bills,
+            unallocated,
+            MAX_DETAIL_ROWS,
+        )
+        .await
+    }
+
+    /// [`Self::outstandings_detail`] with the row limit given, so that its
+    /// refusal can be reached through the handler on a small captured window.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn outstandings_detail_within(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &TallyCompany,
+        as_of: &str,
+        party_argument: &str,
+        kind: DetailKind,
+        reference: Option<&str>,
+        open_bills: &[OpenBillRow],
+        unallocated: &[UnallocatedParty],
+        cap: usize,
+    ) -> Result<(Value, Evidence), ToolFailure> {
         let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
         let party = resolve_ledger_name(catalogue.iter().map(String::as_str), party_argument)?;
         let books_from = company
@@ -815,6 +848,7 @@ impl Server {
             open_bills,
             unallocated,
             vouchers_read,
+            cap,
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
@@ -843,6 +877,7 @@ pub(super) fn party_detail(
     open_bills: &[OpenBillRow],
     unallocated: &[UnallocatedParty],
     vouchers_read: usize,
+    cap: usize,
 ) -> Result<Value, TrailRefusal> {
     if vouchers_read == 0 {
         return Ok(json!({
@@ -854,7 +889,7 @@ pub(super) fn party_detail(
     match kind {
         DetailKind::BillTrail => {
             let bills = bill_trails(party, reference, entries, open_bills)?;
-            within_detail_cap(kind, trail_row_count(&bills))?;
+            within_detail_cap(kind, trail_row_count(&bills), cap)?;
             Ok(json!({
                 "kind": kind.label(),
                 "state": bill_trail_state(&bills, row),
@@ -863,7 +898,7 @@ pub(super) fn party_detail(
         }
         DetailKind::Unadjusted => {
             let detail = unadjusted_detail(entries, open_bills, party, row)?;
-            within_detail_cap(kind, detail.rows.len())?;
+            within_detail_cap(kind, detail.rows.len(), cap)?;
             let mut value = detail.json();
             value["kind"] = json!(kind.label());
             Ok(value)

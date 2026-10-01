@@ -1,5 +1,9 @@
 # Goal 2 report — historical voucher-file import work (not live-verified)
 
+> Historical: this report was written before the live runs now recorded in
+> [docs/agent/README.md](./README.md), and its statement that no live Tally was run describes
+> that report's own run only.
+
 > Status superseded by Goal 6: this report describes synthetic/local
 > voucher-file generation and readback behavior. It records no live-Tally
 > import/read-back evidence and must not be used to claim live verification.

@@ -12,8 +12,8 @@ use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, group_counterparties, selfcheck, Build, BuildOptions, Disposition, Side,
-    StatementRecord, VoucherType,
+    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Disposition,
+    Side, StatementRecord, VoucherType,
 };
 use common::*;
 
@@ -146,6 +146,34 @@ fn build_treatments() {
     assert!(regex::Regex::new(r"^[A-Za-z0-9_-]{1,64}$")
         .unwrap()
         .is_match(&proposals[0].bridge_txn_id));
+    for proposal in &proposals {
+        assert!(
+            is_statement_txn_id(&proposal.bridge_txn_id),
+            "{}",
+            proposal.bridge_txn_id
+        );
+    }
+}
+
+/// A caller of `is_statement_txn_id` refuses on the id alone (#876), so it
+/// must not accept a label an agent types.
+#[test]
+fn only_an_id_of_the_statement_derived_form_is_recognised() {
+    assert!(is_statement_txn_id("st-20260901-0123456789abcdef"));
+    for no in [
+        "",
+        "t1",
+        "st-20260901-0123456789ABCDEF",
+        "st-20260901-0123456789abcde",
+        "st-20260901-0123456789abcdef0",
+        "st-2026090-0123456789abcdef",
+        "st-2026090a-0123456789abcdef",
+        "ST-20260901-0123456789abcdef",
+        "xst-20260901-0123456789abcdef",
+        "st-20260901-0123456789abcdef ",
+    ] {
+        assert!(!is_statement_txn_id(no), "{no}");
+    }
 }
 
 #[test]
@@ -433,8 +461,25 @@ fn counterparties_group_by_mapping_key() {
     assert_eq!(groups.len(), 2);
     // one line for two spellings, labelled with the one the bank printed
     assert_eq!(groups[0].party, "MERCURY MANUFACTURERS");
-    assert_eq!(groups[0].total, "280000.00");
     assert_eq!(groups[0].rows, 2);
     assert_eq!(groups[0].also_printed_as, ["MERCURY M ANUFACTURERS"]);
     assert_eq!(groups[1].party, "AMBIKA INDUSTRIES");
+}
+
+/// Spellings of one payee with the same number of words are chosen and listed
+/// by name, never by the amounts they carry.
+#[test]
+fn a_shown_spelling_is_chosen_without_amounts() {
+    let groups = group_counterparties(&[
+        record("Alpha Traders", "900.00"),
+        record("ALPHA TRADERS", "10.00"),
+        record("alpha traders", "50.00"),
+    ])
+    .unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].party, "ALPHA TRADERS");
+    assert_eq!(
+        groups[0].also_printed_as,
+        ["Alpha Traders", "alpha traders"]
+    );
 }

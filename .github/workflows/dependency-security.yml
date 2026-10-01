@@ -12,6 +12,8 @@ on:
     # state, because nothing required failed. A dependency advisory is worth
     # hearing about on the PR that introduces it, not several PRs later.
     types: [opened, reopened, synchronize, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:

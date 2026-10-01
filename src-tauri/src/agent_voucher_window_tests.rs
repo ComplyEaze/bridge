@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 
 // The four tests below moved here from `agent_import_tests.rs` with the #485

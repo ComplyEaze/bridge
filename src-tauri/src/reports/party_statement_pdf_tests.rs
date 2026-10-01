@@ -399,6 +399,8 @@ fn xlsx_and_pdf_render_the_same_model_total() {
         party: "Synthetic Party".to_string(),
         amount: ExactDecimal::parse("300.00").unwrap(),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }];
     let statement = build_party_statement(
         "Synthetic Books Pvt Ltd",
@@ -425,6 +427,8 @@ fn renders_not_due_and_unallocated_direction_in_the_pdf_text() {
         party: "Synthetic Party".to_string(),
         amount: ExactDecimal::parse("42.00").unwrap(),
         direction: ExposureDirection::Payable,
+        opening_balance: None,
+        composition: None,
     }];
     let statement = build_party_statement(
         "Synthetic Books Pvt Ltd",

@@ -241,6 +241,13 @@ This makes a real protocol fact operationally visible: on an automatically
 numbered voucher type, Bridge will decide nothing, and will say so, rather than
 matching on a number Tally threw away.
 
+*Note, 2026-09-30.* A voucher-type read now exists: the `masters` tool with
+`kind=voucher_types` returns each type's numbering method as Tally reported it
+([protocol reference §12a.12](../tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)).
+It is measured on one synthetic book (`Default`, `Automatic` and `Manual`), and
+what `Default` means for numbering is still unmeasured, so the rule above
+stands: the method is still declared by the caller.
+
 ### 4. Three statuses. The middle one is never resolved
 
 Per proposed voucher, exactly one of:

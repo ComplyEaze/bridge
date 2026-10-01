@@ -1,5 +1,9 @@
 # Goal 3b report
 
+> Historical: this report was written before the live runs now recorded in
+> [docs/agent/README.md](./README.md), and its statement that no live Tally was run describes
+> that report's own run only.
+
 Completed on `feat/agent-connector`.
 
 ## Delivered

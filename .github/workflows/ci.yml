@@ -13,6 +13,10 @@ on:
     # A stack then accumulated unchecked changes until its root merged, so the
     # first real run faced several pull requests' worth of change at once.
     types: [opened, reopened, synchronize, ready_for_review]
+  # The merge queue's temporary branch (gh-readonly-queue/master/...) is the exact
+  # tree that will land; a required check must be reported on it under the same name.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -44,6 +48,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
 
@@ -56,6 +61,8 @@ jobs:
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            base="$MERGE_GROUP_BASE_SHA"
           else
             base="$BEFORE_SHA"
           fi
@@ -71,7 +78,7 @@ jobs:
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
           changed_files="$(git diff --name-only --no-renames -z "$base" "$GITHUB_SHA" | tr '\0' '\n')"
-          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs)'; then
+          if printf '%s\n' "$changed_files" | grep -Eq '^(\.github/workflows/|\.github/actions/setup-windows-native/|rust-toolchain\.toml|src-tauri/|tools/|scripts/package-mcpb\.mjs|scripts/check-no-test-seam(\.test)?\.mjs|scripts/check-tally-egress-boundary(\.test)?\.mjs|scripts/tally-egress-census\.json|scripts/testdata/egress-census-)'; then
             echo 'native=true' >> "$GITHUB_OUTPUT"
           else
             echo 'native=false' >> "$GITHUB_OUTPUT"
@@ -154,11 +161,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           toolchain: 1.96.0
-      - name: Require pinned Rust for reseal regressions
-        run: rustup which --toolchain 1.96.0 rustc
       - run: node scripts/check-ci-workflow-consistency.mjs
-      - name: Test reseal and merge-driver regressions
-        run: node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs
+      # A pull request that changes a pinned file, or the pin list, adds its own
+      # acknowledgement file (docs/release-process.md). Report-only until the rule has
+      # run on real pull requests: it prints WOULD FAIL and exits 0. A push to master is
+      # the exception: every landed commit is always enforced, whatever the flag says.
+      - name: Check the surface acknowledgement
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}
+        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
       - run: node scripts/check-unbounded-reads.mjs
@@ -194,7 +208,7 @@ jobs:
             src-tauri -> target
             tools -> target
           # bridge#669: a PR-scoped cache only serves that PR; PRs restore master's.
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       - name: Test portable Tally truth layer
         working-directory: src-tauri
         run: >-
@@ -297,7 +311,7 @@ jobs:
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
     # check is deliberately skipped only for frontend- and documentation-only PRs.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
     # release profiles unchanged; assertions and overflow checks stay enabled.
@@ -346,7 +360,7 @@ jobs:
           env-vars: ${{ runner.os == 'Windows' && 'ImageOS ImageVersion OPENSSL LIBCLANG' || '' }}
           # PRs consume trusted base caches. Manual branch runs can measure cold
           # and warm reuse in their own scope before a change reaches master.
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       - name: Record Windows prerequisite cache state
         if: runner.os == 'Windows'
         shell: pwsh
@@ -430,6 +444,20 @@ jobs:
           --features bills-native-outstandings-probe-runner
           --all-targets -- --test-threads=1
       - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --all-targets --timings -- -D warnings -A clippy::pedantic
+      # The Tally-path egress census (scripts/check-tally-egress-boundary.mjs, check 2). The
+      # two egress lints are forced to warn, which no group allow, -A or lint table (measured)
+      # can silence, over the shipped targets. The messages go to a file first, so a failed run
+      # cannot read as "nothing found", and the census requires that what fired match the
+      # reviewed call sites for this OS exactly, so a run that silences the lints (RUSTFLAGS
+      # --cap-lints allow does) fails too. Measured with clippy 1.96.0 on macOS, on a two-file crate
+      # and on this workspace: after a passing `-D warnings` step this run re-lints and reports the
+      # firings. If it ever did not, the firings would be zero and the census would fail loudly. To
+      # roll back, delete this step; the static half of the gate still runs in the portable job.
+      - name: Census the Tally-path egress lints
+        shell: bash
+        run: |
+          cargo clippy --locked --manifest-path src-tauri/Cargo.toml --workspace --lib --bins --message-format=json -- -A clippy::pedantic --force-warn clippy::disallowed_methods --force-warn clippy::disallowed_types > "$RUNNER_TEMP/egress-census.jsonl"
+          node scripts/check-tally-egress-boundary.mjs --census "$RUNNER_TEMP/egress-census.jsonl" "$RUNNER_OS"
       # The legacy voucher-scan runtime and the manual Unit A calibration harness
       # are non-default features, so the workspace steps above never compile
       # them. Each feature set carries tests the other lacks: the default-width
@@ -484,7 +512,7 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and every
     # master/manual run. Rust/Tauri PRs retain the native platform matrix above.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -534,7 +562,7 @@ jobs:
           # Tauri sets this inside its process; include it before cache lookup so
           # artifacts from a plain Cargo build cannot masquerade as a warm bundle.
           env-vars: ${{ runner.os == 'macOS' && 'MACOSX_DEPLOYMENT_TARGET' || '' }}
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
       - name: Set up Windows native prerequisites
         id: windows-bundle-prerequisites
         if: runner.os == 'Windows'
@@ -700,7 +728,7 @@ jobs:
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
     # platforms as bundle-smoke, whose runs it guards.
-    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -785,7 +813,7 @@ jobs:
     # master left inconsistent by a merge that bypassed it then reds crate PRs and
     # the nightly run, not every unrelated PR.
     needs: [changes]
-    if: github.event_name != 'pull_request' || needs.changes.outputs.tax_audit == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.tax_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -800,7 +828,7 @@ jobs:
         run: python3 -m unittest discover -s src-tauri/crates/bridge-tax-audit/parity -p 'test_mutations.py'
       # The nightly run writes the ids it found failing into its open tracking issue.
       - name: Read any open nightly mutation issue
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -813,9 +841,9 @@ jobs:
       # crate tree. While a nightly issue is open, a crate change must also re-prove
       # every mutation it lists as failing, so the fix merges and nothing else does.
       - name: Check the change's mutations are proven on this tree
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: >-
           python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py --verify
           --changed-since "$BASE_SHA" --nightly-issues "$RUNNER_TEMP/nightly-issues.txt"

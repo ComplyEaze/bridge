@@ -228,7 +228,8 @@ and master ID), and only then record the type as qualified.
 > (`src-tauri/src/agent_import_amend.rs`) relies on the replacement and refuses type changes.
 >
 > **Still not measured:** a file imported through Tally's own Import menu rather than the gateway;
-> Gold, Education or any other release; bill allocations, inventory or tax entries; a voucher that
+> Education or any other release (Gold is measured for a same-`REMOTEID` upsert of Payment, Receipt and
+> Contra in §9.14); bill allocations, inventory or tax entries; a voucher that
 > is cancelled or optional; and an alteration made in Tally's UI between the two imports. The
 > `REMOTEID` attribute on readback returned Tally's own `<company GUID>-<id>`, as recorded above,
 > so the voucher is still located by its narration marker.
@@ -262,12 +263,17 @@ So the two measurements cover different halves and neither covers the third case
   correction primitive for anyone targeting that environment.
 - **Stored state, licensed 7.1 Gold — confirmed via the UI (§9.12b).** The voucher was gone
   afterwards. No gateway response exists to corroborate it.
-- **Gateway on a licensed SKU — UNVERIFIED**, on Gold and on the Silver/Journal profile this
-  section is about alike. §9.7 does not reach it because its baseline is Educational; §9.12b does
-  not reach it because a UI import returns nothing.
+- **Gateway on a licensed SKU — UNVERIFIED when this was written (2026-09-25); now PARTIAL, once per
+  profile.** §9.7 does not reach it because its baseline is Educational, and §9.12b's first
+  measurement does not reach it because a UI import returns nothing. Two single observations exist:
+  - licensed Silver, Journal, `DELETED=1` on a `REMOTEID` delete (§9.14, PARTIAL: observed once);
+  - licensed Gold, a gateway `Delete` by the creation `REMOTEID` returned `DELETED=1` for one
+    directly imported voucher (§9.12b, 2026-09-28, PARTIAL: one voucher).
 
-Say which of the three you are standing on. "Delete works" is true in two of them and unproven in
-the one a licensed integration actually runs in.
+  §9.14's Gold block records a same-`REMOTEID` upsert, not a delete.
+
+Say which of the three you are standing on. "Delete works" is established in two of them and, in
+the one a licensed integration actually runs in, has one PARTIAL observation per profile.
 
 **Qualifying it on a new SKU or voucher type takes more than "read one voucher back".** A single
 read cannot tell *the original is gone* from *my read did not cover it*: an incomplete, failed or
@@ -324,6 +330,26 @@ The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)
 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a. This section records the gateway observation;
 it does not grant dispatch authority from a pre-read.
+
+**A rename by `Alter` changes only the name. VERIFIED on one run (licensed TallyPrime 7.1 Gold, one
+client book, 2026-09-28).**
+- **Request.** `REPORTNAME` `All Masters`. A `LEDGER` (or `GROUP`) with `NAME="<old name>"` and
+  `ACTION="Alter"`, carrying only
+  `<LANGUAGENAME.LIST><NAME.LIST TYPE="String"><NAME><new name></NAME></NAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST>`.
+- **Pilot ledger.** An Object export (`TYPE=Object`, `SUBTYPE=Ledger`, `FETCH *`) was taken before and
+  after the rename. The textual diff held only the name, `ALTERID` and the company's ledger counter.
+  Opening balance, parent, GUID and `MASTERID` were unchanged. `ledger_movement` showed the ledger's
+  vouchers still attached.
+- **Then about 120 more ledgers** returned `ALTERED` equal to each request's count. Two groups were each
+  piloted with the same Object diff.
+- **Re-read.** A compliance `ledger_masters` read of all the book's ledgers (about 700) found the count unchanged and
+  every renamed ledger under its new name. Parent, opening balance and GSTIN fields had 0 changes.
+- **Scope.** The GUID was diffed only for the pilot ledger and the two piloted groups, and it was
+  unchanged (§12a.9 observed the same for a rename in Tally's screens). The other renamed ledgers (about 120) were
+  counted and re-read for parent, opening balance and GSTIN, not for GUID. Aliases and a rename that
+  collides with an existing name were not measured.
+- **Confidence.** VERIFIED because the pilot was diffed before and after and about 120 more were counted;
+  still one session on one client book, so **Confidence: PARTIAL** beyond it.
 
 ### 9.4a A partial ledger `Alter` preserves the omitted Party GSTIN
 
@@ -706,7 +732,7 @@ habits, not against real operator input.
 
 **VERIFIED 2026-09-26, licensed TallyPrime 7.1 Silver** (`education_mode=false`). One synthetic company, one run of each step. **Confidence: PARTIAL.**
 
-§9.4b and §9.4d measure a folded spelling against **one** live ledger. This measures an import naming one of **two** ledgers whose names fold equal. The twins differed by a trailing CR LF (written as `&#13;&#10;`, §9.4d), and in one case also by ASCII case.
+§9.4b and §9.4d measure a folded spelling against **one** live ledger. This measures an import naming one of **two** ledgers whose names fold equal. The twins differed by a trailing CR LF (written as `&#13;&#10;`; see the encoding paragraph below), and in one case also by ASCII case.
 
 **Tally lets such twins coexist.** A gateway ledger `Create` for the second of each pair returned `CREATED 1`, `ALTERED 0`, three times:
 - plain after the CR LF name;
@@ -729,9 +755,23 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 **Not measured:**
 - a name that matches **neither** twin exactly, only folding to both (e.g. mixed case without the CR LF): which twin Tally picks there is open;
 - twins made or edited in Tally's own screens;
-- Gold and Education.
+- the fold-twin behaviour on Gold and Education (the CR LF block below measures an encoding on Gold, not twins).
 
 Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
+
+**Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
+Gold, one client book, 2026-09-28).**
+- **Vouchers.** A ledger whose stored name ends in CR LF was named with the CR LF written as
+  `&#13;&#10;` inside `LEDGERNAME` and `PARTYLEDGERNAME`. 6 vouchers returned `CREATED`, and
+  `ledger_movement` on that ledger then showed exactly those 6.
+- **Masters.** The same encoding was reported to work in the `NAME` attribute of a ledger `Alter`
+  (§9.4). No read-back of that `Alter` is recorded, so this clause is **PARTIAL**.
+- **Bridge.** Bridge's import file writes CR and LF this way (`xml_escape`, bridge#626).
+- **Not sent.** A raw CR LF was not sent. XML 1.0 normalises a raw CR LF in content to LF, so a
+  raw line break would name a ledger the book does not hold; that is **UNVERIFIED** against Tally.
+- **Confidence.** VERIFIED for the 6 vouchers, because `ledger_movement` read back exactly those 6.
+  The `Alter` clause is PARTIAL (reported, not read back). It is one session on one client book, so
+  **Confidence: PARTIAL** beyond it.
 
 
 #

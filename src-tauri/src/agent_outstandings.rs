@@ -227,15 +227,51 @@ pub(super) fn unallocated_totals_from_parties(
 ) -> Result<Value, String> {
     let mut receivable = "0".to_string();
     let mut payable = "0".to_string();
+    // The same gross amounts split by what the ledger data says about them
+    // (never "on account": see UnallocatedComposition). The two known
+    // compositions are always present; `composition_not_observed` appears only
+    // when a row carries none, so the parts always add up to the totals.
+    let mut by_composition = std::collections::BTreeMap::<&'static str, (String, String)>::new();
+    by_composition.insert("not_bill_wise_ledger", ("0".into(), "0".into()));
+    by_composition.insert(
+        "bill_wise_ledger_components_not_separated",
+        ("0".into(), "0".into()),
+    );
     for party in parties {
         let total = match party.direction {
             ExposureDirection::Receivable => &mut receivable,
             ExposureDirection::Payable => &mut payable,
         };
         *total = add_decimal(total, party.amount.as_str())?;
+        let key = match party.composition {
+            Some(UnallocatedComposition::NotBillWiseLedger) => "not_bill_wise_ledger",
+            Some(UnallocatedComposition::BillWiseLedgerComponentsNotSeparated) => {
+                "bill_wise_ledger_components_not_separated"
+            }
+            None => "composition_not_observed",
+        };
+        let entry = by_composition
+            .entry(key)
+            .or_insert_with(|| ("0".into(), "0".into()));
+        let part = match party.direction {
+            ExposureDirection::Receivable => &mut entry.0,
+            ExposureDirection::Payable => &mut entry.1,
+        };
+        *part = add_decimal(part, party.amount.as_str())?;
     }
     let gross_unallocated = add_decimal(&receivable, &payable)?;
-    Ok(json!({"receivable":receivable, "payable":payable, "gross_unallocated":gross_unallocated}))
+    let by_composition = by_composition
+        .into_iter()
+        .map(|(key, (receivable, payable))| {
+            (
+                key.to_string(),
+                json!({"receivable": receivable, "payable": payable}),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    Ok(
+        json!({"receivable":receivable, "payable":payable, "gross_unallocated":gross_unallocated, "by_composition": by_composition}),
+    )
 }
 
 struct PartyExposure {

@@ -29,6 +29,11 @@ pub(crate) struct PartyLedgerMasterSource {
     pub(crate) currency_decimal_places: u8,
     pub(crate) from: TallyDate,
     pub(crate) to: TallyDate,
+    /// The extent's last voucher date when the read was pinned. It is after
+    /// `to` only when the balance snapshot was ended at the host's today, or at
+    /// the start of the books when the host's date is earlier, because the book
+    /// holds a later-dated voucher (#875).
+    pub(crate) last_voucher_date: TallyDate,
     pub(crate) rows: Vec<PartyLedgerMasterRow>,
     /// Ordered master/balance/group request body commitments (UTF-16LE on wire).
     pub(crate) request_sha256: String,
@@ -50,6 +55,26 @@ pub(crate) struct PartyLedgerMasterSource {
     /// Base-currency ledgers left out of `rows` because a balance of theirs
     /// is a currency composite (bridge#551). Empty on a book with one master.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted a book whose mark is past its catalogue
+    /// was checked against the company's own ledger count (#938); `None` when
+    /// no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
+}
+
+impl PartyLedgerMasterSource {
+    /// Said in the workbook only when a voucher is dated after the balance
+    /// snapshot's end, so a workbook read as "everything in the book" is not.
+    /// It claims no count and no cause: a later date may be legitimate
+    /// (post-dated entries) or a typing error.
+    pub(crate) fn later_dated_vouchers_note(&self) -> Option<String> {
+        (self.last_voucher_date > self.to).then(|| {
+            format!(
+                "Vouchers dated after {} (the book's last voucher date is {}) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after this computer's date, or on or after the start of the books if that is later; if this computer's date is wrong, correct it and export again.",
+                self.to.as_str(),
+                self.last_voucher_date.as_str()
+            )
+        })
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -516,7 +516,7 @@ jobs:
           workspaces: src-tauri -> target
           key: ${{ format('native-deps-v1-{0}', hashFiles('.github/actions/setup-windows-native/action.yml')) }}
           env-vars: ImageOS ImageVersion OPENSSL LIBCLANG
-          # Pilot only: save on pull request runs too, so a later push on this branch can restore it.
+          # Pilot only: save on pull request runs too, so a later push on this branch restores it (third run).
           save-if: true
       - name: Report the dependency cache state
         shell: pwsh

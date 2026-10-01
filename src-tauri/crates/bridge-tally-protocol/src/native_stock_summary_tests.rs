@@ -10,6 +10,9 @@ use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName, ValidatedD
 const COMPANY: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const FOREIGN_COMPANY: &str = "ffffffff-b835-4bff-89dd-8a6af138c346";
 const LAB: &str = "BRIDGE SHAPE LAB";
+/// A second synthetic company: inventory on, and no stock item at all.
+const EMPTY_BOOK: &str = "c3edf50d-3dca-4213-a1f1-1d9fa331a674";
+const EMPTY_BOOK_LAB: &str = "BRIDGE EMPTY BOOK";
 
 fn utf16le(bytes: &[u8]) -> String {
     let units = bytes
@@ -35,6 +38,22 @@ fn report_response() -> String {
 fn flags_response() -> String {
     utf16le(
         &include_bytes!("../tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml")[..],
+    )
+}
+
+fn empty_book_flags() -> String {
+    utf16le(
+        &include_bytes!("../tests/fixtures/company_inventory_flags_empty_book_live.utf16le.xml")[..],
+    )
+}
+
+fn empty_book_items() -> String {
+    utf16le(&include_bytes!("../tests/fixtures/stock_items_empty_book_fy_live.utf16le.xml")[..])
+}
+
+fn empty_book_report() -> String {
+    utf16le(
+        &include_bytes!("../tests/fixtures/stock_summary_report_empty_book_fy_live.utf16le.xml")[..],
     )
 }
 
@@ -230,6 +249,34 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
         render_company_inventory_flags_request(LAB, COMPANY).unwrap(),
         utf16le(
             &include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml")[..]
+        )
+    );
+    // The same three requests as sent for the company with no stock item.
+    assert_eq!(
+        render_native_stock_summary_request(EMPTY_BOOK_LAB, &period),
+        utf16le(
+            &include_bytes!(
+                "../tests/fixtures/stock_summary_report_empty_book_fy_request.utf16le.xml"
+            )[..]
+        )
+    );
+    let company = ValidatedCompanyName::new(EMPTY_BOOK_LAB).unwrap();
+    assert_eq!(
+        ReadOnlyProfile::AuditStockItemsV1 {
+            company: &company,
+            period: &range
+        }
+        .render(),
+        utf16le(
+            &include_bytes!("../tests/fixtures/stock_items_empty_book_fy_request.utf16le.xml")[..]
+        )
+    );
+    assert_eq!(
+        render_company_inventory_flags_request(EMPTY_BOOK_LAB, EMPTY_BOOK).unwrap(),
+        utf16le(
+            &include_bytes!(
+                "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
+            )[..]
         )
     );
 }
@@ -1236,23 +1283,26 @@ fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not
 
 #[test]
 fn a_book_with_no_stock_items_is_an_answer_only_when_three_sources_agree() {
-    // PROVISIONAL (not a capture): the three texts are the committed captures
-    // with their rows, their lines and their count edited away. The situation
-    // itself was observed live on a synthetic company (count `0`, an empty item
-    // collection, an empty Stock Summary envelope), but no wire capture of it
-    // taken through Bridge is committed yet. This test stands in until one is,
-    // and the change does not ship with it in this form.
-    let zero = count_of(&flags_with_count(Some("0")));
+    // The three captures of a synthetic company with inventory on and no stock
+    // item, taken through Bridge: a count written `0`, a present and empty
+    // collection, and an empty Stock Summary envelope.
+    let inventory = parse_company_inventory_flags(&empty_book_flags(), EMPTY_BOOK).unwrap();
+    assert_eq!(inventory.flags.inventory_on, NativeFlag::Yes);
+    let zero = inventory.item_count;
     assert_eq!(zero, NativeStockItemCount::Reported(0));
-    assert_eq!(parse(&no_item_rows()).unwrap().rows.len(), 0);
+    let items = parse_native_stock_items(&empty_book_items(), EMPTY_BOOK).unwrap();
+    assert!(items.rows.is_empty());
+    let report = report_of(&empty_book_report()).unwrap();
+    assert_eq!(report, NativeStockReport::Empty);
     assert_eq!(
-        gate_with(&no_item_rows(), zero, &empty_report()),
+        gate_stock_summary(items.rows, zero, &report),
         Ok(NativeStockGate::NoStockItems)
     );
-    // Any one of the three saying otherwise is not that answer.
+    // Any one of the three saying otherwise is not that answer; from here the
+    // other company's captures stand in for the source that disagrees.
     // A report with a total, and no items: Tally shows a value the items lack.
     assert_eq!(
-        gate_with(&no_item_rows(), zero, &report_response()),
+        gate_with(&empty_book_items(), zero, &report_response()),
         Ok(NativeStockGate::Differs {
             items_total: None,
             report_total: decimal("3000.01"),
@@ -1260,7 +1310,11 @@ fn a_book_with_no_stock_items_is_an_answer_only_when_three_sources_agree() {
     );
     // A report with lines and no amount, and no items: nothing to compare.
     assert_eq!(
-        gate_with(&no_item_rows(), zero, &report_with_amounts(["", "", ""])),
+        gate_with(
+            &empty_book_items(),
+            zero,
+            &report_with_amounts(["", "", ""])
+        ),
         Ok(NativeStockGate::NotComparable)
     );
     // Rows, with a count of zero: not "no stock" (the count is lower; the

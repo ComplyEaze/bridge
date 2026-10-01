@@ -28,7 +28,7 @@ Each line names the pull requests it comes from.
   than Tally's own count; otherwise no item is returned, with the reason and
   the next step. A company with no stock items is told so. Quantities are not
   returned yet, because nothing checks them. Only a 31 March and small books
-  are read (#980 and the checked-reads change that follows it).
+  are read (#980, #979 and the checked-reads change that follows them).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read

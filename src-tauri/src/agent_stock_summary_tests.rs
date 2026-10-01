@@ -12,6 +12,8 @@ use tally_protocol_simulator::{
 
 const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
 const CAPTURE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+/// The company of the second set of captures: inventory on, no stock item.
+const EMPTY_BOOK_GUID: &str = "c3edf50d-3dca-4213-a1f1-1d9fa331a674";
 /// The only date stock has been measured at: the end of the financial year the
 /// captures were taken over, 20250401 to 20260331.
 const AS_OF: &str = "20260331";
@@ -81,6 +83,24 @@ fn flags() -> String {
         "../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
     ))
     .replace(CAPTURE_GUID, GUID)
+}
+
+/// The three captures of the company with no stock item, as the test double's
+/// company.
+fn empty_book() -> Book {
+    let flags = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_empty_book_live.utf16le.xml"
+    ));
+    assert!(flags.contains(EMPTY_BOOK_GUID));
+    Book {
+        flags: flags.replace(EMPTY_BOOK_GUID, GUID),
+        items: decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_empty_book_fy_live.utf16le.xml"
+        )),
+        report: decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_empty_book_fy_live.utf16le.xml"
+        )),
+    }
 }
 
 /// `text` with the first `from` replaced by `to`, which must be there.
@@ -1122,17 +1142,10 @@ async fn nothing_comparable_returns_no_item() {
 
 #[tokio::test]
 async fn a_book_with_no_stock_items_is_an_answer_with_an_empty_list() {
-    // PROVISIONAL (not a capture): the committed captures with their rows,
-    // their report lines and their item count edited away. The situation was
-    // observed live on a synthetic company (count `0`, an empty item
-    // collection, an empty Stock Summary envelope), but no wire capture of it
-    // taken through Bridge is committed yet. The change does not ship with this
-    // test in this form.
-    let book = Book {
-        flags: flags_with_count(Some("0")),
-        items: no_item_rows(),
-        report: empty_report(),
-    };
+    // The captures of a synthetic company with inventory on and no stock item,
+    // taken through Bridge: a count of `0`, an empty item collection and an
+    // empty Stock Summary envelope.
+    let book = empty_book();
     let mut plans = book.first_page(14, MARK);
     plans.extend(continuation_plans(14));
     let total = plans.len();

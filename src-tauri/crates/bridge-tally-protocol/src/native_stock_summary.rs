@@ -1143,7 +1143,8 @@ pub fn gate_stock_summary(
                 report_total: report_total.clone(),
             },
         },
-        NativeStockReport::Empty if rows == 0 && tally_count == 0 => NativeStockGate::NoStockItems,
+        // No rows, and so a count of zero: a higher count returned above.
+        NativeStockReport::Empty if rows == 0 => NativeStockGate::NoStockItems,
         NativeStockReport::Lines { total: None, .. } | NativeStockReport::Empty => {
             match items_total {
                 Some(sum) if !sum.is_zero() => {

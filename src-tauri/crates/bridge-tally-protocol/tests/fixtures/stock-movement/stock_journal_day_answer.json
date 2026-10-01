@@ -1,0 +1,254 @@
+{
+ "company": {
+  "books_from": "20250401",
+  "company_number": "100021",
+  "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+  "identity_state": "verified_tuple",
+  "missing_field": null,
+  "name": "BRIDGE SHAPE LAB"
+ },
+ "evidence": {
+  "bytes": 203588,
+  "duration_ms": 7386,
+  "read_at": "2026-10-01T18:04:13.105Z",
+  "request_sha256": "101f58911a5709fa8f87ab8679dcfbe5b908143632e81909cceecac3dec8f91a",
+  "response_sha256": "6a3ddfe5637d830dd185cd6e7f3f52f3ed7eab27828aebc20f9f3c06fad2284c",
+  "state": "complete"
+ },
+ "read_at": "2026-10-01T18:04:05.718Z",
+ "result": {
+  "godowns": [
+   {
+    "name": "Factory Floor",
+    "parent": "�#4; Primary"
+   },
+   {
+    "name": "Main Location",
+    "parent": "�#4; Primary"
+   }
+  ],
+  "stock_groups": [
+   {
+    "name": "Finished Kits",
+    "parent": "�#4; Primary"
+   },
+   {
+    "name": "Packaging",
+    "parent": "�#4; Primary"
+   },
+   {
+    "name": "Raw Chemicals",
+    "parent": "�#4; Primary"
+   }
+  ],
+  "stock_items": [
+   {
+    "base_unit": "Box",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Carton Box Small",
+    "opening_qty": " 100 Box",
+    "opening_rate": "25.00/Box",
+    "opening_value": "2500.00",
+    "parent": "Packaging"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Caustic Soda Flakes",
+    "opening_qty": " 200.000 Kgs",
+    "opening_rate": "45.00/Kgs",
+    "opening_value": "9000.00",
+    "parent": "Raw Chemicals"
+   },
+   {
+    "base_unit": "Nos",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Cleaning Kit A",
+    "opening_qty": " 25 Nos",
+    "opening_rate": "750.00/Nos",
+    "opening_value": "18750.00",
+    "parent": "Finished Kits"
+   },
+   {
+    "base_unit": "Nos",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Cleaning Kit B",
+    "opening_qty": null,
+    "opening_rate": null,
+    "opening_value": "0.00",
+    "parent": "Finished Kits"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Descaler Concentrate",
+    "opening_qty": null,
+    "opening_rate": null,
+    "opening_value": "0.00",
+    "parent": "Finished Kits"
+   },
+   {
+    "base_unit": "Nos",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "HDPE Drum 50L",
+    "opening_qty": " 40 Nos",
+    "opening_rate": "300.00/Nos",
+    "opening_value": "12000.00",
+    "parent": "Packaging"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Hydrochloric Acid 33pc",
+    "opening_qty": " 150.000 Kgs",
+    "opening_rate": "30.00/Kgs",
+    "opening_value": "4500.00",
+    "parent": "Raw Chemicals"
+   },
+   {
+    "base_unit": "Nos",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Label Roll",
+    "opening_qty": null,
+    "opening_rate": null,
+    "opening_value": "0.00",
+    "parent": "Packaging"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": "�#4; Applicable",
+    "gst_hsn_name": null,
+    "gst_type_of_supply": "Goods",
+    "hsn_code": null,
+    "name": "Soda Ash Light",
+    "opening_qty": " 300.000 Kgs",
+    "opening_rate": "25.00/Kgs",
+    "opening_value": "7500.00",
+    "parent": "Raw Chemicals"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": "�#4; Applicable",
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Sulphuric Acid 98pc",
+    "opening_qty": " 100.000 Kgs",
+    "opening_rate": "50.00/Kgs",
+    "opening_value": "5000.00",
+    "parent": "Raw Chemicals"
+   },
+   {
+    "base_unit": "Kgs",
+    "gst_applicable": null,
+    "gst_hsn_name": null,
+    "gst_type_of_supply": null,
+    "hsn_code": null,
+    "name": "Zero Stock Item",
+    "opening_qty": null,
+    "opening_rate": null,
+    "opening_value": "0.00",
+    "parent": "Raw Chemicals"
+   }
+  ],
+  "units": [
+   {
+    "decimal_places": "0",
+    "is_simple_unit": "Yes",
+    "name": "Box"
+   },
+   {
+    "decimal_places": " 3",
+    "is_simple_unit": "Yes",
+    "name": "Kgs"
+   },
+   {
+    "decimal_places": "0",
+    "is_simple_unit": "Yes",
+    "name": "Nos"
+   },
+   {
+    "decimal_places": "0",
+    "is_simple_unit": "No",
+    "name": "Nos of 10 Box"
+   }
+  ],
+  "vouchers": {
+   "items": [
+    {
+     "date": "20250430",
+     "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000000c",
+     "inventory_entries": [
+      {
+       "actual_qty": " 50.000 Kgs",
+       "amount": "1250.00",
+       "batch_allocations": [
+        {
+         "actual_qty": " 50.000 Kgs",
+         "amount": "1250.00",
+         "batch": "Primary Batch",
+         "billed_qty": " 50.000 Kgs",
+         "godown": "Factory Floor"
+        }
+       ],
+       "billed_qty": " 50.000 Kgs",
+       "godown": null,
+       "rate": "25.00/Kgs",
+       "stock_item": "Soda Ash Light"
+      },
+      {
+       "actual_qty": " 50.000 Kgs",
+       "amount": "-1250.00",
+       "batch_allocations": [
+        {
+         "actual_qty": " 50.000 Kgs",
+         "amount": "-1250.00",
+         "batch": "Primary Batch",
+         "billed_qty": " 50.000 Kgs",
+         "godown": "Main Location"
+        }
+       ],
+       "billed_qty": " 50.000 Kgs",
+       "godown": null,
+       "rate": "25.00/Kgs",
+       "stock_item": "Soda Ash Light"
+      }
+     ],
+     "is_cancelled": "No",
+     "party": null,
+     "voucher_number": "1",
+     "voucher_type": "Stock Journal"
+    }
+   ],
+   "offset": 0,
+   "profile": "lab_read_inventory_v1",
+   "total": 1,
+   "window_honoured": true
+  }
+ },
+ "truncated": false
+}

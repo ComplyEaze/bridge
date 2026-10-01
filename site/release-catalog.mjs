@@ -1,4 +1,4 @@
-export const repository = "lamemustafa/bridge";
+export const repository = "ComplyEaze/bridge";
 const platforms = ["windows-x64", "macos-arm64"];
 
 // A preview is identified by its tag and its complete asset set, not by GitHub's pre-release

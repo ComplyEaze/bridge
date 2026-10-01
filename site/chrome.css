@@ -521,3 +521,4 @@ html:has(.ce-page) { background: var(--footer-ground); }
 .ce-page .btn-primary { background: var(--ink); color: var(--paper); }
 .ce-page .btn-secondary { background: var(--card); color: var(--ink); border-color: var(--ink-faint); }
 .ce-page .ce-header .btn-primary { background: var(--paper); color: var(--ink); }
+html.js #dlLoading + noscript, html.js #relLoading + noscript { display: none; }

@@ -44,18 +44,26 @@ settings (section 4).
 - **Between ComplyEaze Bridge and Tally:** only to a loopback address on this
   computer. If you forward that port to a virtual machine or another machine,
   the traffic follows your forward.
-- **To your AI provider: yes, whatever the assistant reads.** Claude Desktop
-  sends the results a tool returns, including company names, party names and
-  amounts, to the AI provider you use, as it sends the rest of the
-  conversation. ComplyEaze Bridge can mask party names or drop narration
+- **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
+  Bridge hands each tool result, including company names, party names and
+  amounts, to Claude Desktop. Claude Desktop is the host, and it sends tool
+  results to the AI provider you use as part of the conversation; that is the
+  host's behaviour, which this repository cannot show. ComplyEaze Bridge can
+  mask party names or drop narration
   (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting), but neither
   removes amounts. The default is `none`: nothing is masked unless you choose it.
-  - `mask_parties` shortens the names it treats as party names (the party and
-    ledgers of a voucher, ledger and other master names and their parents,
-    stock item names, and the name on a PAN, a bank account holder name and
-    bank details) to their first two and last two characters; a name of four
-    characters or fewer is removed entirely. It does not touch company names,
-    narrations, GSTINs or amounts.
+  - `mask_parties` shortens, to their first two and last two characters, the
+    names of ledgers and parties wherever a tool returns them (in vouchers,
+    ledger lists, the trial balance and statements, outstandings, the purchase
+    register and bank-statement proposals), stock item names and their
+    parents, godown and stock-group names and their parents, and three fields
+    of a ledger's details: the name on the PAN, the bank account holder's name
+    and the bank details. A name of four characters or fewer is removed
+    entirely. It does not mask amounts, company names, a ledger's parent
+    group, the names of voucher types, units and account groups, narrations,
+    references, GSTINs, PAN numbers, email addresses, phone numbers, postal
+    addresses or IFSCs, and a name written inside a narration or reference
+    stays as it is.
   - `drop_narration` removes narrations and nothing else.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
@@ -73,9 +81,11 @@ settings (section 4).
   transport. It accepts only a loopback address (any `127.x.x.x` address, or
   `::1`) or the name `localhost`, which it maps to `127.0.0.1` without a DNS
   lookup. It refuses anything else, uses no proxy and follows no redirects.
-- In the source of release 0.4.0 no `complyeaze.com` address remains, and the
-  Tally transport is the only code that depends on an HTTP client library
-  outside tests.
+- In the program code of release 0.4.0 no `complyeaze.com` address remains
+  outside a test, and the Tally transport is the only code that depends on an
+  HTTP client library outside tests. The extension's manifest links to the
+  privacy and terms pages on `bridge.complyeaze.com`; the program does not
+  contact them.
 - CI checks this in two ways. The
   [egress check](../scripts/check-tally-egress-boundary.mjs) limits which
   source files and crates may hold network code. A second check runs the
@@ -86,12 +96,30 @@ settings (section 4).
   that sends an HTTP request; its other entries are a development simulator's
   local socket and the two places that start a process (the approval window,
   and a desktop-app command).
-- The check's own header lists what it does not prove: that the loopback
-  restriction is correct or still wired up (that has its own tests), and
-  network use through a method the lints do not name, such as a native
-  library. PDFium, the PDF library in the package, is such a library. The
-  changelog adds that the check does not by itself prove that no data leaves
-  the machine.
+- Among the limits the check's own
+  [header](../scripts/check-tally-egress-boundary.mjs) lists, in plain words:
+  - it does not prove that the loopback restriction is correct or still wired
+    up (that has its own tests);
+  - the lints name specific methods, so network use through a method they do
+    not name, a crate on neither list or a native library is outside them.
+    PDFium, the PDF library in the package, is such a library;
+  - the second check sees only the code its own run compiles (the shipped
+    targets with default features, on Windows and on Apple Silicon macOS), not
+    code built under other settings or features, Linux-only code, or tests;
+  - nine system functions on its list were reported as resolving to nothing
+    on Windows, on one run, and six of those are unexplained;
+  - a client it does not name, such as the HTTP library's blocking client,
+    and the desktop app's window settings are outside it;
+  - an entry is a file, a method and a count, so one reviewed call swapped for
+    another of the same method in the same file passes;
+  - removing or narrowing the check in the CI file, dropping the setting that
+    makes its warnings fail, or a build that skips the lints is not detected
+    by the check itself;
+  - the project's development tools are outside the lints, because they do
+    not ship.
+
+  The changelog adds that the check does not by itself prove that no data
+  leaves the machine.
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
@@ -102,12 +130,14 @@ settings (section 4).
 | Windows: `%LOCALAPPDATA%\Bridge\agent` | the files below |
 | macOS: `~/Library/Application Support/Bridge` | the files below |
 
-- **A receipt log** (`agent-egress.jsonl`): a record for each tool call, with
-  the tool name, the time, the company's Tally GUID, fingerprints of the
-  request and the response, the names (not the values) of the fields returned,
-  how many rows and bytes, whether the response was cut short, the redaction
-  setting in force, an error code if there was one, and for each request the
-  call sent to Tally its kind, size, outcome and time. It holds no row values.
+- **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
+  first has the tool name, the time, the company's Tally GUID, fingerprints of
+  the request and the response, the names (not the values) of the fields
+  returned, how many rows and bytes, whether the response was cut short, the
+  redaction setting in force, an error code if there was one, and the last 32
+  requests the call sent to Tally (their kind, size, outcome and time) with a
+  count of the rest. The second records that the response was written out. It
+  holds no row values.
 - **A terms record** (`terms-acceptance.jsonl`): the extension asks you to
   accept the ComplyEaze Bridge Terms of Use (version 2026-10) in its settings,
   and every tool refuses with `terms_not_accepted` until you do. When the
@@ -120,11 +150,12 @@ settings (section 4).
 - **An import journal** (`agent-import-ledger.jsonl`) and saved batch files
   (`imports/`): the vouchers ComplyEaze Bridge prepared or posted, with their
   dates, narrations, amounts and ledgers, the proof-of-post files that hold
-  what Tally read back, and a short note when an approval you gave ran out
-  before it was used.
+  what Tally read back, and a short note when an approval you gave was
+  dropped without being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
-- **Lock files** with no content, a lock folder that keeps two copies of the
+- **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
+  kept in ComplyEaze Bridge's per-user folder) that keeps two copies of the
   program from sending to Tally at the same time, and a small record written
   when you record a review of a posted voucher, including your
   operating-system account name.
@@ -136,8 +167,9 @@ permissions. **Not measured:** the resulting Windows permissions.
 You can ask what is stored. The `local_data_report` tool (and
 `bridge_mcp --local-data-report` on the command line) counts the files, their
 size and the age of the oldest by kind, says how many saved batches are not
-settled, and says so when it could not read something. It changes and deletes
-nothing, names no file path unless you ask on the command line, and covers
+settled, and says so when it could not read something. It changes no book
+and deletes nothing; the tool form, like every call, adds its own receipt to
+the log. It names no file path unless you ask on the command line, and covers
 this folder only, not files kept by the desktop app.
 
 There is no size limit, expiry or deletion command: the files grow until you
@@ -145,8 +177,12 @@ delete them. You can delete them by hand when Claude Desktop is not running. Do
 not delete the import journal (`agent-import-ledger.jsonl`) or `imports/` while
 any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
-`verify_import` cannot find the batch (see the
-[installation guide](./agent/INSTALL.md)). **Not measured:** what else breaks if
+`verify_import` cannot find the batch. The journal is also how it remembers
+which batches and which bank-statement rows it has already sent to Tally, so
+that it can refuse to send one twice. The
+[Privacy Policy](./legal/privacy.md) (section 7) describes archiving the whole
+folder instead of deleting it, and what ComplyEaze Bridge no longer remembers
+afterwards. **Not measured:** what else breaks if
 only some files are deleted.
 
 ## 5. Is it signed, and how do I check what I downloaded?
@@ -154,8 +190,10 @@ only some files are deleted.
 It is not yet code-signed or notarized. Each package on GitHub Releases has a
 SHA-256 file and a provenance record naming the source commit it was built
 from. From release 0.4.0 the release workflow also records a build attestation
-for each package and checks it before publishing; an attestation says where a
-file was built, and is not a code signature. The package includes an unsigned
+for each package and checks it before publishing. An attestation says which
+workflow run and commit produced a file. In the workflow's own words, it is
+not a code signature, no client checks it yet, and it does not show the code
+is safe. The package includes an unsigned
 third-party PDF library (PDFium, from a pinned release, checked by SHA-256 at
 build time), used only to read the bank statement PDF you name. **Not
 measured:** whether PDFium itself opens any network connection or file other
@@ -170,9 +208,9 @@ in CI, and everything is open source, but that is not an external review.
 
 The package declares only a command to run and its settings. In its source we
 found no service, driver, scheduled task, registry key, launch agent or
-listening port. It writes files only in its data folder and in the lock folder
-named in section 4. It also reads files named in a tool call (often by the
-assistant), such as a bank statement and its password file; on macOS it
+listening port. It writes files only in its data folder and in the lock
+folder described in section 4. It also reads files named in a tool call (often
+by the assistant), such as a bank statement and its password file; on macOS it
 refuses a password file that other users can read. Its one extra process is a
 second copy of itself that shows the approval window.
 
@@ -196,8 +234,9 @@ and a check of a machine before and after installing and running it.
   statements stay available, and still write to the folder in section 4.
   **Not measured:** whether Claude Desktop applies the change without a
   restart.
-- **Remove it:** uninstall it from Claude Desktop's Extensions settings. This
-  does not change Tally's gateway setting. **Not measured:** what the uninstall
+- **Remove it:** uninstall it from Claude Desktop's Extensions settings.
+  ComplyEaze Bridge never changes Tally's gateway setting, so uninstalling it
+  does not either. **Not measured:** what the uninstall
   removes. ComplyEaze Bridge has no uninstall step of its own and nothing in it
   deletes the files in section 4; delete them yourself.
 - **Vouchers already posted stay in Tally.** ComplyEaze Bridge has no tool to delete or

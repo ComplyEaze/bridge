@@ -510,7 +510,8 @@ two-platform preview lane. It produces the actual Windows x64 and macOS arm64
 MCPB archives, validates and launches each archive without contacting Tally,
 then publishes a durable **GitHub prerelease** only when every archive, checksum,
 payload-free smoke result, and source-provenance record is present. Preview tags
-must start with `mcp-preview-`; they cannot reuse a production `v*` tag. A
+must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
+0.3.0); they cannot reuse a production `v*` tag. A
 build without publisher signing must never be described as signed, notarized,
 or ready for production use.
 
@@ -561,7 +562,8 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut an `mcp-preview-*` build at most every two weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
+  weeks, and only when both of
   these hold: at least one user-visible change has landed, and CI is green on
   both hosts.
 - The workflow publishes each preview as a prerelease. Once its checks are
@@ -587,8 +589,8 @@ patch for a fix-only release:
 | Documentation only (`documentation`) | no release | no release |
 
 `node scripts/next-version.mjs` proposes the version:
-- It reads the pull requests squash-merged since the last `mcp-preview-*` or
-  `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
+- It reads the pull requests squash-merged since the last `mcp-v*`,
+  `mcp-preview-*` or `v*` tag, from `git log`, up to `origin/master` (`--to REF` changes that;
   `HEAD` would count an unmerged working branch's commits as direct pushes).
   It refuses when `origin/master` here is not origin's current master, or when
   the version files here differ from that commit's, so a stale branch cannot
@@ -641,7 +643,7 @@ disagree.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
-  the `## [X.Y.Z]` section that matches the tag (for `mcp-preview-X.Y.Z`),
+  the `## [X.Y.Z]` section that matches the tag (for `mcp-vX.Y.Z` or `mcp-preview-X.Y.Z`),
   puts it above the release-notes footer, and appends GitHub's list. The
   install page's "What changed" page renders the same file when the install
   page is deployed, so a changelog edit reaches the site with the next

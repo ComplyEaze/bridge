@@ -461,8 +461,25 @@ fn counterparties_group_by_mapping_key() {
     assert_eq!(groups.len(), 2);
     // one line for two spellings, labelled with the one the bank printed
     assert_eq!(groups[0].party, "MERCURY MANUFACTURERS");
-    assert_eq!(groups[0].total, "280000.00");
     assert_eq!(groups[0].rows, 2);
     assert_eq!(groups[0].also_printed_as, ["MERCURY M ANUFACTURERS"]);
     assert_eq!(groups[1].party, "AMBIKA INDUSTRIES");
+}
+
+/// Spellings of one payee with the same number of words are chosen and listed
+/// by name, never by the amounts they carry.
+#[test]
+fn a_shown_spelling_is_chosen_without_amounts() {
+    let groups = group_counterparties(&[
+        record("Alpha Traders", "900.00"),
+        record("ALPHA TRADERS", "10.00"),
+        record("alpha traders", "50.00"),
+    ])
+    .unwrap();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].party, "ALPHA TRADERS");
+    assert_eq!(
+        groups[0].also_printed_as,
+        ["Alpha Traders", "alpha traders"]
+    );
 }

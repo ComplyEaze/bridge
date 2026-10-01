@@ -55,8 +55,12 @@ actually on.
    Tally's gateway is configured for that port. This is not a Tally licence
    port. Changing it changes only where Bridge calls Tally, not Tally's own
    HTTP setting.
-4. Save the extension settings and restart Claude Desktop if its tools are not
-   visible. In a new chat, use **Connectors** to confirm Bridge is connected.
+4. Read the Terms of Use linked in the extension settings, then turn on **I
+   accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge refuses
+   every tool call and the assistant reports why; it reads nothing from Tally.
+5. Save the extension settings, then quit Claude Desktop completely and reopen
+   it: Bridge reads the acceptance when it starts, and the tools can be listed
+   while every call is still refused. In a new chat, use **Connectors** to confirm Bridge is connected.
 
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while three

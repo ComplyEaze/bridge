@@ -87,6 +87,8 @@ use movement_math::*;
 #[path = "agent_egress.rs"]
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
+#[path = "agent_terms.rs"]
+mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
@@ -393,6 +395,10 @@ struct Server {
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
+    /// The Terms-of-Use gate. Open for tests and the desktop app's local views; the server that
+    /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
+    /// accepted the Terms (see `agent_terms.rs`).
+    terms: terms::TermsGate,
 }
 
 struct ToolOutcome {
@@ -627,6 +633,12 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 
+/// The causes of a movement's ledger catalogue read that outlived its deadline
+/// or the response cap. The catalogue lists every ledger in the book, so it does
+/// not shrink with the voucher window.
+const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
+const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -635,6 +647,20 @@ const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "terms_not_accepted" => Some(
+            "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
+             them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
+             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             there, then quit Claude completely and reopen it so Bridge starts again. Nothing \
+             was read from Tally.",
+        ),
+        "terms_record_unavailable" => Some(
+            "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
+             folder, so it is off although the Terms of Use are accepted. Check that the folder \
+             can be written; if the file is damaged, move it aside and Bridge will record your \
+             acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
+             Tally.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
              mark and Bridge has no \"before\" to attribute an import against. Record one \
@@ -663,6 +689,18 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. Bridge \
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
+        ),
+        // Causes of `ledger_movement_read_failed`: the ledger catalogue is read whole,
+        // whatever voucher window is asked for (#485).
+        MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED | MOVEMENT_CATALOGUE_TOO_LARGE => Some(
+            "The book's ledger catalogue, which ledger_movement reads whole whatever \
+             voucher window it is given, took longer than one request may or was larger than \
+             one response may be. It lists every ledger in the book, so it does not shrink \
+             when the window does: narrowing from and to is not known to help, and calling \
+             again sends the same read again, so do not retry in a loop. trial_balance \
+             reads Tally's own period figures per ledger without this catalogue read (a \
+             whole-book read of its own, on a different basis: not literal voucher \
+             movement).",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
@@ -720,6 +758,23 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
              book's master-alteration mark: call ledger_masters with fields=basic instead. Bridge \
              released nothing.",
+        ),
+        "ledger_count_company_differs" => Some(
+            "Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
+             company's ledgers is higher than that census found: the census missed ledgers, either \
+             because a ledger was added during the read or (reasoned, not reproduced) because \
+             the company was closed and reopened while it ran, and a read sized from the low \
+             count would have been sized too small. No master was requested. Retry once with the company left alone and \
+             nobody editing it in Tally. A repeat means the census and Tally's count disagree \
+             about this book: call ledger_masters with fields=basic instead."
+        ),
+        "ledger_count_company_invalid" => Some(
+            "Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
+             own count of its ledgers to check it, and the answer was damaged, named another \
+             company (or the company is no longer loaded), or held a count that is not a plain \
+             number. No master was requested. Retry once with the company left alone. A repeat \
+             means Tally's answer to that request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead."
         ),
         "ledger_count_catalogue_too_large" => Some(
             "The census counted more ledgers than one compliance read holds, so Bridge would \
@@ -1008,7 +1063,22 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             post_approvals,
+            terms: terms::TermsGate::NotRequired,
         }
+    }
+
+    /// The server that answers an MCP client: every tool refuses until the user has accepted the
+    /// Terms of Use (`BRIDGE_TERMS_ACCEPTED`). `run_stdio` is its only production caller.
+    fn for_mcp(settings: Settings) -> Self {
+        let accepted = env::var(terms::TERMS_ENV).ok();
+        Self::for_mcp_with(settings, accepted.as_deref())
+    }
+
+    fn for_mcp_with(settings: Settings, accepted: Option<&str>) -> Self {
+        let terms = terms::TermsGate::for_mcp(accepted, &settings.data_dir);
+        let mut server = Self::new(settings);
+        server.terms = terms;
+        server
     }
 
     fn tally_config(&self) -> TallyConfig {
@@ -1320,6 +1390,11 @@ impl Server {
     }
 
     async fn tool_payload(&self, name: &str, args: &Value) -> Result<ToolOutcome, ToolFailure> {
+        // First, before any argument or Tally request: every tool refuses until the Terms of Use
+        // are accepted.
+        if let Some(code) = self.terms.refusal() {
+            return Err(code.to_string().into());
+        }
         if name == "changed_since" {
             return Err("changed_since_unqualified".to_string().into());
         }
@@ -1883,7 +1958,7 @@ fn mask(value: &str) -> String {
 }
 
 pub async fn run_stdio() -> Result<(), String> {
-    let server = Server::new(Settings::from_env()?);
+    let server = Server::for_mcp(Settings::from_env()?);
     let stdin = BufReader::new(tokio::io::stdin());
     let mut stdout = tokio::io::stdout();
     serve_stdio(server, stdin, &mut stdout).await

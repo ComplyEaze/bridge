@@ -118,6 +118,16 @@ reviewer: some-github-login
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
 - The branch name is not the file name, so a lane branch is fine.
+- The number is known only once the pull request is open, so the first run of a
+  pull request that touches a pinned path fails with `found 0` until
+  `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
+  the pull request, then push the file.
+- Dependency-update pull requests (Dependabot's npm, cargo and GitHub Actions
+  updates) change pinned files (`package.json`, `pnpm-lock.yaml`,
+  `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and pinned workflows), so each
+  one fails `Required checks` until a person pushes its `pr-<N>.txt`. The local
+  merge gate already asked for the same file; the difference is that CI now
+  reports it too.
 
 The `reviewer:` login is procedural assurance, not authentication: the file is
 written by hand and proves nothing by itself. What it records is that a named

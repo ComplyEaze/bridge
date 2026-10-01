@@ -91,6 +91,9 @@ struct Call {
     /// limits; `Some` calls `outstandings_detail_within` with these.
     limits: Option<DetailLimits>,
     books_from_missing: bool,
+    /// The `party` argument as the caller typed it.
+    party: &'static str,
+    reference: Option<&'static str>,
 }
 
 impl Call {
@@ -103,6 +106,8 @@ impl Call {
             redaction: Redaction::None,
             limits: None,
             books_from_missing: false,
+            party: PARTY,
+            reference: None,
         }
     }
 }
@@ -139,9 +144,9 @@ async fn run(
                     &identity,
                     &company,
                     call.as_of,
-                    PARTY,
+                    call.party,
                     call.kind,
-                    None,
+                    call.reference,
                     &call.open_bills,
                     &call.unallocated,
                 )
@@ -153,9 +158,9 @@ async fn run(
                     &identity,
                     &company,
                     call.as_of,
-                    PARTY,
+                    call.party,
                     call.kind,
-                    None,
+                    call.reference,
                     &call.open_bills,
                     &call.unallocated,
                     limits,
@@ -441,4 +446,52 @@ async fn a_composite_voucher_anywhere_in_the_window_fails_the_detail() {
         // which is parsed first.
         assert_eq!(failure.code, "bill_allocation_amount_invalid");
     }
+}
+
+/// A named reference reaches the window: it starts at the earliest date
+/// Tally lists for that bill, not at the books' start, and only that bill is
+/// answered.
+#[tokio::test]
+async fn a_named_reference_starts_the_window_at_its_bill_date() {
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.open_bills = vec![native_bill("GLUE-1"), {
+        let mut other = native_bill("GLUE-2");
+        other.bill_date = "20260501".into();
+        other
+    }];
+    call.reference = Some("GLUE-1");
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    let (detail, _) = result.unwrap();
+    assert_eq!(
+        detail["window"],
+        json!({"from": "20260801", "to": AS_OF, "company_vouchers_read": 3})
+    );
+    let bills = detail["bills"].as_array().unwrap();
+    assert_eq!(bills.len(), 1, "{detail}");
+    assert_eq!(bills[0]["reference"], "GLUE-1");
+}
+
+/// The party is resolved against the ledger catalogue as `vouchers ledger=`
+/// resolves it: a name that differs only in case and punctuation finds the
+/// ledger, and the answer names it as the catalogue spells it.
+#[tokio::test]
+async fn a_party_named_in_another_case_is_answered_under_the_catalogues_name() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "CAFÉ NAÏVE TRADERS";
+    call.unallocated = vec![residual("102.02")];
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    let (detail, _) = result.unwrap();
+    assert_eq!(detail["party"], PARTY);
+    assert_eq!(detail["state"], "tied", "{detail}");
+}
+
+/// A party the catalogue does not hold is refused after the catalogue and
+/// before any voucher request, never answered as a party with no rows.
+#[tokio::test]
+async fn an_unknown_party_is_refused_before_any_voucher_request() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "No Such Synthetic Party";
+    let (result, served) = run(detail_plans(captured_window()), call).await;
+    assert_eq!(result.unwrap_err().code, "ledger_not_found");
+    assert_eq!(served, 10, "only the company and the catalogue were read");
 }

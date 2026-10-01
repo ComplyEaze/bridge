@@ -2,7 +2,7 @@
 
 **Version:** 2026-10
 
-**Effective:** [PUBLISH DATE]
+**Effective:** 2 October 2026
 
 **Applies to:** ComplyEaze Bridge builds that include or link to these Terms (starting with the first build that asks you to accept them), and any Bridge-related service we provide.
 

@@ -2,7 +2,7 @@
 
 **Version:** 2026-10
 
-**Effective:** [PUBLISH DATE]
+**Effective:** 2 October 2026
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 

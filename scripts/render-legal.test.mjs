@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { LegalError, applyTemplate, renderDocument } from "./render-legal.mjs";
+import { LegalError, UNRESOLVED_MARKERS, applyTemplate, renderDocument } from "./render-legal.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const script = join(root, "scripts", "render-legal.mjs");
@@ -39,17 +39,15 @@ const noRawMarkdown = (html) => {
   assert.ok(!/<p>#/.test(html) && !/^- /m.test(html), "heading or bullet marker survived");
 };
 
-test("the documents hold one placeholder, the effective date, and are refused until it is set", () => {
+test("the published documents carry no unresolved marker and render as they stand", () => {
   for (const name of ["privacy.md", "terms.md"]) {
     const source = realDoc(name);
     assert.notEqual(source, undefined, `${name} is missing`);
-    assert.ok(!source.includes("[VERIFY"), `${name} still holds a [VERIFY marker`);
-    assert.equal(source.split("[PUBLISH DATE]").length - 1, 1, `${name} holds exactly one [PUBLISH DATE], on its Effective line`);
-    assert.match(source, /^\*\*Effective:\*\* \[PUBLISH DATE\]$/m);
-    // as they stand they must not publish: the deploy stops here until the release day is written in
-    assert.throws(() => renderDocument(source), (error) => error instanceof LegalError && /unresolved marker \[PUBLISH DATE\]/.test(error.reason));
-    // and with the date written in, the same text renders
-    assert.doesNotThrow(() => renderDocument(source.replace("[PUBLISH DATE]", "1 January 2027")));
+    for (const marker of UNRESOLVED_MARKERS) assert.ok(!source.includes(marker), `${name} still holds ${marker}`);
+    assert.match(source, /^\*\*Effective:\*\* [0-9]{1,2} [A-Z][a-z]+ [0-9]{4}$/m, `${name} states its effective date`);
+    assert.doesNotThrow(() => renderDocument(source));
+    // the refusal still fires on this very text once a marker is put back
+    assert.throws(() => renderDocument(source.replace(/^(\*\*Effective:\*\*) .*$/m, "$1 [PUBLISH DATE]")), (error) => error instanceof LegalError && /unresolved marker \[PUBLISH DATE\]/.test(error.reason));
   }
 });
 

@@ -233,6 +233,10 @@ request is predicted over a budget well below the cap.
    - `voucher_window_too_many_reads` — the read would dispatch more than 128 data requests. The
      allowance is spent **when a request is dispatched**, not when a plan is made, so a part divided
      after Tally could not serve it — and the failed attempt itself — count against it.
+     The refusal carries `reads.needed_at_least` against `reads.allowed`. A census read in several
+     AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
+     default figure (the allowed requests times the vouchers one request holds at it, which every
+     first plan uses), so that certain refusal costs no further census span (#945).
    - `voucher_window_book_too_large` — the book's mark needs more than 256 census spans (a mark above
      about 2.1 million). A **product limit**: narrowing the window does not help, because the census
      walks the book's AlterIDs whatever the window.
@@ -1246,8 +1250,6 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - how a deletion moves `ALTMSTID`;
   - Education and Gold.
 
----
-
 ### 12a.13 Stock items and the Stock Summary by name on licensed 7.1
 
 **VERIFIED 2026-09-30, licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from one synthetic company with integrated inventory (11 items, 3 stock groups). The tie in the second bullet was also measured on one client book, by role, and nothing from it is committed. One run of each request. **Confidence: PARTIAL.** This extends §12a.11, where `Stock Summary` returned an empty envelope on a book not known to hold inventory, to a book with inventory.
@@ -1281,6 +1283,51 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - the report with a godown or batch split, and the explode flag;
   - a foreign-currency book;
   - Education and Gold.
+
+---
+
+### 12a.14 One party's bill trail, tied to the native balance
+
+**PARTIAL: observed by read-back on one seeded synthetic book** (TallyPrime Silver 7.1, `BRIDGE OUTSTANDINGS LAB`,
+seeded by this project; seeded data is not evidence about a client book). Each row below was read
+from Tally's own Bills Receivable and Bills Payable reports and from the vouchers' bill allocations
+at one as-of date, and the `outstandings` party detail (#945) ties the two. The captures committed
+with that change are the voucher window, the two bills reports, and the responses of two whole
+`outstandings` calls with a party detail (`native-outstandings-detail-*`, with an ordered record of
+each call's 66 requests): an `unadjusted` detail of the on-account debtor, tied (on-account sum and
+residual both 3,000), and a `bill_trail` of one named bill, tied. Every response body is kept byte
+for byte (UTF-16LE with no byte-order mark, as received; the status read as received) except three
+listings, the company list, the book extent and the company marks, which answer for every loaded
+company and are trimmed to this company's row, with the untrimmed size and hash in their records.
+The HTTP heads are described in the sequence records, not kept. The unreferenced-opening row rests
+on a read-back through ComplyEaze Bridge that is not captured as a fixture:
+
+| What was measured | Result |
+| --- | --- |
+| The same bill reference on two parties | two rows in one Bills Receivable report, so a bill is identified by its party as well as its reference |
+| A reference reused by the same party a year later | stored as an `Agst Ref` carrying the original bill's date (see 12a.2), so within one party a reference is one continuing bill |
+| A journal that moves a bill from one party to another | the voucher's own party field names the first (debit) ledger, while the `Agst Ref` sits on another ledger's entry, so allocations belong to the party of the entry they sit on, not of the voucher's party field |
+| An on-account receipt and an on-account payment on one party | they net into one unallocated figure |
+| A note or an on-account entry with no reference | it appears only in the party's unallocated residual (closing balance less its named bills), never as a bill |
+| A referenced opening balance | it is a bill, with no voucher; an unreferenced opening is residual only |
+| An advance or a pending note with a reference | listed as a named bill in the report of the opposite direction, with no type label (12a.1) |
+
+**Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
+voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
+term in the request would be lossless for the journal above (it was not tried, which is why the
+party detail reads the whole window and filters by each entry's own ledger); the cost of that
+whole-window read on a large book.
+
+**What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
+extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
+changes that compensate, or allocations that net to zero, can still tie. An unadjusted `tied`
+means the on-account sum equals the residual, not that the residual's composition is proven. One
+unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
+tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
+having no residual row, never as a residual of zero, and an empty voucher read is reported as
+such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
+unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open
+balance for its reference beside it, rather than netting allocations on an unverified rule.
 
 ---
 
@@ -1335,3 +1382,4 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-10-01 | §12a.13: the sign of a stock value: a negative wire value is stock held and shows as positive on Tally's Stock Summary screen; a positive one shows as `(-)`. VERIFIED on one synthetic licensed 7.1 Silver company against Tally's own screen |
 | 2026-10-01 | §12a.13: the Company collection's `NUMSTOCKITEMS` after one stock item was deleted on Tally's own screen: it fell by one and equalled the rows read, on one synthetic licensed 7.1 Silver company. PARTIAL, one sample |
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
+| 2026-10-01 | §12a.14: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |

@@ -353,46 +353,6 @@ fn party_count_deduplicates_nonzero_bill_and_unallocated_parties() {
     );
 }
 
-/// bridge#833: every statement and the manifest a batch writes are recorded as
-/// Bridge's own exports, so the documents uploader leaves them out of a
-/// folder the user syncs.
-#[test]
-fn every_file_a_batch_writes_is_recorded_as_an_export() {
-    crate::export_registry::init_for_tests();
-    let destination = tempfile::tempdir().expect("temporary destination");
-    let approved = approved_destination(destination.path());
-    let marker = uuid::Uuid::new_v4().to_string();
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[
-            bill("Synthetic Party A", "15.00"),
-            bill("Synthetic Party B", "20.00"),
-        ],
-        &[],
-        |statement| Ok(format!("{marker} {}", statement.party).into_bytes()),
-    )
-    .expect("statement batch succeeds");
-    assert_eq!(result.written.len(), 2);
-    let recorded = crate::export_registry::recorded().expect("read the registry");
-    let mut files = result
-        .written
-        .iter()
-        .map(|written| destination.path().join(&written.file_name))
-        .collect::<Vec<_>>();
-    files.push(PathBuf::from(&result.manifest_path));
-    for file in files {
-        let bytes = fs::read(&file).expect("written file");
-        assert!(
-            recorded.contains(&crate::export_registry::content_sha256(&bytes)),
-            "{}",
-            file.display()
-        );
-    }
-}
-
 fn request<'a, Render>(
     destination: &'a ApprovedPartyStatementDestination,
     open_bills: &'a [OpenBillRow],
@@ -424,55 +384,29 @@ fn files_in(folder: &Path) -> Vec<(String, Vec<u8>)> {
         .collect()
 }
 
-/// bridge#833: each statement and the manifest are recorded before any of
-/// their bytes reach the folder, and no staging file is left behind.
+/// A batch leaves its statements and the manifest in the folder, and no
+/// staging file behind.
 #[test]
-fn every_file_is_recorded_before_its_bytes_reach_the_folder() {
+fn a_batch_leaves_only_its_statements_and_manifest() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
     let bills = [
         bill("Synthetic Party A", "15.00"),
         bill("Synthetic Party B", "20.00"),
     ];
-    let recorded = std::cell::RefCell::new(Vec::<Vec<u8>>::new());
-    let record = |bytes: &[u8]| {
-        for (name, on_disk) in files_in(destination.path()) {
-            assert_ne!(on_disk, bytes, "{name} was written before it was recorded");
-        }
-        recorded.borrow_mut().push(bytes.to_vec());
-        Ok(())
-    };
-    let result = write_recorded_bulk_party_statements(
-        request(&approved, &bills, |statement: &PartyStatement| {
-            Ok(format!("synthetic {}", statement.party).into_bytes())
-        }),
-        &record,
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(request(
+        &approved,
+        &bills,
+        |statement: &PartyStatement| Ok(format!("synthetic {}", statement.party).into_bytes()),
+    ))
     .expect("statement batch succeeds");
     assert_eq!(result.written.len(), 2);
     let on_disk = files_in(destination.path());
     assert_eq!(on_disk.len(), 3, "two statements and the manifest");
-    for (name, bytes) in &on_disk {
+    for (name, _) in &on_disk {
         assert!(
             !name.starts_with('.'),
             "{name} is a staging file left behind"
         );
-        assert!(recorded.borrow().contains(bytes), "{name} was not recorded");
     }
-}
-
-/// bridge#833: a statement or manifest that cannot be recorded is not written.
-#[test]
-fn nothing_is_written_when_the_registry_refuses() {
-    let destination = tempfile::tempdir().expect("temporary destination");
-    let approved = approved_destination(destination.path());
-    let bills = [bill("Synthetic Party A", "15.00")];
-    let result = write_recorded_bulk_party_statements(
-        request(&approved, &bills, |_: &PartyStatement| {
-            Ok(b"synthetic".to_vec())
-        }),
-        &|_| Err("export_registry_write_failed".to_string()),
-    );
-    assert_eq!(result.err().as_deref(), Some(UNRECORDED_EXPORT));
-    assert!(files_in(destination.path()).is_empty());
 }

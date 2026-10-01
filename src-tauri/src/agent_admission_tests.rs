@@ -86,25 +86,38 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // a new tool must be added to `ToolEffect::of` and to this table to be
     // published.
     const READ_TOOLS: &[&str] = &[
-        "tally_status",
-        "list_companies",
-        "voucher_schema",
-        "validate_masters",
-        "outstandings",
+        "balance_sheet",
+        "changed_since",
+        "egress_log",
         "ledger_masters",
         "ledger_movement",
-        "trial_balance",
-        "profit_and_loss",
-        "balance_sheet",
-        "vouchers",
-        "voucher_presence",
-        "changed_since",
-        "read_evidence",
-        "egress_log",
-        "masters",
+        "list_companies",
         "local_data_report",
+        "masters",
+        "outstandings",
+        "profit_and_loss",
+        "read_evidence",
         "stock_summary",
+        "tally_status",
+        "trial_balance",
+        "validate_masters",
+        "voucher_presence",
+        "voucher_schema",
+        "vouchers",
     ];
+    // One name per line in sorted order, so two pull requests that add different
+    // tools touch different lines; the lists stay hand-written.
+    let assert_sorted_and_unique = |list: &str, names: &[&str]| {
+        assert!(
+            names.windows(2).all(|pair| pair[0] < pair[1]),
+            "{list} must be sorted with no duplicate: {names:?}"
+        );
+    };
+    assert_sorted_and_unique("READ_TOOLS", READ_TOOLS);
+    assert_sorted_and_unique(
+        "REGISTERED_TOOL_NAMES",
+        super::catalog::REGISTERED_TOOL_NAMES,
+    );
     // The exact sentence each description ends with, written out here so an edit
     // to the catalogue's constants cannot pass by agreeing with itself.
     const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";

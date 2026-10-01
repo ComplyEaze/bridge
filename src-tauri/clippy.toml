@@ -19,9 +19,9 @@ too-many-lines-threshold = 150
 # OS, which files and how many times these lints fire. The actions are listed, not the types, so a
 # call fires however its client or socket was obtained.
 disallowed-methods = [
-  { path = "reqwest::RequestBuilder::send", reason = "HTTP egress: only the reviewed Tally and cloud call sites send" },
-  { path = "reqwest::Client::execute", reason = "HTTP egress: only the reviewed Tally and cloud call sites send" },
-  { path = "reqwest::get", reason = "HTTP egress: only the reviewed Tally and cloud call sites send" },
+  { path = "reqwest::RequestBuilder::send", reason = "HTTP egress: only the reviewed Tally call sites send" },
+  { path = "reqwest::Client::execute", reason = "HTTP egress: only the reviewed Tally call sites send" },
+  { path = "reqwest::get", reason = "HTTP egress: only the reviewed Tally call sites send" },
   { path = "std::net::TcpStream::connect", reason = "raw socket egress" },
   { path = "std::net::TcpStream::connect_timeout", reason = "raw socket egress" },
   { path = "std::net::TcpListener::bind", reason = "raw socket" },

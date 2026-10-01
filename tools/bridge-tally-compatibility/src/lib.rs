@@ -133,10 +133,6 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 ///   pinned file.
 ///
 /// What leaves the machine, and the record of it:
-/// - `documents.rs` -- which storage URLs customer documents may be uploaded
-///   to, and the file checks made before an upload.
-/// - `axal.rs` -- which AXAL API origins may receive credentialed requests,
-///   and that its API client follows no redirects.
 /// - `agent_protocol.rs` -- the MCP response loop, which records an egress
 ///   receipt for a tool response before writing it and decides what is sent
 ///   when recording fails.
@@ -234,6 +230,10 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// deleted. Neither was reachable from any binary, test or feature: the first
 /// ran a legacy schema no caller opened, the second named import actions no
 /// builder used.
+///
+/// Lowered by three, to the pin count then in use, when `axal.rs`, `documents.rs` and `export_registry.rs` were
+/// deleted with the unfinished document-upload feature (bridge#912). The raise
+/// to 232 above names the first two, which no longer exist.
 ///
 /// The raise to 262 binds thirteen test files because a directory rule requires
 /// it, not because of what they decide. Each `src-tauri/src/reports`
@@ -353,10 +353,6 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 // party is a cash withdrawal or deposit, which answers a person may give for
 // one, which need a ledger and which Bridge refuses; a defect there could post
 // a cash line to a ledger nobody chose.
-// `src-tauri/src/export_registry.rs` (bridge#833) records the files Bridge
-// exports from Tally data (bulk party statements so far), and the documents
-// uploader skips a file whose hash it holds; a defect there uploads a
-// client's exported statements from a folder the user syncs.
 // `bridge-tally-protocol/src/xml_text.rs` (bridge#832) is the one escaper every
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value

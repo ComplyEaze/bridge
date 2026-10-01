@@ -16,7 +16,7 @@ Apache-2.0 builds from current source stays unambiguous.
 These changes are on the main branch. They are not yet in a published package.
 Each line names the pull requests it comes from.
 
-**What you can do now**
+**What the next build adds**
 
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
   line for line to Tally's own statement; otherwise it is refused, and the
@@ -40,6 +40,11 @@ Each line names the pull requests it comes from.
 
 **Safer or fixed**
 
+- `profit_and_loss` and `balance_sheet` no longer open with `"state": "observed"`
+  when nothing was established. The top-level `state` is `observed` only when
+  the tool's result is established; otherwise it is `not_established`, with
+  the same `reason` as the nested result. This changes the tool's output; no
+  figure, check or withheld line changes (#984).
 - If you are slow at the approval window, the agent's call no longer waits
   on it. The agent is told the approval is pending and asks again. A click
   made while no call is waiting is posted by the next call, not one call later
@@ -280,7 +285,7 @@ there is no summary for that build.
 ### Security
 
 - SQLCipher/keyring-backed local Tally state, immutable proof/checkpoint
-  receipts, loopback-only proxy-free HTTP, bounded incremental decoding,
+  receipts, loopback-only HTTP without a proxy, bounded incremental decoding,
   cancellation and lease enforcement, idempotent crash replay, and sealed
   no-write qualification boundaries.
 - SQLCipher pool replacement connections now receive raw key bytes from

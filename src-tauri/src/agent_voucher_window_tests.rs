@@ -1417,9 +1417,12 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
             .map(|body| Some(wire_len(body)))
             .to_vec()
     );
+    // Only the delayed part's lower bound is asserted: a delay can only add to
+    // elapsed time, so this holds on any runner. Comparing the undelayed parts
+    // against it is not safe, since a loaded runner can stall them as long (#986).
+    // Dropping a part's timing, or charging the delay to another part, leaves the
+    // second part below the bound.
     assert!(timings.parts[1].ms >= 400, "{timings:?}");
-    assert!(timings.parts[0].ms < timings.parts[1].ms, "{timings:?}");
-    assert!(timings.parts[2].ms < timings.parts[1].ms, "{timings:?}");
     assert_eq!(timings.failed, None);
 }
 

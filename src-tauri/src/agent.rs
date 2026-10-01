@@ -43,6 +43,8 @@ use company::*;
 mod changes;
 #[path = "agent_ledgers.rs"]
 mod ledgers;
+#[path = "agent_masters.rs"]
+mod masters;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
 #[path = "agent_outstandings.rs"]
 mod outstandings;
@@ -87,11 +89,13 @@ use movement_math::*;
 #[path = "agent_egress.rs"]
 mod egress;
 use egress::{append_egress_line, read_egress_tail};
+#[path = "agent_terms.rs"]
+mod terms;
 
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
     ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor, OutstandingsLoadResult, TallyConfig,
-    TallyRuntime, UnallocatedParty, VerifiedCompanyIdentity,
+    TallyRuntime, UnallocatedComposition, UnallocatedParty, VerifiedCompanyIdentity,
 };
 use bridge_tally_protocol::xml_read_profiles::{
     ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange,
@@ -193,6 +197,17 @@ fn open_bill_json(bill: &OpenBillRow) -> Value {
 fn unallocated_party_json(party: &UnallocatedParty) -> Value {
     let mut value = serde_json::to_value(party).unwrap_or_default();
     mark_party_field(&mut value, "party");
+    // The ledger's bill-wise flag, written from the composition that carries it
+    // so the two cannot disagree. Absent with the composition.
+    if let (Some(object), Some(composition)) = (value.as_object_mut(), party.composition) {
+        object.insert(
+            "ledger_bill_wise".to_string(),
+            Value::Bool(matches!(
+                composition,
+                UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+            )),
+        );
+    }
     value
 }
 
@@ -367,6 +382,8 @@ struct EgressContext {
     tool: String,
     args_sha256: String,
     company_guid: Option<String>,
+    /// What each Tally send of the call was and how it ended (#918).
+    request_trail: Option<Value>,
 }
 
 struct ToolResponse {
@@ -391,6 +408,10 @@ struct Server {
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
+    /// The Terms-of-Use gate. Open for tests and the desktop app's local views; the server that
+    /// answers an MCP client is built by [`Server::for_mcp`], which closes it until the user has
+    /// accepted the Terms (see `agent_terms.rs`).
+    terms: terms::TermsGate,
 }
 
 struct ToolOutcome {
@@ -439,14 +460,17 @@ struct Candidates {
     items: Vec<Value>,
 }
 
-/// A compliance read refused before any ledger request was sent because the
-/// catalogue that would count its ledgers is over the response limit: the
-/// master mark, the estimated catalogue response and the limit it exceeded.
+/// A compliance read refused before any ledger request was sent because its
+/// master mark is past the census's reach and the catalogue that would count
+/// its ledgers is over the response limit: the master mark, the estimated
+/// catalogue response, the limit it exceeded and the largest mark the census
+/// counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ReadSize {
     master_alter_id: u64,
     estimated_bytes: u64,
     limit_bytes: u64,
+    limit_master_alter_id: u64,
 }
 
 fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
@@ -467,6 +491,20 @@ fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
 
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
     error.chain().find_map(|cause| {
+        if let Some(crate::tally::runtime::MastersReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -474,10 +512,12 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 master_alter_id,
                 estimated_bytes,
                 limit_bytes,
+                mark_limit,
             } => Some(ReadSize {
                 master_alter_id: *master_alter_id,
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
+                limit_master_alter_id: *mark_limit,
             }),
             _ => None,
         }
@@ -592,6 +632,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(amount.safe_code());
         }
+        if let Some(masters) =
+            cause.downcast_ref::<bridge_tally_protocol::native_masters::NativeMastersError>()
+        {
+            return Some(masters.code());
+        }
+        if let Some(crate::tally::runtime::MastersReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -620,6 +670,12 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 
+/// The causes of a movement's ledger catalogue read that outlived its deadline
+/// or the response cap. The catalogue lists every ledger in the book, so it does
+/// not shrink with the voucher window.
+const MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED: &str = "movement_catalogue_deadline_exceeded";
+const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
+
 /// Guidance for refusals whose remedy a caller cannot derive from the code alone.
 ///
 /// Deliberately sparse. A code without a documented, concrete next step returns
@@ -628,6 +684,20 @@ const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "terms_not_accepted" => Some(
+            "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
+             them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
+             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             there, then quit Claude completely and reopen it so Bridge starts again. Nothing \
+             was read from Tally.",
+        ),
+        "terms_record_unavailable" => Some(
+            "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
+             folder, so it is off although the Terms of Use are accepted. Check that the folder \
+             can be written; if the file is damaged, move it aside and Bridge will record your \
+             acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
+             Tally.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
              mark and Bridge has no \"before\" to attribute an import against. Record one \
@@ -657,16 +727,105 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
         ),
+        // The masters read's own size refusal (`size` carries the mark).
+        "masters_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row of this kind is over Bridge's response budget \
+             (`size.limit_bytes`), so no request for masters was sent. The mark also counts \
+             masters of every other kind, so a company with fewer masters of this kind may \
+             be refused. A larger book refuses; retrying this call refuses again.",
+        ),
+        // Causes of `ledger_movement_read_failed`: the ledger catalogue is read whole,
+        // whatever voucher window is asked for (#485).
+        MOVEMENT_CATALOGUE_DEADLINE_EXCEEDED | MOVEMENT_CATALOGUE_TOO_LARGE => Some(
+            "The book's ledger catalogue, which ledger_movement reads whole whatever \
+             voucher window it is given, took longer than one request may or was larger than \
+             one response may be. It lists every ledger in the book, so it does not shrink \
+             when the window does: narrowing from and to is not known to help, and calling \
+             again sends the same read again, so do not retry in a loop. trial_balance \
+             reads Tally's own period figures per ledger without this catalogue read (a \
+             whole-book read of its own, on a different basis: not literal voucher \
+             movement).",
+        ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) is above what \
-             Bridge can read a ledger catalogue for, so no request for ledgers was sent: a \
-             catalogue past the transport's response cap is cut off mid-read, which can leave \
+             Bridge can count ledgers for (400,000), so no request for ledgers was sent: a \
+             response past the transport's response cap is cut off mid-read, which can leave \
              Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
              since stock items, units and every other master raise it too, so a company with \
              fewer ledgers may be refused. Call ledger_masters with fields=basic, which \
              returns names, parents and opening balances without the compliance fields. \
              Retrying this call refuses again. A `group` filter does not narrow the request.",
+        ),
+        // Causes reached through `party_ledger_master_read_failed` when a book whose mark is
+        // past what its catalogue can be read for is counted by AlterID span (#679).
+        "ledger_span_slice_over_bound"
+        | "ledger_span_duplicate_identity"
+        | "ledger_span_census_empty" => Some(
+            "Bridge counts this book's ledgers by AlterID span before reading them, because its \
+             master-alteration mark is too high to read a catalogue for, and the count could not \
+             be trusted: a slice returned more ledgers than its span can hold (Tally may have \
+             ignored its filter), a ledger was seen twice, no ledger was found at all (a closed or \
+             absent company answers an empty slice exactly like a book without ledgers). No \
+             master was requested. A ledger added or deleted \
+             during the count can cause it; retry once while the book is quiet. A repeat means \
+             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        "ledger_span_slice_malformed" | "ledger_span_identity_mismatch" => Some(
+            "Bridge counts this book's ledgers by AlterID span before reading them, and a slice \
+             of the answer was damaged, held a field it should not, or answered for another \
+             company. No master was requested. Switching or closing the company in Tally during \
+             the count can cause it; retry once with the company left alone. A repeat means \
+             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead.",
+        ),
+        // Not reachable after admission (the plan is bounded before it is made); named so
+        // a refusal here is never read as a transient one.
+        "ledger_span_too_many_slices" | "ledger_span_plan_invalid" | "ledger_span_incomplete" => Some(
+            "Bridge could not plan or finish the AlterID-span count of this book's ledgers. No \
+             master was requested. Retrying this call refuses again; call ledger_masters with \
+             fields=basic instead.",
+        ),
+        "ledger_span_slice_response_too_large" => Some(
+            "Bridge counts this book's ledgers by AlterID span, and one slice's answer was \
+             larger than Bridge's response limit, far more than the slice's span can account \
+             for: Tally may have ignored the slice's filter. Bridge sent nothing after that \
+             response and released nothing. Retrying is expected to refuse again; call \
+             ledger_masters with fields=basic.",
+        ),
+        "ledger_count_differs" => Some(
+            "Two counts of this book's ledgers, taken by different requests, disagree: the \
+             AlterID-span census against the catalogue, or the catalogue's or census's count \
+             against the ledgers the master read returned. A ledger added or deleted during the \
+             read can cause it; retry once while the book is quiet. A repeat means Tally answers \
+             one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
+             book's master-alteration mark: call ledger_masters with fields=basic instead. Bridge \
+             released nothing.",
+        ),
+        "ledger_count_company_differs" => Some(
+            "Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
+             company's ledgers is higher than that census found: the census missed ledgers, either \
+             because a ledger was added during the read or (reasoned, not reproduced) because \
+             the company was closed and reopened while it ran, and a read sized from the low \
+             count would have been sized too small. No master was requested. Retry once with the company left alone and \
+             nobody editing it in Tally. A repeat means the census and Tally's count disagree \
+             about this book: call ledger_masters with fields=basic instead."
+        ),
+        "ledger_count_company_invalid" => Some(
+            "Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
+             own count of its ledgers to check it, and the answer was damaged, named another \
+             company (or the company is no longer loaded), or held a count that is not a plain \
+             number. No master was requested. Retry once with the company left alone. A repeat \
+             means Tally's answer to that request is not what Bridge expects: call ledger_masters \
+             with fields=basic instead."
+        ),
+        "ledger_count_catalogue_too_large" => Some(
+            "The census counted more ledgers than one compliance read holds, so Bridge would \
+             read them in parts by parent group, but the catalogue that names their parents \
+             would itself be larger than Bridge's response limit. Nothing was requested after \
+             the census. Call ledger_masters with fields=basic. Retrying this call refuses again.",
         ),
         // Causes reached through `party_ledger_master_read_failed` when a book too
         // large for one compliance read is read as parts by parent group (#679).
@@ -855,6 +1014,10 @@ impl ToolFailure {
             cause.downcast_ref::<crate::tally::runtime::TrialBalanceReadError>()
         }) {
             error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        }) {
+            error.safe_code()
         } else if error.chain().any(|cause| {
             matches!(
                 cause.downcast_ref::<crate::tally::runtime::OpeningBoundaryObservationError>(),
@@ -949,7 +1112,22 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
             post_approvals,
+            terms: terms::TermsGate::NotRequired,
         }
+    }
+
+    /// The server that answers an MCP client: every tool refuses until the user has accepted the
+    /// Terms of Use (`BRIDGE_TERMS_ACCEPTED`). `run_stdio` is its only production caller.
+    fn for_mcp(settings: Settings) -> Self {
+        let accepted = env::var(terms::TERMS_ENV).ok();
+        Self::for_mcp_with(settings, accepted.as_deref())
+    }
+
+    fn for_mcp_with(settings: Settings, accepted: Option<&str>) -> Self {
+        let terms = terms::TermsGate::for_mcp(accepted, &settings.data_dir);
+        let mut server = Self::new(settings);
+        server.terms = terms;
+        server
     }
 
     fn tally_config(&self) -> TallyConfig {
@@ -1011,8 +1189,12 @@ impl Server {
 
     async fn call_tool_response(&self, name: &str, args: Value) -> ToolResponse {
         let started = Utc::now();
-        let result = self.tool_payload(name, &args).await;
-        self.finish_tool_response(name, &args, started, result)
+        let (result, request_trail) =
+            crate::request_trail::with_request_trail(Box::pin(self.tool_payload(name, &args)))
+                .await;
+        let mut response = self.finish_tool_response(name, &args, started, result);
+        response.egress.request_trail = request_trail;
+        response
     }
 
     fn finish_tool_response(
@@ -1107,6 +1289,7 @@ impl Server {
                             "master_alter_id": size.master_alter_id,
                             "estimated_bytes": size.estimated_bytes,
                             "limit_bytes": size.limit_bytes,
+                            "limit_master_alter_id": size.limit_master_alter_id,
                         });
                     }
                 }
@@ -1203,6 +1386,7 @@ impl Server {
                             tool: name.to_string(),
                             args_sha256,
                             company_guid,
+                            request_trail: None,
                         },
                     };
                 }
@@ -1228,6 +1412,7 @@ impl Server {
                     tool: name.to_string(),
                     args_sha256,
                     company_guid,
+                    request_trail: None,
                 },
             };
         }
@@ -1239,6 +1424,7 @@ impl Server {
                 tool: name.to_string(),
                 args_sha256,
                 company_guid,
+                request_trail: None,
             },
         }
     }
@@ -1253,6 +1439,11 @@ impl Server {
     }
 
     async fn tool_payload(&self, name: &str, args: &Value) -> Result<ToolOutcome, ToolFailure> {
+        // First, before any argument or Tally request: every tool refuses until the Terms of Use
+        // are accepted.
+        if let Some(code) = self.terms.refusal() {
+            return Err(code.to_string().into());
+        }
         if name == "changed_since" {
             return Err("changed_since_unqualified".to_string().into());
         }
@@ -1315,6 +1506,7 @@ impl Server {
             "outstandings" => self.outstandings(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "trial_balance" => self.trial_balance(args).await,
+            "masters" => self.masters(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
@@ -1816,7 +2008,7 @@ fn mask(value: &str) -> String {
 }
 
 pub async fn run_stdio() -> Result<(), String> {
-    let server = Server::new(Settings::from_env()?);
+    let server = Server::for_mcp(Settings::from_env()?);
     let stdin = BufReader::new(tokio::io::stdin());
     let mut stdout = tokio::io::stdout();
     serve_stdio(server, stdin, &mut stdout).await

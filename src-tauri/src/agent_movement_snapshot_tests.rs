@@ -1,7 +1,8 @@
 //! Replay observed source shapes, then inject a concurrent voucher edit.
 use super::*;
 use tally_protocol_simulator::{
-    Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    Delivery, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator,
+    WireEncoding,
 };
 
 fn captured(bytes: &[u8]) -> ScenarioPlan {
@@ -516,4 +517,289 @@ async fn a_movement_on_a_non_inr_book_is_refused_before_any_ledger() {
     assert_eq!(response["isError"], true, "{response}");
     assert_eq!(error["code"], "ledger_movement_read_failed");
     assert_eq!(error["cause"], "company_base_currency_not_inr");
+}
+
+// -- The movement's ledger catalogue read: one attempt, a typed cause, and the
+// -- ledger named before any voucher is read.
+
+/// Identity, then the movement's first ledger read to its end: the read's own
+/// brackets, its paired currency read, its paired export (positions 15 and 17)
+/// and its closing brackets. The same sequence the happy-path tests replay.
+const FIRST_EXPORT: usize = 15;
+
+fn first_ledger_read() -> Vec<ScenarioPlan> {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let extent = captured_utf8(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    ));
+    let ledger = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
+    ));
+    let currency = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    vec![
+        company.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+        status.clone(),
+        company.clone(),
+        company.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        currency,
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        ledger,
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        extent,
+        status.clone(),
+        company.clone(),
+        status,
+        company,
+    ]
+}
+
+fn movement_server(
+    simulator: &SequenceSimulator,
+    policy: bridge_tally_transport::TransportPolicy,
+) -> (Server, tempfile::TempDir) {
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    server.runtime = TallyRuntime::with_transport_policy(policy);
+    (server, directory)
+}
+
+/// A ledger catalogue export that outlives its deadline is sent once (a 2 s deadline,
+/// a 5 s stall, and a wait past both: a request that is slow enough to fail the
+/// deadline on a loaded machine fails this test rather than passing it). The
+/// script holds a whole second read behind the stalled one, so a retry would
+/// find plans to answer it, and `received` would count them. Agent voucher reads
+/// are single-attempt because a request that timed out queues more work behind
+/// a gateway still building the abandoned response; this read is the same.
+#[tokio::test]
+async fn a_movement_catalogue_read_that_times_out_is_sent_once_and_names_why() {
+    let busy = std::time::Duration::from_millis(5_000);
+    let mut plans = first_ledger_read();
+    plans[FIRST_EXPORT] = plans[FIRST_EXPORT]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(busy));
+    let stalled = FIRST_EXPORT + 1;
+    // Directly behind the stalled export: a whole read (its brackets, currency
+    // read and export), which is what a retry would send next.
+    plans.truncate(stalled);
+    plans.extend(first_ledger_read().into_iter().skip(4));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: std::time::Duration::from_millis(2_000),
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    // Past the stalled response and any retry that would have queued behind it.
+    tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+    assert_eq!(
+        simulator.received(),
+        stalled,
+        "nothing was sent after the export that timed out"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_deadline_exceeded");
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("narrowing from and to is not known to help")),
+        "narrowing the dates is not known to help a whole-book catalogue: {error}"
+    );
+    simulator.cancel();
+}
+
+/// A ledger the first catalogue does not hold is refused as soon as that
+/// catalogue is read. One plan sits behind the catalogue's 26 requests (4
+/// identity and 22 of the read itself): a request after the catalogue would be
+/// answered and counted, so `received` stays at 26 only if none is sent.
+#[tokio::test]
+async fn a_movement_names_an_unknown_ledger_before_reading_any_voucher() {
+    let mut plans = first_ledger_read();
+    let total = plans.len();
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy::default(),
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"No Such Ledger"
+            }),
+        )
+        .await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "ledger_not_found"
+    );
+    assert_eq!(
+        simulator.received(),
+        total,
+        "no request after the catalogue"
+    );
+    simulator.cancel();
+}
+
+/// A catalogue export the transport refuses for its size names that too. A
+/// timeout is named already (a request no response answered); an oversized one
+/// was answered, so it needs its own naming. The export is the captured one
+/// padded past a cap that the identity, extent and currency answers stay under.
+#[tokio::test]
+async fn a_movement_catalogue_over_the_response_cap_names_why() {
+    let mut plans = first_ledger_read();
+    let padded = format!(
+        "{}{}",
+        plans[FIRST_EXPORT].fixture.body(),
+        " ".repeat(30_000)
+    );
+    plans[FIRST_EXPORT] = captured_utf8(&padded);
+    plans.truncate(FIRST_EXPORT + 1);
+    // One plan behind the export: an extra send would be answered and counted.
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            xml_response_max_bytes: 30_000,
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_too_large");
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("do not retry in a loop")),
+        "{error}"
+    );
+    assert_eq!(simulator.received(), FIRST_EXPORT + 1);
+    simulator.cancel();
+}
+
+/// The corroborating catalogue read (the second, after the voucher window) is
+/// sent once as well: it is the same read through the same function, and this
+/// pins it rather than inferring it. The script is the stable happy path up to
+/// the second export, which stalls, with a whole read behind it for a retry.
+#[tokio::test]
+async fn a_movements_second_catalogue_read_that_times_out_is_sent_once() {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let voucher = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    ));
+    let high_water = captured_utf8(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>61c6de69-1748-461c-ad3f-162cb949df9f</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>",
+    );
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let voucher_read = |body: ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body,
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let busy = std::time::Duration::from_millis(5_000);
+    let mut plans = first_ledger_read();
+    plans.extend(voucher_read(high_water));
+    plans.extend(voucher_read(voucher));
+    // The second catalogue read is the first one's requests from the read's own
+    // brackets on (the identity requests are not repeated); its export is the
+    // 12th.
+    let export = FIRST_EXPORT - 4;
+    let mut second = first_ledger_read().into_iter().skip(4).collect::<Vec<_>>();
+    second[export] = second[export]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(busy));
+    second.truncate(export + 1);
+    plans.extend(second);
+    let stalled = plans.len();
+    plans.extend(first_ledger_read().into_iter().skip(4));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: std::time::Duration::from_millis(2_000),
+            ..Default::default()
+        },
+    );
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+    assert_eq!(
+        simulator.received(),
+        stalled,
+        "nothing was sent after the second export that timed out"
+    );
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(error["code"], "ledger_movement_read_failed");
+    assert_eq!(error["cause"], "movement_catalogue_deadline_exceeded");
+    simulator.cancel();
 }

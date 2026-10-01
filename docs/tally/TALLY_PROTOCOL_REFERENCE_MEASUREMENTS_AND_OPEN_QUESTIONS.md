@@ -592,6 +592,83 @@ limit on its length are Bridge's own choices, UNVERIFIED against Tally. Whether 
 always agree byte for byte is UNVERIFIED; if they differ the read fails closed as
 `parent_part_row_differs_from_catalogue`.
 
+**The ledger census (bridge#679) counts a book whose mark is past its catalogue — PARTIAL, three books.**
+A `List of Ledgers` collection filtered by `$AlterID > a AND $AlterID <= b` (one `SYSTEM` formula, its
+name in `FILTERS`) returned exactly the ledgers whose AlterID lies in `(a, b]`, and the union over
+slices covering `(0, mark]` equalled the whole catalogue as a set of GUIDs, with no GUID twice, on
+three licensed 7.1 Silver books read on 30 Sep 2026, one request at a time: a synthetic book (mark
+5,547, 4,339 ledgers, 7 slices of 800 over (0, 5,547], the last clipped at the mark), a stock-heavy book (mark 102,161, 864
+ledgers, 15 slices of 8,000 over (0, 120,000], of which 14 were empty: the ledgers' AlterIDs sit in
+one band, the rest of the mark is stock items and other masters), and a second stock-heavy book (mark
+316,028, 2,649 ledgers, 318 slices of 1,000 over (0, 318,000] and again 80 slices of 4,000 over
+(0, 320,000]). The tilings on the two stock-heavy books reached past the mark, so the numbers of
+slices measured there are not what Bridge sends: it clips the last slice at the mark and sends
+ceil(mark / width) of them (13 slices of 8,000 for 102,161, 317 of 1,000 and 80 of 4,000 for
+316,028). Every ledger lay below its book's mark. A slice held at most its width in rows on every request. The survey made earlier that day counted one
+ledger fewer than the census and the catalogue on each of the two stock-heavy books (unexplained). The GUID-only fetch (`NATIVEMETHOD` GUID and the company
+GUID computed) makes a row about 846 to 892 bytes; the row still carries the ledger's name twice
+(as the row's `NAME` attribute and inside `LANGUAGENAME.LIST`) whatever is fetched, so a row is
+`2 x (415 + 2 x name characters)` bytes on the synthetic book, and the worst row Bridge assumes is
+`2 x (415 + 12 x 128)` (name 128 characters, each escaped to six): the longest name seen is 88
+characters, so 128 is UNVERIFIED (bridge#917). A slice of 4,000 then holds at most about 15.6 MB, under
+the 16 MB budget and about half the transport's cap; the largest slice read was 1.7 MB. A slice past
+every ledger answers a well-formed status 1 envelope with an empty collection (2,994 bytes; captured
+byte for byte). An earlier measurement recorded the same size for a closed or absent company (that
+body was not kept, so identical content is UNVERIFIED), so an empty slice is not evidence of a healthy
+read: Bridge refuses a census that found no ledger and relies on the company
+extent bracket (opening equal to closing, master mark and company GUID included) to say the company
+was open. Each request cost about 0.15 s on the 316,028-mark book, whether or not the slice was empty
+(the filter scan dominates): 80 slices took 11.8 s of transport time. Bridge reads each slice once,
+inside the bracket, and does not pair the reads.
+
+**The company's own ledger count (`NUMLEDGERS`, bridge#938) agrees with the census — PARTIAL, three books.**
+The Company collection fetched with `Name, GUID, NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`, sent once on
+30 Sep 2026 on a licensed 7.1 Silver holding 31 lab companies) answered 200 with a status 1 collection of one
+`COMPANY` row per loaded company, whatever `SVCURRENTCOMPANY` named, each row `NAME`, `GUID` and
+`NUMLEDGERS` (a number with a leading space, as `ALTMSTID` is): present on 31 of 31 rows, in 0.09 s for
+18.7 KB. The synthetic 4,339-ledger book's value, 4,339, equalled its catalogue and AlterID-census counts, and two
+real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane, also equalled their censuses
+(recorded in #938 only; the tree holds the synthetic book's capture, and the counts of the two other kept rows,
+6 and 123, are not compared with a census anywhere in this tree). That is three books, one of them captured here: what `NUMLEDGERS` counts for a book with deleted or hidden ledgers, and on another Tally
+version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the
+company reports is refused (`ledger_count_company_differs`), which is meant to catch a company closed and
+reopened with equal marks while the census ran (by reasoning: that case was not reproduced live) and also
+refuses a ledger added during the read; an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
+sizes nothing, and the result of a counted read says which it was (`ledger_count_cross_check.status`).
+
+**A company name of 150 characters is stored whole, and a request naming it is handled (bridge#917) — PARTIAL, one company, one release.**
+On 1 Oct 2026, on the licensed 7.1 Silver holding 31 lab companies, the Company collection fetched with `Name, GUID,
+NUMLEDGERS` (the request above, 992 bytes, answered 200 in 18,696 bytes, status 1, 31 rows) gave the lab company its owner
+says they created with the longest name they could type (the owner's account) a `NAME` attribute and a `NAME` element of 150 characters, 150 UTF-8 bytes, equal, with
+no XML escape. That is the stored length, not Tally's limit: it is the limit only if more was typed and Tally cut it, which
+is UNVERIFIED. A census slice request naming that company in `SVCURRENTCOMPANY` (2,174 bytes, `$AlterID > 0 AND $AlterID <=
+100`) answered 200, status 1, a complete envelope of 4,716 bytes in 0.06 s with the company's two ledgers, each row
+carrying that company's GUID; no dialog appeared and `GET /` answered the same 200 and 51 bytes before and after (VERIFIED
+for that one request shape; other shapes with that name are not measured). A census row carries the company's GUID and
+not its name, so a long company name changes the size of the request, not of a row.
+
+**A census row carries the ledger's name twice, or three times for a reserved ledger — PARTIAL, two rows.**
+On the same answer the row of the ledger `Cash` (a 4-character name, `RESERVEDNAME` empty) was 396 characters, a fixed part of
+388 plus two copies of the name, against 391 in the pinned capture (Bridge's constant of 415 keeps its margin over both), and
+the row of `Profit & Loss A/c` (a built-in ledger, 17 characters, 21 once escaped, `RESERVEDNAME` equal to the name) carried the name
+three times: its `NAME` attribute, its `RESERVEDNAME` attribute and its `NAME` element, 451 characters, the same 388 fixed plus three
+copies of the escaped name. If a ledger a user names never has a `RESERVEDNAME` (not measured), `2 x (415 + 12 x 128)` (two
+copies, six characters each) bounds a user-named ledger's row. Not measured: whether a built-in ledger a user renames to a long
+name keeps its `RESERVEDNAME` and so carries three copies (such a row could pass that bound: three copies of a 128-character name
+at six characters each is about 2,300 characters before the fixed part, against the 27 characters of margin between the pinned 415 and the measured
+388), and what an alias adds. The longest ledger and group names Tally accepts, and whether its limit counts characters or bytes, are not
+measured (bridge#917: they need writes to a synthetic company).
+
+**Not established** for the census: that AlterIDs are distinct across a book's ledgers (a slice's row
+bound rests on it: two ledgers sharing an AlterID both fall in one slice, and only a slice pushed past
+its span by them is refused, so this can cost a spurious refusal, not a missed ledger), how many names a ledger's row carries when it has aliases (each alias would add to the row
+past the two copies bounded here), a book whose ledgers' AlterIDs exceed its master mark (the mark is
+assumed to bound them; a census then undercounts, and Bridge compares the count with the ledgers the
+read returns and refuses a difference), a mark above 400,000, a slice of names longer than 88
+characters, and how a busy or edited book answers a slice (the bracket, not the slice, is what
+detects an edit). Tally's behaviour on a slice that would exceed the 32 MiB response cap is not
+measured and is not to be: Bridge sizes a slice by its width before sending it.
+
 ## 11a. Scale measurements — 11,287-voucher corpus
 
 **VERIFIED 2026-07-29** on a generated production-shaped corpus: 25 customers and 15
@@ -833,7 +910,9 @@ matching weeks or months ceiling; those units are constrained by checked
 resulting-date arithmetic instead.
 
 The voucher parser accepts explicit `N Day(s)`, `N Week(s)`, and `N Month(s)` forms only. It
-rejects an unknown unit rather than guessing a day count. Weeks add exactly seven days each;
+does not guess a day count for an unknown unit: the voucher-scan boundary rejects it, and the
+agent `vouchers` read carries the text as `unrecognised` instead (so `10000 Days`, above the
+ceiling, is carried, not refused). Weeks add exactly seven days each;
 months use a calendar-month operation that preserves the day of month when possible and otherwise
 clamps to the target month's last day. The same licensed-gateway evidence measured:
 
@@ -1135,6 +1214,37 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 
 ---
 
+### 12a.12 Master collections on licensed 7.1
+
+**Measured 2026-09-30 on licensed TallyPrime 7.1 Silver** (`education_mode=false`). The fixtures come from two synthetic companies. Two stock-heavy client books were read only for the figures marked "by role", and nothing from them is committed. One run of each request. **Confidence: PARTIAL**
+
+- **Four kinds read as one collection each.** Voucher types, godowns, units and stock groups can each be read as one `TYPE=Collection` export with `<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>` (the group snapshot's compute).
+  - Every row of every kind carried the computed GUID, equal to the company's.
+  - A collection with rows came back as one `COLLECTION` element.
+  - **A kind with no master:** on a synthetic book without inventory, units and stock groups returned `STATUS` 1 with a present, empty `COLLECTION` element (its `ISMSTDEPTYPE` and `MSTDEPTYPE` attributes, no rows). It was not absent and not an empty envelope. Godowns returned one row, the company's default location; whether a company can answer with no godown is unmeasured, so a zero-row godown answer is admitted like the other inventory kinds (voucher types are refused, because every company has predefined ones).
+  - Bridge refuses a zero-row `voucher_types` answer (`masters_voucher_types_empty`), because every company has predefined voucher types. That is a rule Bridge applies, not a measurement: every captured voucher-type answer had rows.
+  - Fixtures and exact requests: `tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`.
+- **Numbering method.** `NUMBERINGMETHOD` is a direct child of each voucher-type row when fetched on `List of VoucherTypes`.
+  - `NUMBERINGMETHOD` alone adds about 130 bytes per row: on a client book, by role, the same request without it was about 38 KB for 24 types, and about 41 KB with it.
+  - Bridge's request adds four things to `List of VoucherTypes`: `ISACTIVE`, `ISOPTIONAL`, `NUMBERINGMETHOD` and the `BRIDGECOMPANYGUID` compute. In the committed synthetic capture they add about 500 bytes per row (UTF-16, a row counted from its opening to its closing tag, line ends and indentation included), so its rows average about 1,700 bytes against about 1,200 in production's `List of VoucherTypes` capture, roughly 40% larger. Apart from those four tags the rows carry the same tags as production's, so the row population is the same.
+  - Values seen: `Default`, `Automatic` and `Manual` on a synthetic book (24/1/1), and `Automatic` and `Manual` on a client book.
+  - What `Default` means for numbering is unmeasured, and a value outside these is unmeasured. Bridge reports the value raw rather than refusing it.
+  - `PREVENTDUPLICATES` was not returned by this shape.
+- **The company's voucher-type count is not the row count.** The `Company` collection's `NUMVOUCHERTYPES` did not equal the voucher-type rows returned: 35 against 26 on a synthetic book, and 33 against 24 on a client book. On that client book it equalled `NUMVOUCHERNUMBERSERIES` (33), so it may count number series. That is an inference, unmeasured.
+- **Names and aliases.** Voucher-type, godown and stock-group rows carry `LANGUAGENAME.LIST`, so aliases add names without a fixed limit. The synthetic book's unit rows did not carry it.
+  - A whole read can only be sized by assuming a longest name and an alias count.
+  - Bridge checks each row's length against that assumption after the read, and refuses a row beyond it.
+- **Every captured row had its own AlterID at or under the book's mark.** On both synthetic books the AlterIDs were distinct and the largest sat under `ALTMSTID`: 269 against 289 on one, and 100 against 242 on the other (the one godown). For godowns, units and stock groups, Bridge sizes a read from this premise before sending it, and refuses a response that breaks it. Voucher types have no size check before the read and are checked after it (rows, AlterIDs and response size), and groups are not checked at all.
+- **Master marks run far past the counts.** The two client books had master-alteration marks (`ALTMSTID`) of about 100,000 and 300,000 (rounded, by role), against a few thousand ledgers. A size estimate from the mark refuses both, and any book whose mark is above about 1,150 (the admission limits for godowns, units and stock groups are 1,152, 1,168 and 1,160) refuses those three kinds. How common such marks are across live books is unmeasured; both client books measured refuse.
+- **Not measured:**
+  - a numbering value other than the three seen;
+  - what `Default` numbering does on import;
+  - a book whose masters were copied from another company (whether row GUIDs keep the source prefix);
+  - how a deletion moves `ALTMSTID`;
+  - Education and Gold.
+
+---
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1179,3 +1289,6 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 | 2026-09-28 | Licensed TallyPrime 7.1 Gold, one client book, one run each, VERIFIED for what was read back (one session, not repeated on a second book; the delete is one voucher and PARTIAL): §9.14 an upsert (same `REMOTEID`, `ACTION="Create"`) alters Payment, Receipt and Contra in place (about 300 vouchers, full read-back), and `native_remote_ids` is in batch voucher order (9 of 9 captured batches; a tenth was not captured); §9.4 a rename by `Alter` changes only the name, `ALTERID` and the company counter (about 120 ledgers, 2 groups); §9.12b a delete by the creation `REMOTEID` of a directly imported voucher (one voucher, PARTIAL); §9.4e a CR LF in a master name sent as `&#13;&#10;` (6 vouchers). |
 | 2026-09-29 | §11e: ledger catalogue, balance, party-master and group read sizes, and the master part-read go/no-go (GO), on one 1,989-ledger synthetic licensed 7.1 Silver book with no vouchers. PARTIAL (bridge#668, bridge#679) |
 | 2026-09-30 | §11e: `NOT` filters, several listed together, on the party-ledger master and balance collections of a 4,339-ledger synthetic licensed 7.1 Silver book with no vouchers: exact expected rows for up to 511 excluded parents as up to seven formulas, and for a seven-formula request of about 110 KB whose extra names were fictitious. PARTIAL (bridge#679) |
+| 2026-09-30 | §11e: the `$AlterID > a AND $AlterID <= b` filter on `List of Ledgers` (GUID-only fetch) on three licensed 7.1 Silver books, marks 5,547, 102,161 and 316,028: slices hold at most their width, their union equals the catalogue, an empty slice is a well-formed 2,994-byte answer. PARTIAL (bridge#679) |
+| 2026-09-30 | §11e: the Company collection's `NUMLEDGERS` (request `BridgeCompanyLedgerCountV1`): present on all 31 loaded lab companies, equal to the ledger catalogue and census counts on a 4,339-ledger synthetic book, and to the census counts of two real books read by another lane. PARTIAL (bridge#938) |
+| 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |

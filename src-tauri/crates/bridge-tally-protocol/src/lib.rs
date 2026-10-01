@@ -41,7 +41,9 @@ pub mod india_tax_observation;
 pub mod jsonex;
 #[cfg(feature = "jsonex-request-builder")]
 pub mod jsonex_request;
+pub mod ledger_census;
 mod native_ledger_collection;
+pub mod native_masters;
 pub mod native_outstandings;
 pub mod native_statement_reports;
 pub mod native_trial_balance;
@@ -84,10 +86,10 @@ pub use native_ledger_collection::{
     NativeLedgerAmountError, PartyLedgerMasterFields, PartyLedgerMasterRecord,
 };
 pub use standard_ledger_catalog::{
-    parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, StandardLedgerCatalog,
-    StandardLedgerCatalogBinding, StandardLedgerCatalogError, StandardLedgerIdentityObservation,
-    MAX_STANDARD_LEDGER_IDENTITY_ROWS,
+    parse_ledger_census_slice, parse_standard_ledger_catalog,
+    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
+    StandardLedgerCatalog, StandardLedgerCatalogBinding, StandardLedgerCatalogError,
+    StandardLedgerIdentityObservation, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 pub use text_encoding::{
     decode_tally_text_bytes_limited, decode_tally_xml_response_bytes_limited, decode_xml_bytes,

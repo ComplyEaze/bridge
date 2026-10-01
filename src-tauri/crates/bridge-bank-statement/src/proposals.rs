@@ -665,8 +665,9 @@ pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal>
 /// One line of the list an operator writes the mapping from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CounterpartyGroup {
-    /// The spelling with the fewest words, then the most value: a cell wrap can
-    /// only insert a space the bank did not print, never remove one.
+    /// The spelling with the fewest words, then the first by name: a cell wrap
+    /// can only insert a space the bank did not print, never remove one. No
+    /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
     /// The ledger its non-bank leg posts to; empty when skipped.
@@ -675,27 +676,21 @@ pub struct CounterpartyGroup {
     pub disposition: String,
     pub suspense: bool,
     pub rows: usize,
-    pub total: String,
 }
 
 /// Records grouped the way the mapping is read (`_print_dry_run`): on the
-/// mapping key, so two wrap spellings of one payee are one line.
+/// mapping key, so two wrap spellings of one payee are one line. No amount is
+/// kept: groups come in the order each first appears, and the parse summary
+/// sorts them.
 pub fn group_counterparties(
     records: &[StatementRecord],
 ) -> Result<Vec<CounterpartyGroup>, Refusal> {
     struct Bucket {
         key: (String, String, bool),
         ledger: String,
-        total: ExactDecimal,
         rows: usize,
-        spellings: Vec<(String, ExactDecimal)>,
+        spellings: Vec<String>,
     }
-    let overflow = |_| {
-        Refusal::new(
-            "arithmetic_out_of_range",
-            "a counterparty total exceeded the exact-decimal bound",
-        )
-    };
     let mut buckets: Vec<Bucket> = Vec::new();
     for record in records {
         let disposition = match record.disposition {
@@ -704,14 +699,12 @@ pub fn group_counterparties(
             Disposition::NeedsAnswer => "NeedsAnswer".to_string(),
         };
         let key = (mapping_key(&record.party), disposition, record.suspense);
-        let amount = ExactDecimal::parse(record.amount.as_str()).map_err(overflow)?;
         let position = match buckets.iter().position(|bucket| bucket.key == key) {
             Some(position) => position,
             None => {
                 buckets.push(Bucket {
                     key,
                     ledger: record.ledger.clone(),
-                    total: ExactDecimal::zero(),
                     rows: 0,
                     spellings: Vec::new(),
                 });
@@ -719,52 +712,39 @@ pub fn group_counterparties(
             }
         };
         let bucket = &mut buckets[position];
-        bucket.total = bucket.total.checked_add(&amount).map_err(overflow)?;
         bucket.rows += 1;
-        match bucket
-            .spellings
-            .iter_mut()
-            .find(|(name, _)| *name == record.party)
-        {
-            Some((_, total)) => *total = total.checked_add(&amount).map_err(overflow)?,
-            None => bucket.spellings.push((record.party.clone(), amount)),
+        if !bucket.spellings.contains(&record.party) {
+            bucket.spellings.push(record.party.clone());
         }
     }
-    // Stable sorts, largest first, so ties keep first-appearance order.
-    buckets.sort_by(|left, right| right.total.cmp_magnitude(&left.total));
     Ok(buckets
         .into_iter()
         .map(|mut bucket| {
-            bucket
-                .spellings
-                .sort_by(|left, right| right.1.cmp_magnitude(&left.1));
+            // By name, so the spellings' order says nothing of their amounts.
+            bucket.spellings.sort();
             let shown = bucket
                 .spellings
                 .iter()
                 .enumerate()
                 .min_by(|(left_index, left), (right_index, right)| {
-                    left.0
-                        .split_whitespace()
+                    left.split_whitespace()
                         .count()
-                        .cmp(&right.0.split_whitespace().count())
-                        .then(right.1.cmp_magnitude(&left.1))
+                        .cmp(&right.split_whitespace().count())
                         .then(left_index.cmp(right_index))
                 })
-                .map(|(_, spelling)| spelling.0.clone())
+                .map(|(_, spelling)| spelling.clone())
                 .unwrap_or_default();
             CounterpartyGroup {
                 also_printed_as: bucket
                     .spellings
-                    .iter()
-                    .filter(|(name, _)| *name != shown)
-                    .map(|(name, _)| name.clone())
+                    .into_iter()
+                    .filter(|name| *name != shown)
                     .collect(),
                 party: shown,
                 ledger: bucket.ledger,
                 disposition: bucket.key.1,
                 suspense: bucket.key.2,
                 rows: bucket.rows,
-                total: format_amount(&bucket.total),
             }
         })
         .collect())

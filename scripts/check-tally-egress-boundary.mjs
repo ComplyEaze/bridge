@@ -109,8 +109,8 @@
 //  - A pin is (file, method, count): removing one reviewed call and adding
 //    another of the same method in the same file passes; only the diff shows it.
 //  - Removing or narrowing the census step in ci.yml is not detected here.
-//    ci.yml is a compatibility-pinned file, so an edit to it is a resealed,
-//    reviewed change.
+//    ci.yml is a compatibility-pinned file, so an edit to it needs an
+//    acknowledgement and a named review.
 //  - On Windows, opening a UNC or WebDAV path through std::fs reaches the
 //    network; no method list can tell such a path from a local one.
 //  - Dropping `-D warnings` from a CI clippy step, or narrowing what it

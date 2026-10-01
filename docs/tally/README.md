@@ -44,13 +44,13 @@ capability from assumption, and a completed request from a verified snapshot.
   `--confirm-open-company` makes that an explicit operator step rather than a silent one.
   Contract tests run in CI: `python3 scripts/bank_statement_import.test.py`.
 
-  It was written because Bridge's own writer could not express a bank statement at all: it
-  qualified **Journal only** (`LIVE_QUALIFIED_VOUCHER_TYPES` in `src-tauri/src/agent_import.rs`),
-  while money out is a Payment, money in a Receipt, and an own-account or ATM movement a
-  Contra. **That is still the case on master**; qualifying the three types is in flight and
-  not landed, so nothing here should be read as a plan of record.
+  It was written when Bridge's own writer could express only a Journal, while money out is a
+  Payment, money in a Receipt, and an own-account or ATM movement a Contra. The writer now
+  qualifies all four voucher types (`LIVE_QUALIFIED_VOUCHER_TYPES` in
+  `src-tauri/src/agent_import.rs`), so that is no longer the gap it was written for; this
+  tool remains as the standalone route.
 
-  Even once it lands, this tool covers a part Bridge does not: it reads the **statement
+  This tool covers a part Bridge does not: it reads the **statement
   PDF**, whereas `build_import_xml` takes an already-structured payload. It also covers books
   the writer refuses, such as one whose bank ledger sits under a money group Bridge has not
   yet observed a captured ledger beneath.
@@ -58,10 +58,9 @@ capability from assumption, and a completed request from a verified snapshot.
   No statement, password, ledger name or account number lives in this repository — all are
   supplied at run time.
 
-  > **Scoped update, 2026-09-16.** The "still the case on master" paragraph above is stale:
-  > `LIVE_QUALIFIED_VOUCHER_TYPES` now carries Journal, Payment, Receipt and Contra, and a
-  > Bridge-built batch is corrected through `build_import_xml(..., amends_batch_id)`
-  > (`agent_import_amend.rs`), never by a rebuild.
+  > **Scoped update, 2026-09-16.** A Bridge-built batch is corrected through
+  > `build_import_xml(..., amends_batch_id)` (`agent_import_amend.rs`), never by a
+  > rebuild.
 
 - `parse_bank_statement` (MCP tool, [`src-tauri/crates/bridge-bank-statement`](../../src-tauri/crates/bridge-bank-statement))
   is the parsing half of the script above, ported to Rust. It reads the PDF through a bundled

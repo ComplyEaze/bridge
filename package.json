@@ -7,12 +7,12 @@
   "description": "ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime running on your own computer.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lamemustafa/bridge.git"
+    "url": "https://github.com/ComplyEaze/bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/lamemustafa/bridge/issues"
+    "url": "https://github.com/ComplyEaze/bridge/issues"
   },
-  "homepage": "https://github.com/lamemustafa/bridge#readme",
+  "homepage": "https://github.com/ComplyEaze/bridge#readme",
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=24.15.0 <25"

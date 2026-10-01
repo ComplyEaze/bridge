@@ -350,6 +350,46 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
             "Do not retry the unchanged export: it refuses again.",
         );
     }
+    // The ledger count could not be established or did not add up (#679): each
+    // has its own typed code, not the endpoint failure the text heuristics of
+    // `tally_runtime_command_error` would read into it.
+    use PartyLedgerMasterSourceValidationError as Validation;
+    if let Some((code, too_large)) =
+        error
+            .chain()
+            .find_map(|cause| match cause.downcast_ref::<Validation>()? {
+                error @ (Validation::LedgerSpan { .. }
+                | Validation::LedgerSpanSliceInvalid { .. }
+                | Validation::LedgerCountDiffers { .. }
+                | Validation::LedgerCountCompanyDiffers { .. }
+                | Validation::LedgerCountCompanyInvalid { .. }) => Some((error.safe_code(), false)),
+                error @ (Validation::LedgerSpanSliceResponseTooLarge { .. }
+                | Validation::CountedCatalogueTooLarge { .. }) => Some((error.safe_code(), true)),
+                _ => None,
+            })
+    {
+        // A count that did not add up may be a book edited during the read; a
+        // count or a slice past what Bridge reads in one export refuses again.
+        return if too_large {
+            tally_command_error(
+                code,
+                "Response size",
+                "Bridge withheld the party/ledger master: counting this company's ledgers needs a response larger than Bridge will read. Nothing was released.",
+                "after_change",
+                false,
+                "Do not retry the unchanged export: it refuses again.",
+            )
+        } else {
+            tally_command_error(
+                code,
+                "Response validation",
+                "Bridge withheld the party/ledger master: counting this company's ledgers failed or did not add up. Nothing was released.",
+                "after_change",
+                false,
+                "Retry once while nobody is editing this company in Tally. If it refuses again, this company cannot be exported by Bridge yet.",
+            )
+        };
+    }
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
         "Bridge withheld the party/ledger master: {}",

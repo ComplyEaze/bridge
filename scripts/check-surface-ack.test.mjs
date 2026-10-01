@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins } from "./check-surface-ack.mjs";
+import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, withdrawnPins } from "./check-surface-ack.mjs";
 
 // ---- the pure core ----
 
@@ -630,4 +630,135 @@ test("bad usage exits 2", () => {
   for (const args of [[], ["--mode", "nope"], ["--mode"], ["--mode", "push", "--surprise"]]) {
     assert.equal(cli(dir, args).status, 2, JSON.stringify(args));
   }
+});
+
+// ---- the branch history check: a pin the branch added and then lost ----
+
+const OWN_REASON = "decides what is posted";
+const WITHDRAWN = /pinned by a commit of this pull request but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line/;
+
+// main: M0 pins a and b. The branch adds its own pin n, changes a, and acknowledges both. Main moves
+// on. The branch then merges main resolving the pin list by taking main's, which drops n, and `fix`
+// edits the working tree for that merge commit (the acknowledgement, usually). The pull request is
+// then merged into main, so HEAD^2 is the branch tip.
+function ownPinLost({ fix = () => {}, unionList = false } = {}) {
+  const r = prRepo();
+  r.sh("switch", "-q", "-c", "own", "main");
+  r.write("n.txt", "n\n");
+  r.write("a.txt", "changed\n");
+  r.surface([{ path: "a.txt" }, { path: "b.txt" }, { path: "n.txt", reason: OWN_REASON }]);
+  r.ackFile(7, ["a.txt", "n.txt"]);
+  r.commit("own pin");
+  r.sh("switch", "-q", "main");
+  r.write("master-only.txt", "master moved on\n");
+  r.commit("master moves on");
+  r.sh("switch", "-q", "own");
+  r.sh("merge", "--no-commit", "--no-ff", "main");
+  if (!unionList) r.sh("checkout", "main", "--", SURFACE_PATH);
+  fix(r);
+  r.commit("merge main");
+  const tip = r.sh("rev-parse", "HEAD");
+  r.sh("switch", "-q", "main");
+  mergeBranch(r, "own");
+  return { r, tip };
+}
+const run = ({ r, tip }, n = "7") => cli(r.dir, ["--mode", "pull_request"], { PR_NUMBER: n, PR_HEAD_SHA: tip });
+
+test("history check: a pin the branch added and lost fails while the acknowledgement still names it", () => {
+  const out = run(ownPinLost());
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /touched pinned files \(2: a\.txt, n\.txt\)/);
+  assert.match(out.stdout, /lists path\(s\) that are not changed pinned paths: n\.txt/);
+});
+
+test("history check: a lost pin fails even when the acknowledgement is edited to match", () => {
+  const out = run(ownPinLost({ fix: (r) => r.ackFile(7, ["a.txt"]) }));
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, WITHDRAWN);
+  assert.match(out.stdout, /n\.txt: pinned by a commit of this pull request/);
+});
+
+test("history check: a lost pin fails when the acknowledgement is deleted, and nothing else is pinned", () => {
+  const out = run(
+    ownPinLost({
+      fix: (r) => {
+        r.sh("rm", "-q", "-f", `${ACK_DIR}pr-7.txt`);
+        r.sh("checkout", "main", "--", "a.txt");
+      },
+    }),
+  );
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /touched pinned files \(1: n\.txt\)/);
+  assert.match(out.stdout, /exactly one ack must be added; found 0/);
+});
+
+test("history check: a withdrawn pin passes when the acknowledgement declares it with a removed-pin line", () => {
+  const out = run(ownPinLost({ fix: (r) => r.write(`${ACK_DIR}pr-7.txt`, "a.txt\nreviewer: octocat\nremoved-pin: n.txt\n") }));
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /touched pinned files \(2: a\.txt, n\.txt\)/);
+  assert.match(out.stdout, /surface ack check ok/);
+});
+
+test("history check: a union resolution that keeps the pin passes", () => {
+  const out = run(ownPinLost({ unionList: true }));
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /surface ack check ok/);
+});
+
+test("history check: a removed-pin line for a pin that was never withdrawn is still refused", () => {
+  const out = run(ownPinLost({ unionList: true, fix: (r) => r.write(`${ACK_DIR}pr-7.txt`, "a.txt\nn.txt\nreviewer: octocat\nremoved-pin: zzz.txt\n") }));
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /"removed-pin:" names path\(s\) that were not removed: zzz\.txt/);
+});
+
+test("history check: a shallow clone fails closed", () => {
+  const { r, tip } = ownPinLost({ unionList: true });
+  const clone = mkdtempSync(join(tmpdir(), "surface-ack-shallow-"));
+  tmpDirs.push(clone);
+  execFileSync("git", ["clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8" });
+  const out = cli(clone, ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /shallow clone/);
+});
+
+test("history check: a branch commit whose pin list cannot be parsed fails closed", () => {
+  const r = prRepo();
+  r.sh("switch", "-q", "-c", "broken", "main");
+  r.write(SURFACE_PATH, "{ not json");
+  r.commit("break the list");
+  r.surface([{ path: "a.txt" }, { path: "b.txt" }]);
+  r.write("other.txt", "changed\n");
+  const tip = r.commit("repair it");
+  r.sh("switch", "-q", "main");
+  mergeBranch(r, "broken");
+  const out = cli(r.dir, ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /cannot be parsed/);
+});
+
+test("history check, pure: a merge is compared with all of its parents, not the first only", () => {
+  const set = (...paths) => new Set(paths);
+  const lists = new Map([
+    ["p1", { blob: "b1", paths: set("a") }],
+    ["p2", { blob: "b2", paths: set("a", "z") }],
+    ["m", { blob: "b3", paths: set("a", "z") }],
+    ["n", { blob: "b4", paths: set("a") }],
+  ]);
+  const pinsOf = (sha) => lists.get(sha);
+  const commits = [
+    { sha: "m", parents: ["p1", "p2"] },
+    { sha: "n", parents: ["m"] },
+  ];
+  // z reached the branch through the second parent; the first-parent view would call it the branch's own.
+  assert.deepEqual(withdrawnPins({ commits, pinsOf, basePaths: set("a"), headPaths: set("a") }), []);
+  // The same path added by a commit whose every parent lacks it is the branch's own, and is withdrawn.
+  lists.set("c", { blob: "b5", paths: set("a", "z") });
+  lists.set("p0", { blob: "b6", paths: set("a") });
+  assert.deepEqual(withdrawnPins({ commits: [{ sha: "c", parents: ["p0"] }, ...commits.slice(1)], pinsOf, basePaths: set("a"), headPaths: set("a") }), ["z"]);
+  // A pin the base or the head holds is never withdrawn.
+  assert.deepEqual(withdrawnPins({ commits: [{ sha: "c", parents: ["p0"] }], pinsOf, basePaths: set("a", "z"), headPaths: set("a") }), []);
+  assert.deepEqual(withdrawnPins({ commits: [{ sha: "c", parents: ["p0"] }], pinsOf, basePaths: set("a"), headPaths: set("a", "z") }), []);
+  // A commit whose list is the same blob as a parent's adds nothing, and an unreadable list throws.
+  assert.deepEqual(withdrawnPins({ commits: [{ sha: "n", parents: ["n"] }], pinsOf, basePaths: set(), headPaths: set() }), []);
+  assert.throws(() => withdrawnPins({ commits: [{ sha: "x", parents: [] }], pinsOf: () => { throw new Error("unreadable"); }, basePaths: set(), headPaths: set() }), /unreadable/);
 });

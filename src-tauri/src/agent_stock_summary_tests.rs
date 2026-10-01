@@ -3,7 +3,9 @@
 //! book's GUID replaced by the test double's company. The runtime read's own
 //! faults are `runtime_stock_summary_tests`.
 use super::super::*;
-use bridge_tally_protocol::native_stock_summary::stock_item_worst_row_bytes;
+use bridge_tally_protocol::native_stock_summary::{
+    parse_native_stock_items, stock_item_worst_row_bytes,
+};
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -18,8 +20,11 @@ const AS_OF: &str = "20260331";
 /// companies list and in the extent are moved a year back together, as the
 /// identity bracket compares them.
 const BOOKS_FROM: &str = "20250401";
-/// The basis sentence for a read whose report total equalled the items' sum.
-const MATCHED_SENTENCE: &str = "The items' closing values sum to Tally's own Stock Summary total.";
+/// The basis sentence for a read whose report lines summed to the items' sum.
+const MATCHED_SENTENCE: &str = "The items' closing values equal the sum of the top-level lines of Tally's own Stock Summary.";
+/// The start of the basis sentence for a read that was not compared.
+const UNCHECKED_SENTENCE: &str =
+    "They were NOT checked against the sum of the top-level lines of Tally's own Stock Summary";
 /// The part of a basis that is the same whatever Tally reported.
 const UNMEASURED_USE: &str =
     "how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured";
@@ -400,7 +405,15 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "16,000,000 bytes",
         "company totals only",
         "Empty is not zero",
-        "an empty opening quantity or value is returned as null and not counted",
+        "an empty closing quantity or value is returned as null and counted",
+        "The opening quantity and value are read but not returned, because their as-at date is unmeasured",
+        "what the sign means is unmeasured, and `value_sum` adds the values as sent, signs included",
+        "the sum of the top-level lines of Tally's own Stock Summary",
+        "The top-level `state` is `observed`",
+        "`unchecked`",
+        "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
+        "what a negative value means is unmeasured",
+        "`not_established`",
         "not measured",
         "ISINTEGRATED",
         "Education mode is refused",
@@ -409,7 +422,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "stock_summary_as_of_not_measured",
         "negative_closing_quantity_count",
         "`amount`",
-        "`parent` is masked under mask_parties",
+        "`name` and `parent` are masked under mask_parties",
         "company_flags_not_one_row",
         "stock_quantity_unparseable",
         "`matched` can stand beside `partial` true",
@@ -426,6 +439,9 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "day 1, 2 or 31",
         "stock_summary_as_of_unsupported",
         "unless its closing quantity is present and zero",
+        "Tally's own Stock Summary total",
+        "item names are not masked",
+        "`opening` and `closing`",
     ] {
         assert!(!description.contains(phrase), "{phrase}");
     }
@@ -500,10 +516,26 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         json!({
             "name": "Carton Box Small", "guid": format!("{GUID}-00000110"),
             "parent": "Packaging", "base_unit": "Box",
-            "opening": {"quantity": {"amount": "100", "unit": "Box"}, "value": "2500.00"},
             "closing": {"quantity": {"amount": "100", "unit": "Box"}, "value": "2500.00"},
         })
     );
+    // The note beside `value_sum`, which is null here: always present.
+    assert_eq!(page["totals"]["value_sum"], Value::Null);
+    assert_eq!(page["totals"]["value_sum_signs"], "as_sent_meaning_unmeasured");
+    // No returned item carries `opening`: it is read but not returned.
+    assert!(page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item.get("opening").is_none()));
+    // The limitations pin what the figures are and are not.
+    let limitations = page["limitations"].as_array().unwrap();
+    for line in [
+        "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
+        "Values and their signs are exactly as Tally sends them: the one capture had items with a positive quantity and a negative value, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
+    ] {
+        assert!(limitations.iter().any(|found| found == line), "{line}");
+    }
     // The totals cover the book: Zero Stock Item holds -50 Kgs with no value.
     assert_eq!(page["totals"]["item_count"], 11);
     assert_eq!(page["totals"]["negative_closing_quantity_count"], 1);
@@ -513,6 +545,13 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     let second = one.call(args(AS_OF, 5, 5, Some(&id))).await;
     let page = result(&second);
     assert_eq!(page["snapshot"]["reused"], true);
+    // A later page of a matched read is `observed`, as its first page was.
+    assert_eq!(page["state"], "observed");
+    assert!(page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item.get("opening").is_none()));
     assert_eq!(page["next_offset"], 10);
     assert_eq!(
         names(page),
@@ -688,6 +727,8 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     let page = result(&response);
     assert_eq!(page["totals"]["value_sum"], "3000.01");
+    // Present beside a non-null sum too.
+    assert_eq!(page["totals"]["value_sum_signs"], "as_sent_meaning_unmeasured");
     assert_eq!(page["totals"]["partial"], false);
     assert_eq!(page["totals"]["empty_closing_value_count"], 0);
     assert_eq!(page["tie_out"]["state"], "matched");
@@ -810,12 +851,16 @@ async fn a_not_checked_read_is_held_and_a_later_page_continues_it() {
     let first = one.call(args(AS_OF, 0, 5, None)).await;
     let page = result(&first);
     assert_eq!(page["tie_out"]["state"], "not_checked");
+    // Returned without a comparison: not `observed`, as a matched read is.
+    assert_eq!(page["state"], "unchecked");
     assert_eq!(page["snapshot"]["reused"], false);
     let id = page["snapshot"]["id"].as_str().unwrap().to_string();
     let second = one.call(args(AS_OF, 5, 5, Some(&id))).await;
     let page = result(&second);
     assert_eq!(page["snapshot"]["reused"], true);
     assert_eq!(page["tie_out"]["state"], "not_checked");
+    // A later page served from the held snapshot is as unchecked as its first.
+    assert_eq!(page["state"], "unchecked");
     assert_eq!(one.requests(), total);
 }
 
@@ -843,16 +888,21 @@ async fn an_empty_or_unknown_report_returns_the_items_and_says_they_are_unchecke
         let response = one.call(args(AS_OF, 0, 500, None)).await;
         let page = result(&response);
         assert_eq!(page["total"], 11);
+        assert_eq!(page["state"], "unchecked");
+        assert_eq!(
+            page["totals"]["value_sum_signs"],
+            "as_sent_meaning_unmeasured"
+        );
         assert_eq!(
             page["tie_out"],
             json!({"state":"not_checked","reason":reason})
         );
         let basis = page["basis"].as_str().unwrap();
-        assert!(basis.contains("NOT checked against Tally's own Stock Summary total"));
+        assert!(basis.contains(UNCHECKED_SENTENCE), "{basis}");
         assert!(basis.contains(reason), "{basis}");
         // No tie is claimed of figures that were not compared.
         assert!(!basis.contains(MATCHED_SENTENCE), "{basis}");
-        assert!(!basis.contains("sum to"), "{basis}");
+        assert!(!basis.contains("equal the sum"), "{basis}");
         assert!(!basis.contains("ties"), "{basis}");
         assert!(basis.contains(UNMEASURED_USE), "{basis}");
         assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
@@ -887,7 +937,7 @@ async fn the_basis_states_only_what_tally_reported_about_integration() {
         let basis = page["basis"].as_str().unwrap();
         assert!(basis.starts_with(expected), "{page}");
         // Whatever Tally reported, how the books use the values is not claimed,
-        // and a matched read says only that the sum equals Tally's own.
+        // and a matched read says only that the sum equals the report lines' sum.
         assert!(basis.contains(UNMEASURED_USE), "{basis}");
         assert!(basis.ends_with(MATCHED_SENTENCE), "{basis}");
         assert!(!basis.contains("NOT checked"), "{basis}");
@@ -1027,17 +1077,93 @@ async fn a_parser_refusal_surfaces_as_the_tool_error_with_its_stock_cause() {
 }
 
 #[tokio::test]
-async fn item_names_are_not_masked_under_mask_parties() {
-    // They are not party names: a masked read returns them as they are.
+async fn item_names_are_marked_under_mask_parties_and_plain_without_it() {
+    // Masked: the names go out under the party-name marker, and the guid, the
+    // identity, stays plain.
     let one = OneServer::spawn_with(
         Book::captured().first_page(14, MARK),
         Redaction::MaskParties,
     );
     let response = one.call(args(AS_OF, 0, 3, None)).await;
+    let page = result(&response);
+    assert_eq!(
+        names(page),
+        [
+            mask("Carton Box Small"),
+            mask("Caustic Soda Flakes"),
+            mask("Cleaning Kit A")
+        ]
+    );
+    // A mask that kept the plain text would pass the above if `mask` did.
+    assert_ne!(mask("Carton Box Small"), "Carton Box Small");
+    for plain in ["Carton Box Small", "Caustic Soda Flakes", "Cleaning Kit A"] {
+        assert!(!response.to_string().contains(plain), "{plain}");
+    }
+    assert_eq!(page["items"][0]["guid"], format!("{GUID}-00000110"));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+
+    // The `items` filter is by guid, so masking does not touch it.
+    let one = OneServer::spawn_with(
+        Book::captured().first_page(14, MARK),
+        Redaction::MaskParties,
+    );
+    let response = one
+        .call(json!({
+            "company_guid": GUID, "as_of": AS_OF,
+            "items": [format!("{GUID}-00000111")],
+        }))
+        .await;
+    let page = result(&response);
+    assert_eq!(names(page), [mask("Label Roll")]);
+    assert_eq!(page["items"][0]["guid"], format!("{GUID}-00000111"));
+    assert_eq!(page["items_not_found"], Value::Null);
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+
+    // Without it the marker is materialised: the same names, as plain text.
+    let one = OneServer::spawn(Book::captured().first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 3, None)).await;
     assert_eq!(
         names(result(&response)),
         ["Carton Box Small", "Caustic Soda Flakes", "Cleaning Kit A"]
     );
+    assert!(!response.to_string().contains(PARTY_NAME_MARKER));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_masked_response_contains_no_item_or_stock_group_name_anywhere() {
+    // The names are parsed from the capture, not written here.
+    let rows = parse_native_stock_items(&items(), GUID).unwrap().rows;
+    let item_names = rows.iter().map(|row| row.name.clone()).collect::<Vec<_>>();
+    assert_eq!(item_names.len(), 11, "the check cannot pass vacuously");
+    let mut group_names = rows
+        .iter()
+        .filter_map(|row| row.parent.clone())
+        .collect::<Vec<_>>();
+    group_names.sort();
+    group_names.dedup();
+    assert_eq!(group_names.len(), 3);
+    let all = item_names.iter().chain(&group_names).collect::<Vec<_>>();
+
+    // Positive control: unmasked, the whole response carries every one of them.
+    let one = OneServer::spawn(Book::captured().first_page(14, MARK));
+    let plain = one.call(args(AS_OF, 0, 500, None)).await.to_string();
+    for name in &all {
+        assert!(plain.contains(name.as_str()), "{name} is in the plain read");
+    }
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+
+    // Masked: the whole serialized tool response, not one field, has none.
+    let one = OneServer::spawn_with(
+        Book::captured().first_page(14, MARK),
+        Redaction::MaskParties,
+    );
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    assert_eq!(result(&response)["total"], 11);
+    let masked = response.to_string();
+    for name in &all {
+        assert!(!masked.contains(name.as_str()), "{name} leaked");
+    }
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1065,9 +1191,15 @@ async fn a_stock_group_parent_is_marked_under_mask_parties_and_the_reserved_root
     assert_eq!(
         names_and_parents,
         [
-            (json!("Carton Box Small"), json!("\u{fffd}#4; Primary")),
-            (json!("Caustic Soda Flakes"), json!(mask("Raw Chemicals"))),
-            (json!("Cleaning Kit A"), json!(mask("Finished Kits"))),
+            (
+                json!(mask("Carton Box Small")),
+                json!("\u{fffd}#4; Primary")
+            ),
+            (
+                json!(mask("Caustic Soda Flakes")),
+                json!(mask("Raw Chemicals"))
+            ),
+            (json!(mask("Cleaning Kit A")), json!(mask("Finished Kits"))),
         ]
     );
     // A mask that kept the plain text would pass the above if `mask` did.
@@ -1080,7 +1212,7 @@ async fn a_stock_group_parent_is_marked_under_mask_parties_and_the_reserved_root
         .as_array()
         .unwrap()
         .iter()
-        .any(|line| line.as_str().unwrap().contains("`parent`")));
+        .any(|line| line.as_str().unwrap().contains("`name` and `parent` are masked")));
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1093,7 +1225,7 @@ async fn an_item_without_a_parent_keeps_a_null_parent_under_mask_parties() {
     let one = OneServer::spawn_with(book.first_page(14, MARK), Redaction::MaskParties);
     let response = one.call(args(AS_OF, 0, 1, None)).await;
     let item = &result(&response)["items"][0];
-    assert_eq!(item["name"], "Carton Box Small");
+    assert_eq!(item["name"], mask("Carton Box Small"));
     assert_eq!(item["parent"], Value::Null);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }

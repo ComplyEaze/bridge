@@ -167,6 +167,10 @@ pub struct NativeStockItem {
     /// the group snapshot keeps it; absent or blank is `None`.
     pub parent: Option<String>,
     pub base_unit: Option<String>,
+    /// Read and validated (a malformed opening quantity or value still refuses),
+    /// but never serialized: it is returned unchecked, and its as-at date is
+    /// unmeasured (the only capture's books start where its period starts).
+    #[serde(skip)]
     pub opening: NativeStockPosition,
     pub closing: NativeStockPosition,
 }

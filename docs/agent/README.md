@@ -44,7 +44,8 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-and `drop_narration` drops narration. Neither setting removes amounts. Set the
+(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
+and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -331,7 +332,7 @@ are not masked: they are configuration labels, not counterparties.
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
 closing stock quantity and value per stock item, whether inventory is integrated
 with the accounts, and how many items have a negative closing quantity, checked
-against Tally's own Stock Summary total. `as_of` must be a 31 March (a
+against the sum of the top-level lines of Tally's own Stock Summary. `as_of` must be a 31 March (a
 financial-year end), the only date measured for stock, and not before the book's
 start or after today. Any other date is refused as
 `stock_summary_as_of_not_measured` before any request, and retrying the same date
@@ -340,13 +341,19 @@ refuses again. The only period measured is the period ending 31 March 2026
 measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
 or the book's start if that is later.
 
-Each item carries `name`, `guid`, `parent`, `base_unit`, `opening` and `closing`;
-`opening` and `closing` hold `quantity` (`amount`, signed as Tally sent it, and
-`unit`) and `value` (a plain signed decimal exactly as Tally sends it: the sign is
-kept, never flipped, and not interpreted). Either is `null` where Tally sent none,
-which is not zero: an empty opening quantity or value is returned as `null` and not
-counted, and an empty closing one is returned as `null` and counted in `totals`
-(`empty_closing_quantity_count`, `empty_closing_value_count`). `totals` also holds
+Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
+holds `quantity` (`amount`, signed as Tally sent it, and `unit`) and `value` (a
+plain signed decimal exactly as Tally sends it: the sign is kept, never flipped,
+and not interpreted). Either is `null` where Tally sent none, which is not zero,
+and is counted in `totals` (`empty_closing_quantity_count`,
+`empty_closing_value_count`). The opening quantity and value are read but not
+returned, because their as-at date is unmeasured. Values and their signs are
+exactly as Tally sends them: the one capture had items with a positive quantity and
+a negative value, what the sign means is unmeasured, and `value_sum` adds the
+values as sent, signs included: `totals.value_sum_signs` is always
+`as_sent_meaning_unmeasured` beside it, whether or not `value_sum` is null, saying
+the values were added with the signs Tally sent and that what a negative value
+means is unmeasured. `totals` also holds
 `item_count`, `negative_closing_quantity_count` (company totals at `as_of`: batch,
 godown and in-year negatives are not counted), `zero_quantity_count`, and
 `value_sum`, which is `null` with `partial` true whenever any item's closing value
@@ -358,11 +365,17 @@ reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`
 and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
 that these are the stock items' closing values exactly as Tally sends them, and that
 how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
-measured. It then says either that they sum to Tally's own Stock Summary total, or
-that they were NOT checked against it, with the reason.
+measured. It then says either that they equal the sum of the top-level lines of
+Tally's own Stock Summary, or that they were NOT checked against it, with the
+reason.
 
-`tie_out` compares the sum of the items' closing values with the sum of Tally's own
-Stock Summary (its top-level groups). If they are equal it is `matched`. If the
+The top-level `state` is one of three values. `observed`: the items were returned
+and matched that sum. `unchecked`: the items were returned without having been
+compared with it (an empty, unknown or all-empty report), so `tie_out.state` is
+`not_checked` with its `reason`. `not_established`: the sum differs, and no item is returned.
+
+`tie_out` compares the sum of the items' closing values with the sum of the
+top-level lines of Tally's own Stock Summary. If they are equal it is `matched`. If the
 report is empty, unknown or has only empty amounts it is `not_checked` with a
 `reason`, the items are returned and `basis` says they are unchecked. If they
 differ the result is `not_established` with reason `tally_stock_summary_differs`
@@ -411,10 +424,10 @@ company-flags read requires exactly one Company row for the GUID
 compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes
 such units is unmeasured.
 
-Under `mask_parties`, an item's `parent` is masked like a party name, because it is
-a stock-group name and a supplier-named stock group can carry a party's name;
-Tally's reserved root as a parent is a fixed marker and is left as it is. Item
-names are not masked: they are not party names.
+Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
+because stock-item and stock-group names are free text that can carry a customer's
+or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
+as it is. `guid` is not masked and is the identity the `items` filter uses.
 
 ### Profit and Loss and Balance Sheet
 

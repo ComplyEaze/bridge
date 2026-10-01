@@ -1261,6 +1261,78 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_when_any_closing_value_
     );
 }
 
+/// The sum of `values` with every sign dropped, built in the test from the
+/// same rows: the number a magnitude comparison would use.
+fn sum_of_magnitudes<'a>(values: impl Iterator<Item = &'a ExactDecimal>) -> ExactDecimal {
+    values
+        .map(|value| value.abs().unwrap())
+        .try_fold(ExactDecimal::zero(), |sum, value| sum.checked_add(&value))
+        .unwrap()
+}
+
+#[test]
+fn a_mixed_sign_set_is_summed_algebraically_on_both_sides() {
+    let rows = parse(&items_response()).unwrap().rows;
+    let report = report_of(&report_response()).unwrap();
+    let NativeStockReport::Lines {
+        total: Some(report_total),
+        ..
+    } = &report
+    else {
+        panic!("the capture's report has amounts");
+    };
+    let item_values = rows
+        .iter()
+        .filter_map(|row| row.closing.value.as_ref())
+        .collect::<Vec<_>>();
+    // Both signs are present among the items' values, and (below) among the
+    // report's amounts.
+    assert!(item_values.iter().any(|value| value.is_negative()));
+    assert!(item_values.iter().any(|value| !value.is_negative()));
+    // Each side is its algebraic sum, `3000.01`, and the gate matches them.
+    let items_sum = present_closing_value_sum(&rows).unwrap();
+    assert!(items_sum.numeric_eq(&decimal("3000.01")));
+    assert!(report_total.numeric_eq(&decimal("3000.01")));
+    assert!(matches!(
+        gate(&items_response(), &report_response()),
+        NativeStockGate::Matched { .. }
+    ));
+    // A sum of magnitudes is a different number on each side, so a comparison
+    // of magnitudes would not have matched.
+    let items_magnitudes = sum_of_magnitudes(item_values.iter().copied());
+    assert!(!items_magnitudes.numeric_eq(&decimal("3000.01")));
+    // The report's own amounts, read from the capture's text.
+    let report_text = report_response();
+    let report_amounts = report_text
+        .split("<DSPCLAMTA>")
+        .skip(1)
+        .map(|part| decimal(part.split("</DSPCLAMTA>").next().unwrap().trim()))
+        .collect::<Vec<_>>();
+    assert_eq!(report_amounts.len(), 3);
+    assert!(report_amounts.iter().any(|amount| amount.is_negative()));
+    assert!(report_amounts.iter().any(|amount| !amount.is_negative()));
+    let report_magnitudes = sum_of_magnitudes(report_amounts.iter());
+    assert!(!report_magnitudes.numeric_eq(&decimal("3000.01")));
+    assert!(!items_magnitudes.numeric_eq(&report_magnitudes));
+    // An edit of captured text: Caustic Soda Flakes' closing value `-1000.00`
+    // has its sign flipped. The items' algebraic sum moves by 2000.00 and no
+    // longer equals the report's, so the gate differs.
+    let flipped = replaced(
+        &items_response(),
+        "<CLOSINGVALUE TYPE=\"Amount\">-1000.00</CLOSINGVALUE>",
+        "<CLOSINGVALUE TYPE=\"Amount\">1000.00</CLOSINGVALUE>",
+    );
+    let NativeStockGate::Differs {
+        items_total,
+        report_total,
+    } = gate(&flipped, &report_response())
+    else {
+        panic!("a flipped sign must not match");
+    };
+    assert!(items_total.numeric_eq(&decimal("5000.01")));
+    assert!(report_total.numeric_eq(&decimal("3000.01")));
+}
+
 #[test]
 fn a_sum_is_formed_only_when_every_closing_value_is_present() {
     // An edit of the captured text, not a capture: each of the four empty
@@ -1342,6 +1414,24 @@ fn a_book_with_no_items_has_a_sum_of_zero_and_is_not_partial() {
 }
 
 #[test]
+fn an_opening_position_that_is_not_returned_is_still_validated() {
+    // Edits of captured text: the opening is never serialized, but a malformed
+    // one still refuses the whole read.
+    let quantity = replaced(
+        &items_response(),
+        "<OPENINGBALANCE TYPE=\"Quantity\"> 100 Box</OPENINGBALANCE>",
+        "<OPENINGBALANCE TYPE=\"Quantity\">100</OPENINGBALANCE>",
+    );
+    assert_eq!(parse(&quantity), Err(NativeStockError::QuantityUnparseable));
+    let value = replaced(
+        &items_response(),
+        "<OPENINGVALUE TYPE=\"Amount\">2500.00</OPENINGVALUE>",
+        "<OPENINGVALUE TYPE=\"Amount\">not a value</OPENINGVALUE>",
+    );
+    assert_eq!(parse(&value), Err(NativeStockError::ValueUnparseable));
+}
+
+#[test]
 fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
     let items = parse(&items_response()).unwrap();
     let json = serde_json::to_value(item(&items, "Caustic Soda Flakes")).unwrap();
@@ -1352,10 +1442,19 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
             "guid": format!("{COMPANY}-0000010c"),
             "parent": "Raw Chemicals",
             "base_unit": "Kgs",
-            "opening": {"quantity": {"amount": "200.000", "unit": "Kgs"}, "value": "9000.00"},
             "closing": {"quantity": {"amount": "400.000", "unit": "Kgs"}, "value": "-1000.00"},
         })
     );
+    // The opening position is read (the parse tests above assert it) but is
+    // never serialized, on any item.
+    assert!(item(&items, "Caustic Soda Flakes").opening.value.is_some());
+    for row in &items.rows {
+        assert!(
+            serde_json::to_value(row).unwrap().get("opening").is_none(),
+            "{}",
+            row.name
+        );
+    }
     let empty = serde_json::to_value(item(&items, "Cleaning Kit B")).unwrap();
     assert_eq!(
         empty["closing"],

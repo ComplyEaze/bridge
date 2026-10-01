@@ -40,6 +40,11 @@ Each line names the pull requests it comes from.
 
 **Safer or fixed**
 
+- `profit_and_loss` and `balance_sheet` no longer open with `"state": "observed"`
+  when nothing was established. The top-level `state` is `observed` only when
+  the tool's result is established; otherwise it is `not_established`, with
+  the same `reason` as the nested result. This changes the tool's output; no
+  figure, check or withheld line changes (#984).
 - If you are slow at the approval window, the agent's call no longer waits
   on it. The agent is told the approval is pending and asks again. A click
   made while no call is waiting is posted by the next call, not one call later

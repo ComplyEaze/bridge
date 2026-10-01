@@ -163,16 +163,16 @@ jobs:
           toolchain: 1.96.0
       - run: node scripts/check-ci-workflow-consistency.mjs
       # A pull request that changes a pinned file, or the pin list, adds its own
-      # acknowledgement file (docs/release-process.md). Report-only until the rule has
-      # run on real pull requests: it prints WOULD FAIL and exits 0. A push to master is
-      # the exception: every landed commit is always enforced, whatever the flag says.
+      # acknowledgement file (docs/release-process.md). The step enforces: a missing,
+      # wrong, edited or unneeded acknowledgement fails the job. A push to master checks
+      # every landed commit the same way.
       - name: Check the surface acknowledgement
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}
-        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only
+        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE"
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
       - run: node scripts/check-unbounded-reads.mjs

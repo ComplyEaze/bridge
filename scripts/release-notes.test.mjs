@@ -112,7 +112,7 @@ test("the page renderer escapes everything and links only https URLs and issue n
   assert.doesNotMatch(html, /<script|<img|<b>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt; a &amp; b &quot;q&quot;/);
   assert.match(html, /<code>&lt;img src=x onerror=alert\(1\)&gt;<\/code>/);
-  assert.match(html, /<strong>&lt;b&gt;bold&lt;\/b&gt;<\/strong> \(<a href="https:\/\/github\.com\/lamemustafa\/bridge\/issues\/77">#77<\/a>\)/);
+  assert.match(html, /<strong>&lt;b&gt;bold&lt;\/b&gt;<\/strong> \(<a href="https:\/\/github\.com\/ComplyEaze\/bridge\/issues\/77">#77<\/a>\)/);
   assert.match(html, /<a href="https:\/\/example\.invalid\/a\?x=1&amp;y=2">ok<\/a>/);
   assert.doesNotMatch(html, /href="javascript/);
   assert.doesNotMatch(html, /href="https:\/\/x\.invalid\/"/);

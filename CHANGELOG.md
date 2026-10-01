@@ -34,11 +34,14 @@ Each line names the pull requests it comes from.
 - Read a register of the tax in the books for sales: the Sales and Credit Note
   vouchers of a date window that touch a Duties & Taxes ledger, with each
   entry's tax taken only from the GST duty head on that ledger's master, never
-  from a name or an amount. It reads as the purchase register does. It was
-  measured on two imported Sales item invoices and one Sales voucher in lab
-  books; credit notes, an inter-state line, a tax Tally computes itself, a sale
-  typed on Tally's screen and several currencies are not measured, and the tool
-  says so (#1009).
+  from a name or an amount. It reads as the purchase register does. The read
+  was captured live, through the purchase register, on two days that each held
+  one imported Sales item invoice, and one Sales voucher was classified
+  against its book's ledger masters; `sales_register` itself has not yet been
+  run against a live Tally. A sale of a kind no capture covers (a credit note,
+  an inter-state line, an invoice voucher, a cancelled or optional sale) is
+  returned and marked `not_measured_live`, and the tool says what is not
+  measured (#1009).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read

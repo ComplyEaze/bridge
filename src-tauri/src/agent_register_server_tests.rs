@@ -332,3 +332,67 @@ async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_rea
     }
     let _ = simulator.finish();
 }
+
+#[tokio::test]
+async fn the_servers_redaction_setting_masks_what_the_sales_register_lists() {
+    // Read as a sales register, the recorded day's Purchase is listed apart with the ledger names
+    // it touches; with parties masked none of them may survive, and unmasked they are there.
+    for (redaction, expect_names) in [(Redaction::None, true), (Redaction::MaskParties, false)] {
+        let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_for(&simulator, directory.path(), redaction);
+        let response = server
+            .call_tool(
+                "sales_register",
+                json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            )
+            .await;
+        assert_eq!(response["isError"], false, "{response}");
+        let text = response["structuredContent"]["result"].to_string();
+        for name in ["Input CGST", "Input SGST"] {
+            assert_eq!(text.contains(name), expect_names, "{name}: {text}");
+        }
+        let _ = simulator.finish();
+    }
+}
+
+/// The two captured sales-day window requests are the request the code sends for a one-day
+/// window, with the lab company and the day substituted: hashed like the recorded purchase
+/// window request (UTF-16LE with a byte-order mark), they equal its fingerprint.
+#[test]
+fn the_captured_sales_day_requests_are_the_window_request_the_code_sends() {
+    use sha2::{Digest, Sha256};
+    for (bytes, day) in [
+        (
+            &include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_sales_day_request.utf16le.xml"
+            )[..],
+            "20250420",
+        ),
+        (
+            &include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_taxed_sales_day_request.utf16le.xml"
+            )[..],
+            "20250421",
+        ),
+    ] {
+        assert_eq!(&bytes[..2], &[0xff, 0xfe], "a byte-order mark, as sent");
+        let text = utf16(&bytes[2..]);
+        assert!(text.contains("<SVCURRENTCOMPANY>BRIDGE STOCK LAB</SVCURRENTCOMPANY>"));
+        let substituted = text
+            .replace("BRIDGE STOCK LAB", "BRIDGE GST RECON LAB")
+            .replace(day, "20250903");
+        let mut wire = vec![0xff, 0xfe];
+        for unit in substituted.encode_utf16() {
+            wire.extend(unit.to_le_bytes());
+        }
+        assert_eq!(
+            Sha256::digest(&wire)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            recorded_request_sha256(Kind::Window),
+            "the {day} request is not the window request the code sends"
+        );
+    }
+}

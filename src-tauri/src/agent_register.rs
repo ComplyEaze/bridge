@@ -71,7 +71,7 @@ impl RegisterKind {
     fn not_measured_note(self) -> &'static str {
         match self {
             Self::Purchase => "",
-            Self::Sales => "; not measured for sales: credit notes, an inter-state (IGST) line, a tax Tally computes itself, a sale typed on Tally's screen, accounting-invoice mode, optional, cancelled and post-dated sales, a REFERENCE or a populated PARTYGSTIN on a sale, and books with several currencies",
+            Self::Sales => "; measured for sales so far: the voucher window of two imported Sales item invoices (not classified end to end) and one Sales accounting voucher classified against its book's ledger masters; not measured for sales: the classification of a Sales item invoice, a Sales voucher with no entry on a Duties & Taxes ledger, credit notes, an inter-state (IGST) line, a tax Tally computes itself, a sale typed on Tally's screen, accounting-invoice mode, optional, cancelled and post-dated sales, a REFERENCE or a populated PARTYGSTIN on a sale, REFERENCEDATE (not returned) and books with several currencies; a row of such a kind carries `not_measured_live` naming it",
         }
     }
 
@@ -79,56 +79,20 @@ impl RegisterKind {
     pub(super) fn description(self) -> String {
         match self {
             Self::Purchase => PURCHASE_REGISTER_DESCRIPTION.to_string(),
-            Self::Sales => sales_register_description(),
+            Self::Sales => SALES_REGISTER_DESCRIPTION.to_string(),
         }
     }
 }
 
-/// The purchase register's description. The sales register's is derived from it below, so the
-/// two cannot drift apart in what they say about the shared read.
+/// The purchase register's description. The sales register's is the text below it; a test
+/// derives the sales text from this one and fails when the two stop agreeing about the shared
+/// read, so an edit to one cannot silently leave the other behind.
 const PURCHASE_REGISTER_DESCRIPTION: &str = "Read-only: a register of what the books record, not a GST return. It does not decide input tax credit eligibility or blocked credit, matches nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned only when the voucher carries one), does not return REFERENCEDATE yet (`reference` is returned only when the voucher carries one), does not classify an item invoice's purchase as taxable (`has_taxable_entry` is false when no entry sits on a Purchase Accounts ledger), and never sums tax across heads or vouchers. It does not treat reverse-charge journals, imports (IGST paid at customs) or input service distribution specially: a voucher that touches a Duties & Taxes ledger is listed by the rule below and nothing more. A GST duty head does not say whether a ledger is input or output, and a Debit Note can be a purchase return or a debit note issued to a customer: each row carries `party_group` (the voucher party's predefined group, for example Sundry Creditors or Sundry Debtors, when it resolves) and the tool does not guess which it is. It inherits the compliance read's refusals (an INR base currency is required; a book too large to list is refused; see `ledger_masters`) and refuses with `register_master_mark_unavailable` when Tally does not report the master-alteration mark. Each page re-reads the masters and the window, so rows can shift between pages. Return the Purchase and Debit Note vouchers of a date window that touch a ledger under Duties & Taxes, with the tax each entry carries taken only from the GST duty head recorded on that ledger's master -- never from a ledger name and never from an amount. Reads the full voucher window before pagination (use narrow dates) and the ledger masters twice, before and after it. Per row: `tax_in_books` lists each entry on a ledger whose head Bridge recognises as {ledger, head, raw_head, amount}; `duties_taxes_entries_without_gst_head` lists entries on Duties & Taxes ledgers that carry no GST head and never assigns them one: `observation` `not_tax_ledger` is a ledger whose own tax type is not GST (usually TDS or another payable), `absent` is a ledger with no head whose tax type is GST or was not reported, which may be a GST ledger whose head is missing (`tax_type` says which); `duties_taxes_entries_with_unrecognised_head` lists entries whose head is not in the recognised vocabulary or contradicts the ledger's tax type, with the raw spelling and its observation; `entries_on_ledgers_with_unresolved_group` lists entries on ledgers whose group chain could not be resolved; `taxable_entries` are entries on Purchase Accounts ledgers only (a GST purchase booked to a fixed-asset or expense ledger has `has_taxable_entry` false); `party_entries` are the voucher party's own; `other_entries` is everything else (round-off included) with no role inferred. `status` is the first that applies of head_conflict, has_unrecognised_head, has_unresolved_group, has_entries_without_gst_head, has_other_entries, complete. Amounts are as the books state them (negative is a debit), never re-signed and never summed across heads; there is no input-credit or direction field. `reference`, `party_gstin`, `is_invoice`, `post_dated` follow `vouchers`: absent means not observed, and `cancelled`, `optional` and `post_dated` vouchers are returned flagged, not excluded. Every other voucher type that touches Duties & Taxes (Sales, Journal, Payment and so on) is listed apart in `other_voucher_types_touching_duties_taxes`, not in `items`: whether it belongs in a return is the CA's call. A voucher with no resolved class is listed under `unclassified_voucher_type`; a voucher that touches only unplaceable ledgers under `vouchers_with_unplaced_ledgers`; a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, or tax booked to a ledger filed elsewhere). Rows are in `items` (paged by offset and limit like `vouchers`); each has `has_taxable_entry`, false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation). The side lists carry exact counts (`total`) and at most 100 items (`listed`); every ledger name in the response is masked like `vouchers` masks it. A voucher that names a ledger the masters do not list, a master or voucher that changed while the window was read, or a ledger set aside for its currency, refuses (`ledger_snapshot_drifted`, `voucher_window_changed_during_read`, `register_ledger_currency_excluded`) and releases no rows; a row dated outside the window refuses as `window_not_honoured`. A `sgst_utgst` head is a state-side head that a consumer summing state tax must include alongside `state_tax`. Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.";
 
-/// Where the purchase description stops being about purchases specifically and starts being
-/// about the read both registers share.
-const SHARED_DESCRIPTION_FROM: &str = " It inherits the compliance read";
-
-const SALES_REGISTER_DESCRIPTION_HEAD: &str = "Read-only: a register of what the books record, not a GST return. It does not decide the place of supply, the tax rate, whether tax is payable or which part of a return a sale belongs in, matches nothing against any portal, checks no GSTIN (`party_gstin` is returned only when the voucher carries one), does not return REFERENCEDATE yet (`reference` is returned only when the voucher carries one), and never sums tax across heads or vouchers. It does not treat exports, sales under reverse charge or advances specially: a voucher that touches a Duties & Taxes ledger is listed by the rule below and nothing more. A GST duty head does not say whether a ledger is input or output, and a Credit Note can be a sales return or a credit note issued to a supplier: each row carries `party_group` (the voucher party's predefined group, for example Sundry Debtors or Sundry Creditors, when it resolves) and the tool does not guess which it is.";
-
-const SALES_NOT_MEASURED: &str = "Measured so far: the voucher window of two Sales item invoices imported into one company (one untaxed, one with a CGST and an SGST ledger entry; the goods line sits nested under the sales ledger's own entry), and the classification of one Sales accounting voucher (not an invoice) against the ledger masters of a second company. Not measured: credit notes; an inter-state (IGST) line; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; optional, cancelled and post-dated sales; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies.";
-
-/// The sales register's description: its own opening, then the shared read with the purchase
-/// register's classes, group, list name and measurements swapped for the sales ones.
-fn sales_register_description() -> String {
-    let (_, shared) = PURCHASE_REGISTER_DESCRIPTION
-        .split_once(SHARED_DESCRIPTION_FROM)
-        .expect("the shared description starts where the head ends");
-    let swaps = [
-        ("Return the Purchase and Debit Note vouchers", "Return the Sales and Credit Note vouchers"),
-        (
-            "`taxable_entries` are entries on Purchase Accounts ledgers only (a GST purchase booked to a fixed-asset or expense ledger has `has_taxable_entry` false)",
-            "`taxable_entries` are entries on Sales Accounts ledgers only (a sale booked to another ledger has `has_taxable_entry` false)",
-        ),
-        ("(Sales, Journal, Payment and so on)", "(Purchase, Journal, Payment and so on)"),
-        (
-            "a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, or tax booked to a ledger filed elsewhere)",
-            "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (exempt or unregistered sales, or tax booked to a ledger filed elsewhere)",
-        ),
-        (
-            "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
-            "false when no entry sits on a Sales Accounts ledger",
-        ),
-        (
-            "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
-            SALES_NOT_MEASURED,
-        ),
-    ];
-    let mut text = shared.to_string();
-    for (from, to) in swaps {
-        assert!(text.contains(from), "the shared description lost: {from}");
-        text = text.replace(from, to);
-    }
-    format!("{SALES_REGISTER_DESCRIPTION_HEAD}{SHARED_DESCRIPTION_FROM}{text}")
-}
+/// The sales register's description: its own opening, then the purchase text's shared read with
+/// the sales classes, group, list name and measurements swapped in. A test derives everything
+/// after the opening from `PURCHASE_REGISTER_DESCRIPTION` and compares it with this text.
+const SALES_REGISTER_DESCRIPTION: &str = "Read-only: a register of what the books record, not a GST return. It does not decide the place of supply, the tax rate, whether tax is payable or which part of a return a sale belongs in, matches nothing against any portal, checks no GSTIN (`party_gstin` is returned only when the voucher carries one), does not return REFERENCEDATE yet (`reference` is returned only when the voucher carries one), and never sums tax across heads or vouchers. It does not treat exports, sales under reverse charge or advances specially: a voucher that touches a Duties & Taxes ledger is listed by the rule below and nothing more. A GST duty head does not say whether a ledger is input or output, and a Credit Note can be a sales return or a credit note issued to a supplier: each row carries `party_group` (the voucher party's predefined group, for example Sundry Debtors or Sundry Creditors, when it resolves) and the tool does not guess which it is. A Debit Note, including one issued to a customer, is not a sales row: it is listed apart by identity and ledger names, with no amount. It inherits the compliance read's refusals (an INR base currency is required; a book too large to list is refused; see `ledger_masters`) and refuses with `register_master_mark_unavailable` when Tally does not report the master-alteration mark. Each page re-reads the masters and the window, so rows can shift between pages. Return the Sales and Credit Note vouchers of a date window that touch a ledger under Duties & Taxes, with the tax each entry carries taken only from the GST duty head recorded on that ledger's master -- never from a ledger name and never from an amount. Reads the full voucher window before pagination (use narrow dates) and the ledger masters twice, before and after it. Per row: `tax_in_books` lists each entry on a ledger whose head Bridge recognises as {ledger, head, raw_head, amount}; `duties_taxes_entries_without_gst_head` lists entries on Duties & Taxes ledgers that carry no GST head and never assigns them one: `observation` `not_tax_ledger` is a ledger whose own tax type is not GST (usually TDS or another payable), `absent` is a ledger with no head whose tax type is GST or was not reported, which may be a GST ledger whose head is missing (`tax_type` says which); `duties_taxes_entries_with_unrecognised_head` lists entries whose head is not in the recognised vocabulary or contradicts the ledger's tax type, with the raw spelling and its observation; `entries_on_ledgers_with_unresolved_group` lists entries on ledgers whose group chain could not be resolved; `taxable_entries` are entries on Sales Accounts ledgers only (a sale booked to another ledger, or whose sales ledger sits in an inventory allocation, has `has_taxable_entry` false); `party_entries` are the voucher party's own; `other_entries` is everything else (round-off included) with no role inferred. `status` is the first that applies of head_conflict, has_unrecognised_head, has_unresolved_group, has_entries_without_gst_head, has_other_entries, complete. Amounts are as the books state them (negative is a debit), never re-signed and never summed across heads; there is no input-credit or direction field. `reference`, `party_gstin`, `is_invoice`, `post_dated` follow `vouchers`: absent means not observed, and `cancelled`, `optional` and `post_dated` vouchers are returned flagged, not excluded. Every other voucher type that touches Duties & Taxes (Purchase, Journal, Payment and so on) is listed apart in `other_voucher_types_touching_duties_taxes`, not in `items`: whether it belongs in a return is the CA's call. A voucher with no resolved class is listed under `unclassified_voucher_type`; a voucher that touches only unplaceable ledgers under `vouchers_with_unplaced_ledgers`; a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry). Rows are in `items` (paged by offset and limit like `vouchers`); each has `has_taxable_entry`, false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen or an item invoice may hold the sales ledger in an inventory allocation instead; not measured). The side lists carry exact counts (`total`) and at most 100 items (`listed`); every ledger name in the response is masked like `vouchers` masks it. A voucher that names a ledger the masters do not list, a master or voucher that changed while the window was read, or a ledger set aside for its currency, refuses (`ledger_snapshot_drifted`, `voucher_window_changed_during_read`, `register_ledger_currency_excluded`) and releases no rows; a row dated outside the window refuses as `window_not_honoured`. A `sgst_utgst` head is a state-side head that a consumer summing state tax must include alongside `state_tax`. Measured so far: the voucher window of two Sales item invoices imported into one company (one untaxed, one with two plain credit entries on tax ledgers whose masters carry the heads CGST and SGST/UTGST; the goods line sits nested under the sales ledger's own entry), which the purchase register read and which no test classifies end to end; and the classification of one Sales accounting voucher (not an invoice) against the ledger masters of a second company. `sales_register` itself has not been run against a live Tally. Not measured: the classification of a Sales item invoice; a Sales voucher with no entry on a Duties & Taxes ledger; credit notes; an inter-state (IGST) line; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; optional, cancelled and post-dated sales; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, invoice_voucher_classification, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present).";
 
 /// Which predefined group a ledger sits under, from its group chain and nothing else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,6 +200,49 @@ fn gap_code(gap: AncestryGap) -> &'static str {
         AncestryGap::Cycle => "cycle",
         AncestryGap::Exhausted => "exhausted",
     }
+}
+
+/// Why a sales row is of a kind no capture has covered, as codes a caller can read. A row the
+/// captures cover has none and carries no field. The purchase register has no such field: its
+/// kinds were measured, and the tool text says what was not.
+fn sales_not_measured(
+    row: &Value,
+    class: Option<&str>,
+    tax: &[Value],
+    has_taxable_entry: bool,
+) -> Vec<&'static str> {
+    let flag = |key: &str| row.get(key).and_then(Value::as_bool) == Some(true);
+    let mut marks = Vec::new();
+    if class == Some("Credit Note") {
+        marks.push("credit_note");
+    }
+    if tax.iter().any(|entry| entry["head"] == "igst") {
+        marks.push("inter_state_line");
+    }
+    if flag("is_invoice") {
+        marks.push("invoice_voucher_classification");
+    }
+    if !has_taxable_entry && !tax.is_empty() {
+        marks.push("sales_ledger_not_an_entry");
+    }
+    for (key, code) in [
+        ("cancelled", "cancelled"),
+        ("optional", "optional"),
+        ("post_dated", "post_dated"),
+    ] {
+        if flag(key) {
+            marks.push(code);
+        }
+    }
+    for (key, code) in [
+        ("party_gstin", "party_gstin_present"),
+        ("reference", "reference_present"),
+    ] {
+        if row.get(key).is_some_and(|value| !value.is_null()) {
+            marks.push(code);
+        }
+    }
+    marks
 }
 
 /// The classifier's output for one window: the register, the other voucher types that touch
@@ -447,10 +454,16 @@ pub(super) fn classify_register(
             out["party_group"] = json!(reserved);
         }
         out["status"] = json!(status);
+        let not_measured = (kind == RegisterKind::Sales)
+            .then(|| sales_not_measured(row, class, &tax, !taxable.is_empty()))
+            .filter(|marks| !marks.is_empty());
         out["tax_in_books"] = Value::Array(tax);
         out["duties_taxes_entries_without_gst_head"] = Value::Array(without_head);
         out["duties_taxes_entries_with_unrecognised_head"] = Value::Array(unrecognised);
         out["entries_on_ledgers_with_unresolved_group"] = Value::Array(unresolved);
+        if let Some(marks) = not_measured {
+            out["not_measured_live"] = json!(marks);
+        }
         out["has_taxable_entry"] = json!(!taxable.is_empty());
         out["taxable_entries"] = Value::Array(taxable);
         out["party_entries"] = Value::Array(party_entries);

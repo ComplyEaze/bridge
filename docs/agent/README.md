@@ -730,17 +730,33 @@ rate or return section, and matches nothing against any portal.
   lab company (TallyPrime 7.1 Silver), read through the purchase register's own
   request: voucher type Sales, the invoice view, the party as a debit entry, the
   sales ledger as an ordinary credit entry with the goods line nested under it,
-  and, for the taxed one, two plain credit entries on tax ledgers. And one Sales
-  accounting voucher (not an invoice) classified against the ledger masters of
-  the purchase register's lab book, with CGST and SGST heads.
+  and, for the taxed one, two plain credit entries on tax ledgers whose masters
+  carry the heads CGST and SGST/UTGST. The parsed window has exactly those
+  entries (a test), and the requests are the request the code sends (a test).
+  And one Sales accounting voucher (not an invoice) classified against the
+  ledger masters of the purchase register's lab book, with CGST and SGST heads.
+  `sales_register` itself has not been run against a live Tally, and no test
+  classifies the two item invoices end to end: their company's ledger masters
+  were not captured.
 - **Not measured, and said so in the tool's text and in each response's
-  `coverage`:** credit notes; an inter-state (IGST) line on a sale; a tax Tally
-  computes itself (rate or HSN on the item); a sale typed on Tally's screen
-  (only imported sales were read); accounting-invoice mode; optional, cancelled
-  and post-dated sales (returned flagged, as the purchase register does); a
-  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
-  returned); books with several currencies. The two item invoices' own ledger
-  masters were not captured, so no test classifies them end to end.
+  `coverage`:** the classification of a Sales item invoice; a Sales voucher
+  with no entry on a Duties & Taxes ledger; credit notes; an inter-state (IGST)
+  line on a sale; a tax Tally computes itself (rate or HSN on the item); a sale
+  typed on Tally's screen (only imported sales were read); accounting-invoice
+  mode; optional, cancelled and post-dated sales; a `REFERENCE` or a populated
+  `PARTYGSTIN` on a sale; `REFERENCEDATE` (not returned); books with several
+  currencies.
+- **A row of a kind no capture covers says so.** It is returned, not withheld,
+  with `not_measured_live` listing why: `credit_note`, `inter_state_line`,
+  `invoice_voucher_classification` (an invoice-view voucher),
+  `sales_ledger_not_an_entry` (tax is present but no entry is on a Sales
+  Accounts ledger: the sales ledger may sit in an inventory allocation),
+  `cancelled`, `optional`, `post_dated`, `party_gstin_present`,
+  `reference_present`. A row the captures cover has no such field, and the
+  purchase register's rows never carry it. `sales_vouchers_without_duties_taxes_entry`
+  lists such vouchers by identity only; the tool does not say why one carries no
+  tax entry. A Debit Note, even to a customer, is not a sales row: it is listed
+  apart by identity and ledger names, with no amount.
 
 ### Foreign-currency composites in `vouchers`
 

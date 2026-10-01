@@ -1,10 +1,10 @@
-# `sales-day/`: two Sales item invoices, each read two ways
+# `sales-day/`: two Sales item invoices, each read through the register window
 
-Eight files: for each of two day windows that hold exactly one voucher, a Sales item invoice, the
-same voucher captured through two fetches. The first day's sale carries no tax; the second day's
-carries two tax ledger entries. The four `register_window_*` files back the sales register's
-tests. The four `inventory_window_*` files are for a read that comes next (stock item
-movement); no test reads them yet. No sales-register or movement tool produced them.
+Four files: for each of two day windows that hold exactly one voucher, a Sales item invoice, the
+request Bridge sent and the answer Tally gave through the class-shaped voucher window. The first
+day's sale carries no tax; the second day's carries two tax ledger entries. The sales register's
+tests read all four: the answers are parsed (`agent_register_tests.rs`), and the requests are
+checked against the request the code sends (`agent_register_server_tests.rs`).
 
 ## Provenance
 
@@ -28,7 +28,7 @@ movement); no test reads them yet. No sales-register or movement tool produced t
 
 ## The two pairs
 
-**`register_window_sales_day_*` and `register_window_taxed_sales_day_*` are wire bytes.**
+**All four files are wire bytes.**
 - Sender: `bridge_mcp`, a debug build of commit `9d3d92f2745c908ef7883bea43a8bd7ee8572c2e` (the
   purchase register's branch), making one `purchase_register` call for each single day. A serial
   read-only relay sat between the binary and the gateway and kept the exact request and response
@@ -42,42 +42,24 @@ movement); no test reads them yet. No sales-register or movement tool produced t
   UTF-16LE, exactly as received; its length equalled the declared `Content-Length`; the call's two
   paired reads returned identical bytes. No transformation.
 
-**`inventory_window_sales_day_*` and `inventory_window_taxed_sales_day_*` are not wire bytes.**
-- Sender: `bridge_mcp`, a debug build of commit `4b3871cad358522f335812f47b2ec64235924de4` with the
-  `lab-writes` feature, making one `lab_read_inventory` call for each single day. That tool refuses
-  any endpoint port but the gateway's own, so no relay could sit in front of it.
-- The files are what the tool itself persists for each data read: the request and the response
-  **as the text Bridge held** (UTF-8), named by their SHA-256. They are byte-exact copies of those
-  persisted files, not of the bytes on the wire.
-- The request's `FETCH` asks for `ALLINVENTORYENTRIES.*`. It is a lab-only shape; no shipped tool
-  sends it.
-
 ## What the captures show
 
-- **Ledger-entries window.** `VCHTYPE="Sales"`, `ISINVOICE` `Yes`, the class predicate for sales
+- **The first day's window.** `VCHTYPE="Sales"`, `ISINVOICE` `Yes`, the class predicate for sales
   `Yes`, voucher number `1` (a number supplied on import was not kept; numbering is automatic), and
   `REMOTEID` equal to Tally's own GUID. Two `ALLLEDGERENTRIES.LIST`: the party (`-24.00`, deemed
   positive `Yes`) and the sales ledger (`24.00`, `No`). **The goods line is nested under the sales
   ledger's entry**, as `INVENTORYALLOCATIONS.LIST` with its `BATCHALLOCATIONS.LIST` inside.
-- **Inventory-entries window.** The goods line is at the top level (`ALLINVENTORYENTRIES.LIST`):
-  deemed positive `No`, rate `12.00/U.`, actual and billed quantity ` 2 U.`, amount `24.00`, with
-  its `BATCHALLOCATIONS.LIST` and an `ACCOUNTINGALLOCATIONS.LIST` to the sales ledger. An outward
-  line reads back with a positive amount.
-- **The taxed sale, ledger-entries window.** Four `ALLLEDGERENTRIES.LIST`, in this order: the
+- **The taxed sale's window.** Four `ALLLEDGERENTRIES.LIST`, in this order: the
   party (`-118.00`, deemed positive `Yes`), the sales ledger (`100.00`, `No`, with the goods line
   nested under it), and the two tax ledgers (`9.00` each, `No`). **The tax amounts read back as
   imported.** Voucher number `2`.
-- **The taxed sale, inventory-entries window.** One `ALLINVENTORYENTRIES.LIST` (1 unit at
-  `100.00/U.`, amount `100.00`, its batch allocation and its accounting allocation to the sales
-  ledger) and three `LEDGERENTRIES.LIST`: the party and the two tax ledgers. The sales ledger is
-  not among them in this fetch; it is the goods line's accounting allocation.
 
 ## What they do not settle
 
 Tax beyond two plain ledger entries (no registration, GSTIN, place of supply, HSN, rate or
-inter-state line); a tax Tally computed itself; credit notes; a Stock Journal; optional, cancelled or
-post-dated vouchers; a line listed twice; a sale typed on Tally's screen; a real batch; stock items
-under a stock group inside a stock group; other releases. Two vouchers, one company.
+inter-state line); a tax Tally computed itself; credit notes; optional, cancelled or
+post-dated vouchers; a line listed twice; a sale typed on Tally's screen; a real batch; other releases. Two vouchers, one company. The ledger masters and groups of that
+company were not captured alongside, so nothing here classifies these two vouchers end to end.
 
 ## Files
 
@@ -85,9 +67,5 @@ under a stock group inside a stock group; other releases. Two vouchers, one comp
 |---|---|---|---|
 | `register_window_sales_day_request.utf16le.xml` | 3088 | `c266e0139725fc954f7427a5082633891598178634358480e162ee1b02948b42` | captured request, class-shaped voucher window, wire bytes |
 | `register_window_sales_day_live.utf16le.xml` | 49988 | `3b6f2bae39000b8cf3aa7e40ee8b1d674e792edd1a688bd783736bf9a48ef0f7` | captured response, one Sales voucher, wire bytes |
-| `inventory_window_sales_day_request.utf8.xml` | 815 | `4bfec60199ef88746403d4407301e2aa89faa36c894fd79e4b33b426e077277f` | request as persisted text, inventory-entries window |
-| `inventory_window_sales_day_response.utf8.xml` | 17890 | `06cbaee9df3a4a7648a62497895c0b587d83a72500b7c801459f2b6d68b2f37d` | response as persisted text, one Sales voucher |
 | `register_window_taxed_sales_day_request.utf16le.xml` | 3088 | `32bc080b2715f9f570e65189b66e225889877fb4f056f387e9fc0979ac2a2632` | captured request, class-shaped voucher window, second day, wire bytes |
 | `register_window_taxed_sales_day_live.utf16le.xml` | 76868 | `d449e05ecc97bb52d98f0c24dc2ec38749f8625e5fe89634b9a35bce65cd121c` | captured response, one taxed Sales voucher, wire bytes |
-| `inventory_window_taxed_sales_day_request.utf8.xml` | 815 | `b7f3d1fa62553ddbdb7a85ae10bc4f759b6e185231dd58f2b3416f2b58a77798` | request as persisted text, inventory-entries window, second day |
-| `inventory_window_taxed_sales_day_response.utf8.xml` | 18736 | `22b1fcb5fbfaf1fbedb2bd43e41dce3a53fa2cbebaef3a10940ff64c7d59b6db` | response as persisted text, one taxed Sales voucher |

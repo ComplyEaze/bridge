@@ -442,7 +442,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
   .story-sticky { flex-direction: column; }
   /* the hero text needs ~400px below the object; the object gives up height
      on short phones rather than pushing the Download button past the fold */
-  .canvas-box { flex: 0 0 clamp(200px, calc(100% - 470px), 58%); }
+  .canvas-box { flex: 0 0 clamp(130px, calc(100% - 510px), 58%); }
   .panel[data-chapter="0"] .fp-wide { display: none; } /* the platforms are on the Download page and the closing card */
   .panel[data-chapter="0"] .fineprint, .panel[data-chapter="0"] .coming-line { font-size: 13px; line-height: 1.4; }
   .panels { flex: 1 1 auto; }
@@ -813,7 +813,6 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 :is(html:not(.js), html.ce-static) .cap-phone { display: none; }
 :is(html:not(.js), html.ce-static) :is(.dialog-cap, .cap-wide) { display: block; }
 :is(html:not(.js), html.ce-static) .dialog-cap { background: none; padding: 0; color: var(--on-cobalt-soft); }
-:is(html:not(.js), html.ce-static) .panel[data-chapter="0"] .coming-line { display: none; } /* no book, so no tabs to label */
 :is(html:not(.js), html.ce-static) .prop-row { width: min(100%, 640px); box-sizing: border-box; }
 .tag { border-color: rgba(246, 248, 251, 0.55); }
 /* a short phone (360x740): the approval window gives up size so the chapter's headline stays clear of it */

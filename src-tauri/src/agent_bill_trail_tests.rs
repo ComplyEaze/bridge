@@ -770,6 +770,7 @@ fn a_residual_the_vouchers_do_not_explain_is_reported_with_the_difference_and_th
             "state": "residual_not_explained_by_vouchers",
             "residual": "-20000",
             "on_account_sum": "0",
+            "row_amounts": "as_allocated",
             "rows": [],
             "difference": "-20000",
             "difference_equals_opening_balance": true,
@@ -1050,6 +1051,118 @@ fn advances_and_open_pending_notes_are_listed_and_settled_notes_are_not() {
             ("pending_note_with_reference", "CN-1".to_string())
         ]
     );
+}
+
+/// An advance or note row carries its amount as allocated, never net of what
+/// later allocations adjusted against it; what is still open is Tally's own
+/// balance for the reference, carried beside the row, and `null` when the
+/// bills reports do not list it. No captured book shows an advance being
+/// adjusted, so these allocations test the rule, not Tally's behaviour.
+#[test]
+fn advance_and_note_rows_are_as_allocated_with_tallys_open_balance_beside_them() {
+    let rows = vec![
+        voucher(
+            "20260515",
+            "Receipt",
+            "P",
+            vec![entry(
+                "P",
+                "6000.00",
+                vec![allocation(
+                    "Advance",
+                    Some("ADV-1"),
+                    "6000.00",
+                    Some("20260515"),
+                )],
+            )],
+        ),
+        // A later invoice adjusted part of the advance.
+        voucher(
+            "20260601",
+            "Sales",
+            "P",
+            vec![entry(
+                "P",
+                "-2500.00",
+                vec![allocation(
+                    "Agst Ref",
+                    Some("ADV-1"),
+                    "-2500.00",
+                    Some("20260515"),
+                )],
+            )],
+        ),
+        voucher(
+            "20260520",
+            "Credit Note",
+            "P",
+            vec![entry(
+                "P",
+                "3000.00",
+                vec![allocation(
+                    "New Ref",
+                    Some("CN-1"),
+                    "3000.00",
+                    Some("20260520"),
+                )],
+            )],
+        ),
+    ];
+    let entries = entries_for_party(&rows, "P").unwrap();
+    let natives = vec![
+        open_bill("P", "ADV-1", "20260515", "3500", ExposureDirection::Payable),
+        open_bill("P", "CN-1", "20260520", "1200", ExposureDirection::Payable),
+    ];
+    let json = unadjusted_detail(&entries, &natives, "P", None)
+        .unwrap()
+        .json();
+    assert_eq!(json["row_amounts"], "as_allocated");
+    let rows = json["rows"].as_array().unwrap();
+    let summary = rows
+        .iter()
+        .map(|row| {
+            (
+                row["class"].as_str().unwrap(),
+                row["amount"].as_str().unwrap(),
+                row["native_balance"].clone(),
+                row["native_rows"].clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        summary,
+        vec![
+            // The advance as received, with what Tally still lists open on it.
+            ("advance", "6000.00", json!("3500"), json!(1)),
+            (
+                "pending_note_with_reference",
+                "3000.00",
+                json!("1200"),
+                json!(1)
+            ),
+        ]
+    );
+    // An advance the bills reports no longer list carries no open balance.
+    let json = unadjusted_detail(&entries, &natives[1..], "P", None)
+        .unwrap()
+        .json();
+    assert_eq!(json["rows"][0]["class"], "advance");
+    assert!(json["rows"][0]["native_balance"].is_null(), "{json}");
+    assert_eq!(json["rows"][0]["native_rows"], 0);
+    // Two native rows for one reference are ambiguous: no balance is chosen.
+    let mut doubled = natives.clone();
+    doubled.push(open_bill(
+        "P",
+        "ADV-1",
+        "20260516",
+        "1",
+        ExposureDirection::Payable,
+    ));
+    let json = unadjusted_detail(&entries, &doubled, "P", None)
+        .unwrap()
+        .json();
+    assert!(json["rows"][0]["native_balance"].is_null(), "{json}");
+    assert_eq!(json["rows"][0]["native_rows"], 2);
 }
 
 #[test]

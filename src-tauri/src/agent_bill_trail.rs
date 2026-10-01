@@ -512,10 +512,19 @@ impl UnadjustedTie {
 }
 
 /// The unadjusted detail of one party, with its tie-out.
+///
+/// Every row's `amount` is the allocation as it was made, never net of what
+/// later allocations adjusted against its reference: no captured book shows how
+/// an advance is later adjusted, so no netting is built on it. What is still
+/// open on an advance or a note's reference is Tally's own figure, from its
+/// bills reports at the same as-of, carried beside the row.
 pub(super) struct UnadjustedDetail {
     pub(super) tie: UnadjustedTie,
     pub(super) on_account_sum: ExactDecimal,
     pub(super) rows: Vec<(&'static str, TrailEntry)>,
+    /// The party's signed native balances by reference, for the advance and
+    /// note rows: one per row Tally lists, so several mean an ambiguous bill.
+    pub(super) native_by_reference: BTreeMap<String, Vec<ExactDecimal>>,
 }
 
 impl UnadjustedDetail {
@@ -528,11 +537,21 @@ impl UnadjustedDetail {
             "state": self.state(),
             "residual": self.tie.residual().map(ExactDecimal::as_str),
             "on_account_sum": self.on_account_sum.as_str(),
+            "row_amounts": "as_allocated",
             "rows": self.rows.iter().map(|(class, entry)| {
                 let mut row = entry.json();
                 row["class"] = json!(class);
                 if let Some(reference) = &entry.reference {
                     row["reference"] = json!(reference);
+                    // Tally's own open balance for the reference, signed as the
+                    // allocations are: `null` when its bills reports do not list
+                    // it at the as-of, or list it more than once.
+                    let natives = self.native_by_reference.get(reference);
+                    row["native_rows"] = json!(natives.map_or(0, Vec::len));
+                    row["native_balance"] = json!(match natives.map(Vec::as_slice) {
+                        Some([one]) => Some(one.as_str()),
+                        _ => None,
+                    });
                 }
                 row
             }).collect::<Vec<_>>(),
@@ -579,13 +598,16 @@ pub(super) fn unadjusted_detail(
             },
             on_account_sum: ExactDecimal::zero(),
             rows: Vec::new(),
+            native_by_reference: BTreeMap::new(),
         });
     }
-    let party_references = native_bills
-        .iter()
-        .filter(|bill| bill.party == party)
-        .map(|bill| bill.reference.as_str())
-        .collect::<std::collections::BTreeSet<_>>();
+    let mut party_natives = BTreeMap::<String, Vec<ExactDecimal>>::new();
+    for bill in native_bills.iter().filter(|bill| bill.party == party) {
+        party_natives
+            .entry(bill.reference.clone())
+            .or_default()
+            .push(signed_native(bill)?);
+    }
     let mut rows = Vec::new();
     let mut on_account = Vec::<&TrailEntry>::new();
     for entry in entries {
@@ -600,7 +622,7 @@ pub(super) fn unadjusted_detail(
                     && entry
                         .reference
                         .as_deref()
-                        .is_some_and(|reference| party_references.contains(reference)) =>
+                        .is_some_and(|reference| party_natives.contains_key(reference)) =>
             {
                 rows.push(("pending_note_with_reference", entry.clone()));
             }
@@ -628,10 +650,16 @@ pub(super) fn unadjusted_detail(
             }
         }
     };
+    // Kept only for the references the rows name.
+    party_natives.retain(|reference, _| {
+        rows.iter()
+            .any(|(_, entry)| entry.reference.as_deref() == Some(reference.as_str()))
+    });
     Ok(UnadjustedDetail {
         tie,
         on_account_sum,
         rows,
+        native_by_reference: party_natives,
     })
 }
 

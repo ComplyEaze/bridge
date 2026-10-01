@@ -26,7 +26,7 @@
   --cobalt-line: rgba(246, 248, 251, 0.16);
   --ink: #0b1436;
   --ink-soft: rgba(11, 20, 54, 0.68);
-  --ink-faint: rgba(11, 20, 54, 0.46);
+  --ink-faint: rgba(11, 20, 54, 0.64);
   --on-cobalt: #f6f8fb;
   --on-cobalt-soft: rgba(246, 248, 251, 0.74);
   --on-cobalt-faint: rgba(246, 248, 251, 0.68); /* AA on the darkest ground */
@@ -43,6 +43,7 @@
   --band: radial-gradient(120% 160% at 78% 0%, #1a2250 0%, #121936 48%, #0b1027 100%);
   --card: #fff;
   --link: #14297f;
+  --cover: #1f3fbf;
   --w-ui: 600;
   --w-brand: 650;
 
@@ -96,6 +97,7 @@ html[data-theme="red"] {
   --band: radial-gradient(120% 160% at 78% 0%, #2a1512 0%, #1d0f0d 55%, #120a09 100%);
   --card: #fffaf0;
   --link: #7a170f;
+  --cover: #8e1d14;
   --red-card-line: #e3d3a6;
   --red-card-shadow: 0 18px 44px rgba(20, 3, 2, 0.42);
 }
@@ -170,6 +172,7 @@ html[data-theme="red"] {
   transition: background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
 }
 .ce-header.is-scrolled {
+  background: var(--header-ground);
   background: color-mix(in srgb, var(--header-ground) 78%, transparent);
   border-bottom-color: var(--cobalt-line);
   backdrop-filter: blur(14px) saturate(140%);
@@ -291,11 +294,11 @@ html[data-theme="red"] {
   justify-content: center;
   align-items: center;
   gap: 4px;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 8px;
-  border: 1px solid var(--cobalt-line);
+  border: 1px solid rgba(246, 248, 251, 0.45);
   background: rgba(246, 248, 251, 0.06);
   cursor: pointer;
 }
@@ -320,7 +323,7 @@ html[data-theme="red"] {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: color-mix(in srgb, var(--header-ground) 97%, transparent);
+    background: var(--header-ground);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--cobalt-line);
@@ -455,70 +458,73 @@ html[data-theme="red"] {
    is the lowercase x-height on every side; never smaller than 21 px tall. */
 .ce-logo { display: block; height: 24px; width: auto; aspect-ratio: 898.5 / 105; color: var(--on-cobalt); flex: none; }
 .ce-brand { padding: 4px 0; }
-.ce-footer__brand .ce-logo--footer { height: 22px; color: var(--on-cobalt); }
-@media (max-width: 480px) { .ce-logo { height: 21px; } }
+.ce-footer__brand .ce-logo--footer { height: 24px; color: var(--on-cobalt); }
+@media (max-width: 480px) { .ce-logo { height: 23px; } }
 
 /* The wordmark and the footer brand line */
 .ce-brand, .ce-footer__brand { font-family: var(--font-head); font-weight: var(--w-brand); font-size: 16px; }
 
 /* ----------------------------------------------------------- colour switch */
-/* Built by chrome.js (no script, no switch). Two plain buttons in the nav: inline on a wide
-   screen, a row of the menu on a phone. The pressed one is the world in view. */
-.ce-theme {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--cobalt-line);
-  border-radius: var(--r-pill);
-  background: rgba(246, 248, 251, 0.06);
-}
+/* Built by chrome.js (no script, no switch), in the header at every width: two swatches, the
+   pressed one ringed. Each button is named for a screen reader and has a tooltip. */
+.ce-theme { display: inline-flex; align-items: center; gap: 2px; flex: none; }
 .ce-theme__opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px 0 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
   border: 0;
-  border-radius: var(--r-pill);
   background: transparent;
-  color: var(--on-cobalt-soft);
-  font: 500 13px/1 var(--font-display);
   cursor: pointer;
 }
 .ce-theme__opt::before {
   content: '';
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1.5px solid var(--on-cobalt);
   background: #1f3fbf;
+  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.6);
 }
-.ce-theme__opt--red::before { background: #8e1d14; }
-.ce-theme__opt:hover { color: var(--on-cobalt); }
-.ce-theme__opt[aria-pressed='true'] { background: var(--on-cobalt); color: var(--ink); }
-.ce-theme__opt[aria-pressed='true']::before { border-color: var(--ink); }
+.ce-theme__opt--red::before { background: #a3231a; }
+.ce-theme__opt[aria-pressed='true']::before { box-shadow: 0 0 0 2px var(--header-ground), 0 0 0 4px var(--on-cobalt); }
+.ce-theme__opt:hover::before { box-shadow: 0 0 0 1.5px var(--on-cobalt); }
+.ce-theme__opt[aria-pressed='true']:hover::before { box-shadow: 0 0 0 2px var(--header-ground), 0 0 0 4px var(--on-cobalt); }
+
+/* A phone header holds the wordmark, the switch and the menu; Download is the menu's first row
+   (and the page's own button). */
+.ce-nav__download { display: none; }
 @media (max-width: 640px) {
-  .ce-theme { align-self: flex-start; margin: 12px 0 2px; }
-  .ce-theme__opt { height: 36px; padding: 0 14px 0 10px; font-size: 14px; }
+  .ce-cta { display: none; }
+  .ce-nav__download { display: block; }
 }
+@media (max-width: 380px) {
+  .ce-header { padding: 0 14px; }
+  .ce-header__inner { gap: 8px; }
+  .ce-theme__opt { width: 28px; }
+}
+
+/* Without JavaScript the menu button cannot open anything: it is not shown, and the footer carries the links. */
+html:not(.js) .ce-menu-toggle { display: none; }
 
 /* ------------------------------------------------------------- inner pages */
 /* Download, Releases, Changelog, Privacy and Terms: a title band on the world's dark ground
-   (the home page's ground, not a second blue), then one 760px column on paper. */
+   (the home page's ground, not a second blue) closed by a rule in the world's cover colour, then
+   one 760px column on paper. */
 .ce-page { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-display); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 html:has(.ce-page) { background: var(--footer-ground); }
 .ce-page :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; box-shadow: 0 0 0 2px var(--paper); }
 .ce-page .ce-header :focus-visible, .ce-page .ce-footer :focus-visible, .ce-page .page-hero :focus-visible { outline-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
-.page-hero { padding: calc(var(--header-h) + 56px) var(--gutter) 56px; background: var(--band); color: var(--on-cobalt); }
+.ce-page .ce-header.is-scrolled { background: var(--header-ground); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.page-hero { padding: calc(var(--header-h) + 56px) var(--gutter) 56px; background: var(--band); color: var(--on-cobalt); border-bottom: 6px solid var(--cover); }
 .page-hero__inner { max-width: 760px; margin: 0 auto; }
-.page-hero h1 { font-family: var(--font-head); font-size: clamp(34px, 4vw, 52px); font-weight: 700; line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 14px; max-width: 18ch; text-wrap: balance; }
-.page-hero p { color: var(--on-cobalt-soft); font-size: 16px; line-height: 1.6; max-width: 56ch; margin: 0; }
+.page-hero :is(h1, .page-hero__title) { font-family: var(--font-head); font-size: clamp(34px, 4vw, 52px); font-weight: 700; line-height: 1.06; letter-spacing: -0.03em; margin: 0 0 14px; max-width: 18ch; text-wrap: balance; }
+.page-hero p:not(.page-hero__title) { color: var(--on-cobalt-soft); font-size: 16px; line-height: 1.6; max-width: 56ch; margin: 0; }
 .page-section { width: min(100% - 2 * var(--gutter), 760px); margin: 0 auto; padding: 48px 0; }
 .page-section + .page-section { border-top: 1px solid var(--paper-line); }
 .page-section h2 { font-family: var(--font-head); font-size: 22px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 18px; }
-.ce-page a:not(.btn):not(.ce-brand):not(.ce-star) { text-underline-offset: 2px; }
-.ce-page .btn-primary { background: var(--ink); color: var(--paper); }
+.ce-page main a:not(.btn) { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.ce-page .btn-primary { background: var(--cover); color: #fff; }
 .ce-page .btn-secondary { background: var(--card); color: var(--ink); border-color: var(--ink-faint); }
 .ce-page .ce-header .btn-primary { background: var(--paper); color: var(--ink); }
-html.js #dlLoading + noscript, html.js #relLoading + noscript { display: none; }
+html:not(.js) :is(#dlLoading, #relLoading) { display: none; }

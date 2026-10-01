@@ -6,7 +6,6 @@
 
 import { FileScene, CHAPTER_COUNT, setTheme, nameResolve, slipWindow } from './scene.js';
 
-const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ric = window.requestIdleCallback
   ? window.requestIdleCallback.bind(window)
   : (cb) => setTimeout(() => cb({ didTimeout: true, timeRemaining: () => 0 }), 100);
@@ -51,13 +50,6 @@ const BANK_TOTAL = 142;
 async function boot() {
   const mobile = window.matchMedia('(max-width: 760px)').matches;
 
-  if (REDUCED) {
-    document.getElementById('story').hidden = true;
-    afterLoad(() => buildStaticStory(mobile));
-    document.addEventListener('ce:theme', () => buildStaticStory(mobile));
-    return;
-  }
-
   const panels = Array.from(document.querySelectorAll('.panel'));
   if (mobile) {
     // the synthetic-data line moves into each chapter's panel (chapters 1-7), one 12 px line under its words
@@ -71,10 +63,11 @@ async function boot() {
       panel.appendChild(p);
     });
   }
-  // a panel that cannot be seen must not be reachable by keyboard: it is `inert` (in the HTML for
-  // chapters 1-7, so before this script runs too) while its opacity is under 0.05, toggled only when that changes
+  // A panel that cannot be seen keeps its words for a screen reader (it is never `inert`), but its
+  // links leave the tab order while its opacity is under 0.05, changed only when that flips.
   const INERT_BELOW = 0.05;
-  const panelInert = panels.map((panel) => panel.hasAttribute('inert'));
+  const panelLinks = panels.map((panel) => Array.from(panel.querySelectorAll('a')));
+  const panelOff = panels.map(() => false);
   const panelMeta = panels.map((panel) => ({
     panel,
     i: Number(panel.dataset.chapter),
@@ -188,9 +181,9 @@ async function boot() {
       const op = panelOpacity(chapterPos, i);
       panel.style.opacity = String(op);
       const off = op < INERT_BELOW;
-      if (off !== panelInert[k]) {
-        panelInert[k] = off;
-        panel.inert = off;
+      if (off !== panelOff[k]) {
+        panelOff[k] = off;
+        panelLinks[k].forEach((a) => (off ? a.setAttribute('tabindex', '-1') : a.removeAttribute('tabindex')));
       }
       const headEnter = i === 0 ? 1 : smoothstep(IN_START, IN_END, d);
       const bodyEnter = i === 0 ? 1 : smoothstep(IN_START + 0.02, IN_END + 0.02, d);
@@ -278,7 +271,6 @@ async function boot() {
     readbackShown = setCount(counterReadback, readbackShown, Math.round(BANK_TOTAL * smoothstep(5.25, 5.85, chapterPos)));
   }
 
-  if (location.search.includes('debug=1')) window.__ceMaster = (chapterPos) => masterUpdate(chapterPos / CHAPTER_COUNT); // local checks only
 
 
   // ?smooth=<ms> (A/B, 30 Sep): the owner's numbers showed perfect frames at
@@ -393,7 +385,14 @@ async function boot() {
       canvas = fresh;
       canvasBox.classList.remove('is-ready');
     }
-    const built = new FileScene(canvas, { mobile, externalTicker: true });
+    let built;
+    try {
+      built = new FileScene(canvas, { mobile, externalTicker: true });
+    } catch (e) {
+      // no WebGL: the page reads as it does without the 3D book (home.css, "the story as a plain page")
+      document.documentElement.classList.add('ce-static');
+      return;
+    }
     scene = built;
     measureLayout();
     built.setChapterProgress(lastChapterPos);
@@ -432,6 +431,7 @@ async function boot() {
       } catch (e) {
         /* fonts API unavailable; proceed with fallback stack */
       }
+      document.addEventListener('ce:theme', () => buildScene());
       await buildScene();
       if (hoverPointer) {
         window.addEventListener('pointermove', (e) => {
@@ -442,86 +442,8 @@ async function boot() {
         });
       }
       window.addEventListener('resize', measureLayout);
-      document.addEventListener('ce:theme', () => buildScene());
     });
   });
-}
-
-// ---------------------------------------------------------- reduced motion
-// One WebGL render per chapter, captured as a still image, then the
-// renderer is torn down: the page that ships to the visitor is pure HTML
-// and eight <img> stills, no canvas, no scroll listener, no rAF loop. Each
-// still sits beside a clone of the chapter's own live .panel, so the hero
-// headline, the Coming tags and the download button are the page's own.
-async function buildStaticStory(mobile) {
-  try {
-    await document.fonts.ready;
-  } catch (e) {
-    /* proceed with fallback fonts */
-  }
-  setTheme(document.documentElement.dataset.theme);
-  const host = document.getElementById('staticStory');
-  host.replaceChildren();
-  const panels = Array.from(document.querySelectorAll('#story .panel'));
-  const tmpCanvas = document.createElement('canvas');
-  const scene = new FileScene(tmpCanvas, { mobile });
-  tmpCanvas.style.width = mobile ? '100%' : '640px';
-  tmpCanvas.style.height = mobile ? '46vh' : '520px';
-  document.body.appendChild(tmpCanvas);
-
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < CHAPTER_COUNT; i++) {
-    scene.renderStill(i);
-    const img = document.createElement('img');
-    img.src = tmpCanvas.toDataURL('image/png');
-    img.alt = '';
-    img.setAttribute('aria-hidden', 'true');
-    img.className = 'static-still';
-    const fig = document.createElement('figure');
-    fig.className = 'static-figure';
-    fig.appendChild(img);
-    const cap = document.createElement('figcaption');
-    const copy = panels[i].cloneNode(true);
-    copy.removeAttribute('style');
-    copy.removeAttribute('inert'); // the stills page shows every chapter at once
-    copy.querySelectorAll('[style]').forEach((el) => el.removeAttribute('style'));
-    // counters finish where the animated page leaves them (chapter 3's still is taken with the
-    // 139 slips up and the three names still waiting, so its counter reads 139; the read-back
-    // reads 142 of 142); ids must stay unique
-    copy.querySelectorAll('.counter').forEach((el) => {
-      el.textContent = String(el.id === 'counterReadback' ? BANK_TOTAL : BANK_READY);
-      el.removeAttribute('id');
-    });
-    cap.appendChild(copy);
-    if (i === 2) {
-      // the chapter's Coming feature, shown: the working paper's row 1, filled (the live card, cloned)
-      const wp = document.getElementById('propRow');
-      if (wp) {
-        const row = wp.cloneNode(true);
-        row.removeAttribute('id');
-        row.removeAttribute('style');
-        row.removeAttribute('aria-hidden');
-        row.querySelectorAll('[style]').forEach((el) => el.removeAttribute('style'));
-        row.querySelector('.row-sheet').classList.add('is-filled');
-        cap.appendChild(row);
-      }
-    }
-    if (i === 4) {
-      // the approval dialog, so the still-only page shows what you approve (the live replica, cloned)
-      const dlg = document.querySelector('#propDialog .dialog-replica');
-      if (dlg) cap.appendChild(dlg.cloneNode(true));
-    }
-    fig.appendChild(cap);
-    frag.appendChild(fig);
-  }
-  host.appendChild(frag);
-  host.hidden = false;
-  scene.dispose();
-  document.body.removeChild(tmpCanvas);
-
-  const cta = document.getElementById('downloadCta');
-  cta.style.opacity = '1';
-  cta.style.transform = 'none';
 }
 
 boot();

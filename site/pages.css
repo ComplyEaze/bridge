@@ -203,3 +203,8 @@
 
 .changelog a { color: var(--link); text-decoration: none; border-bottom: 1px solid var(--paper-line); }
 .changelog a:hover, .changelog a:focus-visible { border-bottom-color: currentColor; }
+
+/* the list arrives from GitHub after the page: hold its room so the footer does not jump */
+.rel-body { min-height: 70vh; }
+/* the generated article opens with its own h1; the title band already says the page's name */
+.changelog > h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

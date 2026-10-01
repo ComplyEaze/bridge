@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="chrome.css" />
 <link rel="preload" href="fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="home.css" />
-<script>document.documentElement.classList.add("js");</script>
+<script>(function(c){c.add("js");try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)c.add("ce-static")}catch(e){}})(document.documentElement.classList)</script>
 </head>
 <body>
 <a class="ce-skip-link" href="#main">Skip to content</a>
@@ -24,6 +24,7 @@
     </a>
     <div class="ce-header__right">
       <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
         <a href="./releases.html">Releases</a>
         <a href="./changelog.html">Changelog</a>
         <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -131,6 +132,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
               <span class="dbtn dbtn-default">Cancel</span>
             </div>
           </div>
+          <p class="dialog-cap">The approval window in release 0.3.0 on a Mac. On Windows it asks Yes or No.</p>
         </div>
 
         <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
@@ -138,52 +140,52 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
 
       <div class="panels" id="panels">
         <article class="panel" data-chapter="0">
-          <h1>Your client's Tally books, flagged before you open them.</h1>
-          <p class="coming-line"><span class="tag">In progress</span>Scrutiny: every finding tied to its voucher and its clause.</p>
-          <p class="proof">ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs in audit season.</p>
+          <h1>Ask your client's Tally books in plain English.</h1>
+          <p class="proof">ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs.</p>
           <div class="cta-row">
             <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
           </div>
-          <p class="fineprint"><span class="fp-line">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>; your computer may warn you.</span><span class="fp-line">Reading and approved posting are in the published release; what has been run against a real TallyPrime, and what has not, is listed in the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">README</a>.</span></p>
+          <p class="fineprint"><span class="fp-line fp-wide">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>, still being developed, and may contain errors: try it on a test company, with backups.</span><span class="fp-line"><a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">What has been run against a real TallyPrime, and what has not</a>.</span></p>
+          <p class="coming-line"><span class="tag">In development, not in the download</span>The coloured tabs: findings flagged by clause.</p>
         </article>
 
-        <article class="panel" data-chapter="1" inert>
-          <h2>Ask the books, in plain English.</h2>
+        <article class="panel" data-chapter="1">
+          <h2>Who owes you, and for how long.</h2>
           <p class="proof">Five parties over 90 days, &#8377;7,86,300 in all.</p>
-          <p class="proof-sub">Reads trial balance, ledgers, vouchers and outstandings. Ask as you would ask a colleague.</p>
+          <p class="proof-sub">Reads the trial balance, ledgers, vouchers and outstandings. Ask as you would ask a colleague.</p>
         </article>
 
-        <article class="panel" data-chapter="2" inert>
+        <article class="panel" data-chapter="2">
           <h2>Every finding, tied to its voucher.</h2>
           <p class="proof">Payment 1187 to Demo Packaging Supplies, flagged 40A(3).</p>
-          <p class="coming-line"><span class="tag">In progress</span>One finding per row, cited to its clause.</p>
+          <p class="coming-line"><span class="tag">In development, not in the download</span>One finding per row, cited to its clause. Its accuracy is not yet proven.</p>
         </article>
 
-        <article class="panel" data-chapter="3" inert>
+        <article class="panel" data-chapter="3">
           <h2>From bank statement to a voucher file.</h2>
-          <p class="proof">142 statement lines, <span class="counter" id="counterBank">0</span> vouchers ready.</p>
-          <p class="proof-sub">3 near-miss ledger names wait for your decision. ComplyEaze Bridge creates no ledger.</p>
+          <p class="proof">142 statement lines, <span class="counter" id="counterBank">139</span> vouchers ready.</p>
+          <p class="proof-sub">3 near-miss ledger names wait for your decision. ComplyEaze Bridge creates no ledger. It reads a few banks' PDF statements so far.</p>
         </article>
 
-        <article class="panel" data-chapter="4" inert>
-          <h2>Nothing posts until you click Post voucher.</h2>
+        <article class="panel" data-chapter="4">
+          <h2>Nothing posts until you approve it.</h2>
           <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
-          <p class="proof-sub">Posting is off until you turn it on.</p>
+          <p class="proof-sub">Posting is off by default in a new install. For many vouchers, import the prepared file in Tally yourself instead.</p>
         </article>
 
-        <article class="panel" data-chapter="5" inert>
+        <article class="panel" data-chapter="5">
           <h2>Every voucher checked back in Tally.</h2>
-          <p class="proof">Import the file in Tally yourself; ComplyEaze Bridge reads each one back. Found in Tally <span class="counter" id="counterReadback">0</span> of 142.</p>
+          <p class="proof">Import the file in Tally yourself; ComplyEaze Bridge reads each one back. Found in Tally <span class="counter" id="counterReadback">142</span> of 142.</p>
         </article>
 
-        <article class="panel" data-chapter="6" inert>
+        <article class="panel" data-chapter="6">
           <h2>Every call leaves a receipt.</h2>
           <p class="proof">Every read and every post, including refusals, is logged on your computer.</p>
-          <p class="fineprint">What Claude reads goes to your AI provider. Party names can be masked or narrations dropped first; amounts are always sent.</p>
+          <p class="fineprint">What Claude reads goes to your AI provider. Party names can be partly masked or narrations dropped first; amounts are always sent.</p>
         </article>
 
-        <article class="panel" data-chapter="7" inert>
-          <h2>Close the file. One tick.</h2>
+        <article class="panel" data-chapter="7">
+          <h2>Read back, and on record.</h2>
           <p class="proof">Every voucher read back. Every call on record.</p>
           <div class="cta-row">
             <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
@@ -198,23 +200,15 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       index flags down its edge, coloured by the kind of finding. Asked who owes money for more than 90 days, the
       flags fold back into the edge, it opens to an ageing page, and the five overdue parties are ringed in pencil. The page turns
       to a voucher, two pencil ticks are drawn, and its 40A(3) flag leaves the page and lands as row 1 of a working
-      paper titled &ldquo;Working paper &middot; Tax audit FY 2025-26&rdquo; (scrutiny is in progress, not yet released). The page turns
+      paper titled &ldquo;Working paper &middot; Tax audit FY 2025-26&rdquo; (flagging is in development and not in the download). The page turns
       again to a bank statement; a slip lifts off each of five rows and the pile reads 139 ready, and three
       question-mark flags mark near-miss ledger names that wait for your decision; you decide them one after
       another, each turns into a tick, and the count of ready vouchers, the voucher file ComplyEaze Bridge prepares for you to import in Tally, rises from 139 to 142. A replica of
-      the real ComplyEaze Bridge approval dialog rises from one row, asks you to post that one voucher, and shrinks back into the row with a
+      the approval window of release 0.3.0 on a Mac rises from one row, asks you to post that one voucher, and shrinks back into the row with a
       red tick: one voucher per approval. After you import the prepared file in Tally yourself, each voucher is ticked as ComplyEaze Bridge
       reads it back, counting up to 142 of 142. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
       one tick, and the four install steps and the download follow.
     </p>
-  </section>
-
-  <!-- ================================================== REDUCED MOTION FALLBACK -->
-  <!-- Shown instead of #story when prefers-reduced-motion is set: one
-       captured still per chapter, no canvas, no scroll listener. -->
-  <section class="static-story" id="staticStory" hidden>
-    <!-- <figure> per chapter injected by app.js: an <img> still plus a clone of
-         that chapter's own live panel, so the words are the page's words. -->
   </section>
 
   <!-- ================================================================ CLOSE -->
@@ -231,9 +225,8 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
         <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
       </div>
       <p class="fineprint"><span class="fp-line">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>; your computer may warn you.</span></p>
-      <p class="next-line"><span class="tag">In progress</span><span>Scrutiny.</span></p>
-      <p class="next-line"><span class="tag">Planned</span><span>Repeatable bank-statement matching.</span></p>
-      <p class="next-line"><span class="tag tag-next">Built, not yet released</span><span>Balance sheet and P&amp;L reads.</span></p>
+      <p class="next-line"><span class="tag">In development, not in the download</span><span>Flagging findings by clause.</span></p>
+      <p class="next-line"><span class="tag">Built, not yet released</span><span>Balance sheet and P&amp;L reads.</span></p>
     </div>
   </section>
 
@@ -246,7 +239,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       <div>
         <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
         <dl class="ce-footer__facts">
-          <div><dt>Tally connection</dt><dd>This computer only.</dd></div>
+          <div><dt>Tally connection</dt><dd>On this computer only (loopback).</dd></div>
           <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
           <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
           <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
@@ -265,7 +258,6 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
         <h3>Project</h3>
         <ul>
           <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md" target="_blank" rel="noopener noreferrer">Install guide</a></li>
           <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
         </ul>
       </nav>
@@ -285,8 +277,10 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
 
 <script>
 /* The story's script (and three.js under it) loads only after the page has loaded and the browser
-   has reported its largest paint, so nothing competes with the first paint; the hero is plain HTML. */
-(function(){var l=0,p=0,d=0;function go(){if(d||!l||!p)return;d=1;setTimeout(function(){var e=document.createElement("script");e.type="module";e.src="app.js";document.body.appendChild(e)},0)}
+   has reported its largest paint, so nothing competes with the first paint; the hero is plain HTML.
+   With reduced motion the story is a plain page and none of it loads. */
+(function(){if(document.documentElement.classList.contains("ce-static"))return;var l=0,p=0,d=0;function add(t,a){var e=document.createElement(t);for(var k in a)e[k]=a[k];return e}
+function go(){if(d||!l||!p)return;d=1;setTimeout(function(){["scene.js","vendor/three/three.bundle.min.js"].forEach(function(u){document.head.appendChild(add("link",{rel:"modulepreload",href:u}))});document.body.appendChild(add("script",{type:"module",src:"app.js"}))},0)}
 try{new PerformanceObserver(function(x,o){o.disconnect();p=1;go()}).observe({type:"largest-contentful-paint",buffered:true})}catch(e){p=1}
 addEventListener("load",function(){l=1;setTimeout(function(){p=1;go()},600);go()})})()
 </script>

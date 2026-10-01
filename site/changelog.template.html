@@ -17,6 +17,7 @@
 <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="chrome.css" />
 <link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
 </head>
 <body class="ce-page">
 <a class="ce-skip-link" href="#main">Skip to content</a>
@@ -28,6 +29,7 @@
     </a>
     <div class="ce-header__right">
       <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
         <a href="./releases.html">Releases</a>
         <a href="./changelog.html" aria-current="page">Changelog</a>
         <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -52,7 +54,7 @@
 <main id="main">
   <section class="page-hero">
     <div class="page-hero__inner">
-      <h1>Changelog</h1>
+      <p class="page-hero__title">Changelog</p>
       <p class="lede">Every ComplyEaze Bridge release, in the order it shipped, plus what is already in source and not yet published.</p>
     </div>
   </section>
@@ -68,7 +70,7 @@
       <div>
         <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
         <dl class="ce-footer__facts">
-          <div><dt>Tally connection</dt><dd>This computer only.</dd></div>
+          <div><dt>Tally connection</dt><dd>On this computer only (loopback).</dd></div>
           <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
           <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
           <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
@@ -87,7 +89,6 @@
         <h3>Project</h3>
         <ul>
           <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md" target="_blank" rel="noopener noreferrer">Install guide</a></li>
           <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
         </ul>
       </nav>

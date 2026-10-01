@@ -73,8 +73,10 @@ a { color: inherit; }
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100svh; /* the small viewport: a phone browser's toolbar never covers the hero's last lines */
   min-height: 560px;
   overflow: hidden;
+  overflow: clip; /* clip, not hidden: focusing a link inside can never scroll the pinned stage */
   display: flex;
   flex-direction: row;
   background: var(--story-bg);
@@ -375,43 +377,6 @@ a { color: inherit; }
 .dbtn-post.is-pressed { background: #cfcfd3; transform: scale(0.97); }
 .dbtn-default.is-pressed { background: #0060cc; transform: scale(0.97); }
 
-@media (prefers-reduced-motion: reduce) {
-  .prop, .panel { opacity: 1 !important; transform: none !important; }
-}
-
-/* ------------------------------------------------------------ static story */
-/* prefers-reduced-motion fallback: normal document flow, nine stills. */
-
-.static-story { padding: 72px var(--gutter); max-width: 1100px; margin: 0 auto; }
-.static-figure {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 28px;
-  align-items: center;
-  margin: 0 0 56px;
-}
-.static-figure:last-child { margin-bottom: 0; }
-.static-still { border-radius: 14px; box-shadow: 0 20px 50px rgba(3, 7, 25, 0.4); }
-/* each caption is a clone of the live chapter panel: same headline, Coming tags and
-   buttons, laid out in the flow instead of stacked in the pinned column */
-.static-figure .panel { position: static; inset: auto; padding: 0; opacity: 1; pointer-events: auto; }
-.static-figure .panel h1 { max-width: none; }
-.static-figure .panel h2 { max-width: none; }
-.static-figure .dialog-replica { margin-top: 20px; width: min(440px, 100%); zoom: 1; }
-/* the chapter-2 working paper, cloned into its caption (the Coming feature is shown, not only described):
-   in the flow, filled, and in the two-row layout the phone uses, since a caption is too narrow for five columns */
-.static-figure .prop-row { position: static; opacity: 1; width: 100%; max-width: 560px; margin-top: 20px; font-size: 13px; }
-.static-figure .prop-row .wp-title { font-size: 13px; padding: 8px 12px 6px; }
-.static-figure .prop-row .wp-sec { opacity: 1; width: 84px; height: 24px; line-height: 24px; padding: 0; text-align: center; font-size: 12px; }
-.static-figure .prop-row .row-sheet, .static-figure .prop-row .row-sheet tbody, .static-figure .prop-row .row-sheet tr { display: block; font-size: 13px; }
-.static-figure .prop-row .row-sheet thead { display: none; }
-.static-figure .prop-row .row-sheet tr { display: grid; grid-template-columns: 1.15fr 1.1fr 1fr 1.6fr; }
-.static-figure .prop-row .row-sheet td { display: block; height: auto; padding: 5px 8px; border-width: 1px 0 0 1px; white-space: normal; }
-.static-figure .prop-row .row-sheet td:first-child { grid-column: 1 / -1; border-left: 0; font-weight: 600; }
-.static-figure .prop-row .row-sheet td[data-l]::before { content: attr(data-l); display: block; font-size: 10px; font-weight: 600; color: #5a6384; }
-.static-figure .prop-row .row-sheet td:first-child::before { display: none; }
-.static-figure .prop-row .row-sheet td:nth-child(2) { border-left: 0; }
-
 /* ---------------------------------------------------------------- close */
 
 .close-full { padding: var(--space-8) var(--gutter) var(--space-6); max-width: 760px; margin: 0 auto; }
@@ -459,7 +424,8 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
 }
 .install-steps code { font-family: var(--font-mono); font-size: 14px; background: var(--paper-line); padding: 1px 5px; border-radius: var(--r-sm); }
 /* one primary button: the story's white button, given an ink edge so it keeps its contrast on the card's light ground */
-.download-block .btn-primary { background: #fff; color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+/* one button in both worlds: the world's cover colour, as on the inner pages */
+.download-block .btn-primary { background: var(--cover); color: #fff; border-color: var(--cover); }
 .download-block .fineprint { font-size: 14px; }
 
 .visually-hidden {
@@ -476,7 +442,9 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
   .story-sticky { flex-direction: column; }
   /* the hero text needs ~400px below the object; the object gives up height
      on short phones rather than pushing the Download button past the fold */
-  .canvas-box { flex: 0 0 clamp(200px, calc(100% - 400px), 58%); }
+  .canvas-box { flex: 0 0 clamp(200px, calc(100% - 470px), 58%); }
+  .panel[data-chapter="0"] .fp-wide { display: none; } /* the platforms are on the Download page and the closing card */
+  .panel[data-chapter="0"] .fineprint, .panel[data-chapter="0"] .coming-line { font-size: 13px; line-height: 1.4; }
   .panels { flex: 1 1 auto; }
   /* item 10 (text part): the object keeps the top half; words start right
      under the header instead of centring in a half-empty column. */
@@ -491,7 +459,6 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
   .panel > :last-child { margin-bottom: auto; }
   .panel[data-chapter="0"] h1 { max-width: none; font-size: clamp(24px, 7vw, var(--fs-xl)); }
   .panel h2 { max-width: none; font-size: clamp(22px, 6vw, var(--fs-xl)); }
-  .static-figure { grid-template-columns: minmax(0, 1fr); }
   /* the story leaves an empty panel area as it scrolls off; the install card
      rises into it instead of arriving after half a screen of bare gradient */
   .close-full { padding: var(--space-3) var(--gutter) var(--space-5); position: relative; z-index: 1; }
@@ -512,7 +479,7 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
 }
 .next-line:first-of-type { margin-top: var(--space-4); }
 .download-block .next-line { color: var(--ink-soft); }
-.download-block .next-line .tag { background: #e8ecf8; color: #1b2a6b; border: 1px solid #c3cdee; }
+.download-block .next-line .tag { background: transparent; color: var(--ink); border: 1px solid var(--ink-soft); }
 /* stable ink/paper-line tokens: no theme redefines them, so this pill stays
    neutral on the red and green paper too, with no extra per-world rule. */
 .download-block .next-line .tag-next { background: transparent; color: var(--ink-soft); border: 1px solid var(--paper-line); }
@@ -620,12 +587,13 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
 /* Over the live WebGL file a backdrop blur re-samples the canvas every frame
    and caused intermittent frame hitches; the home page uses a solid tint. */
 .ce-header.is-scrolled {
+  background: var(--header-ground);
   background: color-mix(in srgb, var(--header-ground) 94%, transparent);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 @media (max-width: 640px) {
-  .ce-nav { background: color-mix(in srgb, var(--header-ground) 98%, transparent); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .ce-nav { background: var(--header-ground); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 /* mobile props: after their base rules, which would otherwise win on order.
@@ -667,10 +635,8 @@ html.js .download-block:focus-within { opacity: 1; transform: none; transition-d
 html[data-theme="red"] .story { --story-bg: radial-gradient(75% 95% at 30% 42%, #2a1512 0%, #1d0f0d 55%, #120a09 100%); }
 /* ---- per-world details (critique 29 Sep) ---- */
 html[data-theme="red"] .prop-question, html[data-theme="red"] .prop-ageing, html[data-theme="red"] .prop-row, html[data-theme="red"] .prop-names { background: #fbf3dc; border: 1px solid var(--red-card-line); box-shadow: var(--red-card-shadow); }
-html[data-theme="red"] .download-block .next-line .tag { background: transparent; color: var(--ink); border-color: var(--ink-soft); }
 /* W2 fix 9: paper, not plastic: a 4 px card and an ink button with paper lettering, in place of the white sticker */
 html[data-theme="red"] .download-block { border-radius: 4px; }
-html[data-theme="red"] .download-block .btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: 0 2px 0 rgba(43, 14, 12, 0.5); }
 html[data-theme="red"] .download-block :focus-visible { box-shadow: 0 0 0 2px var(--paper); }
 /* W2 fix 1: the working paper's flag cell is the 3D flag's muted 40A(3) tab */
 html[data-theme="red"] .wp-sec { background: #efd96a; }
@@ -685,7 +651,6 @@ html[data-theme="red"] .row-sheet th { background: #f3e8c8; color: var(--ink-sof
 html[data-theme="red"] .row-sheet td { border-color: #c9b588; }
 html[data-theme="red"] .row-sheet.is-filled td { border-color: var(--red-card-line); }
 html[data-theme="red"] .row-sheet td:nth-child(5) { color: var(--ink); }
-html[data-theme="red"] .row-sheet td[data-l]::before, html[data-theme="red"] .static-figure .prop-row .row-sheet td[data-l]::before { color: var(--ink-soft); }
 html[data-theme="red"] .wp-sec { color: rgba(43, 14, 12, 0.9); }
 html[data-theme="red"] .names-cap { color: var(--ink-soft); }
 html[data-theme="red"] .name-parsed { color: rgba(43, 14, 12, calc(1 - var(--r, 0) * 0.32)); text-decoration-color: rgba(43, 14, 12, calc(var(--r, 0) * 0.35)); }
@@ -786,15 +751,51 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 }
 /* a narrow phone: the reference takes its own line rather than pushing the title onto two */
 @media (max-width: 389px) { html:not([data-theme]) .wp-ref { float: none; margin: 0 0 2px; text-align: right; } }
-html:not([data-theme]) .static-figure .prop-row .wp-title { padding: 8px 12px 6px 40px; font-size: 12px; letter-spacing: 0.02em; }
-@media (max-width: 760px) { html:not([data-theme]) .static-figure .prop-row .wp-title { font-size: 11px; } }
 /* the reduced-motion stills sit on the ink room without a drop shadow (the old one showed as a darker box on the near-black ground) */
-html:not([data-theme]) .static-still { box-shadow: none; }
-html:not([data-theme]) .static-figure .prop-row .row-sheet tr { padding-left: 34px; grid-template-columns: 1.4fr 1.05fr 1fr 1.45fr; }
-html:not([data-theme]) .static-figure .prop-row .row-sheet td:first-child { padding-left: 8px; }
 
 /* Red world, X1 W7, phone (chapters 4-7): the same centring as the cobalt rule above, so the words sit midway in the space under the book and no bare band is left between them (under html[data-theme="red"]: no other world changes) */
 @media (max-width: 760px) {
   html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) { justify-content: center; }
   html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) > :first-child { margin-top: 0; }
 }
+
+/* The approval window's caption: what the replica is, and that Windows differs. */
+.dialog-cap { margin: 10px auto 0; max-width: 46ch; text-align: center; font-size: 12px; line-height: 1.4; color: var(--on-cobalt); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+
+/* =====================================================================
+   The story as a plain page: without JavaScript, with reduced motion, or when WebGL cannot start
+   (html.ce-static). No pin, no 3D book: the eight chapters read top to bottom, each followed by the
+   paper it talks about (the answer, the working paper, the names, the approval window).
+   ===================================================================== */
+:is(html:not(.js), html.ce-static) .story { height: auto; }
+:is(html:not(.js), html.ce-static) .story-sticky { position: static; height: auto; min-height: 0; overflow: visible; display: flex; flex-direction: column; align-items: center; gap: 0; padding: calc(var(--header-h) + 40px) var(--gutter) 24px; }
+:is(html:not(.js), html.ce-static) .story-sticky::after,
+:is(html:not(.js), html.ce-static) :is(.canvas-poster, #fileCanvas, .prop-scrim, .demo-caption, .panel-synthetic) { display: none; }
+:is(html:not(.js), html.ce-static) :is(.canvas-box, .panels) { display: contents; }
+:is(html:not(.js), html.ce-static) :is(.panel, .prop) { position: static; inset: auto; width: min(100%, 640px); opacity: 1 !important; transform: none !important; pointer-events: auto; }
+:is(html:not(.js), html.ce-static) .panel { padding: 0; margin-top: 72px; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="0"] { margin-top: 0; padding-right: 0; }
+:is(html:not(.js), html.ce-static) .panel :is(h1, h2, .proof, .proof-sub, .coming-line, .cta-row, .fineprint) { opacity: 1 !important; transform: none !important; }
+:is(html:not(.js), html.ce-static) .panel :is(h1, h2) { max-width: none; }
+:is(html:not(.js), html.ce-static) .prop { margin-top: 20px; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="0"] { order: 0; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="1"] { order: 10; }
+:is(html:not(.js), html.ce-static) .prop-question { order: 11; max-width: none; }
+:is(html:not(.js), html.ce-static) .prop-question p { white-space: normal; text-align: left; }
+:is(html:not(.js), html.ce-static) .prop-ageing { order: 12; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="2"] { order: 20; }
+:is(html:not(.js), html.ce-static) .prop-row { order: 21; overflow-x: auto; }
+:is(html:not(.js), html.ce-static) .prop-row :is(.cell, .wp-sec) { opacity: 1 !important; clip-path: none !important; transform: none !important; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="3"] { order: 30; }
+:is(html:not(.js), html.ce-static) .prop-names { order: 31; min-width: 0; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="4"] { order: 40; }
+:is(html:not(.js), html.ce-static) .prop-dialog { order: 41; }
+:is(html:not(.js), html.ce-static) .prop-dialog .dialog-replica { zoom: 1; transform: none; width: 100%; max-width: 480px; margin: 0; }
+:is(html:not(.js), html.ce-static) .dialog-cap { margin-left: 0; text-align: left; text-shadow: none; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="5"] { order: 50; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="6"] { order: 60; }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="7"] { order: 70; }
+:is(html:not(.js), html.ce-static) .download-block { opacity: 1 !important; transform: none !important; }
+:is(html:not(.js), html.ce-static) .ce-header { background: var(--header-ground); border-bottom-color: var(--cobalt-line); }
+
+.coming-line, .next-line { flex-wrap: wrap; row-gap: 4px; }

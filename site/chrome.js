@@ -39,6 +39,11 @@
     toggle.addEventListener("click", function () {
       var open = nav.classList.toggle("ce-nav--open");
       toggle.setAttribute("aria-expanded", String(open));
+      // the menu sits before its button in the page, so Tab would skip it: move into it
+      if (open) {
+        var first = nav.querySelector("a");
+        if (first) first.focus();
+      }
     });
     Array.prototype.forEach.call(nav.querySelectorAll("a"), function (a) {
       a.addEventListener("click", closeMenu);
@@ -76,26 +81,41 @@
     else root.removeAttribute("data-theme");
     if (icon) icon.setAttribute("href", name === "red" ? "brand/favicon-red.svg" : "brand/favicon.svg");
   }
-  if (nav) {
+  function storedTheme() {
+    try {
+      return window.localStorage.getItem("ce-theme") === "red" ? "red" : "cobalt";
+    } catch (e) {
+      return currentTheme();
+    }
+  }
+  var actions = document.querySelector(".ce-header__actions");
+  if (actions) {
     var group = document.createElement("div");
     group.className = "ce-theme";
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Colour theme");
-    var buttons = ["cobalt", "red"].map(function (name) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "ce-theme__opt ce-theme__opt--" + name;
-      b.textContent = name === "red" ? "Red" : "Cobalt";
-      b.addEventListener("click", function () {
-        if (currentTheme() === name) return;
-        applyTheme(name);
+    var choose = function (name, store) {
+      if (currentTheme() === name) return;
+      applyTheme(name);
+      if (store) {
         try {
           window.localStorage.setItem("ce-theme", name);
         } catch (e) {
           /* the choice holds for this page only */
         }
-        sync();
-        document.dispatchEvent(new CustomEvent("ce:theme", { detail: name }));
+      }
+      sync();
+      document.dispatchEvent(new CustomEvent("ce:theme", { detail: name }));
+    };
+    var buttons = ["cobalt", "red"].map(function (name) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "ce-theme__opt ce-theme__opt--" + name;
+      var label = name === "red" ? "Red theme" : "Cobalt theme";
+      b.setAttribute("aria-label", label);
+      b.title = label;
+      b.addEventListener("click", function () {
+        choose(name, true);
       });
       group.appendChild(b);
       return b;
@@ -107,7 +127,14 @@
       });
     };
     sync();
-    nav.appendChild(group);
+    actions.insertBefore(group, actions.firstChild);
+    // a page restored from the back/forward cache, or another tab changing the choice, follows the stored world
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted) choose(storedTheme(), false);
+    });
+    window.addEventListener("storage", function (event) {
+      if (event.key === "ce-theme") choose(storedTheme(), false);
+    });
   }
 
   /* The GitHub star count is not fetched here: the deploy writes it into

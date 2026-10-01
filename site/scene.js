@@ -997,7 +997,7 @@ const BANK_ROWS = [
   { date: '11 Mar', narration: 'NEFT CR-KESARVAN TEX', ref: 'N26031102', dr: '', cr: '38,750.00', bal: '9,26,450.00' },
   { date: '12 Mar', narration: 'NEFT CR-NEVRIKA AGRO FOOD', ref: 'N26031204', dr: '', cr: '1,24,600.00', bal: '10,51,050.00', query: 'nevrika' },
   { date: '14 Mar', narration: 'NEFT DR-GST PAYMENT', ref: 'N26031401', dr: '22,000.00', cr: '', bal: '10,29,050.00' },
-  { date: '17 Mar', narration: 'RTGS CR-KESARVAN TEX', ref: 'R26031701', dr: '', cr: '71,300.00', bal: '11,00,350.00' },
+  { date: '17 Mar', narration: 'NEFT CR-KESARVAN TEX', ref: 'N26031701', dr: '', cr: '71,300.00', bal: '11,00,350.00' },
   { date: '19 Mar', narration: 'BANK CHARGES', ref: '-', dr: '590.00', cr: '', bal: '10,99,760.00' },
   { date: '21 Mar', narration: 'NEFT DR-SAMPLE BANK A/C', ref: 'N26032101', dr: '50,000.00', cr: '', bal: '10,49,760.00', query: 'samplebank' },
   { date: '24 Mar', narration: 'NEFT CR-SHRAVIKA STL', ref: 'N26032401', dr: '', cr: '54,200.00', bal: '11,03,960.00' },

@@ -75,7 +75,11 @@ function releaseCard(release, isLatest) {
 
   var hasWindows = !!releaseAssets(release, "windows-x64");
   var hasMac = !!releaseAssets(release, "macos-arm64");
-  if (!hasWindows && !hasMac) {
+  if (!isLatest) {
+    // An earlier build is history, not an offer: its settings and checks differ from the latest
+    // (0.2.0 had posting on by default), so it links to its notes and carries no download.
+    card.appendChild(el("p", "rel-one-line", hasWindows || hasMac ? "Superseded by the latest release." : "Source only. No installer for this release."));
+  } else if (!hasWindows && !hasMac) {
     // Collapse two "not built for this release" rows into one honest line
     // (critique #34) instead of repeating the same note per platform.
     card.appendChild(el("p", "rel-one-line", "Source only. No installer for this release."));

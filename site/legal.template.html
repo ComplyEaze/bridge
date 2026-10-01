@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Releases: ComplyEaze Bridge</title>
-<meta name="description" content="Every ComplyEaze Bridge release, newest first, with the full notes on GitHub." />
+<title><!-- legal-title --></title>
+<meta name="description" content="The legal text that applies to ComplyEaze Bridge." />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
 <link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="pages.css" />
 <script>document.documentElement.classList.add("js");</script>
 </head>
-<body class="ce-page">
+<body class="ce-page ce-page--plain">
 <a class="ce-skip-link" href="#main">Skip to content</a>
 <div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
 <header class="ce-header" id="ceHeader">
@@ -24,7 +24,7 @@
     <div class="ce-header__right">
       <nav class="ce-nav" id="ceNav" aria-label="Primary">
         <a class="ce-nav__download" href="./download.html">Download</a>
-        <a href="./releases.html" aria-current="page">Releases</a>
+        <a href="./releases.html">Releases</a>
         <a href="./changelog.html">Changelog</a>
         <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
       </nav>
@@ -46,22 +46,9 @@
 </header>
 
 <main id="main">
-  <section class="page-hero">
-    <div class="page-hero__inner">
-      <h1>Releases</h1>
-      <p>Every ComplyEaze Bridge release, newest first. Downloads are offered for the latest one; earlier ones link to their notes.</p>
-    </div>
-  </section>
-
-  <section class="rel-body">
-    <p class="rel-state" id="relLoading" role="status">Loading releases from GitHub&hellip;</p>
-    <noscript><p class="rel-state">This list needs JavaScript. Without it, see the <a href="https://github.com/ComplyEaze/bridge/releases">releases page on GitHub</a>.</p></noscript>
-    <div class="rel-state" id="relError" hidden>
-      <p>We could not reach GitHub for the release list.</p>
-      <a class="btn btn-primary" href="https://github.com/ComplyEaze/bridge/releases">See releases on GitHub</a>
-    </div>
-    <div id="relList" hidden></div>
-  </section>
+  <div class="legal-layout">
+<!-- legal -->
+  </div>
 </main>
 
 <footer class="ce-footer">
@@ -81,7 +68,7 @@
         <h3>Product</h3>
         <ul>
           <li><a href="./download.html">Download</a></li>
-          <li><a href="./releases.html" aria-current="page">Releases</a></li>
+          <li><a href="./releases.html">Releases</a></li>
           <li><a href="./changelog.html">Changelog</a></li>
         </ul>
       </nav>
@@ -109,6 +96,5 @@
 </footer>
 
 <script src="chrome.js" defer></script>
-<script type="module" src="releases.js"></script>
 </body>
 </html>

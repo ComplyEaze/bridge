@@ -172,6 +172,11 @@ function assertReleaseWorkflow(release) {
   assert.equal(releaseStep.env.GH_REPO, "${{ github.repository }}");
   assert.match(releaseStep.run, /gh release create/);
   assert.match(releaseStep.run, /refusing to replace existing release assets/);
+  assert.match(releaseStep.run, /for other in "mcp-preview-\$version" "mcp-v\$version"; do/);
+  assert.match(releaseStep.run, /found="\$\(git ls-remote --tags origin "refs\/tags\/\$other"\)"/);
+  assert.match(releaseStep.run, /released="\$\(gh release list --limit 1000 --json tagName --jq '\.\[\]\.tagName'\)"/);
+  assert.match(releaseStep.run, /refusing to publish: version \$version already has the tag \$other/);
+  assert.doesNotMatch(releaseStep.run, /gh release view/, "a release lookup that cannot tell 'not found' from a failure is not used");
   assert.match(releaseStep.run, /git ls-remote --tags origin "refs\/tags\/\$RELEASE_TAG" "refs\/tags\/\$RELEASE_TAG\^\{\}"/);
   assert.match(releaseStep.run, /\$\{peeled_sha:-\$tag_sha\}/);
   assert.match(releaseStep.run, /could not verify whether \$RELEASE_TAG already exists; refusing to publish/);
@@ -243,7 +248,7 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
   // A preview missing one checksum would deploy a page with no download, so it is refused too.
   const incomplete = runSnapshotStep(run, [release("mcp-preview-0.3.0", false, files("mcp-preview-0.3.0").slice(0, 3))]);
   assert.equal(incomplete.status, 1);
-  assert.match(incomplete.stderr, /no installable mcp-preview release/);
+  assert.match(incomplete.stderr, /no installable release/);
 });
 
 // Runs the summary step's own shell in a shallow clone, as the deploy job's checkout is, with `gh`
@@ -455,13 +460,61 @@ test("the MCPB smoke binds initialize serverInfo.version to the archived manifes
   assert.match(smoke, /validate_server_version\(replies\[0\], manifest\)/);
 });
 
-test("unsigned preview notes state the host-validation scope and remaining gaps", async () => {
+test("the release footer states what the release check covers, the true limits, and does not call the release a preview", async () => {
   const notes = await readFile(new URL("../packaging/mcpb/UNSIGNED_PREVIEW_RELEASE.md", import.meta.url), "utf8");
+  assert.match(notes, /still being developed/);
+  assert.match(notes, /not yet\s+code-signed or notarized, so your computer may warn you/);
+  assert.match(notes, /Compare each download with its \.sha256 file/);
+  assert.match(notes, /unsigned third-party PDFium shared library/);
   assert.match(notes, /hosted Windows x64 and Apple Silicon Mac runners/);
-  assert.match(notes, /does not establish\nlive Tally behaviour or Claude Desktop conversational tool calls/);
-  assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains outstanding/);
+  assert.match(notes, /does not\s+establish live Tally behaviour or Claude Desktop conversational tool calls/);
+  assert.match(notes, /What has and has not been run against a real TallyPrime is listed\s+in the README/);
+  assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains\s+outstanding/);
   assert.match(notes, /Intel Mac is not qualified/);
   // The attestation line is scoped: where and by what a file was built, never a signature or a safety claim.
   assert.match(notes, /gh attestation verify <file>\.mcpb --repo ComplyEaze\/bridge --signer-workflow\s+ComplyEaze\/bridge\/\.github\/workflows\/release-mcpb-preview\.yml --source-ref\s+refs\/heads\/master --deny-self-hosted-runners/);
   assert.match(notes, /It is not a code\s+signature and does not show the code is safe\./);
+  // User-facing text says what is true; it neither calls the release a preview nor claims signing.
+  // File and tag names (`release-mcpb-preview.yml`, `mcp-preview-*`) are names, not prose.
+  const prose = notes.replaceAll("release-mcpb-preview", "").replaceAll("mcp-preview", "");
+  assert.doesNotMatch(prose, /\bpreviews?\b|for evaluation|production/i);
+  const claims = prose.replace(/not yet\s+code-signed or notarized/g, "").replace(/unsigned/g, "");
+  assert.doesNotMatch(claims, /\b(?:code-)?signed\b|\bnotarized\b|\bnotarised\b/i, "the footer may not claim signing or notarization");
+});
+
+test("the install guide does not call a release a preview or say it is for evaluation", async () => {
+  const guide = await readFile(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8");
+  const prose = guide.replaceAll("mcp-preview", "");
+  assert.doesNotMatch(prose, /\bpreviews?\b|for evaluation|production release/i);
+  assert.match(prose, /not yet code-signed or\s+notarized/);
+  assert.match(prose, /try it on\s+test data first and keep current backups/);
+});
+
+// The two existence checks of the publish step run against stubs, so "the lookup failed" is shown
+// to refuse rather than to read as "not released".
+test("the publish step refuses on a failed lookup and on a version already released under the other tag form", async () => {
+  const release = await workflow("../.github/workflows/release-mcpb-preview.yml");
+  const run = step(release.jobs["publish-preview"], "Create the immutable GitHub preview release").run;
+  const start = run.indexOf('released="$(gh release list');
+  const end = run.indexOf("resolve_preview_tag_commit() {");
+  assert.ok(start > 0 && end > start, "the existence checks are found");
+  const checks = run.slice(start, end);
+  const attempt = (tag, { gh, git }) => {
+    const script = `set -euo pipefail\nRELEASE_TAG=${tag}\ngh(){ ${gh}; }\ngit(){ ${git}; }\n${checks}\necho PASSED\n`;
+    const result = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+    return { status: result.status, out: result.stdout + result.stderr };
+  };
+  const ok = { gh: "printf 'mcp-preview-0.2.0\\nmcp-preview-0.3.0\\n'", git: "true" };
+  assert.match(attempt("mcp-v0.4.0", ok).out, /PASSED/);
+  assert.notEqual(attempt("mcp-v0.4.0", { ...ok, gh: "return 1" }).status, 0, "a failed release listing refuses");
+  assert.doesNotMatch(attempt("mcp-v0.4.0", { ...ok, gh: "return 1" }).out, /PASSED/);
+  assert.notEqual(attempt("mcp-v0.4.0", { ...ok, git: "return 128" }).status, 0, "a failed tag lookup refuses");
+  assert.doesNotMatch(attempt("mcp-v0.4.0", { ...ok, git: "return 128" }).out, /PASSED/);
+  assert.match(attempt("mcp-preview-0.3.0", ok).out, /refusing to replace existing release assets/);
+  assert.match(attempt("mcp-v0.3.0", ok).out, /refusing to publish: version 0\.3\.0 already has the tag mcp-preview-0\.3\.0/);
+  assert.match(attempt("mcp-v0.4.0", { ...ok, git: "printf 'abc\\trefs/tags/mcp-preview-0.4.0\\n'" }).out, /already has the tag mcp-preview-0\.4\.0/);
+  // A tag already created for THIS release (the publish step creates it if absent, and checks it
+  // points at the source commit later) is not "the other form".
+  const ownTagExists = { ...ok, git: "case \"$*\" in *refs/tags/mcp-v0.4.0) printf 'abc\\trefs/tags/mcp-v0.4.0\\n';; esac" };
+  assert.match(attempt("mcp-v0.4.0", ownTagExists).out, /PASSED/);
 });

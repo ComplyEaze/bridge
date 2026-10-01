@@ -57,6 +57,8 @@ fn final_outstandings_receipt_covers_dates_directions_derived_totals_and_envelop
         party: "Private Supplier".into(),
         amount: bridge_tally_core::ExactDecimal::parse("3").unwrap(),
         direction: ExposureDirection::Payable,
+        opening_balance: None,
+        composition: None,
     }];
     let structured = redact_value(
         json!({

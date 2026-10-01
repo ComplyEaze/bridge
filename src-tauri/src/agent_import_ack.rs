@@ -536,7 +536,7 @@ fn render_review_text(
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
     let preview = format!(
-        "Record that you reviewed ONE {} in {}\nBridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
+        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
         shown(&row.date),
@@ -613,7 +613,7 @@ fn batch_review_preview(
     )];
     match kind {
         DoubtKind::Masters => {
-            text.push("Bridge posted them, but these ledgers no longer resolve".into());
+            text.push("ComplyEaze Bridge posted them, but these ledgers no longer resolve".into());
             text.push("to the master you approved:".into());
             text.extend(
                 doubted_ledgers
@@ -630,7 +630,7 @@ fn batch_review_preview(
                 || "Tally's answer could not be read".to_string(),
                 |created| format!("Tally reported creating {created}"),
             );
-            text.push("Bridge posted them, but cannot confirm that only they".into());
+            text.push("ComplyEaze Bridge posted them, but cannot confirm that only they".into());
             text.push("changed this company's vouchers:".into());
             text.push(
                 match (
@@ -644,7 +644,7 @@ fn batch_review_preview(
                     (Some(before), Some(after), None) => format!(
                         "its voucher mark went backwards (from {before} to {after}); {created}."
                     ),
-                    _ => "Bridge could not read its voucher mark after posting.".into(),
+                    _ => "ComplyEaze Bridge could not read its voucher mark after posting.".into(),
                 },
             );
             text.push("Reviewing these vouchers covers no other voucher in this company.".into());
@@ -678,7 +678,9 @@ fn batch_review_preview(
         "Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed these {} vouchers in Tally.",
         rows.len()
     ));
-    text.push("They are correct as they stand.\" Bridge changes nothing in Tally,".into());
+    text.push(
+        "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,".into(),
+    );
     text.push("and the batch still reads reconciliation_required.".into());
     let preview = text.join("\n");
     if text.len() > post::BATCH_REVIEW_MAX_LINES

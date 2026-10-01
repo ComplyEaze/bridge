@@ -47,7 +47,8 @@ const changelog = [
 
 test("release tags map to changelog versions", () => {
   assert.equal(versionFromTag("mcp-preview-0.3.0"), "0.3.0");
-  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), "1.2.3-rc.1");
+  assert.equal(versionFromTag("mcp-v0.4.0"), "0.4.0");
+  assert.equal(versionFromTag("mcp-preview-1.2.3-rc.1"), undefined, "a release is exactly X.Y.Z");
   assert.equal(versionFromTag("v0.1.0"), undefined);
   assert.equal(versionFromTag("mcp-preview-0.3"), undefined);
 });
@@ -96,7 +97,7 @@ test("notes fall back from the version section to a non-empty Unreleased to noth
   assert.deepEqual(pickNotes(emptyUnreleased, "mcp-preview-0.5.0"), { mode: "none", body: "" });
   const emptyOwn = parseChangelog("## [0.5.0] - 2026-10-01\n\n## [Unreleased]\n\nNext words.\n");
   assert.equal(pickNotes(emptyOwn, "mcp-preview-0.5.0").mode, "unreleased");
-  assert.throws(() => pickNotes(sections, "v0.1.0"), /not an mcp-preview tag/);
+  assert.throws(() => pickNotes(sections, "v0.1.0"), /not a release tag/);
   assert.equal(composeBody({ mode: "none", body: "" }, "Footer.\n"), "Footer.\n");
   assert.equal(composeBody({ mode: "version", body: "Body" }, "Footer.\n"), "Body\n\n---\n\nFooter.\n");
 });

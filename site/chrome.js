@@ -137,7 +137,6 @@
     });
   }
 
-  /* The GitHub star count is not fetched here: the deploy writes it into
-     .ce-star__count when the site is published (the privacy policy, section 8:
-     only the download and release pages contact GitHub from the browser). */
+  /* Nothing here contacts GitHub: only the Download and Releases pages do. The header's GitHub
+     link shows the word, not a star count. */
 })();

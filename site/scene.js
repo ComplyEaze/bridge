@@ -1,13 +1,13 @@
-// scene.js — Direction C "Flagged" v2: one client file, nine chapters, one
+// The 3D book of the home page's story: one client file, eight chapters, one
 // pinned canvas. The file object never hands off: it opens, its focal page
 // changes content (ledger / voucher / bank statement), flags spring on and
 // off it, and it shuts again at the close. Every number and label drawn
-// here comes from BRIEF.md's synthetic demo book or its V2 ADDENDUM.
+// here belongs to one synthetic demo book; none is real.
 //
 // Performance notes:
-// - named imports only, no three/addons, so esbuild can tree-shake this.
+// - named imports only, so the vendored three.js file holds just what is used.
 // - textures are generated small and lazily, per chapter, not all at once.
-// - no real-time shadow map (30 Sep, TBT pass): the first frame compiled ~14 shadow
+// - no real-time shadow map: the first frame compiled ~14 shadow
 //   depth programs synchronously (~100 ms, ~400 ms at 4x CPU) and every frame paid a
 //   second render. The desktop floor now carries one baked soft contact shadow
 //   (_buildContactShadow); the renderer never enables a shadow map, never toggles it.
@@ -70,7 +70,7 @@ const THEMES = {
   // board values are sRGB; before the colour-space fix the cobalt cover rendered
   // as ~#0e1f8c, so these keep that look
   cobalt: { board: 0x1a2fb0, boardDeep: 0x0c1668, block: 0xeef1f7, paper: '#f6f8fb', edge: '#eef1f7', rule: 'rgba(31,63,191,0.45)', ink: '#0b1436', inkRgb: '11,20,54', floor: 0.5, label: '#fbfbfa', exposure: 0.95, hemi: [0xe8eeff, 0x1a1f33, 0.45], rim: true, tick: '#b3261e',
-    // Cobalt: a lighter cloth board against a darker spine and back board, on the ink room (style.css);
+    // Cobalt: a lighter cloth board against a darker spine and back board, on the ink room (home.css);
     // stationery flags with a cut edge (yellow, pink, green, orange, periwinkle, white); the "?" state in blue
     // pencil (the book's cobalt) on a pale wash, its tick red; the pastedown as board paper (epTone, no lattice); a pen tick on the label (penTick)
     flags: { '40a3': 0xf2d33b, '43bh': 0xee7fa4, '411': 0x74c596, cash: 0xf29a4c, round: 0xa9b8e6, '26as': 0xffffff }, flagEdge: true,
@@ -112,7 +112,7 @@ export function setTheme(name) {
 }
 
 // The colour law. One colour per finding kind, never decorative. Cyan is
-// new in v2: "needs follow-up" for an ask-the-books result, not a clause.
+// "needs follow-up" for an ask-the-books result, not a clause.
 export const FLAG_GROUPS = [
   { key: '40a3', color: 0xf7e733, count: 7, label: '40A(3)' },
   { key: '43bh', color: 0xff5fa2, count: 4, label: '43B(h)' },
@@ -1232,7 +1232,7 @@ export class FileScene {
     // scratch objects for the per-frame hero-flag travel (no allocation there)
     this._v0 = new Vector3();
     this._v1 = new Vector3();
-    this._v2 = new Vector3();
+    this._vTmp = new Vector3();
     this._v3 = new Vector3();
     this._qa = new Quaternion();
     this._qb = new Quaternion();
@@ -2471,15 +2471,15 @@ export class FileScene {
     const P0 = this._v0.copy(this.flagPresentPos);
     g.localToWorld(P0);
     const fwd = cam.getWorldDirection(this._v1);
-    const d0 = this._v2.copy(P0).sub(cam.position).dot(fwd);
-    const q = this._v2.copy(P0).project(cam);
+    const d0 = this._vTmp.copy(P0).sub(cam.position).dot(fwd);
+    const q = this._vTmp.copy(P0).project(cam);
     const cw = this._cw, ch = this._ch;
     const sx = ((q.x + 1) / 2) * cw, sy = ((1 - q.y) / 2) * ch;
     const ex = rp.ok ? rp.x : sx, ey = rp.ok ? rp.y : sy + 300;
     const cx = Math.max(sx, ex) + ch * 0.04, cy = sy + (ey - sy) * 0.5;
     const a = 1 - t;
     const x = a * a * sx + 2 * a * t * cx + t * t * ex, y = a * a * sy + 2 * a * t * cy + t * t * ey;
-    const w = this._v2.set((x / cw) * 2 - 1, 1 - (y / ch) * 2, 0.5).unproject(cam).sub(cam.position);
+    const w = this._vTmp.set((x / cw) * 2 - 1, 1 - (y / ch) * 2, 0.5).unproject(cam).sub(cam.position);
     w.multiplyScalar(d0 / w.dot(fwd)).add(cam.position);
     f.position.copy(w);
     g.worldToLocal(f.position);

@@ -523,7 +523,8 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow runs when a maintainer
+`site/` is the static website (home, Download, Releases and Changelog). Its
+workflow runs when a maintainer
 dispatches it, and again when a maintainer-dispatched preview publication in
 this repository finishes successfully, so the page's release snapshot follows
 the release without a second step. The job requires the publication run's event

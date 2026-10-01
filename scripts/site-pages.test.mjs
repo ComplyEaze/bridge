@@ -48,14 +48,38 @@ test("every page sets the stored colour world before its stylesheet, and loads t
   }
 });
 
-test("every local link and file reference on a page points at a file the site ships or the deploy writes", () => {
+// The only outside addresses a page may name: this project on GitHub (links), and nothing loaded from elsewhere.
+const outsideLinks = /^https:\/\/github\.com\/ComplyEaze\/bridge(?:[/#?]|$)/;
+
+test("every reference on a page is a file the site ships or the deploy writes, or a link to this project on GitHub", () => {
   for (const name of pages) {
     const html = read(name).replace(/<!--[\s\S]*?-->/g, " ");
-    for (const [, ref] of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
-      if (/^(https:|#|data:)/.test(ref)) continue;
-      assert.doesNotMatch(ref, /^(http:|\/\/|\.\.\/|\/)/, `${name}: ${ref} leaves the site folder`);
+    for (const [tag, attribute, , ref] of html.matchAll(/<[a-z][^>]*?\b(href|src)=(["'])(.*?)\2/g)) {
+      if (ref.startsWith("#")) continue;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("//")) {
+        // only an <a> may leave the site, and only for this project's GitHub pages: no outside script, style, font or image
+        assert.ok(tag.startsWith("<a ") && attribute === "href" && outsideLinks.test(ref), `${name}: ${ref} is an outside reference`);
+        continue;
+      }
+      assert.doesNotMatch(ref, /^(\.\.\/|\/)/, `${name}: ${ref} leaves the site folder`);
       const path = ref.replace(/^\.\//, "").replace(/[?#].*$/, "") || "index.html";
       assert.ok(generated.has(path) || existsSync(new URL(path, site)), `${name}: ${ref} does not exist`);
+    }
+  }
+});
+
+test("stylesheets and scripts name only files the site ships, and no outside address but GitHub's", () => {
+  for (const name of readdirSync(site).filter((file) => /\.(css|js|mjs)$/.test(file))) {
+    const text = read(name);
+    for (const [, ref] of text.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) {
+      if (ref.startsWith("data:")) continue;
+      assert.ok(!/^[a-z]+:|^\/\//i.test(ref) && existsSync(new URL(ref, site)), `${name}: url(${ref}) is missing or outside the site`);
+    }
+    for (const [, ref] of text.matchAll(/\b(?:from|import)\s*\(?\s*["'](\.[^"']+)["']/g)) {
+      assert.ok(existsSync(new URL(ref, site)), `${name}: imports ${ref}, which does not exist`);
+    }
+    for (const [ref] of text.matchAll(/https?:\/\/[^\s"'`)<>]+/g)) {
+      assert.match(ref, /^https:\/\/(?:api\.)?github\.com\/|^http:\/\/www\.w3\.org\/|^http:\/\/127\.0\.0\.1:9000$/, `${name}: ${ref} is an outside address`);
     }
   }
 });
@@ -68,9 +92,11 @@ test("nothing on the site points at the roadmap or the comparison, which ship se
 });
 
 test("page text keeps to the wording rules", () => {
-  for (const name of [...pages, "download.js", "releases.js"]) {
+  // scripts and stylesheets draw words too (the 3D pages, the header switch, CSS content)
+  for (const name of [...pages, "download.js", "releases.js", "release-source.mjs", "chrome.js", "app.js", "scene.js", "chrome.css", "home.css", "pages.css"]) {
     const raw = read(name);
-    const text = name.endsWith(".html") ? visibleText(raw) : raw;
+    // in a script or stylesheet the words are in the code, not in its comments
+    const text = name.endsWith(".html") ? visibleText(raw) : raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
     for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) {
       assert.doesNotMatch(text.replaceAll("mcp-preview", ""), banned, `${name} says ${banned}`);
     }
@@ -90,12 +116,22 @@ test("the product is never a bare Bridge, except inside the replica of the relea
 });
 
 test("no file that ships carries an internal working label", () => {
-  // Comments say what the code does and why; names of work lanes, review rounds and fix numbers stay out of public files.
-  const labels = /\bLane\b|\bcritics?\b|\bcritique\b|\bW[0-9]\b|\bfix(?:es)? [0-9]|\b[XYLAD][0-9]\b|builder[A-Z]|\bitem [0-9]|motion spec|_lh\//;
+  // Comments say what the code does and why. Names of work lanes, review rounds, design directions, briefs, fix
+  // numbers, working dates and files that are not in the site stay out of public files.
+  const labels = [
+    /\bLane\b/, /\bcritics?\b/i, /\bcritique\b/i, /\bW[0-9]\b/, /\bfix(?:es)? [0-9]/i, /\b[XYLAD][0-9]\b/, /builder[A-Z]/, /\bitem [0-9]/i,
+    /motion spec/i, /_lh\//, /\bdirection [A-Z]\b/i, /\bbrief\b/i, /\baddendum\b/i, /\bA\/B\b/, /\bowner/i, /\blead decision\b/i,
+    /\bround[- ]?[0-9]/i, /\bv[0-9]m?\b(?!\.[0-9]|[0-9])/, /\bv[0-9]\//, /\bpages\//, /\bstyle\.css\b/, /\b[0-9]{1,2} (?:Sep|Oct)\b(?! 20)/,
+    /privacy policy, section/i, /\bPrivacy and Terms\b/, /\b(?:TBT|perf) pass\b/i, /\bfinal (?:pass|review)\b/i,
+  ];
   const files = readdirSync(site, { recursive: true }).filter((name) => /\.(html|css|js|mjs|svg|md)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
+  assert.ok(files.includes("scene.js") && files.includes("chrome.js") && files.includes("home.css") && files.includes("brand/lockup.svg"), "the check reads the scripts, stylesheets and artwork");
   for (const name of files) {
     // path data (d="M2.21 7 L4.99 7 …") is drawing commands, not words
-    const hit = read(name).replace(/\bd="[^"]*"/g, "").split("\n").find((line) => labels.test(line));
-    assert.equal(hit, undefined, `${name}: ${hit}`);
+    const lines = read(name).replace(/\bd="[^"]*"/g, "").split("\n");
+    for (const label of labels) {
+      const hit = lines.find((line) => label.test(line));
+      assert.equal(hit, undefined, `${name} matches ${label}: ${hit}`);
+    }
   }
 });

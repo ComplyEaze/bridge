@@ -25,6 +25,7 @@
 .dl-meta a { color: var(--ink-soft); }
 .dl-note { font-size: 13px; color: var(--ink-faint); margin: 8px 0 0; }
 
+.before-list code { background: var(--paper-line); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 12.5px; }
 .before-list, .steps-list { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 15px; line-height: 1.55; color: var(--ink-soft); }
 .steps-list code { background: var(--paper-line); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 12.5px; }
 
@@ -53,7 +54,7 @@
   color: var(--ink);
   border: 1px solid var(--paper-line);
 }
-.rel-tag--muted { background: var(--paper-line); color: var(--ink-faint); border-color: var(--paper-line); }
+.rel-tag--muted { background: var(--paper-line); color: var(--ink); border-color: var(--paper-line); }
 /* neutral ink, not green: green means "resolved" on the home page */
 .rel-tag--latest { background: var(--paper-line); color: var(--ink); border-color: var(--ink-faint); }
 .rel-date { font-size: 13px; color: var(--ink-faint); margin: 8px 0 16px; }

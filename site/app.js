@@ -1,4 +1,4 @@
-// app.js — Direction C "Flagged" v2: one scroll-driven master update
+// The home page's story: one scroll-driven master update
 // drives the 3D scene, the chapter panels and the HTML "props" together.
 // Performance: the hero is plain HTML, visible at first
 // paint; the WebGL scene builds only after window `load`, inside an idle
@@ -277,8 +277,8 @@ async function boot() {
 
 
 
-  // ?smooth=<ms> (A/B, 30 Sep): the owner's numbers showed perfect frames at
-  // ~130 Hz and zero trail, yet the motion still felt rough; 1:1 mapping hands
+  // ?smooth=<ms>: measured frames were perfect at
+  // ~130 Hz with zero trail, yet the motion still felt rough; 1:1 mapping hands
   // every uneven trackpad delta straight to the camera and props. With
   // smooth > 0, the ANIMATED position follows the scroll through a critically
   // damped spring (SmoothDamp, no overshoot) with that smoothing time. The
@@ -317,7 +317,7 @@ async function boot() {
     }
   }
 
-  // Native scrolling and CSS sticky pinning (no GSAP, no ScrollTrigger, 30 Sep):
+  // Native scrolling and CSS sticky pinning, with no animation library:
   // the OS supplies trackpad momentum, the compositor holds the pin, and one
   // rAF loop reads scrollY, drives the story (through the ?smooth follower
   // when set) and then renders the WebGL frame, in that order. `story` keeps

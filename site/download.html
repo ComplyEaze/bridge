@@ -74,7 +74,8 @@
       <h2>Before you install</h2>
       <ul class="before-list">
         <li>ComplyEaze Bridge is still being developed and may contain errors. Try it first on a test company, and take a backup before you turn posting on.</li>
-        <li>Posting is off by default in a new install. If you upgraded from an earlier version, check the setting. There is no tool to undo or delete a posted voucher; you correct it in Tally.</li>
+        <li>Posting is off by default in a new install. If you upgraded from an earlier version, check the setting. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
+        <li>Each download has a matching <code>.sha256</code> file on the same release. Compare it with your download before opening the package.</li>
         <li>What has been run against a real TallyPrime, and what has not, is listed in the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">README</a>.</li>
         <li>Tally must be running on the same computer as Claude&nbsp;Desktop.</li>
         <li>On a Mac, run Tally in a Windows virtual machine on that same Mac with its gateway port forwarded to the Mac's localhost, or reach it through local port forwarding your organisation has approved. ComplyEaze Bridge talks to Tally only on localhost, so a separate PC, or a Tally elsewhere on your network, cannot be reached.</li>
@@ -100,7 +101,7 @@
       <div>
         <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
         <dl class="ce-footer__facts">
-          <div><dt>Tally connection</dt><dd>On this computer only (loopback).</dd></div>
+          <div><dt>Tally connection</dt><dd>A loopback address on this computer.</dd></div>
           <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
           <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
           <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>

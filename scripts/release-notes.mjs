@@ -171,7 +171,8 @@ const pageHead = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>What changed in ComplyEaze Bridge</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./chrome.css" />
+    <link rel="stylesheet" href="./pages.css" />
   </head>
   <body>
     <main class="page">

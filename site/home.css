@@ -1,6 +1,6 @@
 
-/* Direction C "Flagged" v2: one client file, pinned for nine chapters, on
-   file cobalt from the hero to the close. Paper objects (the ageing sheet,
+/* The home page: one client file, pinned for eight chapters, on the world's
+   dark ground from the hero to the close. Paper objects (the ageing sheet,
    the dialog, the download block) are the only light surfaces. */
 
 
@@ -46,8 +46,7 @@ a { color: inherit; }
 /* The story is pinned by CSS on the compositor (position: sticky), not by a
    script switching it to position:fixed: the section is as tall as the whole
    take (1 + 8 screens) from the first paint, and only its first screen
-   sticks, carrying the background and the seam. Measured identical to the
-   ScrollTrigger pin on the owner's Mac (30 Sep) and needs no library. */
+   sticks, carrying the background and the seam. It needs no library. */
 .story {
   position: relative;
   height: 900vh;
@@ -188,13 +187,12 @@ a { color: inherit; }
   border: 1px solid rgba(246, 248, 251, 0.32);
   white-space: nowrap;
 }
-/* Lead decision: green means "resolved" only. "Next release" is a neutral
-   outline pill, not a second meaning for green. */
+/* Green means "resolved" only, so this is a neutral outline pill. */
 .tag-next { background: transparent; border-color: rgba(246, 248, 251, 0.4); }
 
 .cta-row { display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; margin-top: var(--space-5); }
-/* .btn itself (size, radius, weight) is defined once in pages/chrome.css so
-   the hero, the close card and every page share one button spec (#36). This
+/* .btn itself (size, radius, weight) is defined once in chrome.css so
+   the hero, the close card and every page share one button spec. This
    file only carries the colour inversion needed on the dark story ground. */
 .panel .btn-primary { background: var(--paper); color: var(--ink); }
 .fineprint {
@@ -486,7 +484,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
 
 /* the working paper the 40A(3) flag lands in: a card in
    the band under the voucher, 14 px type, from 2.40 at about 0.35 opacity with a
-   title, the brief's real columns and a dashed empty row 1. It sits UNDER the
+   title, the working paper's columns and a dashed empty row 1. It sits UNDER the
    canvas (z-index 1 < 2) so the 3D flag flies over it and lands on the chip in
    the clause cell; the chip takes over the flag's lettering at the same screen
    spot and the row's other cells reveal from it with clip-path. Never scaled. */
@@ -661,12 +659,9 @@ html[data-theme="red"] .tag-next { background: transparent; border-color: rgba(2
 html[data-theme="red"] .prop-scrim { background: rgba(26, 5, 4, 0.4); }
 /* the pre-WebGL poster is the book's own colours: cloth, then the cream page block */
 html[data-theme="red"] .canvas-poster::before { background: linear-gradient(90deg, #7a170f 0% 86%, #e6d6ad 86% 100%); box-shadow: 0 30px 60px rgba(10, 1, 1, 0.5); }
-/* tag-next is a neutral outline pill everywhere (lead decision): no green,
-   no per-world tint, just the ink/paper-line tokens that never change. */
 
 /* =====================================================================
-   Typography variant (round 2) B+. Bricolage Grotesque (96 pt cut) for headlines and the wordmark; Geist for text and UI; Geist Mono for figures (round-1 B, larger headings)
-   Everything below and the @font-face rules above are the only differences from v2m.
+   Typography. Bricolage Grotesque (96 pt cut) for headlines; Geist for text and UI; Geist Mono for figures.
    ===================================================================== */
 body { font-weight: 400; }
 .panel[data-chapter="0"] h1 { font-family: var(--font-head); font-size: clamp(38px, 4.3vw, 62px); font-weight: 700; line-height: 1.04; letter-spacing: -0.03em; }
@@ -799,7 +794,6 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 :is(html:not(.js), html.ce-static) .ce-header { background: var(--header-ground); border-bottom-color: var(--cobalt-line); }
 
 .coming-line, .next-line { flex-wrap: wrap; row-gap: 4px; }
-.coming-first { margin: 0 0 var(--space-3); }
 
 /* phone: the caption cannot sit between the window and the words, so it is a line of the chapter's text */
 .cap-phone { display: none; }
@@ -817,6 +811,9 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 .tag { border-color: rgba(246, 248, 251, 0.55); }
 /* a short phone (360x740): the approval window gives up size so the chapter's headline stays clear of it */
 @media (max-width: 760px) and (max-height: 780px) {
-  .dialog-replica { zoom: 0.58; }
-  .prop-dialog { top: calc(var(--header-h, 64px) + 140px); }
+  .dialog-replica { zoom: 0.54; }
+  .prop-dialog { top: calc(var(--header-h, 64px) + 122px); }
 }
+/* the label is part of the heading it qualifies, so no list of headings carries the claim without it */
+.panel :is(h1, h2) .tag { display: table; margin: 0 0 12px; font-family: var(--font-display); font-size: 12px; font-weight: 500; letter-spacing: 0.01em; line-height: 1.3; }
+.panel .proof a { text-underline-offset: 2px; }

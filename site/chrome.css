@@ -11,10 +11,8 @@
 @font-face { font-family: 'Geist Mono Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
   src: url(fonts/geist-mono-rupee.woff2) format('woff2-variations'); unicode-range: U+20B9; }
 
-/* ComplyEaze Bridge shared chrome: header + footer, direction C "Flagged".
-   Tokens mirror site/v2/style.css so this file can sit beside it on the home
-   page without a visible seam. Class names are prefixed ce- to avoid
-   collisions with page-specific styles. */
+/* ComplyEaze Bridge shared base: fonts, both colour worlds' tokens, the header and the footer,
+   loaded by every page. Class names are prefixed ce- to avoid collisions with page-specific styles. */
 
 :root {
   --cobalt: #1f3fbf;
@@ -119,7 +117,7 @@ html[data-theme="red"] {
 /* one button spec: every primary/secondary CTA, on the home
    page and on every page, is this element sized this way. Only the colours
    invert for the surface they sit on (see the ce-header rule below, and
-   v2/style.css's .panel .btn-primary for the hero and the close card). */
+   home.css's .panel .btn-primary for the hero). */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -237,10 +235,7 @@ html[data-theme="red"] {
 
 .ce-header__actions { display: flex; align-items: center; gap: var(--space-3); }
 
-/* GitHub is a quiet icon link now: the CTA carries the
-   emphasis. The count reserves its width with tabular digits and stays
-   invisible until the fetch resolves, so it can never shift the header
-  . */
+/* GitHub is a quiet icon link: the Download button carries the emphasis. */
 .ce-star {
   display: inline-flex;
   align-items: center;
@@ -261,10 +256,8 @@ html[data-theme="red"] {
   transform: translateY(-1px);
 }
 .ce-star__icon { flex: none; }
-/* Icon plus the word "GitHub" until the repository has a count worth
-   showing (100 stars); the deploy then writes the number here, and it takes
-   the mono figure style. The word comes from CSS, so an unfilled page needs
-   no extra markup. */
+/* Icon plus the word "GitHub". The word comes from CSS while the span is empty; a number put in
+   the span would take the mono figure style. */
 .ce-star__count {
   font-family: var(--font-display);
   font-size: 14px;
@@ -283,9 +276,8 @@ html[data-theme="red"] {
 .ce-nav__github { display: none; }
 
 /* the header sits over the dark story/hero ground, so its CTA takes the
-   same light-on-dark inversion as the hero button (v2/style.css
-   .panel .btn-primary); the light theme's own .btn-primary override (in
-   v2/style.css) still wins there, since its ground is pale instead. */
+   same light-on-dark inversion as the hero button (home.css,
+   .panel .btn-primary). */
 .ce-header .btn-primary { background: var(--paper); color: var(--ink); }
 
 .ce-menu-toggle {
@@ -512,7 +504,7 @@ html:not(.js) .ce-menu-toggle { display: none; }
 @media (max-width: 640px) { html:not(.js) .ce-cta { display: inline-flex; } }
 
 /* ------------------------------------------------------------- inner pages */
-/* Download, Releases, Changelog, Privacy and Terms: a title band on the world's dark ground
+/* Download, Releases and Changelog: a title band on the world's dark ground
    (the home page's ground, not a second blue) closed by a rule in the world's cover colour, then
    one 760px column on paper. */
 .ce-page { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-display); line-height: 1.5; -webkit-font-smoothing: antialiased; }

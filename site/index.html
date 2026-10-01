@@ -132,7 +132,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
               <span class="dbtn dbtn-default">Cancel</span>
             </div>
           </div>
-          <p class="dialog-cap">The approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; we have not yet run that window on Windows.</p>
+          <p class="dialog-cap">A replica of the approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; we have not yet run that window on Windows.</p>
         </div>
 
         <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
@@ -140,9 +140,9 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
 
       <div class="panels" id="panels">
         <article class="panel" data-chapter="0">
-          <h1>Your client's Tally books, flagged before you open them.</h1>
-          <p class="coming-line"><span class="tag">In development, not in the download</span>Flagging: every finding tied to its voucher and its clause.</p>
-          <p class="proof">In the download today: ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs.</p>
+          <h1><span class="tag">In development, not in the download</span> Your client's Tally books, flagged before you open them.</h1>
+          <p class="coming-line">Flagging: findings tied to their voucher and clause.</p>
+          <p class="proof">In the download today: ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> lists the limits. For Indian CAs.</p>
           <div class="cta-row">
             <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
           </div>
@@ -156,8 +156,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
         </article>
 
         <article class="panel" data-chapter="2">
-          <p class="coming-line coming-first"><span class="tag">In development, not in the download</span></p>
-          <h2>Every finding, tied to its voucher.</h2>
+          <h2><span class="tag">In development, not in the download</span> A finding, tied to its voucher.</h2>
           <p class="proof">Payment 1187 to Demo Packaging Supplies, flagged 40A(3).</p>
           <p class="proof-sub">One finding per row, cited to its clause. Its accuracy is not yet proven.</p>
         </article>
@@ -165,20 +164,20 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
         <article class="panel" data-chapter="3">
           <h2>From bank statement to a voucher file.</h2>
           <p class="proof">142 statement lines, <span class="counter" id="counterBank" aria-hidden="true">139</span><span class="visually-hidden">139</span> matched to your ledgers.</p>
-          <p class="proof-sub">3 near-miss ledger names wait for your decision; the voucher file is built once every name is exact. ComplyEaze Bridge creates no ledger. It reads password-protected PDF statements from three banks so far.</p>
+          <p class="proof-sub">3 near-miss ledger names wait for your decision; a voucher file is built once every name in it is exact. ComplyEaze Bridge creates no ledger. It reads password-protected PDF statements from three banks so far.</p>
         </article>
 
         <article class="panel" data-chapter="4">
           <h2>Nothing posts until you approve it.</h2>
           <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
-          <p class="proof-sub cap-wide">Posting is off by default in a new install. Post a voucher this way or import it in the prepared file, never both.</p>
+          <p class="proof-sub cap-wide">Here one receipt is prepared as its own one-voucher file and posted. Posting is off by default in a new install. A voucher is posted this way or imported in a file, never both.</p>
           <p class="proof-sub cap-wide">Posting from the released package has not yet been run by us against a live TallyPrime.</p>
-          <p class="proof-sub cap-phone">Shown: release 0.3.0 on a Mac. Windows asks Yes, No or Cancel. That window, and posting from the released package, have not yet been run by us against a live TallyPrime.</p>
+          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of release 0.3.0's window on a Mac. Windows asks Yes, No or Cancel. That window, and posting from the released package, have not yet been run by us against a live TallyPrime.</p>
         </article>
 
         <article class="panel" data-chapter="5">
           <h2>Every voucher checked back in Tally.</h2>
-          <p class="proof">Import the file in Tally yourself; ComplyEaze Bridge reads each one back. Found in Tally <span class="counter" id="counterReadback" aria-hidden="true">142</span><span class="visually-hidden">142</span> of 142.</p>
+          <p class="proof">Import the file of the other 141 in Tally yourself; ComplyEaze Bridge reads every voucher back. Found in Tally <span class="counter" id="counterReadback" aria-hidden="true">142</span><span class="visually-hidden">142</span> of 142.</p>
         </article>
 
         <article class="panel" data-chapter="6">
@@ -202,10 +201,10 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       paper titled &ldquo;Working paper &middot; Tax audit FY 2025-26&rdquo; (flagging is in development and not in the download). The page turns
       again to a bank statement; a slip lifts off each of five rows and the pile reads 139 matched, and three
       question-mark flags mark near-miss ledger names that wait for your decision; you decide them one after
-      another, each turns into a tick, and the count of lines matched to your ledgers rises from 139 to 142; ComplyEaze Bridge then prepares the voucher file for you to import in Tally. A replica of
-      the approval window of release 0.3.0 on a Mac rises from one row, asks you to post that one voucher, and shrinks back into the row with a
-      red tick: one voucher per approval, and a voucher is posted this way or imported in the file, never both. After you import the prepared file in Tally yourself, each voucher is ticked as ComplyEaze Bridge
-      reads it back, counting up to 142 of 142. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
+      another, each turns into a tick, and the count of lines matched to your ledgers rises from 139 to 142; ComplyEaze Bridge then prepares one receipt as its own one-voucher file, and the other 141 vouchers as a file for you to import in Tally. A replica of
+      the approval window of release 0.3.0 on a Mac rises from that receipt's row, asks you to post that one voucher, and shrinks back into the row with a
+      red tick: one voucher per approval, and a voucher is posted this way or imported in a file, never both. After you import the file of the other 141 in Tally yourself, each voucher is ticked as ComplyEaze Bridge
+      reads it back, counting up to 142 of 142: 141 imported and one posted. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
       one tick, and the four install steps and the download follow.
     </p>
   </section>
@@ -238,7 +237,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       <div>
         <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
         <dl class="ce-footer__facts">
-          <div><dt>Tally connection</dt><dd>On this computer only (loopback).</dd></div>
+          <div><dt>Tally connection</dt><dd>A loopback address on this computer.</dd></div>
           <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
           <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
           <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>

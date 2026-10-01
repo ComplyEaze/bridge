@@ -22,10 +22,10 @@ export async function loadReleases() {
   return combineReleaseSources(live, snapshot);
 }
 
-// "Version 0.3.0" for a tag like mcp-preview-0.3.0 or v0.1.0: the tag stays in links and file
+// "Version 0.3.0" for a tag like mcp-preview-0.3.0, mcp-v0.4.0 or v0.1.0: the tag stays in links and file
 // names, but the page never shows the word the tag carries
 export function versionLabel(release) {
-  return `Version ${release.tag_name.replace(/^mcp-preview-/, "").replace(/^v(?=\d)/, "")}`;
+  return `Version ${release.tag_name.replace(/^mcp-(?:[a-z]+-|v)/, "").replace(/^v(?=\d)/, "")}`;
 }
 
 // The snapshot keeps only tag, flags, date and asset links, so the release page link is built

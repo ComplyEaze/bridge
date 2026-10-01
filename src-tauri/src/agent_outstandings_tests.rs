@@ -1148,3 +1148,28 @@ async fn mcp_outstandings_give_the_whole_detail_whatever_the_paging_arguments() 
         "{result}"
     );
 }
+
+/// The two sequence records hold the expected answers and request hashes the
+/// replays assert against. The fixture-provenance gate reads a JSON record
+/// carrying `source` as documentation and never hashes the record itself, so
+/// their bytes are pinned here: an edited expected answer fails this test
+/// rather than passing the replay it was edited to match. These are the bytes
+/// committed with the capture in 2d415cd.
+#[test]
+fn the_recorded_sequences_are_the_ones_committed_with_the_capture() {
+    for (record, bytes, sha256) in [
+        (
+            RECORDED_UNADJUSTED,
+            27_538,
+            "9695b8107905bb4483ef8c82ad0ba9927ac52fb3ddc830d1b3897de806a16817",
+        ),
+        (
+            RECORDED_BILL_TRAIL,
+            27_780,
+            "07a1512d5af5ca7457a0d6664906ef2fedf20d1501f764c5912e635f3e91c610",
+        ),
+    ] {
+        assert_eq!(record.len(), bytes);
+        assert_eq!(sha256_hex(record.as_bytes()), sha256);
+    }
+}

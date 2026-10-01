@@ -1027,15 +1027,13 @@ fn sum_at_scale<'a>(
         .map_err(|_| NativeStockError::SumInvalid)
 }
 
-/// How the rows read compare with Tally's own stock item count. The count is a
-/// cross-check, never a bound: it refuses only when the rows fall short of it.
+/// How the rows read compare with Tally's own stock item count. Items leave
+/// only when the two are equal: a count that differs in either direction is not
+/// counting the list that was read ([`NativeStockGate::ItemCountDiffers`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NativeItemCountStatus {
     Matched,
-    /// Tally's count is below the rows read. Every row is this company's (its
-    /// GUID is bound and de-duplicated), so the read goes on.
-    CompanyCountLower,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -1062,8 +1060,8 @@ pub enum NativeStockGate {
         report_empty_amounts: usize,
         item_count: NativeItemCountCrossCheck,
     },
-    /// Fewer rows were read than Tally counts stock items.
-    RowsBelowItemCount { rows: usize, tally_count: u64 },
+    /// The rows read and Tally's own stock item count differ, either way.
+    ItemCountDiffers { rows: usize, tally_count: u64 },
     /// The report has a total that the items do not add up to. `items_total` is
     /// `None` when no item carries a value at all.
     Differs {
@@ -1081,7 +1079,9 @@ pub enum NativeStockGate {
 /// the report. In order:
 ///
 /// 1. no count: nothing says whether every item was read, so the read refuses;
-/// 2. fewer rows than the count: its own outcome, before any comparison;
+/// 2. the rows and the count differ, either way: its own outcome, before any
+///    comparison. Fewer rows may be an incomplete list; more rows means the
+///    count is not counting the list that was read;
 /// 3. no rows, a count of zero and an empty report: no stock items;
 /// 4. the report has a total: the items' closing values must add up to it, with
 ///    at least one value on their side (two empty sides never match);
@@ -1090,8 +1090,7 @@ pub enum NativeStockGate {
 ///    Summary shows a line for a group worth zero is unmeasured, so a sum of
 ///    zero against an empty report is not called a contradiction.
 ///
-/// A present `0.00` is a value. More rows than the count is not a refusal: each
-/// row is this company's by its GUID.
+/// A present `0.00` is a value.
 pub fn gate_stock_summary(
     items: Vec<NativeStockItem>,
     item_count: NativeStockItemCount,
@@ -1102,15 +1101,11 @@ pub fn gate_stock_summary(
     };
     let rows = items.len();
     let rows_counted = u64::try_from(rows).unwrap_or(u64::MAX);
-    if rows_counted < tally_count {
-        return Ok(NativeStockGate::RowsBelowItemCount { rows, tally_count });
+    if rows_counted != tally_count {
+        return Ok(NativeStockGate::ItemCountDiffers { rows, tally_count });
     }
     let item_count = NativeItemCountCrossCheck {
-        status: if rows_counted == tally_count {
-            NativeItemCountStatus::Matched
-        } else {
-            NativeItemCountStatus::CompanyCountLower
-        },
+        status: NativeItemCountStatus::Matched,
         rows,
         tally_count,
     };

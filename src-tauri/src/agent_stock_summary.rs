@@ -26,9 +26,9 @@ const NOT_ATOMIC: &str =
 
 const ONE_PERIOD_MEASURED: &str = "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted, sharing the request shape but not the measurement";
 
-/// Fewer rows were read than Tally counts stock items. The numbers travel in
-/// the refusal's `counts`.
-const ROWS_BELOW_ITEM_COUNT: &str = "stock_summary_rows_below_item_count";
+/// The rows read and Tally's own stock item count differ. The numbers travel
+/// in the refusal's `counts`.
+const ITEM_COUNT_DIFFERS: &str = "stock_summary_item_count_differs";
 
 /// What is and is not checked, per field, in one closed vocabulary: `checked`,
 /// `not_checked`, `withheld`. Only the value total is compared with a second
@@ -159,12 +159,10 @@ impl Server {
                     }
                 };
                 let (items, frame): (&[NativeStockItem], Value) = match &read.gate {
-                    NativeStockGate::RowsBelowItemCount { rows, tally_count } => {
-                        return Err(rows_below_item_count(*rows, *tally_count)
-                            .with_prior_evidence(combine_evidence(
-                                prior.clone(),
-                                read_evidence.clone(),
-                            )));
+                    NativeStockGate::ItemCountDiffers { rows, tally_count } => {
+                        return Err(item_count_differs(*rows, *tally_count).with_prior_evidence(
+                            combine_evidence(prior.clone(), read_evidence.clone()),
+                        ));
                     }
                     // The report has a total the items do not add up to: a
                     // figure Tally contradicts is not shown.
@@ -339,16 +337,18 @@ fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
         .map(Some)
 }
 
-/// What a read with fewer rows than Tally's own item count becomes: a refusal,
-/// because the list may be incomplete. In the one delete measured the count
-/// fell with the rows (§12a.13, one sample).
-fn rows_below_item_count(rows: usize, tally_count: u64) -> ToolFailure {
+/// What a read whose rows differ from Tally's own item count becomes: a
+/// refusal, either way. Fewer rows may be an incomplete list; more rows means
+/// the count is not counting the list that was read, and the refusal for fewer
+/// rows rests on that same count. In the one delete measured the count fell
+/// with the rows (§12a.13, one sample).
+fn item_count_differs(rows: usize, tally_count: u64) -> ToolFailure {
     ToolFailure {
         counts: Some(Box::new(RowCounts {
             returned: rows as u64,
             counted: tally_count,
         })),
-        ..ToolFailure::from(ROWS_BELOW_ITEM_COUNT.to_string())
+        ..ToolFailure::from(ITEM_COUNT_DIFFERS.to_string())
     }
 }
 
@@ -408,7 +408,7 @@ fn stock_frame(
             "Only the closing-value TOTAL is compared with Tally's own Stock Summary (`checks`): no item's value is checked on its own, so `value_total_matched` can stand beside `partial: true` when some items have no closing value",
             "Quantities are withheld: nothing checks them, so none is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
             "An empty closing value is not zero: it is returned as null and counted (`empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty. A value Tally sent as 0.00 is a value",
-            "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; that count refuses the read only when it is higher than the rows read. It followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
+            "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; a read whose rows differ from that count either way is refused. The count followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
             "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
             "Values and their signs are exactly as Tally sends them: the one capture had items holding stock with a negative value beside others with a positive one, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
             "`totals`, `tie_out` and `item_count_cross_check` cover the whole book, whatever `items` filters",

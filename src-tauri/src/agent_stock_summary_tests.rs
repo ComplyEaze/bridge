@@ -443,8 +443,8 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "stock_values_not_comparable",
         "only Tally's own stock item count vouches for it",
         "`item_count_cross_check` reports `rows`, `tally_count` and `status`",
-        "company_count_lower",
-        "stock_summary_rows_below_item_count",
+        "items are returned only when the two are equal",
+        "stock_summary_item_count_differs",
         "stock_item_count_unavailable",
         "stock_report_unknown",
         "closing_quantity_unread_count",
@@ -1254,11 +1254,15 @@ async fn fewer_rows_than_tallys_own_item_count_refuses_with_both_numbers() {
     let one = OneServer::spawn(book.first_page(14, MARK));
     let refused = one.call(args(AS_OF, 0, 500, None)).await;
     let refusal = error(&refused);
-    assert_eq!(refusal["code"], "stock_summary_rows_below_item_count");
+    assert_eq!(refusal["code"], "stock_summary_item_count_differs");
     assert_eq!(refusal["counts"], json!({"returned": 11, "counted": 12}));
     let remediation = refusal["remediation"].as_str().unwrap();
-    assert!(remediation.contains("do not retry"), "{remediation}");
     assert!(remediation.contains("why they differ is not known"));
+    assert!(
+        remediation
+            .contains("the next call is stock_summary with the same `company_guid` and `as_of`"),
+        "{remediation}"
+    );
     assert!(refused["structuredContent"]["result"]
         .get("items")
         .is_none());
@@ -1266,21 +1270,31 @@ async fn fewer_rows_than_tallys_own_item_count_refuses_with_both_numbers() {
 }
 
 #[tokio::test]
-async fn more_rows_than_tallys_item_count_is_read_and_says_so() {
-    let book = Book {
-        flags: flags_with_count(Some(" 10")),
-        ..Book::captured()
-    };
-    let one = OneServer::spawn(book.first_page(14, MARK));
-    let response = one.call(args(AS_OF, 0, 500, None)).await;
-    let page = result(&response);
-    assert_eq!(page["state"], "value_total_matched");
-    assert_eq!(page["total"], 11);
-    assert_eq!(
-        page["item_count_cross_check"],
-        json!({"status":"company_count_lower","rows":11,"tally_count":10})
-    );
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+async fn more_rows_than_tallys_item_count_refuses_with_both_numbers_too() {
+    // Ten counted, and then none counted, beside eleven rows that tie to the
+    // report: the count is not counting this list, so no row leaves.
+    for (count, counted) in [(" 10", 10), ("0", 0)] {
+        let book = Book {
+            flags: flags_with_count(Some(count)),
+            ..Book::captured()
+        };
+        let one = OneServer::spawn(book.first_page(14, MARK));
+        let refused = one.call(args(AS_OF, 0, 500, None)).await;
+        let refusal = error(&refused);
+        assert_eq!(refusal["code"], "stock_summary_item_count_differs");
+        assert_eq!(
+            refusal["counts"],
+            json!({"returned": 11, "counted": counted})
+        );
+        assert!(refusal["remediation"]
+            .as_str()
+            .unwrap()
+            .contains("with more rows the count is not counting the list Bridge read"));
+        assert!(refused["structuredContent"]["result"]
+            .get("items")
+            .is_none());
+        assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+    }
 }
 
 #[tokio::test]

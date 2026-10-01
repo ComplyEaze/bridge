@@ -781,13 +781,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              a company with few stock items may be refused. A larger book refuses; retrying \
              this call refuses again.",
         ),
-        // The stock summary read with fewer rows than Tally's own item count
+        // The stock summary read whose rows differ from Tally's own item count
         // (`counts` carries both numbers).
-        "stock_summary_rows_below_item_count" => Some(
-            "Tally's own count of this company's stock items (`counts.counted`) is higher than \
-             the number Bridge read (`counts.returned`), so the list may be incomplete and \
-             nothing is returned. The book did not change during the read, so do not retry. \
-             Give the user both numbers; why they differ is not known.",
+        "stock_summary_item_count_differs" => Some(
+            "Tally's own count of this company's stock items (`counts.counted`) differs from \
+             the number Bridge read (`counts.returned`), so nothing is returned: with fewer \
+             rows the list may be incomplete, and with more rows the count is not counting \
+             the list Bridge read. The book did not change during the read, so the same call \
+             now gives the same refusal. Give the user both numbers and ask them to open the \
+             Stock Summary in Tally for this company; why they differ is not known. Once the \
+             user has looked, the next call is stock_summary with the same `company_guid` \
+             and `as_of`.",
         ),
         // Causes, reached through `stock_summary_read_failed`.
         "stock_report_unknown" => Some(

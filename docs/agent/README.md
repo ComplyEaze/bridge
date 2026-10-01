@@ -437,11 +437,12 @@ An item valued at zero or with no value adds nothing to either total, so only
 Tally's own stock item count vouches for it. That count followed the one delete
 measured (one synthetic company, one sample: the protocol reference, §12a.13),
 which is not proof of a complete list, so `checks.item_list_complete` is
-`not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`: `matched`, or
-`company_count_lower` when Tally's count is below the rows read (every row is this
-company's, so the read goes on). The count is a cross-check, not a bound. A read
-with fewer rows than Tally's count is refused as
-`stock_summary_rows_below_item_count`, with both numbers under `counts`. A count
+`not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`
+`matched`: items are returned only when the two are equal. A read whose rows differ
+from Tally's count, either way, is refused as `stock_summary_item_count_differs`,
+with both numbers under `counts` and the next call in `remediation`: with fewer
+rows the list may be incomplete, and with more rows the count is not counting the
+list Bridge read. A count
 Tally did not give (missing, empty or not a number; never read as zero) refuses as
 `stock_summary_read_failed` with cause `stock_item_count_unavailable`. A Stock
 Summary answered without the report refuses with cause `stock_report_unknown`;

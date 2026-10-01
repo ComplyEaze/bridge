@@ -1273,7 +1273,7 @@ fn an_unavailable_item_count_refuses_whatever_the_report_says() {
 }
 
 #[test]
-fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not() {
+fn rows_that_differ_from_tallys_own_item_count_either_way_are_their_own_outcome() {
     // Twelve counted, eleven read: the list may be incomplete, though the
     // report ties.
     assert_eq!(
@@ -1282,7 +1282,7 @@ fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not
             NativeStockItemCount::Reported(12),
             &report_response()
         ),
-        Ok(NativeStockGate::RowsBelowItemCount {
+        Ok(NativeStockGate::ItemCountDiffers {
             rows: 11,
             tally_count: 12
         })
@@ -1295,7 +1295,7 @@ fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not
             NativeStockItemCount::Reported(12),
             &differs
         ),
-        Ok(NativeStockGate::RowsBelowItemCount {
+        Ok(NativeStockGate::ItemCountDiffers {
             rows: 11,
             tally_count: 12
         })
@@ -1307,29 +1307,50 @@ fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not
             NativeStockItemCount::Reported(5),
             &empty_report()
         ),
-        Ok(NativeStockGate::RowsBelowItemCount {
+        Ok(NativeStockGate::ItemCountDiffers {
             rows: 0,
             tally_count: 5
         })
     );
-    // Ten counted, eleven read: every row is this company's, so the read goes
-    // on and says the count was lower.
-    let NativeStockGate::ValueTotalMatched { item_count, .. } = gate_with(
-        &items_response(),
-        NativeStockItemCount::Reported(10),
-        &report_response(),
-    )
-    .unwrap() else {
-        panic!("a lower count does not withhold a tying read");
-    };
+    // Ten counted, eleven read: the count is not counting the list that was
+    // read, so a report that ties does not release the rows.
     assert_eq!(
-        item_count,
-        NativeItemCountCrossCheck {
-            status: NativeItemCountStatus::CompanyCountLower,
+        gate_with(
+            &items_response(),
+            NativeStockItemCount::Reported(10),
+            &report_response()
+        ),
+        Ok(NativeStockGate::ItemCountDiffers {
             rows: 11,
-            tally_count: 10,
-        }
+            tally_count: 10
+        })
     );
+    // A count of zero beside eleven rows, whatever the report says.
+    for report in [report_response(), empty_report()] {
+        assert_eq!(
+            gate_with(
+                &items_response(),
+                NativeStockItemCount::Reported(0),
+                &report
+            ),
+            Ok(NativeStockGate::ItemCountDiffers {
+                rows: 11,
+                tally_count: 0
+            })
+        );
+    }
+    // Only an equal count releases them.
+    assert!(matches!(
+        gate_with(&items_response(), ELEVEN, &report_response()),
+        Ok(NativeStockGate::ValueTotalMatched {
+            item_count: NativeItemCountCrossCheck {
+                status: NativeItemCountStatus::Matched,
+                rows: 11,
+                tally_count: 11,
+            },
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -1368,28 +1389,18 @@ fn a_book_with_no_stock_items_is_an_answer_only_when_three_sources_agree() {
         ),
         Ok(NativeStockGate::NotComparable)
     );
-    // Rows, a count of zero and the empty company's own empty report: the
-    // answer rests on there being no row, not on the count. The rows carry a
-    // value the report does not show.
-    assert_eq!(
-        gate_with(&items_response(), zero, &empty_book_report()),
-        Ok(NativeStockGate::ReportShowsNoValue {
-            items_total: decimal("3000.01")
-        })
-    );
-    // Rows, with a count of zero: not "no stock" (the count is lower; the
-    // capture's rows tie to its report).
-    assert!(matches!(
-        gate_with(&items_response(), zero, &report_response()),
-        Ok(NativeStockGate::ValueTotalMatched {
-            item_count: NativeItemCountCrossCheck {
-                status: NativeItemCountStatus::CompanyCountLower,
+    // Rows with a count of zero are never "no stock", and never released:
+    // against the empty company's own empty report, and against a report they
+    // tie to.
+    for report in [empty_book_report(), report_response()] {
+        assert_eq!(
+            gate_with(&items_response(), zero, &report),
+            Ok(NativeStockGate::ItemCountDiffers {
                 rows: 11,
-                tally_count: 0,
-            },
-            ..
-        })
-    ));
+                tally_count: 0
+            })
+        );
+    }
 }
 
 #[test]
@@ -2018,12 +2029,12 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
     );
     assert_eq!(
         serde_json::to_value(NativeItemCountCrossCheck {
-            status: NativeItemCountStatus::CompanyCountLower,
+            status: NativeItemCountStatus::Matched,
             rows: 11,
-            tally_count: 10,
+            tally_count: 11,
         })
         .unwrap(),
-        serde_json::json!({"status": "company_count_lower", "rows": 11, "tally_count": 10})
+        serde_json::json!({"status": "matched", "rows": 11, "tally_count": 11})
     );
     assert_eq!(
         serde_json::to_value(NativeInventoryFlags {

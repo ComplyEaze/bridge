@@ -967,7 +967,7 @@ fn flags_with_count(text: Option<&str>) -> String {
 }
 
 #[tokio::test]
-async fn fewer_rows_than_the_companys_own_item_count_completes_the_read_as_that_outcome() {
+async fn rows_that_differ_from_the_companys_own_item_count_complete_the_read_as_that_outcome() {
     // Twelve counted, eleven read, and a report that ties.
     let book = Book {
         flags: flags_with_count(Some(" 12")),
@@ -976,29 +976,26 @@ async fn fewer_rows_than_the_companys_own_item_count_completes_the_read_as_that_
     let (result, observed) = run(book.complete()).await;
     assert_eq!(
         result.unwrap().0.gate,
-        NativeStockGate::RowsBelowItemCount {
+        NativeStockGate::ItemCountDiffers {
             rows: 11,
             tally_count: 12
         }
     );
     assert_eq!(observed.len(), WHOLE_READ);
-    // Ten counted: the read goes on, and says the count was lower.
+    // Ten counted, eleven read: the same outcome the other way round.
     let book = Book {
         flags: flags_with_count(Some(" 10")),
         ..Book::captured()
     };
-    let (result, _) = run(book.complete()).await;
-    let NativeStockGate::ValueTotalMatched { item_count, .. } = result.unwrap().0.gate else {
-        panic!("a lower count does not withhold a tying read");
-    };
+    let (result, observed) = run(book.complete()).await;
     assert_eq!(
-        item_count,
-        NativeItemCountCrossCheck {
-            status: NativeItemCountStatus::CompanyCountLower,
+        result.unwrap().0.gate,
+        NativeStockGate::ItemCountDiffers {
             rows: 11,
-            tally_count: 10,
+            tally_count: 10
         }
     );
+    assert_eq!(observed.len(), WHOLE_READ);
 }
 
 #[tokio::test]

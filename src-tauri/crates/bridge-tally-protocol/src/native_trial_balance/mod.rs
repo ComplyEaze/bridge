@@ -1,5 +1,6 @@
 //! Native Trial Balance source contract and closed request profile.
 //! See TALLY_PROTOCOL_REFERENCE section 5.6 for observed field semantics.
+use crate::xml_text::escape_text as xml_escape;
 use crate::{native_outstandings::NativeLedgerSnapshotPeriod, PartyLedgerMasterFieldObservation};
 use bridge_tally_primitives::ExactDecimal;
 use serde::Serialize;
@@ -8,6 +9,7 @@ mod scalar;
 mod wire;
 // One classifier for every reader, shared with `vouchers` (bridge#674).
 pub(crate) use crate::currency_composite::is_currency_composite;
+pub(crate) use wire::guid_suffix_is_valid;
 pub use wire::{parse_native_trial_balance, parse_native_trial_balance_with_currency};
 
 /// One amount exactly as the native collection exposed it.
@@ -117,15 +119,6 @@ fn render_trial_balance_collection(
         from = period.from().as_str(),
         to = period.to().as_str(),
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

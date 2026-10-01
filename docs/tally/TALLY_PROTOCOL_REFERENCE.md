@@ -6,7 +6,7 @@
 > invisible to them until it merges. Two branches have already collided, and `1.2` is used twice
 > below. `scripts/check-protocol-section-numbers.mjs` fails CI on a duplicate; see
 > [`SECTION-REGISTER.md`](./SECTION-REGISTER.md) for what it does and does not guarantee.
-> Editing this index or any part also stales its compatibility-surface pin; the reseal procedure is in
+> Editing this index or any part changes a pinned file, which needs a compatibility-surface acknowledgement; the procedure is in
 > [`docs/release-process.md`](../release-process.md#compatibility-surface-reseal).
 
 **Purpose.** The reference set is the single source of truth for how Tally's XML gateway actually
@@ -312,6 +312,9 @@ base revision.
 <a id="11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred"></a>
 
 [11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred)
+<a id="11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial"></a>
+
+[11e. Ledger master read sizes and part reads on two books — **PARTIAL**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial)
 <a id="11a-scale-measurements--11287-voucher-corpus"></a>
 
 [11a. Scale measurements — 11,287-voucher corpus](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11a-scale-measurements--11287-voucher-corpus)
@@ -366,6 +369,9 @@ base revision.
 <a id="12a11-balance-sheet-and-profit-and-loss-by-name-on-licensed-71"></a>
 
 [12a.11 Balance Sheet and Profit and Loss by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a11-balance-sheet-and-profit-and-loss-by-name-on-licensed-71)
+<a id="12a12-master-collections-on-licensed-71"></a>
+
+[12a.12 Master collections on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

@@ -1,4 +1,5 @@
 use super::{AlterIdRange, NarrowDateWindow, PinnedCompany};
+use crate::xml_text::escape_text as xml_escape;
 
 #[derive(Clone, Copy)]
 enum CollectionName {
@@ -391,15 +392,6 @@ fn render_voucher_fetch(fields: &[VoucherFetchField]) -> String {
         .map(|field| field.as_str())
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

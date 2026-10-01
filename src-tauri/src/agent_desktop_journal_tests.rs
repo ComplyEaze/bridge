@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::desktop_journal::{DesktopJournalOperation, DesktopJournalService};
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;
@@ -477,4 +481,55 @@ async fn review_refuses_fresh_unreviewable_text_but_retains_dispatched_reconcili
         reconciliation.result["result"]["error"]["code"],
         "import_mode_probe_failed"
     );
+}
+
+/// The local desktop, which shows the message alone, names the ledgers a
+/// message refers to by field: marked or plain, up to the bound, then counted.
+#[test]
+fn the_desktop_message_names_the_ledgers_the_result_lists() {
+    let operation = |result: Value| {
+        DesktopJournalOperation::from_outcome(ToolOutcome {
+            payload: json!({ "result": result }),
+            evidence: Evidence {
+                request_sha256: "a".repeat(64),
+                response_sha256: "b".repeat(64),
+                bytes: 0,
+                state: "complete",
+                read_at: None,
+                duration_ms: None,
+                reason_code: None,
+            },
+            company_guid: None,
+            truncated: false,
+        })
+        .result["result"]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let marked = (1..=10)
+        .map(|n| serde_json::to_value(party_name(format!("Ledger {n}"))).unwrap())
+        .collect::<Vec<_>>();
+    let changed_masters = operation(json!({
+        "error": {"code": "posted_under_changed_masters", "message": "Posted."},
+        "masters_after_post": {"ledgers": marked},
+    }));
+    assert_eq!(
+        changed_masters,
+        "Posted. Ledgers: Ledger 1, Ledger 2, Ledger 3, Ledger 4, Ledger 5, Ledger 6, Ledger 7, Ledger 8 and 2 more."
+    );
+    let refused = operation(json!({
+        "error": {
+            "code": "import_masters_changed_since_build",
+            "message": "Refused.",
+            "ledgers_changed": ["Cash"],
+            "ledgers_changed_total": 3,
+        },
+    }));
+    assert_eq!(refused, "Refused. Ledgers: Cash and 2 more.");
+    let other = operation(json!({
+        "error": {"code": "import_reconciliation_required", "message": "Reconcile."},
+        "masters_after_post": {"ledgers": ["Cash"]},
+    }));
+    assert_eq!(other, "Reconcile.");
 }

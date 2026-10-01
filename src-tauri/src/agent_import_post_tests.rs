@@ -1,4 +1,8 @@
 //! Admission tests for locally generated batches, not authored Tally responses.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;
 
@@ -26,6 +30,21 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
     (line, endpoint)
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 #[test]
 fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
     let (line, endpoint) = batch();
@@ -41,11 +60,13 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
         "Cr",
         "REF-1",
         "Synthetic test only",
-        "Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.",
+        "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.",
         &line.batch_id,
     ] {
         assert!(preview.contains(field), "missing {field}");
     }
+    every_bridge_is_the_brand(&preview);
 }
 
 #[test]
@@ -357,6 +378,326 @@ fn recovery_failure_retains_the_saved_dispatch_response() {
         1
     );
     assert_eq!(result["error"]["code"], "verification_transport_failed");
+}
+
+#[test]
+fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
+    let response = dispatch_response("success", 1, 0);
+    let after = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "tally_endpoint_busy",
+    );
+    let error = &after["result"]["error"];
+    assert_eq!(error["code"], "tally_endpoint_busy");
+    assert_eq!(
+        error["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    assert_eq!(
+        error["next_step"],
+        "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again."
+    );
+    // Held back before any attempt was recorded: it says when to retry but
+    // offers no verify_import step.
+    let before =
+        reconciliation_failure_payload("bridge-test", Some(false), None, "tally_endpoint_busy");
+    assert!(before["result"]["error"].get("next_step").is_none());
+    assert_eq!(
+        before["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    // An attempt that could not be observed: the verify_import step, worded
+    // without claiming a send.
+    let unknown = reconciliation_failure_payload("bridge-test", None, None, "tally_endpoint_busy");
+    assert_eq!(
+        unknown["result"]["error"]["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    let step = unknown["result"]["error"]["next_step"].as_str().unwrap();
+    assert!(step.contains("verify_import") && step.contains("could not be observed"));
+    assert!(!step.contains("already sent"));
+    // No other code gains the fields.
+    let other = reconciliation_failure_payload(
+        "bridge-test",
+        Some(true),
+        Some(&response),
+        "verification_transport_failed",
+    );
+    assert!(other["result"]["error"].get("next_step").is_none());
+}
+
+/// #876: a refused row says not to rebuild it, even when the blocking batch
+/// could not be named.
+#[test]
+fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
+    let mut payload = reconciliation_failure_payload(
+        "bridge-test",
+        Some(false),
+        None,
+        "import_txn_already_posted",
+    );
+    name_blocking_batch(&mut payload, None);
+    let error = &payload["result"]["error"];
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .contains("Nothing was sent"));
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.contains("Never rebuild a row"), "{step}");
+    assert!(step.contains("recent batches"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
+    assert!(step.contains("Never rename a statement row"), "{step}");
+    assert!(error.get("blocking_batch_id").is_none());
+}
+
+/// A wire refusal replaces a generic failure code with the refusal's own, but
+/// never the code that tells the caller not to rebuild an unknown post.
+#[test]
+fn a_wire_refusal_never_replaces_the_unknown_post_outcome_code() {
+    let refused = || {
+        anyhow::Error::new(bridge_tally_transport::TallyTransportError::WireRefused {
+            refusal: bridge_tally_transport::WireRefusal::Busy,
+        })
+    };
+    assert_eq!(
+        ToolFailure::from_runtime("import_dispatch_outcome_unknown", refused()).code,
+        "import_dispatch_outcome_unknown"
+    );
+    assert_eq!(
+        ToolFailure::from_runtime("status_probe_unavailable", refused()).code,
+        "tally_endpoint_busy"
+    );
+}
+
+/// A cause is added only when it says something the code does not.
+#[test]
+fn a_failure_cause_never_repeats_its_own_code() {
+    assert_eq!(
+        refusal_cause("tally_endpoint_busy", None, Some("tally_endpoint_busy")),
+        None
+    );
+    assert_eq!(
+        refusal_cause(
+            "post_queue_read_failed",
+            None,
+            Some("tally_connection_failed")
+        ),
+        Some("tally_connection_failed")
+    );
+    assert_eq!(
+        refusal_cause("post_queue_read_failed", Some("group"), Some("other")),
+        Some("group")
+    );
+}
+
+/// The marks readback after a sent post draws on a wait budget of its own. A
+/// call whose admission reads have spent the shared budget would otherwise be
+/// refused as busy at once, and the refusal reads as an unconfirmed step: a
+/// lasting doubt on a batch that posted cleanly (#697). The lock is never free
+/// here, so the wait itself is what is measured; nothing is sent.
+#[tokio::test]
+async fn the_marks_readback_after_a_post_waits_on_a_budget_of_its_own() {
+    use crate::endpoint_wire::{wire_refusal, FileWireGate};
+    use bridge_tally_transport::{TallyWireGate, WireRefusal, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let budget = Duration::from_millis(600);
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap());
+    let _other = FileWireGate::new(wire.root().clone(), endpoint.clone())
+        .try_acquire()
+        .unwrap();
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire);
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let busy = |result: anyhow::Result<String>| {
+        wire_refusal(&result.expect_err("the wire lock is held")) == Some(WireRefusal::Busy)
+    };
+    crate::tally::runtime::with_operation_wire_budget(async {
+        // The call's admission reads spend its whole budget.
+        let spent = server
+            .runtime
+            .read_company_marks_once(server.tally_config(), request())
+            .await;
+        assert!(busy(spent));
+        let started = Instant::now();
+        // A call with no time left, so this measures one budget.
+        let after = server
+            .read_marks_after_post(
+                request(),
+                Instant::now()
+                    .checked_sub(Duration::from_secs(44))
+                    .unwrap_or_else(Instant::now),
+            )
+            .await;
+        assert!(busy(after));
+        assert!(
+            started.elapsed() >= budget,
+            "the readback must wait on a fresh budget, not inherit the spent one"
+        );
+    })
+    .await;
+}
+
+/// The retry of the marks readback after a sent post (#884) never stretches
+/// the call past its ceiling: whatever has elapsed, what elapsed, the wait and
+/// the rest of the post fit under it, and a call with little left retries not
+/// at all. The slowest measured live post took about 21 s from its answer.
+#[test]
+fn the_after_read_retry_budget_keeps_the_call_under_its_ceiling() {
+    use std::time::Duration;
+    let policy = bridge_tally_transport::WireRetryPolicy::DEFAULT.total();
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(18), policy),
+        Some(policy)
+    );
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(25), policy),
+        Some(Duration::from_secs(7))
+    );
+    assert_eq!(
+        after_read_retry_budget(Duration::from_secs(31), policy),
+        Some(Duration::from_secs(1))
+    );
+    for elapsed in [Duration::from_millis(31_001), Duration::from_secs(90)] {
+        assert_eq!(after_read_retry_budget(elapsed, policy), None);
+    }
+    for millis in (0..=60_000).step_by(50) {
+        let elapsed = Duration::from_millis(millis);
+        if let Some(budget) = after_read_retry_budget(elapsed, policy) {
+            assert!(budget <= policy && budget >= AFTER_READ_MIN_RETRY_WAIT);
+            assert!(elapsed + budget + AFTER_READ_REST_OF_POST <= approval::CALL_CEILING);
+        }
+    }
+    assert!(approval::CALL_CEILING + Duration::from_secs(10) <= Duration::from_secs(60));
+}
+
+/// A busy wire lock on the marks readback after a sent post is tried once
+/// more, on a fresh wait budget (#884): a lock freed after the first budget
+/// but within the second is not a lasting doubt. A lock that stays held is
+/// still refused, once, after both waits; a call with no time left retries
+/// nothing. The port has nothing listening, so a read that gets through the
+/// wire fails as a connection failure, which is how it shows here.
+#[tokio::test]
+async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
+    use crate::endpoint_wire::{wire_refusal, FileWireGate};
+    use bridge_tally_transport::{TallyWireGate, WireRefusal, WireRetryPolicy};
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    let endpoint = server.settings.endpoint.clone();
+    let budget = Duration::from_millis(600);
+    let wire = crate::tally::TallyRuntime::default()
+        .wire_gate_config()
+        .clone()
+        .with_retry(WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(wire.clone());
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let hold = || {
+        FileWireGate::new(wire.root().clone(), endpoint.clone())
+            .try_acquire()
+            .unwrap()
+    };
+    let busy = |result: &anyhow::Result<String>| {
+        wire_refusal(result.as_ref().expect_err("the read sends nothing"))
+            == Some(WireRefusal::Busy)
+    };
+
+    // Freed after the first budget, inside the second: the retry gets through.
+    let held = hold();
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(budget + Duration::from_millis(300)).await;
+        drop(held);
+    });
+    let started = Instant::now();
+    let result = server
+        .read_marks_after_post(request(), Instant::now())
+        .await;
+    assert!(started.elapsed() >= budget);
+    assert!(!busy(&result), "the retry must reach the wire: {result:?}");
+    release.await.unwrap();
+
+    // Held throughout: refused once, after both budgets, never a third.
+    let _held = hold();
+    let started = Instant::now();
+    let result = server
+        .read_marks_after_post(request(), Instant::now())
+        .await;
+    assert!(busy(&result));
+    assert!(started.elapsed() >= budget * 2);
+    assert!(started.elapsed() < budget * 3);
+
+    // A call with no time left waits its first budget and nothing more.
+    let spent = Instant::now()
+        .checked_sub(Duration::from_secs(44))
+        .unwrap_or_else(Instant::now);
+    let started = Instant::now();
+    let result = server.read_marks_after_post(request(), spent).await;
+    assert!(busy(&result));
+    assert!(started.elapsed() >= budget && started.elapsed() < budget * 2);
+}
+
+/// A marks readback that failed after a sent post is named in the recorded
+/// step doubt (#884): the doubt says the read was held back, and the verdict
+/// stays doubt.
+#[test]
+fn a_failed_marks_readback_is_named_in_the_step_doubt() {
+    let refused = anyhow::Error::new(bridge_tally_transport::TallyTransportError::WireRefused {
+        refusal: bridge_tally_transport::WireRefusal::Busy,
+    })
+    .context("marks readback");
+    assert_eq!(after_read_cause(&refused), "tally_endpoint_busy");
+    assert_eq!(
+        after_read_cause(&anyhow::anyhow!("something else")),
+        "marks_readback_failed"
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let server = records_server(directory.path());
+    server.record_post_checks_pending("batch-a", true).unwrap();
+    server.record_batch_step_verdict_caused("batch-a", &Value::Null, Some("tally_endpoint_busy"));
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(super::super::batch_step_doubt_path(&imports, "batch-a")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["state"], "unmatched");
+    assert_eq!(doubt["cause"], "tally_endpoint_busy");
+    let recorded = server.record_masters_verdict_for("batch-a", json!({"state":"unchanged"}), true);
+    assert_eq!(
+        post_doubt(Some(&recorded), 2).map(|(code, _)| code),
+        Some("batch_step_unconfirmed")
+    );
+    // A verdict with no cause carries none.
+    let other = tempfile::tempdir().unwrap();
+    let server = records_server(other.path());
+    server.record_post_checks_pending("batch-b", true).unwrap();
+    server.record_batch_step_verdict_caused("batch-b", &Value::Null, None);
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(super::super::batch_step_doubt_path(
+            &server.imports_dir().unwrap(),
+            "batch-b",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(doubt.get("cause").is_none());
 }
 
 #[test]
@@ -1318,6 +1659,156 @@ fn a_bank_preview_is_refused_at_each_cap_rather_than_truncated() {
     );
 }
 
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// A batch of two Payments over the same `parties` ledgers named by `names`, in
+/// the company `company`.
+fn payment_batch_with(names: &[String], company: &str) -> ImportLedgerLine {
+    let mut line = payment_with(names.len(), |index| names[index].clone());
+    line.company.as_mut().unwrap().name = company.into();
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "journal-test-2".into();
+    line.vouchers.push(second);
+    line.txn_ids.push("journal-test-2".into());
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// The lengths of fields that grow together: `pad` more characters are dealt out
+/// round-robin from `start`, and each field stops at its own cap, so the total
+/// grows by one, or by nothing, per step.
+fn grown_lengths(pad: usize, start: usize, caps: &[usize]) -> Vec<usize> {
+    caps.iter()
+        .enumerate()
+        .map(|(field, cap)| {
+            (start + pad / caps.len() + usize::from(field < pad % caps.len())).min(*cap)
+        })
+        .collect()
+}
+
+/// The longest length, up to 200, at which `fits` still holds.
+fn widest(fits: impl Fn(usize) -> bool) -> usize {
+    (1..=200)
+        .take_while(|&length| fits(length))
+        .last()
+        .expect("fits at one character")
+}
+
+/// A name of `length` characters: a letter for `field`, so names differ, then
+/// `filler`.
+fn name_of(field: usize, length: usize, filler: &str) -> String {
+    format!(
+        "{}{}",
+        char::from_u32(0x0915 + field as u32).expect("a Devanagari letter"),
+        filler.repeat(length.saturating_sub(1))
+    )
+}
+
+/// One Payment of six parties and a balancing ledger in a company, whose every
+/// free-text field (the company, each entry's ledger, the narration and the
+/// reference) has the length `lengths` gives: company, six parties, the balancing
+/// ledger, narration, reference.
+fn payment_of(lengths: &[usize]) -> ImportLedgerLine {
+    let mut line = payment_with(6, |party| name_of(party, lengths[1 + party], "N"));
+    line.company.as_mut().unwrap().name = name_of(9, lengths[0], "N");
+    let voucher = &mut line.vouchers[0];
+    voucher.entries.last_mut().unwrap().ledger = name_of(6, lengths[7], "N");
+    voucher.narration = Some(name_of(7, lengths[8], "N"));
+    voucher.reference = Some(name_of(8, lengths[9], "N"));
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// The single-voucher preview's 1,600-character cap is exact: with every field
+/// grown to its own width (the company and the balancing ledger as well as the
+/// parties, narration and reference), a preview of exactly 1,600 characters in 24
+/// lines fits and one more is refused. Branding the dialog text added characters
+/// to every preview, so a preview near the cap is refused loudly, never cut, and
+/// the boundary is pinned here.
+#[test]
+fn a_single_voucher_preview_fits_at_exactly_1600_characters_and_not_one_more() {
+    let (_, endpoint) = batch();
+    let fits = |lengths: &[usize]| admit_fresh_saved_voucher(&payment_of(lengths), &endpoint);
+    let caps: Vec<usize> = (0..10)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; 10];
+                lengths[field] = length;
+                fits(&lengths).is_ok()
+            })
+        })
+        .collect();
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 10 * 100);
+    assert_eq!(fit.chars().count(), 1_600, "{fit}");
+    assert_eq!(fit.lines().count(), 24, "{fit}");
+    assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+}
+
+/// The batch post preview's caps (3,200 characters, 7,000 bytes) against what 40
+/// lines allow, with the company, all 22 parties and the balancing ledger grown to
+/// their own width: ASCII names and three-byte names. At full width the preview
+/// still fits all 40 lines and is under both caps (3,123 characters, 6,725 bytes
+/// with three-byte names when measured), so the character and byte caps do not
+/// bind for it: the line caps do. Measured, not derived: a change that lets this
+/// preview grow past them fails here and needs its own boundary test.
+#[test]
+fn the_batch_post_preview_at_full_width_against_its_caps() {
+    let (_, endpoint) = batch();
+    for filler in ["N", "न"] {
+        let fits = |lengths: &[usize]| {
+            // The company, 22 parties and the balancing ledger.
+            let names: Vec<String> = (0..22)
+                .map(|party| name_of(party, lengths[1 + party], filler))
+                .collect();
+            let mut line = payment_batch_with(&names, &name_of(24, lengths[0], filler));
+            for voucher in &mut line.vouchers {
+                voucher.entries.last_mut().unwrap().ledger = name_of(23, lengths[23], filler);
+            }
+            refresh_batch_sha256(&mut line);
+            review_preview_with(&line, &endpoint, &[])
+        };
+        let caps: Vec<usize> = (0..24)
+            .map(|field| {
+                widest(|length| {
+                    let mut lengths = vec![1; 24];
+                    lengths[field] = length;
+                    fits(&lengths).is_ok()
+                })
+            })
+            .collect();
+        let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+        assert_eq!(refusal, None, "every field at its width still fits");
+        assert_eq!(fit.lines().count(), 40, "{fit}");
+        assert!(
+            fit.chars().count() < 3_200,
+            "{} characters",
+            fit.chars().count()
+        );
+        assert!(fit.len() < 7_000, "{} bytes", fit.len());
+    }
+}
+
 fn captured_currencies(bytes: &[u8]) -> String {
     String::from_utf16(
         &bytes
@@ -1520,10 +2011,16 @@ fn a_changed_ledger_is_named_in_plain_words_only_when_nothing_was_attempted() {
     let message = error["message"].as_str().unwrap();
     assert!(
         message.starts_with(
-            "A ledger this batch names is no longer the one it was built against (L1, L2, L3, L4, L5, L6, L7, L8 and 1 more)"
+            "A ledger this batch names (listed in error.ledgers_changed) is no longer the one it was built against"
         ),
         "{message}"
     );
+    assert!(!message.contains("L1"), "{message}");
+    // Listed, each marked as a party name, up to the bound; counted in full.
+    let listed = (1..=8)
+        .map(|n| serde_json::to_value(party_name(format!("L{n}"))).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(error["ledgers_changed"], json!(listed));
     assert_eq!(error["ledgers_changed_total"], 9);
     for attempted in [json!(true), Value::Null] {
         assert_eq!(refused(attempted)["message"], "generic");

@@ -222,6 +222,71 @@ fn voucher_company_name_is_validated_and_xml_escaped_without_a_tdl_literal() {
     );
 }
 
+/// The decoded, unescaped text of the first `SVCURRENTCOMPANY` element in
+/// `xml`. Panics if `xml` does not parse as well-formed XML, or has no such
+/// element -- neither should ever happen for a request built from
+/// `bridge_tally_protocol::xml_text::escape_text`.
+fn decoded_svcurrentcompany(xml: &str) -> String {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    loop {
+        match reader
+            .read_event()
+            .expect("request must be well-formed XML")
+        {
+            quick_xml::events::Event::Start(event)
+                if event.name().as_ref() == b"SVCURRENTCOMPANY" =>
+            {
+                let raw = reader
+                    .read_text(event.name())
+                    .expect("SVCURRENTCOMPANY must have a matching close tag");
+                let decoded = raw.decode().expect("text must decode as UTF-8");
+                return quick_xml::escape::unescape(&decoded)
+                    .expect("text must unescape")
+                    .into_owned();
+            }
+            quick_xml::events::Event::Eof => {
+                panic!("request has no SVCURRENTCOMPANY element:\n{xml}")
+            }
+            _ => {}
+        }
+    }
+}
+
+/// One table-driven check, across the app crate's two remaining request
+/// families (`tdl_engine` and `agent_read_profiles`'s windowed voucher
+/// requests), that a company name carrying every reserved XML character
+/// round-trips through `escape_text` unchanged (bridge#832): the rendered
+/// request parses as well-formed XML and `SVCURRENTCOMPANY` decodes back to
+/// exactly the raw name.
+#[test]
+fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
+    const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
+    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
+    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
+    let requests: Vec<(&str, String)> = vec![
+        (
+            "tally::tdl_engine::ledgers_request",
+            crate::tally::tdl_engine::ledgers_request(NAME),
+        ),
+        (
+            "tally::tdl_engine::ledger_period_balances_request",
+            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
+        ),
+        (
+            "agent_read_profiles::render_agent_vouchers",
+            render_agent_vouchers(NAME, "20260901", "20260902", None)
+                .expect("company name is a valid XML value"),
+        ),
+    ];
+    for (label, request) in requests {
+        assert_eq!(
+            decoded_svcurrentcompany(&request),
+            NAME,
+            "{label} did not round-trip the company name byte for byte"
+        );
+    }
+}
+
 #[test]
 fn the_audit_voucher_part_is_the_agent_window_shape_with_its_own_fetch() {
     use bridge_tally_protocol::xml_read_profiles::{
@@ -555,6 +620,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
+            "masters",
+            json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
             "profit_and_loss",
             json!({"unclassified":[{"ledger":party_name("Entry Ledger")}]}),
         ),
@@ -573,7 +642,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
     ]);
-    assert_eq!(samples.len(), 17);
+    assert_eq!(samples.len(), 18);
     for (tool, sample) in samples {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);
@@ -1302,6 +1371,8 @@ fn outstandings_top_ranking_includes_wholly_unallocated_parties() {
         amount: bridge_tally_core::ExactDecimal::parse("100".to_string())
             .expect("synthetic amount"),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }];
 
     let ranked = redact_value(
@@ -1355,12 +1426,16 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
             amount: bridge_tally_core::ExactDecimal::parse("30".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "Supplier B".to_string(),
             amount: bridge_tally_core::ExactDecimal::parse("40".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Payable,
+            opening_balance: None,
+            composition: None,
         },
     ];
     let payable_unallocated = mixed_unallocated
@@ -1371,7 +1446,7 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
     assert_eq!(payable_unallocated[0].party, "Supplier B");
     assert_eq!(
         unallocated_totals_from_parties(&payable_unallocated).expect("payable unallocated"),
-        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40"})
+        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40", "by_composition": {"not_bill_wise_ledger":{"receivable":"0","payable":"0"}, "bill_wise_ledger_components_not_separated":{"receivable":"0","payable":"0"}, "composition_not_observed":{"receivable":"0","payable":"40"}}})
     );
 }
 

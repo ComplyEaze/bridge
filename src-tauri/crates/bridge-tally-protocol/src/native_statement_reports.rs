@@ -22,7 +22,7 @@ use std::{collections::HashSet, fmt};
 
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
-    tolerant_xml::sanitize_invalid_numeric_references,
+    tolerant_xml::sanitize_invalid_numeric_references, xml_text::escape_text as xml_escape,
 };
 
 /// Which built-in statement a request names and a response is parsed as.
@@ -146,15 +146,6 @@ pub fn render_native_statement_request(
         from = period.from().as_str(),
         to = period.to().as_str(),
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 /// Parses a built-in Balance Sheet or Profit and Loss response. Refuses a

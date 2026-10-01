@@ -2,6 +2,7 @@ use super::{
     ConnectionStatus, TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity,
 };
 use super::{TallyProbeResult, TallyVoucher};
+use crate::endpoint_wire::WireGateConfig;
 use crate::observability::BodyBytesObservation;
 use crate::reports::party_ledger_master::PartyLedgerMasterSource;
 use crate::tally::connection::canonical_loopback_origin;
@@ -48,7 +49,7 @@ use bridge_tally_protocol::{
     parse_companies_from_collection, parse_native_ledger_source_records_with_evidence,
     xml_read_profiles::ReadOnlyProfile,
 };
-use bridge_tally_transport::TallyTransportError;
+use bridge_tally_transport::{TallyTransportError, WireWaitBudget};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -59,6 +60,14 @@ use std::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 const MAX_ENDPOINT_SESSIONS: usize = 32;
+
+#[path = "runtime_masters.rs"]
+mod masters;
+pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
+
+#[cfg(test)]
+#[path = "runtime_masters_tests.rs"]
+mod masters_tests;
 
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
@@ -564,6 +573,10 @@ fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
                 AuditPartFailureKind::HeadRejected(transport.safe_code())
             }
             TallyTransportError::ConnectionFailed => AuditPartFailureKind::Unreachable,
+            // Held back by the endpoint's wire gate (#697): nothing was sent.
+            TallyTransportError::WireRefused { refusal } => {
+                AuditPartFailureKind::NotSent(refusal.safe_code())
+            }
             other => AuditPartFailureKind::Other(other.safe_code()),
         }
     } else if error
@@ -711,6 +724,59 @@ tokio::task_local! {
     /// during one: an operation already sent to Tally runs to completion, since
     /// abandoning a request does not stop Tally (protocol reference §11b.2).
     pub(crate) static TOOL_CANCELLATION: CancellationToken;
+}
+
+tokio::task_local! {
+    /// One user-level operation's wait for the endpoint wire lock (#697 item
+    /// (a)): one MCP tool call, or a desktop command that scopes it (the ones
+    /// in `commands.rs` that call `with_operation_wire_budget`), whose host
+    /// gives up after about 60 s. Every runtime operation run in this task
+    /// draws on the one budget the first of them creates, so the call waits at
+    /// most `WireRetryPolicy::total` in all, however many runtime operations
+    /// it makes. A task without it (a spawned snapshot run, a test, and the
+    /// desktop commands that do not scope it) gives each runtime operation a
+    /// budget of its own: still bounded, never unbounded, but not one budget
+    /// for the whole command.
+    static OPERATION_WIRE_BUDGET: std::sync::OnceLock<WireWaitBudget>;
+}
+
+/// Run `operation`, one MCP tool call or one desktop command, under one wire
+/// lock wait budget shared by every runtime operation it makes in this task.
+///
+/// The operation is boxed: a tool call's state machine is large, and scoped
+/// inline it grew the MCP loop's future past a 2 MiB test thread's stack (and
+/// would past Windows' 1 MiB main thread's; see `run_post`).
+pub(crate) async fn with_operation_wire_budget<F: Future>(operation: F) -> F::Output {
+    OPERATION_WIRE_BUDGET
+        .scope(std::sync::OnceLock::new(), Box::pin(operation))
+        .await
+}
+
+/// As [`with_operation_wire_budget`], with the shared wait budget already
+/// set to `total` (capped at `WIRE_WAIT_MAX`) rather than the policy's own.
+pub(crate) async fn with_operation_wire_budget_of<F: Future>(
+    total: std::time::Duration,
+    operation: F,
+) -> F::Output {
+    let budget = std::sync::OnceLock::new();
+    let _ = budget.set(WireWaitBudget::new(total));
+    OPERATION_WIRE_BUDGET
+        .scope(budget, Box::pin(operation))
+        .await
+}
+
+/// A failed pre-intent read as the typed admission refusal, with the transport
+/// failure as context (a context value is not reachable by `downcast_ref`). A
+/// wire refusal stays the error itself: it says the port was busy, with a
+/// retry time, and nothing was sent.
+fn unconfirmed_unless_wire_refused(
+    error: anyhow::Error,
+    unconfirmed: super::approved_import::ApprovedImportAdmissionError,
+) -> anyhow::Error {
+    if crate::endpoint_wire::wire_refusal(&error).is_some() {
+        return error;
+    }
+    anyhow::Error::new(unconfirmed).context(format!("{error:#}"))
 }
 
 /// The tool call was withdrawn before this operation started; nothing was sent.
@@ -1219,6 +1285,9 @@ pub(crate) struct PartyLedgerMasterListing {
         Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
     /// Base-currency ledgers set aside because a balance is a currency composite.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted the book was checked against the
+    /// company's own ledger count (#938); `None` when no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
     /// The master request's SVFROMDATE (the admitted BOOKSFROM).
     pub(crate) opening_as_of: TallyDate,
     pub(crate) extent: CompanyBookExtent,
@@ -1547,6 +1616,12 @@ fn all_unallocated_parties(
                 } else {
                     ExposureDirection::Payable
                 },
+                opening_balance: residual.opening_balance.clone(),
+                composition: Some(if residual.bill_wise_on {
+                    UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+                } else {
+                    UnallocatedComposition::NotBillWiseLedger
+                }),
             })
         })
         .collect::<Vec<_>>();
@@ -1620,11 +1695,38 @@ impl OutstandingsAgeingAnchor {
     }
 }
 
+/// What the data Bridge holds can say about an unallocated amount, without
+/// reading vouchers. It is deliberately NOT "on account": on a bill-wise ledger
+/// the amount is the net of on-account entries and of any opening balance not
+/// allocated to a reference, and only voucher rows tell those apart (#945).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnallocatedComposition {
+    /// The ledger's bill-wise flag is off: it keeps no bills, so what it carries
+    /// has no bill reference. (The label follows the flag alone; it does not
+    /// claim the residual is the ledger's whole balance.)
+    NotBillWiseLedger,
+    /// The residual of a bill-wise ledger after its named bills: on-account
+    /// entries, an opening balance not allocated to a reference, notes with no
+    /// reference and anything else are not separated.
+    BillWiseLedgerComponentsNotSeparated,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnallocatedParty {
     pub party: String,
     pub amount: ExactDecimal,
     pub direction: ExposureDirection,
+    /// The ledger's own opening balance as of the start of the books, shown and
+    /// never interpreted. `None` when Tally sent none (an empty element is
+    /// unknown, not zero) or the row was not built from a ledger snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_balance: Option<ExactDecimal>,
+    /// What the ledger's bill-wise flag says about the amount; it also carries
+    /// that flag (`NotBillWiseLedger` is flag off), so the two cannot disagree.
+    /// `None` for a row not built from a ledger snapshot (older saved rows).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<UnallocatedComposition>,
 }
 
 fn partial_result(reason: impl Into<OutstandingsPartialReason>) -> OutstandingsLoadResult {
@@ -2003,6 +2105,7 @@ fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
             | TallyTransportError::UnsupportedContentEncoding => {
                 "segment_response_encoding_invalid"
             }
+            TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
         };
     }
     let deadline_exceeded = error.chain().any(|cause| {
@@ -2133,11 +2236,15 @@ struct TallySession {
 }
 
 impl TallySession {
-    fn new(endpoint: EndpointKey, config: TallyConfig) -> anyhow::Result<Self> {
+    fn new(
+        endpoint: EndpointKey,
+        config: TallyConfig,
+        wire: &WireGateConfig,
+    ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::new(config)?,
+            client: TallyClient::with_wire(config, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2151,11 +2258,12 @@ impl TallySession {
         endpoint: EndpointKey,
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::with_transport_policy(config, policy)?,
+            client: TallyClient::with_transport_policy(config, policy, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2326,6 +2434,9 @@ pub struct TallyRuntime {
     unallocated_balance_coverage: Option<QualifiedUnallocatedBalanceCoverage>,
     #[cfg(feature = "voucher-scan")]
     outstandings_boundary_profile_override: Option<DateBoundaryProfile>,
+    /// The per-port wire lock every session's client gates its sends on
+    /// (`endpoint_wire`).
+    wire: WireGateConfig,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
 }
@@ -2411,6 +2522,7 @@ impl Default for TallyRuntime {
             unallocated_balance_coverage: None,
             #[cfg(feature = "voucher-scan")]
             outstandings_boundary_profile_override: None,
+            wire: WireGateConfig::default(),
             #[cfg(test)]
             transport_policy: None,
         }
@@ -2449,6 +2561,19 @@ impl TallyRuntime {
             transport_policy: Some(policy),
             ..Self::default()
         }
+    }
+
+    /// Share `wire`'s root (another runtime's, or a test's), or shorten its
+    /// retry bound. Only before the first request: a session keeps the gate it
+    /// was built with.
+    #[cfg(test)]
+    pub(crate) fn with_wire_gate_config(mut self, wire: WireGateConfig) -> Self {
+        self.wire = wire;
+        self
+    }
+
+    pub(crate) fn wire_gate_config(&self) -> &WireGateConfig {
+        &self.wire
     }
 
     /// Manual-only admission for the ignored Billwise Lab reconciliation
@@ -2496,11 +2621,13 @@ impl TallyRuntime {
         }
         #[cfg(test)]
         let session = Arc::new(match self.transport_policy {
-            Some(policy) => TallySession::with_transport_policy(endpoint.clone(), config, policy)?,
-            None => TallySession::new(endpoint.clone(), config)?,
+            Some(policy) => {
+                TallySession::with_transport_policy(endpoint.clone(), config, policy, &self.wire)?
+            }
+            None => TallySession::new(endpoint.clone(), config, &self.wire)?,
         });
         #[cfg(not(test))]
-        let session = Arc::new(TallySession::new(endpoint.clone(), config)?);
+        let session = Arc::new(TallySession::new(endpoint.clone(), config, &self.wire)?);
         sessions.insert(
             endpoint,
             SessionSlot {
@@ -2548,7 +2675,14 @@ impl TallyRuntime {
         }
         let session = self.session(config)?;
         let request = session.begin_request()?;
-        let client = session.client.clone();
+        // One wire-lock wait budget (#697 item (a)) for every send of every
+        // attempt below, shared with every other runtime operation of the
+        // enclosing tool call or desktop command when it scoped one.
+        let fresh = || WireWaitBudget::new(self.wire.retry().total());
+        let budget = OPERATION_WIRE_BUDGET
+            .try_with(|shared| shared.get_or_init(fresh).clone())
+            .unwrap_or_else(|_| fresh());
+        let client = session.client.for_operation(budget);
         let endpoint = EndpointIdentity::new(session.endpoint.as_str().to_string())
             .map_err(anyhow::Error::new)?;
         let effective_cancellation = request.cancellation.child_token();
@@ -2861,6 +2995,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -2884,6 +3019,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| read.listing)
@@ -2906,6 +3042,7 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
+                ReadRetryPolicy::transient_default(),
             )
             .await?;
         let Some(groups) = read.groups else {
@@ -2935,6 +3072,10 @@ impl TallyRuntime {
             Some(from),
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            // Sent once. A catalogue that outlived its deadline is abandoned, and
+            // sending it again queues more work behind a gateway still building
+            // the response: agent voucher reads take the same rule (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -2947,13 +3088,15 @@ impl TallyRuntime {
         opening_date: Option<TallyDate>,
         read_groups: bool,
         currency_gate: LedgerCurrencyGate,
+        retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
             config,
             ReadOperation::MasterExport,
-            ReadRetryPolicy::transient_default(),
+            // The caller's: a movement sends its catalogue once (#485, #937).
+            retry,
             move |client| {
                 let identity = identity.clone();
                 let opening_date = opening_date.clone();
@@ -3065,10 +3208,16 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        today: TallyDate,
     ) -> anyhow::Result<PartyLedgerMasterSource> {
-        self.fetch_party_ledger_master_source_with_evidence(config, identity, currency_assertion)
-            .await
-            .map(|(source, _)| source)
+        self.fetch_party_ledger_master_source_with_evidence(
+            config,
+            identity,
+            currency_assertion,
+            today,
+        )
+        .await
+        .map(|(source, _)| source)
     }
 
     async fn fetch_party_ledger_master_source_with_evidence(
@@ -3076,6 +3225,7 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        today: TallyDate,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
@@ -3086,6 +3236,7 @@ impl TallyRuntime {
             move |client| {
                 let identity = identity.clone();
                 let currency_assertion = currency_assertion.clone();
+                let today = today.clone();
                 async move {
                     let mut evidence = RuntimeReadEvidence::empty();
                     let result = async {
@@ -3093,15 +3244,17 @@ impl TallyRuntime {
                             observe_read_boundary(&client).await?;
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
-                        let source = client
+                        let (source, count_evidence) = client
                             .fetch_party_ledger_master_source(
                                 &identity,
                                 boundary_profile,
                                 currency_assertion,
+                                &today,
                             )
                             .await?;
                         evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone());
+                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
+                                .combine(count_evidence);
                         bracket_verified_company_identity(&client, &identity).await?;
                         let closing_evidence =
                             confirm_read_boundary(&client, boundary_profile).await?;
@@ -3132,6 +3285,7 @@ impl TallyRuntime {
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
+        today: TallyDate,
     ) -> anyhow::Result<PartyLedgerMasterListing> {
         // The classified read admits a book with several Currency masters
         // when Tally identifies an INR base (bridge#551); the source then
@@ -3154,13 +3308,14 @@ impl TallyRuntime {
             })?
             .into_compliance_assertion();
         let (source, source_evidence) = self
-            .fetch_party_ledger_master_source_with_evidence(config, identity, assertion)
+            .fetch_party_ledger_master_source_with_evidence(config, identity, assertion, today)
             .await
             .map_err(|error| with_read_evidence(error, currency_evidence.clone()))?;
         let evidence = currency_evidence.combine(source_evidence);
         let groups = source.groups.clone();
         let foreign = source.foreign_currency_ledgers_excluded.clone();
         let mixed = source.mixed_currency_ledgers_excluded.clone();
+        let count_cross_check = source.count_cross_check;
         // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
         let opening_as_of = source.from.clone();
         let records = source
@@ -3181,6 +3336,7 @@ impl TallyRuntime {
             groups,
             foreign_currency_ledgers_excluded: foreign,
             mixed_currency_ledgers_excluded: mixed,
+            count_cross_check,
             opening_as_of,
             extent,
             evidence,
@@ -3678,10 +3834,10 @@ impl TallyRuntime {
                             .await
                             .map_err(|error| {
                                 with_read_evidence(
-                                    anyhow::Error::new(
+                                    unconfirmed_unless_wire_refused(
+                                        error,
                                         super::approved_import::ApprovedImportAdmissionError::MastersUnconfirmed,
-                                    )
-                                    .context(format!("{error:#}")),
+                                    ),
                                     admission_evidence.clone(),
                                 )
                             })?;
@@ -3772,10 +3928,10 @@ impl TallyRuntime {
                         // nothing was sent, never an unknown outcome.
                         let before_marks = client.post_xml_raw(marks_xml.clone()).await.map_err(|error| {
                             with_read_evidence(
-                                anyhow::Error::new(
+                                unconfirmed_unless_wire_refused(
+                                    error,
                                     super::approved_import::ApprovedImportAdmissionError::CompanyScopeUnconfirmed,
-                                )
-                                .context(format!("{error:#}")),
+                                ),
                                 admission_evidence.clone(),
                             )
                         })?;
@@ -3812,6 +3968,22 @@ impl TallyRuntime {
                             None => marked,
                         }
                     })?;
+                    // The wire lock for the one import send is taken before its
+                    // attempt is recorded (#697), tried once and never waited for:
+                    // a wait here would sit between the aim marks read above and
+                    // the attempt's record, after which the approval could no
+                    // longer be trusted. A taken lock refuses the post here:
+                    // nothing recorded, nothing sent. Held, it covers the record
+                    // (a local disk write that waits on no other process) and is
+                    // spent on the one send.
+                    let wire = client.acquire_wire().await.map_err(|refused| {
+                        with_read_evidence(
+                            anyhow::Error::from(super::approved_import::PreIntentQueueRefusal {
+                                source: refused,
+                            }),
+                            admission_evidence.clone(),
+                        )
+                    })?;
                     before_dispatch().map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
@@ -3824,7 +3996,7 @@ impl TallyRuntime {
                         with_read_evidence(error, admission_evidence.clone())
                     })?;
                     let mut response_evidence = RuntimeReadEvidence::empty();
-                    let body = client
+                    let body = wire
                         .post_probe_xml(xml, &mut response_evidence)
                         .await
                         .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
@@ -4006,9 +4178,10 @@ impl TallyRuntime {
     /// live 2026-08-07), which the Collection path does not -- that path
     /// silently substitutes whichever company is loaded.
     ///
-    /// The bills reports alone are **not** complete: unallocated "on account"
-    /// balances carry no bill reference and appear in neither report. The
-    /// ledger snapshot recovers them exactly, as
+    /// The bills reports alone are **not** complete: unallocated amounts (on
+    /// account, or all of a bill-less ledger's balance) carry no bill reference
+    /// and appear in neither report. The ledger snapshot recovers them
+    /// exactly, as
     /// `CLOSINGBALANCE - sum(BILLCL)` per party -- measured to 0.00 to the
     /// paisa on every bill-carrying party of both a bill-dominated book (6 of
     /// 10 parties exact, residual Rs 1,05,000) and an on-account-dominated one
@@ -5097,7 +5270,11 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
         Some(
             TallyTransportError::EndpointInvalid { .. }
             | TallyTransportError::PolicyInvalid { .. }
-            | TallyTransportError::ClientInitializationFailed,
+            | TallyTransportError::ClientInitializationFailed
+            // A wire-gate refusal sent nothing: it is neither retried by the
+            // read policy (the gate already waited its bound) nor a transport
+            // failure for the circuit breaker.
+            | TallyTransportError::WireRefused { .. },
         ) => ReadFailureClass::Validation,
         None => ReadFailureClass::Validation,
     }

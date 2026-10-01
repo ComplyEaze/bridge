@@ -1,4 +1,8 @@
 //! Status-page faults against the captured gateway product observation.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -494,4 +498,44 @@ fn an_unanswered_code_is_not_repeated_as_its_cause_and_keeps_the_endpoint() {
     let error = error_of(both);
     assert_eq!(error["cause"], "native_report_pair_changed");
     assert_eq!(error["endpoint"], "http://127.0.0.1:9");
+}
+
+/// #697: a send the endpoint's wire gate held back is refused by its own code,
+/// with a retry hint and the step to take, and nothing reaches the port
+/// (nothing listens on it here).
+#[tokio::test]
+async fn a_busy_wire_lock_names_itself_and_says_when_to_retry() {
+    use bridge_tally_transport::WireRetryPolicy;
+    let port = {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap().port()
+    };
+    let (mut server, _directory) = server_at(port, 200_000);
+    server.runtime = TallyRuntime::default().with_wire_gate_config(
+        crate::endpoint_wire::WireGateConfig::default().with_retry(
+            WireRetryPolicy::new(
+                std::time::Duration::from_millis(1),
+                std::time::Duration::from_millis(1),
+            )
+            .unwrap(),
+        ),
+    );
+    let held = server
+        .runtime
+        .wire_gate_config()
+        .gate_for(&server.settings.endpoint)
+        .try_acquire()
+        .unwrap();
+    let response = server.call_tool("tally_status", json!({})).await;
+    let error = refusal(&response);
+    assert_eq!(error["code"], "tally_endpoint_busy");
+    assert_eq!(
+        error["retry_after_s"],
+        bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs()
+    );
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("retry_after_s"));
+    drop(held);
 }

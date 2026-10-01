@@ -1,3 +1,6 @@
+use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::xml_text::escape_text as xml_escape;
+
 pub fn company_list_request() -> String {
     bridge_tally_protocol::xml_read_profiles::compatibility::company_list_request()
 }
@@ -175,7 +178,17 @@ pub fn groups_request(company: &str) -> String {
 /// Experimental Bridge-defined ledger-balance cross-view. The request emits no
 /// ledger names: rows are joined to the canonical mirror by candidate native
 /// identifiers. Exact semantics and applicability remain capability-gated.
-pub fn ledger_period_balances_request(company: &str, from: &str, to: &str) -> String {
+///
+/// `from`/`to` are interpolated into two places: ordinary `SVFROMDATE`/
+/// `SVTODATE` character content, and a **quoted TDL literal**
+/// (`<SET>"{from}"</SET>`/`<SET>"{to}"</SET>`, bridge#832). XML escaping
+/// cannot protect the quoted-literal occurrence -- Tally decodes `&quot;`
+/// back to a literal `"` before evaluating the `<SET>` formula, so an
+/// escaped quote could still close the literal early. `TallyDate` closes
+/// that off with a closed input alphabet (exactly 8 ASCII digits) instead of
+/// escaping, the same fix used by
+/// `native_outstandings::render_native_voucher_export_request`.
+pub fn ledger_period_balances_request(company: &str, from: &TallyDate, to: &TallyDate) -> String {
     format!(
         r#"
 <ENVELOPE>
@@ -241,29 +254,20 @@ pub fn ledger_period_balances_request(company: &str, from: &str, to: &str) -> St
 </ENVELOPE>
 "#,
         xml_escape(company),
-        xml_escape(from),
-        xml_escape(to),
-        xml_escape(from),
-        xml_escape(to),
+        from.as_str(),
+        to.as_str(),
+        from.as_str(),
+        to.as_str(),
     )
     .trim()
     .to_string()
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         company_list_request, groups_request, ledger_period_balances_request, ledgers_request,
-        legacy_company_list_request,
+        legacy_company_list_request, TallyDate,
     };
 
     /// The builders the hazard gate records as passing a spaced identifier to
@@ -305,11 +309,13 @@ mod tests {
         for id in [ReadOnlyProfileId::LedgersV1, ReadOnlyProfileId::VouchersV2] {
             assert!(id.education_refuses_report_formula(), "{}", id.as_str());
         }
+        let synthetic_from = TallyDate::parse("20260401").unwrap();
+        let synthetic_to = TallyDate::parse("20260430").unwrap();
         for (builder, request) in [
             ("ledgers_request", ledgers_request("Synthetic Company")),
             (
                 "ledger_period_balances_request",
-                ledger_period_balances_request("Synthetic Company", "20260401", "20260430"),
+                ledger_period_balances_request("Synthetic Company", &synthetic_from, &synthetic_to),
             ),
             ("groups_request", groups_request("Synthetic Company")),
         ] {
@@ -393,15 +399,25 @@ mod tests {
         let groups = groups_request("BRIDGE & <GROUPS>");
         assert!(groups.contains("BRIDGE &amp; &lt;GROUPS&gt;"));
 
-        let period = ledger_period_balances_request("BRIDGE & PERIOD", "2026<0401", "2026&0430");
+        let from = TallyDate::parse("20260401").unwrap();
+        let to = TallyDate::parse("20260430").unwrap();
+        let period = ledger_period_balances_request("BRIDGE & PERIOD", &from, &to);
         assert!(period.contains("BRIDGE &amp; PERIOD"));
-        assert!(period.contains("2026&lt;0401"));
-        assert!(period.contains("2026&amp;0430"));
+
+        // `from`/`to` also feed the quoted `<SET>"{from}"</SET>` TDL literal,
+        // where XML escaping cannot protect the argument (Tally decodes
+        // `&quot;` back to `"` before the formula runs). A closed-alphabet
+        // `TallyDate` makes the previously-escaped injection strings simply
+        // not constructible, rather than escaping them.
+        assert!(TallyDate::parse("2026<0401").is_err());
+        assert!(TallyDate::parse("2026&0430").is_err());
     }
 
     #[test]
     fn period_balance_request_is_identity_scoped_and_name_free() {
-        let request = ledger_period_balances_request("Synthetic Company", "20260401", "20260430");
+        let from = TallyDate::parse("20260401").unwrap();
+        let to = TallyDate::parse("20260430").unwrap();
+        let request = ledger_period_balances_request("Synthetic Company", &from, &to);
         assert!(request.contains("bridge.tally.ledger-period-balances/1"));
         assert!(request.contains("<SET>$TBalOpening</SET>"));
         assert!(request.contains("<SET>$TBalClosing</SET>"));

@@ -180,6 +180,8 @@ fn manifest_totals_keep_receivable_and_payable_directions_separate() {
         party: "Mixed Party".to_string(),
         amount: ExactDecimal::parse("3.00").expect("synthetic decimal"),
         direction: ExposureDirection::Payable,
+        opening_balance: None,
+        composition: None,
     }];
 
     let result = write_bulk_party_statements(
@@ -319,16 +321,22 @@ fn party_count_deduplicates_nonzero_bill_and_unallocated_parties() {
             party: "Bill and On Account".to_string(),
             amount: ExactDecimal::parse("25.00").expect("synthetic decimal"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "On Account Only".to_string(),
             amount: ExactDecimal::parse("10.00").expect("synthetic decimal"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "Zero Balance".to_string(),
             amount: ExactDecimal::zero(),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
     ];
 

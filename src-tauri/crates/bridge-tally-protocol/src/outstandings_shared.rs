@@ -9,6 +9,10 @@
 //!   scans every voucher in a date/AlterID-partitioned wildcard fetch and
 //!   derives outstandings from bill allocations.
 //!
+//! The bill credit-period type and its parser ([`CreditPeriod`],
+//! [`parse_credit_period`]) also live here, shared by the voucher-scan parser and
+//! the agent `vouchers` read.
+//!
 //! Both begin by pinning the same verified company identity and book extent
 //! (`PinnedCompany`, `CompanyBookExtent`, via `parse_company_book_extent`),
 //! and both end by producing the same report shape (`OutstandingsReport` and
@@ -30,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_read_profiles::ValidatedCompanyName;
+use crate::xml_text::escape_text as xml_escape;
 
 /// Whether a `BILLALLOCATIONS.LIST` row that carries no `BILLTYPE` is one of
 /// Tally's placeholder containers, and may be ignored.
@@ -51,6 +56,94 @@ use crate::xml_read_profiles::ValidatedCompanyName;
 /// boundaries now call this.
 pub fn bill_allocation_without_type_is_placeholder(name: Option<&str>) -> bool {
     name.is_none_or(|value| value.trim().is_empty())
+}
+
+/// Tally's credit period on a bill: a magnitude and a unit, kept typed so a
+/// due date is a calendar operation (months are not a guessed number of days).
+/// [`parse_credit_period`] returns an error for an unknown wire unit, never a
+/// default; each boundary decides what that error costs (the voucher scan
+/// refuses the read, the agent `vouchers` read carries the text as
+/// `unrecognised`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreditPeriod {
+    Days(u32),
+    Weeks(u32),
+    Months(u32),
+}
+
+// Licensed TallyPrime 7.1 read-back on 2026-08-23 retained up to 9999 days,
+// but silently discarded 10000 days to an empty credit period. This is a
+// measured wire-format ceiling, not a business-term policy. Weeks and months
+// have no equivalent measured ceiling, so their checked resulting date is the
+// bound instead.
+const MAX_TALLY_CREDIT_PERIOD_DAYS: u32 = 9999;
+
+/// The error code for a credit period that is not `<n> Days|Weeks|Months`
+/// (singular forms too), or whose days exceed what Tally retains.
+pub const BILL_CREDIT_PERIOD_INVALID: &str = "bill_credit_period_invalid";
+
+/// Parses Tally's `BILLCREDITPERIOD` text (`30 Days`, `2 Weeks`, `1 Months`).
+/// Blank text is `Days(0)`, the legacy scan's reading of "none set"; a caller
+/// that must tell "none set" from "zero" checks for blank before calling.
+/// This lives here so the voucher-scan boundary and the agent `vouchers`
+/// boundary cannot drift apart on what a credit period is.
+pub fn parse_credit_period(value: &str) -> Result<CreditPeriod, &'static str> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(CreditPeriod::Days(0));
+    }
+    let Some((magnitude, period, maximum)) = [
+        (
+            " Months",
+            CreditPeriod::Months as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Month",
+            CreditPeriod::Months as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Weeks",
+            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Week",
+            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
+            None,
+        ),
+        (
+            " Days",
+            CreditPeriod::Days as fn(u32) -> CreditPeriod,
+            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
+        ),
+        (
+            " Day",
+            CreditPeriod::Days as fn(u32) -> CreditPeriod,
+            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
+        ),
+    ]
+    .into_iter()
+    .find_map(|(suffix, period, maximum)| {
+        value
+            .strip_suffix(suffix)
+            .map(|magnitude| (magnitude, period, maximum))
+    }) else {
+        return Err(BILL_CREDIT_PERIOD_INVALID);
+    };
+    if magnitude.is_empty() || !magnitude.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(BILL_CREDIT_PERIOD_INVALID);
+    }
+    let magnitude = magnitude
+        .parse::<u32>()
+        .map_err(|_| BILL_CREDIT_PERIOD_INVALID)?;
+    if let Some(maximum) = maximum {
+        if magnitude > maximum {
+            return Err(BILL_CREDIT_PERIOD_INVALID);
+        }
+    }
+    Ok(period(magnitude))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -712,13 +805,99 @@ fn render_company_book_extent_with_contract(
     )
 }
 
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
+// --- The company's own count of its ledgers (bridge#938). ---
+
+const COMPANY_LEDGER_COUNT_COLLECTION_NAME: &str = "BridgeCompanyLedgerCountV1";
+const COMPANY_LEDGER_COUNT_FETCH: &str = "Name, GUID, NUMLEDGERS";
+
+/// The request for Tally's own count of a company's ledgers: the same Company
+/// collection shape as the company extent, fetching only the company's name and
+/// GUID and its `NUMLEDGERS`. It is deliberately not part of the extent request,
+/// which every reader shares and whose equality is the read bracket.
+pub fn render_company_ledger_count_request(company: &str) -> String {
+    render_company_book_extent_with_contract(
+        company,
+        COMPANY_LEDGER_COUNT_COLLECTION_NAME,
+        COMPANY_LEDGER_COUNT_FETCH,
+    )
+}
+
+/// Tally's own count of a company's ledgers (`NUMLEDGERS` of the Company
+/// object). A cross-check on another count, never a count to size a read from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompanyLedgerCount(u64);
+
+impl CompanyLedgerCount {
+    pub fn get(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Deserialize)]
+struct LedgerCountCollection {
+    #[serde(rename = "COMPANY", default)]
+    companies: Vec<RawLedgerCountCompany>,
+}
+
+#[derive(Deserialize)]
+struct RawLedgerCountCompany {
+    #[serde(rename = "@NAME")]
+    attribute_name: String,
+    #[serde(rename = "NAME")]
+    name: Value,
+    #[serde(rename = "GUID")]
+    guid: Value,
+    #[serde(rename = "NUMLEDGERS", default)]
+    num_ledgers: Option<Value>,
+}
+
+/// Parses the response to [`render_company_ledger_count_request`] for one
+/// company. `Ok(None)` is a well-formed answer that carries no `NUMLEDGERS`
+/// (the cross-check is then unavailable, not failed); a value that is present
+/// but is not a plain non-negative integer is refused, as is a response for
+/// another company, for no company, or for one matching more than one row.
+pub fn parse_company_ledger_count(
+    xml: &str,
+    expected_name: &str,
+    expected_guid: &str,
+) -> Result<Option<CompanyLedgerCount>, OutstandingsError> {
+    require_complete_envelope(xml)?;
+    let sanitized = sanitize_invalid_numeric_references(xml);
+    let parsed: Envelope<LedgerCountCollection> = quick_xml::de::from_str(&sanitized)
+        .map_err(|_| OutstandingsError::InvalidResponse("company_ledger_count_xml_invalid"))?;
+    require_success(&parsed.header)?;
+    let mut matching = parsed
+        .body
+        .data
+        .collection
+        .companies
+        .into_iter()
+        .filter(|raw| raw.guid.text.trim().eq_ignore_ascii_case(expected_guid));
+    let raw = matching
+        .next()
+        .ok_or(OutstandingsError::CompanyIdentityMismatch)?;
+    if matching.next().is_some() {
+        return Err(OutstandingsError::InvalidResponse(
+            "company_identity_ambiguous",
+        ));
+    }
+    let name = raw.name.text.trim();
+    if raw.attribute_name != name || name != expected_name {
+        return Err(OutstandingsError::CompanyIdentityMismatch);
+    }
+    let Some(value) = raw.num_ledgers else {
+        return Ok(None);
+    };
+    let digits = value.text.trim();
+    if !(1..=12).contains(&digits.len()) || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(OutstandingsError::InvalidResponse(
+            "company_ledger_count_invalid",
+        ));
+    }
+    digits
+        .parse::<u64>()
+        .map(|count| Some(CompanyLedgerCount(count)))
+        .map_err(|_| OutstandingsError::InvalidResponse("company_ledger_count_invalid"))
 }
 
 #[cfg(test)]

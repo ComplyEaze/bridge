@@ -7,6 +7,7 @@ pub mod commands;
 pub mod db;
 pub mod documents;
 pub(crate) mod endpoint_coordination;
+pub(crate) mod endpoint_wire;
 pub mod export_registry;
 pub mod gst;
 pub(crate) mod local_files;
@@ -14,6 +15,7 @@ pub(crate) mod local_files;
 // one consumer inside this crate, so it does not need to be reachable from outside `bridge_lib`.
 mod observability;
 pub mod reports;
+pub(crate) mod request_trail;
 pub(crate) mod source_draft;
 pub(crate) mod source_draft_xml;
 pub mod sync;

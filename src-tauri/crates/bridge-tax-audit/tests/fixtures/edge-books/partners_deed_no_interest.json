@@ -1,0 +1,195 @@
+{
+ "comment": "partners_40b_194t: a firm whose deed authorises no interest on capital ([partners.deed] no_interest_authorised = true, no interest_rate_bp), under the closing rule (the s.40(b) excess computed for no partner). The rate used is 0 and no deed question is raised. P has an interest ledger: its plain interest journal (TDS on a ledger classified as TDS payable, added back gross) is read as a working figure, and its not-computed finding says any interest is disallowed in full beyond that figure and asks for the interest credited, not the rate. Q has no interest ledger: its finding takes the no-interest title, names Q's capital, and asks nothing about interest; its s.194T question says the base leaves out interest. P also withdraws capital and Q introduces capital, both read into the capital walk; the firm total is withheld for 2 partners.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Capital Account": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-partners_deed_no_interest-000"
+  },
+  {
+   "name": "Interest on Capital",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_deed_no_interest-001"
+  },
+  {
+   "name": "P Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_deed_no_interest-002"
+  },
+  {
+   "name": "Q Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_deed_no_interest-003"
+  },
+  {
+   "name": "Remuneration to Q",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_deed_no_interest-004"
+  },
+  {
+   "name": "TDS 194T Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_deed_no_interest-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 400000000,
+   "debit": 20000000,
+   "credit": 5000000,
+   "closing": 415000000
+  },
+  {
+   "ledger": "Interest on Capital",
+   "opening": 0,
+   "debit": 6000000,
+   "credit": 0,
+   "closing": 6000000
+  },
+  {
+   "ledger": "P Capital",
+   "opening": -300000000,
+   "debit": 5000000,
+   "credit": 5400000,
+   "closing": -300400000
+  },
+  {
+   "ledger": "Q Capital",
+   "opening": -100000000,
+   "debit": 0,
+   "credit": 30800000,
+   "closing": -130800000
+  },
+  {
+   "ledger": "Remuneration to Q",
+   "opening": 0,
+   "debit": 12000000,
+   "credit": 0,
+   "closing": 12000000
+  },
+  {
+   "ledger": "TDS 194T Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1800000,
+   "closing": -1800000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "nd-01",
+   "date": "2025-05-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Q Capital",
+     -20000000
+    ],
+    [
+     "Bank",
+     20000000
+    ]
+   ]
+  },
+  {
+   "guid": "nd-02",
+   "date": "2025-08-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "P Capital",
+     5000000
+    ],
+    [
+     "Bank",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "nd-03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest on Capital",
+     6000000
+    ],
+    [
+     "P Capital",
+     -5400000
+    ],
+    [
+     "TDS 194T Payable",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "nd-04",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration to Q",
+     12000000
+    ],
+    [
+     "Q Capital",
+     -10800000
+    ],
+    [
+     "TDS 194T Payable",
+     -1200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "partners_40b_194t"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "partner_p": {
+   "capital_ledgers": [
+    "P Capital"
+   ],
+   "interest_ledger": "Interest on Capital"
+  },
+  "partner_q": {
+   "capital_ledgers": [
+    "Q Capital"
+   ],
+   "remuneration_ledger": "Remuneration to Q"
+  }
+ },
+ "deed": {
+  "no_interest_authorised": true
+ },
+ "tds_payable_ledgers": [
+  "TDS 194T Payable"
+ ]
+}

@@ -1,5 +1,5 @@
 {
- "comment": "partners_40b_194t: an LLP with no deed (the statutory cap is used and said to be an assumption) and rules without [s194t] (the module's own default rate and limit, flagged). A is credited interest far above the allowable amount; B only remuneration, exactly at the s.194T limit (not over it, so no finding), on a voucher whose only 'TDS' ledger is not under Duties & Taxes (so no TDS line is seen).",
+ "comment": "partners_40b_194t: an LLP with no deed (the statutory cap is used and said to be an assumption) and rules without [s194t] (the module's own default rate and limit, flagged). A is credited interest far above the allowable amount; B only remuneration, exactly at the s.194T limit (not over it, so no finding), on a voucher whose only 'TDS' ledger is classified as TDS payable by no configuration (so whether TDS was deducted is not judged).",
  "groups": {
   "Current Assets": null,
   "Bank Accounts": "Current Assets",

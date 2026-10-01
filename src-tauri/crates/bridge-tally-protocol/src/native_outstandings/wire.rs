@@ -581,7 +581,9 @@ fn parse_native_ledger_snapshot_rows(
     reader.config_mut().trim_text(true);
 
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_element_seen = false;
     let mut collection_seen = false;
     let mut entries = Vec::new();
 
@@ -597,8 +599,24 @@ fn parse_native_ledger_snapshot_rows(
                         "ledger_root_not_envelope",
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    // A second STATUS, empty or not, is the response's shape,
+                    // not Tally's answer (bridge#717).
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            "ledger_status_repeated",
+                        ));
+                    }
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
+                    if text.is_empty() {
+                        continue;
+                    }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -618,6 +636,16 @@ fn parse_native_ledger_snapshot_rows(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
+                // A self-closing STATUS is no answer, and a second STATUS of
+                // any kind is refused (bridge#717).
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            "ledger_status_repeated",
+                        ));
+                    }
+                    continue;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
                     continue;
@@ -648,8 +676,16 @@ fn parse_native_ledger_snapshot_rows(
             "ledger_envelope_unterminated",
         ));
     }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            "ledger_envelope_missing",
+        ));
+    }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(
@@ -709,7 +745,9 @@ pub fn parse_native_group_snapshot_with_evidence(
     reader.config_mut().trim_text(true);
 
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_element_seen = false;
     let mut collection_seen = false;
     let mut entries = Vec::new();
     loop {
@@ -725,8 +763,24 @@ pub fn parse_native_group_snapshot_with_evidence(
                         "group_root_not_envelope",
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    // A second STATUS, empty or not, is the response's shape,
+                    // not Tally's answer (bridge#717).
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            "group_status_repeated",
+                        ));
+                    }
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
+                    if text.is_empty() {
+                        continue;
+                    }
                     if text != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -769,6 +823,16 @@ pub fn parse_native_group_snapshot_with_evidence(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
+                // A self-closing STATUS is no answer, and a second STATUS of
+                // any kind is refused (bridge#717).
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            "group_status_repeated",
+                        ));
+                    }
+                    continue;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
                 } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
@@ -797,8 +861,16 @@ pub fn parse_native_group_snapshot_with_evidence(
             "group_envelope_unterminated",
         ));
     }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            "group_envelope_missing",
+        ));
+    }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(
@@ -1083,11 +1155,17 @@ impl ParsedLedgerSnapshotRow {
     fn into_entry(self) -> Result<LedgerSnapshotEntry, NativeOutstandingsError> {
         let closing_balance = parse_ledger_closing_balance(&self.closing_text, &self.name)?;
         let opening_balance = parse_ledger_amount(&self.opening_text)?;
+        let opening_balance_observed = if self.opening_text.is_empty() {
+            None
+        } else {
+            Some(opening_balance.clone())
+        };
         Ok(LedgerSnapshotEntry {
             name: self.name,
             parent: self.parent,
             closing_balance,
             opening_balance,
+            opening_balance_observed,
             bill_wise_on: self.bill_wise_on,
             currency_name: self.currency_name,
         })
@@ -1268,6 +1346,8 @@ pub(crate) fn parse_currency_masters(
             row_empty: "currency_row_empty",
             unexpected_close: "currency_unexpected_close",
             unterminated: "currency_envelope_unterminated",
+            envelope_missing: "currency_envelope_missing",
+            status_repeated: "currency_status_repeated",
             collection_missing: "currency_collection_missing",
         },
         |reader, element| {
@@ -1285,6 +1365,8 @@ struct CollectionCodes {
     row_empty: &'static str,
     unexpected_close: &'static str,
     unterminated: &'static str,
+    envelope_missing: &'static str,
+    status_repeated: &'static str,
     collection_missing: &'static str,
 }
 
@@ -1304,7 +1386,9 @@ fn walk_collection_rows(
     let mut reader = Reader::from_str(&sanitized);
     reader.config_mut().trim_text(true);
     let mut path = Vec::<Vec<u8>>::new();
+    let mut envelope_seen = false;
     let mut status_seen = false;
+    let mut status_element_seen = false;
     let mut collection_seen = false;
     loop {
         let event = reader
@@ -1318,8 +1402,24 @@ fn walk_collection_rows(
                         codes.root_not_envelope,
                     ));
                 }
+                if path.is_empty() {
+                    envelope_seen = true;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    // A second STATUS, empty or not, is the response's shape,
+                    // not Tally's answer (bridge#717).
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            codes.status_repeated,
+                        ));
+                    }
                     let text = read_element_text(&mut reader, element.name())?;
+                    // An empty STATUS is no answer (bridge#717). The envelope's
+                    // end refuses it, so a response cut off after it still
+                    // ends as malformed.
+                    if text.is_empty() {
+                        continue;
+                    }
                     if text.trim() != "1" {
                         return Err(NativeOutstandingsError::TallyReportedFailure);
                     }
@@ -1337,6 +1437,16 @@ fn walk_collection_rows(
             }
             Event::Empty(element) => {
                 let name = element.name().as_ref().to_ascii_uppercase();
+                // A self-closing STATUS is no answer, and a second STATUS of
+                // any kind is refused (bridge#717).
+                if path_is(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
+                    if std::mem::replace(&mut status_element_seen, true) {
+                        return Err(NativeOutstandingsError::InvalidResponse(
+                            codes.status_repeated,
+                        ));
+                    }
+                    continue;
+                }
                 if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA"]) && name == b"COLLECTION" {
                     collection_seen = true;
                 } else if path_is(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
@@ -1362,8 +1472,16 @@ fn walk_collection_rows(
     if !path.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(codes.unterminated));
     }
+    // An empty body, or one with no ENVELOPE, is no answer at all: it is
+    // malformed, not an envelope without a STATUS (bridge#717).
+    if !envelope_seen {
+        return Err(NativeOutstandingsError::InvalidResponse(
+            codes.envelope_missing,
+        ));
+    }
+    // No STATUS, or a self-closing one, is no answer either (bridge#717).
     if !status_seen {
-        return Err(NativeOutstandingsError::TallyReportedFailure);
+        return Err(NativeOutstandingsError::StatusAbsent);
     }
     if !collection_seen {
         return Err(NativeOutstandingsError::InvalidResponse(
@@ -1478,6 +1596,8 @@ pub fn parse_company_currency_name(
             row_empty: "company_currency_row_empty",
             unexpected_close: "company_currency_unexpected_close",
             unterminated: "company_currency_envelope_unterminated",
+            envelope_missing: "company_currency_envelope_missing",
+            status_repeated: "company_currency_status_repeated",
             collection_missing: "company_currency_collection_missing",
         },
         |reader, element| {

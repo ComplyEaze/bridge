@@ -15,13 +15,13 @@ const preview = {
   ],
 };
 
-test("release catalogue selects the newest usable unsigned preview, not an unrelated release", () => {
+test("release catalogue selects the newest usable release, not an unrelated one", () => {
   const unrelatedNewest = { ...preview, prerelease: false, tag_name: "v9.0.0", assets: [] };
   const incompleteNewestPreview = { ...preview, tag_name: "mcp-preview-0.3.0", assets: preview.assets.slice(0, 2) };
   assert.equal(isInstallablePreview(unrelatedNewest), false);
   assert.equal(isInstallablePreview(incompleteNewestPreview), false);
   assert.equal(selectRelease([unrelatedNewest, incompleteNewestPreview, preview]), preview);
-  assert.match(releaseLabel(preview), /unsigned preview/);
+  assert.match(releaseLabel(preview), /not yet code-signed/);
 });
 
 test("a preview marked Latest (pre-release flag cleared) stays installable", () => {
@@ -73,4 +73,16 @@ test("release catalogue requires immutable package and checksum names together",
     checksum: preview.assets[1],
   });
   assert.equal(releaseAssets({ ...preview, assets: preview.assets.slice(0, 2) }, "macos-arm64"), undefined);
+});
+
+test("user-facing site text does not call a release a preview or say it is for evaluation only", async () => {
+  const { readFile } = await import("node:fs/promises");
+  for (const file of ["index.html", "app.mjs"]) {
+    const text = await readFile(new URL(`../site/${file}`, import.meta.url), "utf8");
+    // The tag prefix is how a user finds the release; it is a name, not prose.
+    const prose = text.replaceAll("mcp-preview", "");
+    assert.doesNotMatch(prose, /\bpreviews?\b/i, `${file} calls a release a preview`);
+    assert.doesNotMatch(prose, /for evaluation/i, `${file} says a release is for evaluation only`);
+  }
+  assert.doesNotMatch(releaseLabel({ tag_name: "mcp-preview-9.9.9" }).replace("mcp-preview", ""), /\bpreview\b|for evaluation/i);
 });

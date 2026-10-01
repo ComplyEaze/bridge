@@ -612,7 +612,7 @@ the voucher type) and that is a hypothesis, not a default.
 
 **Procedure for the first write of an untested invoice type.** It costs one voucher and settles the
 question — but it *deliberately risks the silent one-sided write described above*, and its cleanup
-depends on a `Delete` that is itself not qualified on a licensed book (§9.12b). So run it where a
+depends on a `Delete` that is qualified on a licensed book for one voucher only, and PARTIAL (§9.12b). So run it where a
 bad voucher does not matter:
 
 1. **Use a disposable synthetic company, and take a backup first** — `docs/adr/0004-tally-write-safety.md`
@@ -830,6 +830,18 @@ the Delete + Create path §9.7 argues for, outside the lab.
 Worth noting against `IMPLEMENTATION_GUIDE.md` §3.3a, which records that Tally overwrites the
 attribute with a value of its own: the client-supplied string still **worked as a delete key**
 afterwards. Whatever the export shows, the value you sent remains addressable.
+
+**Repeated on Gold. PARTIAL — observed once, on one voucher (licensed TallyPrime 7.1 Gold, one
+client book, 2026-09-28).**
+- **The voucher.** It was first created by a direct gateway import with a client-supplied `REMOTEID`,
+  not by Bridge's native post.
+- **The delete.** It used a `VOUCHER` element with that creation `REMOTEID` and
+  `ACTION="Delete"`. It returned `DELETED=1`, with every other counter 0.
+- **Read-back.** A vouchers read of that day no longer held the voucher. After a replacement Contra
+  was created, the day's count was back to its count before the delete.
+- **Confidence.** PARTIAL by §9.14's convention: one voucher, one session, one client book, not
+  repeated. The counters and the read-back agree, but only one voucher was read back. The
+  deleted voucher's type was not recorded.
 
 **`Alter` is UNVERIFIED on this profile — not ruled out.** This experiment exercised only `Delete`.
 The `Alter` failures on record (§9.6, and `IMPLEMENTATION_GUIDE.md` §3.1) came from an

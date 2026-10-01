@@ -187,6 +187,7 @@ async fn financial_reads_refuse_unqualified_profiles_before_reports_despite_stal
                             config,
                             &identity,
                             assertion(&extents(), &identity),
+                            TallyDate::parse("20990101").unwrap(),
                         )
                         .await
                         .unwrap_err()
@@ -269,6 +270,7 @@ async fn compliance_source_requires_closing_mode_and_preserves_source_commitment
                 },
                 &identity,
                 assertion(&extents(), &identity),
+                TallyDate::parse("20990101").unwrap(),
             )
             .await;
         let (source, evidence) = result.unwrap();
@@ -301,6 +303,44 @@ async fn compliance_source_requires_closing_mode_and_preserves_source_commitment
                 .iter()
                 .map(|i| responses[*i].len())
                 .sum::<usize>()
+        );
+    }
+}
+
+#[tokio::test]
+async fn party_source_ends_its_balance_snapshot_at_the_hosts_today_when_a_voucher_is_later_dated() {
+    // #875. The captured extent's last voucher date for this company is 20260907
+    // and its books begin 20260401. The clock is injected, never read.
+    for (today, to, later_dated) in [
+        ("20260815", "20260831", true),
+        // A host clock before the books begin: a one-day snapshot from the
+        // start of the books, with the later-dated note.
+        ("20260301", "20260401", true),
+        ("20260907", "20261001", false),
+        ("20990101", "20261001", false),
+    ] {
+        let plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let identity = company_identity(&companies());
+        let (source, _) = TallyRuntime::default()
+            .fetch_party_ledger_master_source_with_evidence(
+                TallyConfig {
+                    host: simulator.address().ip().to_string(),
+                    port: simulator.address().port(),
+                },
+                &identity,
+                assertion(&extents(), &identity),
+                TallyDate::parse(today).unwrap(),
+            )
+            .await
+            .unwrap();
+        simulator.finish().unwrap();
+        assert_eq!(source.to.as_str(), to, "today {today}");
+        assert_eq!(source.last_voucher_date.as_str(), "20260907");
+        assert_eq!(
+            source.later_dated_vouchers_note().is_some(),
+            later_dated,
+            "today {today}"
         );
     }
 }
@@ -451,6 +491,7 @@ async fn rejected_currency_retains_its_completed_pair_before_any_master_read() {
                     port: simulator.address().port(),
                 },
                 &company_identity(&companies()),
+                TallyDate::parse("20990101").unwrap(),
             )
             .await
             .unwrap_err();

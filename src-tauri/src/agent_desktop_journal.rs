@@ -69,10 +69,8 @@ impl DesktopJournalService {
             Err(failure) => {
                 // This Err boundary precedes approval/dispatch. It does not
                 // prove that unreadable history contains no earlier attempt.
-                let mut operation = DesktopJournalOperation::from_failure(
-                    failure,
-                    "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.",
-                );
+                let message = "This request stopped before approval or posting. Choose the saved Journal file again after correcting the error.";
+                let mut operation = DesktopJournalOperation::from_failure(failure, message);
                 operation.result["result"]["dispatch"] =
                     json!({"state":"admission_refused","resent":false});
                 operation
@@ -178,6 +176,40 @@ impl DesktopJournalService {
     }
 }
 
+/// The ledgers an error refers to by field, named for the local desktop, which
+/// shows the message alone: the masters list of a changed-masters post, or
+/// the changed ledgers of a refused build. The MCP message names none.
+fn named_ledgers(result: &Value) -> Option<String> {
+    const SHOWN: usize = super::post::REFUSAL_LEDGERS_NAMED;
+    let (listed, total) = match result["error"]["code"].as_str()? {
+        "posted_under_changed_masters" => (&result["masters_after_post"]["ledgers"], None),
+        "import_masters_changed_since_build" => (
+            &result["error"]["ledgers_changed"],
+            result["error"]["ledgers_changed_total"].as_u64(),
+        ),
+        _ => return None,
+    };
+    let plain = super::super::redact_value(listed.clone(), super::super::Redaction::None);
+    let names = plain
+        .as_array()?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    if names.is_empty() {
+        return None;
+    }
+    let shown = names.iter().take(SHOWN).copied().collect::<Vec<_>>();
+    let total = total.map_or(names.len(), |total| {
+        usize::try_from(total).unwrap_or(usize::MAX)
+    });
+    let more = total.saturating_sub(shown.len());
+    let mut list = shown.join(", ");
+    if more > 0 {
+        list.push_str(&format!(" and {more} more"));
+    }
+    Some(list)
+}
+
 pub(super) struct DesktopJournalOperation {
     pub(super) result: Value,
 }
@@ -190,6 +222,13 @@ impl DesktopJournalOperation {
         // itself failed and the saved batch does not contain it.
         let result = &outcome.payload["result"];
         let error = &result["error"];
+        let message =
+            bounded_action_text(&error["message"], 4096).map(|message| {
+                match named_ledgers(result) {
+                    Some(names) => format!("{message} Ledgers: {names}."),
+                    None => message.to_string(),
+                }
+            });
         let mut projected = json!({"result":{
             "dispatch": {
                 "state": bounded_action_text(&result["dispatch"]["state"], 128),
@@ -198,7 +237,7 @@ impl DesktopJournalOperation {
             "attempt_recorded": result["attempt_recorded"].as_bool(),
             "error": (!error.is_null()).then(|| json!({
                 "code": bounded_action_text(&error["code"], 256).unwrap_or("journal_action_error"),
-                "message": bounded_action_text(&error["message"], 4096).unwrap_or("Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
+                "message": message.as_deref().unwrap_or("Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
                 "remediation": bounded_action_text(&error["remediation"], 4096),
             })),
         }});
@@ -262,6 +301,9 @@ impl Server {
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
             post_approvals,
+            // The desktop app calls Bridge's operations directly and never dispatches an MCP
+            // tool, so there is no MCP client to accept anything.
+            terms: super::super::terms::TermsGate::NotRequired,
         }
     }
 }

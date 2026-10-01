@@ -28,7 +28,7 @@ use crate::error::{AuditError, Result};
 
 pub const VENDORED: &str = include_str!("../rules/ay2026-27.s44ab.toml");
 pub const VENDORED_SHA256: &str =
-    "579db20c99fa43f76c36b7a46e3ab295f998290c8512e7f82e0e0aff3712ce79";
+    "5485e9512b502cb0bcc4c10ed267fef32281d9e10acb0d87a4a55d153e633ec5";
 pub const SOURCE_PATH: &str = "the reference Python implementation's AY 2026-27 rules file";
 pub const SOURCE_SHA256: &str = "6a95baa80420c044f466320c92898240f7e6c292182fbffbe086207d87113857";
 pub const SOURCE_COMMIT: &str = "e2456bcf4f163cf770945e8620e715788db0ca46";
@@ -107,6 +107,9 @@ pub struct Rules {
     /// `loans_interest`: `[s269ss_269t].reporting_exempt_lender_types`, the narrower Clause 31
     /// reporting exemption. `None` when absent, defaulted by the test as above.
     pub s269ss_269t_reporting_exempt_lender_types: Option<Vec<String>>,
+    /// `partners_40b_194t`: `[s40b_v]`, the remuneration slab it quotes (never a computed limit).
+    /// `None` without the table; the test then says the rules hold no slab.
+    pub s40b_v: Option<S40bV>,
     /// `loans_interest`: `[s269ss_269t].reporting_exempt_lender_types_accepted`, Clause
     /// 31(a)/(b)'s own note (loans taken or accepted), `None` when absent (the test then uses its
     /// default).
@@ -124,6 +127,16 @@ pub struct Rules {
     /// `[entity.<type>]`, keyed by entity type. `None` when the rules carry no `[entity]` table
     /// at all: every lookup then refuses, as the reference's `self["entity"]` raises.
     pub entity: Option<BTreeMap<String, EntityRules>>,
+}
+
+/// `[s40b_v]`: s.40(b)(v)'s remuneration slab.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct S40bV {
+    pub first_slab_paise: i64,
+    pub floor_paise: i64,
+    pub first_slab_bp: i64,
+    pub balance_bp: i64,
+    pub authority: String,
 }
 
 /// `[s194t]`: TDS on payments to partners.
@@ -394,6 +407,17 @@ impl Rules {
             s269ss_269t_reporting_exempt_lender_types: s269ss_269t
                 .contains_key("reporting_exempt_lender_types")
                 .then(|| strings_in(s269ss_269t, "s269ss_269t", "reporting_exempt_lender_types"))
+                .transpose()?,
+            s40b_v: optional("s40b_v")
+                .map(|t| -> Result<S40bV> {
+                    Ok(S40bV {
+                        first_slab_paise: int_in(t, "s40b_v", "first_slab_paise")?,
+                        floor_paise: int_in(t, "s40b_v", "floor_paise")?,
+                        first_slab_bp: int_in(t, "s40b_v", "first_slab_bp")?,
+                        balance_bp: int_in(t, "s40b_v", "balance_bp")?,
+                        authority: str_in(t, "s40b_v", "authority")?,
+                    })
+                })
                 .transpose()?,
             s269ss_269t_reporting_exempt_lender_types_accepted: s269ss_269t
                 .contains_key("reporting_exempt_lender_types_accepted")
@@ -728,6 +752,17 @@ mod tests {
     #[test]
     fn vendored_rules_carry_the_partners_values() {
         let rules = Rules::vendored().unwrap();
+        assert_eq!(
+            rules.s40b_v,
+            Some(S40bV {
+                first_slab_paise: 60_000_000,
+                floor_paise: 30_000_000,
+                first_slab_bp: 9000,
+                balance_bp: 6000,
+                authority: "s.40(b)(v) as amended by the Finance (No. 2) Act 2024, from AY 2025-26"
+                    .to_string(),
+            })
+        );
         assert_eq!(
             rules.s194t,
             Some(S194t {

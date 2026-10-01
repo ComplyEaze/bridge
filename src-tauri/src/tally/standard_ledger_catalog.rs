@@ -186,7 +186,10 @@ fn classify_transport_error(error: &TallyTransportError) -> StandardLedgerCatalo
         | TallyTransportError::RequestFailed
         | TallyTransportError::HttpStatus { .. }
         | TallyTransportError::ResponseTruncated
-        | TallyTransportError::ResponseReadFailed => StandardLedgerCatalogReadError::Transport,
+        | TallyTransportError::ResponseReadFailed
+        // Held back by the wire gate (#697): a retry after the other sender
+        // finishes can succeed.
+        | TallyTransportError::WireRefused { .. } => StandardLedgerCatalogReadError::Transport,
         TallyTransportError::ResponseTooLarge { .. } => {
             StandardLedgerCatalogReadError::BoundsViolation
         }

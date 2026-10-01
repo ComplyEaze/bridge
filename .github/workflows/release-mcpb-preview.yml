@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Immutable preview tag, for example mcp-preview-0.2.1"
+        description: "Immutable release tag, for example mcp-v0.4.0 (the older mcp-preview-0.2.1 form is also accepted)"
         required: true
         type: string
 
@@ -125,13 +125,65 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  publish-preview:
-    name: Publish durable unsigned preview assets
+  # The only job that can mint an identity token. It runs no repository code and installs nothing:
+  # it downloads the two archives the package jobs built, checks each against the digest the
+  # package job wrote beside it, and attests them. The package jobs, which run dependency build
+  # scripts, hold contents: read only. The digest check catches a mismatched or damaged download,
+  # not a package job that wrote a matching set; the attestation vouches for this run's output
+  # (which workflow run and commit produced these bytes), not for what the archive contains. It is
+  # not a code signature, no client checks it yet, and it does not show the code is safe.
+  attest:
+    name: Attest the built archives
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mcpb-preview-*
+          path: release-assets
+          merge-multiple: true
+      - name: Check each archive against the digest its package job recorded
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          for platform in windows-x64 macos-arm64; do
+            asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"
+            test -f "$asset"
+            actual="$(sha256sum "$asset" | cut -d' ' -f1)"
+            listed="$(cut -d' ' -f1 "$asset.sha256")"
+            recorded="$(jq -r .sha256 "$asset.provenance.json")"
+            source_sha="$(jq -r .source_sha "$asset.provenance.json")"
+            if [[ "$actual" != "$listed" || "$actual" != "$recorded" ]]; then
+              echo "digest mismatch for $asset: file $actual, .sha256 $listed, provenance $recorded"
+              exit 1
+            fi
+            if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
+              echo "provenance names commit $source_sha, not this run's $GITHUB_SHA"
+              exit 1
+            fi
+          done
+      - name: Attest where these archives were built
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-assets/bridge-tally-${{ inputs.release_tag }}-windows-x64.mcpb
+            release-assets/bridge-tally-${{ inputs.release_tag }}-macos-arm64.mcpb
+
+  publish-preview:
+    name: Publish durable unsigned preview assets
+    needs: [package, attest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
       contents: write
+      attestations: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -154,6 +206,38 @@ jobs:
             test -f "$asset.provenance.json"
             test -f "$asset.smoke.json"
           done
+      # The archives crossed an artifact upload and download between jobs. Check the downloaded bytes
+      # against the attestation the attest job signed for them, requiring this workflow, this
+      # commit, the default branch and a GitHub-hosted runner, before anything is published.
+      - name: Verify each archive against its build attestation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          for platform in windows-x64 macos-arm64; do
+            asset="release-assets/bridge-tally-${RELEASE_TAG}-${platform}.mcpb"
+            gh attestation verify "$asset" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/release-mcpb-preview.yml" --source-digest "$SOURCE_SHA" --source-ref "refs/heads/$DEFAULT_BRANCH" --deny-self-hosted-runners
+          done
+      # The notes come from CHANGELOG.md, the file the install page's changelog also renders. A
+      # missing or unreadable section never stops the release: it warns and publishes the standard
+      # unsigned-preview text alone.
+      - name: Compose the release notes from CHANGELOG.md
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          footer=packaging/mcpb/UNSIGNED_PREVIEW_RELEASE.md
+          notes="$RUNNER_TEMP/release-notes.md"
+          if ! node scripts/release-notes.mjs notes --tag "$RELEASE_TAG" --changelog CHANGELOG.md --footer "$footer" --out "$notes"; then
+            echo "::warning::could not compose release notes from CHANGELOG.md; publishing the standard unsigned-preview text only"
+            cp "$footer" "$notes"
+          fi
       - name: Create the immutable GitHub preview release
         shell: bash
         env:
@@ -163,10 +247,26 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          # A failed lookup refuses the release; it never reads as "not found". `released` and
+          # `found` are assigned before they are tested, so a failing command stops the step.
+          released="$(gh release list --limit 1000 --json tagName --jq '.[].tagName')"
+          if grep -Fxq -- "$RELEASE_TAG" <<<"$released"; then
             echo "refusing to replace existing release assets for $RELEASE_TAG"
             exit 1
           fi
+
+          # Immutability is per version, not per tag string: a version already released under
+          # the other tag form is not released again.
+          version="${RELEASE_TAG#mcp-preview-}"
+          version="${version#mcp-v}"
+          for other in "mcp-preview-$version" "mcp-v$version"; do
+            [[ "$other" == "$RELEASE_TAG" ]] && continue
+            found="$(git ls-remote --tags origin "refs/tags/$other")"
+            if [[ -n "$found" ]] || grep -Fxq -- "$other" <<<"$released"; then
+              echo "refusing to publish: version $version already has the tag $other"
+              exit 1
+            fi
+          done
 
           resolve_preview_tag_commit() {
             local tag_ref_file tag_sha peeled_sha ref_sha ref
@@ -214,5 +314,24 @@ jobs:
           gh release create "$RELEASE_TAG" release-assets/* \
             --verify-tag \
             --title "Bridge MCPB unsigned preview: $RELEASE_TAG" \
-            --notes-file packaging/mcpb/UNSIGNED_PREVIEW_RELEASE.md \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             --prerelease
+      # GitHub's grouped change list (.github/release.yml) goes under the written notes. It is added
+      # after the release exists, so a failure here leaves a complete release and only a warning.
+      - name: Append GitHub's generated change list
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -uo pipefail
+          combined="$RUNNER_TEMP/release-notes-combined.md"
+          if generated="$(gh api --method POST "repos/$GH_REPO/releases/generate-notes" -f "tag_name=$RELEASE_TAG" --jq .body)" \
+            && [ -n "$generated" ] \
+            && { cat "$RUNNER_TEMP/release-notes.md" && printf '\n---\n\n%s\n' "$generated"; } >"$combined" \
+            && gh release edit "$RELEASE_TAG" --notes-file "$combined"; then
+            echo "appended GitHub's generated change list to $RELEASE_TAG"
+          else
+            echo "::warning::could not append GitHub's generated change list to $RELEASE_TAG; the release keeps its written notes"
+          fi

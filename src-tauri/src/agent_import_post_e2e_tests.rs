@@ -217,6 +217,14 @@ fn assert_journaled_clean_create(directory: &std::path::Path) {
 }
 
 fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
+    server_redacting(address, directory, crate::agent::Redaction::None)
+}
+
+fn server_redacting(
+    address: std::net::SocketAddr,
+    directory: &std::path::Path,
+    redaction: crate::agent::Redaction,
+) -> Server {
     Server::new(crate::agent::Settings {
         endpoint: TallyEndpointConfig {
             host: address.ip().to_string(),
@@ -225,7 +233,7 @@ fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Serv
         data_dir: directory.to_path_buf(),
         max_rows: 10,
         max_bytes: 200_000,
-        redaction: crate::agent::Redaction::None,
+        redaction,
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: false,
@@ -403,6 +411,72 @@ async fn a_remoteid_the_journal_records_is_refused_before_any_tally_request() {
     assert_eq!(journal(directory.path()), before);
 }
 
+/// #876: a row another batch of the company already sent to Tally is refused
+/// from the journal alone, before any Tally request and before the person is
+/// asked; nothing is appended.
+#[tokio::test]
+async fn a_row_another_batch_already_sent_is_refused_before_any_tally_request() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    journal_an_earlier_intent(&server, &line, Uuid::new_v4());
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_txn_already_posted",
+        "{response}"
+    );
+    let next_step = response["structuredContent"]["result"]["error"]["next_step"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(next_step.contains("verify_import"), "{response}");
+    assert!(next_step.contains("Never rebuild"), "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["blocking_batch_id"],
+        "bridge-00000000-0000-4000-8000-000000000584",
+        "{response}"
+    );
+    assert!(
+        next_step.contains("bridge-00000000-0000-4000-8000-000000000584"),
+        "{response}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// #876: the same row sent by another batch while the dialog is open is
+/// refused under the admission lock, before this post's intent, and nothing is
+/// sent.
+#[tokio::test]
+async fn a_row_another_batch_sends_while_approval_is_pending_is_never_sent() {
+    let result = refused_under_the_admission_lock(
+        |path, line| {
+            let mut earlier = line.clone();
+            earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000586".into();
+            append_record(path, &earlier);
+            append_record(
+                path,
+                &ledger::StatusRecord::dispatch_native(&earlier, "c".repeat(64), Uuid::new_v4()),
+            );
+        },
+        "import_txn_already_posted",
+        json!(false),
+        0,
+    )
+    .await;
+    assert_eq!(
+        result["error"]["blocking_batch_id"], "bridge-00000000-0000-4000-8000-000000000586",
+        "{result}"
+    );
+}
+
 /// While the dialog is open, another process journals an intent carrying
 /// `injected`; this post mints `minted`. Returns the response, the requests
 /// Tally received, where the POST would be, and the batches with an intent.
@@ -419,6 +493,9 @@ async fn race_an_intent_during_approval(
     let (line, args) = saved_batch(&server);
     let mut earlier = line.clone();
     earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
+    // Another transaction, so only the REMOTEID can make this a refusal (#876).
+    earlier.txn_ids = vec!["journal-585".into()];
+    earlier.vouchers[0].bridge_txn_id = "journal-585".into();
     let mut appended = serde_json::to_vec(&earlier).unwrap();
     appended.push(b'\n');
     appended.extend(
@@ -467,7 +544,7 @@ async fn refused_under_the_admission_lock(
     code: &str,
     attempted: Value,
     intents: usize,
-) {
+) -> Value {
     let mut plans = before_approval();
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
@@ -495,6 +572,7 @@ async fn refused_under_the_admission_lock(
         })
         .count();
     assert_eq!(recorded, intents, "no intent from this post: {response}");
+    result.clone()
 }
 
 fn append_record(path: &std::path::Path, record: &impl serde::Serialize) {
@@ -610,6 +688,9 @@ async fn race_a_batch_id_during_approval(
     earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
     earlier.vouchers.truncate(1);
     earlier.txn_ids.truncate(1);
+    // Another transaction, so only the REMOTEID can make this a refusal (#876).
+    earlier.txn_ids = vec!["journal-585".into()];
+    earlier.vouchers[0].bridge_txn_id = "journal-585".into();
     let mut appended = serde_json::to_vec(&earlier).unwrap();
     appended.push(b'\n');
     appended.extend(
@@ -697,6 +778,49 @@ async fn a_batch_post_records_its_step_verdict_before_the_readback() {
         response["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
         "{response}"
     );
+}
+
+/// A batch post whose marks readback fails records the cause with the step
+/// doubt (#884), in the result and in the durable file; the verdict stays a
+/// doubt either way.
+#[tokio::test]
+async fn a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt() {
+    for (readback, cause) in [
+        (None, "response_encoding_invalid"),
+        (Some(xml(created_one())), "marks_readback_unparsed"),
+    ] {
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.extend(readback);
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = batch_server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch_of_two(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["post_location"]["after_read_failure"], cause,
+            "{response}"
+        );
+        assert_eq!(
+            result["post_location"]["state"], "after_snapshot_unavailable",
+            "{response}"
+        );
+        let imports = server.imports_dir().unwrap();
+        let doubt: Value = serde_json::from_slice(
+            &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(doubt["state"], "unmatched", "{doubt}");
+        assert_eq!(doubt["cause"], cause, "{doubt}");
+        assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
+    }
 }
 
 /// With batch posting off, a batch of two is refused before any request.
@@ -1478,6 +1602,14 @@ async fn a_group_collection_that_reports_failure_is_refused_with_its_cause() {
     refused_on_the_group_read(failed, "group_status_not_success").await;
 }
 
+/// bridge#717: a group collection with no STATUS answer names its own cause,
+/// not Tally's failure answer.
+#[tokio::test]
+async fn a_group_collection_without_a_status_answer_is_refused_as_status_absent() {
+    let silent = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS/>");
+    refused_on_the_group_read(silent, "group_status_absent").await;
+}
+
 /// bridge#717: the group collection the queue re-reads after approval is
 /// refused as `group_export_invalid` with the same data-free `cause` the read
 /// before approval carries, not as a causeless queue failure. Nothing is sent
@@ -1532,6 +1664,12 @@ async fn a_queued_group_collection_of_another_company_is_refused_with_its_cause(
 async fn a_queued_group_collection_that_reports_failure_is_refused_with_its_cause() {
     let failed = replaced_once(&groups(), "<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
     refused_on_the_queued_group_read(failed, "group_status_not_success").await;
+}
+
+#[tokio::test]
+async fn a_queued_group_collection_without_a_status_answer_is_refused_as_status_absent() {
+    let silent = replaced_once(&groups(), "<STATUS>1</STATUS>", "");
+    refused_on_the_queued_group_read(silent, "group_status_absent").await;
 }
 
 /// Already changed since the build: refused before approval is asked, and no
@@ -2539,6 +2677,14 @@ async fn refused_by_build_binding(
     identities: Option<Vec<BoundLedger>>,
     desktop: bool,
 ) -> (Value, usize, usize, bool) {
+    refused_by_build_binding_under(identities, desktop, crate::agent::Redaction::None).await
+}
+
+async fn refused_by_build_binding_under(
+    identities: Option<Vec<BoundLedger>>,
+    desktop: bool,
+    redaction: crate::agent::Redaction,
+) -> (Value, usize, usize, bool) {
     let mut plans = before_approval();
     let expected = if identities.is_some() {
         // The Currency read and mode probe after the catalogue are never sent.
@@ -2550,7 +2696,7 @@ async fn refused_by_build_binding(
     };
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
+    let server = server_redacting(simulator.address(), directory.path(), redaction);
     let (mut line, args) = saved_batch(&server);
     line.ledger_identities = identities;
     server.append_import_ledger(&line).unwrap();
@@ -2608,10 +2754,15 @@ async fn a_ledger_replaced_under_its_name_since_the_build_is_refused_before_appr
                 "{result}"
             );
         }
-        assert!(result["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("(Cash)"));
+        // The desktop names the ledger; the MCP message leaves it to the list.
+        assert_eq!(
+            result["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Cash"),
+            desktop,
+            "{result}"
+        );
         assert_eq!(observed, expected, "{result}");
         assert!(!intent);
     }
@@ -3094,6 +3245,30 @@ async fn a_failed_readback_after_a_doubted_post_still_carries_the_doubt() {
     );
 }
 
+/// Only a busy wire lock earns the marks readback its retry (#884): a read
+/// that failed on the wire is asked once, so the retry never doubles a send
+/// Tally already answered badly.
+#[tokio::test]
+async fn a_marks_readback_that_failed_for_another_reason_is_sent_once() {
+    // No readback is scripted: a status answers it, so it fails. A second
+    // one is there to be consumed by a retry that must not happen.
+    let simulator = SequenceSimulator::spawn(with_sentinel(vec![status()])).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let request = crate::tally::agent_read_request::AgentReadRequest::parse(
+        super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+    )
+    .unwrap();
+    let result = server
+        .read_marks_after_post(request, std::time::Instant::now())
+        .await;
+    assert!(
+        result.is_err(),
+        "the sentinel must fail the read: {result:?}"
+    );
+    assert_eq!(sent(simulator).len(), 1);
+}
+
 /// A verdict replaces a pending check; an observed doubt outranks any later
 /// verdict; a check that could not run is not recorded; a verdict that cannot
 /// be written leaves the check, and the result, pending.
@@ -3223,3 +3398,137 @@ fn a_pending_mark_never_erases_a_doubt() {
 mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
+
+/// A post whose ledger no longer resolves to the master approved names the
+/// ledger only in the masters list, where the configured redaction applies:
+/// under none it is there, and under mask_parties it is nowhere in the
+/// response; the message names none.
+#[tokio::test]
+async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
+    let replaced = replaced_once(
+        &catalogue(),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+    );
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.push(xml(masters_moved_to(8)));
+        plans.extend(paired(replaced.clone()));
+        plans.extend(reconcile_readback());
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_redacting(simulator.address(), directory.path(), redaction);
+        let args = saved_captured_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(
+            result["error"]["code"], "posted_under_changed_masters",
+            "{response}"
+        );
+        assert_eq!(result["error"]["message"], super::CHANGED_MASTERS_MESSAGE);
+        // The whole response: the ledger is there under none, and nowhere
+        // under mask_parties.
+        assert_eq!(
+            response.to_string().contains("Cash"),
+            redaction == crate::agent::Redaction::None,
+            "{response}"
+        );
+    }
+}
+
+/// A post refused because a ledger changed since the build names the ledger
+/// only in its list, where the configured redaction applies: under none it is
+/// there, and under mask_parties it is nowhere in the result.
+#[tokio::test]
+async fn a_changed_ledger_refusal_names_no_ledger_under_mask_parties() {
+    let identities = vec![
+        BoundLedger {
+            name: "Cash".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
+        },
+        BoundLedger {
+            name: "WR2 Sales".into(),
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
+        },
+    ];
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        let (result, _, _, _) =
+            refused_by_build_binding_under(Some(identities.clone()), false, redaction).await;
+        assert_eq!(
+            result["error"]["code"], "import_masters_changed_since_build",
+            "{result}"
+        );
+        // The whole result: the ledger is listed under none, and appears
+        // nowhere under mask_parties.
+        assert_eq!(
+            result.to_string().contains("Cash"),
+            redaction == crate::agent::Redaction::None,
+            "{result}"
+        );
+    }
+}
+
+/// A post whose readback fails after its masters check found a changed ledger
+/// reports that check with the ledger marked: named under none, masked under
+/// mask_parties.
+#[tokio::test]
+async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
+    let replaced = replaced_once(
+        &catalogue(),
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-0000001f</GUID>",
+        ">61c6de69-1748-461c-ad3f-162cb949df9f-000000ff</GUID>",
+    );
+    for redaction in [
+        crate::agent::Redaction::None,
+        crate::agent::Redaction::MaskParties,
+    ] {
+        // No readback is scripted, so the read after the post fails.
+        let mut plans = before_approval();
+        plans.extend(after_approval(xml(created_one())));
+        plans.push(xml(masters_moved_to(8)));
+        plans.extend(paired(replaced.clone()));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_redacting(simulator.address(), directory.path(), redaction);
+        let args = saved_captured_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        // The failure path: no dispatch verdict, and the failure's own error.
+        assert!(result.get("dispatch").is_none(), "{response}");
+        assert_ne!(
+            result["error"]["code"], "posted_under_changed_masters",
+            "{response}"
+        );
+        assert!(result["error"]["code"].is_string(), "{response}");
+        assert_eq!(
+            result["masters_after_post"]["state"], "posted_under_changed_masters",
+            "{response}"
+        );
+        let ledgers = result["masters_after_post"]["ledgers"].as_array().unwrap();
+        assert_eq!(ledgers.len(), 1, "{response}");
+        assert_eq!(
+            ledgers[0] == "Cash",
+            redaction == crate::agent::Redaction::None,
+            "{response}"
+        );
+    }
+}

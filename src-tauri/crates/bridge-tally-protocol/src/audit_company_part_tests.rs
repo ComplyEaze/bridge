@@ -156,10 +156,6 @@ fn a_failed_or_malformed_response_is_refused() {
         Err(AuditCompanyPartError::StatusNotSuccess)
     );
     assert_eq!(
-        admit_audit_company_part(&body.replace("<STATUS>1</STATUS>", ""), GUID, "20250401"),
-        Err(AuditCompanyPartError::StatusNotSuccess)
-    );
-    assert_eq!(
         admit_audit_company_part(&body.replace("</ENVELOPE>", ""), GUID, "20250401"),
         Err(AuditCompanyPartError::Malformed)
     );
@@ -321,5 +317,67 @@ fn cdata_wrapped_fields_read_as_the_consumer_reads_them() {
             "20250401"
         ),
         Err(AuditCompanyPartError::Malformed)
+    );
+}
+
+/// The part's STATUS must read `1`; another value is Tally's failure answer. A
+/// complete envelope with no STATUS, an empty one or a self-closing one is no
+/// answer (bridge#717, #863). An empty body, a root that is not ENVELOPE, a
+/// response cut off after the STATUS, or a second STATUS is malformed.
+#[test]
+fn a_part_status_is_one_failure_or_absent_and_its_shape_is_checked() {
+    let body = part(&company(&complete()));
+    for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
+        let silent = body.replacen("<STATUS>1</STATUS>", absent, 1);
+        assert_ne!(silent, body);
+        assert_eq!(
+            admit_audit_company_part(&silent, GUID, "20250401"),
+            Err(AuditCompanyPartError::StatusAbsent),
+            "{absent:?}"
+        );
+        let cut = body.find("<STATUS>1</STATUS>").unwrap() + absent.len();
+        assert_eq!(
+            admit_audit_company_part(&silent[..cut], GUID, "20250401"),
+            Err(AuditCompanyPartError::Malformed),
+            "{absent:?} cut off"
+        );
+    }
+    for empty in [
+        "",
+        " \r\n",
+        "<ENVELOPE/>",
+        "<RESPONSE>Unknown Request</RESPONSE>",
+    ] {
+        assert_eq!(
+            admit_audit_company_part(empty, GUID, "20250401"),
+            Err(AuditCompanyPartError::Malformed),
+            "{empty:?}"
+        );
+    }
+    for repeated in [
+        "<STATUS></STATUS><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS></STATUS>",
+        "<STATUS/><STATUS>1</STATUS>",
+        "<STATUS>1</STATUS><STATUS/>",
+        "<STATUS/><STATUS/>",
+        "<STATUS>1</STATUS><STATUS>1</STATUS>",
+    ] {
+        assert_eq!(
+            admit_audit_company_part(
+                &body.replacen("<STATUS>1</STATUS>", repeated, 1),
+                GUID,
+                "20250401"
+            ),
+            Err(AuditCompanyPartError::Malformed),
+            "{repeated:?}"
+        );
+    }
+    assert_ne!(
+        AuditCompanyPartError::StatusAbsent.code(),
+        AuditCompanyPartError::StatusNotSuccess.code()
+    );
+    assert_eq!(
+        AuditCompanyPartError::StatusAbsent.code(),
+        "audit_company_part_status_absent"
     );
 }

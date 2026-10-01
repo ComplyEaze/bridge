@@ -230,10 +230,12 @@ def _loans_interest(c):
 
 def _partners_40b_194t(c):
     from tae.audit_tests import partners_40b_194t
-    from tae.config import partners_config
-    # As tae/pack.py calls it: the [partners] table, with the deed popped out of it.
+    from tae.config import partners_config, tds_payable_ledgers
+    # As tae/pack.py calls it: the [partners] table, with the deed popped out of it, and the ledgers the client's
+    # statutory dues classify as TDS payable.
     partners, deed = partners_config(c.cfg)
-    return partners_40b_194t, partners_40b_194t.run(c.eng, c.rules, partners, deed)
+    return partners_40b_194t, partners_40b_194t.run(c.eng, c.rules, partners, deed,
+                                                    tds_ledgers=tds_payable_ledgers(c.cfg))
 
 
 def _traces_documents(c):

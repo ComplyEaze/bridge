@@ -99,7 +99,13 @@ fn acquire_snapshot_at(
     })
 }
 
-fn lease_path(coordination_root: &Path, endpoint: &TallyEndpointConfig) -> Result<PathBuf, String> {
+/// The per-port lease file. `endpoint_wire` derives its per-send wire lock
+/// from this path, beside the lease, so both share one key and one directory;
+/// it never opens this file itself.
+pub(crate) fn lease_path(
+    coordination_root: &Path,
+    endpoint: &TallyEndpointConfig,
+) -> Result<PathBuf, String> {
     // Validate the configured host before intentionally collapsing all loopback
     // aliases for this port into one conservative dispatch lane.
     canonical_loopback_origin(endpoint)

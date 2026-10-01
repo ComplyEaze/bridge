@@ -62,6 +62,40 @@ enum ApprovalState {
     Approved,
 }
 
+/// How a post call enters (#725 slice 2.0).
+pub(in crate::agent) enum Entry {
+    /// A call from the agent or the desktop: it may ask, join or redeem.
+    Fresh,
+    /// The second pass of a call, from the top, to redeem the approval its
+    /// own Join just found, keeping that call's evidence. It may only
+    /// redeem: it never asks, so it can never show a second dialog. It also
+    /// keeps that call's start, so every budget in the second pass is
+    /// measured from the call and not from the pass.
+    RedeemOnly {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
+}
+
+/// What a post's checked body came to: an answer, or an approval its Join
+/// found that the same call redeems by entering again from the top, so every
+/// check before the wait is made again after it.
+enum Step {
+    Done(Box<ToolOutcome>),
+    Redeem,
+}
+
+/// What one pass of a post call came to: its answer, or a click its Join
+/// found already made, which the same call redeems in a second, redeem-only
+/// pass (#725 slice 2.0). The passes run one after the other, never nested.
+pub(in crate::agent) enum Pass {
+    Done(ToolOutcome),
+    Redeem {
+        evidence: Evidence,
+        call_started: std::time::Instant,
+    },
+}
+
 /// What waiting on a dialog came to.
 enum Waited {
     Answered((Result<ApprovedImport, String>, Answered)),
@@ -77,6 +111,46 @@ fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
     approval::CALL_BUDGET
         .saturating_sub(call_started.elapsed())
         .max(approval::MIN_DIALOG_WAIT)
+}
+
+/// Kept back from the call's ceiling for what a post still does after its
+/// marks readback: the verification readback took 12.1 s at 200 vouchers, the
+/// largest batch measured live, plus the spacing between the requests
+/// (`approval::MEASURED_POST`).
+/// Only lock waits are bounded: the retry's own send, and the wire waits of the
+/// checks after it (each at most the policy total), are not counted, so the
+/// call can pass its ceiling by about that much and stay under the host limit.
+const AFTER_READ_REST_OF_POST: std::time::Duration = std::time::Duration::from_secs(13);
+/// A retry with less to wait than this is not worth its send.
+const AFTER_READ_MIN_RETRY_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The wire wait for the one retry of the marks readback after a sent post
+/// (#884): the policy's own total, cut to what the call has left of its
+/// ceiling once the rest of the post is kept back. `None` when too little is
+/// left to be worth another wait, so a slow call is never stretched past the
+/// ceiling by the retry.
+fn after_read_retry_budget(
+    elapsed: std::time::Duration,
+    policy_total: std::time::Duration,
+) -> Option<std::time::Duration> {
+    let left = approval::CALL_CEILING
+        .saturating_sub(elapsed)
+        .saturating_sub(AFTER_READ_REST_OF_POST);
+    (left >= AFTER_READ_MIN_RETRY_WAIT).then(|| left.min(policy_total))
+}
+
+/// Why the marks readback after a sent post failed: the transport's own safe
+/// code when it has one (a busy wire lock is `tally_endpoint_busy`), so a
+/// doubt says the read was held back and never that the step moved wrongly.
+fn after_read_cause(error: &anyhow::Error) -> &'static str {
+    error
+        .chain()
+        .find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_transport::TallyTransportError>()
+                .map(bridge_tally_transport::TallyTransportError::safe_code)
+        })
+        .unwrap_or("marks_readback_failed")
 }
 
 /// Wait up to `budget` for the person's answer, stopping at once if the call
@@ -172,6 +246,43 @@ impl Server {
             Err(error) if error == "import_admission_busy" => Err(error.into()),
             Err(_) => Ok(None),
         }
+    }
+
+    /// The marks readback after a sent post. It gets a wire wait of its own:
+    /// the admission reads may have spent the call's budget, and a marks read
+    /// refused as busy after a sent post would record a lasting doubt on a
+    /// clean batch (#697). A busy refusal has waited that whole budget, so it
+    /// is tried once more with a second, cut to what the call has left of its
+    /// ceiling (#884); a refusal that survives is returned as it is.
+    async fn read_marks_after_post(
+        &self,
+        request: crate::tally::agent_read_request::AgentReadRequest,
+        call_started: std::time::Instant,
+    ) -> anyhow::Result<String> {
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
+        let first = crate::tally::runtime::with_operation_wire_budget(
+            self.runtime
+                .read_company_marks_once(self.tally_config(), request.clone()),
+        )
+        .await;
+        let busy = first.as_ref().err().is_some_and(|error| {
+            crate::endpoint_wire::wire_refusal(error)
+                == Some(bridge_tally_transport::WireRefusal::Busy)
+        });
+        let policy_total = self.runtime.wire_gate_config().retry().total();
+        let Some(budget) = busy
+            .then(|| after_read_retry_budget(call_started.elapsed(), policy_total))
+            .flatten()
+        else {
+            return first;
+        };
+        crate::tally::runtime::with_operation_wire_budget_of(
+            budget,
+            self.runtime
+                .read_company_marks_once(self.tally_config(), request),
+        )
+        .await
     }
 
     /// The company's masters across the post (#239). Only when the snapshots
@@ -289,6 +400,7 @@ impl Server {
                     .approval_remaining(batch_id)
                     .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
+                "next_step": "Call post_import again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s.",
             }),
         };
         ToolOutcome {
@@ -319,7 +431,58 @@ impl Server {
         expected_sha256: Option<&str>,
         scope: PostScope,
     ) -> Result<ToolOutcome, ToolFailure> {
-        let call_started = std::time::Instant::now();
+        match self
+            .post_import_entry(args, expected_sha256, scope, Entry::Fresh)
+            .await?
+        {
+            Pass::Done(outcome) => Ok(outcome),
+            // At most one more pass: a redeem-only pass never joins, so it
+            // never hands on another redeem.
+            Pass::Redeem {
+                evidence,
+                call_started,
+            } => {
+                #[cfg(test)]
+                let _ = BETWEEN_PASSES.try_with(|between| between());
+                match self
+                    .post_import_entry(
+                        args,
+                        expected_sha256,
+                        scope,
+                        Entry::RedeemOnly {
+                            evidence,
+                            call_started,
+                        },
+                    )
+                    .await?
+                {
+                    Pass::Done(outcome) => Ok(outcome),
+                    // Unreachable: only a Join hands on a redeem.
+                    Pass::Redeem { .. } => Err("import_approval_revoked".to_string().into()),
+                }
+            }
+        }
+    }
+
+    /// One pass of a post call: the whole post, or up to a Join that found a
+    /// click already made, which the caller then redeems in a second pass.
+    pub(in crate::agent) async fn post_import_entry(
+        &self,
+        args: &Value,
+        expected_sha256: Option<&str>,
+        scope: PostScope,
+        entry: Entry,
+    ) -> Result<Pass, ToolFailure> {
+        let (carried, call_started) = match entry {
+            Entry::Fresh => (None, std::time::Instant::now()),
+            Entry::RedeemOnly {
+                evidence,
+                call_started,
+            } => (Some(evidence), call_started),
+        };
+        #[cfg(test)]
+        let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
+        let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let snapshot = self
@@ -332,8 +495,10 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
-        let mut accumulated =
-            evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty());
+        // A re-entered call keeps what its first pass read (#725 slice 2.0).
+        let mut accumulated = carried.unwrap_or_else(|| {
+            evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty())
+        });
         let mut received_response = None;
         // Where the voucher went, once a POST has been sent (#574).
         let mut post_location: Option<Value> = None;
@@ -343,7 +508,7 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
-        let operation: Result<ToolOutcome, ToolFailure> = async {
+        let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
                 &self.settings.endpoint,
@@ -355,7 +520,10 @@ impl Server {
                 // posted, and must not keep other batches waiting (#725).
                 self.post_approvals
                     .revoke(batch_id, "batch_already_dispatched");
-                return self.verify_import(args).await;
+                return self
+                    .verify_import(args)
+                    .await
+                    .map(|outcome| Step::Done(Box::new(outcome)));
             }
             // The record's own hash only proves the record agrees with itself.
             // The file Bridge built must hold exactly the XML this record
@@ -374,21 +542,40 @@ impl Server {
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let redeeming = match scope {
+                // Never built by the flow: only an agent's Join hands on a
+                // redeem, and a second pass keeps its scope. The types allow
+                // this pair, and the desktop's post asks through its own
+                // dialog below, so it is refused before anything could ask
+                // (#725 slice 2.0).
+                PostScope::JournalOnly if redeem_only => {
+                    return Err("import_approval_revoked".to_string().into())
+                }
                 PostScope::JournalOnly => false,
+                // Re-entered to redeem what its Join found: only that
+                // approval lets it go on, and it never asks (#725 slice 2.0).
+                PostScope::Vouchers if redeem_only => {
+                    self.post_approvals.begin_redeem(batch_id)?;
+                    true
+                }
                 PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
                     Begin::Ask => false,
                     Begin::Redeem => true,
                     Begin::Busy(code) => return Err(code.to_string().into()),
                     Begin::Refused(code) => return Err(code.into()),
                     Begin::Waiting => {
-                        return Ok(self.approval_outcome(
+                        return Ok(Step::Done(Box::new(self.approval_outcome(
                             batch_id,
                             guid,
                             ApprovalState::Pending(None),
                             accumulated.clone(),
-                        ))
+                        ))))
                     }
                     Begin::Join(dialog) => {
+                        // Only a click that landed while no call waited is
+                        // posted by the call that finds it (#725 slice 2.0):
+                        // posting after this call's own wait could run past
+                        // the host's timeout on a large book (#852).
+                        let answered_at_join = dialog.answered().is_some();
                         let waited = match wait_for_answer(dialog, call_budget(call_started)).await
                         {
                             Waited::Cancelled => {
@@ -398,18 +585,32 @@ impl Server {
                             Waited::Answered(answer) => Ok(answer),
                         };
                         return match self.post_approvals.settle_join(batch_id, waited) {
-                            Joined::StillOpen { remaining } => Ok(self.approval_outcome(
-                                batch_id,
-                                guid,
-                                ApprovalState::Pending(Some(remaining)),
-                                accumulated.clone(),
-                            )),
-                            Joined::Approved => Ok(self.approval_outcome(
+                            Joined::StillOpen { remaining } => {
+                                Ok(Step::Done(Box::new(self.approval_outcome(
+                                    batch_id,
+                                    guid,
+                                    ApprovalState::Pending(Some(remaining)),
+                                    accumulated.clone(),
+                                ))))
+                            }
+                            // Posted by this call when it found the click
+                            // already made and the redeem fits in it, entering
+                            // again from the top so every check is made anew.
+                            Joined::Approved
+                                if answered_at_join
+                                    && self.post_approvals.redeem_fits_in_call(
+                                        call_started.elapsed(),
+                                        line.vouchers.len(),
+                                    ) =>
+                            {
+                                Ok(Step::Redeem)
+                            }
+                            Joined::Approved => Ok(Step::Done(Box::new(self.approval_outcome(
                                 batch_id,
                                 guid,
                                 ApprovalState::Approved,
                                 accumulated.clone(),
-                            )),
+                            )))),
                             Joined::Refused(code) => Err(code.into()),
                         };
                     }
@@ -426,6 +627,16 @@ impl Server {
             };
             if recorded {
                 return Err("import_remote_id_reused".to_string().into());
+            }
+            // A row another batch already sent to Tally is refused here too,
+            // before the person is asked to approve it (#876); the check that
+            // binds runs under the exclusive lock as the intent is written.
+            let row_posted = {
+                let _lock = self.lock_import_admission_shared()?;
+                self.import_rows_already_posted_while_admitted(&line)?
+            };
+            if row_posted.is_some() {
+                return Err("import_txn_already_posted".to_string().into());
             }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
@@ -593,12 +804,12 @@ impl Server {
                                 let remaining = dialog.remaining();
                                 self.post_approvals
                                     .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(self.approval_outcome(
+                                return Ok(Step::Done(Box::new(self.approval_outcome(
                                     batch_id,
                                     guid,
                                     ApprovalState::Pending(Some(remaining)),
                                     accumulated.clone(),
-                                ));
+                                ))));
                             }
                             Waited::Answered((answer, answered)) => {
                                 self.post_approvals.hold_approved(
@@ -615,12 +826,12 @@ impl Server {
                                     .post_approvals
                                     .fits_in_call(call_started.elapsed(), line.vouchers.len())
                                 {
-                                    return Ok(self.approval_outcome(
+                                    return Ok(Step::Done(Box::new(self.approval_outcome(
                                         batch_id,
                                         guid,
                                         ApprovalState::Approved,
                                         accumulated.clone(),
-                                    ));
+                                    ))));
                                 }
                             }
                         }
@@ -694,6 +905,15 @@ impl Server {
                         {
                             return Err(BeforeDispatchError::Refused(
                                 UnderLockRefusal::BatchChanged,
+                            ));
+                        }
+                        if self
+                            .import_rows_already_posted_while_admitted(&line)
+                            .map_err(BeforeDispatchError::Other)?
+                            .is_some()
+                        {
+                            return Err(BeforeDispatchError::Refused(
+                                UnderLockRefusal::TxnAlreadyPosted,
                             ));
                         }
                         // Spent here, once, under this lock and before the
@@ -871,9 +1091,11 @@ impl Server {
                         _ => None,
                     }
                 });
+                // A wire-gate refusal before the intent (#697) becomes the code
+                // itself in `from_runtime`; it is not repeated as the cause.
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
-                    failure.cause = group.or(transport);
+                    failure.cause = refusal_cause(&failure.code, group, transport);
                 }
                 failure
             })?;
@@ -907,12 +1129,16 @@ impl Server {
             // Where the voucher went (#574), read only once the journal write has
             // been attempted, so a slow or failed read delays nothing that records
             // the post. A failed read is reported, never guessed.
-            let marks_after = self
-                .runtime
-                .read_company_marks_once(self.tally_config(), company_marks_request.clone())
-                .await
-                .ok()
-                .and_then(|marks| location::parse_all_company_marks(&marks).ok());
+            let marks_read = self
+                .read_marks_after_post(company_marks_request.clone(), call_started)
+                .await;
+            let (marks_after, after_read_cause) = match marks_read {
+                Ok(marks) => match location::parse_all_company_marks(&marks) {
+                    Ok(rows) => (Some(rows), None),
+                    Err(_) => (None, Some("marks_readback_unparsed")),
+                },
+                Err(error) => (None, Some(after_read_cause(&error))),
+            };
             post_location = Some(location::classify_post_location(
                 &location::parse_all_company_marks(&posted.company_marks_before)
                     .unwrap_or_default(),
@@ -921,12 +1147,19 @@ impl Server {
                 &company.name,
                 reported_created,
             ));
+            if let (Some(cause), Some(location)) = (after_read_cause, post_location.as_mut()) {
+                location["after_read_failure"] = json!(cause);
+            }
             // A batch is clean only if the target's voucher mark moved by
             // exactly what Tally created; recorded durably, before anything
             // else can fail, so no later readback can lose it.
             if line.vouchers.len() > 1 {
                 if let Some(located) = &post_location {
-                    self.record_batch_step_verdict(batch_id, &located["target_voucher_step"]);
+                    self.record_batch_step_verdict_caused(
+                        batch_id,
+                        &located["target_voucher_step"],
+                        located["after_read_failure"].as_str(),
+                    );
                 }
             }
             journaled?;
@@ -958,9 +1191,22 @@ impl Server {
             if let Some(located) = post_location.clone() {
                 proof.payload["result"]["post_location"] = located;
             }
-            Ok(proof)
+            Ok(Step::Done(Box::new(proof)))
         }
         .await;
+        // A Join that found a click it can redeem in this call hands it to a
+        // second, redeem-only pass from the top (#725 slice 2.0). The approval
+        // stays held for that pass: nothing below revokes it.
+        let operation = match operation {
+            Ok(Step::Redeem) => {
+                return Ok(Pass::Redeem {
+                    evidence: accumulated,
+                    call_started,
+                })
+            }
+            Ok(Step::Done(outcome)) => Ok(*outcome),
+            Err(failure) => Err(failure),
+        };
         // A refused redemption withdraws the approval it was to use (#725): a
         // later call asks the person again. One taken by this call has already
         // lapsed; another call's, or a dialog, is left as it is.
@@ -971,7 +1217,7 @@ impl Server {
         // Even failure after a lost response carries the saved identity. The next
         // call must reconcile that batch, never create a replacement business event.
         match operation {
-            Ok(result) => Ok(result),
+            Ok(result) => Ok(Pass::Done(result)),
             Err(failure) => {
                 let snapshot = self.latest_import_snapshot(batch_id).ok().flatten();
                 let attempted = self.post_failure_attempt_observation(
@@ -997,11 +1243,25 @@ impl Server {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
                 }
+                // Name the earlier batch to verify. Both refusal paths land
+                // here; the journal only grows, so a later read finds one unless a later
+                // record of that batch replaced its row set, or the lock or the read failed
+                // (both swallowed here), and then no batch is named.
+                if outcome.payload["result"]["error"]["code"] == "import_txn_already_posted" {
+                    let blocking = snapshot.as_ref().and_then(|current| {
+                        let _lock = self.lock_import_admission_shared().ok()?;
+                        self.import_rows_already_posted_while_admitted(&current.batch)
+                            .ok()
+                            .flatten()
+                    });
+                    name_blocking_batch(&mut outcome.payload, blocking.as_deref());
+                }
                 if let Some(located) = post_location {
                     outcome.payload["result"]["post_location"] = located;
                 }
                 if let Some(masters) = masters_verdict {
                     outcome.payload["result"]["masters_after_post"] = masters;
+                    mark_verification_names(&mut outcome.payload["result"]);
                 }
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
@@ -1011,7 +1271,7 @@ impl Server {
                 } else {
                     explain_unbound_batch(&mut outcome.payload);
                 }
-                Ok(outcome)
+                Ok(Pass::Done(outcome))
             }
         }
     }
@@ -1116,6 +1376,36 @@ fn post_failure_outcome(
         truncated: false,
     }
 }
+/// The cause a failure adds to its code: none when it would only repeat the
+/// code, as a wire refusal's transport code does once `from_runtime` made it the
+/// code itself (#697).
+fn refusal_cause(
+    code: &str,
+    group: Option<&'static str>,
+    transport: Option<&'static str>,
+) -> Option<&'static str> {
+    group.or(transport).filter(|cause| code != *cause)
+}
+
+/// What a caller does when the port was busy for the readback after its own
+/// send (#697). Tally may or may not have accepted it; only the proof is missing.
+const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its readback was held back. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again.";
+
+/// The same, when whether the post was sent could not be observed.
+const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
+
+/// What a caller does when another batch already sent, or was found to have
+/// posted, a row of this one (#876). Tally's counters for a rejected send are
+/// not proof that the row is absent now, so Bridge never lifts the block itself.
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
+
+fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
+    let Some(id) = blocking else { return };
+    payload["result"]["error"]["blocking_batch_id"] = json!(id);
+    payload["result"]["error"]["next_step"] = json!(format!(
+        "{TXN_ALREADY_POSTED_NEXT_STEP} The earlier batch is {id}."
+    ));
+}
 
 fn reconciliation_failure_payload(
     batch_id: &str,
@@ -1123,9 +1413,30 @@ fn reconciliation_failure_payload(
     response: Option<&ledger::DispatchResponse>,
     code: &str,
 ) -> Value {
-    json!({"result":{"batch_id":batch_id,"attempt_recorded":attempted,"dispatch_response":response,"error":{"code":code,
+    let mut payload = json!({"result":{"batch_id":batch_id,"attempt_recorded":attempted,"dispatch_response":response,"error":{"code":code,
         "message":if attempted == Some(false) { "No posting attempt was recorded. Review the error before requesting approval again." }
-        else { "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry." }}}})
+        else { "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry." }}}});
+    // Every busy refusal says when to retry. A recorded attempt makes it the
+    // readback after a send; an unknown attempt (`None`) gets the same step in
+    // words that do not claim a send, since verify_import is right either way.
+    // A recorded non-attempt (`Some(false)`) offers no step: its message says
+    // no attempt was recorded.
+    if code == "import_txn_already_posted" {
+        payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
+        payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
+    if code == "tally_endpoint_busy" {
+        payload["result"]["error"]["retry_after_s"] =
+            json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+        match attempted {
+            Some(true) => {
+                payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
+            }
+            None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
+            Some(false) => {}
+        }
+    }
+    payload
 }
 
 fn mark_reconciliation_required(payload: &mut Value) {
@@ -1193,6 +1504,23 @@ pub(super) fn finalize_previous_attempt_reconciliation(
     }
 }
 
+/// What a person does about a doubt across a post: one text, in each message
+/// that asks for it.
+macro_rules! masters_review {
+    () => {
+        "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event."
+    };
+}
+const MASTERS_REVIEW: &str = masters_review!();
+
+/// The message for a post whose ledgers no longer resolve to the masters
+/// approved. The ledgers are named in `masters_after_post.ledgers`, where the
+/// response's redaction reaches them, never in this text.
+pub(super) const CHANGED_MASTERS_MESSAGE: &str = concat!(
+    "Posted to Tally, but the ledgers in masters_after_post.ledgers no longer resolve to the master you approved. ",
+    masters_review!()
+);
+
 /// Whether the masters check across a post leaves doubt that the voucher went
 /// to the ledgers approved (#239), as the refusal code and plain message. Only
 /// an unchanged resolution, or a mark proven unmoved, admits: any other state,
@@ -1208,18 +1536,10 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
             .get("batch_step")
             .and_then(|step| batch_step_doubt(Some(step)));
     }
-    const REVIEW: &str = "Review the voucher in Tally and correct it there if it went to the wrong ledger. It is already posted, so do not rebuild this event.";
     Some(if state == "posted_under_changed_masters" {
-        let ledgers = masters["ledgers"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .collect::<Vec<_>>()
-            .join(", ");
         (
             "posted_under_changed_masters",
-            format!("Posted to Tally, but these ledgers no longer resolve to the master you approved: {ledgers}. {REVIEW}"),
+            CHANGED_MASTERS_MESSAGE.to_string(),
         )
     } else {
         let again = if state == super::MASTERS_CHECK_PENDING || state == "check_unavailable" {
@@ -1229,7 +1549,7 @@ pub(super) fn masters_doubt(masters_after_post: Option<&Value>) -> Option<(&'sta
         };
         (
             "masters_after_post_unconfirmed",
-            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {REVIEW}"),
+            format!("Posted to Tally, but Bridge could not confirm that its ledgers are still the masters you approved.{again} {MASTERS_REVIEW}"),
         )
     })
 }
@@ -1484,29 +1804,28 @@ fn admit_build_binding(
 }
 
 /// How many changed ledgers a refusal names; the rest are counted.
-const REFUSAL_LEDGERS_NAMED: usize = 8;
+pub(super) const REFUSAL_LEDGERS_NAMED: usize = 8;
 
-/// Name the ledgers whose GUID changed since the build, in plain words, where
-/// no attempt is recorded.
+/// List the ledgers whose GUID changed since the build, each marked as a party
+/// name so the response's redaction applies, and, where no attempt is
+/// recorded, say in plain words what that means. The message refers to the
+/// list and names no ledger itself.
 fn name_changed_ledgers(payload: &mut Value, ledgers: &[String]) {
     let named = ledgers
         .iter()
         .take(REFUSAL_LEDGERS_NAMED)
-        .cloned()
+        .map(|ledger| party_name(ledger.clone()))
         .collect::<Vec<_>>();
     let error = &mut payload["result"]["error"];
     error["ledgers_changed"] = json!(named);
     error["ledgers_changed_total"] = json!(ledgers.len());
     if payload["result"]["attempt_recorded"] == json!(false) {
-        let mut list = named.join(", ");
-        if ledgers.len() > named.len() {
-            list.push_str(&format!(" and {} more", ledgers.len() - named.len()));
-        }
-        payload["result"]["error"]["message"] = json!(format!(
-            "A ledger this batch names is no longer the one it was built against ({list}): the \
-             name now belongs to a different ledger in Tally. Nothing was posted. Confirm which \
-             ledger you meant (it may now have another name) before building the batch again."
-        ));
+        payload["result"]["error"]["message"] = json!(
+            "A ledger this batch names (listed in error.ledgers_changed) is no longer the one it \
+             was built against: the name now belongs to a different ledger in Tally. Nothing was \
+             posted. Confirm which ledger you meant (it may now have another name) before \
+             building the batch again."
+        );
     }
 }
 
@@ -1558,6 +1877,11 @@ tokio::task_local! {
     pub(super) static SCRIPTED_REMOTE_ID: Uuid;
     /// Test-only: the REMOTEIDs a batch post mints, one per voucher.
     pub(super) static SCRIPTED_REMOTE_IDS: Vec<Uuid>;
+    /// Test-only: run between a call's two passes (#725 slice 2.0), as a
+    /// cancel, an expiry or another route's post landing there would.
+    pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Test-only: the start each pass of a post call took its budgets from.
+    pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
 }
 
 /// A fresh random REMOTEID for one native post.
@@ -1764,7 +2088,7 @@ fn admit_fresh_saved_voucher(
 /// is held in memory), is never made. Exactly the 100-character line cap.
 pub(super) fn agent_post_timing_lines() -> [String; 1] {
     [format!(
-        "Bridge posts this now or when asked again within {} minutes, unless cancelled, refused or restarted.",
+        "ComplyEaze Bridge posts now or if asked again within {} min, unless cancelled, refused or restarted.",
         approval::APPROVAL_TTL.as_secs() / 60
     )]
 }
@@ -1845,7 +2169,7 @@ fn review_preview_with(
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
@@ -1996,11 +2320,11 @@ fn batch_review_text(
     text.push(format!("Batch: {}", line.batch_id));
     text.push(String::new());
     text.push(
-        "Ledgers checked by identity against the build; Bridge adds its batch reference.".into(),
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.".into(),
     );
     text.push("Do not post a file already imported manually.".into());
     text.push(
-        "Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes."
+        "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
             .into(),
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());

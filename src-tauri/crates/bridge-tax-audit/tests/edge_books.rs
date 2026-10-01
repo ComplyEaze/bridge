@@ -635,9 +635,15 @@ fn check(name: &str) {
             }
             "partners_40b_194t" => {
                 let entity_type = s["entity_type"].as_str().unwrap_or("individual");
-                let r =
-                    partners_40b_194t::run(&book, &rules, &period(&s), entity_type, &partners(&s))
-                        .unwrap();
+                let r = partners_40b_194t::run(
+                    &book,
+                    &rules,
+                    &period(&s),
+                    entity_type,
+                    &partners(&s),
+                    &strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+                )
+                .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
                 let rust = canonical_test_result(&book, &r, None).unwrap();
                 let golden = common::golden_named(&format!("edge.{name}.{test}"));

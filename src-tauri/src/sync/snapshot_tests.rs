@@ -3573,6 +3573,18 @@ async fn reviewed_tally_error_codes_are_precise_allowlisted_and_persisted() {
             "endpoint_queue_deadline_exceeded",
         ),
         (
+            TallyError::Unsupported {
+                code: "tally_endpoint_busy".to_string(),
+            },
+            "tally_endpoint_busy",
+        ),
+        (
+            TallyError::Unsupported {
+                code: "tally_endpoint_lock_unavailable".to_string(),
+            },
+            "tally_endpoint_lock_unavailable",
+        ),
+        (
             TallyError::Protocol {
                 code: "source_supplied_sensitive_text".to_string(),
             },

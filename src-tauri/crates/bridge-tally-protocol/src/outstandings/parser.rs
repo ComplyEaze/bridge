@@ -390,76 +390,11 @@ fn convert_bill_allocation(
     }))
 }
 
-// Licensed TallyPrime 7.1 read-back on 2026-08-23 retained up to 9999 days,
-// but silently discarded 10000 days to an empty credit period. This is a
-// measured wire-format ceiling, not a business-term policy. Weeks and months
-// have no equivalent measured ceiling, so their checked resulting date is the
-// bound instead.
-const MAX_TALLY_CREDIT_PERIOD_DAYS: u32 = 9999;
-
+/// The scan's credit-period boundary: the shared parser, with its code carried
+/// as this module's error.
 fn parse_credit_period(value: &str) -> Result<CreditPeriod, OutstandingsError> {
-    let value = value.trim();
-    if value.is_empty() {
-        return Ok(CreditPeriod::Days(0));
-    }
-    let Some((magnitude, period, maximum)) = [
-        (
-            " Months",
-            CreditPeriod::Months as fn(u32) -> CreditPeriod,
-            None,
-        ),
-        (
-            " Month",
-            CreditPeriod::Months as fn(u32) -> CreditPeriod,
-            None,
-        ),
-        (
-            " Weeks",
-            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
-            None,
-        ),
-        (
-            " Week",
-            CreditPeriod::Weeks as fn(u32) -> CreditPeriod,
-            None,
-        ),
-        (
-            " Days",
-            CreditPeriod::Days as fn(u32) -> CreditPeriod,
-            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
-        ),
-        (
-            " Day",
-            CreditPeriod::Days as fn(u32) -> CreditPeriod,
-            Some(MAX_TALLY_CREDIT_PERIOD_DAYS),
-        ),
-    ]
-    .into_iter()
-    .find_map(|(suffix, period, maximum)| {
-        value
-            .strip_suffix(suffix)
-            .map(|magnitude| (magnitude, period, maximum))
-    }) else {
-        return Err(OutstandingsError::InvalidResponse(
-            "bill_credit_period_invalid",
-        ));
-    };
-    if magnitude.is_empty() || !magnitude.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(OutstandingsError::InvalidResponse(
-            "bill_credit_period_invalid",
-        ));
-    }
-    let magnitude = magnitude
-        .parse::<u32>()
-        .map_err(|_| OutstandingsError::InvalidResponse("bill_credit_period_invalid"))?;
-    if let Some(maximum) = maximum {
-        if magnitude > maximum {
-            return Err(OutstandingsError::InvalidResponse(
-                "bill_credit_period_invalid",
-            ));
-        }
-    }
-    Ok(period(magnitude))
+    crate::outstandings_shared::parse_credit_period(value)
+        .map_err(OutstandingsError::InvalidResponse)
 }
 
 fn parse_money(value: String) -> Result<MoneyValue, OutstandingsError> {

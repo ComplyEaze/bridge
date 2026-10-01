@@ -9,6 +9,7 @@ use std::fmt;
 use sha2::{Digest, Sha256};
 
 use crate::encode_tally_xml_request_utf16le;
+use crate::xml_text::escape_text as xml_escape;
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_LEDGER: &str = "BRIDGE TEMPLATE LEDGER";
@@ -309,15 +310,6 @@ fn valid_yyyymmdd(value: &str) -> bool {
         _ => 31,
     };
     (1..=maximum_day).contains(&day)
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 fn scope_sha256(company: &str, ledger: &str, to_date: &str) -> String {

@@ -80,6 +80,13 @@ or request shape. A mandatory manual-numbering preflight would require a
 separately observed voucher-type read contract; it cannot be inferred from the
 failed-`Alter` case.
 
+*Note, 2026-09-30.* A voucher-type read now exists: the `masters` tool with
+`kind=voucher_types` returns each type's numbering method as Tally reported it, measured on one
+synthetic book on licensed TallyPrime 7.1 Silver
+([§12a.12](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)).
+`Default` numbering remains unmeasured, so a numbering preflight is still not
+qualified and the rule above stands until that is measured.
+
 **Native mutation selector — verified 2026-09-07, bounded fresh-dispatch observation.**
 A new native attempt uses a fresh private `REMOTEID`, separate from the selected
 public file's identity. The narration keeps the original batch attribution.
@@ -428,8 +435,11 @@ the `FETCH` list and looks at what arrives.
 > So a live monetary read of a Gold book (`verify_import` over vouchers with amounts) and the
 > gateway import of Bridge-built Payment, Receipt and Contra files are both observed on Gold. Two
 > things are not:
-> - **Native posting.** `post_import` with its approval has not been observed on Gold, on Windows
->   or on Education.
+> - **Native posting.** `post_import` with its approval had not been observed on Gold, on Windows
+>   or on Education when this correction was written (2026-09-25). A native post (a batch with a
+>   recorded `dispatch_intent`) was later captured on Gold on 2026-09-28 (§9.14's recorded-list item:
+>   one client book, a debug build). The approval step was not recorded.
+>   Windows and Education remain unobserved.
 > - **Reads at scale.** Reads of books of thousands of vouchers are the open failure in bridge#485.
 >
 > Neither run exercised a second Tally user writing during the read. That is the case Gold adds
@@ -539,6 +549,10 @@ run per item, one voucher each (2026-09-25); per P5 an anomaly is repeated befor
 each is PARTIAL until it is.** Counters were read from the saved responses and state
 from a Voucher collection readback, not from the counters alone.
 
+**Exception, dated 2026-09-28.** The recorded-list item and the Payment, Receipt and Contra block
+below were measured on licensed TallyPrime 7.1 Gold, on one client book. The recorded-list item
+used Bridge's native post; the upsert block used the gateway. Each states its own scope.
+
 - **`ACTION="Cancel"` with the full voucher body cancels in place. PARTIAL — observed once (G).**
   - The response reported `ALTERED=1` and `CANCELLED=0`, with all other counters zero.
   - The readback showed the same GUID with `ISCANCELLED=Yes` and its entries gone: one empty entry list, with no ledger and no amount.
@@ -556,6 +570,7 @@ from a Voucher collection readback, not from the counters alone.
   - The upsert reported `CREATED=1`, with a **new GUID**, a **new MASTERID** (7 before, 855 after) and the number 815.
   - A resend therefore undoes a delete, and neither the GUID nor the MASTERID survives it. Anything keyed on either (a baseline, a binding) must treat the re-created voucher as new. The REMOTEID is the only link, and after a delete that link re-creates the voucher rather than restoring it.
   - **Current behaviour:** Bridge's native post sends a fresh random REMOTEID for every post and records it with the dispatch intent (#582), so it never resends one.
+  - **The recorded list is in batch voucher order. VERIFIED on one run (licensed TallyPrime 7.1 Gold, 2026-09-28).** For 9 of 9 batches whose import request was captured, `dispatch_intent.native_remote_ids` equalled the captured `REMOTEID` attributes, in order. So the recorded list can address each voucher of a batch. It is VERIFIED rather than PARTIAL because the equality was checked request by request over 9 captured requests, not inferred from one. It is one session on one client book, with the request captured for 9 of the 10 batches (one was not captured), on a debug build of master 4857aff6, so a second book would strengthen it.
   - **Design consequence, not current behaviour:** a batch-posting design must refuse to resend a REMOTEID Bridge has already sent, because a resend after a delete re-creates the voucher under a new GUID.
 - **Manual numbering with duplicates prevented refuses, and two of the three refusals are silent. PARTIAL — observed once each (G).** The same Journal type was switched to Manual with Prevent Duplicates, then restored.
   - An upsert (same `REMOTEID`) with no `VOUCHERNUMBER` reported `ERRORS=1` with `LINEERROR` "Voucher Number cannot be left BLANK!", and no create or alter counter moved.
@@ -566,7 +581,28 @@ from a Voucher collection readback, not from the counters alone.
   - An upsert omitting `REFERENCE` kept the stored value: omitted fields merge. **VERIFIED for a `REFERENCE` written over the gateway**, licensed 7.1 Silver. There are two independent runs: this block's (G), and a 2026-09-26 repeat through Bridge's own `build_import_xml` amendment file, sent unchanged (`ALTERED 1`, reference kept; bridge#239 comment of that date). A `REFERENCE` typed in Tally's own screens is **not measured**.
   - Each upsert moved the voucher's ALTERID to the book's next mark. PARTIAL — observed across several upserts on one book (G).
 
-**Not measured here:** other voucher types, Gold concurrency, an edit in Tally's
+**Not measured in the Journal block above (see the Gold block below for Payment, Receipt and Contra):** other voucher types, Gold concurrency, an edit in Tally's
 own screens, and repeatability beyond one run (except the `REFERENCE` merge above, repeated
 once on 2026-09-26). A masters delete in the same session drew no
 response, and its cause is **UNVERIFIED**; nothing is recorded about it here.
+
+**Payment, Receipt and Contra on Gold: an upsert alters in place. VERIFIED on one run (licensed
+TallyPrime 7.1 Gold, one client book, 2026-09-28).**
+- **What was sent.** The request shape was §9.13's, with the same `REMOTEID` a voucher was created
+  with, `ACTION="Create"`, and only the `NARRATION` changed. It was byte-identical to Bridge's own
+  native request apart from `NARRATION`: a renderer reproduced every one of the captured native vouchers
+  (about 260) exactly.
+- **Pilot.** One Payment returned `ALTERED=1`, `CREATED=0`. A vouchers read of that day showed the
+  same GUID, the same `VOUCHERNUMBER`, the same amounts and an unchanged day total. Only `NARRATION`
+  and `ALTERID` had changed.
+- **Then about 300 more** Payment, Receipt and Contra vouchers, in 13 requests, each returned `ALTERED` equal to
+  its voucher count and `CREATED=0`.
+- **Read-back.** A full vouchers read of the window (about 2,000 vouchers, paged) found each of the
+  roughly 300 target vouchers once. Their type, amounts, cancelled and optional flags were unchanged, and none
+  still carried the narration tag the upsert removed.
+- **What it extends.** It extends the Journal-on-Silver upsert above to Payment, Receipt and Contra
+  on Gold, for a narration change only. A changed amount, ledger or date was not sent, and
+  neither was a repeat run on a second book.
+- **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because about 300
+  vouchers were read back in full. It is still one session on one client book, not repeated on a
+  second, so treat it as **Confidence: PARTIAL** beyond that book.

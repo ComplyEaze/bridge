@@ -18,6 +18,7 @@ use crate::outstandings::{
 #[cfg(feature = "voucher-scan")]
 use crate::outstandings_shared::PinnedCompany;
 use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
+use crate::xml_text::escape_text as xml_escape;
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_FROM: &str = "20000101";
@@ -937,15 +938,6 @@ fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
         from = xml_escape(from),
         to = xml_escape(to),
     )
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 fn valid_yyyymmdd(value: &str) -> bool {

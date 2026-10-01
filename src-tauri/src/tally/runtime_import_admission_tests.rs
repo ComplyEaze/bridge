@@ -579,3 +579,158 @@ async fn queued_import_refuses_attribution_after_final_profile_and_catalogue_rea
         "initial mode/company and all three queued source reads survive refusal, with the marks snapshot"
     );
 }
+
+/// #697: a post whose wire lock is taken is refused at once, without waiting
+/// between its aim recheck and its attempt record, before the attempt is
+/// recorded, and the import is never sent.
+#[tokio::test]
+async fn a_post_refused_by_a_busy_wire_lock_records_nothing_and_sends_nothing() {
+    use bridge_tally_transport::{WireRefusal, WireRetryPolicy};
+    let companies = captured_companies();
+    let plans = queued_plans(
+        companies.clone(),
+        companies.clone(),
+        captured_catalogue(),
+        companies.clone(),
+        None,
+    );
+    let queue_reads = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let wire = WireGateConfig::default().with_retry(
+        WireRetryPolicy::new(
+            std::time::Duration::from_millis(10),
+            std::time::Duration::from_secs(5),
+        )
+        .unwrap(),
+    );
+    let runtime = TallyRuntime::default().with_wire_gate_config(wire.clone());
+    let config = TallyConfig {
+        host: "127.0.0.1".into(),
+        port: simulator.address().port(),
+    };
+    let lock_path = crate::endpoint_wire::wire_lock_path(wire.root(), &config);
+    // Another holder takes the wire lock after the queue's last read, between
+    // the admission recheck and the attempt's record, and keeps it.
+    let other_holder = std::sync::Mutex::new(None);
+    let dispatched = Arc::new(AtomicBool::new(false));
+    let guard = dispatched.clone();
+    let started = std::time::Instant::now();
+    let result = runtime
+        .post_approved_import(
+            config,
+            &identity(&companies),
+            approved_import(&companies, "20260901"),
+            |_: QueuedAdmission<'_>| {
+                let file = crate::local_files::file::open_local_file(&lock_path, true)?;
+                file.try_lock()
+                    .map_err(|_| anyhow::anyhow!("test holder could not take the wire lock"))?;
+                *other_holder.lock().unwrap() = Some(file);
+                Ok(())
+            },
+            move || {
+                guard.store(true, Ordering::Release);
+                Ok(())
+            },
+        )
+        .await;
+    let error = result.expect_err("the wire lock was never free");
+    // A five-second budget is available and none of it is used: the refusal
+    // is one try, not a wait that happens to run out.
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(2),
+        "the post's wire lock waited"
+    );
+    assert!(other_holder.lock().unwrap().is_some(), "the recheck ran");
+    assert!(error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>()));
+    assert!(error.chain().any(|cause| matches!(
+        cause.downcast_ref::<TallyTransportError>(),
+        Some(TallyTransportError::WireRefused {
+            refusal: WireRefusal::Busy
+        })
+    )));
+    assert!(
+        !dispatched.load(Ordering::Acquire),
+        "refused before the attempt is recorded"
+    );
+    // Every queue read, and no import POST.
+    assert_eq!(simulator.finish().unwrap().len(), queue_reads);
+}
+
+/// #697: the post's wire lock is held across the attempt's record and
+/// released once its one send has been read.
+#[tokio::test]
+async fn the_wire_lock_is_held_across_the_record_and_released_after_the_post() {
+    let companies = captured_companies();
+    let plans = queued_plans(
+        companies.clone(),
+        companies.clone(),
+        captured_catalogue(),
+        companies.clone(),
+        Some(companies.clone()),
+    );
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let runtime = TallyRuntime::default();
+    let config = TallyConfig {
+        host: "127.0.0.1".into(),
+        port: simulator.address().port(),
+    };
+    let lock_path =
+        crate::endpoint_wire::wire_lock_path(runtime.wire_gate_config().root(), &config);
+    let held_at_record = Arc::new(AtomicBool::new(false));
+    let seen = held_at_record.clone();
+    let probe_path = lock_path.clone();
+    runtime
+        .post_approved_import(
+            config,
+            &identity(&companies),
+            approved_import(&companies, "20260901"),
+            |_: QueuedAdmission<'_>| Ok(()),
+            move || {
+                let probe = crate::local_files::file::open_local_file(&probe_path, true).map_err(
+                    |error| {
+                        crate::tally::approved_import::BeforeDispatchError::Other(error.to_string())
+                    },
+                )?;
+                seen.store(
+                    matches!(probe.try_lock(), Err(std::fs::TryLockError::WouldBlock)),
+                    Ordering::Release,
+                );
+                Ok(())
+            },
+        )
+        .await
+        .expect("a free wire lock posts");
+    assert!(
+        held_at_record.load(Ordering::Acquire),
+        "the wire lock is held while the attempt is recorded"
+    );
+    let after = crate::local_files::file::open_local_file(&lock_path, true).unwrap();
+    after
+        .try_lock()
+        .expect("the lock is released once the one send has been read");
+    assert_eq!(simulator.finish().unwrap().len(), 33);
+}
+
+/// A pre-intent read refused by the wire gate stays the refusal, with its retry
+/// time and "nothing sent"; any other failed read is the typed unconfirmed
+/// refusal (#697).
+#[test]
+fn a_wire_refused_pre_intent_read_stays_the_wire_refusal() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError as Unconfirmed;
+    use bridge_tally_transport::WireRefusal;
+    let refused = anyhow::Error::new(TallyTransportError::WireRefused {
+        refusal: WireRefusal::Busy,
+    });
+    let kept = unconfirmed_unless_wire_refused(refused, Unconfirmed::MastersUnconfirmed);
+    assert_eq!(
+        crate::endpoint_wire::wire_refusal(&kept),
+        Some(WireRefusal::Busy)
+    );
+    assert!(!kept.chain().any(|cause| cause.is::<Unconfirmed>()));
+    let failed = anyhow::Error::new(TallyTransportError::ConnectionFailed);
+    let typed = unconfirmed_unless_wire_refused(failed, Unconfirmed::MastersUnconfirmed);
+    assert!(typed.chain().any(|cause| cause.is::<Unconfirmed>()));
+    assert_eq!(crate::endpoint_wire::wire_refusal(&typed), None);
+}

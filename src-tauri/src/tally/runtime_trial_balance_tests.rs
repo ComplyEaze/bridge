@@ -4,9 +4,9 @@ use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
 
-const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
+pub(super) const GUID: &str = "eebb9a9f-1679-4468-9e8f-814c729674cb";
 
-fn decode(bytes: &[u8]) -> String {
+pub(super) fn decode(bytes: &[u8]) -> String {
     String::from_utf16(
         &bytes
             .chunks_exact(2)
@@ -16,13 +16,13 @@ fn decode(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-fn companies() -> String {
+pub(super) fn companies() -> String {
     decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
     ))
 }
 
-fn extents() -> String {
+pub(super) fn extents() -> String {
     include_str!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     )
@@ -36,7 +36,7 @@ fn trial_balance() -> String {
     .to_string()
 }
 
-fn identity() -> VerifiedCompanyIdentity {
+pub(super) fn identity() -> VerifiedCompanyIdentity {
     let companies = parse_companies_from_collection(&companies()).unwrap();
     let row = companies
         .iter()
@@ -52,24 +52,24 @@ fn identity() -> VerifiedCompanyIdentity {
     .unwrap()
 }
 
-fn xml(text: String) -> ScenarioPlan {
+pub(super) fn xml(text: String) -> ScenarioPlan {
     ScenarioPlan::new(Fixture::SyntheticXml(text))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn status() -> ScenarioPlan {
+pub(super) fn status() -> ScenarioPlan {
     ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
 }
 
-fn education(text: &str) -> String {
+pub(super) fn education(text: &str) -> String {
     text.replace(
         "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
         "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
     )
 }
 
-fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
+pub(super) fn pair(plans: &mut Vec<ScenarioPlan>, response: ScenarioPlan) {
     plans.extend([response.clone(), status(), response, status()]);
 }
 
@@ -91,7 +91,7 @@ fn complete_plans(currency: String, report: String) -> Vec<ScenarioPlan> {
     plans
 }
 
-fn config(simulator: &SequenceSimulator) -> TallyConfig {
+pub(super) fn config(simulator: &SequenceSimulator) -> TallyConfig {
     TallyConfig {
         host: simulator.address().ip().to_string(),
         port: simulator.address().port(),

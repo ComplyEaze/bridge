@@ -7,16 +7,19 @@ unavailable.
 
 ## If a package is published
 
-Check the project's [GitHub Releases](https://github.com/lamemustafa/bridge/releases)
+Check the project's [GitHub Releases](https://github.com/ComplyEaze/bridge/releases)
 for a compatible `.mcpb`. If no release asset is listed, use the [source MCP
 setup](./README.md) instead; the steps below apply only after a package is
-published. Preview packaging targets Windows x64 and Apple Silicon Mac (ARM64);
-Intel Mac and other platforms are not qualified. Package availability
+published. The packages target Windows x64 and Apple Silicon Mac (ARM64); Intel
+Mac and other platforms are not qualified. Package availability
 is not a host-validation claim; read each release's notes for its current
 runtime gaps.
 
-An **unsigned preview** is labelled as a prerelease and is only for evaluation;
-it is not signed or notarized. Each archive has a same-named `.sha256` file and
+Releases are published on GitHub, the newest listed first and normally marked
+Latest. ComplyEaze
+Bridge is still being developed, so a release may contain errors: try it on
+test data first and keep current backups. It is not yet code-signed or
+notarized. Each archive has a same-named `.sha256` file and
 a small provenance record on its release so an organization can identify the
 downloaded bytes and source commit.
 
@@ -40,8 +43,9 @@ actually on.
 
 ## Install and configure
 
-1. Open the `.mcpb` file. If it does not open Claude Desktop, use **Settings →
-   Extensions → Advanced settings → Install Extension…** and choose the file.
+1. In Claude Desktop, use **Settings → Extensions → Advanced settings →
+   Install Extension…** and choose the `.mcpb` file. Opening the file directly
+   may also work on your computer.
 2. Keep **Tally host** as `localhost`. Bridge accepts only a local loopback
    endpoint. On a Mac, Tally must already be available there through a local
    Windows VM or organization-approved local forwarding. A separate PC or a
@@ -51,8 +55,12 @@ actually on.
    Tally's gateway is configured for that port. This is not a Tally licence
    port. Changing it changes only where Bridge calls Tally, not Tally's own
    HTTP setting.
-4. Save the extension settings and restart Claude Desktop if its tools are not
-   visible. In a new chat, use **Connectors** to confirm Bridge is connected.
+4. Read the Terms of Use linked in the extension settings, then turn on **I
+   accept the ComplyEaze Bridge Terms of Use**. Until you do, Bridge refuses
+   every tool call and the assistant reports why; it reads nothing from Tally.
+5. Save the extension settings, then quit Claude Desktop completely and reopen
+   it: Bridge reads the acceptance when it starts, and the tools can be listed
+   while every call is still refused. In a new chat, use **Connectors** to confirm Bridge is connected.
 
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while three

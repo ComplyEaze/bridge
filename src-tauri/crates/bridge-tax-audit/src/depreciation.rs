@@ -1110,6 +1110,7 @@ mod tests {
             s194i_per_month_per_payee_paise: None,
             deductor_individual_huf_prev_year_turnover_paise: None,
             deductor_individual_huf_prev_year_receipts_profession_paise: None,
+            s40b_v: None,
             s194h_aggregate_paise: None,
             s194j_aggregate_paise: None,
             s194a: None,

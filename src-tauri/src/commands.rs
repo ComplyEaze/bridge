@@ -30,7 +30,7 @@ use crate::sync::snapshot::{
     SqliteSnapshotStateStore,
 };
 use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
-use crate::tally::runtime::TallyRuntimeControlError;
+use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
 };
@@ -122,7 +122,34 @@ fn desktop_journal_command_error(
 #[path = "commands_native_ledger_tests.rs"]
 mod native_ledger_tests;
 
+/// The desktop's words for a send the endpoint wire gate held back (#697).
+/// Nothing was sent in either case.
+fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> TallyCommandError {
+    use bridge_tally_transport::WireRefusal;
+    match refusal {
+        WireRefusal::Busy => tally_command_error(
+            "tally_endpoint_busy",
+            "Operation",
+            "Another Bridge window or AI client is talking to Tally right now. Try again in a few seconds.",
+            "safe",
+            false,
+            "Try again in a few seconds. Nothing was sent to Tally.",
+        ),
+        WireRefusal::Unavailable => tally_command_error(
+            "tally_endpoint_lock_unavailable",
+            "Operation",
+            "Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
+            "after_change",
+            false,
+            "Check that Bridge's Application Support folder is available and writable, then try again.",
+        ),
+    }
+}
+
 fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
+    if let Some(refusal) = crate::endpoint_wire::wire_refusal(&error) {
+        return wire_refusal_command_error(refusal);
+    }
     if error.chain().any(|cause| {
         cause
             .downcast_ref::<PartyLedgerMasterSourceValidationError>()
@@ -304,22 +331,62 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
 /// Adds report context only after the shared runtime mapper has removed
 /// transport and internal details from the operator-facing text.
 fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
-    // Sized before the master request was sent (#637): not a validation
+    // Sized before any ledger request was sent (#637, #679): not a validation
     // failure, and retrying the unchanged export cannot help.
     if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
-            Some(PartyLedgerMasterSourceValidationError::TooLarge { .. })
+            Some(PartyLedgerMasterSourceValidationError::CatalogueTooLarge { .. })
         )
     }) {
         return tally_command_error(
-            "ledger_masters_too_large",
+            "ledger_catalogue_too_large",
             "Response size",
-            "Bridge withheld the party/ledger master: this company's master-alteration mark puts the compliance read over the size Bridge will request, because a read of that size has left Tally unable to answer. The mark is an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No ledger was requested.",
+            "Bridge withheld the party/ledger master: the company's master-alteration mark is too high for Bridge to count its ledgers within the response limit, and a response past the limit is cut off mid-read, which can leave Tally unable to answer. The mark is an upper bound on ledgers (stock items, units and every other master count too), so a company with fewer ledgers may be refused. No master was requested.",
             "after_change",
             false,
-            "Do not retry the unchanged export: it refuses again. A precise ledger count is pending (bridge#668).",
+            "Do not retry the unchanged export: it refuses again.",
         );
+    }
+    // The ledger count could not be established or did not add up (#679): each
+    // has its own typed code, not the endpoint failure the text heuristics of
+    // `tally_runtime_command_error` would read into it.
+    use PartyLedgerMasterSourceValidationError as Validation;
+    if let Some((code, too_large)) =
+        error
+            .chain()
+            .find_map(|cause| match cause.downcast_ref::<Validation>()? {
+                error @ (Validation::LedgerSpan { .. }
+                | Validation::LedgerSpanSliceInvalid { .. }
+                | Validation::LedgerCountDiffers { .. }
+                | Validation::LedgerCountCompanyDiffers { .. }
+                | Validation::LedgerCountCompanyInvalid { .. }) => Some((error.safe_code(), false)),
+                error @ (Validation::LedgerSpanSliceResponseTooLarge { .. }
+                | Validation::CountedCatalogueTooLarge { .. }) => Some((error.safe_code(), true)),
+                _ => None,
+            })
+    {
+        // A count that did not add up may be a book edited during the read; a
+        // count or a slice past what Bridge reads in one export refuses again.
+        return if too_large {
+            tally_command_error(
+                code,
+                "Response size",
+                "Bridge withheld the party/ledger master: counting this company's ledgers needs a response larger than Bridge will read. Nothing was released.",
+                "after_change",
+                false,
+                "Do not retry the unchanged export: it refuses again.",
+            )
+        } else {
+            tally_command_error(
+                code,
+                "Response validation",
+                "Bridge withheld the party/ledger master: counting this company's ledgers failed or did not add up. Nothing was released.",
+                "after_change",
+                false,
+                "Retry once while nobody is editing this company in Tally. If it refuses again, this company cannot be exported by Bridge yet.",
+            )
+        };
     }
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
@@ -1287,8 +1354,9 @@ pub async fn start_tally_core_snapshot(
 
     // Persist only the profile produced by the exact canary used for this run. A prior generic
     // endpoint probe intentionally cannot authorize a pack snapshot.
-    let canary = connector
-        .probe()
+    // One wire-lock wait budget for this command's reads (#697); the run it
+    // starts below is a spawned task, whose operations have their own.
+    let canary = with_operation_wire_budget(connector.probe())
         .await
         .map_err(|_| "The read-only Core Accounting canary could not complete".to_string())?;
     if !canary.reachable
@@ -1797,6 +1865,15 @@ pub async fn export_party_ledger_master(
     request: CompanyRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<String, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
+}
+
+async fn export_party_ledger_master_once(
+    app: tauri::AppHandle,
+    request: CompanyRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<String, TallyCommandError> {
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
     // The classified read admits a book with several Currency masters when
@@ -1808,8 +1885,9 @@ pub async fn export_party_ledger_master(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
+    let today = host_today()?;
     let source = runtime
-        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion)
+        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion, today)
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(
@@ -1855,6 +1933,14 @@ pub async fn export_party_ledger_master(
 /// operation validates the complete requested window before filtering.
 #[tauri::command]
 pub async fn fetch_selected_ledger_entries(
+    request: SelectedLedgerEntriesRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<serde_json::Value, TallyCommandError> {
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(fetch_selected_ledger_entries_once(request, runtime)).await
+}
+
+async fn fetch_selected_ledger_entries_once(
     request: SelectedLedgerEntriesRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<serde_json::Value, TallyCommandError> {
@@ -1913,19 +1999,22 @@ pub async fn fetch_selected_ledger_entries(
 fn requested_outstandings_as_of(
     explicit_as_of: Option<TallyDate>,
 ) -> Result<TallyDate, TallyCommandError> {
-    explicit_as_of
-        .map(Ok)
-        .unwrap_or_else(|| TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()))
-        .map_err(|_| {
-            tally_command_error(
-                "current_date_invalid",
-                "Bridge application",
-                "Bridge could not construct today's outstandings date.",
-                "after_change",
-                false,
-                "Check the workstation date and time, then repeat the read-only action.",
-            )
-        })
+    explicit_as_of.map(Ok).unwrap_or_else(host_today)
+}
+
+/// The Bridge host's calendar date: Tally is local to it, so accounting-day
+/// defaults use its calendar rather than UTC's.
+fn host_today() -> Result<TallyDate, TallyCommandError> {
+    TallyDate::parse(chrono::Local::now().format("%Y%m%d").to_string()).map_err(|_| {
+        tally_command_error(
+            "current_date_invalid",
+            "Bridge application",
+            "Bridge could not construct today's date.",
+            "after_change",
+            false,
+            "Check the workstation date and time, then repeat the read-only action.",
+        )
+    })
 }
 
 #[tauri::command]
@@ -1935,12 +2024,13 @@ pub async fn fetch_tally_outstandings(
     working_paper_exports: State<'_, WorkingPaperExportStore>,
     party_statement_sources: State<'_, PartyStatementSourceStore>,
 ) -> Result<FetchOutstandingsResponse, TallyCommandError> {
-    read_screen_outstandings(
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(read_screen_outstandings(
         request,
         &runtime,
         &working_paper_exports,
         &party_statement_sources,
-    )
+    ))
     .await
 }
 
@@ -2188,6 +2278,17 @@ pub async fn fetch_tally_outstandings_all_companies(
     request: AllCompaniesOutstandingsRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
+    // One wire-lock wait budget for the whole sweep (#697).
+    with_operation_wire_budget(fetch_tally_outstandings_all_companies_once(
+        request, runtime,
+    ))
+    .await
+}
+
+async fn fetch_tally_outstandings_all_companies_once(
+    request: AllCompaniesOutstandingsRequest,
+    runtime: State<'_, TallyRuntime>,
+) -> Result<Vec<CompanyOutstandingsEntry>, TallyCommandError> {
     if request.companies.is_empty() {
         return Ok(Vec::new());
     }
@@ -2323,9 +2424,13 @@ pub async fn desktop_post_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::post_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::post_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]
@@ -2333,9 +2438,13 @@ pub async fn desktop_reconcile_reviewed_journal(
     request: crate::agent::desktop_journal::DesktopJournalDescriptorRequest,
     runtime: State<'_, TallyRuntime>,
 ) -> Result<crate::agent::desktop_journal::DesktopJournalActionResponse, TallyCommandError> {
-    crate::agent::desktop_journal::reconcile_reviewed(request, runtime.inner().clone())
-        .await
-        .map_err(desktop_journal_command_error)
+    // One wire-lock wait budget for the whole command (#697).
+    with_operation_wire_budget(crate::agent::desktop_journal::reconcile_reviewed(
+        request,
+        runtime.inner().clone(),
+    ))
+    .await
+    .map_err(desktop_journal_command_error)
 }
 
 #[tauri::command]
@@ -2523,12 +2632,20 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     let mut command = {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("open");
         command.arg("-R").arg(&target);
         command
     };
     #[cfg(target_os = "windows")]
     let mut command = {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("explorer");
         // `explorer` wants the selector and path as one argument.
         command.arg(format!("/select,{}", target.display()));
@@ -2537,6 +2654,10 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let mut command = {
         let parent = target.parent().unwrap_or(&target);
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
+        )]
         let mut command = std::process::Command::new("xdg-open");
         command.arg(parent);
         command

@@ -18,6 +18,11 @@ on:
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
+  # A daily full run on master: push runs skip the heavy jobs when the merge queue already ran
+  # them on the same commit, so this run is what keeps the Rust caches warm (they are saved
+  # only by push, manual and scheduled runs) and catches drift that no change triggers.
+  schedule:
+    - cron: '17 3 * * *'
 
 concurrency:
   # A pull request's newer push supersedes its older run. Every other run (a
@@ -33,7 +38,10 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).
+      actions: read
     outputs:
+      full: ${{ steps.scope.outputs.full }}
       bundle: ${{ steps.scope.outputs.bundle }}
       native: ${{ steps.scope.outputs.native }}
       tax_audit: ${{ steps.scope.outputs.tax_audit }}
@@ -49,31 +57,52 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          # `full` is the unscoped run: every heavy job runs, whatever changed.
+          full_run() {
+            echo 'full=true' >> "$GITHUB_OUTPUT"
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
             echo 'native=true' >> "$GITHUB_OUTPUT"
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "schedule" ]]; then
+            full_run
+          fi
+
+          # A push to master is a full run unless the merge queue already ran this exact commit green
+          # (scripts/master-push-reuse.mjs). Any error or doubt in that lookup is a full run: the
+          # `|| true` and the exact-line match mean only a printed `reuse=true` skips anything.
+          # To turn the reuse off, delete this block: every push is then a full run again.
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            decision="$(node scripts/master-push-reuse.mjs || true)"
+            printf '%s\n' "$decision"
+            if ! printf '%s\n' "$decision" | grep -qx 'reuse=true'; then
+              full_run
+            fi
+            echo 'full=false' >> "$GITHUB_OUTPUT"
+            echo 'bundle=false' >> "$GITHUB_OUTPUT"
+            echo 'native=false' >> "$GITHUB_OUTPUT"
+            echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE_SHA"
-          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
-            base="$MERGE_GROUP_BASE_SHA"
           else
-            base="$BEFORE_SHA"
+            base="$MERGE_GROUP_BASE_SHA"
           fi
 
-          # A new branch has no useful predecessor. Keep the conservative path.
+          # A missing base has no useful predecessor. Keep the conservative path.
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            echo 'bundle=true' >> "$GITHUB_OUTPUT"
-            echo 'native=true' >> "$GITHUB_OUTPUT"
-            echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
-            exit 0
+            full_run
           fi
+
+          echo 'full=false' >> "$GITHUB_OUTPUT"
 
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
@@ -171,7 +200,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}
+          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || github.event_name == 'push' && 'push' || 'workflow_dispatch' }}
         run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only
       - run: node scripts/check-protocol-section-numbers.mjs
       - run: node scripts/check-protocol-section-numbers.test.mjs
@@ -208,7 +237,7 @@ jobs:
             src-tauri -> target
             tools -> target
           # bridge#669: a PR-scoped cache only serves that PR; PRs restore master's.
-          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Test portable Tally truth layer
         working-directory: src-tauri
         run: >-
@@ -311,7 +340,7 @@ jobs:
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
     # check is deliberately skipped only for frontend- and documentation-only PRs.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
     # release profiles unchanged; assertions and overflow checks stay enabled.
@@ -360,7 +389,7 @@ jobs:
           env-vars: ${{ runner.os == 'Windows' && 'ImageOS ImageVersion OPENSSL LIBCLANG' || '' }}
           # PRs consume trusted base caches. Manual branch runs can measure cold
           # and warm reuse in their own scope before a change reaches master.
-          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Record Windows prerequisite cache state
         if: runner.os == 'Windows'
         shell: pwsh
@@ -512,7 +541,7 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and every
     # master/manual run. Rust/Tauri PRs retain the native platform matrix above.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -562,7 +591,7 @@ jobs:
           # Tauri sets this inside its process; include it before cache lookup so
           # artifacts from a plain Cargo build cannot masquerade as a warm bundle.
           env-vars: ${{ runner.os == 'macOS' && 'MACOSX_DEPLOYMENT_TARGET' || '' }}
-          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+          save-if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
       - name: Set up Windows native prerequisites
         id: windows-bundle-prerequisites
         if: runner.os == 'Windows'
@@ -728,7 +757,7 @@ jobs:
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
     # platforms as bundle-smoke, whose runs it guards.
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -813,7 +842,7 @@ jobs:
     # master left inconsistent by a merge that bypassed it then reds crate PRs and
     # the nightly run, not every unrelated PR.
     needs: [changes]
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.tax_audit == 'true'
+    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.tax_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

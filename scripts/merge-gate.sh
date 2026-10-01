@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Validate a pull request's compatibility-surface reseal, run the privacy/PII
-# scan, and confirm review evidence names the current head SHA.
+# Validate a pull request's pinned-path acknowledgement (compatibility surface),
+# run the privacy/PII scan, and confirm review evidence names the current head
+# SHA (and, when a pinned path is touched, the acknowledgement and those paths).
 #
 # Usage: scripts/merge-gate.sh <pr-number> [--repo OWNER/NAME]
 #        [--independent-review-sha FULL_SHA] (manual attestation naming the head)
@@ -58,7 +59,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h|--help)
-      sed -n '2,15p' "$0"
+      sed -n '2,16p' "$0"
       exit 0
       ;;
     -*)
@@ -98,8 +99,10 @@ fi
 
 # This command encodes Bridge-specific master workflow and surface policy.
 # An arbitrary repository's passing checks cannot qualify that contract.
-if [ "$REPO" != "lamemustafa/bridge" ]; then
-  echo "unsupported repository: this gate implements lamemustafa/bridge policy" >&2
+# Two names: the repository moved from the lamemustafa account to the ComplyEaze
+# organization, and the old name stays valid as a redirect, so both are accepted.
+if [ "$REPO" != "lamemustafa/bridge" ] && [ "$REPO" != "ComplyEaze/bridge" ]; then
+  echo "unsupported repository: this gate implements the Bridge policy (lamemustafa/bridge or ComplyEaze/bridge)" >&2
   exit 2
 fi
 
@@ -186,6 +189,7 @@ fi
 
 : >"$errfile"
 metadata_status=0
+metadata_commits_proven=0
 metadata_commits=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/commits?per_page=100" 2>"$errfile") || metadata_status=$?
 if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -e --argjson expected "$metadata_commit_total" --arg head "$head" '
   type == "array" and (all(.[]; type == "array") or all(.[]; type == "object")) and
@@ -207,6 +211,7 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
   unknown "could not prove complete head-bound PR commit metadata for the privacy scan"
   privacy_metadata=""
 else
+  metadata_commits_proven=1
   # Author and committer emails were structurally validated above and are an
   # explicit identity-only source class. Do not mix them into payload/path/
   # metadata scan input, where an identical address would be customer data.
@@ -270,22 +275,35 @@ else
     unknown "changed-file response has $changed_count unique records; PR metadata reports $changed_files_expected"
   fi
 fi
-# Read and validate the surface (schema 2; schema 1 only at the base tip) as a
-# required object. Any transport, decoding, JSON, or schema failure is
-# indeterminate; an unrelated nested
-# `path` must not turn an incomplete manifest into an empty pin set. Both the
-# reviewed head and captured base tip are checked: a head surface that silently
-# drops a previously pinned path is a human hold, and changed paths are tested
-# against the union so an unpinned head cannot hide a reseal obligation.
+# Read and validate the surface as a required object: schema 3 at the head
+# (an authored pin list, no stored hashes), schema 2 or 3 at the base tip and
+# at the merge base (a schema-2 base under a schema-3 head is the cut-over PR).
+# Any transport, decoding, JSON, or schema failure is indeterminate; an
+# unrelated nested `path` must not turn an incomplete manifest into an empty
+# pin set.
+#
+# A pinned file is not hash-checked here (CI computes the digest from live
+# bytes). Instead, a PR that touches a pinned path must ADD exactly one
+# acknowledgement file, docs/tally/compatibility/acks/pr-<PR>.txt, listing the
+# touched paths, and a review or comment by the acknowledging reviewer must name
+# the head, the acknowledgement path and every touched path (checked below,
+# beside the head-SHA review evidence).
 SURFACE="docs/tally/compatibility/compatibility-surface.json"
-read_surface_paths() {
+ACK_DIR="docs/tally/compatibility/acks"
+ACK_PATH="$ACK_DIR/pr-$PR.txt"
+ack_required=0
+ack_touched=""
+ack_reviewer=""
+
+# Read a repository file at a ref through the contents API into
+# $contents_text_result. Any failure returns 1 with the result empty.
+read_contents_text() {
   local ref="$1"
-  local allow_schema_1="$2"
+  local path="$2"
   local response content decoded decode_status
-  surface_paths_result=""
-  surface_schema_result=""
+  contents_text_result=""
   : >"$errfile"
-  response=$(gh api "repos/$REPO/contents/$SURFACE?ref=$ref" 2>"$errfile") || return 1
+  response=$(gh api "repos/$REPO/contents/$path?ref=$ref" 2>"$errfile") || return 1
   content=$(jq -er 'select(.encoding == "base64") | .content | strings' <<<"$response") || return 1
   decoded=""
   decode_status=0
@@ -294,38 +312,69 @@ read_surface_paths() {
     decode_status=0
     decoded=$(printf '%s' "${content//$'\n'/}" | base64 -D 2>"$errfile") || decode_status=$?
   fi
-  if [ "$decode_status" -ne 0 ] || ! jq -e --arg allow_schema_1 "$allow_schema_1" '
+  [ "$decode_status" -eq 0 ] || return 1
+  contents_text_result="$decoded"
+}
+
+# $2 is "3" (head: schema 3 only) or "2or3" (base tip and merge base).
+read_surface_paths() {
+  local ref="$1"
+  local accepted="$2"
+  surface_paths_result=""
+  surface_schema_result=""
+  surface_reasoned_result=""
+  surface_bad_reason_result=""
+  surface_seen_schema_result=""
+  read_contents_text "$ref" "$SURFACE" || return 1
+  # Remember what schema the file claims, so a stale schema-2 head gets a useful message.
+  surface_seen_schema_result=$(jq -r '.schema_version? // empty | tostring' <<<"$contents_text_result" 2>/dev/null || true)
+  if ! jq -e --arg accepted "$accepted" '
     type == "object" and
-    # Schema 2 stores only the pins (bridge#760). Schema 1, which also stored
-    # the aggregate digest, is read only at the base tip, which may predate it.
-    ((.schema_version == 2 and (keys == ["files", "schema_version"])) or
-     ($allow_schema_1 == "yes" and .schema_version == 1 and
-      ((.manifest_sha256 | type) == "string") and (.manifest_sha256 | test("^[0-9a-f]{64}$")))) and
-    (.files | type == "array" and length > 0 and
-      all(.[]; type == "object" and
-        ((.path | type) == "string") and (.path | length > 0) and
-        ((.sha256 | type) == "string") and (.sha256 | test("^[0-9a-f]{64}$")))) and
-    (([.files[].path] | length) == ([.files[].path] | unique | length))
-  ' <<<"$decoded" >/dev/null 2>&1; then
+    (.schema_version as $sv |
+      (keys == ["files", "schema_version"]) and
+      ($sv == 3 or ($accepted == "2or3" and $sv == 2)) and
+      (.files | type == "array" and length > 0 and
+        all(.[]; type == "object" and
+          ((.path | type) == "string") and (.path | length > 0) and
+          (if $sv == 3 then
+             ((keys - ["path", "reason"]) | length == 0) and
+             ((has("reason") | not) or ((.reason | type) == "string"))
+           else
+             ((.sha256 | type) == "string") and (.sha256 | test("^[0-9a-f]{64}$"))
+           end))) and
+      (([.files[].path] | length) == ([.files[].path] | unique | length)))
+  ' <<<"$contents_text_result" >/dev/null 2>&1; then
     return 1
   fi
-  surface_paths_result=$(jq -r '.files[].path' <<<"$decoded")
-  surface_schema_result=$(jq -r '.schema_version' <<<"$decoded")
+  surface_paths_result=$(jq -r '.files[].path' <<<"$contents_text_result")
+  surface_schema_result=$(jq -r '.schema_version' <<<"$contents_text_result")
+  surface_reasoned_result=$(jq -r '.files[] | select(((.reason // "") | test("\\S"))) | .path' <<<"$contents_text_result")
+  # The pin list caps a reason at 500 characters (not bytes) and refuses control characters
+  # (Cc), as the Rust loader and scripts/check-surface-ack.mjs do.
+  surface_bad_reason_result=$(jq -r '.files[] | select((.reason // "") | (length > 500 or test("[\u0000-\u001F\u007F-\u009F]"))) | .path' <<<"$contents_text_result")
 }
 
 head_surface_status=0
-read_surface_paths "$head" no || head_surface_status=$?
+read_surface_paths "$head" 3 || head_surface_status=$?
 if [ "$head_surface_status" -ne 0 ]; then
-  unknown "could not read and validate compatibility surface at $short"
+  if [ "$surface_seen_schema_result" = "2" ]; then
+    unknown "could not read and validate compatibility surface at $short: it is still schema 2 (a branch that predates schema 3); merge master into the branch and migrate the pin list to schema 3, see docs/release-process.md"
+  else
+    unknown "could not read and validate compatibility surface at $short"
+  fi
   pinned=""
+  head_reasoned=""
+  head_bad_reason=""
 else
   pinned="$surface_paths_result"
+  head_reasoned="$surface_reasoned_result"
+  head_bad_reason="$surface_bad_reason_result"
   say "ok" "validated schema-$surface_schema_result compatibility surface at head $short"
 fi
 
 base_surface_status=0
 if [ -n "$base_tip" ]; then
-  read_surface_paths "$base_tip" yes || base_surface_status=$?
+  read_surface_paths "$base_tip" 2or3 || base_surface_status=$?
 fi
 if [ -n "$base_tip" ] && [ "$base_surface_status" -ne 0 ]; then
   unknown "could not read and validate compatibility surface at base ${base_tip:0:7}"
@@ -337,20 +386,213 @@ else
   base_pinned=""
 fi
 
-if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
-  removed_pins=$(comm -23 <(sort -u <<<"$base_pinned") <(sort -u <<<"$pinned"))
-  if [ -n "$removed_pins" ]; then
-    removed_count=$(wc -l <<<"$removed_pins" | tr -d ' ')
-    unknown "$removed_count base-pinned path(s) are absent from the head surface; human review is required"
-  fi
-  union_pinned=$(printf '%s\n%s\n' "$base_pinned" "$pinned" | sort -u)
-  touched=$(comm -12 <(sort -u <<<"$union_pinned") <(sort -u <<<"$changed") | awk -v surface="$SURFACE" '$0 != surface')
-  if [ -z "$touched" ]; then
-    say "ok" "changed files contain no pinned path requiring a reseal"
-  elif grep -Fxq "$SURFACE" <<<"$changed"; then
-    say "ok" "changed pinned paths include the compatibility surface"
+# Pins added or removed by THIS PR are measured against the PR's merge base, not
+# the base tip: a PR behind a master commit that added a pin would otherwise
+# look as if it removed that pin.
+merge_base=""
+merge_base_pinned=""
+if [ -n "$base_tip" ] && [ -n "$base_pinned" ]; then
+  : >"$errfile"
+  merge_base_status=0
+  merge_base=$(gh api "repos/$REPO/compare/${base_tip}...${head}?per_page=1" --jq '.merge_base_commit.sha' 2>"$errfile") || merge_base_status=$?
+  if [ "$merge_base_status" -ne 0 ] || ! [[ "$merge_base" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    unknown "could not read the merge base of $short and base tip ${base_tip:0:7}"
+    merge_base=""
+  elif [ "$merge_base" = "$base_tip" ]; then
+    merge_base_pinned="$base_pinned"
   else
-    bad "changed pinned paths omit the compatibility surface reseal"
+    merge_base_surface_status=0
+    read_surface_paths "$merge_base" 2or3 || merge_base_surface_status=$?
+    if [ "$merge_base_surface_status" -ne 0 ]; then
+      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}"
+    else
+      merge_base_pinned="$surface_paths_result"
+      say "ok" "validated schema-$surface_schema_result compatibility surface at merge base ${merge_base:0:7}"
+    fi
+  fi
+fi
+
+# One path per line, blank lines dropped, byte-order sorted and unique.
+path_set() { printf '%s\n' "$1" | sed '/^$/d' | LC_ALL=C sort -u; }
+# Print the lines of a path list that are not plain repository-relative paths.
+malformed_paths() {
+  awk '{
+    bad = 0
+    if ($0 ~ /^\// || $0 ~ /\\/ || $0 ~ /^ / || $0 ~ / $/) bad = 1
+    n = split($0, seg, "/")
+    for (i = 1; i <= n; i++) if (seg[i] == "" || seg[i] == "." || seg[i] == "..") bad = 1
+    if (bad) print
+  }'
+}
+first_lines() { head -n 5 | paste -sd ' ' -; }
+# Succeeds when the non-blank lines are strictly ascending in byte order.
+is_sorted_unique() {
+  local text
+  text=$(sed '/^$/d' <<<"$1")
+  [ -z "$text" ] || LC_ALL=C sort -c -u <<<"$text" 2>/dev/null
+}
+
+# The branch history check, as in scripts/check-surface-ack.mjs. The diff against the base cannot
+# see a pin the branch added and then lost (a merge resolved by taking the other side's pin list):
+# at the head the list equals the base's. So every commit of the PR (the complete, head-bound list
+# proved above) is read with its parents: a path is collected when a commit's pin list holds it and
+# none of its parents' lists does (a merge is compared with ALL its parents). A collected path that
+# is in neither the base tip's list nor the head's was pinned by the branch and withdrawn. It is a
+# removed pin: the acknowledgement must declare it with a "removed-pin:" line. Any commit whose
+# list cannot be read and parsed makes the answer indeterminate (fail closed).
+withdrawn_pins=""
+history_cache="$tmpdir/pin-history"
+# The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
+pins_at_commit() {
+  local sha="$1"
+  local file="$history_cache/$sha"
+  pins_at_result=""
+  if ! [ -f "$file" ]; then
+    read_contents_text "$sha" "$SURFACE" || return 1
+    jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
+      <<<"$contents_text_result" >/dev/null 2>&1 || return 1
+    jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
+    mv "$file.tmp" "$file"
+  fi
+  pins_at_result="$file"
+}
+if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
+  if [ "$metadata_commits_proven" -ne 1 ]; then
+    unknown "the PR's complete commit list is unproven, so a pin the branch added and then lost cannot be ruled out"
+  else
+    mkdir -p "$history_cache"
+    commit_records=$(jq -r '(if all(.[]; type == "array") then flatten else . end)[] |
+      if (.parents | type) == "array" and all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-fA-F]{40}$"))) then
+        ([.sha] + [.parents[].sha]) | join(" ")
+      else "NOPARENTS " + .sha end' <<<"$metadata_commits" 2>/dev/null) || commit_records="NOPARENTS unreadable"
+    history_status=0
+    collected=""
+    parents_union="$tmpdir/parents-union"
+    while read -r -a record; do
+      [ "${#record[@]}" -gt 0 ] || continue
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; break; fi
+      pins_at_commit "${record[0]}" || { history_status=1; break; }
+      own_file="$pins_at_result"
+      : >"$parents_union"
+      for parent in "${record[@]:1}"; do
+        pins_at_commit "$parent" || { history_status=1; break 2; }
+        cat "$pins_at_result" >>"$parents_union"
+      done
+      LC_ALL=C sort -u -o "$parents_union" "$parents_union"
+      collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
+    done <<<"$commit_records"
+    if [ "$history_status" -ne 0 ]; then
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out"
+    else
+      withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
+    fi
+  fi
+fi
+
+if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merge_base_pinned" ]; then
+  removed_pins=$(LC_ALL=C comm -23 <(path_set "$merge_base_pinned") <(path_set "$pinned"))
+  removed_pins=$(path_set "$(printf '%s\n%s\n' "$removed_pins" "$withdrawn_pins")")
+  added_pins=$(LC_ALL=C comm -13 <(path_set "$merge_base_pinned") <(path_set "$pinned"))
+  union_pinned=$(path_set "$(printf '%s\n%s\n' "$base_pinned" "$pinned")")
+  # Both names of a rename count: the old path is what a pinned rename removes.
+  changed_names=$(path_set "$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records")")")
+  # A `.gitattributes` below the root can change the bytes of a pinned file (eol, ident,
+  # working-tree-encoding) without any pinned path in the diff, so none is allowed.
+  nested_attributes=$(awk -F/ 'NF > 1 && $NF == ".gitattributes"' <<<"$changed_names" | first_lines)
+  [ -z "$nested_attributes" ] || bad "a nested .gitattributes can change the bytes of a pinned file without a pinned path changing; none is allowed: $nested_attributes"
+  changed_pinned=$(LC_ALL=C comm -12 <(printf '%s\n' "$union_pinned") <(printf '%s\n' "$changed_names") \
+    | awk -v surface="$SURFACE" '$0 != surface' \
+    | LC_ALL=C comm -23 - <(path_set "$removed_pins"))
+  ack_expected=$(path_set "$(printf '%s\n%s\n' "$changed_pinned" "$added_pins")")
+  ack_touched=$(path_set "$(printf '%s\n%s\n' "$ack_expected" "$removed_pins")")
+  # Records that touch the ack directory. An ack may only be ADDED: a modification, a deletion,
+  # and a rename of an ack (a delete plus an add, including out of the directory) are changes.
+  # A copy leaves its source alone, so a copy out of the directory is not an ack change.
+  ack_records=$(awk -F '\t' -v dir="$ACK_DIR/" 'index($1, dir) == 1 || ($2 != "copied" && index($5, dir) == 1)' "$changed_records")
+  # awk helpers over these records. own(): the record adds THIS PR's ack: status added, or copied,
+  # or renamed FROM a file outside the ack directory (git pairs an added ack with an unrelated
+  # deleted file of similar content). name(): what to report: the old ack a rename removed,
+  # else the changed path.
+  ack_awk_defs='function own() { return $1 == p && ($2 == "added" || $2 == "copied" || ($2 == "renamed" && index($5, dir) != 1)) }
+    function name() { return ($2 == "renamed" && index($5, dir) == 1) ? $5 : $1 }
+'
+  if [ -z "$ack_touched" ]; then
+    added_acks=$(awk -F '\t' -v dir="$ACK_DIR/" "$ack_awk_defs"'$2 != "removed" { print name() }' <<<"$ack_records" | first_lines)
+    if [ -n "$added_acks" ]; then
+      bad "no pinned path is touched, so no acknowledgement may be added or changed: $added_acks"
+    else
+      say "ok" "changed files contain no pinned path requiring an acknowledgement"
+    fi
+  else
+    ack_required=1
+    touched_count=$(sed '/^$/d' <<<"$ack_touched" | wc -l | tr -d ' ')
+    have_ack=$(awk -F '\t' -v p="$ACK_PATH" -v dir="$ACK_DIR/" "$ack_awk_defs"'own() { n++ } END { print n + 0 }' <<<"$ack_records")
+    other_acks=$(awk -F '\t' -v p="$ACK_PATH" -v dir="$ACK_DIR/" "$ack_awk_defs"'!own() { print name() }' <<<"$ack_records" | sed '/^$/d' | first_lines)
+    if [ "$have_ack" -ne 1 ]; then
+      bad "$touched_count pinned path(s) touched (e.g. $(first_lines <<<"$ack_touched")) but the PR does not add $ACK_PATH"
+    fi
+    if [ -n "$other_acks" ]; then
+      bad "acknowledgement files are append-only; the PR also changes: $other_acks"
+    fi
+    if [ "$have_ack" -eq 1 ]; then
+      if ! read_contents_text "$head" "$ACK_PATH"; then
+        unknown "could not read $ACK_PATH at $short"
+      else
+        ack_text="$contents_text_result"
+        ack_problems=""
+        ack_note() { ack_problems="${ack_problems}${ack_problems:+; }$1"; }
+        # Here-strings, not `printf | grep -q`: under pipefail a match that makes grep exit early
+        # kills printf with SIGPIPE on a large ack, and the pipeline then reports "no match".
+        if LC_ALL=C grep -q '[[:cntrl:]]' <<<"$ack_text"; then
+          ack_note "contains a control character"
+        fi
+        if LC_ALL=C grep -Eiq '[0-9a-f]{64}' <<<"$ack_text"; then
+          ack_note "contains a 64-hex token (paths only; a hash would re-create same-file conflicts)"
+        fi
+        reviewer_lines=$(grep -E '^reviewer: ' <<<"$ack_text" || true)
+        # A GitHub login (1-39 characters, no hyphen at either end, optional [bot]); the same
+        # expression is in scripts/check-surface-ack.mjs.
+        login_re='^reviewer: [A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?(\[bot\])?$'
+        reviewer_count=$(sed '/^$/d' <<<"$reviewer_lines" | wc -l | tr -d ' ')
+        if [ "$reviewer_count" -ne 1 ] || ! [[ "$reviewer_lines" =~ $login_re ]]; then
+          ack_note "needs exactly one 'reviewer: <github login>' line"
+        else
+          ack_reviewer="${reviewer_lines#reviewer: }"
+        fi
+        ack_paths=$(grep -Ev '^(reviewer|removed-pin): ' <<<"$ack_text" || true)
+        ack_removed=$(sed -n 's/^removed-pin: //p' <<<"$ack_text")
+        if [ -n "$(malformed_paths <<<"$ack_paths")" ] || [ -n "$(malformed_paths <<<"$ack_removed")" ]; then
+          ack_note "has a line that is not a repository path"
+        fi
+        # Byte order (LC_ALL=C), the order Rust and scripts/check-surface-ack.mjs use.
+        if ! is_sorted_unique "$ack_paths"; then
+          ack_note "paths must be sorted and unique"
+        fi
+        if ! is_sorted_unique "$ack_removed"; then
+          ack_note "removed-pin lines must be sorted and unique"
+        fi
+        ack_missing=$(LC_ALL=C comm -13 <(path_set "$ack_paths") <(printf '%s\n' "$ack_expected") | sed '/^$/d' | first_lines)
+        ack_extra=$(LC_ALL=C comm -23 <(path_set "$ack_paths") <(printf '%s\n' "$ack_expected") | sed '/^$/d' | first_lines)
+        [ -z "$ack_missing" ] || ack_note "omits touched pinned path(s): $ack_missing"
+        [ -z "$ack_extra" ] || ack_note "lists path(s) the PR does not touch: $ack_extra"
+        removed_undeclared=$(LC_ALL=C comm -13 <(path_set "$ack_removed") <(path_set "$removed_pins"))
+        removed_missing=$(LC_ALL=C comm -23 <(path_set "$removed_undeclared") <(path_set "$withdrawn_pins") | sed '/^$/d' | first_lines)
+        withdrawn_missing=$(LC_ALL=C comm -12 <(path_set "$removed_undeclared") <(path_set "$withdrawn_pins") | sed '/^$/d' | first_lines)
+        removed_extra=$(LC_ALL=C comm -23 <(path_set "$ack_removed") <(path_set "$removed_pins") | sed '/^$/d' | first_lines)
+        [ -z "$removed_missing" ] || ack_note "lacks a removed-pin line for: $removed_missing"
+        [ -z "$withdrawn_missing" ] || ack_note "pin(s) pinned by a commit of this PR but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line: $withdrawn_missing"
+        [ -z "$removed_extra" ] || ack_note "has removed-pin line(s) for pin(s) the PR does not remove: $removed_extra"
+        no_reason=$(LC_ALL=C comm -23 <(path_set "$added_pins") <(path_set "$head_reasoned") | sed '/^$/d' | first_lines)
+        [ -z "$no_reason" ] || ack_note "pin(s) added without a non-empty reason: $no_reason"
+        bad_reason=$(LC_ALL=C comm -12 <(path_set "$added_pins") <(path_set "$head_bad_reason") | sed '/^$/d' | first_lines)
+        [ -z "$bad_reason" ] || ack_note "pin(s) added with a reason over 500 characters or containing a control character: $bad_reason"
+        if [ -n "$ack_problems" ]; then
+          bad "$ACK_PATH is invalid: $ack_problems"
+        else
+          say "ok" "$ACK_PATH lists the $touched_count touched pinned path(s), reviewer $ack_reviewer"
+        fi
+      fi
+    fi
   fi
 fi
 # Scan destination paths and added payload lines. Removed/context lines never
@@ -391,6 +633,7 @@ else
   metadata_only_count=0
   metadata_only_examples=""
   binary_count=0
+  binary_examples=""
   gitlink_count=0
   bounded_coverage_name() {
     local item
@@ -432,6 +675,9 @@ else
       if [ "$binary" -eq 1 ]; then
         # Its bytes cannot be reconciled through textual hunks.
         binary_count=$((binary_count + 1))
+        if [ "$binary_count" -le 8 ]; then
+          binary_examples="${binary_examples}${binary_examples:+; }$(bounded_coverage_name "$filename")"
+        fi
         continue
       fi
       if [ "$status" = "removed" ]; then
@@ -476,7 +722,7 @@ else
       if [ "$BINARY_REVIEW_SHA" = "$head" ] && [ "$INDEPENDENT_REVIEW_SHA" = "$head" ]; then
         say "ok" "$binary_count binary addition/change(s) have explicit current-head binary and independent review attestations"
       else
-        bad "$binary_count binary addition/change(s) require matching --binary-review-sha and --independent-review-sha human attestations"
+        bad "$binary_count binary addition/change(s) require matching --binary-review-sha and --independent-review-sha human attestations (first 8 at most: $binary_examples)"
       fi
     fi
     [ "$gitlink_count" -eq 0 ] || unknown "$gitlink_count gitlink change(s) require explicit provenance, license, and NOTICE review"
@@ -491,6 +737,39 @@ else
     # carry no newly added material and are deliberately excluded.
     path_text=$(awk -F '\t' '$2 != "removed" { print $1 }' "$changed_records")
   fi
+  # Where the scan's hits are: location and category per line, never a value. Runs only when the
+  # scan blocked or was indeterminate; a failure here changes no verdict.
+  explain_privacy_hits() {
+    local input="$tmpdir/privacy-explain-input.json" located
+    printf '%s' "$title" >"$tmpdir/ex-title"
+    printf '%s' "$raw_prbody" >"$tmpdir/ex-body"
+    printf '%s' "${commit_identity_names:-}" >"$tmpdir/ex-names"
+    printf '%s' "${path_text:-}" >"$tmpdir/ex-paths"
+    printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/ex-messages.json"
+    printf '%s' "$parsed_diff" >"$tmpdir/ex-diff.json"
+    if ! jq -n --rawfile title "$tmpdir/ex-title" --rawfile body "$tmpdir/ex-body" \
+          --rawfile names "$tmpdir/ex-names" --rawfile paths "$tmpdir/ex-paths" \
+          --slurpfile messages "$tmpdir/ex-messages.json" --slurpfile diff "$tmpdir/ex-diff.json" '
+        ($diff[0]) as $d |
+        {sources: ([{label: "pr-title", text: $title}, {label: "pr-body", text: $body},
+                    {label: "commit-identity-names", text: $names}] +
+                   ($messages[0] | to_entries | map({label: ("commit-message-" + ((.key + 1) | tostring)), text: .value}))),
+         added: ([$paths | split("\n")[] | select(length > 0) | {path: ., line: 0, text: .}] +
+                 [range(0; $d.added_payload | length) as $i |
+                  {path: $d.added_locations[$i][0], line: $d.added_locations[$i][1], text: $d.added_payload[$i]}])}
+      ' >"$input" 2>/dev/null \
+       || ! located=$(python3 "$script_dir/merge_gate_privacy.py" --head "$head" --explain <"$input" 2>/dev/null) \
+       || ! jq -e '(.hits | type == "array") and (.truncated | type == "number")' <<<"$located" >/dev/null 2>&1; then
+      say "note" "could not locate the lines that tripped the privacy scan"
+      return 0
+    fi
+    if [ "$(jq -r '.hits | length' <<<"$located")" -eq 0 ]; then
+      say "note" "no single line reproduces the privacy finding (it needs context from several lines, or comes from the whole PR text)"
+    else
+      while IFS= read -r line; do say "note" "$line"; done < <(jq -r '.hits[] | "at \(.where): \(.messages | join("; "))"' <<<"$located")
+      [ "$(jq -r '.truncated' <<<"$located")" -eq 0 ] || say "note" "$(jq -r '.truncated' <<<"$located") more line(s) not listed"
+    fi
+  }
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
@@ -513,6 +792,9 @@ else
       while IFS= read -r message; do bad "$message"; done < <(jq -r '.blockers[]' <<<"$privacy_result")
       while IFS= read -r message; do unknown "$message"; done < <(jq -r '.indeterminate[]' <<<"$privacy_result")
       while IFS= read -r message; do say "note" "$message"; done < <(jq -r '.notes[]' <<<"$privacy_result")
+      if jq -e '(.blockers | length) + (.indeterminate | length) > 0' <<<"$privacy_result" >/dev/null 2>&1; then
+        explain_privacy_hits
+      fi
     fi
   fi
   fi
@@ -527,6 +809,7 @@ fi
 review_evidence_status=0
 head_reviews=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/reviews" 2>"$errfile") || review_evidence_status=$?
 review_names_head=false
+reviews_flat=""
 if [ "$review_evidence_status" -eq 0 ] && jq -e '
   type == "array" and (all(.[]; type == "array") or all(.[]; type == "object"))
 ' <<<"$head_reviews" >/dev/null 2>&1; then
@@ -534,26 +817,75 @@ if [ "$review_evidence_status" -eq 0 ] && jq -e '
     (if all(.[]; type == "array") then flatten else . end) |
     any(.[]; .commit_id == $head)
   ' <<<"$head_reviews")
+  reviews_flat=$(jq -c 'if all(.[]; type == "array") then flatten else . end' <<<"$head_reviews")
 fi
 comment_names_head=false
-if [ "$review_names_head" != "true" ]; then
+comments_flat=""
+short_marker="\`${short}\`"
+# Comments are also a place the pinned-path review may live, so they are read
+# whenever an acknowledgement is required, not only as a head-SHA fallback.
+if [ "$review_names_head" != "true" ] || [ "$ack_required" -eq 1 ]; then
   : >"$errfile"
   head_comments_status=0
   head_comments=$(gh api --paginate --slurp "repos/$REPO/issues/$PR/comments" 2>"$errfile") || head_comments_status=$?
   if [ "$head_comments_status" -eq 0 ] && jq -e '
     type == "array" and (all(.[]; type == "array") or all(.[]; type == "object"))
   ' <<<"$head_comments" >/dev/null 2>&1; then
-    short_marker="\`${short}\`"
     comment_names_head=$(jq -r --arg head "$head" --arg marker "$short_marker" '
       (if all(.[]; type == "array") then flatten else . end) |
       any(.[]; ((.body // "") | contains($head)) or ((.body // "") | contains($marker)))
     ' <<<"$head_comments")
+    comments_flat=$(jq -c 'if all(.[]; type == "array") then flatten else . end' <<<"$head_comments")
   fi
 fi
 if [ "$review_names_head" = "true" ] || [ "$comment_names_head" = "true" ]; then
   say "ok" "review evidence names the current head $short"
 else
   bad "no review evidence (review or comment) names current head $short — see #317"
+fi
+# A PR that touches a pinned path also needs one review or comment that names
+# the head, the acknowledgement path and every touched path, written by the
+# login the acknowledgement names as reviewer. The login proves nothing when
+# several lanes post under one account; the file list is what the reviewer must
+# have read. A review counts as naming the head when GitHub bound it to the
+# head commit or when its body names the head.
+if [ "$ack_required" -eq 1 ]; then
+  if [ -z "$reviews_flat" ] || [ -z "$comments_flat" ]; then
+    unknown "could not read the review and comment bodies that must name the pinned paths"
+  else
+    touched_json=$(printf '%s\n' "$ack_touched" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+    ack_review=""
+    ack_review_status=0
+    ack_review=$(jq -n -c --argjson reviews "$reviews_flat" --argjson comments "$comments_flat" \
+      --argjson paths "$touched_json" --arg head "$head" --arg marker "$short_marker" \
+      --arg ackpath "$ACK_PATH" --arg reviewer "$ack_reviewer" '
+      # A path is named only as a whole token: delimited by whitespace, a backtick, a quote, a
+      # parenthesis, a comma, a colon or the ends of the text, so "src/a.rs.bak" does not name
+      # "src/a.rs" and "pr-3210.txt" does not name "pr-321.txt".
+      def esc: gsub("(?<c>[\\\\.^$*+?(){}\\[\\]|])"; "\\" + .c);
+      def names($b; $p): $b | test("(^|[\\s`\"\u0027\u201c\u201d\u2018\u2019(),:])" + ($p | esc) + "($|[\\s`\"\u0027\u201c\u201d\u2018\u2019(),:])");
+      ([$reviews[] | {login: (.user.login // ""), body: (.body // ""), bound: (.commit_id == $head)}] +
+       [$comments[] | {login: (.user.login // ""), body: (.body // ""), bound: false}]) as $all |
+      [$all[] | select(.bound or (.body | contains($head)) or (.body | contains($marker))) |
+        . + {missing: (.body as $b | ([$ackpath] + $paths) | map(. as $p | select(names($b; $p) | not)))}] as $named |
+      ($named | map(select(.missing | length == 0))) as $full |
+      {named: ($named | length),
+       full: ($full | length),
+       matching: ($full | map(select($reviewer == "" or ((.login | ascii_downcase) == ($reviewer | ascii_downcase)))) | length),
+       missing: (if ($named | length) == 0 then [] else ($named | min_by(.missing | length) | .missing) end),
+       logins: ($full | map(.login) | unique)}' 2>"$errfile") || ack_review_status=$?
+    if [ "$ack_review_status" -ne 0 ] || ! jq -e 'type == "object" and (.named | type == "number")' <<<"$ack_review" >/dev/null 2>&1; then
+      unknown "could not evaluate the review and comment bodies for the pinned paths"
+    elif [ "$(jq -r '.matching' <<<"$ack_review")" -gt 0 ]; then
+      say "ok" "review by ${ack_reviewer:-the reviewer} names $short, $ACK_PATH and all pinned paths touched"
+    elif [ "$(jq -r '.full' <<<"$ack_review")" -gt 0 ]; then
+      bad "the review naming the pinned paths is by $(jq -r '.logins | join(", ")' <<<"$ack_review"), not the acknowledgement's reviewer '$ack_reviewer'"
+    elif [ "$(jq -r '.named' <<<"$ack_review")" -gt 0 ]; then
+      bad "no review or comment names every pinned path touched; the closest lacks: $(jq -r '.missing | join(", ")' <<<"$ack_review")"
+    else
+      bad "no review or comment names head $short together with $ACK_PATH and the touched pinned path(s)"
+    fi
+  fi
 fi
 echo
 if [ "$fail" -ne 0 ]; then
@@ -565,7 +897,7 @@ if [ "$uncertain" -ne 0 ]; then
   exit 2
 fi
 
-echo "MAY MERGE — compatibility-surface, privacy, and head-SHA review-evidence checks passed for $short."
+echo "MAY MERGE — compatibility-surface acknowledgement, privacy, and head-SHA review-evidence checks passed for $short."
 echo "Branch protection on $base enforces the remaining required status checks separately."
 printf '  [ "$(gh pr view %s --repo %s --json baseRefName -q .baseRefName)" = "%s" ] \\\n    && gh pr merge %s --repo %s --squash --match-head-commit %s\n' \
   "$PR" "$REPO" "$base" "$PR" "$REPO" "$head"

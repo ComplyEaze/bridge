@@ -1,5 +1,12 @@
 # Proposed CI wiring for the shrunk merge gate
 
+> **Status note, 30 Sep 2026:** schema 3 removed the reseal and merge-driver scripts
+> and the stored per-file hashes. Where this proposal says "surface reseal", read
+> "the compatibility-surface acknowledgement": a pull request that changes a pinned
+> file now adds `docs/tally/compatibility/acks/pr-<N>.txt`, which
+> `scripts/merge-gate.sh` and `scripts/check-surface-ack.mjs` (enforcing in CI) check
+> (`docs/release-process.md`). The body below is kept as written.
+
 `scripts/merge-gate.sh` was cut from a 3977-line manual CLI tool that gated
 nothing automatically down to three checks that can run as real, required CI
 status contexts: compatibility-surface validation, the privacy/PII scan, and

@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945 and read back through Bridge",
+  "observed_date": "2026-09-30",
+  "requested_as_of": "20260630",
+  "source_response_bytes": 4338,
+  "source_response_sha256": "a08adb76ffede07d33deb86a11b4eea82f245dc41f55e784f6b376911a7386b2",
+  "source_request_bytes": 778,
+  "source_request_sha256": "d2f2d5d542fb99f2078e58652996c0719fe8f9a767264edb1d28fe1fa7225543",
+  "request_rendered_by": "render_native_bills_request(NativeBillsReportKind::Receivable, company, 20250401, 20260630)",
+  "fixture_bytes": 4338,
+  "fixture_sha256": "a08adb76ffede07d33deb86a11b4eea82f245dc41f55e784f6b376911a7386b2",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "9 open bills at 20260630 (the sum of the seeded vouchers): OL-OPEN-001, OL-INV-001, OL-INV-002, OL-INV-101, OL-INV-301, OL-DN-001, OL-REUSE-1 (two parties), OL-JV-001.",
+  "provenance_limit": "One synthetic book on one build. The data is seeded by this project (15 ledgers, 19 vouchers over raw import), so the capture shows how Tally stores and reports those shapes; it is not evidence about any client's book. The request was sent once through a capped harness; the response is unmodified.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUID; no party, person, GSTIN, address or credential."
+}

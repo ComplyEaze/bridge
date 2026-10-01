@@ -1559,7 +1559,7 @@ fn the_agent_preview_says_when_the_post_happens() {
     let [now] = agent_post_timing_lines();
     assert_eq!(
         now,
-        "Bridge posts this now or when asked again within 15 minutes, unless cancelled, refused or restarted."
+        "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted."
     );
     // Exactly at the width cap, which refuses only past it: no margin.
     assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
@@ -1578,6 +1578,26 @@ fn the_agent_preview_says_when_the_post_happens() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     assert!(batch.ends_with(&format!("\n{now}")), "{batch}");
+    // The product is named in full in every line the person reads, in a
+    // single voucher's dialog and in a batch's.
+    for text in [&single, &batch] {
+        assert!(
+            text.contains("ComplyEaze Bridge"),
+            "the product is not named at all: {text}"
+        );
+        for (at, _) in text.match_indices("Bridge") {
+            assert!(
+                text[..at].ends_with("ComplyEaze "),
+                "a bare Bridge at {at}: {text}"
+            );
+        }
+        assert!(text.contains(
+            "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference."
+        ));
+        assert!(text.contains(
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
+        ));
+    }
     // The footer counts inside the caps: one long enough is refused.
     let crowded = vec!["x".to_string(); BATCH_REVIEW_MAX_LINES];
     for line in [&one, &two] {

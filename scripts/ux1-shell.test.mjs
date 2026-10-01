@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -23,6 +22,12 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.match(app, /Settings/);
   const nav = app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>"));
   assert.doesNotMatch(nav, /GST Returns|DSC Token|Documents|AXAL Backend|Evidence dashboard/);
+  // The document-upload and AXAL screens are gone from the source, not only
+  // from the navigation, and no view or state in the app names them.
+  assert.doesNotMatch(app, /AxalScreen|DocumentsScreen|AxalConnectionStatus|"axal"|"documents"/);
+  for (const removed of ["AxalScreen.tsx", "DocumentsScreen.tsx"]) {
+    await assert.rejects(readFile(new URL(`../src/${removed}`, import.meta.url)), { code: "ENOENT" });
+  }
   assert.match(app, /loadEndpointReconnectHint/);
   assert.match(endpointHint, /host: "localhost"/);
   assert.match(endpointHint, /port: 9000/);
@@ -146,31 +151,24 @@ test("UX2 keeps report evidence distinct from Core Accounting history and hides 
   assert.match(advanced, /className="panel wide runtime-panel"/);
 });
 
-test("compatibility surface binds every desktop Tally read entry control and selected-ledger boundary", async () => {
-  const [surfaceBytes, clientSwitcher, mirrorProof, trialBalance, ledgerEntries, selectedReadSources] = await Promise.all([
-    readFile(new URL("../docs/tally/compatibility/compatibility-surface.json", import.meta.url), "utf8"),
-    readFile(new URL("../src/ClientSwitcher.tsx", import.meta.url)),
-    readFile(new URL("../src/MirrorProofScreen.tsx", import.meta.url)),
-    readFile(new URL("../src/TrialBalanceScreen.tsx", import.meta.url)),
-    readFile(new URL("../src/LedgerEntriesScreen.tsx", import.meta.url)),
-    Promise.all([
-      "src-tauri/src/agent.rs",
-      "src-tauri/src/agent_read_profiles.rs",
-      "src-tauri/src/agent_voucher_parse.rs",
-      "src-tauri/src/agent_voucher_scalars.rs",
-      "src-tauri/src/agent_vouchers.rs",
-      "src-tauri/src/agent_read_validation.rs",
-      "src-tauri/src/tally/agent_read_request.rs",
-    ].map(async (path) => [path, await readFile(new URL(`../${path}`, import.meta.url))])),
-  ]);
-  const hashes = new Map(JSON.parse(surfaceBytes).files.map(({ path, sha256 }) => [path, sha256]));
+test("compatibility surface pins every desktop Tally read entry control and selected-ledger boundary", async () => {
+  const surfaceBytes = await readFile(new URL("../docs/tally/compatibility/compatibility-surface.json", import.meta.url), "utf8");
+  const pinned = new Set(JSON.parse(surfaceBytes).files.map(({ path }) => path));
 
-  assert.equal(hashes.get("src/ClientSwitcher.tsx"), createHash("sha256").update(clientSwitcher).digest("hex"));
-  assert.equal(hashes.get("src/MirrorProofScreen.tsx"), createHash("sha256").update(mirrorProof).digest("hex"));
-  assert.equal(hashes.get("src/TrialBalanceScreen.tsx"), createHash("sha256").update(trialBalance).digest("hex"));
-  assert.equal(hashes.get("src/LedgerEntriesScreen.tsx"), createHash("sha256").update(ledgerEntries).digest("hex"));
-  for (const [path, source] of selectedReadSources) {
-    assert.equal(hashes.get(path), createHash("sha256").update(source).digest("hex"), `${path} must remain sealed`);
+  for (const path of [
+    "src/ClientSwitcher.tsx",
+    "src/MirrorProofScreen.tsx",
+    "src/TrialBalanceScreen.tsx",
+    "src/LedgerEntriesScreen.tsx",
+    "src-tauri/src/agent.rs",
+    "src-tauri/src/agent_read_profiles.rs",
+    "src-tauri/src/agent_voucher_parse.rs",
+    "src-tauri/src/agent_voucher_scalars.rs",
+    "src-tauri/src/agent_vouchers.rs",
+    "src-tauri/src/agent_read_validation.rs",
+    "src-tauri/src/tally/agent_read_request.rs",
+  ]) {
+    assert.ok(pinned.has(path), `${path} must remain pinned in the compatibility surface`);
   }
 });
 

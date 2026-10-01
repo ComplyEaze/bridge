@@ -30,8 +30,6 @@ import {
   refreshAutomaticOutstandingsAsOf,
 } from "./outstandings-as-of";
 import { GstScreen } from "./GstScreen";
-import { createDocumentsWorkspaceState, DocumentsScreen } from "./DocumentsScreen";
-import { AxalScreen } from "./AxalScreen";
 import { MirrorProofScreen } from "./MirrorProofScreen";
 import { ErrorBoundary, ReloadGuardContext } from "./ErrorBoundary";
 import { ClientSwitcher, type ClientSwitcherClient } from "./ClientSwitcher";
@@ -71,19 +69,9 @@ type TallyProbeResult = {
   connection: ConnectionStatus;
   companies: TallyCompany[];
   profile: CapabilityProfile;
-  selected_read_scope?: SelectedReadScope;
   profile_sha256: string;
   review_commitment_sha256: string;
   passport_snapshot_id?: string;
-};
-
-type SelectedReadScope = {
-  scope_version: number;
-  ledger_profile_id: string;
-  voucher_profile_id: string;
-  voucher_from_yyyymmdd: string;
-  voucher_to_yyyymmdd: string;
-  scope_commitment_sha256: string;
 };
 
 type SavedTallySetup = {
@@ -127,22 +115,7 @@ export type GstReturnDraft = {
   missing_fields: string[];
 };
 
-type AxalIntegration = "tally" | "documents";
-
-type AxalConnectionStatus = {
-  connected: boolean;
-  status: string;
-  last_synced_at?: string | null;
-  workspace: {
-    id: string;
-    name: string;
-    billing_plan: string;
-    storage_used: number;
-    storage_limit: number;
-  };
-};
-
-type View = "dashboard" | "clients" | "outstandings" | "trial_balance" | "ledger_entries" | "companies" | "settings" | "journal" | "source_draft" | "gst" | "documents" | "axal";
+type View = "dashboard" | "clients" | "outstandings" | "trial_balance" | "ledger_entries" | "companies" | "settings" | "journal" | "source_draft" | "gst";
 
 const TABLE_PREVIEW_LIMIT = 100;
 const MIRROR_PAGE_LIMIT = 25;
@@ -161,8 +134,6 @@ const VIEW_TITLES: Record<View, string> = {
   journal: "Review Journal",
   source_draft: "Prepare file",
   gst: "GST return readiness",
-  documents: "Documents",
-  axal: "AXAL backend",
 };
 
 const TRANSPORT_LABELS: Record<string, string> = {
@@ -197,7 +168,6 @@ function App() {
   const [profileSha256, setProfileSha256] = React.useState<string | null>(null);
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const [reviewCommitmentSha256, setReviewCommitmentSha256] = React.useState<string | null>(null);
-  const [selectedReadScope, setSelectedReadScope] = React.useState<SelectedReadScope | null>(null);
   const [passportSnapshotId, setPassportSnapshotId] = React.useState<string | null>(null);
   const { runtimeSessions, runtimeError, refreshRuntime, cancelTallyRequest } = useTallyRuntimeSessions();
   const [companies, setCompanies] = React.useState<TallyCompany[]>([]);
@@ -247,11 +217,6 @@ function App() {
   const [gstCompany, setGstCompany] = React.useState("");
   const [gstFinancialYear, setGstFinancialYear] = React.useState(currentFinancialYear.label);
   const [draft, setDraft] = React.useState<GstReturnDraft | null>(null);
-  // Owned by App() and shared with the Documents and AXAL views --
-  // AxalScreen both reads and writes these two (see its Props comment).
-  const [axalSession, setAxalSession] = React.useState<{ id: string; integration: AxalIntegration } | null>(null);
-  const [axalConnection, setAxalConnection] = React.useState<AxalConnectionStatus | null>(null);
-  const [documentsWorkspace, setDocumentsWorkspace] = React.useState(createDocumentsWorkspaceState);
   const [view, setView] = React.useState<View>("outstandings");
   const [evidenceDrawerOpen, setEvidenceDrawerOpen] = React.useState(false);
   const [evidenceDrawerRestorePending, setEvidenceDrawerRestorePending] = React.useState(false);
@@ -518,7 +483,6 @@ function App() {
     setProfileSha256(null);
     setReviewId(null);
     setReviewCommitmentSha256(null);
-    setSelectedReadScope(null);
     setPassportSnapshotId(null);
     setLiveCompanyKeys([]);
     setOpenCompanyNames([]);
@@ -555,7 +519,6 @@ function App() {
         if (!preserveCurrentProbeReview) {
           setReviewId(null);
           setReviewCommitmentSha256(null);
-          setSelectedReadScope(null);
         }
       },
       clearPassportSnapshot: () => setPassportSnapshotId(null),
@@ -676,7 +639,6 @@ function App() {
               setProfileSha256(result.profile_sha256);
               setReviewId(result.review_id);
               setReviewCommitmentSha256(result.review_commitment_sha256);
-              setSelectedReadScope(result.selected_read_scope ?? null);
               setPassportSnapshotId(result.passport_snapshot_id ?? null);
               setCompanies((current) => mergeTallyCompanies(liveCompanies, current));
               setLiveCompanyKeys(nextLiveCompanyKeys);
@@ -711,7 +673,6 @@ function App() {
         setProfileSha256(null);
         setReviewId(null);
         setReviewCommitmentSha256(null);
-        setSelectedReadScope(null);
         setPassportSnapshotId(null);
         setLiveCompanyKeys([]);
         setOpenCompanyNames([]);
@@ -774,7 +735,6 @@ function App() {
             setProfileSha256(result.profile_sha256);
             setReviewId(result.review_id);
             setReviewCommitmentSha256(result.review_commitment_sha256);
-            setSelectedReadScope(result.selected_read_scope ?? null);
             setPassportSnapshotId(result.passport_snapshot_id ?? null);
             setCompanies((current) => mergeTallyCompanies(liveCompanies, current));
             // MERGE, never replace. This probe is scoped to one company via
@@ -2130,32 +2090,6 @@ function App() {
             </div>,
             document.body,
           )
-        )}
-
-        {view === "documents" && (
-          <ErrorBoundary key="documents" label="Documents">
-          <DocumentsScreen
-            busy={busy}
-            setBusy={setBusy}
-            axalConnection={axalConnection}
-            axalSession={axalSession}
-            workspaceState={documentsWorkspace}
-            setWorkspaceState={setDocumentsWorkspace}
-          />
-          </ErrorBoundary>
-        )}
-
-        {view === "axal" && (
-          <ErrorBoundary key="axal" label="AXAL backend">
-          <AxalScreen
-            busy={busy}
-            setBusy={setBusy}
-            axalConnection={axalConnection}
-            axalSession={axalSession}
-            setAxalSession={setAxalSession}
-            setAxalConnection={setAxalConnection}
-          />
-          </ErrorBoundary>
         )}
       </main>
     </div>

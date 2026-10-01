@@ -1,0 +1,19 @@
+package.json
+scripts/check-tally-live-read-boundary.mjs
+scripts/ux1-shell.test.mjs
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+src-tauri/crates/bridge-tally-core/Cargo.toml
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/src/commands.rs
+src-tauri/src/lib.rs
+src-tauri/src/reports/bulk_party_statement.rs
+src-tauri/src/reports/bulk_party_statement_tests.rs
+src/main.tsx
+src/styles.css
+tools/bridge-tally-compatibility/src/lib.rs
+removed-pin: src-tauri/src/axal.rs
+removed-pin: src-tauri/src/documents.rs
+removed-pin: src-tauri/src/export_registry.rs
+reviewer: lamemustafa

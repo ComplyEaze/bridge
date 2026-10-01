@@ -59,7 +59,7 @@ test("changing a saved client retains endpoint probe evidence but clears the old
     frontend.indexOf("function selectSavedCompany"),
   );
 
-  assert.match(clearSelection, /if \(!preserveCurrentProbeReview\) \{\s*setReviewId\(null\);\s*setReviewCommitmentSha256\(null\);\s*setSelectedReadScope\(null\);/s);
+  assert.match(clearSelection, /if \(!preserveCurrentProbeReview\) \{\s*setReviewId\(null\);\s*setReviewCommitmentSha256\(null\);\s*\}/s);
   assert.doesNotMatch(clearSelection, /setPassport\(null\)|setProfileSha256\(null\)/);
   assert.match(frontend, /function selectSavedCompany[\s\S]*?clearSelectedCompanyScope\(\);/);
 });

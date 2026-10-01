@@ -12,3 +12,57 @@
 # this produced and the reasoning for keeping it at 150 rather than tightening
 # it further.
 too-many-lines-threshold = 150
+
+# Network and process egress (scripts/check-tally-egress-boundary.mjs). Each is refused
+# everywhere in the workspace. A reviewed call site carries
+# `#[expect(clippy::disallowed_methods, reason = "...")]`, and the egress gate's census pins, per
+# OS, which files and how many times these lints fire. The actions are listed, not the types, so a
+# call fires however its client or socket was obtained.
+disallowed-methods = [
+  { path = "reqwest::RequestBuilder::send", reason = "HTTP egress: only the reviewed Tally call sites send" },
+  { path = "reqwest::Client::execute", reason = "HTTP egress: only the reviewed Tally call sites send" },
+  { path = "reqwest::get", reason = "HTTP egress: only the reviewed Tally call sites send" },
+  { path = "std::net::TcpStream::connect", reason = "raw socket egress" },
+  { path = "std::net::TcpStream::connect_timeout", reason = "raw socket egress" },
+  { path = "std::net::TcpListener::bind", reason = "raw socket" },
+  { path = "std::net::UdpSocket::bind", reason = "raw socket egress" },
+  { path = "std::net::ToSocketAddrs::to_socket_addrs", reason = "DNS lookup can carry data in the name" },
+  { path = "tokio::net::TcpStream::connect", reason = "raw socket egress" },
+  { path = "tokio::net::TcpListener::bind", reason = "raw socket" },
+  { path = "tokio::net::UdpSocket::bind", reason = "raw socket egress" },
+  { path = "tokio::net::TcpSocket::new_v4", reason = "raw socket egress" },
+  { path = "tokio::net::TcpSocket::new_v6", reason = "raw socket egress" },
+  { path = "tokio::net::lookup_host", reason = "DNS lookup can carry data in the name" },
+  { path = "std::process::Command::new", reason = "a spawned process (an opened URL included) is egress" },
+  { path = "tokio::process::Command::new", reason = "a spawned process (an opened URL included) is egress" },
+  # The webview can reach the network by navigating or running script; its windows come from
+  # tauri.conf.json. `builder` returns a WebviewWindowBuilder without naming the type.
+  { path = "tauri::webview::WebviewWindow::navigate", reason = "webview navigation is egress" },
+  { path = "tauri::webview::WebviewWindow::eval", reason = "script in the webview can reach the network" },
+  { path = "tauri::webview::WebviewWindow::builder", reason = "the app's windows come from tauri.conf.json, not from code" },
+  { path = "tauri::webview::WebviewWindowBuilder::new", reason = "the app's windows come from tauri.conf.json, not from code" },
+  { path = "tauri::webview::Webview::navigate", reason = "webview navigation is egress" },
+  { path = "tauri::webview::Webview::eval", reason = "script in the webview can reach the network" },
+  # Process and socket calls through the FFI crates this workspace already depends on.
+  # The first Windows run reported the libc and windows_sys paths below as resolving to
+  # nothing there, so they are inert on Windows (scripts/tally-egress-census.json pins them as
+  # such, and the gate refuses their names in src-tauri Rust).
+  { path = "libc::execve", reason = "a spawned process is egress" },
+  { path = "libc::execv", reason = "a spawned process is egress" },
+  { path = "libc::execvp", reason = "a spawned process is egress" },
+  { path = "libc::system", reason = "a spawned process is egress" },
+  { path = "libc::posix_spawn", reason = "a spawned process is egress" },
+  { path = "libc::posix_spawnp", reason = "a spawned process is egress" },
+  { path = "libc::socket", reason = "raw socket egress" },
+  { path = "libc::connect", reason = "raw socket egress" },
+  { path = "libc::getaddrinfo", reason = "DNS lookup can carry data in the name" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteW", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteA", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::UI::Shell::ShellExecuteExW", reason = "opens a URL or program: egress" },
+  { path = "windows_sys::Win32::System::Threading::CreateProcessW", reason = "a spawned process is egress" },
+  { path = "windows_sys::Win32::System::Threading::CreateProcessA", reason = "a spawned process is egress" },
+  { path = "windows_sys::Win32::System::Threading::WinExec", reason = "a spawned process is egress" },
+]
+disallowed-types = [
+  { path = "tauri::webview::WebviewWindowBuilder", reason = "the app's windows come from tauri.conf.json, not from code" },
+]

@@ -14,8 +14,9 @@ use super::*;
 use bridge_tally_protocol::native_masters::MASTERS_RESPONSE_BUDGET_BYTES;
 use bridge_tally_protocol::native_stock_summary::{
     parse_native_stock_summary_report, render_company_inventory_flags_request,
-    render_native_stock_summary_request, stock_item_worst_row_bytes, NativeFlag, NativeStockError,
-    NativeStockGate, NativeStockReport, StockSummaryAsOf,
+    render_native_stock_summary_request, stock_item_worst_row_bytes, NativeFlag,
+    NativeItemCountCrossCheck, NativeItemCountStatus, NativeStockError, NativeStockGate,
+    NativeStockReport, StockSummaryAsOf,
 };
 use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
@@ -292,10 +293,11 @@ async fn a_whole_read_ties_through_every_bracket_and_sends_the_builders_requests
     assert_eq!(read.inventory.integrated, NativeFlag::Yes);
     assert_eq!(read.inventory.inventory_on, NativeFlag::Yes);
     assert_eq!(read.inventory.batchwise, NativeFlag::Yes);
-    let NativeStockGate::Matched {
+    let NativeStockGate::ValueTotalMatched {
         items,
         total,
         report_empty_amounts,
+        item_count,
         ..
     } = read.gate
     else {
@@ -303,6 +305,15 @@ async fn a_whole_read_ties_through_every_bracket_and_sends_the_builders_requests
     };
     assert_eq!(items.len(), 11);
     assert_eq!(total.as_str(), "3000.01");
+    // The company's own item count, from the flags answer, is the rows read.
+    assert_eq!(
+        item_count,
+        NativeItemCountCrossCheck {
+            status: NativeItemCountStatus::Matched,
+            rows: 11,
+            tally_count: 11,
+        }
+    );
     assert_eq!(report_empty_amounts, 0);
     assert_eq!(
         extent.master_alter_id_high_water().map(|mark| mark.get()),
@@ -453,7 +464,7 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
     let (result, observed) = run(Book::at_mark(edge).complete()).await;
     assert!(matches!(
         result.unwrap().0.gate,
-        NativeStockGate::Matched { .. }
+        NativeStockGate::ValueTotalMatched { .. }
     ));
     assert_eq!(observed.len(), WHOLE_READ);
 
@@ -715,10 +726,10 @@ async fn a_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause(
     let start = items_text.find("<COLLECTION").unwrap();
     let end = items_text.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
     let absent = format!("{}{}", &items_text[..start], &items_text[end..]);
-    let bad_quantity = replaced(
+    let bad_value = replaced(
         &items_text,
-        "<CLOSINGBALANCE TYPE=\"Quantity\"> 100 Box</CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\">100</CLOSINGBALANCE>",
+        "<CLOSINGVALUE TYPE=\"Amount\">2500.00</CLOSINGVALUE>",
+        "<CLOSINGVALUE TYPE=\"Amount\">2,500.00</CLOSINGVALUE>",
     );
     let other_company = items_text.replace(GUID, CAPTURE_GUID);
     // No closing extent is read after these: the answer's shape is wrong
@@ -730,9 +741,9 @@ async fn a_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause(
             NativeStockError::CollectionAbsent,
         ),
         (
-            "a quantity that does not read",
-            bad_quantity,
-            NativeStockError::QuantityUnparseable,
+            "a value that does not read",
+            bad_value,
+            NativeStockError::ValueUnparseable,
         ),
         (
             "rows that are another company's",
@@ -891,35 +902,150 @@ async fn a_report_that_differs_completes_the_read_and_withholds_the_items() {
     else {
         panic!("the report's total is not the items' sum");
     };
-    assert_eq!(items_total.as_str(), "3000.01");
+    assert_eq!(items_total.unwrap().as_str(), "3000.01");
     assert_eq!(report_total.as_str(), "3000.02");
     assert_eq!(observed.len(), WHOLE_READ);
 }
 
 #[tokio::test]
-async fn an_empty_or_unknown_report_returns_the_items_unchecked() {
-    let unknown =
-        report()
-            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
-            .replacen("</ENVELOPE>", "</RESPONSE>", 1);
-    for (text, expected) in [
-        (hollow_report(), "stock_report_empty"),
-        (unknown, "stock_unknown_report"),
-    ] {
-        let book = Book {
-            report: text,
-            ..Book::captured()
-        };
-        let (result, observed) = run(book.complete()).await;
-        let NativeStockGate::NotChecked { items, reason, .. } = result.unwrap().0.gate else {
-            panic!("{expected}: nothing to compare");
-        };
-        assert_eq!((items.len(), reason), (11, expected));
-        assert_eq!(observed.len(), WHOLE_READ);
-    }
+async fn valued_items_against_an_empty_report_complete_the_read_and_return_no_item() {
+    let book = Book {
+        report: hollow_report(),
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.complete()).await;
+    let NativeStockGate::ReportShowsNoValue { items_total } = result.unwrap().0.gate else {
+        panic!("the items carry a value the report does not show");
+    };
+    assert_eq!(items_total.as_str(), "3000.01");
+    assert_eq!(observed.len(), WHOLE_READ);
     // The parser's own answer, for the record.
     assert_eq!(
         parse_native_stock_summary_report(&hollow_report()),
         Ok(NativeStockReport::Empty)
     );
+}
+
+#[tokio::test]
+async fn a_report_tally_did_not_recognise_is_refused_at_once_with_its_typed_cause() {
+    let unknown =
+        report()
+            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
+            .replacen("</ENVELOPE>", "</RESPONSE>", 1);
+    let book = Book {
+        report: unknown,
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.through_report()).await;
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeStockError>(&error),
+        Some(&NativeStockError::ReportUnknown)
+    );
+    // The answer's shape is wrong whether or not the book moved: no closing
+    // extent is read.
+    assert_eq!(observed.len(), AT_REPORT);
+}
+
+/// The flags capture with its stock item count element as given: `Some(text)`
+/// for its text, `None` to leave the element out.
+fn flags_with_count(text: Option<&str>) -> String {
+    replaced(
+        &flags(),
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
+        &text.map_or(String::new(), |text| {
+            format!("<NUMSTOCKITEMS TYPE=\"Number\">{text}</NUMSTOCKITEMS>")
+        }),
+    )
+}
+
+#[tokio::test]
+async fn fewer_rows_than_the_companys_own_item_count_completes_the_read_as_that_outcome() {
+    // Twelve counted, eleven read, and a report that ties.
+    let book = Book {
+        flags: flags_with_count(Some(" 12")),
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.complete()).await;
+    assert_eq!(
+        result.unwrap().0.gate,
+        NativeStockGate::RowsBelowItemCount {
+            rows: 11,
+            tally_count: 12
+        }
+    );
+    assert_eq!(observed.len(), WHOLE_READ);
+    // Ten counted: the read goes on, and says the count was lower.
+    let book = Book {
+        flags: flags_with_count(Some(" 10")),
+        ..Book::captured()
+    };
+    let (result, _) = run(book.complete()).await;
+    let NativeStockGate::ValueTotalMatched { item_count, .. } = result.unwrap().0.gate else {
+        panic!("a lower count does not withhold a tying read");
+    };
+    assert_eq!(
+        item_count,
+        NativeItemCountCrossCheck {
+            status: NativeItemCountStatus::CompanyCountLower,
+            rows: 11,
+            tally_count: 10,
+        }
+    );
+}
+
+#[tokio::test]
+async fn an_item_count_tally_did_not_give_is_refused_after_the_closing_extent() {
+    for flags in [flags_with_count(None), flags_with_count(Some("eleven"))] {
+        let book = Book {
+            flags,
+            ..Book::captured()
+        };
+        let (result, observed) = run(book.through_closing_extent()).await;
+        let error = result.err().expect("refused");
+        assert_eq!(
+            cause::<NativeStockError>(&error),
+            Some(&NativeStockError::ItemCountUnavailable)
+        );
+        // Held until the closing extent was read, and it had not moved.
+        assert_eq!(observed.len(), AT_CLOSING_EXTENT);
+    }
+}
+
+#[tokio::test]
+async fn a_book_that_moved_is_reported_as_moved_not_as_a_missing_item_count() {
+    let book = Book {
+        flags: flags_with_count(None),
+        closing_extent: extent_with_mark(260),
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.through_closing_extent()).await;
+    let error = result.err().expect("refused");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&error),
+        Some(PairedReadValidationError::StockSummaryExtent)
+    ));
+    assert!(cause::<NativeStockError>(&error).is_none());
+    assert_eq!(observed.len(), AT_CLOSING_EXTENT);
+}
+
+#[tokio::test]
+async fn a_quantity_bridge_cannot_read_does_not_refuse_the_read() {
+    // An edit of captured text: a compound unit. No quantity is returned, so
+    // the book is still read, and the totals count the quantity as unread.
+    let book = Book {
+        items: replaced(
+            &items(),
+            "<CLOSINGBALANCE TYPE=\"Quantity\"> 100 Box</CLOSINGBALANCE>",
+            "<CLOSINGBALANCE TYPE=\"Quantity\"> 2 Box of 10 Nos</CLOSINGBALANCE>",
+        ),
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.complete()).await;
+    let NativeStockGate::ValueTotalMatched { items, totals, .. } = result.unwrap().0.gate else {
+        panic!("the value total still ties");
+    };
+    assert_eq!(items.len(), 11);
+    assert_eq!(totals.closing_quantity_unread_count, 1);
+    assert_eq!(observed.len(), WHOLE_READ);
 }

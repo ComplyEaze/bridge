@@ -781,6 +781,27 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              a company with few stock items may be refused. A larger book refuses; retrying \
              this call refuses again.",
         ),
+        // The stock summary read with fewer rows than Tally's own item count
+        // (`counts` carries both numbers).
+        "stock_summary_rows_below_item_count" => Some(
+            "Tally's own count of this company's stock items (`counts.counted`) is higher than \
+             the number Bridge read (`counts.returned`), so the list may be incomplete and \
+             nothing is returned. The book did not change during the read, so do not retry. \
+             Give the user both numbers; why they differ is not known.",
+        ),
+        // Causes, reached through `stock_summary_read_failed`.
+        "stock_report_unknown" => Some(
+            "Tally answered Bridge's request for its Stock Summary without the report, both \
+             times it was asked, so stock values cannot be checked and nothing is returned. Do \
+             not call stock_summary again for this company. Tell the user Bridge cannot read \
+             stock from this Tally and that the Stock Summary in Tally itself is the place to \
+             read it.",
+        ),
+        "stock_item_count_unavailable" => Some(
+            "Tally gave no usable count of this company's stock items, both times it was asked, \
+             so Bridge cannot tell whether it read every item and returns nothing. Do not \
+             retry. Tell the user that stock for this company has to be read in Tally itself.",
+        ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
             "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \

@@ -20,12 +20,9 @@ const AS_OF: &str = "20260331";
 /// companies list and in the extent are moved a year back together, as the
 /// identity bracket compares them.
 const BOOKS_FROM: &str = "20250401";
-/// The basis sentence for a read whose report lines summed to the items' sum.
-const MATCHED_SENTENCE: &str =
-    "The items' closing values equal the sum of the top-level lines of Tally's own Stock Summary.";
-/// The start of the basis sentence for a read that was not compared.
-const UNCHECKED_SENTENCE: &str =
-    "They were NOT checked against the sum of the top-level lines of Tally's own Stock Summary";
+/// The end of the basis of a read whose value total matched: exactly what was
+/// compared, and what was not.
+const MATCHED_SENTENCE: &str = "The closing values returned add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them.";
 /// The part of a basis that is the same whatever Tally reported.
 const UNMEASURED_USE: &str =
     "how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured";
@@ -389,7 +386,9 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
     assert_eq!(schema["properties"]["limit"]["minimum"], 1);
     let description = tool["description"].as_str().unwrap();
     // It leads with what a caller searches for.
-    assert!(description.starts_with("Return the stock summary: closing stock quantity and value"));
+    assert!(description.starts_with(
+        "Return the stock summary: the closing stock value per stock item as of a date, with the total of those values checked against Tally's own Stock Summary"
+    ));
     // The prose's admitted mark is the constants'.
     let mark = 16_000_000 / stock_item_worst_row_bytes();
     assert_eq!(mark, 874);
@@ -399,19 +398,38 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "the period ending 31 March 2026",
         "other years' 31 March",
         "admitted but unmeasured",
-        "whenever any item's closing value is empty, whatever its quantity",
-        "a book with no items has a `value_sum` of zero",
+        "null with `partial` true whenever any item's closing value is empty",
+        "written at the scale of the values it adds",
         "stock_summary_too_large",
         "Typical stock-heavy client books refuse today",
         "16,000,000 bytes",
         "company totals only",
         "Empty is not zero",
-        "an empty closing quantity or value is returned as null and counted",
+        "an empty closing value is returned as null and counted",
+        "a value sent as 0.00 is a value",
         "The opening quantity and value are read but not returned, because their as-at date is unmeasured",
         "what the sign means is unmeasured, and `value_sum` adds the values as sent, signs included",
         "the sum of the top-level lines of Tally's own Stock Summary",
-        "The top-level `state` is `observed`",
-        "`unchecked`",
+        "The top-level `state` is one of three",
+        "`value_total_matched`: the items are returned",
+        "only that total was compared",
+        "`no_stock_items`: Tally's own stock item count is 0, the item list is empty and the Stock Summary is empty",
+        "`not_established`: no item is returned (`items` is null)",
+        "`remediation` says what to do next",
+        "Quantities are withheld: nothing checks them",
+        "`checks` says per field what is `checked`, `not_checked` or `withheld`",
+        "`closing` holds `value` only",
+        "tally_stock_summary_shows_no_value",
+        "stock_values_not_comparable",
+        "Tally's Stock Summary has no line for a stock group worth zero",
+        "`item_count_cross_check` reports `rows`, `tally_count` and `status`",
+        "company_count_lower",
+        "stock_summary_rows_below_item_count",
+        "stock_item_count_unavailable",
+        "stock_report_unknown",
+        "closing_quantity_unread_count",
+        "do not refuse the read",
+        "A result that returns no item is not held for paging",
         "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
         "what a negative value means is unmeasured",
         "`not_established`",
@@ -421,12 +439,9 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "tally_stock_summary_differs",
         "stock_not_enabled",
         "stock_summary_as_of_not_measured",
-        "negative_closing_quantity_count",
-        "`amount`",
         "`name` and `parent` are masked under mask_parties",
         "company_flags_not_one_row",
-        "stock_quantity_unparseable",
-        "`matched` can stand beside `partial` true",
+        "`value_total_matched` can stand beside `partial` true",
     ] {
         assert!(description.contains(phrase), "{phrase}");
     }
@@ -440,9 +455,18 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "day 1, 2 or 31",
         "stock_summary_as_of_unsupported",
         "unless its closing quantity is present and zero",
-        "Tally's own Stock Summary total",
         "item names are not masked",
         "`opening` and `closing`",
+        // Nothing of the earlier shape, and no claim about quantities.
+        "`observed`",
+        "`unchecked`",
+        "with its reason), and",
+        "negative_closing_quantity_count",
+        "zero_quantity_count",
+        "empty_closing_quantity_count",
+        "stock_quantity_unparseable",
+        "how many items have a negative closing quantity",
+        "`amount`",
     ] {
         assert!(!description.contains(phrase), "{phrase}");
     }
@@ -470,7 +494,8 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     let one = OneServer::spawn(plans);
     let first = one.call(args("2026-03-31", 0, 5, None)).await;
     let page = result(&first);
-    assert_eq!(page["state"], "observed");
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(first["structuredContent"]["evidence"]["state"], "complete");
     assert_eq!(page["company_guid"], GUID);
     assert_eq!(page["as_of"], "20260331");
     assert_eq!(page["period"], json!({"from":"20250401","to":"20260331"}));
@@ -483,11 +508,27 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         "Tally reported ISINTEGRATED Yes. These are the stock items' closing values exactly as Tally sends them"
     ));
     assert!(basis.contains(UNMEASURED_USE), "{basis}");
-    assert!(basis.contains(MATCHED_SENTENCE), "{basis}");
-    assert!(!basis.contains("NOT checked"), "{basis}");
+    assert!(basis.ends_with(MATCHED_SENTENCE), "{basis}");
+    assert!(!basis.contains("equal the sum"), "{basis}");
     assert_eq!(
         page["tie_out"],
         json!({"state":"matched","total":"3000.01","report_empty_amounts":0})
+    );
+    // The company's own item count is the rows read.
+    assert_eq!(
+        page["item_count_cross_check"],
+        json!({"status":"matched","rows":11,"tally_count":11})
+    );
+    // Per field, what was and was not checked.
+    assert_eq!(
+        page["checks"],
+        json!({
+            "closing_value_total": "checked",
+            "closing_value_each": "not_checked",
+            "closing_quantity": "withheld",
+            "name_parent_unit": "not_checked",
+            "as_of_honoured": "not_checked",
+        })
     );
     assert_eq!(page["total"], 11);
     assert_eq!(page["offset"], 0);
@@ -517,7 +558,26 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         json!({
             "name": "Carton Box Small", "guid": format!("{GUID}-00000110"),
             "parent": "Packaging", "base_unit": "Box",
-            "closing": {"quantity": {"amount": "100", "unit": "Box"}, "value": "2500.00"},
+            "closing": {"value": "2500.00"},
+        })
+    );
+    // No quantity leaves, on any item or in the totals: nothing checks one.
+    for item in page["items"].as_array().unwrap() {
+        assert_eq!(
+            item["closing"].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["value"],
+            "{item}"
+        );
+    }
+    assert_eq!(
+        page["totals"],
+        json!({
+            "item_count": 11,
+            "empty_closing_value_count": 4,
+            "closing_quantity_unread_count": 0,
+            "value_sum": null,
+            "partial": true,
+            "value_sum_signs": "as_sent_meaning_unmeasured",
         })
     );
     // The note beside `value_sum`, which is null here: always present.
@@ -540,17 +600,21 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
-    // The totals cover the book: Zero Stock Item holds -50 Kgs with no value.
-    assert_eq!(page["totals"]["item_count"], 11);
-    assert_eq!(page["totals"]["negative_closing_quantity_count"], 1);
+    for line in [
+        "Quantities are withheld: nothing checks them, so no quantity and no count derived from one is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
+        "Item names, parents and base units come from one source and are not checked against another",
+    ] {
+        assert!(limitations.iter().any(|found| found == line), "{line}");
+    }
     let id = page["snapshot"]["id"].as_str().unwrap().to_string();
 
     // The same date in the other form continues the same read.
     let second = one.call(args(AS_OF, 5, 5, Some(&id))).await;
     let page = result(&second);
     assert_eq!(page["snapshot"]["reused"], true);
-    // A later page of a matched read is `observed`, as its first page was.
-    assert_eq!(page["state"], "observed");
+    // A later page of a matched read says what its first page said.
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(page["checks"]["closing_quantity"], "withheld");
     assert!(page["items"]
         .as_array()
         .unwrap()
@@ -642,35 +706,8 @@ async fn a_moved_book_another_date_or_another_snapshot_refuses_a_page_that_names
     assert_eq!(one.requests(), total);
 }
 
-/// A book whose Zero Stock Item (-50 Kgs, no value) has its quantity blanked:
-/// its empty value now has no quantity to explain it either.
-fn unstocked_items() -> String {
-    replaced(
-        &items(),
-        "<CLOSINGBALANCE TYPE=\"Quantity\">-50.000 Kgs</CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\"></CLOSINGBALANCE>",
-    )
-}
-
-/// The captured items with every item that has an empty closing value given a
-/// closing quantity of zero: Zero Stock Item's -50 Kgs becomes zero, and the
-/// three items with neither a quantity nor a value are given one. An edit of
-/// captured text.
-fn zeroed_items() -> String {
-    replaced(
-        &items(),
-        "<CLOSINGBALANCE TYPE=\"Quantity\">-50.000 Kgs</CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\">0.000 Kgs</CLOSINGBALANCE>",
-    )
-    .replace(
-        "<CLOSINGBALANCE TYPE=\"Quantity\"></CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\">0 Nos</CLOSINGBALANCE>",
-    )
-}
-
-/// The captured items with every empty closing value given an explicit `0.00`.
-/// This is an edit of captured text, not a capture: it is how a book with no
-/// empty closing value is made from the one capture there is.
+/// The captured items with each of the four empty closing values given an
+/// explicit `0.00`. An edit of captured text, not a capture.
 fn explicit_zero_values() -> String {
     let from = "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>";
     let text = items();
@@ -678,51 +715,97 @@ fn explicit_zero_values() -> String {
     text.replace(from, "<CLOSINGVALUE TYPE=\"Amount\">0.00</CLOSINGVALUE>")
 }
 
+/// The captured items with every closing value emptied. An edit of captured
+/// text.
+fn no_closing_values() -> String {
+    let open = "<CLOSINGVALUE TYPE=\"Amount\">";
+    let text = items();
+    let mut parts = text.split(open);
+    let mut out = parts.next().unwrap().to_string();
+    let mut emptied = 0;
+    for part in parts {
+        let rest = &part[part.find("</CLOSINGVALUE>").unwrap()..];
+        out.push_str(open);
+        out.push_str(rest);
+        emptied += 1;
+    }
+    assert_eq!(emptied, 11);
+    out
+}
+
+/// The captured items with every row removed: a present, empty collection.
+fn no_item_rows() -> String {
+    let text = items();
+    let start = text.find("<COLLECTION").unwrap();
+    let open_end = start + text[start..].find('>').unwrap() + 1;
+    format!(
+        "{}{}",
+        &text[..open_end],
+        &text[text.find("</COLLECTION>").unwrap()..]
+    )
+}
+
+/// The report with nothing between its envelope tags.
+fn empty_report() -> String {
+    let text = report();
+    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
+    format!(
+        "{}{}",
+        &text[..start],
+        &text[text.rfind("</ENVELOPE>").unwrap()..]
+    )
+}
+
+/// The flags capture with its stock item count element as given: `Some(text)`
+/// for its text, `None` to leave the element out.
+fn flags_with_count(text: Option<&str>) -> String {
+    replaced(
+        &flags(),
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
+        &text.map_or(String::new(), |text| {
+            format!("<NUMSTOCKITEMS TYPE=\"Number\">{text}</NUMSTOCKITEMS>")
+        }),
+    )
+}
+
+/// What a result that returns no item must look like, whatever its reason.
+fn assert_withheld(response: &Value, reason: &str) {
+    let page = result(response);
+    assert_eq!(page["state"], "not_established");
+    assert_eq!(page["reason"], reason);
+    assert_eq!(page["items"], Value::Null);
+    assert!(page.get("totals").is_none(), "no figure derived from them");
+    assert!(page.get("snapshot").is_none(), "nothing held");
+    assert!(page.get("checks").is_none(), "nothing was checked");
+    assert_eq!(page["as_of"], "20260331");
+    assert_eq!(page["period"], json!({"from":"20250401","to":"20260331"}));
+    assert_eq!(response["structuredContent"]["truncated"], false);
+    // Withheld is said where an agent looks first, as `vouchers` does.
+    assert_eq!(response["structuredContent"]["evidence"]["state"], "partial");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["reason_code"],
+        reason
+    );
+    // The next step is in band, and it never asks for the same read again.
+    let remediation = page["remediation"].as_str().unwrap();
+    assert!(!remediation.is_empty());
+    assert!(!remediation.to_lowercase().contains("call again"), "{remediation}");
+    assert!(!remediation.contains("offset 0"), "{remediation}");
+}
+
 #[tokio::test]
 async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
-    // The capture itself: -50 Kgs with an empty value, and three items with
-    // neither a quantity nor a value.
+    // The capture itself: four items with an empty closing value.
     let one = OneServer::spawn(Book::captured().first_page(14, MARK));
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     let totals = &result(&response)["totals"];
     assert_eq!(totals["value_sum"], Value::Null);
     assert_eq!(totals["partial"], true);
     assert_eq!(totals["empty_closing_value_count"], 4);
-    assert_eq!(totals["empty_closing_quantity_count"], 3);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 
-    // Blanking that quantity too changes nothing.
-    let book = Book {
-        items: unstocked_items(),
-        ..Book::captured()
-    };
-    let one = OneServer::spawn(book.first_page(14, MARK));
-    let response = one.call(args(AS_OF, 0, 500, None)).await;
-    let page = result(&response);
-    assert_eq!(page["totals"]["value_sum"], Value::Null);
-    assert_eq!(page["totals"]["partial"], true);
-    assert_eq!(page["totals"]["negative_closing_quantity_count"], 0);
-    assert_eq!(page["totals"]["empty_closing_quantity_count"], 4);
-    assert_eq!(page["tie_out"]["state"], "matched");
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
-
-    // Nor does a present zero quantity: that it makes an empty value zero is
-    // unmeasured. The four items with an empty value are given a zero quantity
-    // (an edit of captured text).
-    let book = Book {
-        items: zeroed_items(),
-        ..Book::captured()
-    };
-    let one = OneServer::spawn(book.first_page(14, MARK));
-    let response = one.call(args(AS_OF, 0, 500, None)).await;
-    let totals = &result(&response)["totals"];
-    assert_eq!(totals["value_sum"], Value::Null);
-    assert_eq!(totals["partial"], true);
-    assert_eq!(totals["zero_quantity_count"], 4);
-    assert_eq!(totals["empty_closing_value_count"], 4);
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
-
-    // With no empty closing value the sum is formed, and is the tie's.
+    // With no empty closing value the sum is formed, is the tie's, and is
+    // written at the values' scale.
     let book = Book {
         items: explicit_zero_values(),
         ..Book::captured()
@@ -730,6 +813,7 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     let one = OneServer::spawn(book.first_page(14, MARK));
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     let page = result(&response);
+    assert_eq!(page["state"], "value_total_matched");
     assert_eq!(page["totals"]["value_sum"], "3000.01");
     // Present beside a non-null sum too.
     assert_eq!(
@@ -762,6 +846,7 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     let page = result(&response);
     assert_eq!(page["totals"]["value_sum"], Value::Null);
     assert_eq!(page["totals"]["partial"], true);
+    assert_eq!(page["state"], "value_total_matched");
     assert_eq!(page["tie_out"]["state"], "matched");
     assert!(page["limitations"]
         .as_array()
@@ -770,7 +855,43 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
         .any(|line| line
             .as_str()
             .unwrap()
-            .contains("`matched` can stand beside `partial: true`")));
+            .contains("`value_total_matched` can stand beside `partial: true`")));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_single_value_sums_to_itself_at_its_own_scale() {
+    // One item, one value: `2500.00`, not `2500`. Its group is the only one
+    // with a value, so the report is given that one amount (an edit of captured
+    // text on both sides).
+    let text = items();
+    let first = text.find("<STOCKITEM ").unwrap();
+    let second = first + 1 + text[first + 1..].find("<STOCKITEM ").unwrap();
+    let close = text.find("</COLLECTION>").unwrap();
+    let report_text = report();
+    let first_pair = report_text.find("<DSPACCNAME>").unwrap();
+    let second_pair = first_pair + 1 + report_text[first_pair + 1..].find("<DSPACCNAME>").unwrap();
+    let book = Book {
+        flags: flags_with_count(Some(" 1")),
+        items: format!("{}{}", &text[..second], &text[close..]),
+        report: replaced(
+            &format!(
+                "{}{}",
+                &report_text[..second_pair],
+                &report_text[report_text.rfind("</ENVELOPE>").unwrap()..]
+            ),
+            "<DSPCLAMTA>18750.00</DSPCLAMTA>",
+            "<DSPCLAMTA>2500.00</DSPCLAMTA>",
+        ),
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(page["total"], 1);
+    assert_eq!(page["items"][0]["closing"], json!({"value": "2500.00"}));
+    assert_eq!(page["totals"]["value_sum"], "2500.00");
+    assert_eq!(page["tie_out"]["total"], "2500.00");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -795,32 +916,29 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
     let one = OneServer::spawn(plans);
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     // Not an error call: the read completed and Tally's figures disagree.
+    assert_withheld(&response, "tally_stock_summary_differs");
     let page = result(&response);
-    assert_eq!(page["state"], "not_established");
-    assert_eq!(page["reason"], "tally_stock_summary_differs");
-    assert_eq!(page["items"], Value::Null);
     assert_eq!(
         page["tie_out"],
         json!({"state":"differs","items_value_sum":"3000.01","report_total":"3000.02"})
     );
-    assert!(page.get("totals").is_none(), "no figure derived from them");
-    assert!(page.get("snapshot").is_none(), "nothing held");
-    assert_eq!(page["as_of"], "20260331");
-    assert_eq!(response["structuredContent"]["truncated"], false);
+    assert!(page["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("present neither figure as the stock value"));
     // The limitation says this read is not held, and does not say that nothing
-    // is: an earlier read of the same date that was returned, matched or not
-    // checked, may still be.
+    // is: an earlier read of the same date that returned rows may still be.
     assert!(page["limitations"]
         .as_array()
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap()
-            == "This read is not held: a later page continues only from an earlier read of the same date that was returned (matched or not checked), if one is still held; call again with offset 0 to read afresh"));
+            == "This read is not held: a later page continues only from an earlier read of the same date that returned rows, if one is still held; call again with offset 0 to read afresh"));
     // A later page naming no snapshot: the differing read was not held, so
     // this reads afresh and serves its second page from that new read.
     let next = one.call(args(AS_OF, 5, 5, None)).await;
     let page = result(&next);
-    assert_eq!(page["state"], "observed");
+    assert_eq!(page["state"], "value_total_matched");
     assert_eq!(page["snapshot"]["reused"], false);
     assert_eq!(page["tie_out"]["state"], "matched");
     assert_eq!(
@@ -837,93 +955,247 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
 }
 
 #[tokio::test]
-async fn a_not_checked_read_is_held_and_a_later_page_continues_it() {
-    // What the differing read's limitation names: a returned read that was not
-    // checked against the report is held like a matched one.
-    let text = report();
-    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
-    let hollow = format!(
-        "{}{}",
-        &text[..start],
-        &text[text.rfind("</ENVELOPE>").unwrap()..]
-    );
+async fn items_with_no_value_against_a_report_that_shows_one_is_a_contradiction_with_one_figure() {
+    // An edit of captured text: every closing value emptied; the report is the
+    // capture's, totalling 3000.01.
     let book = Book {
-        report: hollow,
+        items: no_closing_values(),
         ..Book::captured()
     };
-    let mut plans = book.first_page(14, MARK);
-    plans.extend(continuation_plans(14));
-    let total = plans.len();
-    let one = OneServer::spawn(plans);
-    let first = one.call(args(AS_OF, 0, 5, None)).await;
-    let page = result(&first);
-    assert_eq!(page["tie_out"]["state"], "not_checked");
-    // Returned without a comparison: not `observed`, as a matched read is.
-    assert_eq!(page["state"], "unchecked");
-    assert_eq!(page["snapshot"]["reused"], false);
-    let id = page["snapshot"]["id"].as_str().unwrap().to_string();
-    let second = one.call(args(AS_OF, 5, 5, Some(&id))).await;
-    let page = result(&second);
-    assert_eq!(page["snapshot"]["reused"], true);
-    assert_eq!(page["tie_out"]["state"], "not_checked");
-    // A later page served from the held snapshot is as unchecked as its first.
-    assert_eq!(page["state"], "unchecked");
-    assert_eq!(one.requests(), total);
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    assert_withheld(&response, "tally_stock_summary_differs");
+    assert_eq!(
+        result(&response)["tie_out"],
+        json!({"state":"differs","items_value_sum":null,"report_total":"3000.01"})
+    );
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
 #[tokio::test]
-async fn an_empty_unknown_or_all_empty_report_returns_the_items_and_says_they_are_unchecked() {
-    let text = report();
-    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
-    let hollow = format!(
-        "{}{}",
-        &text[..start],
-        &text[text.rfind("</ENVELOPE>").unwrap()..]
-    );
-    let unknown =
-        text.replacen("<ENVELOPE>", "<RESPONSE>", 1)
-            .replacen("</ENVELOPE>", "</RESPONSE>", 1);
-    // An edit of captured text: every report amount emptied.
-    let all_empty =
-        ["18750.00", "14500.00", "-30249.99"]
-            .iter()
-            .fold(text.clone(), |xml, amount| {
-                let from = format!("<DSPCLAMTA>{amount}</DSPCLAMTA>");
-                assert!(xml.contains(&from), "the capture has no {from}");
-                xml.replacen(&from, "<DSPCLAMTA></DSPCLAMTA>", 1)
-            });
-    for (report, reason) in [
-        (hollow, "stock_report_empty"),
-        (unknown, "stock_unknown_report"),
-        (all_empty, "stock_report_amounts_all_empty"),
-    ] {
+async fn valued_items_against_a_report_with_no_amount_return_no_item_and_do_not_call_it_a_contradiction(
+) {
+    let all_empty = ["18750.00", "14500.00", "-30249.99"]
+        .iter()
+        .fold(report(), |xml, amount| {
+            replaced(
+                &xml,
+                &format!("<DSPCLAMTA>{amount}</DSPCLAMTA>"),
+                "<DSPCLAMTA></DSPCLAMTA>",
+            )
+        });
+    for report in [empty_report(), all_empty] {
         let book = Book {
             report,
             ..Book::captured()
         };
         let one = OneServer::spawn(book.first_page(14, MARK));
         let response = one.call(args(AS_OF, 0, 500, None)).await;
+        assert_withheld(&response, "tally_stock_summary_shows_no_value");
         let page = result(&response);
-        assert_eq!(page["total"], 11);
-        assert_eq!(page["state"], "unchecked");
-        assert_eq!(
-            page["totals"]["value_sum_signs"],
-            "as_sent_meaning_unmeasured"
-        );
+        // One figure, not two: there is no report total to show.
         assert_eq!(
             page["tie_out"],
-            json!({"state":"not_checked","reason":reason})
+            json!({"state":"report_shows_no_value","items_value_sum":"3000.01"})
         );
-        let basis = page["basis"].as_str().unwrap();
-        assert!(basis.contains(UNCHECKED_SENTENCE), "{basis}");
-        assert!(basis.contains(reason), "{basis}");
-        // No tie is claimed of figures that were not compared.
-        assert!(!basis.contains(MATCHED_SENTENCE), "{basis}");
-        assert!(!basis.contains("equal the sum"), "{basis}");
-        assert!(!basis.contains("ties"), "{basis}");
-        assert!(basis.contains(UNMEASURED_USE), "{basis}");
+        let remediation = page["remediation"].as_str().unwrap();
+        assert!(remediation.contains(
+            "Bridge cannot tell whether Tally left the report blank or it truly shows no stock"
+        ));
+        assert!(!remediation.contains("disagree"), "{remediation}");
         assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
     }
+}
+
+#[tokio::test]
+async fn nothing_comparable_returns_no_item() {
+    // No item has a closing value and the report is empty: an edit of captured
+    // text on both sides (a book like this has not been captured).
+    let book = Book {
+        items: no_closing_values(),
+        report: empty_report(),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    assert_withheld(&response, "stock_values_not_comparable");
+    let page = result(&response);
+    assert_eq!(page["tie_out"], json!({"state":"not_comparable"}));
+    assert!(page["remediation"]
+        .as_str()
+        .unwrap()
+        .starts_with("Nothing could be compared"));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_book_with_no_stock_items_is_an_answer_with_an_empty_list() {
+    // PROVISIONAL (not a capture): the committed captures with their rows,
+    // their report lines and their item count edited away. The situation was
+    // observed live on a synthetic company (count `0`, an empty item
+    // collection, an empty Stock Summary envelope), but no wire capture of it
+    // taken through Bridge is committed yet. The change does not ship with this
+    // test in this form.
+    let book = Book {
+        flags: flags_with_count(Some("0")),
+        items: no_item_rows(),
+        report: empty_report(),
+    };
+    let mut plans = book.first_page(14, MARK);
+    plans.extend(continuation_plans(14));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "no_stock_items");
+    assert_eq!(page["items"], json!([]));
+    assert_eq!(page["total"], 0);
+    assert_eq!(page["totals"], json!({"item_count": 0}));
+    assert_eq!(
+        page["item_count_cross_check"],
+        json!({"status":"matched","rows":0,"tally_count":0})
+    );
+    assert!(page["basis"].as_str().unwrap().starts_with(
+        "This company has no stock items: Tally's own item count is 0, the stock item list is empty and Tally's Stock Summary is empty."
+    ));
+    assert_eq!(response["structuredContent"]["evidence"]["state"], "complete");
+    assert_eq!(response["structuredContent"]["truncated"], false);
+    // It is an answer, so it is held like one.
+    let id = page["snapshot"]["id"].as_str().unwrap().to_string();
+    let again = one.call(args(AS_OF, 1, 5, Some(&id))).await;
+    assert_eq!(result(&again)["state"], "no_stock_items");
+    assert_eq!(result(&again)["snapshot"]["reused"], true);
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn no_rows_without_a_count_of_zero_and_an_empty_report_is_not_that_answer() {
+    // No rows, an empty report, and no item count at all: refused, never read
+    // as zero.
+    let book = Book {
+        flags: flags_with_count(None),
+        items: no_item_rows(),
+        report: empty_report(),
+    };
+    let one = OneServer::spawn(book.through_closing_extent(14, MARK));
+    let refused = one.call(args(AS_OF, 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "stock_summary_read_failed");
+    assert_eq!(error(&refused)["cause"], "stock_item_count_unavailable");
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4 + 4);
+    // No rows and a count of zero, and a report that shows a value.
+    let book = Book {
+        flags: flags_with_count(Some("0")),
+        items: no_item_rows(),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    assert_withheld(&response, "tally_stock_summary_differs");
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn an_item_count_tally_did_not_give_refuses_with_its_next_step() {
+    for flags in [flags_with_count(None), flags_with_count(Some("eleven"))] {
+        let book = Book {
+            flags,
+            ..Book::captured()
+        };
+        // Held until the closing extent is read; the trailing identity and
+        // mode reads are not reached.
+        let one = OneServer::spawn(book.through_closing_extent(14, MARK));
+        let refused = one.call(args(AS_OF, 0, 500, None)).await;
+        let refusal = error(&refused);
+        assert_eq!(refusal["code"], "stock_summary_read_failed");
+        assert_eq!(refusal["cause"], "stock_item_count_unavailable");
+        let remediation = refusal["remediation"].as_str().unwrap();
+        assert!(remediation.contains("Do not retry"), "{remediation}");
+        assert!(remediation.contains("has to be read in Tally itself"));
+        assert!(refused["structuredContent"]["result"]["items"].is_null());
+        assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4 + 4);
+    }
+}
+
+#[tokio::test]
+async fn fewer_rows_than_tallys_own_item_count_refuses_with_both_numbers() {
+    // Twelve counted, eleven read, and a report that ties: the read completes,
+    // and nothing is returned.
+    let book = Book {
+        flags: flags_with_count(Some(" 12")),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let refused = one.call(args(AS_OF, 0, 500, None)).await;
+    let refusal = error(&refused);
+    assert_eq!(refusal["code"], "stock_summary_rows_below_item_count");
+    assert_eq!(refusal["counts"], json!({"returned": 11, "counted": 12}));
+    let remediation = refusal["remediation"].as_str().unwrap();
+    assert!(remediation.contains("do not retry"), "{remediation}");
+    assert!(remediation.contains("why they differ is not known"));
+    assert!(refused["structuredContent"]["result"]["items"].is_null());
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn more_rows_than_tallys_item_count_is_read_and_says_so() {
+    let book = Book {
+        flags: flags_with_count(Some(" 10")),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(page["total"], 11);
+    assert_eq!(
+        page["item_count_cross_check"],
+        json!({"status":"company_count_lower","rows":11,"tally_count":10})
+    );
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_stock_summary_tally_does_not_recognise_refuses_with_its_next_step() {
+    let book = Book {
+        report: report()
+            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
+            .replacen("</ENVELOPE>", "</RESPONSE>", 1),
+        ..Book::captured()
+    };
+    let mut plans = book.through_flags(14, MARK);
+    pair(&mut plans, xml(book.items.clone()));
+    pair(&mut plans, xml(book.report.clone()));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args(AS_OF, 0, 500, None)).await;
+    let refusal = error(&refused);
+    assert_eq!(refusal["code"], "stock_summary_read_failed");
+    assert_eq!(refusal["cause"], "stock_report_unknown");
+    let remediation = refusal["remediation"].as_str().unwrap();
+    assert!(remediation.contains("Do not call stock_summary again for this company"));
+    assert!(refused["structuredContent"]["result"]["items"].is_null());
+    // Returned at once: no closing extent.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_quantity_bridge_cannot_read_is_counted_and_does_not_refuse_the_book() {
+    // An edit of captured text: a compound unit on one item.
+    let book = Book {
+        items: replaced(
+            &items(),
+            "<CLOSINGBALANCE TYPE=\"Quantity\"> 100 Box</CLOSINGBALANCE>",
+            "<CLOSINGBALANCE TYPE=\"Quantity\"> 2 Box of 10 Nos</CLOSINGBALANCE>",
+        ),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(page["total"], 11);
+    assert_eq!(page["totals"]["closing_quantity_unread_count"], 1);
+    assert_eq!(page["items"][0]["closing"], json!({"value": "2500.00"}));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
 #[tokio::test]
@@ -954,12 +1226,11 @@ async fn the_basis_states_only_what_tally_reported_about_integration() {
         let basis = page["basis"].as_str().unwrap();
         assert!(basis.starts_with(expected), "{page}");
         // Whatever Tally reported, how the books use the values is not claimed,
-        // and a matched read says only that the sum equals the report lines' sum.
+        // and a matched read says only that the total was compared.
         assert!(basis.contains(UNMEASURED_USE), "{basis}");
         assert!(basis.ends_with(MATCHED_SENTENCE), "{basis}");
-        assert!(!basis.contains("NOT checked"), "{basis}");
         assert!(!basis.contains("reconciled"), "{basis}");
-        assert!(!basis.contains("ties"), "{basis}");
+        assert!(!basis.contains(" ties"), "{basis}");
         assert_eq!(
             page["inventory"]["integrated"],
             if integrated.is_some() {

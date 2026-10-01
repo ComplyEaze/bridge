@@ -86,12 +86,38 @@ fn decimal(text: &str) -> ExactDecimal {
     ExactDecimal::parse(text).expect("a plain decimal")
 }
 
-fn quantity_of(amount: &str, unit: &str) -> Option<NativeStockQuantity> {
-    Some(NativeStockQuantity {
+fn quantity_of(amount: &str, unit: &str) -> NativeQuantityRead {
+    NativeQuantityRead::Read(NativeStockQuantity {
         amount: decimal(amount),
         unit: unit.to_string(),
     })
 }
+
+/// The flags alone, as the read's inventory block carries them.
+fn flags_of(text: &str, company_guid: &str) -> Result<NativeInventoryFlags, NativeStockError> {
+    parse_company_inventory_flags(text, company_guid).map(|inventory| inventory.flags)
+}
+
+/// Tally's own stock item count in a flags answer.
+fn count_of(text: &str) -> NativeStockItemCount {
+    parse_company_inventory_flags(text, COMPANY)
+        .unwrap()
+        .item_count
+}
+
+/// The flags capture with its `NUMSTOCKITEMS` element as given: `Some(text)`
+/// for its text, `None` to leave the element out.
+fn flags_with_count(text: Option<&str>) -> String {
+    replaced(
+        &flags_response(),
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
+        &text.map_or(String::new(), |text| {
+            format!("<NUMSTOCKITEMS TYPE=\"Number\">{text}</NUMSTOCKITEMS>")
+        }),
+    )
+}
+
+const ELEVEN: NativeStockItemCount = NativeStockItemCount::Reported(11);
 
 fn item<'a>(items: &'a NativeStockItems, name: &str) -> &'a NativeStockItem {
     items
@@ -105,8 +131,67 @@ fn report_of(text: &str) -> Result<NativeStockReport, NativeStockError> {
     parse_native_stock_summary_report(text)
 }
 
+/// The gate over an items text, a count and a report text, as the runtime
+/// chains them: a report that does not parse is the read's error.
+fn gate_with(
+    items: &str,
+    count: NativeStockItemCount,
+    report: &str,
+) -> Result<NativeStockGate, NativeStockError> {
+    report_of(report)
+        .and_then(|report| gate_stock_summary(parse(items).unwrap().rows, count, &report))
+}
+
+/// The gate with the count the capture's own company reported (eleven).
 fn gate(items: &str, report: &str) -> NativeStockGate {
-    gate_stock_summary(parse(items).unwrap().rows, &report_of(report).unwrap()).unwrap()
+    gate_with(items, ELEVEN, report).unwrap()
+}
+
+/// The gate over the captured rows after `edit`, with `count` and `report`.
+fn gate_rows(
+    edit: impl Fn(&mut NativeStockItem),
+    count: NativeStockItemCount,
+    report: &NativeStockReport,
+) -> Result<NativeStockGate, NativeStockError> {
+    let mut rows = parse(&items_response()).unwrap().rows;
+    rows.iter_mut().for_each(edit);
+    gate_stock_summary(rows, count, report)
+}
+
+/// The report capture with nothing between its envelope tags: the empty
+/// envelope a book with no valued stock answers with.
+fn empty_report() -> String {
+    let text = report_response();
+    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
+    format!(
+        "{}{}",
+        &text[..start],
+        &text[text.rfind("</ENVELOPE>").unwrap()..]
+    )
+}
+
+/// The items capture with every row removed: a present, empty collection.
+fn no_item_rows() -> String {
+    let text = items_response();
+    let (_, open_end, _) = collection_span(&text);
+    let close = text.find("</COLLECTION>").unwrap();
+    format!("{}{}", &text[..open_end], &text[close..])
+}
+
+const CAPTURED_AMOUNTS: [&str; 3] = ["18750.00", "14500.00", "-30249.99"];
+
+/// The report capture with each of its three amounts replaced by `to`.
+fn report_with_amounts(to: [&str; 3]) -> String {
+    CAPTURED_AMOUNTS
+        .iter()
+        .zip(to)
+        .fold(report_response(), |xml, (from, to)| {
+            replaced(
+                &xml,
+                &format!("<DSPCLAMTA>{from}</DSPCLAMTA>"),
+                &format!("<DSPCLAMTA>{to}</DSPCLAMTA>"),
+            )
+        })
 }
 
 #[test]
@@ -165,7 +250,7 @@ fn the_flags_request_refuses_a_guid_that_could_break_its_formula_and_escapes_the
 #[test]
 fn the_flags_capture_reads_each_flag_from_its_own_element() {
     assert_eq!(
-        parse_company_inventory_flags(&flags_response(), COMPANY),
+        flags_of(&flags_response(), COMPANY),
         Ok(NativeInventoryFlags {
             integrated: NativeFlag::Yes,
             inventory_on: NativeFlag::Yes,
@@ -184,14 +269,15 @@ fn the_flags_capture_reads_each_flag_from_its_own_element() {
         "",
     );
     assert_eq!(
-        parse_company_inventory_flags(&text, COMPANY),
+        flags_of(&text, COMPANY),
         Ok(NativeInventoryFlags {
             integrated: NativeFlag::No,
             inventory_on: NativeFlag::Yes,
             batchwise: NativeFlag::Unknown,
         })
     );
-    // An empty element is unknown too, and the counts are fetched but never read.
+    // An empty element is unknown too. A count that is not a number does not
+    // refuse the flags: it is unavailable, and the gate decides what that means.
     let text = replaced(
         &flags_response(),
         "<ISINVENTORYON TYPE=\"Logical\">Yes</ISINVENTORYON>",
@@ -202,14 +288,56 @@ fn the_flags_capture_reads_each_flag_from_its_own_element() {
         "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
         "<NUMSTOCKITEMS TYPE=\"Number\">not a number</NUMSTOCKITEMS>",
     );
-    assert_eq!(
-        parse_company_inventory_flags(&text, COMPANY)
-            .unwrap()
-            .inventory_on,
-        NativeFlag::Unknown
-    );
+    let inventory = parse_company_inventory_flags(&text, COMPANY).unwrap();
+    assert_eq!(inventory.flags.inventory_on, NativeFlag::Unknown);
+    assert_eq!(inventory.item_count, NativeStockItemCount::Unavailable);
     // The company GUID is compared ignoring ASCII case.
     assert!(parse_company_inventory_flags(&flags_response(), &COMPANY.to_uppercase()).is_ok());
+}
+
+#[test]
+fn the_item_count_is_a_plain_number_trimmed_or_it_is_unavailable_never_zero() {
+    // The capture: ` 11`, with the leading space Tally writes on a non-zero
+    // count. Eleven is also the number of rows in the items capture.
+    assert_eq!(count_of(&flags_response()), NativeStockItemCount::Reported(11));
+    assert_eq!(parse(&items_response()).unwrap().rows.len(), 11);
+    // Edits of captured text. Zero is a count, written with no space.
+    for (text, expected) in [
+        ("0", 0),
+        (" 1", 1),
+        ("1 ", 1),
+        (" 7439", 7439),
+        ("00012", 12),
+    ] {
+        assert_eq!(
+            count_of(&flags_with_count(Some(text))),
+            NativeStockItemCount::Reported(expected),
+            "{text:?}"
+        );
+    }
+    // Missing, empty, blank or not a plain number: unavailable, never zero.
+    assert_eq!(
+        count_of(&flags_with_count(None)),
+        NativeStockItemCount::Unavailable
+    );
+    for text in [
+        "",
+        "   ",
+        "not a number",
+        "-1",
+        "+1",
+        "1.0",
+        "1,000",
+        "1 1",
+        "0x10",
+        "99999999999999999999999",
+    ] {
+        assert_eq!(
+            count_of(&flags_with_count(Some(text))),
+            NativeStockItemCount::Unavailable,
+            "{text:?}"
+        );
+    }
 }
 
 #[test]
@@ -339,9 +467,9 @@ fn the_capture_reads_eleven_rows_bound_by_guid_prefix_with_quantities_and_signed
     assert_eq!(kit.closing.quantity, quantity_of("12", "Nos"));
     // An empty element is None; a present zero value is not.
     let empty = item(&items, "Cleaning Kit B");
-    assert_eq!(empty.closing.quantity, None);
+    assert_eq!(empty.closing.quantity, NativeQuantityRead::Empty);
     assert_eq!(empty.closing.value, None);
-    assert_eq!(empty.opening.quantity, None);
+    assert_eq!(empty.opening.quantity, NativeQuantityRead::Empty);
     assert_eq!(empty.opening.value, Some(decimal("0.00")));
     let negative = item(&items, "Zero Stock Item");
     assert_eq!(negative.closing.quantity, quantity_of("-50.000", "Kgs"));
@@ -349,27 +477,29 @@ fn the_capture_reads_eleven_rows_bound_by_guid_prefix_with_quantities_and_signed
 }
 
 #[test]
-fn a_quantity_is_a_number_a_single_space_and_a_unit_or_nothing() {
+fn a_quantity_is_a_number_a_single_space_and_a_unit_or_nothing_or_unread() {
     let closing = |text: Option<&str>| {
         parse(&carton_closing_quantity(text)).map(|items| items.rows[0].closing.quantity.clone())
     };
-    let refused = Err(NativeStockError::QuantityUnparseable);
     // Absent, empty and whitespace are no quantity, not zero.
-    assert_eq!(closing(None), Ok(None));
-    assert_eq!(closing(Some("")), Ok(None));
-    assert_eq!(closing(Some("   ")), Ok(None));
+    assert_eq!(closing(None), Ok(NativeQuantityRead::Empty));
+    assert_eq!(closing(Some("")), Ok(NativeQuantityRead::Empty));
+    assert_eq!(closing(Some("   ")), Ok(NativeQuantityRead::Empty));
     // As Tally sends it (a leading space), and the shapes seen or admitted.
     assert_eq!(closing(Some(" 100 Box")), Ok(quantity_of("100", "Box")));
     assert_eq!(closing(Some("5 U.")), Ok(quantity_of("5", "U.")));
     assert_eq!(closing(Some("-2.5 Kgs")), Ok(quantity_of("-2.5", "Kgs")));
     assert_eq!(closing(Some("0 Box")), Ok(quantity_of("0", "Box")));
-    // Everything else refuses the read. Two spaces are pinned as a refusal: the
-    // grammar is one space, and a unit has none.
+    // Everything else is unread, and the row is still read: no quantity leaves
+    // Bridge, so one it cannot read (a compound unit, a unit with a space in
+    // it) does not refuse the book. The strict grammar itself still refuses
+    // each of them when it is asked.
     for text in [
         "abc",
         "5",
         "5  Kgs",
         "5 Kgs extra",
+        "2 Box of 10 Nos",
         "1,000 Nos",
         "+5 Kgs",
         ".5 Kgs",
@@ -377,9 +507,25 @@ fn a_quantity_is_a_number_a_single_space_and_a_unit_or_nothing() {
         "Kgs 5",
         "5 \u{a0}Kgs",
     ] {
-        assert_eq!(closing(Some(text)), refused, "{text:?}");
+        assert_eq!(closing(Some(text)), Ok(NativeQuantityRead::Unread), "{text:?}");
+        assert_eq!(
+            quantity(Some(text.to_string())),
+            Err(NativeStockError::QuantityUnparseable),
+            "{text:?}"
+        );
     }
-    // A unit is a name-bearing text and is held to the name bound.
+    // The opening quantity is read the same way.
+    let opening = replaced(
+        &items_response(),
+        "<OPENINGBALANCE TYPE=\"Quantity\"> 100 Box</OPENINGBALANCE>",
+        "<OPENINGBALANCE TYPE=\"Quantity\">100</OPENINGBALANCE>",
+    );
+    assert_eq!(
+        parse(&opening).unwrap().rows[0].opening.quantity,
+        NativeQuantityRead::Unread
+    );
+    // A unit is a name-bearing text and is held to the name bound: that is the
+    // row-size premise, not the grammar, and it still refuses.
     let unit = |length: usize| closing(Some(format!("5 {}", "u".repeat(length)).as_str()));
     assert!(unit(MASTERS_ASSUMED_NAME_CHARS).is_ok());
     assert_eq!(
@@ -881,24 +1027,39 @@ fn the_report_capture_totals_its_amounts_and_equals_the_items_closing_value_sum(
             empty: 0,
         })
     );
-    // The capture's tie: the report total is the items' closing-value sum.
+    // The capture's tie: the report total is the items' closing-value sum, and
+    // the company's own item count is the rows read.
     let items = parse(&items_response()).unwrap();
     assert_eq!(
         present_closing_value_sum(&items.rows),
         Ok(decimal("3000.01"))
     );
-    let NativeStockGate::Matched {
+    let NativeStockGate::ValueTotalMatched {
         items,
         total,
         report_empty_amounts,
+        item_count,
         ..
-    } = gate(&items_response(), &report_response())
+    } = gate_with(
+        &items_response(),
+        count_of(&flags_response()),
+        &report_response(),
+    )
+    .unwrap()
     else {
         panic!("the capture's report ties to its items");
     };
     assert_eq!(items.len(), 11);
     assert_eq!(total, decimal("3000.01"));
     assert_eq!(report_empty_amounts, 0);
+    assert_eq!(
+        item_count,
+        NativeItemCountCrossCheck {
+            status: NativeItemCountStatus::Matched,
+            rows: 11,
+            tally_count: 11,
+        }
+    );
 }
 
 #[test]
@@ -911,7 +1072,7 @@ fn a_report_that_differs_by_a_hundredth_withholds_the_items_and_names_both_total
     assert_eq!(
         gate(&items_response(), &report),
         NativeStockGate::Differs {
-            items_total: decimal("3000.01"),
+            items_total: Some(decimal("3000.01")),
             report_total: decimal("3000.02"),
         }
     );
@@ -925,78 +1086,267 @@ fn the_totals_are_compared_by_value_not_by_spelling() {
         present: 1,
         empty: 0,
     };
-    let items = parse(&items_response()).unwrap().rows;
     assert!(matches!(
-        gate_stock_summary(items, &report),
-        Ok(NativeStockGate::Matched { .. })
+        gate_rows(|_| {}, ELEVEN, &report),
+        Ok(NativeStockGate::ValueTotalMatched { .. })
     ));
 }
 
 #[test]
-fn an_empty_or_unknown_report_is_not_a_comparison_and_returns_the_items_unchecked() {
-    let text = report_response();
-    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
-    let hollow = format!(
-        "{}{}",
-        &text[..start],
-        &text[text.rfind("</ENVELOPE>").unwrap()..]
-    );
-    let cases = [
-        (
-            hollow.clone(),
-            NativeStockReport::Empty,
-            "stock_report_empty",
-        ),
-        (
-            hollow.replace("<ENVELOPE></ENVELOPE>", "<ENVELOPE/>"),
-            NativeStockReport::Empty,
-            "stock_report_empty",
-        ),
-        (
-            text.replacen("<ENVELOPE>", "<RESPONSE>", 1)
-                .replacen("</ENVELOPE>", "</RESPONSE>", 1),
-            NativeStockReport::UnknownReport,
-            "stock_unknown_report",
-        ),
-    ];
-    for (xml, expected, reason) in cases {
-        assert_eq!(report_of(&xml), Ok(expected.clone()), "{xml}");
-        let NativeStockGate::NotChecked {
-            items,
-            reason: given,
-            ..
-        } = gate(&items_response(), &xml)
-        else {
-            panic!("{xml}: not a comparison");
-        };
-        assert_eq!((items.len(), given), (11, reason));
-    }
-    // Every amount empty: nothing to compare, and not a total of zero.
-    let all_empty =
-        ["18750.00", "14500.00", "-30249.99"]
-            .iter()
-            .fold(text.clone(), |xml, amount| {
-                replaced(
-                    &xml,
-                    &format!("<DSPCLAMTA>{amount}</DSPCLAMTA>"),
-                    "<DSPCLAMTA></DSPCLAMTA>",
-                )
-            });
+fn a_report_tally_did_not_recognise_is_the_reads_error_not_an_answer() {
+    // An edit of captured text: the bare `RESPONSE` an unknown report name
+    // answers with (§12a.1). The statements parser refuses the same answer.
+    let unknown = report_response()
+        .replacen("<ENVELOPE>", "<RESPONSE>", 1)
+        .replacen("</ENVELOPE>", "</RESPONSE>", 1);
+    assert_eq!(report_of(&unknown), Err(NativeStockError::ReportUnknown));
     assert_eq!(
-        report_of(&all_empty),
+        report_of("<RESPONSE>Unknown Request, cannot be processed</RESPONSE>"),
+        Err(NativeStockError::ReportUnknown)
+    );
+    assert_eq!(
+        gate_with(&items_response(), ELEVEN, &unknown),
+        Err(NativeStockError::ReportUnknown)
+    );
+    assert_eq!(NativeStockError::ReportUnknown.code(), "stock_report_unknown");
+}
+
+#[test]
+fn an_empty_envelope_and_a_report_with_no_amount_are_answers() {
+    for xml in [
+        empty_report(),
+        empty_report().replace("<ENVELOPE></ENVELOPE>", "<ENVELOPE/>"),
+    ] {
+        assert_eq!(report_of(&xml), Ok(NativeStockReport::Empty), "{xml}");
+    }
+    // Every amount empty: lines, and no total. Not a total of zero.
+    assert_eq!(
+        report_of(&report_with_amounts(["", "", ""])),
         Ok(NativeStockReport::Lines {
             total: None,
             present: 0,
             empty: 3
         })
     );
-    assert!(matches!(
-        gate(&items_response(), &all_empty),
-        NativeStockGate::NotChecked {
-            reason: "stock_report_amounts_all_empty",
-            ..
+}
+
+#[test]
+fn an_unavailable_item_count_refuses_whatever_the_report_says() {
+    // The report ties, and still nothing says every item was read.
+    assert_eq!(
+        gate_with(
+            &items_response(),
+            NativeStockItemCount::Unavailable,
+            &report_response()
+        ),
+        Err(NativeStockError::ItemCountUnavailable)
+    );
+    // Through the parser: the count element left out, and one that is not a
+    // number.
+    for flags in [flags_with_count(None), flags_with_count(Some("eleven"))] {
+        assert_eq!(
+            gate_with(&items_response(), count_of(&flags), &report_response()),
+            Err(NativeStockError::ItemCountUnavailable)
+        );
+    }
+    // It is never read as zero: an empty book with no count is not "no stock".
+    assert_eq!(
+        gate_with(
+            &no_item_rows(),
+            NativeStockItemCount::Unavailable,
+            &empty_report()
+        ),
+        Err(NativeStockError::ItemCountUnavailable)
+    );
+    assert_eq!(
+        NativeStockError::ItemCountUnavailable.code(),
+        "stock_item_count_unavailable"
+    );
+}
+
+#[test]
+fn fewer_rows_than_tallys_own_item_count_is_its_own_outcome_and_more_rows_is_not() {
+    // Twelve counted, eleven read: the list may be incomplete, though the
+    // report ties.
+    assert_eq!(
+        gate_with(
+            &items_response(),
+            NativeStockItemCount::Reported(12),
+            &report_response()
+        ),
+        Ok(NativeStockGate::RowsBelowItemCount {
+            rows: 11,
+            tally_count: 12
+        })
+    );
+    // It comes before the comparison: a report that differs does not hide it.
+    let differs = report_with_amounts(["1.00", "14500.00", "-30249.99"]);
+    assert_eq!(
+        gate_with(&items_response(), NativeStockItemCount::Reported(12), &differs),
+        Ok(NativeStockGate::RowsBelowItemCount {
+            rows: 11,
+            tally_count: 12
+        })
+    );
+    // No rows against a count of five.
+    assert_eq!(
+        gate_with(
+            &no_item_rows(),
+            NativeStockItemCount::Reported(5),
+            &empty_report()
+        ),
+        Ok(NativeStockGate::RowsBelowItemCount {
+            rows: 0,
+            tally_count: 5
+        })
+    );
+    // Ten counted, eleven read: every row is this company's, so the read goes
+    // on and says the count was lower.
+    let NativeStockGate::ValueTotalMatched { item_count, .. } = gate_with(
+        &items_response(),
+        NativeStockItemCount::Reported(10),
+        &report_response(),
+    )
+    .unwrap() else {
+        panic!("a lower count does not withhold a tying read");
+    };
+    assert_eq!(
+        item_count,
+        NativeItemCountCrossCheck {
+            status: NativeItemCountStatus::CompanyCountLower,
+            rows: 11,
+            tally_count: 10,
         }
+    );
+}
+
+#[test]
+fn a_book_with_no_stock_items_is_an_answer_only_when_three_sources_agree() {
+    // PROVISIONAL (not a capture): the three texts are the committed captures
+    // with their rows, their lines and their count edited away. The situation
+    // itself was observed live on a synthetic company (count `0`, an empty item
+    // collection, an empty Stock Summary envelope), but no wire capture of it
+    // taken through Bridge is committed yet. This test stands in until one is,
+    // and the change does not ship with it in this form.
+    let zero = count_of(&flags_with_count(Some("0")));
+    assert_eq!(zero, NativeStockItemCount::Reported(0));
+    assert_eq!(parse(&no_item_rows()).unwrap().rows.len(), 0);
+    assert_eq!(
+        gate_with(&no_item_rows(), zero, &empty_report()),
+        Ok(NativeStockGate::NoStockItems)
+    );
+    // Any one of the three saying otherwise is not that answer.
+    // A report with a total, and no items: Tally shows a value the items lack.
+    assert_eq!(
+        gate_with(&no_item_rows(), zero, &report_response()),
+        Ok(NativeStockGate::Differs {
+            items_total: None,
+            report_total: decimal("3000.01"),
+        })
+    );
+    // A report with lines and no amount, and no items: nothing to compare.
+    assert_eq!(
+        gate_with(&no_item_rows(), zero, &report_with_amounts(["", "", ""])),
+        Ok(NativeStockGate::NotComparable)
+    );
+    // Rows, with a count of zero: not "no stock" (the count is lower; the
+    // capture's rows tie to its report).
+    assert!(matches!(
+        gate_with(&items_response(), zero, &report_response()),
+        Ok(NativeStockGate::ValueTotalMatched {
+            item_count: NativeItemCountCrossCheck {
+                status: NativeItemCountStatus::CompanyCountLower,
+                rows: 11,
+                tally_count: 0,
+            },
+            ..
+        })
     ));
+}
+
+#[test]
+fn a_match_needs_a_value_on_the_items_side_and_a_total_on_the_reports() {
+    let no_values = |item: &mut NativeStockItem| item.closing.value = None;
+    let zero_total = report_of(&report_with_amounts(["0.00", "0.00", "0.00"])).unwrap();
+    assert_eq!(
+        zero_total,
+        NativeStockReport::Lines {
+            total: Some(decimal("0.00")),
+            present: 3,
+            empty: 0,
+        }
+    );
+    // No item carries a value and the report totals zero: the items' sum of
+    // nothing is zero too, but nothing was compared. Not a match.
+    assert_eq!(
+        gate_rows(no_values, ELEVEN, &zero_total),
+        Ok(NativeStockGate::NotComparable)
+    );
+    // No item carries a value and the report shows one: Tally contradicts the
+    // items, with no figure on their side.
+    assert_eq!(
+        gate_rows(no_values, ELEVEN, &report_of(&report_response()).unwrap()),
+        Ok(NativeStockGate::Differs {
+            items_total: None,
+            report_total: decimal("3000.01"),
+        })
+    );
+    // Every item valued at a present 0.00 against a report totalling zero: a
+    // present zero is a value, so this is a comparison, and it holds.
+    let zero_values = |item: &mut NativeStockItem| item.closing.value = Some(decimal("0.00"));
+    assert!(matches!(
+        gate_rows(zero_values, ELEVEN, &zero_total),
+        Ok(NativeStockGate::ValueTotalMatched { .. })
+    ));
+}
+
+#[test]
+fn valued_items_against_a_report_with_no_amount_is_its_own_outcome() {
+    // The items sum to 3000.01; the report is an empty envelope, or has lines
+    // with no amount. One figure, not two: an empty report is not told apart
+    // from one Tally did not render.
+    for report in [empty_report(), report_with_amounts(["", "", ""])] {
+        assert_eq!(
+            gate(&items_response(), &report),
+            NativeStockGate::ReportShowsNoValue {
+                items_total: decimal("3000.01"),
+            },
+            "{report}"
+        );
+    }
+}
+
+#[test]
+fn nothing_comparable_withholds_the_rows() {
+    let empty = NativeStockReport::Empty;
+    // No item carries a value and the report is empty.
+    assert_eq!(
+        gate_rows(|item| item.closing.value = None, ELEVEN, &empty),
+        Ok(NativeStockGate::NotComparable)
+    );
+    // Two values that cancel to exactly zero, the rest empty, and an empty
+    // report: Tally has no line for a group worth zero, so this is not a
+    // contradiction, and it is not a comparison either.
+    let cancelling = |item: &mut NativeStockItem| {
+        item.closing.value = match item.name.as_str() {
+            "Carton Box Small" => Some(decimal("5.00")),
+            "Caustic Soda Flakes" => Some(decimal("-5.00")),
+            _ => None,
+        };
+    };
+    assert_eq!(
+        gate_rows(cancelling, ELEVEN, &empty),
+        Ok(NativeStockGate::NotComparable)
+    );
+    // Every value a present 0.00 and an empty report: the same.
+    assert_eq!(
+        gate_rows(
+            |item| item.closing.value = Some(decimal("0.00")),
+            ELEVEN,
+            &empty
+        ),
+        Ok(NativeStockGate::NotComparable)
+    );
 }
 
 #[test]
@@ -1025,7 +1375,7 @@ fn an_empty_amount_is_counted_and_left_out_never_read_as_zero() {
         "<CLOSINGVALUE TYPE=\"Amount\">12000.00</CLOSINGVALUE>",
         "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>",
     );
-    let NativeStockGate::Matched {
+    let NativeStockGate::ValueTotalMatched {
         total,
         report_empty_amounts,
         totals,
@@ -1208,43 +1558,24 @@ fn totals_after(edit: impl Fn(&mut NativeStockItem)) -> NativeStockTotals {
 }
 
 #[test]
-fn the_totals_count_each_kind_of_item_and_withhold_a_sum_when_any_closing_value_is_empty() {
+fn the_totals_count_the_items_and_withhold_a_sum_when_any_closing_value_is_empty() {
     let totals = totals_of(&items_response());
     // Four closing values are empty: Zero Stock Item holds -50 Kgs with none,
-    // and three items have neither a quantity nor a value.
+    // and three items have neither a quantity nor a value. No count is derived
+    // from a quantity: quantities are withheld.
     assert_eq!(
         totals,
         NativeStockTotals {
             item_count: 11,
-            negative_closing_quantity_count: 1,
-            zero_quantity_count: 0,
-            empty_closing_quantity_count: 3,
             empty_closing_value_count: 4,
+            closing_quantity_unread_count: 0,
             value_sum: None,
             partial: true,
         }
     );
-    // An empty quantity does not change that: blanking Zero Stock Item's
-    // quantity too leaves the sum withheld.
-    let unstocked = replaced(
-        &items_response(),
-        "<CLOSINGBALANCE TYPE=\"Quantity\">-50.000 Kgs</CLOSINGBALANCE>",
-        "<CLOSINGBALANCE TYPE=\"Quantity\"></CLOSINGBALANCE>",
-    );
-    assert_eq!(
-        totals_of(&unstocked),
-        NativeStockTotals {
-            item_count: 11,
-            negative_closing_quantity_count: 0,
-            zero_quantity_count: 0,
-            empty_closing_quantity_count: 4,
-            empty_closing_value_count: 4,
-            value_sum: None,
-            partial: true,
-        }
-    );
-    // Nor does a closing quantity that is present and zero: that it makes an
-    // empty value zero is unmeasured, so the sum is withheld.
+    // A quantity does not change that: with every empty-valued item given a
+    // present zero quantity, the sum is still withheld (that a zero quantity
+    // makes an empty value zero is unmeasured).
     let zero_quantity = totals_after(|item| {
         if item.closing.value.is_none() {
             item.closing.quantity = quantity_of("0.000", "Nos");
@@ -1254,10 +1585,67 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_when_any_closing_value_
         (
             zero_quantity.partial,
             zero_quantity.value_sum,
-            zero_quantity.zero_quantity_count,
             zero_quantity.empty_closing_value_count,
         ),
-        (true, None, 4, 4)
+        (true, None, 4)
+    );
+}
+
+#[test]
+fn a_quantity_bridge_could_not_read_is_counted_and_refuses_nothing() {
+    // An edit of captured text: Carton Box Small's closing quantity in a
+    // compound unit. The row is read, its value is read, and the totals say one
+    // quantity was not.
+    let compound = carton_closing_quantity(Some(" 2 Box of 10 Nos"));
+    let items = parse(&compound).unwrap();
+    assert_eq!(items.rows.len(), 11);
+    assert_eq!(items.rows[0].closing.quantity, NativeQuantityRead::Unread);
+    assert_eq!(items.rows[0].closing.value, Some(decimal("2500.00")));
+    assert_eq!(totals_of(&compound).closing_quantity_unread_count, 1);
+    assert_eq!(totals_of(&items_response()).closing_quantity_unread_count, 0);
+    // And the read still ties: the value total is untouched by it.
+    assert!(matches!(
+        gate(&compound, &report_response()),
+        NativeStockGate::ValueTotalMatched { .. }
+    ));
+}
+
+#[test]
+fn the_value_sum_is_written_at_the_scale_of_the_values_it_adds() {
+    let rows = parse(&items_response()).unwrap().rows;
+    let named = |names: &[&str]| {
+        rows.iter()
+            .filter(|row| names.contains(&row.name.as_str()))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    // One value, `2500.00`: the sum is that text, not `2500`.
+    let one = named(&["Carton Box Small"]);
+    assert_eq!(one.len(), 1);
+    assert_eq!(
+        NativeStockTotals::of(&one).unwrap().value_sum,
+        Some(decimal("2500.00"))
+    );
+    // Two values that cancel: `0.00`, not `0`.
+    let mut cancelling = named(&["Carton Box Small", "Caustic Soda Flakes"]);
+    cancelling[1].closing.value = Some(decimal("-2500.00"));
+    assert_eq!(
+        NativeStockTotals::of(&cancelling).unwrap().value_sum,
+        Some(decimal("0.00"))
+    );
+    // Mixed scales take the widest: 2500.00 and 0.5 is 2500.50.
+    let mut mixed = named(&["Carton Box Small", "Caustic Soda Flakes"]);
+    mixed[1].closing.value = Some(decimal("0.5"));
+    assert_eq!(
+        NativeStockTotals::of(&mixed).unwrap().value_sum,
+        Some(decimal("2500.50"))
+    );
+    // A negative sum keeps its sign and its scale.
+    let mut negative = named(&["Carton Box Small", "Caustic Soda Flakes"]);
+    negative[1].closing.value = Some(decimal("-2600.00"));
+    assert_eq!(
+        NativeStockTotals::of(&negative).unwrap().value_sum,
+        Some(decimal("-100.00"))
     );
 }
 
@@ -1295,7 +1683,7 @@ fn a_mixed_sign_set_is_summed_algebraically_on_both_sides() {
     assert!(report_total.numeric_eq(&decimal("3000.01")));
     assert!(matches!(
         gate(&items_response(), &report_response()),
-        NativeStockGate::Matched { .. }
+        NativeStockGate::ValueTotalMatched { .. }
     ));
     // A sum of magnitudes is a different number on each side, so a comparison
     // of magnitudes would not have matched.
@@ -1329,7 +1717,7 @@ fn a_mixed_sign_set_is_summed_algebraically_on_both_sides() {
     else {
         panic!("a flipped sign must not match");
     };
-    assert!(items_total.numeric_eq(&decimal("5000.01")));
+    assert!(items_total.unwrap().numeric_eq(&decimal("5000.01")));
     assert!(report_total.numeric_eq(&decimal("3000.01")));
     // An edit of captured text: every report amount has its sign flipped, so
     // the report's sum is `-3000.01`, equal in magnitude to the items' and
@@ -1354,7 +1742,7 @@ fn a_mixed_sign_set_is_summed_algebraically_on_both_sides() {
     else {
         panic!("totals of opposite sign must not match");
     };
-    assert!(items_total.numeric_eq(&decimal("3000.01")));
+    assert!(items_total.unwrap().numeric_eq(&decimal("3000.01")));
     assert!(report_total.numeric_eq(&decimal("-3000.01")));
 }
 
@@ -1375,13 +1763,7 @@ fn a_sum_is_formed_only_when_every_closing_value_is_present() {
     let totals = totals_of(&explicit);
     assert!(!totals.partial);
     assert_eq!(totals.empty_closing_value_count, 0);
-    // Quantities are as captured: three are empty, and one is negative.
-    assert_eq!(totals.empty_closing_quantity_count, 3);
-    assert_eq!(totals.negative_closing_quantity_count, 1);
-    assert!(totals
-        .value_sum
-        .expect("every value present")
-        .numeric_eq(&decimal("3000.01")));
+    assert_eq!(totals.value_sum, Some(decimal("3000.01")));
     // One value blanked again (Carton Box Small's): withheld.
     let blanked = replaced(
         &explicit,
@@ -1404,17 +1786,15 @@ fn a_book_whose_closing_values_are_all_empty_has_no_value_sum() {
     // Every item with no quantity and no value: the sum is not zero, it is
     // withheld.
     let totals = totals_after(|item| {
-        item.closing.quantity = None;
+        item.closing.quantity = NativeQuantityRead::Empty;
         item.closing.value = None;
     });
     assert_eq!(
         totals,
         NativeStockTotals {
             item_count: 11,
-            negative_closing_quantity_count: 0,
-            zero_quantity_count: 0,
-            empty_closing_quantity_count: 11,
             empty_closing_value_count: 11,
+            closing_quantity_unread_count: 0,
             value_sum: None,
             partial: true,
         }
@@ -1439,15 +1819,11 @@ fn a_book_with_no_items_has_a_sum_of_zero_and_is_not_partial() {
 }
 
 #[test]
-fn an_opening_position_that_is_not_returned_is_still_validated() {
-    // Edits of captured text: the opening is never serialized, but a malformed
-    // one still refuses the whole read.
-    let quantity = replaced(
-        &items_response(),
-        "<OPENINGBALANCE TYPE=\"Quantity\"> 100 Box</OPENINGBALANCE>",
-        "<OPENINGBALANCE TYPE=\"Quantity\">100</OPENINGBALANCE>",
-    );
-    assert_eq!(parse(&quantity), Err(NativeStockError::QuantityUnparseable));
+fn an_opening_value_that_is_not_returned_is_still_validated() {
+    // An edit of captured text: the opening is never serialized, but a
+    // malformed opening value still refuses the whole read. (An opening
+    // quantity Bridge cannot read is unread, like a closing one: see the
+    // quantity test.)
     let value = replaced(
         &items_response(),
         "<OPENINGVALUE TYPE=\"Amount\">2500.00</OPENINGVALUE>",
@@ -1467,9 +1843,24 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
             "guid": format!("{COMPANY}-0000010c"),
             "parent": "Raw Chemicals",
             "base_unit": "Kgs",
-            "closing": {"quantity": {"amount": "400.000", "unit": "Kgs"}, "value": "-1000.00"},
+            "closing": {"value": "-1000.00"},
         })
     );
+    // No quantity is serialized, on any item: it is read (the parse tests above
+    // assert it) and withheld.
+    assert_eq!(
+        item(&items, "Caustic Soda Flakes").closing.quantity,
+        quantity_of("400.000", "Kgs")
+    );
+    for row in &items.rows {
+        let closing = &serde_json::to_value(row).unwrap()["closing"];
+        assert_eq!(
+            closing.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["value"],
+            "{}",
+            row.name
+        );
+    }
     // The opening position is read (the parse tests above assert it) but is
     // never serialized, on any item.
     assert!(item(&items, "Caustic Soda Flakes").opening.value.is_some());
@@ -1481,13 +1872,27 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
         );
     }
     let empty = serde_json::to_value(item(&items, "Cleaning Kit B")).unwrap();
-    assert_eq!(
-        empty["closing"],
-        serde_json::json!({"quantity": null, "value": null})
-    );
+    assert_eq!(empty["closing"], serde_json::json!({"value": null}));
     let totals = serde_json::to_value(totals_of(&items_response())).unwrap();
-    assert_eq!(totals["value_sum"], serde_json::Value::Null);
-    assert_eq!(totals["partial"], true);
+    assert_eq!(
+        totals,
+        serde_json::json!({
+            "item_count": 11,
+            "empty_closing_value_count": 4,
+            "closing_quantity_unread_count": 0,
+            "value_sum": null,
+            "partial": true,
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(NativeItemCountCrossCheck {
+            status: NativeItemCountStatus::CompanyCountLower,
+            rows: 11,
+            tally_count: 10,
+        })
+        .unwrap(),
+        serde_json::json!({"status": "company_count_lower", "rows": 11, "tally_count": 10})
+    );
     assert_eq!(
         serde_json::to_value(NativeInventoryFlags {
             integrated: NativeFlag::Yes,
@@ -1543,6 +1948,8 @@ fn every_code_carries_the_stock_prefix_but_the_company_flags_refusals() {
         NativeStockError::ValueUnparseable,
         NativeStockError::ReportAmountInvalid,
         NativeStockError::SumInvalid,
+        NativeStockError::ReportUnknown,
+        NativeStockError::ItemCountUnavailable,
         NativeStockError::AsOfNotMeasured,
     ] {
         assert!(error.code().starts_with("stock_"), "{error:?}");

@@ -205,8 +205,9 @@ impl TallyRuntime {
                         evidence = evidence
                             .clone()
                             .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                        let inventory =
+                        let company_inventory =
                             parse_company_inventory_flags(&xml, identity.company_guid())?;
+                        let inventory = company_inventory.flags;
                         if inventory.inventory_on == NativeFlag::No {
                             return Err(StockSummaryReadError::NotEnabled.into());
                         }
@@ -247,13 +248,18 @@ impl TallyRuntime {
                             .clone()
                             .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                         let report = parse_native_stock_summary_report(&xml)?;
-                        let gate = gate_stock_summary(items.rows, &report)?;
+                        // Held, like the premise, until the closing extent is
+                        // read: a book that moved says so before what its rows
+                        // or its item count would have refused.
+                        let gate =
+                            gate_stock_summary(items.rows, company_inventory.item_count, &report);
 
                         let closing_extent = client.fetch_company_book_extent(&identity).await?;
                         if closing_extent != extent {
                             return Err(PairedReadValidationError::StockSummaryExtent.into());
                         }
                         premise?;
+                        let gate = gate?;
                         bracket_verified_company_identity(&client, &identity).await?;
                         evidence = evidence
                             .clone()

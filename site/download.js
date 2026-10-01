@@ -5,12 +5,12 @@ var PLATFORMS = {
   "windows-x64": {
     name: "Windows&nbsp;x64",
     label: "Windows",
-    note: "Windows x64.", // A1 facts F2; "Windows 10 or 11" is not a verified fact
+    note: "Windows x64.", // "Windows 10 or 11" is not a verified fact
   },
   "macos-arm64": {
     name: "Mac (Apple&nbsp;Silicon)",
     label: "Mac",
-    note: "Apple&nbsp;Silicon only. Intel Macs are not qualified for this release.", // A1 facts F2: "not qualified"
+    note: "Apple&nbsp;Silicon only. Intel Macs are not qualified for this release.", // the release text's own words: "not qualified"
   },
 };
 
@@ -34,7 +34,7 @@ function platformCard(release, platformKey, kind) {
   var assets = releaseAssets(release, platformKey);
   var card = el("div", "dl-card dl-card--" + kind);
 
-  // No "Recommended:" prefix (critique #33): the browser's Mac/Windows guess
+  // No "Recommended:" prefix: the browser's Mac/Windows guess
   // cannot tell Apple Silicon from Intel, so a confident label on the wrong
   // build would be worse than none. The primary card's border and shadow
   // (.dl-card--primary) are the only emphasis.
@@ -55,7 +55,7 @@ function platformCard(release, platformKey, kind) {
   card.appendChild(button);
 
   var meta = el("p", "dl-meta");
-  // the tag alone, not releaseLabel(): the site never labels a release with the word the catalog adds (L1 legal pages v1.0)
+  // the tag alone, not releaseLabel(): the site never labels a release with the word the catalog adds
   var tag = el("span", "ver", versionLabel(release));
   var sep = document.createTextNode(" · ");
   var checksumLink = el("a", null, ".sha256 checksum");
@@ -67,7 +67,7 @@ function platformCard(release, platformKey, kind) {
   card.appendChild(meta);
 
   card.appendChild(el("p", "dl-note", info.note));
-  // beside every download, and only this (L1 legal pages v1.0)
+  // beside every download, and only this
   card.appendChild(el("p", "dl-note", "Not yet code-signed; your computer may warn you."));
   return card;
 }

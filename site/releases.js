@@ -13,7 +13,7 @@ function el(tag, className, text) {
   return node;
 }
 
-// d MMM yyyy everywhere on the site (critique #34): en-IN's "short" month can
+// d MMM yyyy everywhere on the site: en-IN's "short" month can
 // render "Sept", so it is corrected to the 3-letter form after formatting.
 function formatDate(iso) {
   if (!iso) return null;
@@ -64,7 +64,7 @@ function releaseCard(release, isLatest) {
   var date = formatDate(release.published_at);
   if (date) card.appendChild(el("p", "rel-date", date));
 
-  // A single primary button on the newest card only (critique #34): it is
+  // A single primary button on the newest card only: it is
   // one clear action, not a second copy of the platform-detection on
   // download.html.
   if (isLatest && isInstallablePreview(release)) {
@@ -83,7 +83,7 @@ function releaseCard(release, isLatest) {
     card.appendChild(el("p", "rel-one-line", hasWindows || hasMac ? "Superseded by the latest release." : "Source only. No installer for this release."));
   } else if (!hasWindows && !hasMac) {
     // Collapse two "not built for this release" rows into one honest line
-    // (critique #34) instead of repeating the same note per platform.
+    // instead of repeating the same note per platform.
     card.appendChild(el("p", "rel-one-line", "Source only. No installer for this release."));
   } else {
     var assets = el("div", "rel-assets");

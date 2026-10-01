@@ -1,6 +1,6 @@
 // app.js — Direction C "Flagged" v2: one scroll-driven master update
 // drives the 3D scene, the chapter panels and the HTML "props" together.
-// Perf pass (owner, 29 Sep): the hero is plain HTML, visible at first
+// Performance: the hero is plain HTML, visible at first
 // paint; the WebGL scene builds only after window `load`, inside an idle
 // callback, behind a CSS poster, and fades in once its first frame renders.
 
@@ -25,10 +25,10 @@ function afterLoad(fn) {
   else window.addEventListener('load', fn, { once: true });
 }
 
-// Text changes in sequence, never double-exposed (motion spec v2, section B):
+// Text changes in sequence, never double-exposed:
 // the outgoing panel fades over 0.00-0.035 of a chapter past the boundary with
 // a 14 px lift, then the incoming one fades in over 0.03-0.10 from 14 px below.
-// The two opacities never sum above 1.1 (checked by _lh/builderM2/opsum.py);
+// The two opacities never sum above 1.1;
 // the only near-blank window is 0.03-0.035. The last panel (heading, proof and
 // the Download button) holds full opacity through the pin's release and scrolls away with it.
 const OUT_END = 0.035;

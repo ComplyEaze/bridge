@@ -47,7 +47,7 @@
   --w-ui: 600;
   --w-brand: 650;
 
-  /* one radius system (critique #36): three sizes plus a pill */
+  /* one radius system: three sizes plus a pill */
   --r-sm: 4px;
   --r-md: 8px;
   --r-lg: 14px;
@@ -64,7 +64,7 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* a real type scale (critique #13): 12/14/16/18/22/28/40/56 */
+  /* a real type scale: 12/14/16/18/22/28/40/56 */
   --fs-2xs: 12px;
   --fs-xs: 14px;
   --fs-sm: 16px;
@@ -76,7 +76,7 @@
 }
 
 html[data-theme="red"] {
-  /* W2 fix 8: the ground is pulled to brown-black (#2a1512 centre, #120a09 edge) so the cloth is the only large saturated red on screen */
+  /* the ground is pulled to brown-black (#2a1512 centre, #120a09 edge) so the cloth is the only large saturated red on screen */
   --cobalt: #2a1512;
   --cobalt-deep: #1d0f0d;
   --cobalt-darker: #170c0a;
@@ -86,7 +86,7 @@ html[data-theme="red"] {
   --on-cobalt: #fff5e8;
   --on-cobalt-soft: rgba(255, 245, 232, 0.82);
   --on-cobalt-faint: rgba(255, 245, 232, 0.7);
-  /* item 9: brown-black ink and its secondary on the cream paper (the cobalt navy would be "pink + navy", S5) */
+  /* brown-black ink and its secondary on the cream paper (the cobalt navy would be "pink + navy") */
   --ink: #2b0e0c;
   --ink-soft: #6b4a3a;
   --ink-faint: #7a5a48;
@@ -102,7 +102,7 @@ html[data-theme="red"] {
   --red-card-shadow: 0 18px 44px rgba(20, 3, 2, 0.42);
 }
 
-/* critique #5: pages did not set border-box, so a shared max-width plus
+/* pages did not set border-box, so a shared max-width plus
    padding rendered wider here than on the home page, and the header/footer
    brand jumped between the two. One box model everywhere. */
 *, *::before, *::after { box-sizing: border-box; }
@@ -116,7 +116,7 @@ html[data-theme="red"] {
   white-space: nowrap;
 }
 
-/* one button spec (critique #36): every primary/secondary CTA, on the home
+/* one button spec: every primary/secondary CTA, on the home
    page and on every page, is this element sized this way. Only the colours
    invert for the surface they sit on (see the ce-header rule below, and
    v2/style.css's .panel .btn-primary for the hero and the close card). */
@@ -203,14 +203,14 @@ html[data-theme="red"] {
   flex: none;
   text-shadow: 0 1px 6px rgba(3, 7, 25, 0.4);
 }
-/* wordmark-led lockup (critique #37): "ComplyEaze" carries the weight,
+/* wordmark-led lockup: "ComplyEaze" carries the weight,
    "Bridge" sits softer, same line. The mark itself is a folded file corner
    in currentColor, so it re-themes with the four worlds. */
-/* one wordmark, one colour: "Bridge" in soft grey read as "ComplyEaze" at a glance (critique 2 #21) */
+/* one wordmark, one colour: "Bridge" in soft grey read as "ComplyEaze" at a glance */
 .ce-brand__sub { font-weight: 500; color: inherit; }
 .ce-mark { flex: none; display: block; color: var(--on-cobalt); }
 
-/* logo left; nav, the GitHub link and the CTA right, one gap (critique #6) */
+/* logo left; nav, the GitHub link and the CTA right, one gap */
 .ce-header__right { display: flex; align-items: center; gap: var(--space-5); }
 
 .ce-nav {
@@ -237,10 +237,10 @@ html[data-theme="red"] {
 
 .ce-header__actions { display: flex; align-items: center; gap: var(--space-3); }
 
-/* GitHub is a quiet icon link now (critique #6): the CTA carries the
+/* GitHub is a quiet icon link now: the CTA carries the
    emphasis. The count reserves its width with tabular digits and stays
    invisible until the fetch resolves, so it can never shift the header
-   (critique #40). */
+  . */
 .ce-star {
   display: inline-flex;
   align-items: center;
@@ -377,7 +377,7 @@ html[data-theme="red"] {
 .ce-footer__inner { max-width: 1280px; margin: 0 auto; }
 
 /* four columns: the about column, then Product / Project / Legal, so the
-   right edge of the links lines up under the header CTA (critique #31) */
+   right edge of the links lines up under the header CTA */
 .ce-footer__grid {
   display: grid;
   grid-template-columns: minmax(0, 6fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 2fr);
@@ -398,7 +398,7 @@ html[data-theme="red"] {
 }
 .ce-footer__brand .ce-mark { color: var(--on-cobalt); }
 
-/* four honest facts in place of one long trust paragraph (critique #31) */
+/* four honest facts in place of one long trust paragraph */
 .ce-footer__facts {
   display: grid;
   gap: 6px;
@@ -452,7 +452,7 @@ html[data-theme="red"] {
   .ce-footer__grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
 }
 
-/* ComplyEaze Bridge lockup (F1, Outfit; Lane Y1, final 30 Sep): one symbol in
+/* ComplyEaze Bridge lockup (F1, Outfit; final): one symbol in
    brand/lockup.svg, coloured by currentColor so each world's
    on-dark ink applies (paper on cobalt, cream on bahi-khata red). Clear space
    is the lowercase x-height on every side; 24 px tall gives the 16 px cap height

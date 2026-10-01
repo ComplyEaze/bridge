@@ -23,7 +23,7 @@ export async function loadReleases() {
 }
 
 // "Version 0.3.0" for a tag like mcp-preview-0.3.0 or v0.1.0: the tag stays in links and file
-// names, but the page never shows the word the tag carries (L1 wording rule, via D5, 30 Sep)
+// names, but the page never shows the word the tag carries
 export function versionLabel(release) {
   return `Version ${release.tag_name.replace(/^mcp-preview-/, "").replace(/^v(?=\d)/, "")}`;
 }

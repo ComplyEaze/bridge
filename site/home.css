@@ -108,7 +108,7 @@ a { color: inherit; }
 .panel .btn { pointer-events: auto; }
 
 /* the hero's right padding gives its headline the width for three lines */
-/* its right edge is the header's content edge (builderF): the header's inner box is at most 1280 wide, so
+/* its right edge is the header's content edge: the header's inner box is at most 1280 wide, so
    from 1280 up the padding is the margin outside it */
 @media (min-width: 761px) { .panel[data-chapter="0"] { padding-right: clamp(var(--gutter), calc((100vw - 1280px) / 2), 96px); } }
 /* short laptop windows (a 1366x768 screen gives about 657 px): the centred hero overflowed upward under the fixed
@@ -248,7 +248,7 @@ a { color: inherit; }
   z-index: 2;
   pointer-events: none;
 }
-/* Lane X1 motion spec, section 3 (desktop only): the 3D is not clipped at the
+/* Desktop only: the 3D is not clipped at the
    58% box edge. The canvas spans the whole pinned story (the box is 58% of it,
    so 100%/0.58 of the box), behind .panels; the box stays the frame the HTML
    props are placed in, and scene.js keeps the object where it was with an
@@ -259,7 +259,7 @@ a { color: inherit; }
   /* the open cover lies out of frame to the left in chapters 1-6 (fitting it whole would shrink the file about a
      quarter): the last 120 px at the left edge fade into the ground instead of ending in a hard cut */
   #fileCanvas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 120px); mask-image: linear-gradient(to right, transparent 0, #000 120px); }
-  /* W3 fix 3: the bahi worlds' lining is flat paper; a 120 px fade over it read as a brass highlight band, so theirs is 60 px */
+  /* the bahi worlds' lining is flat paper; a 120 px fade over it read as a brass highlight band, so theirs is 60 px */
   html[data-theme="red"] #fileCanvas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px); mask-image: linear-gradient(to right, transparent 0, #000 60px); }
 }
 
@@ -403,7 +403,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
   color: var(--ink);
   margin: 0 0 var(--space-5);
 }
-/* the four steps: 16 px type, 24 px numbered markers (motion spec v2, J) */
+/* the four steps: 16 px type, 24 px numbered markers */
 .install-steps { margin: 0 0 var(--space-6); padding: 0; list-style: none; counter-reset: step; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-soft); display: grid; gap: var(--space-4); }
 .install-steps li { position: relative; padding-left: 40px; counter-increment: step; }
 .install-steps li::before {
@@ -446,9 +446,9 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
   .panel[data-chapter="0"] .fp-wide { display: none; } /* the platforms are on the Download page and the closing card */
   .panel[data-chapter="0"] .fineprint, .panel[data-chapter="0"] .coming-line { font-size: 13px; line-height: 1.4; }
   .panels { flex: 1 1 auto; }
-  /* item 10 (text part): the object keeps the top half; words start right
+  /* text part: the object keeps the top half; words start right
      under the header instead of centring in a half-empty column. */
-  /* item 25: the words centre in the space under the object. Auto margins
+  /* the words centre in the space under the object. Auto margins
      rather than justify-content:center, so a tall hero panel overflows at
      the bottom instead of both ends. */
   .panel { padding: var(--space-4) var(--gutter); justify-content: flex-start; }
@@ -467,7 +467,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
 }
 
 /* One tag, one line of text: two small paragraphs rather than one paragraph
-   carrying two tags, so neither can misalign against the other (critique #30). */
+   carrying two tags, so neither can misalign against the other. */
 .next-line {
   display: flex;
   align-items: baseline;
@@ -484,7 +484,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
    neutral on the red and green paper too, with no extra per-world rule. */
 .download-block .next-line .tag-next { background: transparent; color: var(--ink-soft); border: 1px solid var(--paper-line); }
 
-/* the working paper the 40A(3) flag lands in (motion spec v2, D): a card in
+/* the working paper the 40A(3) flag lands in: a card in
    the band under the voucher, 14 px type, from 2.40 at about 0.35 opacity with a
    title, the brief's real columns and a dashed empty row 1. It sits UNDER the
    canvas (z-index 1 < 2) so the 3D flag flies over it and lands on the chip in
@@ -597,7 +597,7 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
 }
 
 /* mobile props: after their base rules, which would otherwise win on order.
-   Below the object, not on it (motion spec v2, I): the names card and the working
+   Below the object, not on it: the names card and the working
    paper sit in the strip between the object and the words. */
 @media (max-width: 760px) {
   .canvas-box { overflow: visible; }
@@ -627,25 +627,25 @@ html.ce-live .download-block:focus-within { opacity: 1; transform: none; transit
 }
 
 /* ------------------------------------------------ material worlds (data-theme) */
-/* Bahi-khata: dark madder cloth, cream pages, oxblood ink (research critique/bahikhata-research-2026-09-30.md, section 6).
+/* Bahi-khata: dark madder cloth, cream pages, oxblood ink.
    Every rule here is under html[data-theme="red"]; nothing above or below it changes for another world. */
-/* item 3 (silhouette): the book sits on the darker end of the ground, not on its lit centre. The dark-madder cloth is
+/* silhouette: the book sits on the darker end of the ground, not on its lit centre. The dark-madder cloth is
    only 1.5:1 against the old #5a1410 centre; against #3c0e0a it is 1.85:1, and the cream tape, stitching and the warm rim
    carry the rest of the outline */
 html[data-theme="red"] .story { --story-bg: radial-gradient(75% 95% at 30% 42%, #2a1512 0%, #1d0f0d 55%, #120a09 100%); }
-/* ---- per-world details (critique 29 Sep) ---- */
+/* ---- per-world details ---- */
 html[data-theme="red"] .prop-question, html[data-theme="red"] .prop-ageing, html[data-theme="red"] .prop-row, html[data-theme="red"] .prop-names { background: #fbf3dc; border: 1px solid var(--red-card-line); box-shadow: var(--red-card-shadow); }
-/* W2 fix 9: paper, not plastic: a 4 px card and an ink button with paper lettering, in place of the white sticker */
+/* paper, not plastic: a 4 px card and an ink button with paper lettering, in place of the white sticker */
 html[data-theme="red"] .download-block { border-radius: 4px; }
 html[data-theme="red"] .download-block :focus-visible { box-shadow: 0 0 0 2px var(--paper); }
-/* W2 fix 1: the working paper's flag cell is the 3D flag's muted 40A(3) tab */
+/* the working paper's flag cell is the 3D flag's muted 40A(3) tab */
 html[data-theme="red"] .wp-sec { background: #efd96a; }
-/* W2 fix 10: the chapter-3 decide state in blue-black ink (today's hand), not cyan */
+/* the chapter-3 decide state in blue-black ink (today's hand), not cyan */
 html[data-theme="red"] .name-chip { background: #1e2b4f; color: #fbeec9; }
 html[data-theme="red"] .name-chip::before { background: #fbeec9; border-color: #1e2b4f; }
 /* the decided face is cream, so the tick takes the closing tick's ink (it inherited the chip's cream and vanished) */
 html[data-theme="red"] .name-chip .t { color: #1e2b4f; }
-/* the paper props, the working paper and the names card: the cobalt blue-greys are replaced by warm browns (item 7/9) */
+/* the paper props, the working paper and the names card: the cobalt blue-greys are replaced by warm browns */
 html[data-theme="red"] .bubble-label { color: var(--ink-faint); }
 html[data-theme="red"] .row-sheet th { background: #f3e8c8; color: var(--ink-soft); border-color: var(--red-card-line); }
 html[data-theme="red"] .row-sheet td { border-color: #c9b588; }
@@ -695,10 +695,10 @@ body { font-weight: 400; }
 }
 
 /* =====================================================================
-   Cobalt world, W5 (critic 1 Oct, fixes 1, 4, 5, 6). Every rule is under html:not([data-theme]), which only the cobalt
+   Cobalt world. Every rule is under html:not([data-theme]), which only the cobalt
    build matches (the other worlds set data-theme), so the red, green and light worlds are untouched.
    ===================================================================== */
-/* fix 1, the ink room: the file is the only saturated mass; the ground is a desaturated deep ink lit from the text side */
+/* the file is the only saturated mass; the ground is a desaturated deep ink lit from the text side */
 html:not([data-theme]) { --room: #0b1027; --ink-margin: rgba(179, 38, 30, 0.6); --ink-feint: rgba(31, 63, 191, 0.22); background: var(--room); }
 html:not([data-theme]) body { background: var(--room); }
 html:not([data-theme]) .story { --story-bg: radial-gradient(70% 90% at 74% 40%, #1a2250 0%, #121936 48%, #0b1027 100%); }
@@ -706,15 +706,15 @@ html:not([data-theme]) .story-sticky::after { background: linear-gradient(to bot
 /* the first paint matches the brighter board */
 html:not([data-theme]) .canvas-poster::before { background: linear-gradient(90deg, #1a2fb0 0% 86%, #eef1f7 86% 100%); }
 
-/* fix 5: the working paper's flag cell is the 40A(3) stationery flag */
+/* the working paper's flag cell is the 40A(3) stationery flag */
 html:not([data-theme]) .wp-sec { background: #f2d33b; }
 
-/* fix 4: queries are blue pencil, and the decision tick is red pencil */
+/* queries are blue pencil, and the decision tick is red pencil */
 html:not([data-theme]) .name-chip { background: #1f3fbf; color: #f6f8fb; border-radius: 2px; }
 html:not([data-theme]) .name-chip::before { border-color: #1f3fbf; border-radius: 2px; }
 html:not([data-theme]) .name-chip .t { color: var(--tick); }
 
-/* fix 6: the working paper and the names card are paper, not cards: square corners, a red margin rule, blue feint ruling */
+/* the working paper and the names card are paper, not cards: square corners, a red margin rule, blue feint ruling */
 .wp-ref { display: none; }
 html:not([data-theme]) .wp-ref { display: block; float: right; margin-left: 12px; font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: #4f587a; }
 html:not([data-theme]) .prop-row,
@@ -744,7 +744,7 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
   html:not([data-theme]) .row-sheet tr { padding-left: 34px; grid-template-columns: 1.4fr 1.05fr 1fr 1.45fr; }
   html:not([data-theme]) .row-sheet td:first-child { padding-left: 8px; }
 }
-/* fix 5, phone (chapters 4-7): the words centre in the space under the book. The old auto margins never reached the last child (a hidden element follows it), so the block sat on the bottom edge and left one 190-250 px bare band between picture and words; centred, the same space is two halves of about 70-140 px. The hero and chapters 1-3 keep their layout. */
+/* the words centre in the space under the book. The old auto margins never reached the last child (a hidden element follows it), so the block sat on the bottom edge and left one 190-250 px bare band between picture and words; centred, the same space is two halves of about 70-140 px. The hero and chapters 1-3 keep their layout. */
 @media (max-width: 760px) {
   html:not([data-theme]) .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) { justify-content: center; }
   html:not([data-theme]) .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) > :first-child { margin-top: 0; }
@@ -753,7 +753,7 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 @media (max-width: 389px) { html:not([data-theme]) .wp-ref { float: none; margin: 0 0 2px; text-align: right; } }
 /* the reduced-motion stills sit on the ink room without a drop shadow (the old one showed as a darker box on the near-black ground) */
 
-/* Red world, X1 W7, phone (chapters 4-7): the same centring as the cobalt rule above, so the words sit midway in the space under the book and no bare band is left between them (under html[data-theme="red"]: no other world changes) */
+/* Red world, phone (chapters 4-7): the same centring as the cobalt rule above, so the words sit midway in the space under the book and no bare band is left between them (under html[data-theme="red"]: no other world changes) */
 @media (max-width: 760px) {
   html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) { justify-content: center; }
   html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) > :first-child { margin-top: 0; }

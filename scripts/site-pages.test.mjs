@@ -88,3 +88,14 @@ test("the product is never a bare Bridge, except inside the replica of the relea
     assert.equal(bare, null, `${name} names the product as a bare Bridge`);
   }
 });
+
+test("no file that ships carries an internal working label", () => {
+  // Comments say what the code does and why; names of work lanes, review rounds and fix numbers stay out of public files.
+  const labels = /\bLane\b|\bcritics?\b|\bcritique\b|\bW[0-9]\b|\bfix(?:es)? [0-9]|\b[XYLAD][0-9]\b|builder[A-Z]|\bitem [0-9]|motion spec|_lh\//;
+  const files = readdirSync(site, { recursive: true }).filter((name) => /\.(html|css|js|mjs|svg|md)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
+  for (const name of files) {
+    // path data (d="M2.21 7 L4.99 7 …") is drawing commands, not words
+    const hit = read(name).replace(/\bd="[^"]*"/g, "").split("\n").find((line) => labels.test(line));
+    assert.equal(hit, undefined, `${name}: ${hit}`);
+  }
+});

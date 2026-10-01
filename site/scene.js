@@ -4,7 +4,7 @@
 // off it, and it shuts again at the close. Every number and label drawn
 // here comes from BRIEF.md's synthetic demo book or its V2 ADDENDUM.
 //
-// Perf notes (owner's "polished, refined, smooth, fast" pass, 29 Sep):
+// Performance notes:
 // - named imports only, no three/addons, so esbuild can tree-shake this.
 // - textures are generated small and lazily, per chapter, not all at once.
 // - no real-time shadow map (30 Sep, TBT pass): the first frame compiled ~14 shadow
@@ -70,30 +70,30 @@ const THEMES = {
   // board values are sRGB; before the colour-space fix the cobalt cover rendered
   // as ~#0e1f8c, so these keep that look
   cobalt: { board: 0x1a2fb0, boardDeep: 0x0c1668, block: 0xeef1f7, paper: '#f6f8fb', edge: '#eef1f7', rule: 'rgba(31,63,191,0.45)', ink: '#0b1436', inkRgb: '11,20,54', floor: 0.5, label: '#fbfbfa', exposure: 0.95, hemi: [0xe8eeff, 0x1a1f33, 0.45], rim: true, tick: '#b3261e',
-    // X1 cobalt W5 (critic 1 Oct): a lighter cloth board against a darker spine and back board, on the ink room (style.css);
-    // stationery flags with a cut edge (yellow, pink, green, orange, periwinkle, white; the critic's values); the "?" state in blue
+    // Cobalt: a lighter cloth board against a darker spine and back board, on the ink room (style.css);
+    // stationery flags with a cut edge (yellow, pink, green, orange, periwinkle, white); the "?" state in blue
     // pencil (the book's cobalt) on a pale wash, its tick red; the pastedown as board paper (epTone, no lattice); a pen tick on the label (penTick)
     flags: { '40a3': 0xf2d33b, '43bh': 0xee7fa4, '411': 0x74c596, cash: 0xf29a4c, round: 0xa9b8e6, '26as': 0xffffff }, flagEdge: true,
     decideInk: '#1f3fbf', decideText: '#f6f8fb', decideRim: '#f6f8fb', washQuery: '#e3e8fa', washDone: '#f4f5f9', decideSwatch: 'rgba(31,63,191,0.16)',
     epTone: 0x4a5384, penTick: true, mobileFrame: true },
-  // bahi-khata (research critique/bahikhata-research-2026-09-30.md, S = finding of section 6; "bahi" is the
+  // bahi-khata ("bahi" is the
   // flag every red-only branch below reads, so cobalt, green and light never run them):
-  //   board/boardDeep: the tiled cloth of the back board and spine, darker than the old 0xb3201c (S1, measured median ~#920c06);
-  //   cloth*: the front cover's unique texture (S1 colours, S2 weave, S3 stitch, S4 tape); the texture is darker than the
+  //   board/boardDeep: the tiled cloth of the back board and spine, darker than the old 0xb3201c (measured median ~#920c06);
+  //   cloth*: the front cover's unique texture (colours, weave, stitch, tape); the texture is darker than the
   //   rendered colour because the key light and the tone map lift it ~1.3x;
-  //   paper: cream, edge: the aged page-block edge (S6); ink/inkSoft (S9); tick on paper and tickOnCloth on the cloth (S10);
-  //   rimColor: the warm rim light that separates cloth from the dark ground (S1 highlight, contrast warning)
+  //   paper: cream, edge: the aged page-block edge; ink/inkSoft; tick on paper and tickOnCloth on the cloth;
+  //   rimColor: the warm rim light that separates cloth from the dark ground
   red: { bahi: true, board: 0x6d120c, boardDeep: 0x4a0a06, block: 0xe9d9b0, paper: '#fbeec9', edge: '#ecdcb4', rule: 'rgba(179,32,28,0.70)', ink: '#2b0e0c', inkRgb: '43,14,12', floor: 0.42, label: '#efe2c0', labelRule: 'rgba(179,32,28,0.85)',
     cloth: '#922811', looseSheet: '#ebc985', clothShadow: '#4a0906', clothRub: '#b86a58', clothHi: '#a8321f', clothLo: '#6a0f0b', turnIn: '#6d120c', thread: '#ece0c2', threadLit: '#fdefc7', tape: '#cdbf9e', rimColor: 0xc4553f,
-    // W2 fix 1: muted stationery tabs (cut card, ink lettering), one distinct colour per finding type; 26AS is the outlined off-white one
+    // muted stationery tabs (cut card, ink lettering), one distinct colour per finding type; 26AS is the outlined off-white one
     flags: { '40a3': 0xefd96a, '43bh': 0xd9a08c, '411': 0xb9c4a0, cash: 0xe3cf9f, round: 0xa9b6c9, '26as': 0xf4ecd8 }, flagEdge: true, flagOutlineFill: '#f4ecd8',
-    // W2 fix 3: the closing tick is a tapered blue-black ink stroke on the label (the reviewer's pen; printed text is brown-black)
+    // the closing tick is a tapered blue-black ink stroke on the label (the reviewer's pen; printed text is brown-black)
     closeTick: '#1e2b4f',
-    // W4 fix 3: the till-roll slip is a warmer thermal stock in the red world (cobalt's #fdfdfb renders grey among the warm creams)
+    // the till-roll slip is a warmer thermal stock in the red world (cobalt's #fdfdfb renders grey among the warm creams)
     receiptPaper: '#f3e9d2',
-    // X1 W7: the phone reframing with the red book's own values ([dolly, dy, dx] per keyframe 1-7, as MOBILE_FRAME); tuned by _lh/builderW7/tune7.py
+    // the phone reframing with the red book's own values ([dolly, dy, dx] per keyframe 1-7, as MOBILE_FRAME)
     mobileFrame: [null, [0.639, 0.054, 0.13], [0.46, 0.679, -0.26], [0.67, -0.133, -0.16], [0.486, 0.26, -0.423], [0.649, 0.24, -0.141], [0.7, 0.15, -0.2], [0.8, 0.35, 0]],
-    // W2 fix 10: the chapter-3 "decide" state in blue-black instead of cyan; wash* are multiply factors (10% ink over the paper, and #f3e6c4 over the paper)
+    // the chapter-3 "decide" state in blue-black instead of cyan; wash* are multiply factors (10% ink over the paper, and #f3e6c4 over the paper)
     decideInk: '#1e2b4f', decideText: '#fbeec9', decideRim: '#fbeec9', washQuery: '#e9eaf0', washDone: '#f7f6f9', decideSwatch: 'rgba(30,43,79,0.16)',
     exposure: 0.95, hemi: [0xfff1e6, 0x2a1210, 0.45], rim: false, tick: '#b3261e' },
   // green ledger: buckram-green cloth, oxblood spine with gold bands, green-ruled paper
@@ -143,11 +143,11 @@ const WARP_A = 0.35;
 // at rest whatever the keyframes do (about 0.06 px per scrolled px there)
 const SWAY = 0.0;
 // [dolly along the view ray, look-point dy, dx] per keyframe 1-6, solved so the open page spans about 260 x 360 px of the
-// 390 x 444 canvas box at 1.8, 2.8, 4.4 and 5.5 (and 3.72 and 6.5, narrower, to leave the lifted slips and the receipt their room); W5, _lh/builderW5/solve.py.
-// W6: [6] keeps the slip's right edge at or under 374 px at 6.5 and the page's foot at the box's foot; [7] (the closed file) is closer and lower, so the
+// 390 x 444 canvas box at 1.8, 2.8, 4.4 and 5.5 (and 3.72 and 6.5, narrower, to leave the lifted slips and the receipt their room).
+// [6] keeps the slip's right edge at or under 374 px at 6.5 and the page's foot at the box's foot; [7] (the closed file) is closer and lower, so the
 // words under it are not a hand's breadth away. dy is a world-space shift of camera and look together: a larger dy puts the book LOWER on screen.
 const MOBILE_FRAME = [null, [0.639, 0.054, 0.13], [0.46, 0.679, -0.26], [0.67, -0.133, -0.16], [0.486, 0.195, -0.423], [0.649, 0.163, -0.141], [0.7, 0.15, -0.2], [0.8, 0.35, 0]];
-// builderF (30 Sep, final pass): the object actions' windows, each on a sine ease (the cover on a flatter one: trapEase) so no action
+// the object actions' windows, each on a sine ease (the cover on a flatter one: trapEase) so no action
 // packs a large move into a few dozen px of scroll (peak = 1.57 x the mean slope)
 const COVER = { open0: 1.12, open1: 1.60, shut0: 7.04, shut1: 7.46, r: 0.2 }; // r: trapEase's soft ends (peak 1 / (1 - r) of the mean)
 // The cover's corners do not move at a constant screen speed per unit of angle (the swing is
@@ -294,7 +294,7 @@ function makeClothTexture(hex) {
 }
 
 // ---- the bahi world's textures (red theme only). Each is drawn once when the file is built; nothing here is
-// called per frame. Research sections (S1..S13) are those of critique/bahikhata-research-2026-09-30.md section 6.
+// called per frame.
 
 const hexRgb = (hex) => {
   const n = parseInt(hex.slice(1), 16);
@@ -303,10 +303,10 @@ const hexRgb = (hex) => {
 // the cover's design space, in px; the canvas is this times `scale` (1 desktop, 0.75 phones)
 const BAHI_W = 1024, BAHI_H = 1354; // = the 1.55 x 2.05 board
 
-// S1 (used, dark madder cloth with a fine matte weave, rubbed lighter at edges and corners), S3 (cream machine
-// stitching in slanting rows across the whole cover) and S4 (a plain woven tape along the cover edges), all in one
+// Used, dark madder cloth with a fine matte weave, rubbed lighter at edges and corners; cream machine
+// stitching in slanting rows across the whole cover; and a plain woven tape along the cover edges, all in one
 // unique, non-repeating texture: the stitching is sewn through the cover, so it must not tile.
-// W2 (critic's fixes 2, 5, 6): the cloth is fine grain + sparse slubs under a raking gradient (no tile lattice); the stitch
+// the cloth is fine grain + sparse slubs under a raking gradient (no tile lattice); the stitch
 // is sewn thread lying in a groove; the niwar is a ribbed tape that wraps the edge.
 
 // thread along `path`: a groove pulled into the cloth (centred on the thread, no offset), the thread, then its lit core.
@@ -336,7 +336,7 @@ function makeBahiCoverTexture(scale) {
   const rub = hexRgb(THEME.clothRub), shade = hexRgb(THEME.clothShadow);
   ctx.fillStyle = THEME.cloth;
   ctx.fillRect(0, 0, W, H);
-  // raking light (fix 5): #a8321f at the upper spine-side corner to #6a0f0b at the lower fore-edge corner, at half
+  // raking light: #a8321f at the upper spine-side corner to #6a0f0b at the lower fore-edge corner, at half
   // strength, so the face's median stays where it was
   const rake = ctx.createLinearGradient(0, 0, W, H);
   rake.addColorStop(0, THEME.clothHi);
@@ -345,7 +345,7 @@ function makeBahiCoverTexture(scale) {
   ctx.fillStyle = rake;
   ctx.fillRect(0, 0, W, H);
   ctx.globalAlpha = 1;
-  // uneven dye and fade: a few very large, very soft patches (S1: "used-looking", not grungy)
+  // uneven dye and fade: a few very large, very soft patches ("used-looking", not grungy)
   for (let i = 0; i < 9; i++) {
     const x = rnd() * W, y = rnd() * H, r = 170 + rnd() * 260, lit = rnd() > 0.72;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -354,7 +354,7 @@ function makeBahiCoverTexture(scale) {
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
-  // S2 (fix 5): fine grain at half resolution (drawn up 2x, so ~2 design px), about +-2.5% luminance, no repeating tile;
+  // fine grain at half resolution (drawn up 2x, so ~2 design px), about +-2.5% luminance, no repeating tile;
   // then sparse slubs, 20-60 px long at 3-5% opacity
   const nw = 512, nh = Math.round((nw * H) / W);
   const nc = document.createElement('canvas');
@@ -376,7 +376,7 @@ function makeBahiCoverTexture(scale) {
     if (rnd() > 0.3) ctx.fillRect(x, y, len, 1.4 + rnd()); else ctx.fillRect(x, y, 1.4 + rnd(), len);
   }
 
-  // S1: rubbing. Edges and, more, corners desaturate toward brick-pink (#b86a58), kept to a soft 18% at the rim
+  // Rubbing. Edges and, more, corners desaturate toward brick-pink (#b86a58), kept to a soft 18% at the rim
   const band = 90;
   [[0, 0, 0, band, 0, 0, W, band], [0, H, 0, H - band, 0, H - band, W, band], [0, 0, band, 0, 0, 0, band, H], [W, 0, W - band, 0, W - band, 0, band, H]].forEach(([x0, y0, x1, y1, rx, ry, rw, rh]) => {
     const g = ctx.createLinearGradient(x0, y0, x1, y1);
@@ -387,20 +387,20 @@ function makeBahiCoverTexture(scale) {
   });
   [[0, 0], [W, 0], [0, H], [W, H]].forEach(([x, y], k) => {
     const r = k > 1 ? 210 : 160, g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(${rub},0.18)`); // W3 fix 8: was 0.42, which read as an airbrushed glow; wear is the hard scuffs drawn below
+    g.addColorStop(0, `rgba(${rub},0.18)`); // was 0.42, which read as an airbrushed glow; wear is the hard scuffs drawn below
     g.addColorStop(1, `rgba(${rub},0)`);
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
   });
 
-  // S3 (fix 2): the stitching, as sewn thread. Slanting rows 73 px apart horizontally (7.1% of the width, so a horizontal cut
+  // the stitching, as sewn thread. Slanting rows 73 px apart horizontally (7.1% of the width, so a horizontal cut
   // crosses 14 of them); each is a run of stitches (~10 px, gaps 1.2-1.8 px, about 6:1) of 2.2 px thread in a 4.5 px groove,
   // with no offset shadow. The slope drifts slowly row to row (0.36 +- 0.05) and each row wanders a little, so neighbours
   // converge and diverge by ~12 px and no two rows are copies. The cloth puffs between rows: a faint lit line half a pitch away.
   const pitch = 73, TH = 2.2, STEP = 1;
   const seat = new Path2D(), chan = new Path2D(), puff = new Path2D();
   for (let i = -7; i < 23; i++) {
-    // W3 fix 1: hand-guided rows, not ruled lines: a 12-20 px wave on a 280-420 px wavelength, a free phase per row, and +-8 px of
+    // hand-guided rows, not ruled lines: a 12-20 px wave on a 280-420 px wavelength, a free phase per row, and +-8 px of
     // seeded spacing jitter, so neighbours converge and diverge (the worst gap is 73 - 2 x 20 - 16 = 17 px: rows never cross)
     const slant = 0.36 + 0.05 * Math.sin(i * 0.33 + 1.1), ph = i * 0.45 + rnd() * 6.28, amp = 12 + rnd() * 8, lam = 280 + rnd() * 140, bow = 0.014 + 0.004 * Math.sin(i * 0.3);
     const x0 = i * pitch + 6 + (rnd() - 0.5) * 16;
@@ -427,7 +427,7 @@ function makeBahiCoverTexture(scale) {
       y = ny;
     }
   }
-  // W3 fix 2: the same paths, drawn once more as height (mid-grey cloth, a shallow channel along the row, a deeper groove under
+  // the same paths, drawn once more as height (mid-grey cloth, a shallow channel along the row, a deeper groove under
   // each stitch and the thread standing proud of it) for the material's bumpMap, so the rows catch the light as the cover turns
   const bump = document.createElement('canvas');
   bump.width = Math.round(BAHI_W * scale * 0.5);
@@ -455,7 +455,7 @@ function makeBahiCoverTexture(scale) {
   ctx.stroke(chan);
   sewThread(ctx, seat, TH, 0.35);
 
-  // S4 (fix 6): niwar, a plain undyed woven tape, 21 px wide, wrapping the edge: its colour runs to texture px 0, which is
+  // niwar, a plain undyed woven tape, 21 px wide, wrapping the edge: its colour runs to texture px 0, which is
   // what the board's straight side walls sample, so the board's thickness is tape-coloured too, and the chamfer (px 0-5)
   // catches a little light. Lengthwise ribs every 2 px at 6%; one sewn line 4 px inside the tape's inner edge; corners
   // mitred and slightly soiled. No coloured piping.
@@ -518,7 +518,7 @@ function makeBahiCoverTexture(scale) {
   [[0, 0, TW, TW], [W, 0, W - TW, TW], [0, H, TW, H - TW], [W, H, W - TW, H - TW]].forEach(([a, b, d, e]) => { ctx.moveTo(a, b); ctx.lineTo(d, e); });
   ctx.stroke();
 
-  // W3 fix 8: wear as a few small hard-edged scuffs at each corner (brick-pink where the cloth is rubbed through, dull grey
+  // wear as a few small hard-edged scuffs at each corner (brick-pink where the cloth is rubbed through, dull grey
   // where the board shows through the tape), seeded, replacing the soft halo
   const scuff = (x, y, r, col) => {
     ctx.fillStyle = col;
@@ -543,9 +543,9 @@ function makeBahiCoverTexture(scale) {
   return { map: tex, bump: bumpTex };
 }
 
-// S6/S7: a sheet of the bahi's blank paper, cream, aged toward the edges, and creased (not inked) into eight equal
+// A sheet of the bahi's blank paper, cream, aged toward the edges, and creased (not inked) into eight equal
 // columns (sal) as a paired shadow + highlight line, so the fold reads without competing with any printed page.
-// Horizontal ruling is left out (S8: traditional books are plain).
+// Horizontal ruling is left out (traditional books are plain).
 function drawBahiFolds(ctx, w, h, shadowA, lightA) {
   for (let k = 1; k < 8; k++) {
     const x = Math.round((w * k) / 8);
@@ -571,7 +571,7 @@ function makeBahiLooseTexture() {
   tex.colorSpace = SRGBColorSpace;
   return tex;
 }
-// S6: the page block's aged edge (#ecdcb4) also fades a little into every printed page, inside the margins
+// The page block's aged edge (#ecdcb4) also fades a little into every printed page, inside the margins
 function agePaperRect(ctx, w, h, band, a) {
   const rgb = '150,108,48';
   [[0, 0, band, 0, 0, 0, band, h], [w, 0, w - band, 0, w - band, 0, band, h], [0, 0, 0, band, 0, 0, w, band], [0, h, 0, h - band, 0, h - band, w, band]].forEach(([x0, y0, x1, y1, rx, ry, rw, rh]) => {
@@ -582,7 +582,7 @@ function agePaperRect(ctx, w, h, band, a) {
     ctx.fillRect(rx, ry, rw, rh);
   });
 }
-// the pasted-down lining of the open cover (W2 fix 4): lit paper, #eadcb6 at the fore-edge to #bfa983 at the hinge (never
+// the pasted-down lining of the open cover: lit paper, #eadcb6 at the fore-edge to #bfa983 at the hinge (never
 // darker than #a08a66), inside a turn-in of red cloth (#6d120c, ~7% of the width) where the cover cloth folds over the board's
 // edge. The lining is flat: no creases (a real pastedown has none). Drawn unlit (MeshBasicMaterial, no tone map), so these
 // are the colours on screen.
@@ -593,7 +593,7 @@ function drawBahiEndpaper(ctx, w, h) {
   const rnd = mulberry32(41);
   for (let i = 0; i < 900; i++) { ctx.fillStyle = rnd() > 0.5 ? 'rgba(255,225,205,0.05)' : 'rgba(20,0,0,0.07)'; ctx.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }
   const g = ctx.createLinearGradient(tx, 0, w - tx, 0); // the right end is the hinge side
-  // W3 fix 3: flat to within 4% (was #eadcb6 to #bfa983, a 16% ramp that the left-edge fade turned into a brass highlight band)
+  // flat to within 4% (was #eadcb6 to #bfa983, a 16% ramp that the left-edge fade turned into a brass highlight band)
   g.addColorStop(0, '#ddcea6');
   g.addColorStop(1, '#d7c79f');
   ctx.fillStyle = g;
@@ -603,7 +603,7 @@ function drawBahiEndpaper(ctx, w, h) {
   ctx.strokeRect(tx + 0.5, ty + 0.5, w - 2 * tx - 1, h - 2 * ty - 1);
   for (let i = 0; i < 500; i++) { ctx.fillStyle = `rgba(120,90,40,${(0.02 + rnd() * 0.04).toFixed(3)})`; ctx.fillRect(tx + rnd() * (w - 2 * tx), ty + rnd() * (h - 2 * ty), 1, 1); }
 }
-// fix 9: the page leaf's outer 2.4% is warm, never cooler than the interior: #d9c08e at the very edge into #e4cfa2
+// the page leaf's outer 2.4% is warm, never cooler than the interior: #d9c08e at the very edge into #e4cfa2
 function warmPageEdge(ctx, w, h) {
   const B = Math.round(w * 0.024);
   [[0, 0, B, 0, 0, 0, B, h], [w, 0, w - B, 0, w - B, 0, B, h], [0, 0, 0, B, 0, 0, w, B], [0, h, 0, h - B, 0, h - B, w, B]].forEach(([x0, y0, x1, y1, rx, ry, rw, rh]) => {
@@ -727,7 +727,7 @@ function makeFlagTexture(key, hex, text, { outline = false, tick = false, textCo
     ctx.strokeRect(5, 5, 438, 98);
   }
   if (rim) {
-    // W3 fix 4: a pale paper-tone outline, so a blue-black flag keeps its shape against the dark ground
+    // a pale paper-tone outline, so a blue-black flag keeps its shape against the dark ground
     ctx.strokeStyle = rim;
     ctx.lineWidth = 9;
     ctx.strokeRect(4.5, 4.5, 439, 99);
@@ -777,7 +777,7 @@ function drawVoucherFace(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = THEME.paper;
   ctx.fillRect(0, 0, w, h);
-  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // bahi item 6: the aged page edge
+  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // the aged page edge
   const rnd = mulberry32(41);
   ctx.fillStyle = `rgba(${THEME.inkRgb},0.04)`;
   for (let i = 0; i < 700; i++) ctx.fillRect(rnd() * w, rnd() * h, 1, 1);
@@ -831,7 +831,7 @@ function drawVoucherFace(ctx, w, h) {
   ctx.font = '500 34px "Geist Variable", sans-serif';
   ctx.fillStyle = ink;
   ctx.fillText('Cash purchase of packing', L, VOUCHER_NARRATION_Y + 46);
-  ctx.fillText('material for godown dispatch', L, VOUCHER_NARRATION_Y + 90); // revenue, unambiguously: see critique/ca-40a3-research
+  ctx.fillText('material for godown dispatch', L, VOUCHER_NARRATION_Y + 90); // revenue, unambiguously
 
   hr(730, `rgba(${THEME.inkRgb},0.5)`, 3);
   ctx.font = '700 38px "Geist Mono Variable", monospace';
@@ -920,7 +920,7 @@ function drawLedgerFace(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = THEME.paper;
   ctx.fillRect(0, 0, w, h);
-  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // bahi item 6
+  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // the aged page
   const L = 72, R = w - 72, ink = THEME.ink, soft = `rgba(${THEME.inkRgb},0.66)`;
   ctx.fillStyle = ink;
   ctx.font = '750 56px "Bricolage Grotesque Variable", sans-serif';
@@ -941,7 +941,7 @@ function drawLedgerFace(ctx, w, h) {
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(L, 276); ctx.lineTo(R, 276); ctx.stroke();
   if (THEME.bahi) {
-    // bahi item 4/7: the one ruled column. Red at 70% separates the party names from the four amount columns (the first
+    // the one ruled column. Red at 70% separates the party names from the four amount columns (the first
     // fold of a bahi holds the amount), midway between the widest name and the widest first-column figure
     ctx.font = partyFont;
     const nameEnd = L + Math.max(...ASK_ROWS.map((r) => ctx.measureText(r[0]).width));
@@ -985,7 +985,7 @@ function drawLedgerFace(ctx, w, h) {
 // Withdrawal | Deposit | Balance. The 12 Mar row is the exact line the
 // approval dialog posts (₹1,24,600 from Nevrika Agro Foods), so the two never
 // contradict each other. Three rows carry the near-miss narrations that
-// item 7's names card ("3 names, your decision") points at: row 3 (Kavyarth Stationery, a supplier who is not in the ageing), row
+// the names card ("3 names, your decision") points at: row 3 (Kavyarth Stationery, a supplier who is not in the ageing), row
 // 5 (Nevrika Agro Food, a near miss of the book's Nevrika Agro Foods; the dialog
 // posts it only after that name is decided) and row 9 (Sample Bank A/c: a
 // transfer to the client's second bank account, a contra, not a self-payment
@@ -1014,7 +1014,7 @@ function drawBankFace(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = THEME.paper;
   ctx.fillRect(0, 0, w, h);
-  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // bahi item 6
+  if (THEME.bahi) { agePaperRect(ctx, w, h, 54, 0.12); warmPageEdge(ctx, w, h); } // the aged page
   const L = 32, R = w - 56, ink = THEME.ink, soft = `rgba(${THEME.inkRgb},0.66)`;
   const rows = BANK_ROWS.slice(BANK_SHOWN_FROM, BANK_SHOWN_FROM + BANK_SHOWN);
   ctx.fillStyle = ink;
@@ -1053,7 +1053,7 @@ function drawBankFace(ctx, w, h) {
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(L, 258); ctx.lineTo(R, 258); ctx.stroke();
   if (THEME.bahi) {
-    // bahi item 4/7: the one ruled column, red at 70%, between the narration and the first figure column
+    // the one ruled column, red at 70%, between the narration and the first figure column
     const rx = Math.round((L + cw[0] + drEndX - cw[1]) / 2);
     ctx.strokeStyle = THEME.rule;
     ctx.lineWidth = 2;
@@ -1150,7 +1150,7 @@ function drawReceiptFace(ctx, w, h) {
   // one plain-English line for a reader who cannot parse the log fields; it
   // says only what the log itself is (the egress receipt of the post call, in
   // the app's data folder), never a field the receipt does not record
-  // W4 fix 2: two lines, each shrunk to the slip's inner width like the values above (one line at 27px ran past the edge and read
+  // two lines, each shrunk to the slip's inner width like the values above (one line at 27px ran past the edge and read
   // "kept on your"); the wording is unchanged, only broken after the middle dot
   ctx.fillStyle = soft;
   ['Receipt for the post call \u00b7', 'kept on your computer'].forEach((line, i) => {
@@ -1255,7 +1255,7 @@ export class FileScene {
     this._lastQuant = {};
   }
 
-  // Camera grammar (motion spec v2, 30 Sep, section A). ONE continuous path: a
+  // Camera grammar. ONE continuous path: a
   // centripetal Catmull-Rom through the eight keyframes (cam, look and exposure
   // alike), keyframe i at chapterPos i + 0.35, driven by the time-warp
   // u(p) = p - (0.7 / 2pi) sin(2pi (p - 0.35)). The warp's slope stays between
@@ -1267,7 +1267,7 @@ export class FileScene {
     const E = THEME.exposure;
     const V = (x, y, z) => new Vector3(x, y, z);
     const heroEnd = V(1.6, 0.8, 4.15);
-    // mobile answers the first scroll with a bigger push (critique #24)
+    // mobile answers the first scroll with a bigger push
     const heroK0 = this.camHero.clone().lerp(heroEnd, this.mobile ? 1.2 : 0.6);
     const kfs = [
       { cam: heroK0, look: this._lookHero }, // 0 hero, after its push
@@ -1279,7 +1279,7 @@ export class FileScene {
       { cam: V(1.9, 0.35, 5.2), look: V(1.05, 0.2, 0.4) }, // 6 receipt
       { cam: this.camClose, look: this._lookClose }, // 7 close
     ];
-    // W5 fix 8 (cobalt, phone): chapters 1-6 dolly in along the view ray so the open page fills the canvas box's width
+    // cobalt, phone: chapters 1-6 dolly in along the view ray so the open page fills the canvas box's width
     // (it spanned ~65% of it; 41% of the screen was bare gradient). The hero is untouched.
     if (this.mobile && THEME.mobileFrame) {
       const MF = Array.isArray(THEME.mobileFrame) ? THEME.mobileFrame : MOBILE_FRAME; // a theme can carry its own values (the red book's block is slimmer)
@@ -1429,7 +1429,7 @@ export class FileScene {
       this.scene.add(rim);
     }
     if (THEME.bahi) {
-      // bahi item 3: a warm rim light from behind and to the right, #c4553f. Dark-madder cloth on the dark red ground is only
+      // a warm rim light from behind and to the right, #c4553f. Dark-madder cloth on the dark red ground is only
       // 1.5-2.3:1, so the cover's far edges, the chamfer and the cloth's sheen must catch light to hold the silhouette
       const rim = new DirectionalLight(THEME.rimColor, 3);
       rim.position.set(3.4, 2.2, -3.0);
@@ -1447,12 +1447,12 @@ export class FileScene {
   // plane follows the file's position, yaw and entrance scale, and fades in with it.
   _buildContactShadow() {
     const W = this.W_FOOT, PXU = 96; // canvas pixels per world unit
-    const X0 = -2.2, X1 = 1.6, Z0 = -1.7, Z1 = 0.9; // world extent, file-local axes
+    const XA = -2.2, XB = 1.6, Z0 = -1.7, Z1 = 0.9; // world extent, file-local axes
     const c = document.createElement('canvas');
-    c.width = Math.round((X1 - X0) * PXU);
+    c.width = Math.round((XB - XA) * PXU);
     c.height = Math.round((Z1 - Z0) * PXU);
     const cx = c.getContext('2d');
-    const px = (x) => (x - X0) * PXU, pz = (z) => (z - Z0) * PXU;
+    const px = (x) => (x - XA) * PXU, pz = (z) => (z - Z0) * PXU;
     // a filled rect drawn far off-canvas with its shadow brought back: a cheap gaussian blur
     const blob = (x0, x1, z0, z1, blur, alpha) => {
       cx.save();
@@ -1469,8 +1469,8 @@ export class FileScene {
     const tex = new CanvasTexture(c);
     tex.colorSpace = SRGBColorSpace;
     const mat = new MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false });
-    const shadow = new Mesh(new PlaneGeometry(X1 - X0, Z1 - Z0), mat);
-    shadow.geometry.translate((X0 + X1) / 2, -(Z0 + Z1) / 2, 0); // plane y is world -z once laid flat
+    const shadow = new Mesh(new PlaneGeometry(XB - XA, Z1 - Z0), mat);
+    shadow.geometry.translate((XA + XB) / 2, -(Z0 + Z1) / 2, 0); // plane y is world -z once laid flat
     shadow.rotation.order = 'YXZ';
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = -1.05; // the book's foot (back board bottom -1.055)
@@ -1516,7 +1516,7 @@ export class FileScene {
     group.position.y = this._entranceBaseY - 0.25;
     group.scale.setScalar(this._entranceBaseScale * 0.96);
 
-    // W3 fix 6 (bahi worlds): a slimmer block, 0.40 (was 0.62); a register is not a brick. The 1:1.55 proportion is not applied:
+    // bahi worlds: a slimmer block, 0.40 (was 0.62); a register is not a brick. The 1:1.55 proportion is not applied:
     // every face is drawn for the 1.55 x 2.05 board, and a taller board would stretch the lettering
     const W = 1.55, H = 2.05, T = THEME.bahi ? 0.4 : 0.62;
     this.W = W; this.H = H; this.T = T;
@@ -1653,7 +1653,7 @@ export class FileScene {
       // kept transparent and faded by setChapterProgress: at their small
       // rotation these full-page sheets never swing clear of the camera,
       // so without the fade they sit as a near-opaque blank page over the
-      // open book (verified against a capture; item 25's cover-angle fix
+      // open book (verified against a capture; the cover-angle fix
       // stands, but this specific "remove the hack" sub-fix regressed here)
       const fm = new MeshStandardMaterial({ map: looseTex, emissiveMap: looseTex, emissive: 0xffffff, emissiveIntensity: 0.3, roughness: 0.88, transparent: true });
       const m = new Mesh(fanGeo, fm);
@@ -1688,7 +1688,7 @@ export class FileScene {
     epCanvas.width = THEME.bahi ? 384 : 256;
     epCanvas.height = THEME.bahi ? 480 : 320;
     const epCtx = epCanvas.getContext('2d');
-    if (THEME.bahi) drawBahiEndpaper(epCtx, 384, 480); // bahi item 4: a creased cream lining, not the cobalt lattice
+    if (THEME.bahi) drawBahiEndpaper(epCtx, 384, 480); // a creased cream lining, not the cobalt lattice
     else {
     const epGrad = epCtx.createLinearGradient(0, 0, 256, 0); // plane u=1 is the hinge side
     epGrad.addColorStop(0, '#dfe4ef'); // a near-flat board paper, a shade lighter at the hinge: no dark stop for the canvas's left mask to meet as a bright column
@@ -1696,7 +1696,7 @@ export class FileScene {
     epCtx.fillStyle = epGrad;
     epCtx.fillRect(0, 0, 256, 320);
     if (!THEME.epTone) {
-    // a faint marbled-paper lattice: fine diagonal rules and a dot in each diamond (cobalt's pastedown is plain board paper, W5 fix 3)
+    // a faint marbled-paper lattice: fine diagonal rules and a dot in each diamond (cobalt's pastedown is plain board paper)
     epCtx.strokeStyle = 'rgba(31,63,191,0.07)';
     epCtx.lineWidth = 1;
     for (let k = -320; k < 256; k += 16) {
@@ -1711,7 +1711,7 @@ export class FileScene {
     epTex.colorSpace = SRGBColorSpace;
     epTex.anisotropy = 4;
     this._epTex = epTex; // uploaded in idle time (ensureAsk), not on the frame the cover first opens
-    // darkened to a board lining (final review, item 8): the open cover runs off the frame's left edge in
+    // darkened to a board lining: the open cover runs off the frame's left edge in
     // chapters 1-6, and a pale panel there read as the second-largest light area on screen
     const endpaper = new Mesh(new PlaneGeometry(W - 0.05, H - 0.05), new MeshBasicMaterial({ map: epTex, color: THEME.bahi ? 0xffffff : (THEME.epTone || 0x9aa1b3), toneMapped: !THEME.bahi }));
     endpaper.rotation.y = Math.PI;
@@ -1724,7 +1724,7 @@ export class FileScene {
     drawCoverLabel(this._labelCtx);
     const labelTex = new CanvasTexture(labelCanvas);
     labelTex.colorSpace = SRGBColorSpace;
-    if (THEME.bahi) labelTex.anisotropy = 8; // W2 fix 9: the label no longer smears at grazing angles
+    if (THEME.bahi) labelTex.anisotropy = 8; // the label no longer smears at grazing angles
     this._labelTex = labelTex;
     const labelH = W * 0.68 * (220 / 640);
     const label = new Mesh(new PlaneGeometry(W * 0.68, labelH), new MeshStandardMaterial({ map: labelTex, roughness: 0.7, transparent: true }));
@@ -1733,25 +1733,25 @@ export class FileScene {
     // the closing tick: ~140 px across the label (640x220 canvas units), 10 px
     // pencil, drawn as geometry so the close uploads no texture
     const lw = W * 0.68, toLabel = ([x, y]) => [(x / 640 - 0.5) * lw, (0.5 - y / 220) * labelH];
-    // builderF: 2.3x the old tick (its arms ran 62 and 151 canvas px), a 24 px pencil, its long arm
+    // 2.3x the old tick (its arms ran 62 and 151 canvas px), a 24 px pencil, its long arm
     // rising past the label's top edge onto the board, so the close's one gesture reads from across the room
-    // bahi item 5: the long arm rises off the paper label onto the cloth, where the paper-red #b3261e would vanish (under
+    // the long arm rises off the paper label onto the cloth, where the paper-red #b3261e would vanish (under
     // 2:1 against the cloth); that part is drawn in the light tick #e8735f instead (vertex colour, flat per segment). The
     // V's foot dips ~19 canvas px below the paper onto the label's own shadow; it stays paper-red (a second colour change
     // on a stub that short read as a glitch, and it is joined to the stroke on the paper).
     // 30 sub-segments per arm keep the colour change within ~6 label px of the label's top edge; both arms keep
     // the same share of the drawing time as before (each is half the segments)
-    // W2 fix 3 (bahi worlds): a tapered blue-black ink stroke (7.5 label px, ~5.5 px on screen at 1440) wholly on the paper label,
+    // bahi worlds: a tapered blue-black ink stroke (7.5 label px, ~5.5 px on screen at 1440) wholly on the paper label,
     // in the free corner under the A.Y. line and right of the voucher line, so it never covers the lettering and never
     // crosses onto the cloth (which removes the old two-colour swap)
-    // W3 fix 7: 11 label px (was 7.5) and a longer arm (about 123 label px, was 91), still wholly in the label's free lower-right
+    // 11 label px (was 7.5) and a longer arm (about 123 label px, was 91), still wholly in the label's free lower-right
     // corner: the tip ends ~9 px below the "(A.Y. 2026-27)" line's descenders, the foot ~6 px above the inner rule
-    // W4 fix 2 (bahi worlds): a steeper pen tick, about 1.8x the W3 one: a short stroke down (about 69 deg) into a clear V, then a long
+    // bahi worlds: a steeper pen tick, about 1.8x the earlier one: a short stroke down (about 69 deg) into a clear V, then a long
     // arm rising at about 49 deg (was about 19), 15 label px wide with a milder taper. It crosses the A.Y. line's right end as a
     // reviewer's ink over print does (cobalt's tick does too) and stays wholly on the label; the foot turns through three short steps
     // (about 40 deg each) so the wide stroke keeps a filled, rounded corner instead of a notch
     if (THEME.bahi) this._labelTickGeo = makeRibbon([[385, 92], [412, 160], [414, 166], [419, 168], [425, 167], [552, 20]].map(toLabel), (15 / 640) * lw, 12, 0.22);
-    // W5 fix 7 (cobalt): the same pen stroke, but wholly in the label's free lower-right corner (right of "Vouchers, Apr to Mar",
+    // cobalt: the same pen stroke, but wholly in the label's free lower-right corner (right of "Vouchers, Apr to Mar",
     // under the A.Y. line), so it never covers "A.Y. 2026-27"; red #b3261e, the tick stays on the paper
     else if (THEME.penTick) this._labelTickGeo = makeRibbon([[392, 134], [414, 178], [417, 183], [422, 185], [428, 183], [588, 132]].map(toLabel), (14 / 640) * lw, 12, 0.22);
     else this._labelTickGeo = makeRibbon([[330, 110], [420, 215], [610, -70]].map(toLabel), (24 / 640) * lw, 10, 0.12);
@@ -2081,10 +2081,10 @@ export class FileScene {
     const mesh = new Mesh(geo, new MeshStandardMaterial({ map: tex, roughness: 0.8, side: DoubleSide, transparent: true, alphaTest: 0.5, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35 }));
     // it starts between the page and the block, wholly behind the focal page
     // (which hides it while it slides), comes out past the page's right edge and
-    // rests clear of the statement and of the text column (_rcX1, fitted by measure())
-    this._rcX0 = 0;
-    if (this._rcX1 === undefined) this._rcX1 = this.W * 0.47 + 0.26 + (gw * RECEIPT_SCALE) / 2;
-    mesh.position.set(this._rcX0, this.H * 0.36, this._pageZ - 0.05);
+    // rests clear of the statement and of the text column (_rcXEnd, fitted by measure())
+    this._rcXStart = 0;
+    if (this._rcXEnd === undefined) this._rcXEnd = this.W * 0.47 + 0.26 + (gw * RECEIPT_SCALE) / 2;
+    mesh.position.set(this._rcXStart, this.H * 0.36, this._pageZ - 0.05);
     mesh.scale.y = 0.6;
     mesh.visible = false; // built in idle time; hidden until its chapter
     mesh.castShadow = false; // an alpha-tested caster needs its own depth program, compiled on first sight; nothing here needs its shadow
@@ -2119,7 +2119,7 @@ export class FileScene {
   // chapterPos is continuous, 0..CHAPTER_COUNT. This is the one function
   // the whole page drives: it derives every object's transform from a
   // single scroll-fraction input, so nothing here is path-dependent. Nothing
-  // below allocates: it runs at 120+ Hz. Timeline (motion spec v2, section C),
+  // below allocates: it runs at 120+ Hz. Timeline,
   // one thing at a time:
   //   1: flags retract 1.02-1.16, cover opens 1.12-1.60 (sine), rings 1.50-1.70, total 1.72-1.85
   //   2: page turn 2.04-2.34 (sine), yellow flags out 2.28-2.38, ticks 2.38-2.50, the 40A(3)
@@ -2289,7 +2289,7 @@ export class FileScene {
       const u = smoothstep(6.12, 6.5, p) * (1 - smoothstep(6.72, 7.02, p));
       const r = this.receiptRoll;
       r.visible = u > 0.002;
-      r.position.x = this._rcX0 + (this._rcX1 - this._rcX0) * u;
+      r.position.x = this._rcXStart + (this._rcXEnd - this._rcXStart) * u;
       r.position.z = this._pageZ - 0.05 + 0.14 * smoothstep(0.95, 1, u); // behind the page plane (and 0.04 of curl) while it slides, then a little forward; the depth follows the page's, not a fixed 0.32 (the red book is slimmer, and the slip was drawn over its statement at 7.0)
       r.scale.set(RECEIPT_SCALE, (0.6 + 0.4 * u) * RECEIPT_SCALE, 1);
       r.rotation.y = 0.18 * smoothstep(0.9, 1, u);
@@ -2434,7 +2434,7 @@ export class FileScene {
       }
       x1 = lo;
     }
-    this._rcX1 = x1;
+    this._rcXEnd = x1;
     g.position.y = keep.py;
     g.scale.setScalar(keep.sc);
     g.rotation.set(keep.rx, keep.ry, 0);

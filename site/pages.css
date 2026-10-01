@@ -141,7 +141,7 @@
   margin: 0 0 14px;
   color: var(--ink);
 }
-/* mono for the version number only, not the whole heading (critique #35) */
+/* mono for the version number only, not the whole heading */
 .changelog h2 .version { font-family: var(--font-mono); font-weight: 600; }
 .changelog h2 time {
   font-weight: 400;
@@ -173,7 +173,7 @@
   opacity: 0.92;
 }
 /* the pill duplicated the heading's own words, "In source, not yet
-   published" (critique #35): removed rather than kept in sync. */
+   published": removed rather than kept in sync. */
 
 .changelog h3 {
   font-size: 14px;

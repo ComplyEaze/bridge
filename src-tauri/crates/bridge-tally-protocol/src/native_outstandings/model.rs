@@ -105,6 +105,11 @@ pub struct LedgerSnapshotEntry {
     /// its own documented treatment of that observed wire shape.
     pub closing_balance: Option<ExactDecimal>,
     pub opening_balance: ExactDecimal,
+    /// The opening as Tally sent it: `None` when the element was empty, which is
+    /// unknown and not zero. `opening_balance` above reads an empty element as
+    /// zero for the callers that established that reading; anything that shows
+    /// the opening uses this field.
+    pub opening_balance_observed: Option<ExactDecimal>,
     pub bill_wise_on: bool,
     /// The ledger's own `CURRENCYNAME` (bridge#551), `None` when the element
     /// was absent or empty. Compared with the base master's NAME by
@@ -114,14 +119,27 @@ pub struct LedgerSnapshotEntry {
 
 /// A party's unallocated residual: the gap between the ledger's own
 /// `CLOSINGBALANCE` and the sum of everything the Bills Receivable/Payable
-/// reports show as open bills for that party. Because the native reports
-/// only ever list named bills, a non-zero residual is exactly the party's
-/// on-account exposure — money the ledger balance carries with no bill
+/// reports show as open bills for that party. The reports list only named
+/// bills, so the residual is money the ledger balance carries with no bill
 /// reference at all, and therefore no truthful bill age.
+///
+/// It is NOT "the on-account amount". On a ledger whose bill-wise flag is off it
+/// is what the ledger carries (seen on one ledger that never had bills; a flag
+/// switched off after bills existed is unmeasured); on a bill-wise ledger it is the net of the on-account
+/// entries and of any opening balance not allocated to a reference, and the
+/// bills reports alone cannot separate those (a live book, #945). `bill_wise_on`
+/// and `opening_balance` are the ledger's own values, carried so a reader can
+/// see which case it is; nothing here infers the components.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartyResidual {
     pub party: String,
     pub amount: ExactDecimal,
+    /// The ledger's `ISBILLWISEON`.
+    pub bill_wise_on: bool,
+    /// The ledger's opening balance as of the start of the snapshot period (the
+    /// books-from date, not the current year's). `None` when Tally sent an empty
+    /// element: unknown, never zero.
+    pub opening_balance: Option<ExactDecimal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,7 +147,8 @@ pub struct NativeOutstandingsResult {
     pub report: OutstandingsReport,
     pub residuals: Vec<PartyResidual>,
     /// Sum of the absolute magnitude of every party residual: the total
-    /// unallocated (on-account) exposure the bill-level reports cannot see.
+    /// unallocated exposure the bill-level reports cannot see (not only
+    /// on-account: see [`PartyResidual`]).
     pub residual_total: ExactDecimal,
     /// The outcome of independently comparing Tally's `BILLOVERDUE` values
     /// with Bridge's due-date ageing. It is never used as ageing's source of

@@ -51,7 +51,8 @@ pub struct PartyLedgerMasterFields {
 /// The GST duty-head classification observed on one ledger master.
 ///
 /// Tally's vocabulary is deliberately not normalised: for example, the state
-/// head is `"State Tax"`, not `"SGST"`. `raw` therefore remains exactly as
+/// head is `"State Tax"` or `"SGST/UTGST"`, never `"SGST"`, and the two
+/// spellings are kept as two heads. `raw` therefore remains exactly as
 /// returned, and any value outside the measured set is surfaced explicitly.
 ///
 /// The measured spellings, the `TAXTYPE` interaction and its four states, the two
@@ -130,6 +131,10 @@ impl GstDutyHeadObservation {
                     raw: raw.clone(),
                     head: GstDutyHead::StateTax,
                 },
+                "SGST/UTGST" => Self::Recognized {
+                    raw: raw.clone(),
+                    head: GstDutyHead::SgstUtgst,
+                },
                 "UT Tax" => Self::Recognized {
                     raw: raw.clone(),
                     head: GstDutyHead::UtTax,
@@ -187,6 +192,10 @@ pub enum GstDutyHead {
     Cgst,
     Igst,
     StateTax,
+    /// The spelling the same instance stores when the head is created as
+    /// `SGST/UTGST`; a separate head from `StateTax` because no capture shows
+    /// the two are the same head.
+    SgstUtgst,
     UtTax,
     Cess,
 }

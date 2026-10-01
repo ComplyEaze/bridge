@@ -1155,11 +1155,17 @@ impl ParsedLedgerSnapshotRow {
     fn into_entry(self) -> Result<LedgerSnapshotEntry, NativeOutstandingsError> {
         let closing_balance = parse_ledger_closing_balance(&self.closing_text, &self.name)?;
         let opening_balance = parse_ledger_amount(&self.opening_text)?;
+        let opening_balance_observed = if self.opening_text.is_empty() {
+            None
+        } else {
+            Some(opening_balance.clone())
+        };
         Ok(LedgerSnapshotEntry {
             name: self.name,
             parent: self.parent,
             closing_balance,
             opening_balance,
+            opening_balance_observed,
             bill_wise_on: self.bill_wise_on,
             currency_name: self.currency_name,
         })

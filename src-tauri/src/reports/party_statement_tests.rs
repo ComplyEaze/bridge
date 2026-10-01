@@ -23,6 +23,8 @@ fn unallocated(party: &str, amount: &str) -> UnallocatedParty {
         party: party.to_string(),
         amount: ExactDecimal::parse(amount).unwrap(),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }
 }
 

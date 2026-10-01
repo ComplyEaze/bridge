@@ -413,12 +413,7 @@ impl BillReferenceKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CreditPeriod {
-    Days(u32),
-    Weeks(u32),
-    Months(u32),
-}
+pub use crate::outstandings_shared::CreditPeriod;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BillAllocation {

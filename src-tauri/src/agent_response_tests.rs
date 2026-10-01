@@ -20,6 +20,23 @@ fn large_pages_use_logarithmically_bounded_serialization_probes() {
 }
 
 #[test]
+fn a_paged_masters_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
+    // The `masters` tool pages by `offset`, so an over-budget page is cut and
+    // resumes where it stopped.
+    let mut paged = json!({"result":{"offset":0,"next_offset":null,
+        "masters":[{"name":"A"},{"name":"B"},{"name":"C"}]}});
+    assert!(truncate_response_items(&mut paged).expect("trims a masters page"));
+    assert_eq!(paged["result"]["masters"].as_array().unwrap().len(), 2);
+    assert_eq!(paged["result"]["next_offset"], 2);
+    // validate_masters and build_import_xml also key `masters`, with no
+    // `offset`: a cursor into them would resume nothing, so they are not paged.
+    let mut unpaged = json!({"result":{"masters":[{"name":"A"},{"name":"B"}]}});
+    assert!(!truncate_response_items(&mut unpaged).expect("no page shape"));
+    assert_eq!(unpaged["result"]["masters"].as_array().unwrap().len(), 2);
+    assert!(unpaged["result"].get("next_offset").is_none());
+}
+
+#[test]
 fn standalone_master_and_status_rows_are_counted_in_final_receipts() {
     for (tool, axis) in [
         ("validate_masters", "masters"),

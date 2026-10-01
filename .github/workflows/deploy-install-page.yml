@@ -53,10 +53,10 @@ jobs:
           # Counted with the page's own predicate, so the deploy and the page agree on what installs.
           count="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; import { isInstallablePreview } from "./site/release-catalog.mjs"; console.log(JSON.parse(readFileSync("site/releases.json", "utf8")).filter(isInstallablePreview).length);')"
           if [ "${count}" -lt 1 ]; then
-            echo "release snapshot has no installable mcp-preview release; refusing to deploy" >&2
+            echo "release snapshot has no installable release; refusing to deploy" >&2
             exit 1
           fi
-          echo "release snapshot: ${count} installable mcp-preview releases"
+          echo "release snapshot: ${count} installable releases"
       # The changelog page is rendered from CHANGELOG.md, the file the release notes come from. A
       # failure writes a page that links to the releases; it never stops the deploy.
       - name: Render the changelog page

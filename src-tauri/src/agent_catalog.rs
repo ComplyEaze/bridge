@@ -375,34 +375,39 @@ impl ToolEffect {
     }
 }
 
+/// Every tool the catalogue registers, one name per line in sorted order so two
+/// pull requests that add different tools touch different lines. The order is
+/// the order `tools/list` returns them in; the lab tools are added after it.
+pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
+    "acknowledge_post_review",
+    "balance_sheet",
+    "build_import_xml",
+    "changed_since",
+    "egress_log",
+    "ledger_masters",
+    "ledger_movement",
+    "list_companies",
+    "local_data_report",
+    "masters",
+    "outstandings",
+    "parse_bank_statement",
+    "post_import",
+    "profit_and_loss",
+    "read_evidence",
+    "stock_summary",
+    "tally_status",
+    "trial_balance",
+    "validate_masters",
+    "verify_import",
+    "voucher_presence",
+    "voucher_schema",
+    "vouchers",
+];
+
 // Retain the internal schema while bounded change enumeration is unqualified.
 pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut names = vec![
-        "tally_status",
-        "list_companies",
-        "voucher_schema",
-        "validate_masters",
-        "build_import_xml",
-        "parse_bank_statement",
-        "verify_import",
-        "post_import",
-        "acknowledge_post_review",
-        "outstandings",
-        "ledger_masters",
-        "ledger_movement",
-        "trial_balance",
-        "masters",
-        "stock_summary",
-        "profit_and_loss",
-        "balance_sheet",
-        "vouchers",
-        "voucher_presence",
-        "changed_since",
-        "read_evidence",
-        "egress_log",
-        "local_data_report",
-    ];
+    let mut names = REGISTERED_TOOL_NAMES.to_vec();
     #[cfg(feature = "lab-writes")]
     names.push("lab_read_inventory");
     #[cfg(feature = "lab-writes")]

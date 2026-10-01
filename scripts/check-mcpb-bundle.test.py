@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+import ast
 import importlib.util
 import json
 import os
@@ -14,6 +15,22 @@ spec.loader.exec_module(smoke)
 
 
 class BundleSmokeTests(unittest.TestCase):
+    def test_tool_lists_are_one_name_per_line_sorted_without_duplicates(self):
+        # Two pull requests that add different tools then touch different lines.
+        # The sets stay hand-written; this reads the source, because a set
+        # literal drops a duplicate before the test could see it.
+        tree = ast.parse(Path(__file__).with_name("check-mcpb-bundle.py").read_text())
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Set):
+                found[node.targets[0].id] = node.value
+        for name in ("DEFAULT_TOOLS", "IMPORT_TOOLS", "POSTING_TOOLS"):
+            elements = found[name].elts
+            names = [element.value for element in elements]
+            self.assertEqual(names, sorted(set(names)), name)
+            lines = [element.lineno for element in elements]
+            self.assertEqual(len(lines), len(set(lines)), f"{name}: one name per line")
+
     def test_schema_receipts_require_matching_write_completion(self):
         response = b'{"jsonrpc":"2.0","id":3,"result":{}}\n'
         digest = smoke.hashlib.sha256(response).hexdigest()

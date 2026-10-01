@@ -482,6 +482,9 @@ jobs:
     needs: changes
     # Pilot: the voucher-scan and calibration-harness feature tests and lints, moved out of the
     # macOS native job so they run in parallel with it. Same scope rule as the native job.
+    # The six unix-only approval-dialog tests and the one Windows-only test under tally::approved_import
+    # are default-build tests, not feature-gated, so this job runs 310 and 312 tests where macOS ran
+    # 315 and 317; the feature-gated tests (19 and 21) are all platform-neutral and all run here.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'
     runs-on: windows-latest
     env:

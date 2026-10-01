@@ -16,7 +16,7 @@ Apache-2.0 builds from current source stays unambiguous.
 These changes are on the main branch. They are not yet in a published package.
 Each line names the pull requests it comes from.
 
-**What you can do now**
+**What the next build adds**
 
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
   line for line to Tally's own statement; otherwise it is refused, and the
@@ -280,7 +280,7 @@ there is no summary for that build.
 ### Security
 
 - SQLCipher/keyring-backed local Tally state, immutable proof/checkpoint
-  receipts, loopback-only proxy-free HTTP, bounded incremental decoding,
+  receipts, loopback-only HTTP without a proxy, bounded incremental decoding,
   cancellation and lease enforcement, idempotent crash replay, and sealed
   no-write qualification boundaries.
 - SQLCipher pool replacement connections now receive raw key bytes from

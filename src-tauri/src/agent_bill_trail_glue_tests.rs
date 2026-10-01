@@ -6,7 +6,8 @@
 //! glue. Each voucher of that window carries one On Account allocation on its
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
-use crate::agent::bill_trail::DetailKind;
+use crate::agent::bill_trail::{DetailKind, DetailLimits};
+use crate::agent::voucher_window::{VoucherReadShape, WindowReadLimits};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
 const PARTY: &str = "Café Naïve Traders";
@@ -86,6 +87,7 @@ struct Call {
     unallocated: Vec<UnallocatedParty>,
     redaction: Redaction,
     cap: usize,
+    window: WindowReadLimits,
     books_from_missing: bool,
 }
 
@@ -98,6 +100,7 @@ impl Call {
             unallocated: Vec::new(),
             redaction: Redaction::None,
             cap: 500,
+            window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
             books_from_missing: false,
         }
     }
@@ -138,7 +141,10 @@ async fn run(
             None,
             &call.open_bills,
             &call.unallocated,
-            call.cap,
+            DetailLimits {
+                rows: call.cap,
+                window: call.window,
+            },
         )
         .await;
     simulator.cancel();
@@ -146,7 +152,9 @@ async fn run(
         .finish()
         .unwrap()
         .iter()
-        .filter(|request| !request.request_body_sha256.is_empty())
+        // `cancel` wakes the simulator with a connection of its own, recorded
+        // as a cancelled entry when it was waiting: that is not a request.
+        .filter(|request| !request.cancelled)
         .count();
     (result, served)
 }
@@ -309,4 +317,70 @@ async fn a_refused_window_read_fails_the_detail_with_its_transport_cause() {
         failure.window_timings.is_some(),
         "the window read's own failure"
     );
+}
+
+/// A whole-books window that needs more data requests than one call may spend
+/// is refused before any data request, as the detail kind's own refusal with
+/// the window's code as its cause, the planned size beside it, and the window
+/// read's timings, so the next call can be chosen from the refusal alone.
+#[tokio::test]
+async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal() {
+    // Planner limits under which the captured book needs one request per
+    // voucher and may spend two: the mark (10) is over one request, so the
+    // window is counted (one census, served the captured three vouchers) and
+    // planned at three requests, which the planner refuses before any is sent.
+    let window = WindowReadLimits {
+        budget_bytes: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
+        max_reads: 2,
+    };
+    for (kind, code) in [
+        (DetailKind::BillTrail, "trail_window_too_large"),
+        (DetailKind::Unadjusted, "unadjusted_window_too_large"),
+    ] {
+        let cycle = import_cycle_plans();
+        let mut plans = company_and_catalogue();
+        plans.extend(cycle[10..16].iter().cloned());
+        plans.extend([
+            cycle[0].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            captured_window(),
+            cycle[1].clone(),
+            cycle[0].clone(),
+        ]);
+        let mut call = Call::new(kind);
+        call.window = window;
+        let (result, served) = run(plans, call).await;
+        let failure = result.unwrap_err();
+        assert_eq!(failure.code, code);
+        assert_eq!(failure.cause, Some("voucher_window_too_many_reads"));
+        assert_eq!(
+            failure.planned_reads.as_deref(),
+            // The day's three vouchers at one a request, and one request each
+            // for the empty days before and after it: the plan tiles the window.
+            Some(&crate::agent::PlannedReads {
+                needed_at_least: 5,
+                allowed: 2,
+            })
+        );
+        assert!(failure.window_timings.is_some());
+        // The company, the catalogue, the marks and the census: no data part.
+        assert_eq!(served, 22, "{code}");
+        assert!(
+            crate::agent::refusal_remediation(code).is_some(),
+            "{code} names its next step"
+        );
+    }
+}
+
+/// Any other refusal of the window read is passed through unchanged.
+#[tokio::test]
+async fn other_window_refusals_keep_their_own_code() {
+    let mut call = Call::new(DetailKind::BillTrail);
+    call.as_of = "20260301";
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    let failure = result.unwrap_err();
+    assert_eq!(failure.code, "invalid_date_range");
+    assert_eq!(failure.cause, None);
 }

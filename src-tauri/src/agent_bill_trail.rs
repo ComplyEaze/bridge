@@ -18,7 +18,6 @@
 //! whether that difference equals the ledger's opening balance is stated as a
 //! fact and never called an opening. A [`BillTrail`] exists only for a bill
 //! that tied (its constructor is private).
-use super::vouchers::VoucherComposites;
 use super::*;
 use bridge_tally_core::ExactDecimal;
 use std::collections::BTreeMap;
@@ -739,6 +738,32 @@ pub(super) fn trail_window_start(
     }
 }
 
+/// The limits one party detail is read and answered under.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct DetailLimits {
+    /// The most rows the answer carries ([`MAX_DETAIL_ROWS`] in production).
+    pub(super) rows: usize,
+    /// The window read's own limits (the planner's in production).
+    pub(super) window: WindowReadLimits,
+}
+
+/// The window read refused as needing more data requests than one call may
+/// spend (`voucher_window_too_many_reads`), told as the detail's own refusal:
+/// each kind has a different next step, so each has its own code, with the
+/// window's code as the cause and its planned size kept beside it.
+pub(super) fn window_too_large(mut failure: ToolFailure, kind: DetailKind) -> ToolFailure {
+    const TOO_MANY_READS: &str = "voucher_window_too_many_reads";
+    if failure.code == TOO_MANY_READS {
+        failure.code = match kind {
+            DetailKind::BillTrail => "trail_window_too_large",
+            DetailKind::Unadjusted => "unadjusted_window_too_large",
+        }
+        .to_string();
+        failure.cause = Some(TOO_MANY_READS);
+    }
+    failure
+}
+
 /// What `outstandings` was asked for beyond the book-wide figures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DetailKind {
@@ -785,13 +810,17 @@ impl Server {
             reference,
             open_bills,
             unallocated,
-            MAX_DETAIL_ROWS,
+            DetailLimits {
+                rows: MAX_DETAIL_ROWS,
+                window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+            },
         )
         .await
     }
 
-    /// [`Self::outstandings_detail`] with the row limit given, so that its
-    /// refusal can be reached through the handler on a small captured window.
+    /// [`Self::outstandings_detail`] with its limits given, so that each of
+    /// its refusals can be reached through the handler on a small captured
+    /// window.
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn outstandings_detail_within(
         &self,
@@ -803,7 +832,7 @@ impl Server {
         reference: Option<&str>,
         open_bills: &[OpenBillRow],
         unallocated: &[UnallocatedParty],
-        cap: usize,
+        limits: DetailLimits,
     ) -> Result<(Value, Evidence), ToolFailure> {
         let (catalogue, mut evidence) = self.read_ledger_catalogue(identity, &company.name).await?;
         let party = resolve_ledger_name(catalogue.iter().map(String::as_str), party_argument)?;
@@ -814,23 +843,25 @@ impl Server {
         let from = trail_window_start(kind, reference, &party, open_bills, &books_from);
         // A window that ends before it starts is refused by the window read
         // itself (`invalid_date_range`), before any request is sent.
+        // The `vouchers` window read, with its own limits: in production the
+        // planner's, so a window needing more requests than one call may spend
+        // is refused, and told as this detail's own refusal.
         let read = self
-            .read_entry_window_rows(
+            .read_voucher_window(
                 identity,
                 &company.name,
                 &from,
                 as_of,
                 VoucherReadShape::EntryWildcard,
-                VoucherComposites::Refuse,
+                WindowPlanSource::Estimate { known_marks: None },
+                limits.window,
+                |xml| parse_agent_rows(xml, identity.company_guid()),
             )
-            .await?;
+            .await
+            .map_err(|failure| window_too_large(failure, kind))?;
         evidence = combine_evidence(evidence, read.all_evidence());
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
-        let rows = read
-            .rows
-            .into_iter()
-            .map(VoucherRow::into_filter_row)
-            .collect::<Vec<_>>();
+        let rows = read.rows;
         let vouchers_read = rows.len();
         let rows = validate_then_filter_voucher_rows(rows, &from, as_of, None)
             .map_err(|code| late(ToolFailure::from(code)))?;
@@ -847,7 +878,7 @@ impl Server {
             open_bills,
             unallocated,
             vouchers_read,
-            cap,
+            limits.rows,
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;

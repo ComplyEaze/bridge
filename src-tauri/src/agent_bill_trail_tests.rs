@@ -1861,3 +1861,67 @@ fn a_refusal_after_the_voucher_read_keeps_that_reads_evidence() {
     assert_eq!(both.evidence.as_ref().unwrap().bytes, 15);
     assert_eq!(both.code, "trail_too_large");
 }
+
+/// The detail's window refusal reaches the caller with everything the next
+/// call needs: its code and cause, the planned size, the remedy, and the
+/// window read's own timings, which only `vouchers` reported before.
+#[test]
+fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let refusal = || {
+        let mut failure = window_too_large(
+            ToolFailure::from("voucher_window_too_many_reads".to_string()),
+            DetailKind::Unadjusted,
+        );
+        failure.planned_reads = Some(Box::new(PlannedReads {
+            needed_at_least: 5,
+            allowed: 2,
+        }));
+        failure.window_timings = Some(Box::new(WindowReadTimings {
+            from: "20260401".into(),
+            to: "20260802".into(),
+            ..WindowReadTimings::default()
+        }));
+        failure
+    };
+    let response = server.finish_tool_response(
+        "outstandings",
+        &json!({}),
+        chrono::Utc::now(),
+        Err(refusal()),
+    );
+    let error = &response.value["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "unadjusted_window_too_large", "{error}");
+    assert_eq!(error["cause"], "voucher_window_too_many_reads");
+    assert_eq!(error["reads"], json!({"needed_at_least": 5, "allowed": 2}));
+    assert_eq!(error["window"]["from"], "20260401", "{error}");
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("Nothing narrows it")),
+        "{error}"
+    );
+    // Another tool that reads a window keeps its refusal shape.
+    let other = server.finish_tool_response(
+        "voucher_presence",
+        &json!({}),
+        chrono::Utc::now(),
+        Err(refusal()),
+    );
+    assert!(other.value["structuredContent"]["result"]["error"]
+        .get("window")
+        .is_none());
+}

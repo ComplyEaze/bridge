@@ -42,7 +42,7 @@ Before bridge#416 nothing recorded either, and the boundary showed it.
 Contra's cash/bank side) and `agent_import_persistence.rs` were not -- so the
 module that *renders* the qualified write shape was sealed and the modules that
 *decide* it were not. #434 pinned those, together with the other admission and
-egress files found the same way, and recorded beside `MAX_SURFACE_FILES` both
+egress files found the same way, and recorded in the comment beside `MAX_SURFACE_FILES` both
 the reason for each pin and which kinds of file were left out on purpose. That
 paragraph is the exemption record; add to it rather than leaving a collaborator
 silently unpinned.
@@ -62,16 +62,14 @@ prints a report that catches the common case -- a new module declared directly b
 -- but not a new module under an unpinned parent or deeper descendants, so check
 the new files against the rule above yourself.
 
-**Capacity is not free, and that is deliberate.** `MAX_SURFACE_FILES` is set to
-the exact pin count, so any branch adding a pin raises
-it in the same PR. Setting the cap to the exact count has been the convention
-since #260, and recording a named reason for each raise since #278 (since schema 3
-the reason is the pin's own `reason` field); neither is how the reserve was first designed. `RESERVED_SURFACE_FILES`
-(15) was introduced in #223 with the cap at exactly count + 15, and in that
-slack period #246 added eight pins without touching the cap. With no slack, a
-new pin cannot land without an edit to the constant, which is where its reason
-now goes. Then add the acknowledgement (`docs/tally/compatibility/acks/pr-<N>.txt`)
-that lists the new pins and the changed pinned files; see the release process.
+**A pin is a decision, and that is deliberate.** `MAX_SURFACE_FILES` is a fixed parse
+bound against a runaway list, not a count: adding a pin does not touch it. (It used to
+be kept equal to the exact pin count, so each new pin was also an edit to a pinned
+constant; that was dropped once the acknowledgement check became enforcing, because
+the pin's own `reason` and the enforced acknowledgement carry the decision.) A new pin
+lands with its `reason` in the pin list, and with the acknowledgement
+(`docs/tally/compatibility/acks/pr-<N>.txt`) that lists the new pins and the changed
+pinned files; see the release process.
 
 Budget for that when planning. Splitting a 6,000-line module four ways is four
 surface decisions, not one refactor.

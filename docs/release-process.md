@@ -197,27 +197,26 @@ Edit the sorted list by hand.
 1. Insert the entry in sorted path order with a `reason` (required for a pin added
    by a pull request, at most 500 characters): why this file decides what Bridge
    posts or lets leave the machine. Paths are relative, unique and sorted.
-2. Raise `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs` to the
-   new pin count. The convention is to pin exactly the count in use, and
-   `RESERVED_SURFACE_FILES` bounds how far the cap may exceed it. Raising it is an
-   explicit compatibility-surface decision: record the reason in the commit and
-   the pull request. That file is pinned, so this edit is itself covered by the
-   acknowledgement.
+2. Leave `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs`
+   alone. It is a fixed parse bound against a runaway list (1024), not a count to
+   maintain, so adding or removing a pin does not touch it and two pull requests
+   that each add a pin no longer collide on it. Only a list that approaches the
+   bound would justify raising it, which is a deliberate change to a pinned file
+   with its own reason and acknowledgement.
 3. Add the acknowledgement, listing the new pin's path (and a `removed-pin:` line for
-   each removal). Then run the tool's tests: a cap change can invalidate a test that
-   hard-codes the old bound.
+   each removal). Then run the tool's tests.
 
-Removing a pin is done the same way, with a `removed-pin:` line and the cap kept
-in step. A malformed list is refused by the tool and by CI.
+Removing a pin is done the same way, with a `removed-pin:` line. A malformed list
+is refused by the tool and by CI.
 
-**`MAX_SURFACE_FILES` is the line most likely to be silently wrong, and it is
-worse when it does NOT conflict.** If two branches start from the same cap and
-each add one pin, both change it from N to N+1: an **identical edit**, which git
-merges without a conflict. The merged surface then holds N+2 pins against a cap
-of N+1, and the gate fails with `surface_file_count_invalid`. That failure is
-loud, so it is not dangerous; what is misleading is expecting a conflict to
-prompt you. Recompute the cap from the merged pin count whether or not git
-stopped to ask.
+**What decides a pin now.** Until the bound replaced the exact count, adding a pin
+meant editing that constant in a pinned file, so the change could not go unnoticed
+in a diff of `lib.rs`. That no longer holds. A pin is now decided by its own
+`reason` (required on every pin a pull request adds), the sorted-and-unique and
+declared-removal rules the tool and the acknowledgement check enforce, and the
+acknowledgement file, which `workflow-consistency` enforces in CI on pull requests,
+in the merge queue and on the push to master. A pull request that adds or removes a
+pin without its acknowledgement fails, whatever else it edits.
 
 #### What the coverage report shows
 
@@ -294,8 +293,7 @@ trace at all, so reconcile its claims the same way.
 
    If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
    (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
-3. **Recompute `MAX_SURFACE_FILES` from the reconciled pin count.** Do not carry a
-   number derived from either side's cap.
+3. Leave `MAX_SURFACE_FILES` alone: it is a fixed bound, not a count.
 4. Run the gate, and check the pin count against the union you computed; the gate
    cannot do this for you. Add or update the acknowledgement so it lists every
    changed pinned path and every added pin.
@@ -323,8 +321,8 @@ every row). Merging master into it conflicts on that file. Once per branch:
 
 3. Re-add the pins the branch itself added. `git diff <merge-base>..HEAD --
    docs/tally/compatibility/compatibility-surface.json` shows them. Insert each as
-   `{ "path": "...", "reason": "..." }` in sorted order, and keep
-   `MAX_SURFACE_FILES` equal to the merged pin count. A branch that only changed the
+   `{ "path": "...", "reason": "..." }` in sorted order; do not touch
+   `MAX_SURFACE_FILES`. A branch that only changed the
    contents of already-pinned files has nothing to re-add.
 4. Add `docs/tally/compatibility/acks/pr-<N>.txt` as above if the branch changes any
    pinned path. Until the branch has merged master, its head still holds a schema 2

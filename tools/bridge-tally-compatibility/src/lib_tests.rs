@@ -935,11 +935,9 @@ fn real_tree_has_complete_migration_and_report_surface_coverage() {
     .unwrap();
     // Resolving reads every pinned file and enforces the required files and directories.
     let surface = pins.resolve(&repository_root).unwrap();
-    // `<=` lets pinned files consume the deliberate reserve without raising
-    // the cap: `validate` protects the upper bound by rejecting a surface
-    // above `MAX_SURFACE_FILES`, while this assertion protects the policy
-    // bound by rejecting an inflated cap with excess headroom.
-    assert!(MAX_SURFACE_FILES - surface.files.len() <= RESERVED_SURFACE_FILES);
+    // The cap is a fixed parse bound, not a count: the pin list may grow or shrink without
+    // touching it, so nothing here compares it with `surface.files.len()`.
+    assert!(!surface.files.is_empty());
 }
 
 #[test]
@@ -958,6 +956,25 @@ fn surface_file_cap_refuses_one_entry_above_the_cap() {
         oversized.validate().unwrap_err(),
         invalid("surface_file_count_invalid")
     );
+}
+
+#[test]
+fn pin_list_longer_than_the_parse_bound_is_refused_and_one_at_the_bound_is_not() {
+    let list = |count: usize| SurfacePins {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files: (0..count)
+            .map(|index| SurfacePin {
+                path: format!("pinned-{index:04}"),
+                reason: None,
+            })
+            .collect(),
+    };
+
+    assert_eq!(
+        list(MAX_SURFACE_FILES + 1).validate().unwrap_err(),
+        invalid("surface_file_count_invalid")
+    );
+    assert!(list(MAX_SURFACE_FILES).validate().is_ok());
 }
 
 #[test]

@@ -63,6 +63,7 @@ DEFAULT_COMMENTS = []
 DEFAULT_BODY = "## Outcome and reason\n\nA bounded merge preflight.\n"
 DEFAULT_COMMIT = {
     "sha": HEAD,
+    "parents": [{"sha": BASE_TIP}],
     "commit": {
         "message": "safe commit metadata",
         "author": {"name": "Maintainer", "email": "maintainer@example.invalid"},
@@ -192,6 +193,8 @@ def state():
         "surface_head_fail": False,
         "surface_head_malformed": False,
         "surface_merge_base": None,      # None: the merge base is the base tip
+        "surface_at": {},                # commit sha -> surface served at that ref (branch history)
+        "surface_at_fail": set(),        # commit shas whose pin list cannot be read
         "merge_base_fail": False,
         "ack_text": None,
         "ack_fail": False,
@@ -366,6 +369,68 @@ def state():
             s["comments"] = [{"user": {"login": "reviewer", "type": "User"}, "body": review_body("src/other.rs")}]
         else:
             with_ack(s, ack_text([], removed=["src/other.rs"]))
+
+    # -- Branch history: a pin the branch added and then lost ---------------------
+    elif scenario.startswith("history-"):
+        c1 = "c1" * 20
+        p2 = "d2" * 20
+        own = "src/own.rs"
+        with_own = schema3(DEFAULT_PINS + [own], {own: "decides what is posted"})
+
+        def commit_at(sha, parents):
+            commit = dict(DEFAULT_COMMIT)
+            commit["sha"] = sha
+            commit["parents"] = [{"sha": p} for p in parents]
+            return commit
+
+        if scenario == "history-merge-parent-compared-with-all":
+            # The pin z reached the branch through a merge's second parent, a master-side commit.
+            merge = "e3" * 20
+            s["commits"] = [commit_at(merge, [BASE_TIP, p2]), commit_at(HEAD, [merge])]
+            s["surface_at"] = {merge: with_own, p2: with_own}
+            set_changes(s, ("modified", "src/example.rs"))
+            with_ack(s, ack_text(["src/example.rs"]))
+        else:
+            s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
+            s["surface_at"] = {c1: with_own}
+            if scenario == "history-own-pin-lost-undeclared":
+                set_changes(s, ("modified", "src/example.rs"))
+                with_ack(s, ack_text(["src/example.rs"]))
+            elif scenario == "history-own-pin-lost-declared":
+                set_changes(s, ("modified", "src/example.rs"))
+                with_ack(s, ack_text(["src/example.rs"], removed=[own]))
+            elif scenario == "history-own-pin-lost-ack-names-the-path":
+                set_changes(s, ("modified", "src/example.rs"))
+                with_ack(s, ack_text(["src/example.rs", own]))
+            elif scenario == "history-own-pin-lost-no-ack":
+                pass  # nothing else pinned changed, and no acknowledgement
+            elif scenario == "history-pin-kept-at-the-head":
+                s["surface_head"] = with_own
+                set_changes(s, ("modified", "src/example.rs"), ("modified", SURFACE_PATH))
+                with_ack(s, ack_text(["src/example.rs", own]))
+            elif scenario.startswith("history-out-of-order-"):
+                # An older commit of the branch pinned the new file with the list out of order. Only
+                # its paths matter there (scripts/check-surface-ack.mjs reads the same thing).
+                unsorted = {"schema_version": 3, "files": [
+                    {"path": "src/example.rs"}, {"path": own, "reason": "decides what is posted"}, {"path": "src/other.rs"}]}
+                s["surface_at"] = {c1: unsorted}
+                if scenario == "history-out-of-order-then-sorted":
+                    s["surface_head"] = with_own
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([own]))
+                elif scenario == "history-out-of-order-then-dropped":
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([own]))
+                elif scenario == "history-out-of-order-then-dropped-declared":
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([], removed=[own]))
+                else:
+                    fail("unknown history scenario")
+            elif scenario == "history-commit-list-unreadable":
+                s["surface_at"] = {}
+                s["surface_at_fail"] = {c1}
+            else:
+                fail("unknown history scenario")
 
     elif scenario == "pin-removed-line-for-a-kept-pin":
         set_changes(s, ("modified", "src/example.rs"))
@@ -870,7 +935,12 @@ elif args and args[0] == "api":
     joined = " ".join(args)
     if "/contents/" in joined:
         if SURFACE_PATH in joined:
-            if f"ref={HEAD}" in joined:
+            history_ref = next((ref for ref in list(S["surface_at"]) + list(S["surface_at_fail"]) if f"ref={ref}" in joined), None)
+            if history_ref is not None:
+                if history_ref in S["surface_at_fail"]:
+                    fail("controlled history surface read failure")
+                emit({"encoding": "base64", "content": b64(S["surface_at"][history_ref])})
+            elif f"ref={HEAD}" in joined:
                 if S["surface_head_fail"]:
                     fail("controlled surface read failure")
                 if S["surface_head_malformed"]:

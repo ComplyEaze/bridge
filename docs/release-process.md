@@ -185,8 +185,9 @@ looked at in the review.
   see: a pin lost in a rebase, a force-push, an amend or a squash before the push
   leaves no history to read, and the merge group and the push to master each check one
   squash commit, which has no branch history, so there the pull-request-time check
-  and the merge gate are the control. Only a stay-pinned guard test covers a rewritten
-  history, and only for the pins it names.
+  and the merge gate are the control. Only a review that compares the pin list with
+  the last reviewed head and a stay-pinned guard test (for the pins it names) can see
+  a rewritten history.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed
@@ -263,8 +264,9 @@ so that no commit records the pin. Before the bound replaced the exact count, a
 reviewer comparing the constant with the pin count could notice that mismatch too;
 that signal is gone. So a review of a pull request that touches the pin list compares
 the list with the last reviewed head as well as with the base, and names any pin that
-was present at the last reviewed head and is gone, which is the only thing that sees
-a rewritten history.
+was present at the last reviewed head and is gone. That review comparison and a
+stay-pinned guard test (for the pins it names) are the only things that can see a
+rewritten history.
 
 What remains of the old collision: two pull requests that insert a pin at the same
 sorted position still conflict in the pin list itself. Resolve it by keeping both
@@ -574,7 +576,8 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow runs when a maintainer
+`site/` is the static website (home, Download, Releases and Changelog). Its
+workflow runs when a maintainer
 dispatches it, and again when a maintainer-dispatched preview publication in
 this repository finishes successfully, so the page's release snapshot follows
 the release without a second step. The job requires the publication run's event

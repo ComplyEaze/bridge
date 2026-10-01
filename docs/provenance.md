@@ -40,15 +40,18 @@ contain customer data in release artifacts.
   distributed. The raster, ICO and ICNS files under `src-tauri/icons/` are
   rendered from `src-tauri/app-icon.svg`, except the 16 px entries of
   `icon.ico` and `icon.icns`, which are rendered from
-  `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid).
+  `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid). The
+  files under `site/brand/` are the website's copies of the same artwork: the
+  two favicons unchanged, and `lockup.svg`, the lockup's outline as one symbol
+  that takes its colour from the page.
   ComplyEaze and ComplyEaze Bridge, and the related logos and visual
   identity, are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze)
   uses to identify its products. They are not registered trade marks. The
   Apache License 2.0 does not grant permission to use them, except to describe
   where the software came from and to reproduce the NOTICE file (section 6 of
   the license); see TRADEMARKS.md. The logo and icon files — docs/brand/,
-  src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are
-  not licensed under Apache-2.0: all rights in them are reserved. They are
+  site/brand/, src-tauri/app-icon.svg, src-tauri/icons/ and
+  packaging/mcpb/icon.png — are not licensed under Apache-2.0: all rights in them are reserved. They are
   included so that official builds carry the ComplyEaze Bridge identity. A fork
   or modified build must replace them and use a different name.
 - Tally XML and JSON files under `src-tauri/crates/tally-protocol-simulator/`
@@ -75,6 +78,14 @@ fixtures.
 
 - JavaScript production dependencies are locked by `pnpm-lock.yaml` and listed
   in `THIRD_PARTY_LICENSES.txt`.
+- The website in `site/` vendors files that are not packages and so are not in
+  either report: `site/vendor/three/three.bundle.min.js`, a bundled and
+  minified subset of three.js r186 (npm `three` 0.186.1, MIT; the licence and
+  the command that reproduces the file are beside it), and the font files in
+  `site/fonts/`, subsets of Bricolage Grotesque, Geist and Geist Mono (SIL Open
+  Font License 1.1; each licence text and the subsetting command are beside
+  them). NOTICE names these files. They are not part of the desktop app or the
+  MCP bundle.
 - Rust dependencies are locked by `src-tauri/Cargo.lock`, governed by
   `src-tauri/about.toml`, and listed in `THIRD_PARTY_LICENSES_RUST.txt`.
 - CI compares both locked release graphs to the checked-in reports and fails on

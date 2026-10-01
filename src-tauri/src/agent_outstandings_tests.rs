@@ -861,25 +861,35 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
 }
 
 /// One recorded `outstandings` call with a party detail, replayed through the
-/// MCP tool on the scripted transport: every response served in the order
-/// the live gateway sent it, from the captures its sequence record names
-/// (#945, review P2.1). Returns the tool's response, the requests the
-/// simulator observed, and the record.
+/// MCP tool on the scripted transport, in the order the live gateway answered
+/// it (#945, review P2.1). What the replay serves, exactly:
+/// - each POST is answered with the bytes of the capture its sequence record
+///   names, as captured (UTF-16LE, no byte-order mark). Three of those
+///   captures, the company list, the book extent and the company marks, are
+///   the live answers trimmed to the one company's row, as their own records
+///   declare, so those three are not byte-identical to what the gateway sent;
+/// - each status read is answered with the recorded status body;
+/// - the HTTP head is the test double's own, not the gateway's.
+///
+/// Returns the tool's response, the requests the simulator observed, and the
+/// record.
 async fn replay_recorded_detail_call(
     record: &str,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
-    replay_recorded_call(record, |_| true, |arguments| arguments).await
+    replay_recorded_call(record, |_| true, |arguments| arguments, Redaction::None).await
 }
 
 /// [`replay_recorded_detail_call`] serving only the recorded requests `keep`
-/// admits, with the call's arguments passed through `arguments`.
+/// admits, with the call's arguments passed through `arguments`, under
+/// `redaction`.
 async fn replay_recorded_call(
     record: &str,
     keep: impl Fn(&Value) -> bool,
     arguments: impl Fn(Value) -> Value,
+    redaction: Redaction,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
     use tally_protocol_simulator::{
-        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
     let record: Value = serde_json::from_str(record).unwrap();
     let directory_of_fixtures = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -890,8 +900,23 @@ async fn replay_recorded_call(
         .iter()
         .filter(|request| keep(request))
         .map(|request| match request["method"].as_str().unwrap() {
-            "GET" => ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
-                .with_framing(ResponseFraming::ContentLength),
+            "GET" => {
+                let bytes = std::fs::read(
+                    directory_of_fixtures.join(request["response_fixture"].as_str().unwrap()),
+                )
+                .unwrap();
+                let plan = ScenarioPlan::new(Fixture::SyntheticXml(
+                    String::from_utf8(bytes.clone()).unwrap(),
+                ))
+                .with_encoding(WireEncoding::Utf8)
+                .with_framing(ResponseFraming::ContentLength);
+                assert_eq!(
+                    tally_protocol_simulator::encode(&plan.fixture.body(), plan.encoding),
+                    bytes,
+                    "the status read is served as recorded"
+                );
+                plan
+            }
             _ => {
                 let bytes = std::fs::read(
                     directory_of_fixtures.join(request["response_fixture"].as_str().unwrap()),
@@ -904,9 +929,16 @@ async fn replay_recorded_call(
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
-                ScenarioPlan::new(Fixture::SyntheticXml(body))
-                    .with_encoding(WireEncoding::Utf16Le)
-                    .with_framing(ResponseFraming::ContentLength)
+                let plan = ScenarioPlan::new(Fixture::SyntheticXml(body))
+                    .with_encoding(WireEncoding::Utf16LeNoBom)
+                    .with_framing(ResponseFraming::ContentLength);
+                assert_eq!(
+                    tally_protocol_simulator::encode(&plan.fixture.body(), plan.encoding),
+                    bytes,
+                    "{} is served byte for byte",
+                    request["response_fixture"]
+                );
+                plan
             }
         })
         .collect::<Vec<_>>();
@@ -920,7 +952,7 @@ async fn replay_recorded_call(
         data_dir: directory.path().into(),
         max_rows: 500,
         max_bytes: 2_000_000,
-        redaction: Redaction::None,
+        redaction,
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
@@ -1012,6 +1044,7 @@ async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Valu
             }
             arguments
         },
+        Redaction::None,
     )
     .await;
     assert_eq!(plain["isError"], false, "{plain}");
@@ -1026,20 +1059,11 @@ async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Valu
                 && request["method"] == "POST"
                 && DETAIL_READS.contains(&request["request_id"].as_str().unwrap_or_default())
         })
-        // Each as the simulator serves it: the capture's text, encoded.
+        // Each as the simulator serves it: the capture's own bytes.
         .map(|request| {
-            let bytes =
-                std::fs::read(directory.join(request["response_fixture"].as_str().unwrap()))
-                    .unwrap();
-            let body = String::from_utf16(
-                &bytes
-                    .chunks_exact(2)
-                    .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap();
-            tally_protocol_simulator::encode(&body, tally_protocol_simulator::WireEncoding::Utf16Le)
-                .len() as u64
+            std::fs::metadata(directory.join(request["response_fixture"].as_str().unwrap()))
+                .unwrap()
+                .len()
         })
         .sum();
     let bytes = |value: &Value| {
@@ -1048,4 +1072,79 @@ async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Valu
             .unwrap()
     };
     assert_eq!(bytes(response), bytes(&plain) + detail_bytes);
+}
+
+const RECORDED_UNADJUSTED: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-unadjusted.json"
+);
+const RECORDED_BILL_TRAIL: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-bill-trail.json"
+);
+
+/// Under `mask_parties` the recorded calls send the same requests, and the
+/// party is masked wherever the detail names it: the detail's own `party`
+/// and every bill's. The name appears nowhere in the tool's response.
+#[tokio::test]
+async fn mcp_outstandings_mask_the_party_throughout_a_recorded_detail() {
+    for record in [RECORDED_UNADJUSTED, RECORDED_BILL_TRAIL] {
+        let (response, observed, record) = replay_recorded_call(
+            record,
+            |_| true,
+            |arguments| arguments,
+            Redaction::MaskParties,
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{response}");
+        assert_eq!(observed.len(), record["requests"].as_array().unwrap().len());
+        let party = record["arguments"]["party"].as_str().unwrap();
+        let detail = &response["structuredContent"]["result"]["detail"];
+        let masked = json!(mask(party));
+        assert_eq!(detail["party"], masked, "{detail}");
+        for bill in detail["bills"].as_array().into_iter().flatten() {
+            assert_eq!(bill["party"], masked, "{bill}");
+        }
+        assert!(!response.to_string().contains(party), "{party} unmasked");
+        // Masking changes names only: the figures are the live call's.
+        let live = &record["answer_detail"];
+        for key in ["state", "window", "rows", "residual", "on_account_sum"] {
+            assert_eq!(detail.get(key), live.get(key), "{key}");
+        }
+    }
+}
+
+/// `direction`, `top`, `offset` and `limit` page and filter the book-wide
+/// figures only: with all four set, the recorded call sends the same requests
+/// and its `detail` is still the live call's whole answer.
+#[tokio::test]
+async fn mcp_outstandings_give_the_whole_detail_whatever_the_paging_arguments() {
+    let (response, observed, record) = replay_recorded_call(
+        RECORDED_UNADJUSTED,
+        |_| true,
+        |mut arguments| {
+            for (key, value) in [
+                ("direction", json!("payable")),
+                ("top", json!(1)),
+                ("offset", json!(1)),
+                ("limit", json!(1)),
+            ] {
+                arguments[key] = value;
+            }
+            arguments
+        },
+        Redaction::None,
+    )
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    let result = &response["structuredContent"]["result"];
+    // The book-wide figures were paged as asked.
+    assert_eq!(result["offset"], 1);
+    assert_eq!(result["limit"], 1);
+    assert!(
+        result["open_bills"].as_array().unwrap().len() <= 1,
+        "{result}"
+    );
+    assert!(
+        result["top_parties"].as_array().unwrap().len() <= 1,
+        "{result}"
+    );
 }

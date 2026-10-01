@@ -726,45 +726,57 @@ counted in `sales_vouchers_without_duties_taxes_entry`; each row carries
 return or a credit note issued to a supplier. It decides no place of supply, tax
 rate or return section, and matches nothing against any portal.
 
-- **Measured.** `sales_register` was run against a live Tally once per day on
-  one synthetic company (TallyPrime 7.1 Silver), for one taxed Sales item
-  invoice and one untaxed one. The taxed sale came back as one row: voucher
-  type Sales in the invoice view, the party as a debit entry, the sales ledger
-  as its taxable entry, and two credit entries on tax ledgers whose masters
-  carry the heads CGST and SGST/UTGST. The untaxed one was counted under
-  `sales_vouchers_without_duties_taxes_entry`. The voucher windows of these two
-  invoices are committed, and the parsed windows have exactly those entries (a
-  test); the requests are the request the code sends (a test). One Sales
-  accounting voucher (not an invoice) is also classified, in tests, against the
-  ledger masters of the purchase register's lab book, with CGST and SGST heads.
+- **Measured.** `sales_register` was run against a live Tally on two synthetic
+  companies (TallyPrime 7.1 Silver). On the first, once per day, for one taxed
+  Sales item invoice and one untaxed one: the taxed sale came back as one row
+  (voucher type Sales in the invoice view, the party as a debit entry, the sales
+  ledger as its taxable entry, and two credit entries on tax ledgers whose
+  masters carry the heads CGST and SGST/UTGST), and the untaxed one was counted
+  under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44
+  ledgers, for one Credit Note in voucher view booked on account: one row with
+  its CGST and state-tax heads and its sales ledger as the taxable entry. The
+  voucher windows of the first two invoices are committed, and the parsed
+  windows have exactly those entries (a test); the requests are the request the
+  code sends (a test). One Sales accounting voucher (not an invoice) is also
+  classified, in tests, against the ledger masters of the purchase register's
+  lab book.
+- **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
+  reversed as Tally sends them: the tool neither nets nor flips, so a caller that
+  sums tax over a window must add signed amounts. The measured Credit Note of
+  1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
+  `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
+  row has the sales and tax entries positive and the party entry negative.
+- **The state-side head has two spellings.** It is `state_tax` (raw `State Tax`)
+  on one measured book and `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
+  recognised heads for the same side of the tax, so a caller must not look for
+  one of them only.
 - **Not shown by any run, and said so in the tool's text and in each
-  response's `coverage`:** a credit note; an inter-state (IGST) line; a
-  cancelled or optional sales voucher; an unrecognised or missing duty head on a
-  sale; more than one voucher in a window; paging; a company with a
+  response's `coverage`:** an invoice-view Credit Note; an inter-state (IGST)
+  line; a cancelled or optional sales voucher; an unrecognised or missing duty
+  head on a sale; more than one voucher in a window; paging; a company with a
   registration; a tax Tally computes itself (rate or HSN on the item); a sale
   typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
   `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
   returned); books with several currencies.
 - **A row of a kind no capture covers says so, where the row itself shows the
   kind.** It is returned, not withheld, with `not_measured_live` listing why:
-  `credit_note`, `inter_state_line`, `sales_ledger_not_an_entry` (tax is present
-  but no entry is on a Sales Accounts ledger: the sales ledger may sit in an
-  inventory allocation), `cancelled`, `optional`, `post_dated`,
+  `invoice_view_credit_note`, `inter_state_line`, `sales_ledger_not_an_entry`
+  (tax is present but no entry is on a Sales Accounts ledger: the sales ledger
+  may sit in an inventory allocation), `cancelled`, `optional`, `post_dated`,
   `party_gstin_present`, `reference_present`. A row the captures cover has no
-  such field, and the purchase register's rows never carry it. An invoice-view
-  voucher is not marked: one taxed and one untaxed item invoice were run live.
-  Some kinds a row cannot show, so they are never marked and are not vouched
-  for: a sale typed on Tally's screen in voucher view, a tax Tally computed
-  itself, a duty head no sales capture has (such as cess, or `sgst_utgst` on a
-  sale), an invoice of another shape than the one run (for example several goods
-  lines), and several currencies; an unmarked row is not a measured one in those
-  respects. A row is marked `inter_state_line` only when a tax entry's ledger
-  master carries a recognised IGST head; an IGST ledger with no head, or an
-  unrecognised head, is listed under the without-head or unrecognised list and
-  the status is not complete. `sales_vouchers_without_duties_taxes_entry` lists
-  such vouchers by identity only; the tool does not say why one carries no tax
-  entry. A Debit Note, even to a customer, is not a sales row: it is listed
-  apart by identity and ledger names, with no amount.
+  such field, and the purchase register's rows never carry it. Some kinds a row
+  cannot show, so they are never marked and are not vouched for: a sale typed on
+  Tally's screen in voucher view, a tax Tally computed itself, a duty head no
+  sales capture has (such as cess), an invoice of another shape than the one run
+  (for example several goods lines), and several currencies; an unmarked row is
+  not a measured one in those respects. A row is marked `inter_state_line` only
+  when a tax entry's ledger master carries a recognised IGST head; an IGST
+  ledger with no head, or an unrecognised head, is listed under the without-head
+  or unrecognised list and the status is not complete.
+  `sales_vouchers_without_duties_taxes_entry` lists such vouchers by identity
+  only; the tool does not say why one carries no tax entry. A Debit Note, even
+  to a customer, is not a sales row: it is listed apart by identity and ledger
+  names, with no amount.
 
 ### Foreign-currency composites in `vouchers`
 

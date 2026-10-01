@@ -967,8 +967,10 @@ fn the_sales_result_names_its_own_profile_classes_and_list() {
     // What no capture covers is said in the response, not only in the tool text.
     for named in [
         "measured for sales so far",
-        "one live run per day on one synthetic company",
-        "not shown by any run: a credit note",
+        "live runs on two synthetic companies",
+        "not shown by any run: an invoice-view Credit Note",
+        "its signs reversed as Tally sends them",
+        "look for neither alone",
         "only where the row itself shows it",
         "not vouched for",
         "a recognised IGST head",
@@ -1108,7 +1110,7 @@ fn derived_sales_tail() -> String {
         ),
         (
             "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
-            "Measured so far: `sales_register` was run against a live Tally once per day on one synthetic company (TallyPrime 7.1 Silver) for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one was counted under `sales_vouchers_without_duties_taxes_entry`; and one Sales accounting voucher (not an invoice) was classified against the ledger masters of a second company. Not shown by any run: a credit note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess, or sgst_utgst on a sale), an invoice of another shape than the one run (for example several goods lines), and several currencies; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
+            "Measured so far: `sales_register` was run against a live Tally on two synthetic companies. On the first, once per day, for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one was counted under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44 ledgers, for one Credit Note in voucher view booked on account: one row, with its CGST and state-tax heads and its sales ledger as the taxable entry. One Sales accounting voucher (not an invoice) was also classified, in tests, against the ledger masters of the purchase register's lab book. A Credit Note is returned as a row with its signs reversed as Tally sends them: the tool neither nets nor flips, so a caller that sums tax over a window must add signed amounts. The measured Credit Note of 1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry -1000.00, each tax entry -90.00 and the party entry 1180.00, where a Sales row has the sales and tax entries positive and the party entry negative. The state-side tax head is `state_tax` (raw State Tax) on one measured book and `sgst_utgst` (raw SGST/UTGST) on another; both are recognised heads for the same side of the tax, so a caller must not look for one of them only. Not shown by any run: an invoice-view Credit Note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (invoice_view_credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess), an invoice of another shape than the one run (for example several goods lines), and several currencies; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
         ),
     ];
     let mut text = shared.to_string();
@@ -1157,8 +1159,10 @@ fn the_sales_description_says_nothing_only_the_purchase_register_would() {
         "may hold the sales ledger in an inventory allocation instead; not measured",
         "the tool does not say why such a voucher carries no tax entry",
         "A Debit Note, including one issued to a customer, is not a sales row",
-        "run against a live Tally once per day",
-        "Not shown by any run: a credit note",
+        "run against a live Tally on two synthetic companies",
+        "Not shown by any run: an invoice-view Credit Note",
+        "its signs reversed as Tally sends them",
+        "must not look for one of them only",
         "more than one voucher in a window",
         "REFERENCEDATE (not returned)",
         "`not_measured_live`",
@@ -1191,7 +1195,6 @@ fn a_sales_row_of_a_kind_no_capture_covers_says_so_and_a_covered_one_does_not() 
         ("post_dated", json!(true), "post_dated"),
         ("party_gstin", json!("SYNTHETIC"), "party_gstin_present"),
         ("reference", json!("SYN-REF"), "reference_present"),
-        ("voucher_class", json!("Credit Note"), "credit_note"),
     ];
     for (key, value, code) in cases {
         let mut marked = sale.clone();
@@ -1205,6 +1208,18 @@ fn a_sales_row_of_a_kind_no_capture_covers_says_so_and_a_covered_one_does_not() 
             "{key} should mark the row"
         );
     }
+    // A Credit Note in voucher view was measured live; one in the invoice view was not.
+    let mut credit = sale.clone();
+    credit["voucher_class"] = json!("Credit Note");
+    let page = super::classify_register(RegisterKind::Sales, &captured_index(), &[credit.clone()])
+        .unwrap();
+    assert!(page.rows[0].get("not_measured_live").is_none());
+    credit["is_invoice"] = json!(true);
+    let page = super::classify_register(RegisterKind::Sales, &captured_index(), &[credit]).unwrap();
+    assert_eq!(
+        page.rows[0]["not_measured_live"],
+        json!(["invoice_view_credit_note"])
+    );
     // An invoice-view voucher is not marked: one taxed and one untaxed item invoice were run live.
     let mut invoice = sale.clone();
     invoice["is_invoice"] = json!(true);

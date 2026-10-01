@@ -1279,8 +1279,11 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 seeded by this project; seeded data is not evidence about a client book). Each row below was read
 from Tally's own Bills Receivable and Bills Payable reports and from the vouchers' bill allocations
 at one as-of date, and the `outstandings` party detail (#945) ties the two. The captures committed
-with that change are the voucher window and the two bills reports; the on-account netting and the
-unreferenced-opening rows rest on read-backs through Bridge that are not captured as fixtures:
+with that change are the voucher window, the two bills reports, and every response of two whole
+`outstandings` calls with a party detail (`native-outstandings-detail-*`, with an ordered record of
+each call's 66 requests): an `unadjusted` detail of the on-account debtor, tied (on-account sum and
+residual both 3,000), and a `bill_trail` of one named bill, tied. The unreferenced-opening row rests
+on a read-back through ComplyEaze Bridge that is not captured as a fixture:
 
 | What was measured | Result |
 | --- | --- |
@@ -1301,9 +1304,9 @@ whole-window read on a large book.
 **What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
 extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
 changes that compensate, or allocations that net to zero, can still tie. An unadjusted `tied`
-means the on-account sum equals the residual, not that the residual's composition is proven. The
-unadjusted tie-out has no captured fixture: its residuals in the tests are typed from the seeded
-vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
+means the on-account sum equals the residual, not that the residual's composition is proven. One
+unadjusted tie-out is captured whole (the on-account debtor above); the other residuals in the
+tests are typed from the seeded vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
 having no residual row, never as a residual of zero, and an empty voucher read is reported as
 such, never corroborated. No captured book shows a later invoice adjusting an advance, so the
 unadjusted detail lists each advance and note at its amount as allocated and puts Tally's own open

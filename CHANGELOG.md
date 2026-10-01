@@ -1,23 +1,52 @@
 # Changelog
 
-All notable changes to Bridge are documented here. The project follows
+All notable changes to ComplyEaze Bridge are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Published builds are unsigned MCPB previews (tags `mcp-preview-*`): so far
-`mcp-preview-0.2.0` and `mcp-preview-0.3.0`. The number of the next build is
-chosen when it is released.
+Published builds so far are `mcp-preview-0.2.0` and `mcp-preview-0.3.0`, unsigned
+MCPB packages. The number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: in source since `mcp-preview-0.3.0` (26 Sep 2026)
+## [0.4.0] - YYYY-MM-DD [PLACEHOLDER: set the release date when the build is cut]
 
-These changes are on the main branch. They are not yet in a published package.
+### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)
+
+[PLACEHOLDER: this section is drafted ahead of the build. Before it merges, resolve every
+line that starts with `[PLACEHOLDER` or `[PENDING`, then delete this paragraph. Heading
+and first-part names follow docs/release-process.md.]
+
 Each line names the pull requests it comes from.
 
-**What the next build adds**
+**What you can do now**
 
+- Read a company's masters as a list: voucher types (with their numbering
+  method), godowns, units, stock groups, or ledger groups, in pages. The book is
+  checked before and after the read. A book with very many masters is refused,
+  with the size named, rather than answered in part (#952).
+- Read closing stock per stock item at a financial year end (a 31 March): the
+  quantity and value of each item, whether inventory is integrated with the
+  accounts, and how many items have a negative closing quantity. The item
+  values are checked against Tally's own Stock Summary. Any other date is
+  refused. Only the year ending 31 March 2026 has been measured, on one
+  synthetic book (#980).
+- See what a party's unallocated amount is made of, from data the tool already
+  reads, and what that data cannot tell apart. Each bill now carries its own
+  date and credit period, and payable and receivable follow the sign of the
+  bill's balance (#945, #946, #957, #959, #961).
+- See what ComplyEaze Bridge keeps on this computer. `local_data_report` (and
+  `bridge_mcp --local-data-report` on the command line) counts files, bytes and
+  the age of the oldest file by kind, and gives the state of the import journal
+  and how many saved batches are not settled. It reads only: it changes and
+  deletes nothing, and it names no file path unless you ask on the command line
+  (#925).
+- [PLACEHOLDER: purchase register (#971). Add one plain sentence when it merges,
+  or delete this line if it does not make the build.]
+- [PLACEHOLDER: bill trail (#981), why a bill is open and what an unallocated
+  amount holds, party by party. Add one plain sentence when it merges, or delete
+  this line if it does not make the build.]
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
   line for line to Tally's own statement; otherwise it is refused, and the
   lines that differ are named. A book with stock items is expected to be
@@ -30,6 +59,12 @@ Each line names the pull requests it comes from.
   whose amount Tally stored in a foreign currency instead of refusing the
   whole date window. The desktop app follows the same read (#642, #647, #649, #715,
   #781, #824, #825).
+- Read a book too large for one read, in parts, including ledgers under parents
+  that cannot be named, and have the ledger count cross-checked against the
+  company's own count. A movement read names an oversized ledger catalogue and
+  refuses an unknown ledger before it reads any voucher (#679, #885, #891, #936,
+  #938, #939, #960).
+- Recognise SGST/UTGST as a GST duty head (#968).
 - A ledger read on a several-currency book, or one whose base currency is not
   INR, is refused before any request to Tally, instead of returning bare
   numbers (#751).
@@ -45,6 +80,26 @@ Each line names the pull requests it comes from.
   the tool's result is established; otherwise it is `not_established`, with
   the same `reason` as the nested result. This changes the tool's output; no
   figure, check or withheld line changes (#984).
+- [PENDING #914: keep this line only once #914 has merged, and then delete the
+  line about the documents upload below.] The unfinished document-sync code is
+  removed: the sign-in and the code that uploaded files you picked. After this
+  change the only network connection ComplyEaze Bridge's own code makes is to
+  Tally on the same computer. The published 0.3.0 package still contains that
+  code, though no tool of the extension reaches it (#914).
+- Every tool is refused until the Terms of Use are accepted, and the extension
+  carries a privacy policy (#943).
+- Each send to Tally is recorded in the local log with its place, kind, size,
+  outcome and time, and no book content (#918, #941).
+- ComplyEaze Bridge refuses to build or post a row that another batch already
+  sent to Tally (#876, #898).
+- A bank statement's result returns no amount except the figures you supplied
+  and an open cash line's amount, and names the saved proposals file by its id
+  alone (#848, #850).
+- The configured redaction also applies to ledger names in posting and
+  verification results (#851).
+- The native posting windows say ComplyEaze Bridge (#970).
+- Each package's build is attested, and the attestation is checked before it is
+  published (#923).
 - If you are slow at the approval window, the agent's call no longer waits
   on it. The agent is told the approval is pending and asks again. A click
   made while no call is waiting is posted by the next call, not one call later
@@ -71,6 +126,20 @@ Each line names the pull requests it comes from.
   marked destructive. Posting stays marked destructive, and no tool is marked
   as reaching outside this computer. `parse_bank_statement` had been marked
   read-only by mistake (#909, #921).
+
+**Known limits**
+
+- Stock: closing stock has been measured for one year end on one synthetic
+  book. A book with stock items is expected to be refused by Profit and Loss and
+  Balance Sheet, because no such book has been measured (#774, #980).
+- A book with very many masters is refused by `masters` for godowns, units and
+  stock groups, and how common that is across real books has not been measured
+  (#952).
+- `local_data_report` has not been run on a Windows host, and how it reports a
+  Windows junction is unverified. It does not cover the desktop app's other
+  settings, its database or its logs (#925).
+- [PLACEHOLDER: add the known limits of the purchase register (#971) and the
+  bill trail (#981) when they merge.]
 
 **Also in source**
 

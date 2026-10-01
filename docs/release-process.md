@@ -164,6 +164,29 @@ looked at in the review.
   master commit that added a pin is not reported as indeterminate. It also
   requires a review or comment that names the head commit, the acknowledgement
   path and every touched path. The `reviewer:` login must be that review's author.
+- **Branch history, in both checks.** The diff against the base cannot see a pin
+  the branch added and then lost, for example when a merge of master is resolved by
+  taking master's pin list: at the head the list equals the base's. So
+  `scripts/check-surface-ack.mjs` and `scripts/merge-gate.sh` also read the pin list at
+  every commit of the pull request and at each commit's parents (a merge is compared
+  with all of them, never the first only). A path that a commit pins and none of its
+  parents pinned, and that is in neither the base list nor the head list, counts as a
+  removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
+  pin must be restored. In an older commit only the paths matter, so both read them
+  leniently (valid JSON with a `files` array whose rows each have a path string); the
+  strict rules (sorted, unique, exact keys, schema) stay as they are for the list at
+  the head and at the base, so a branch is never stuck because an old commit had its
+  list out of order. Both fail closed on a shallow clone and on a commit whose list
+  cannot be read at all (the script fails, the gate is indeterminate). The CI step
+  blocks (it no longer runs with `--report-only`, so a finding fails the job), and the
+  merge gate blocks too. A pin that follows a rename inside the branch (one commit pins a new
+  file, a later one renames it and moves the pin) reports the old name as withdrawn:
+  declare it with one `removed-pin:` line for the old name. What these checks cannot
+  see: a pin lost in a rebase, a force-push, an amend or a squash before the push
+  leaves no history to read, and the merge group and the push to master each check one
+  squash commit, which has no branch history, so there the pull-request-time check
+  and the merge gate are the control. Only a stay-pinned guard test covers a rewritten
+  history, and only for the pins it names.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed
@@ -231,17 +254,17 @@ in the merge queue and on the push to master. A pull request that adds or remove
 pin without its acknowledgement fails, whatever else it edits.
 
 One narrower case remains. A branch adds a pin, and a later merge of master is
-resolved by taking master's pin list, which drops that pin. While the
-acknowledgement still names the pin, the check already fails: against the base the
-list no longer differs by that pin, so the acknowledgement "lists path(s) that are
-not changed pinned paths" (or, when nothing else pinned changed, "an ack was added
-but no pinned path changed"). It is silent only when the acknowledgement is also
-edited or deleted to match, or when history is rewritten (a rebase, a force-push or a
-squash before the push) so that no commit records the pin. Before the bound replaced
-the exact count, a reviewer comparing the constant with the pin count could notice
-that mismatch too; that signal is gone. So a review of a pull request that touches
-the pin list compares the list with the last reviewed head as well as with the base,
-and names any pin that was present at the last reviewed head and is gone.
+resolved by taking master's pin list, which drops that pin. The branch-history check
+(see "What checks it") catches that, including when the acknowledgement is edited or
+deleted to match: the pin counts as withdrawn, so the acknowledgement must declare it
+with a `removed-pin:` line, or the pin must be restored. It is silent only when
+history is rewritten (a rebase, a force-push, an amend or a squash before the push)
+so that no commit records the pin. Before the bound replaced the exact count, a
+reviewer comparing the constant with the pin count could notice that mismatch too;
+that signal is gone. So a review of a pull request that touches the pin list compares
+the list with the last reviewed head as well as with the base, and names any pin that
+was present at the last reviewed head and is gone, which is the only thing that sees
+a rewritten history.
 
 What remains of the old collision: two pull requests that insert a pin at the same
 sorted position still conflict in the pin list itself. Resolve it by keeping both

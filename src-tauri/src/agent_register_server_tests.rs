@@ -417,8 +417,8 @@ fn note_day_json(name: &str) -> Value {
 }
 
 /// Replays one recorded call and returns the tool's response and its observed requests.
-async fn replay_note_day(day: &str) -> (Value, Value, Vec<String>) {
-    let sequence = note_day_json(&format!("{day}_note_day_sequence.json"));
+async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
+    let sequence = note_day_json(&format!("{prefix}_sequence.json"));
     let requests = sequence["requests"].as_array().unwrap();
     assert_eq!(
         requests.len(),
@@ -465,7 +465,7 @@ async fn replay_note_day(day: &str) -> (Value, Value, Vec<String>) {
 
 #[tokio::test]
 async fn a_credit_note_day_replays_through_the_sales_register_with_the_signs_tally_sent() {
-    let (response, _, wrong) = replay_note_day("credit").await;
+    let (response, _, wrong) = replay_note_day("credit_note_day").await;
     assert!(wrong.is_empty(), "{wrong:?}");
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
@@ -529,7 +529,7 @@ async fn a_credit_note_day_replays_through_the_sales_register_with_the_signs_tal
 
 #[tokio::test]
 async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_tally_sent() {
-    let (response, _, wrong) = replay_note_day("debit").await;
+    let (response, _, wrong) = replay_note_day("debit_note_day").await;
     assert!(wrong.is_empty(), "{wrong:?}");
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
@@ -558,7 +558,7 @@ async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_t
     assert_eq!(row, &answer["result"]["items"][0]);
 }
 
-/// Every request file of `note-days/` is a request one of the two calls sent, and every request
+/// Every request file of `note-days/` is a request one of the three calls sent, and every request
 /// a call sent has its file: the record's fingerprints and the files' own bytes agree.
 #[test]
 fn the_note_day_request_files_are_exactly_the_requests_the_two_calls_sent() {
@@ -591,8 +591,12 @@ fn the_note_day_request_files_are_exactly_the_requests_the_two_calls_sent() {
         "no two request files are the same request"
     );
     let mut sent = BTreeSet::new();
-    for day in ["credit", "debit"] {
-        let sequence = note_day_json(&format!("{day}_note_day_sequence.json"));
+    for prefix in [
+        "credit_note_day",
+        "debit_note_day",
+        "cancelled_purchase_day",
+    ] {
+        let sequence = note_day_json(&format!("{prefix}_sequence.json"));
         sent.extend(
             sequence["requests"]
                 .as_array()
@@ -602,4 +606,29 @@ fn the_note_day_request_files_are_exactly_the_requests_the_two_calls_sent() {
         );
     }
     assert_eq!(on_disk, sent);
+}
+
+#[tokio::test]
+async fn a_cancelled_purchase_is_never_a_row_and_is_listed_with_its_cancelled_flag() {
+    // A cancelled voucher keeps no entries, so it has no Duties & Taxes entry and lands in the
+    // list of register-class vouchers without one, flagged, rather than among the rows. This
+    // is a Purchase read through the purchase register; a cancelled SALE is not measured.
+    let (response, _, wrong) = replay_note_day("cancelled_purchase_day").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 0);
+    assert!(result["items"].as_array().unwrap().is_empty());
+    assert_eq!(result["vouchers_observed"], 1);
+    let listed = &result["purchase_vouchers_without_duties_taxes_entry"];
+    assert_eq!(listed["total"], 1);
+    assert_eq!(listed["listed"][0]["voucher_class"], "Purchase");
+    assert_eq!(listed["listed"][0]["cancelled"], true);
+    // What the live call returned, side list for side list.
+    let answer = note_day_json("cancelled_purchase_day_answer.json");
+    assert_eq!(
+        listed,
+        &answer["result"]["purchase_vouchers_without_duties_taxes_entry"]
+    );
 }

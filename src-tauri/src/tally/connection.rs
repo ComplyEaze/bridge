@@ -900,7 +900,6 @@ pub struct TallyProbeResult {
     pub connection: ConnectionStatus,
     pub companies: Vec<TallyCompany>,
     pub profile: CapabilityProfile,
-    pub selected_read_scope: Option<SelectedReadScopeEvidence>,
     pub passport_snapshot_id: Option<String>,
 }
 
@@ -971,43 +970,6 @@ impl GatewayProductModeEvidence {
             capability,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SelectedReadScopeEvidence {
-    pub scope_version: u16,
-    pub ledger_profile_id: String,
-    pub voucher_profile_id: String,
-    pub voucher_from_yyyymmdd: String,
-    pub voucher_to_yyyymmdd: String,
-    pub scope_commitment_sha256: String,
-    #[serde(skip_serializing)]
-    pub(crate) parent_review_sha256: String,
-    #[serde(skip_serializing)]
-    pub(crate) company_guid_ascii_casefolded: String,
-    #[serde(skip_serializing)]
-    pub(crate) company_number: String,
-    #[serde(skip_serializing)]
-    pub(crate) books_from_yyyymmdd: String,
-    #[serde(skip_serializing)]
-    pub(crate) observations: Vec<SelectedReadCapabilityObservation>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SelectedReadCapabilityObservation {
-    pub capability_key: &'static str,
-    pub state: CapabilityState,
-    pub confidence: EvidenceConfidence,
-    pub safe_reason_code: &'static str,
-    pub result_bucket: &'static str,
-    pub request_sha256: Option<String>,
-    pub decoded_response_sha256: Option<String>,
-    pub response_encoding: Option<&'static str>,
-    pub company_context_verified: bool,
-    pub schema_verified: bool,
-    pub record_count_verified: bool,
-    pub identity_evidence_state: &'static str,
-    pub date_window_verified: bool,
 }
 
 #[derive(Clone)]
@@ -1362,7 +1324,6 @@ impl TallyClient {
                     features,
                     packs,
                 },
-                selected_read_scope: None,
                 passport_snapshot_id: None,
             },
             wire_evidence,

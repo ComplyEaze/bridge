@@ -4,6 +4,17 @@ use super::*;
 impl Server {
     pub(super) async fn outstandings(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
+        // The party detail (#945 slice C): parsed before any read, so a
+        // conflicting request costs nothing.
+        let party_argument = optional_string(args, "party")?;
+        let detail_argument = optional_string(args, "detail")?;
+        let reference_argument = optional_string(args, "reference")?;
+        let detail_request = super::bill_trail::parse_detail_request(
+            party_argument.as_deref(),
+            detail_argument.as_deref(),
+            reference_argument.as_deref(),
+        )
+        .map_err(|code| ToolFailure::from(code.to_string()))?;
         let (company, identity, mut result_evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
             let as_of = optional_string(args, "as_of")?
@@ -30,6 +41,7 @@ impl Server {
                 .map_err(|error| ToolFailure::from_runtime("company_currency_probe_failed", error))?;
             result_evidence = combine_evidence(result_evidence.clone(), evidence_from_runtime_read(currency.evidence()));
             let assertion = currency.admit_inr_classified().map_err(str::to_string)?;
+            let as_of_date = to.as_str().to_string();
             let (load, outstandings_evidence) = self
                 .runtime
                 .fetch_agent_outstandings_with_evidence(
@@ -96,10 +108,47 @@ impl Server {
                     statement_unallocated_by_party,
                     ..
                 } => {
+                    let mut detail = None;
+                    if let (Some(kind), Some(party)) = (detail_request, &party_argument) {
+                        let (value, detail_evidence) = self
+                            .outstandings_detail(
+                                &identity,
+                                &company,
+                                &as_of_date,
+                                party,
+                                kind,
+                                reference_argument.as_deref(),
+                                &statement_open_bills,
+                                &statement_unallocated_by_party,
+                            )
+                            .await?;
+                        result_evidence = combine_evidence(result_evidence.clone(), detail_evidence);
+                        detail = Some(value);
+                    }
                     let (mut figures, truncated) =
                         figures(statement_open_bills, statement_unallocated_by_party)?;
                     figures["state"] = json!("complete");
+                    if let Some(detail) = detail {
+                        figures["detail"] = detail;
+                    }
                     (figures, truncated)
+                }
+                // The bills a party detail is tied against are not the whole
+                // book's here, so nothing is tied and nothing is shown; the
+                // refusal keeps the read's own reason beside its code.
+                OutstandingsLoadResult::Partial { reason, .. } if detail_request.is_some() => {
+                    return Err(super::bill_trail::detail_requires_a_complete_read(
+                        reason.reason_code.clone(),
+                        Vec::new(),
+                    ));
+                }
+                OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }
+                    if detail_request.is_some() =>
+                {
+                    return Err(super::bill_trail::detail_requires_a_complete_read(
+                        crate::tally::CurrencyExclusions::PARTIAL_REASON.to_string(),
+                        exclusions.partial_reasons(),
+                    ));
                 }
                 OutstandingsLoadResult::Partial { reason, .. } => {
                     result_evidence.state = "partial";
@@ -227,15 +276,51 @@ pub(super) fn unallocated_totals_from_parties(
 ) -> Result<Value, String> {
     let mut receivable = "0".to_string();
     let mut payable = "0".to_string();
+    // The same gross amounts split by what the ledger data says about them
+    // (never "on account": see UnallocatedComposition). The two known
+    // compositions are always present; `composition_not_observed` appears only
+    // when a row carries none, so the parts always add up to the totals.
+    let mut by_composition = std::collections::BTreeMap::<&'static str, (String, String)>::new();
+    by_composition.insert("not_bill_wise_ledger", ("0".into(), "0".into()));
+    by_composition.insert(
+        "bill_wise_ledger_components_not_separated",
+        ("0".into(), "0".into()),
+    );
     for party in parties {
         let total = match party.direction {
             ExposureDirection::Receivable => &mut receivable,
             ExposureDirection::Payable => &mut payable,
         };
         *total = add_decimal(total, party.amount.as_str())?;
+        let key = match party.composition {
+            Some(UnallocatedComposition::NotBillWiseLedger) => "not_bill_wise_ledger",
+            Some(UnallocatedComposition::BillWiseLedgerComponentsNotSeparated) => {
+                "bill_wise_ledger_components_not_separated"
+            }
+            None => "composition_not_observed",
+        };
+        let entry = by_composition
+            .entry(key)
+            .or_insert_with(|| ("0".into(), "0".into()));
+        let part = match party.direction {
+            ExposureDirection::Receivable => &mut entry.0,
+            ExposureDirection::Payable => &mut entry.1,
+        };
+        *part = add_decimal(part, party.amount.as_str())?;
     }
     let gross_unallocated = add_decimal(&receivable, &payable)?;
-    Ok(json!({"receivable":receivable, "payable":payable, "gross_unallocated":gross_unallocated}))
+    let by_composition = by_composition
+        .into_iter()
+        .map(|(key, (receivable, payable))| {
+            (
+                key.to_string(),
+                json!({"receivable": receivable, "payable": payable}),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    Ok(
+        json!({"receivable":receivable, "payable":payable, "gross_unallocated":gross_unallocated, "by_composition": by_composition}),
+    )
 }
 
 struct PartyExposure {

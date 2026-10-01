@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945 and read back through Bridge",
+  "observed_date": "2026-10-01",
+  "requested_as_of": "20260630",
+  "source_response_bytes": 665150,
+  "source_response_sha256": "228f4d893b15fef8ed62b031699b5b5b805cbd632a14cb8bdd57e34c049c72e9",
+  "source_request_bytes": 1726,
+  "source_request_sha256": "9d22fc0632288429069535f9e4e9deacf71108f9d593c3325507efd1e76fafa3",
+  "request_rendered_by": "render_agent_vouchers(company, 20250401, 20260630, None) (the `vouchers` data request)",
+  "fixture_bytes": 665150,
+  "fixture_sha256": "228f4d893b15fef8ed62b031699b5b5b805cbd632a14cb8bdd57e34c049c72e9",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "20 vouchers: the 19 seeded by W2-W4 and the two-party journal W5; every allocation, ISCANCELLED and ISOPTIONAL field as Tally returned them. Sent with a 768 KB cap (an earlier attempt with a 160 KB cap was cut off and stored nothing).",
+  "provenance_limit": "One synthetic book on one build, seeded by this project over raw import (15 ledgers, 20 vouchers), so the capture shows how Tally stores and reports those shapes; it is not evidence about a client's book. Sent once under a size cap; the response is unmodified.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUIDs; no party, person, GSTIN, address or credential."
+}

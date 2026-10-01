@@ -8,7 +8,7 @@ The developer configuration below remains for supported client integrations.
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
 parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the two limits under *Approved voucher posting* below;
+off by default because of the three limits under *Approved voucher posting* below;
 the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
 separate native approval for each new attempt. Command-line installations
 retain explicit environment switches.
@@ -18,6 +18,17 @@ Build and run it with Rust 1.96:
 ```sh
 rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
 ```
+
+Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
+(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
+is on, Bridge appends a line per terms version (version, time, source) to
+`terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
+can each add one), and refuses if that file cannot be read or written. This is a local
+record that the gate opened, not a security boundary and not proof of who accepted, when
+they ticked the box, or which text they saw. A value of `true` set by hand names no
+version, so it also opens the gate for a later terms version: re-read the Terms whenever
+the version changes.
 
 Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
@@ -33,7 +44,8 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` masks party names
-and `drop_narration` drops narration. Neither setting removes amounts. Set the
+(in `stock_summary` it also masks stock item names and stock-group parents; GUIDs
+and Tally's reserved root stay plain) and `drop_narration` drops narration. Neither setting removes amounts. Set the
 environment variable before launch when that better fits the workflow.
 
 On Unix, new data directories use mode `0700`; an existing data directory
@@ -54,23 +66,57 @@ Claude Desktop example:
   "mcpServers": {
     "bridge-tally": {
       "command": "/absolute/path/to/bridge_mcp",
-      "env": {"BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
+      "env": {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
     }
   }
 }
 ```
 
-Cursor uses the same server object in `.cursor/mcp.json`:
+Cursor uses the same server object in `.cursor/mcp.json`, with the same
+`BRIDGE_TERMS_ACCEPTED` setting:
 
 ```json
-{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp"}}}
+{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `profit_and_loss`,
-`balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. For a command-line
+`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
+`stock_summary`,
+`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
+`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
+`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` are in
+source but not in the 0.3.0 release.) `local_data_report` (also
+`bridge_mcp --local-data-report [--show-paths]` on the command line) is a
+read-only report of what Bridge keeps in its agent data folder: per class
+(journal, import files, proofs, review records, approval notes, bank
+statements, the egress log, lab files, lock files, other) the file count, bytes
+and the age in days of the oldest file, symlinks it did not follow, sockets
+and other special files it did not count, folders it could not list (named, not
+read as empty), and the import journal's state: batches, batches sent or found
+posted, how many of those are not settled (with no recorded response, or with a
+response but a latest status that is not `posted_verified`: a post Tally
+rejected stays not settled), batches with no recorded dispatch that were never
+found posted (`no_dispatch_never_verified`: this includes a batch imported by
+hand whose verification is incomplete, which may well be in Tally, so no
+deletion may rest on it), and interrupted-write folders that Bridge must recover
+before it builds or reads. A journal it could not read is reported as
+`journal_unreadable` (could not be opened), `journal_read_failed` or
+`journal_invalid` (refused twice, 100 ms apart), never as absent. It reads the
+journal without the admission lock, names no file path (the command line adds the
+folder paths only with `--show-paths`), and does not cover files outside this
+folder (the desktop app's other settings, its mirror database and logs); it also
+lists the per-user folder of dispatch lease locks (names, sizes and times only).
+Its own call is logged in the egress log like any tool call. On the command
+line the exit status is 0 for a complete report, 2 when the folder cannot be
+read, 3 when the report is incomplete (journal not read, an entry or folder
+that could not be read or listed, or a folder past the 100,000-entry listing cap:
+the report's `incomplete_reason` says which, and the tool's evidence is then
+`partial`), 1 when it could not be printed, and, for a malformed command line
+only, 2 with a usage line. The journal and the
+`imports/` folder are Bridge's memory of what it
+already sent to Tally: archive the whole folder by moving it, never delete
+them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -114,13 +160,34 @@ under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 1
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
 `unsupported_parent_ledgers`, the number of ledgers and no name) or a repeated ledger GUID
 (`parent_partition_duplicate_ledger_identity`). These carry no `size` object. The extent bracket still checks the book afterwards, so a book that grows between the
-count and the last read is refused, but only after those reads were sent. A mark above 22,857 is
-refused right after the opening extent with cause `ledger_catalogue_too_large` and a `size`
-object (`master_alter_id`, `estimated_bytes`, `limit_bytes`): the catalogue that would count the
-book could pass the transport's response cap, and a response past the cap is cut off mid-read. The
-mark is an upper bound on ledgers, since every master raises it, so a company with fewer ledgers
-may be refused. The limits are unverified against a live Tally beyond a two-parent filter;
-`fields=basic` still reads any of these books.
+count and the last read is refused, but only after those reads were sent. A mark above 22,857 has
+its ledgers counted by AlterID span instead of by catalogue (#679): one read per slice of at most
+4,000 AlterIDs over `(0, mark]`, each asking for the ledgers' GUIDs only and made once, not paired,
+so a mark of 316,028 is 80 requests of about 0.15 s each. The census is bounded by the same extent
+bracket as every other read. A slice holding more ledgers than its span (`ledger_span_slice_over_bound`),
+a GUID seen twice (`ledger_span_duplicate_identity`), no ledger at all (`ledger_span_census_empty`:
+an empty slice is the answer a closed or absent company gives too) or a slice past the response
+limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
+read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
+would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. After the
+slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
+(`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
+higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
+company or held something other than a plain number; a count that is equal, lower or absent never admits
+or sizes anything, and the
+result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
+`company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
+on three books only (one synthetic with its answer captured in the tree, two real books read by
+another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+against the rows the read returns, not by this check. A mark
+above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
+`size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
+census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
+estimated past `limit_bytes`; a response past the transport's cap is cut off mid-read. The mark is an upper bound on ledgers, since every master raises it, so a
+company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
+two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
+these books.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
@@ -148,6 +215,17 @@ milliseconds, and the kind of the request that failed; the last 64 parts listed 
 counted), taken by whitelist. For a JSON-RPC error, whose message is its code, it keeps that code. So a call that ended after the client had
 timed out can be diagnosed without sending it again (bridge#799). The message and every other
 field are dropped; no row content, name or narration is kept.
+A call that sent requests to Tally also keeps a `request_trail` in that record (bridge#918): for
+each of the last 32 sends (the rest counted, and so are the sends that failed), its place in the
+call, its kind (`post` or `status`), the request's size, an outcome code (`answered`, the transport
+error's code, or `send_abandoned` when a cancelled call dropped it), the response's size, and the
+milliseconds the send held the endpoint's lock, so a failed read says which request failed. It
+holds no request or response body, name or value, and no hash of either (a request names the
+company, so a hash of it would let a reader who holds a guessed name confirm it). The request's
+exact size remains, so it shows a company name's length to a reader who holds the request template.
+A request that cannot be built (over the size cap) sends nothing and leaves no record, and a call
+cancelled before its post was dispatched leaves no trail in its receipt. To match a failure with
+`read_evidence`, use the place in the call and the receipt's time.
 After `write_all` and `flush` succeed, it appends a `stdio_write_completed` record
 with the same ID and response hash plus `bytes_written`. This confirms the local
 stdio write, not consumption by the client. A missing completion leaves delivery
@@ -212,6 +290,223 @@ company, mode and extent checks detect observed changes, but do not prove an
 atomic snapshot or voucher-level reconciliation. Keep the company quiet during
 reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 
+### Masters
+
+Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
+`units`, `stock_groups` or `groups`. It lists a company's masters of that
+kind, for example a voucher type's numbering method (`automatic`, `manual` or
+`default`, as Tally reports it) and its `active` and `optional` flags. Each row
+carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
+`decimal_places` and `simple`. A `groups` row carries `name`,
+`parent` and `reserved_name` only, as the group snapshot returns them, and a
+parent that is Tally's reserved root keeps its marker form, as in
+`trial_balance`. Alias names are not returned.
+
+The read runs inside the same company, mode and identity brackets as
+`trial_balance`, with the book extent read before and after (they must be
+equal) and the collection read twice and compared. Education mode is refused.
+`offset` and `limit` restrict output, not the source read; a first page holds
+its read in memory and a later page continues from it while the extent is
+unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
+`trial_balance` does.
+
+Godowns, units and stock groups are read whole only when the master-alteration
+mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
+mark counts the masters of every kind, so a book with few of this kind can be
+refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
+1,160 for stock groups; a larger book is refused before any collection request
+as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
+read at). Retrying refuses again. Both stock-heavy client books measured, with
+marks of about 100,000 and 300,000, refuse these three kinds; how common such
+marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
+before the read: voucher types keep the policy of Bridge's other voucher-type
+read, and groups that of the group read `profit_and_loss` and `balance_sheet`
+make.
+
+The size rests on premises that are checked after the read, not assumed. For
+every kind but `groups`, each row's length is checked against the assumed
+worst-case row (`masters_row_exceeds_bound`), and the rows, their AlterIDs and
+the response size (each collection is read twice, and the size check runs after
+both reads) are checked against the mark and the admitted size: more rows
+than the mark, an AlterID above it, a repeated AlterID or an oversize response
+refuses the whole read as `masters_bound_premise_violated`, unless the closing
+extent shows the book moved, which is reported instead
+(`masters_extent_changed`). A response Bridge cannot read refuses at once with
+a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
+answer with no rows refuses as `masters_voucher_types_empty`, because every
+company has predefined voucher types; the other kinds may answer with none.
+
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
+(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+`Default`, `Automatic` and `Manual` are the only numbering methods observed; any
+other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
+`default` is Tally's reported value, not evidence that a type numbers
+automatically. The company's voucher-type count (`NUMVOUCHERTYPES`) did not
+equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book it
+equalled the number-series count (inferred to count series, unmeasured), so the
+rows are not checked against it. The completeness of the voucher-type list is
+unverified: absence from it is not evidence that a voucher type is absent from
+the book. The size bound rests on assumed limits (128
+characters a name, four aliases a master) that no capture has measured; a row
+that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
+hints (the company's `NUM*` fields), stock items or writes are part of this tool.
+
+Under `mask_parties`, godown and stock-group names and their `parent` values
+are masked like a party name, because a job-work godown or a supplier-named
+stock group can carry a party's name; Tally's reserved root as a parent is a
+fixed marker and is left as it is. Voucher-type, unit and account-group names
+are not masked: they are configuration labels, not counterparties.
+
+### Stock Summary
+
+Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
+the closing stock value per stock item, with the total of those values checked
+against Tally's own Stock Summary, and whether inventory is integrated with the
+accounts. `as_of` must be a 31 March (a
+financial-year end), the only date measured for stock, and not before the book's
+start or after today. Any other date is refused as
+`stock_summary_as_of_not_measured` before any request, and retrying the same date
+refuses again. The only period measured is the period ending 31 March 2026
+(FY 2025-26); other years' 31 March share its request shape but not its
+measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
+or the book's start if that is later.
+
+A row is returned only when a check ran and held. The top-level `state` is one of
+three values:
+
+- `value_total_matched`: the items are returned. Their closing values add up to
+  the sum of the top-level lines of Tally's own Stock Summary, and only that total
+  was compared.
+- `no_stock_items`: Tally's own stock item count is 0, the item list is empty and
+  the Stock Summary is empty. `items` is an empty list.
+- `not_established`: no item is returned (`items` is `null`). `reason` says why and
+  `remediation` says what to do next:
+  - `tally_stock_summary_differs`: the report has a total the items do not add up
+    to.
+  - `tally_stock_summary_shows_no_value`: the items carry a value and the report
+    came back with no amount. An empty report is not told apart from one Tally did
+    not render, so this is not called a contradiction.
+  - `stock_values_not_comparable`: nothing could be compared (no item has a closing
+    value and the report shows no amount or a total of zero, or the values add up
+    to zero and the report shows no amount). Values that add up to zero against a
+    report total of zero are a match.
+
+A `not_established` result carries `unchecked_comparison` in place of `tie_out`:
+its `state`, and what each side of the comparison that did not hold added up to
+(`items_closing_values_added`, and `tally_stock_summary_lines_added` when the
+report had a total). Nothing checked them: the closing-value total of a matched
+read is the only thing `stock_summary` checks, and `checks` says so field by
+field. They are for investigation only (`use` says so); neither is a stock value
+or a total, and the items' side adds only the closing values present.
+
+**Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
+`checks` says per field what is `checked`, `not_checked` or `withheld`: the
+closing-value total is checked; each value on its own, the names, parents and base
+units, whether the date was honoured and whether the item list is complete are
+not; the closing quantity is withheld. A quantity Bridge could not read (a compound
+unit, or a unit with a space in it) is counted in
+`totals.closing_quantity_unread_count` and does not refuse the read.
+
+Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
+holds `value` only (a plain signed decimal exactly as Tally sends it: the sign is
+kept and never flipped). It is `null` where Tally sent none,
+which is not zero, and is counted in `totals` (`empty_closing_value_count`); a
+value Tally sent as `0.00` is a value. The opening quantity and value are read but
+not returned, because their as-at date is unmeasured.
+
+**The sign of a value.** Values keep the sign Tally sends, as in the Trial
+Balance: **a negative value is a debit, which is stock held**, and Tally's own
+Stock Summary screen shows it as a positive value. A positive value is what that
+screen shows as negative, `(-)`. So ordinary closing stock is a negative number
+here, and `value_sum` adds the values with those signs: stock held gives a
+negative sum. `totals.value_sum_signs` is always `as_sent_negative_is_debit`
+beside it, whether or not `value_sum` is null. This was measured on one synthetic
+company on licensed TallyPrime 7.1 Silver against Tally's own screen (the protocol
+reference, §12a.13). The committed captures come from a synthetic book most of
+whose values are positive on the wire, that is, values Tally's screen shows as
+negative.
+
+`totals` also holds `item_count` and `value_sum`, which
+is written at the scale of the values it adds and is `null` with `partial` true
+whenever any item's closing value is empty. `inventory`
+reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
+and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
+that these are the stock items' closing values exactly as Tally sends them, that
+how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
+measured, and that the values of all the company's items (not only those on the
+page) add up to the report's total, the only thing compared.
+
+`tie_out` compares the sum of the items' closing values with the sum of the
+top-level lines of Tally's own Stock Summary. It compares the grand total only, so
+`value_total_matched` can stand beside `partial: true` when some items have no
+closing value, and a match needs at least one value on the items' side and a total
+on the report's.
+
+An item valued at zero or with no value adds nothing to either total, so only
+Tally's own stock item count vouches for it. That count followed the one delete
+measured (one synthetic company, one sample: the protocol reference, §12a.13),
+which is not proof of a complete list, so `checks.item_list_complete` is
+`not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`
+`matched`: items are returned only when the two are equal. A read whose rows differ
+from Tally's count, either way, is refused as `stock_summary_item_count_differs`,
+with both numbers under `counts` and the next call in `remediation`: with fewer
+rows the list may be incomplete, and with more rows the count is not counting the
+list Bridge read. A count
+Tally did not give (missing, empty or not a number; never read as zero) refuses as
+`stock_summary_read_failed` with cause `stock_item_count_unavailable`. A Stock
+Summary answered without the report refuses with cause `stock_report_unknown`;
+Bridge cannot tell why Tally did so. None of these three asks for a retry: every
+source was read twice and the book's extent was the same before and after.
+
+`items` (one to fifty GUIDs) filters the returned rows from the held read; a GUID
+that is not found is listed under `items_not_found`. `totals`, `tie_out` and
+`item_count_cross_check` always cover the whole book. A `not_established` result
+or a refusal is not held, and it replaces any earlier read of the same date. On a
+later page (offset > 0) without a `snapshot_id`, the call reads afresh when
+nothing is held or the book moved; with one, it is refused
+as `listing_snapshot_changed` (cause `snapshot_not_held`, or
+`book_changed_since_first_page` when the book moved). A first page always reads
+afresh.
+
+The read runs inside the same company, mode and identity brackets as `masters`:
+the company's inventory flags (a Company collection filtered to the company's GUID),
+the stock items and Tally's Stock Summary are each read twice and compared, the book
+extent is read before and after and must be equal, and Education mode is refused.
+A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before any
+item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
+`limit`, `snapshot` and `snapshot_id` behave as in `masters`.
+
+Small books only. The items are read whole only when the master-alteration mark
+(`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
+a mark of at most 874. A larger book is refused before any item request as
+`stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
+today (the two measured had marks of about 100,000 and 300,000, protocol reference
+§12a.12), until a counted read lands. After a read, the row count and the response
+size are checked against the mark and the admitted size, and a breach refuses the
+whole read as `stock_summary_bound_premise_violated`, unless the closing extent
+shows the book moved (`stock_summary_extent_changed`). The stock-item request does
+not fetch `ALTERID`, so the rows' AlterIDs are not checked as they are for `masters`.
+
+Evidence: one synthetic book on one licensed TallyPrime 7.1
+(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`,
+protocol reference §12a.13), and the tie once on a client book. The size bound
+rests on the same assumed limits as `masters` (128 characters a name, four aliases)
+and a fixed-size allowance for a row that one synthetic book has measured. No
+quantity, no godown or batch split and no rates are returned. A book in which no
+item has a closing value returns no item today; it waits for a capture of such a
+book.
+
+A company split by year, whose sibling companies share the GUID, is refused: the
+company-flags read requires exactly one Company row for the GUID
+(`company_flags_not_one_row`).
+
+Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
+because stock-item and stock-group names are free text that can carry a customer's
+or supplier's name; Tally's reserved root as a parent is a fixed marker and is left
+as it is. `guid` is not masked and is the identity the `items` filter uses.
+
 ### Profit and Loss and Balance Sheet
 
 `profit_and_loss` and `balance_sheet` take the same `company_guid`, `from` and
@@ -247,6 +542,12 @@ too (#692).
   `closing_stock_not_derivable_from_trial_balance`,
   `profit_and_loss_ledger_not_returned`, `tally_balance_sheet_differs`, and for
   gross and net `tally_profit_and_loss_differs`.
+- **Top-level state.** `result.state` is `observed` only while this tool's
+  result is established (`profit_and_loss`: both `gross_result` and
+  `net_result`; `balance_sheet`: `carried`). Otherwise it is `not_established`
+  and `result.reason` carries the same reason code as the nested result; the
+  weaker result decides. It was always `observed` before (#984). No figure, gate
+  or withheld line changes.
 - **Limits.**
   - The gates are what catch what the Trial Balance cannot see, such as stock
     valued from stock items. No inventory book has been measured; one is
@@ -293,6 +594,18 @@ or immediate parent groups. A missing opening keeps both opening and closing
 unestablished, including at book start. Qualification covers the recorded account
 groups and instances; it is not a claim of universal ledger-report parity.
 
+`ledger_movement` reads the book's whole ledger catalogue twice, once before the
+voucher window and once after it, whatever `ledger` names. Each catalogue read is
+sent once: a read that outlived its deadline is not sent again, because the
+gateway may still be building the abandoned response. A catalogue read that
+outlives the deadline or passes the response cap refuses with
+`ledger_movement_read_failed` and the cause `movement_catalogue_deadline_exceeded`
+or `movement_catalogue_too_large`. The catalogue lists every ledger in the book, so
+it does not shrink with the voucher window and narrowing `from` and `to` is not
+known to help; the refusal's remediation says so. A
+`ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
+after it, before any voucher is read.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after
@@ -335,6 +648,67 @@ If discovery rejects company identity fields, `tally_status` reports the profile
 refusal reason and partial evidence with the completed source commitments. A
 valid empty collection remains distinguishable from invalid discovery.
 
+### Purchase register (`purchase_register`)
+
+Lists the Purchase and Debit Note vouchers of a date window that touch a ledger
+under Duties & Taxes (#969), and says per entry what the books record. Nothing is
+posted and nothing is inferred. It is a register of the books, not a GST return:
+it does not decide input tax credit eligibility or blocked credit, matches
+nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
+only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+classify an item invoice's purchase as taxable, and never sums tax across heads
+or vouchers.
+
+- **Rows are selected by the ledger, not the voucher type.** A voucher is a
+  candidate when one of its entries is on a ledger whose nearest predefined
+  group is Duties & Taxes (by its `RESERVEDNAME`, so a renamed group or a user
+  sub-group still counts). Purchase and Debit Note are the register. Every
+  other voucher type that touches those ledgers (Sales, Journal, Payment) is
+  listed apart in `other_voucher_types_touching_duties_taxes` with exact counts:
+  whether such a voucher belongs in a return is the CA's call, not the tool's.
+  A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
+  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
+  returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
+  masters and the window, so rows can shift between pages); every ledger name in every list is
+  masked when parties are masked, the same way `vouchers` masks it.
+  A Debit Note can be a purchase return or a debit note issued to a customer, and a GST duty head
+  does not say whether a ledger is input or output, so each row carries `party_group` (the party's
+  predefined group, such as Sundry Creditors or Sundry Debtors) and the tool does not guess which it
+  is. Reverse-charge journals, imports and input service distribution get no special treatment.
+- **Tax comes only from the GST duty head on the ledger master.** An entry on a
+  ledger with a recognised head is listed in `tax_in_books` as
+  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
+  assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
+  ledger whose own tax type is not GST (usually TDS or another payable), and
+  `absent` is a ledger with no head whose tax type is GST or was not reported,
+  which may be a GST ledger whose head is missing (`tax_type` is returned).
+  An entry whose head is not in the recognised vocabulary, or contradicts the
+  ledger's tax type, is listed with its raw spelling in
+  `duties_taxes_entries_with_unrecognised_head`. No name is ever matched and no
+  amount is ever used to decide a head.
+- **Amounts are as the books state them** (negative is a debit), never
+  re-signed from the deemed-positive flag and never summed across heads. There
+  is no direction field and nothing is called input credit.
+- **Other fields.** `reference`, `party_gstin`, `is_invoice` and `post_dated`
+  follow `vouchers` (absent means not observed). Cancelled, optional and
+  post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
+  returned yet.
+- **Snapshot binding.** The ledger masters are read before the window (and the
+  window is planned against their marks), the company's marks are read again
+  after it, and the masters are read a second time and must classify exactly as
+  the first read did, because whether a duty-head change, a re-parent or a
+  delete moves the master mark is unmeasured. A difference refuses as
+  `voucher_window_changed_during_read` or `ledger_snapshot_drifted` and releases
+  no rows. A voucher that names a ledger the masters do not list refuses the
+  same way; one the compliance read set aside for its currency refuses as
+  `register_ledger_currency_excluded`.
+- **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
+  in an inventory allocation (`taxable_entries` may be empty for them); books
+  with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
+  post-dated voucher in the captures the tests use. The captures are one
+  synthetic lab book and one month.
+
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a
@@ -356,10 +730,46 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
   `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
   voucher screen), because each of them sums, matches or verifies amounts.
 
+### Bill allocations in voucher reads
+
+Each ledger entry's `bill_allocations` lists its typed allocations: `reference`
+(`{"kind": "named", "name": ...}` or `{"kind": "on_account"}`), `bill_type` and
+`amount`. Since #945 an allocation also carries the bill's own date and credit
+period when Tally sends them (New Ref and Agst Ref allocations do):
+
+- `bill_date` is the bill's date (`YYYYMMDD`), which for an Agst Ref is the
+  original bill's date, not its voucher's. A malformed date refuses the read
+  (`bill_allocation_date_invalid`).
+- `credit_period` is `{"value": 30, "unit": "days"}` (units `days`, `weeks`,
+  `months`). A text that is not one of those (including `10000 Days`, above the
+  measured ceiling) is carried as `{"unit": "unrecognised", "text": ...}`, the
+  text cut to 40 characters (characters, not bytes) with `"truncated": true`
+  when it was cut. It is never read as a number of days and does not refuse the
+  window.
+- An element that is absent or empty is not observed: the key is omitted. It is
+  never `""` or a zero period. The On Account allocations in the live captures
+  carry no such element, or an empty one; if Tally sent a value it would be
+  carried like any other.
+- The unrecognised credit-period text is the only new free text from the book in
+  the output. (The allocation's `reference.name`, the voucher's narration and
+  party were already there.)
+- Like every other scalar the parser reads, a repeated `BILLDATE` or
+  `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
+  refuses the read as a protocol error (`agent_read_protocol_invalid`). So does a
+  malformed `BILLDATE`. Both reach every reader that shares the voucher parser,
+  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
+  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  screen. Write-side verification is not affected, because its fetch names no
+  allocation fields.
+- An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
+  if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
+  name, it refuses the read (`bill_allocation_field_missing`).
+
 ## Voucher-file preparation and verification
 
-The MCPB extension exposes `verify_import` by default as a read-only recovery
-tool, and `build_import_xml` by default because it always sets
+The MCPB extension exposes `verify_import` by default as a recovery tool (it
+reads Tally, saves local proof files and writes nothing to Tally), and
+`build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
 Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
@@ -396,8 +806,10 @@ The four rest on different observations, and each build reports its own in
   Account, and a build that names a counterparty warns so.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file, and only an unnumbered single-voucher
-`Journal` batch is eligible for native posting.
+licence mode, or manually imported file. In the MCPB extension an unnumbered
+Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
+per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
+that turns that on.
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -473,7 +885,8 @@ Positive historical readback remains available on an unqualified profile.
 A failed profile probe remains a read failure.
 
 Safety boundary: local loopback only, bounded responses, verified company tuple
-selection, append-only receipts, and separately approved Journal dispatch. Unsupported:
+selection, append-only receipts, and separately approved Journal, Payment, Receipt or Contra
+dispatch. Unsupported:
 Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
 not live-Tally qualification or a claim that every Tally configuration or
@@ -482,9 +895,9 @@ licence mode has been qualified.
 ## Approved voucher posting
 
 **Voucher posting is off by default in the MCPB extension** while three known
-limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/lamemustafa/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/lamemustafa/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/lamemustafa/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/lamemustafa/bridge/issues/579), [#582](https://github.com/lamemustafa/bridge/pull/582)).
+limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)).
 The saved batch file is now checked byte for byte against the approved record
-before posting ([#575](https://github.com/lamemustafa/bridge/issues/575), fixed).
+before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
 **Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for
 users who accept those risks. Existing
 saved settings are respected, so an installation that saved the earlier default
@@ -519,8 +932,11 @@ for the user. That client permission does not approve an accounting entry.
 
 One native-approved Journal and restart reconciliation have been observed on
 macOS against a synthetic Silver 7.1 instance. This remains a preview: Windows
-interactive approval and native posting on Gold or Education have not been
-established. What has been observed on licensed 7.1 Gold is `verify_import`
+interactive approval and native posting on Education have not been established.
+Native posts on licensed 7.1 Gold were captured once, in one session on a
+development build and one client book, with the approval step not recorded
+([reference](../tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)). Also
+observed on licensed 7.1 Gold is `verify_import`
 returning `posted_verified` for Bridge-built Payment, Receipt and Contra files
 sent over the gateway by a script rather than by this tool. That was verified
 on one book, and partial on a second where larger reads failed (bridge#485); see
@@ -664,7 +1080,9 @@ its separate checks cannot lock out Tally UI edits or other importers. Concurren
 external changes are outside this preview's validated posting workflow.
 
 Cancel, client disconnect, or the two-minute approval timeout ends the pending
-approval. If dispatch has already begun, cancellation cannot undo Tally's
+approval. (The tool call itself returns "approval pending" after about 40 seconds
+and the dialog stays open (for up to the two minutes); calling `post_import`
+again with the same batch waits on that same dialog.) If dispatch has already begun, cancellation cannot undo Tally's
 work. A timeout, crash, malformed response or incomplete readback requires
 `verify_import` on the **same original batch**. Once dispatch intent exists,
 `post_import` only reconciles and never resends, including after process restart.
@@ -870,9 +1288,120 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
-`unallocated.totals` contains `receivable`, `payable`, and `gross_unallocated`.
+`unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
+`by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
 been removed. Gross exposure is not net money due.
+
+Each `unallocated.parties[]` row says what the ledger data can and cannot say about
+its amount, without reading vouchers (#945). `ledger_bill_wise` is the ledger's own
+`ISBILLWISEON`, written from the `composition` that carries it so the two cannot
+disagree. `opening_balance` is the ledger's own opening as of the start of the books
+(not the current year's), shown and never interpreted; it is absent when Tally sent
+an empty element, which is unknown and not zero. It keeps Tally's sign (a debit
+opening is negative) while `amount` is a magnitude and `direction` says which side.
+`composition` is `not_bill_wise_ledger` when the ledger's bill-wise flag is off (it
+keeps no bills; seen on one ledger that never had bills, while a flag switched off
+after bills existed is unmeasured, and the flag is read as of the read, not of
+`as_of`) and `bill_wise_ledger_components_not_separated` for what is left on a
+bill-wise ledger after its named bills: on-account entries, an opening balance not
+allocated to a reference, notes with no reference and anything else all land there
+and are not told apart, because the bills reports carry none of them. No unallocated
+figure is labelled on-account. Advances and credit or debit notes kept as their own
+bills are in the bills, not here.
+
+`unallocated.totals.by_composition` splits the gross by composition, receivable and
+payable apart, over every party in the requested direction before paging, so its
+parts add up to the totals. A row saved without a composition (older saved data)
+counts under `composition_not_observed`, which appears only when such a row exists.
+Each row is about 100 bytes wider than before, so under a byte cap a page can now
+hold fewer rows and `next_offset` can move; no figure changes.
+
+`outstandings` also takes `party` (a ledger name) with `detail`, which adds a `detail` object for
+that one party, tied to the same as-of (#945). Without them nothing changes, and passing `detail`
+is the request to read the company's vouchers from the start of the books (below). `detail:
+bill_trail` (optionally with one `reference`) lists every allocation of each of the party's bills
+in vouchers that are neither cancelled nor optional (those are skipped, as Tally's own reports
+skip them), oldest first, each with its own bill date, and gives each bill a state: `tied` (the
+signed allocations equal Tally's own balance for that bill, or zero for a bill the report no
+longer lists), `trail_does_not_tie` (both numbers shown) or `bill_identity_ambiguous` (more than
+one native row or bill date for one reference, or one native row dated differently from the
+allocations; nothing is merged, and the native dates are shown). Naming a `reference` that Tally's
+bills reports list starts the window at the earliest date they list for it, so allocations dated
+earlier are not read (a reference they do not list is read from the start of the books): a
+reference that carries two bill dates over the whole history, and is ambiguous there, can tie
+when named. The detail's own `state` is `bills_listed`, or, for an empty list,
+`not_bill_wise_ledger` (the ledger snapshot says the ledger keeps no bills) or
+`no_named_bill_for_party` (no voucher read allocates a named bill on the ledger and Tally lists
+none for it; a ledger that keeps no bills, one that is not a party's and a party with no bills are
+not told apart).
+
+`detail: unadjusted` lists the party's on-account, advance and pending credit or debit note
+allocations and compares the on-account sum with the party's unallocated amount. `tied` there
+means the two figures are equal, not that the composition is proven: components that net to zero
+are not seen. `residual_not_explained_by_vouchers` gives the difference and whether it equals the
+ledger's opening balance, as a fact and not a label. `no_residual_row_for_party`, with `residual`
+null, means Tally's ledger snapshot lists no unallocated amount for the ledger (a zero residual, a
+ledger that is not a party's and a name that matched no row are not told apart), so nothing is
+tied; `not_bill_wise_ledger` lists no rows. Its rows carry `row_amounts: as_allocated`: each
+amount is the allocation as it was made, never net of what later allocations adjusted against its
+reference, so an advance shows what was received, not what is left. What is still open on an
+advance's or a note's reference is Tally's own `native_balance` beside the row, from its bills
+reports at the same as-of. It is null in two different cases, told apart only by `native_rows`: 0
+means the reports do not list the reference, and 2 or more means they list it more than once, so
+no balance is chosen. No captured book shows how Tally records a later adjustment of an
+advance, so no netting is built on one. Either kind is `window_returned_no_vouchers`, with nothing
+tied or listed, when the voucher read returned no voucher: unlike `vouchers`, the detail does not
+corroborate an empty read.
+
+The detail reads the whole company's vouchers from the books' beginning (or from the earliest
+date Tally lists for the named bill, when it lists one) to `as_of` and keeps the entries on the party's own ledger,
+so its cost is that of a `vouchers` read over the same span. That cost is unmeasured on a large
+book, and any refusal of that read fails the whole `outstandings` call: one foreign-currency
+composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
+`bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
+every window read is. It may send at most 128 data requests (each sent twice, as every read is, with its
+census and the company marks besides), and before anything is measured a data request holds at
+most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
+refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
+data request when the census shows it (the census stops as soon as it has counted more vouchers
+than the allowed requests can hold), and otherwise when a measured part does, as
+`trail_window_too_large` (name a `reference` that `open_bills` lists for the party; the read then
+starts at that bill's date), `named_bill_window_too_large` (a reference was named already, so
+nothing narrows it further) or `unadjusted_window_too_large` (nothing narrows it, so it is not
+available for that party on that book). Either refusal carries `reads.needed_at_least` against
+`reads.allowed`, and `window` lists any part already read. It needs a complete read
+(`detail_requires_a_complete_read`, with the read's own `partial_reason` beside it), and refuses
+rather than cuts an answer of more than 500 allocations: `trail_too_large` for a bill trail (name
+a `reference`) and `unadjusted_detail_too_large` for the unadjusted detail (nothing narrows it, so
+the detail is not available for that party; its vouchers can still be read with `vouchers` and
+`ledger`, untied). That limit counts allocations, not bills, so bills Tally lists that no voucher
+allocates to (opening bills) are not counted by it, and a party with very many of them can meet
+the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
+nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
+`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
+vouchers in the window, not the party's. A named bill's window never starts before the books.
+The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
+between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
+allocations that net to zero, can still read `tied`. Measured on one synthetic book only
+(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
+measured.
+
+`receivable` and `payable` follow the sign of each bill's balance, as Tally's own
+Bills Receivable and Bills Payable reports scope them, not the type of party, and
+those reports carry no bill type. A customer's advance, or a credit note raised to
+a customer, appears under `payable`; a supplier's advance, or a debit note raised
+to a supplier, appears under `receivable`. That holds for an advance or a note
+kept as its own bill: an on-account advance goes to `unallocated` instead, and a
+credit note set against an open invoice reduces that invoice. It was measured on one
+synthetic book (TallyPrime Silver 7.1). An open bill's `kind` is therefore a
+direction, not "owed by a customer" or "owed to a supplier": with a 50,000
+supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
+`payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
+of an `unallocated` amount is the sign of the party's net unallocated balance, so
+an on-account receipt and an on-account payment on one party net into one figure.
+Separating advances, credit and debit notes and on-account amounts by their
+voucher's bill type is tracked in #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted
@@ -888,7 +1417,7 @@ sent directly as Tally's upsert key. Reused labels in independent batches theref
 have different wire identities, so rebuilding after losing the batch journal
 creates a new identity and does not deduplicate the business event.
 
-**An unknown outcome requires read-only reconciliation for every voucher type.**
+**An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not
 re-import or rebuild the same business event, including a `Journal`. The
 controlled repeat observation returned `CREATED=0, ALTERED=1` and left one

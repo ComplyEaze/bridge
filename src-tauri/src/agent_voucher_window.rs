@@ -203,8 +203,9 @@ pub(super) enum PlanRefusal {
     /// A single voucher is predicted over the budget, so no division of any day
     /// can bring a read within it.
     VoucherOverBudget { day: NaiveDate },
-    /// The window divides, but into more reads than one call may spend.
-    TooManyReads { reads: usize },
+    /// The window divides, but into more reads than one call may spend:
+    /// `reads` needed (at least) against the `allowed` allowance.
+    TooManyReads { reads: usize, allowed: usize },
 }
 
 impl PlanRefusal {
@@ -212,6 +213,19 @@ impl PlanRefusal {
         match self {
             Self::VoucherOverBudget { .. } => "voucher_window_part_over_budget",
             Self::TooManyReads { .. } => "voucher_window_too_many_reads",
+        }
+    }
+
+    /// The refusal as a tool failure. Too many reads keeps its size beside the
+    /// code, so that a caller can say how far over the allowance the window is.
+    pub(super) fn into_failure(self) -> ToolFailure {
+        let failure = ToolFailure::from(self.code().to_string());
+        match self {
+            Self::TooManyReads { reads, allowed } => failure.with_planned_reads(PlannedReads {
+                needed_at_least: reads,
+                allowed,
+            }),
+            Self::VoucherOverBudget { .. } => failure,
         }
     }
 }
@@ -550,7 +564,10 @@ pub(super) fn plan_window_reads(
 
 fn finish(reads: Vec<PlannedRead>, max_reads: usize) -> Result<Vec<PlannedRead>, PlanRefusal> {
     if reads.len() > max_reads {
-        return Err(PlanRefusal::TooManyReads { reads: reads.len() });
+        return Err(PlanRefusal::TooManyReads {
+            reads: reads.len(),
+            allowed: max_reads,
+        });
     }
     Ok(reads)
 }
@@ -742,7 +759,9 @@ impl WindowReadLimits {
     /// so it is sized against the whole transport cap (twice the budget), not
     /// the half-budget that absorbs the error in an estimated data part. Its
     /// only uncertainty is the per-row figure: 4 KiB is assumed against 2.42 to
-    /// 2.72 KB measured live (§11c.5), so a full census is about 22 MB.
+    /// 2.72 KB measured live on earlier books (§11c.5) and about 3.27 KB on a
+    /// book with a mark of about 1.03M (#899), so a full census is about 22 to
+    /// 27 MB of the 33.5 MB cap, about 1.25x headroom on the heaviest row seen.
     pub(super) fn census_capacity(self) -> u64 {
         vouchers_per_read(
             self.budget_bytes.saturating_mul(2),
@@ -1603,9 +1622,7 @@ where
                         limits.budget_bytes,
                         limits.max_reads,
                     )
-                    .map_err(|refusal| {
-                        with_prior(refusal.code().to_string().into(), &preflight, &None)
-                    })?;
+                    .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))?;
                     census = Some(counted);
                     stack_of(&plan)
                 }
@@ -1645,10 +1662,9 @@ where
             if dispatched >= limits.max_reads {
                 return Err(PlanRefusal::TooManyReads {
                     reads: dispatched + 1 + pending.len(),
+                    allowed: limits.max_reads,
                 }
-                .code()
-                .to_string()
-                .into());
+                .into_failure());
             }
             dispatched += 1;
             let request =
@@ -1718,7 +1734,16 @@ where
                         limits.budget_bytes,
                         allowance,
                     )
-                    .map_err(|refusal| ToolFailure::from(refusal.code().to_string()))?;
+                    .map_err(|refusal| match refusal {
+                        // Planned against what is left of the allowance: the
+                        // read as a whole needs those already sent as well.
+                        PlanRefusal::TooManyReads { reads, .. } => PlanRefusal::TooManyReads {
+                            reads: dispatched + reads,
+                            allowed: limits.max_reads,
+                        }
+                        .into_failure(),
+                        other => other.into_failure(),
+                    })?;
                     // `pending` tiles exactly what follows this part, so
                     // replacing it with a plan of the same stretch loses none.
                     pending = stack_of(&plan);
@@ -1890,8 +1915,15 @@ async fn census_window<R: WindowReader>(
     let spans = census_spans(high_water, limits.census_capacity())
         .map_err(|code| ToolFailure::from(code.to_string()))?;
     let (from, to) = (stamp(first), stamp(last));
+    // The first plan reads at most this many vouchers a request (the default
+    // figure, which every plan starts from) and may send at most `max_reads`
+    // requests, so a census that has already counted more than both allow is
+    // a certain refusal: it is refused there, before the census spans left.
+    let per_read = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
+    let plannable = per_read.saturating_mul(limits.max_reads as u64);
+    let mut spans = spans.peekable();
     let mut rows = Vec::new();
-    for span in spans {
+    while let Some(span) = spans.next() {
         let request = voucher_census_read(company, &from, &to, span)?;
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
@@ -1918,6 +1950,15 @@ async fn census_window<R: WindowReader>(
                 refused
             })?,
         );
+        let counted = rows.len() as u64;
+        if per_read > 0 && counted > plannable && spans.peek().is_some() {
+            // The caller adds the census's evidence, as for any refusal here.
+            return Err(PlanRefusal::TooManyReads {
+                reads: usize::try_from(counted.div_ceil(per_read)).unwrap_or(usize::MAX),
+                allowed: limits.max_reads,
+            }
+            .into_failure());
+        }
     }
     Ok(rows)
 }

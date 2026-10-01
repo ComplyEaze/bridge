@@ -4,8 +4,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
-const previewTag = /^mcp-preview-([0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z]+)*)$/;
+const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
+// The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
+const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;
 const linkDefinition = /^\[[^\]]+\]: \S+\s*$/;
 const fenceLine = /^\s*(`{3,}|~{3,})(.*)$/;
@@ -68,7 +69,7 @@ export function parseChangelog(source) {
 
 export function pickNotes(sections, tag) {
   const version = versionFromTag(tag);
-  if (version === undefined) throw new Error(`not an mcp-preview tag: ${tag}`);
+  if (version === undefined) throw new Error(`not a release tag (mcp-v or mcp-preview-): ${tag}`);
   const own = sections.find((section) => section.label === version && section.body !== "");
   if (own) return { mode: "version", body: own.body };
   const unreleased = sections.find((section) => section.label.toLowerCase() === "unreleased" && section.body !== "");
@@ -170,7 +171,8 @@ const pageHead = `<!doctype html>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>What changed in ComplyEaze Bridge</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./chrome.css" />
+    <link rel="stylesheet" href="./pages.css" />
   </head>
   <body>
     <main class="page">

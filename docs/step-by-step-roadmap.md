@@ -53,21 +53,12 @@ UI completions, and replayed review commitments fail closed. GUID matching is
 ASCII case-insensitive across selection and persistence, while the spelling
 actually observed from Tally is retained.
 
-Selected-read qualification now adds exact-scope evidence without promoting the
-broad read claims. After one fresh reviewed GUID-bearing company is selected,
-the operator may run `bridge.tally.ledgers/1` and a maximum-31-day
-`bridge.tally.vouchers/3` window. The voucher response must echo the exact
-window; both responses must match the reviewed company context, strict XML
-structure, record counts, stable populated-row identities, and canonical field
-constraints. Empty execution is explicitly identity-not-applicable and never a
-completeness claim. Ledger failure skips the voucher request. Cancellation
-restores the original review, endpoint read admission is mutually exclusive
-with qualification reservation, and replacement reviews retain the original
-freshness origin. Explicit save recomputes the scope commitment and atomically
-stores immutable migration-v7 evidence tied by composite scope/snapshot
-authority. Migration v8 consumes the full review commitment in the same
-transaction and makes an exact replay idempotent, closing the cancellation
-window after commit but before acknowledgement without duplicating authority.
+Selected-read qualification, which added exact-scope evidence for one reviewed
+company through `bridge.tally.ledgers/1` and a 31-day `bridge.tally.vouchers/3`
+window, has been removed (bridge#732, #754): its step, read profiles and parsers
+are deleted. The migration-v7 selected-read evidence table remains, since
+migrations are never deleted, and nothing writes to it now; the migration-v8
+review-consumption record is still written by the setup save.
 Raw rows are discarded, decoded-response fingerprints remain local encrypted
 evidence, all writes remain disabled, and public compatibility stays `Unknown`
 pending consented synthetic live qualification.

@@ -203,7 +203,7 @@ function requireCommit(ref, advice) {
 
 export function latestReleaseTag(tags) {
   const versioned = tags
-    .map((tag) => ({ tag, match: /^(?:mcp-preview-|v)(\d+\.\d+\.\d+)$/.exec(tag) }))
+    .map((tag) => ({ tag, match: /^(?:mcp-preview-|mcp-v|v)(\d+\.\d+\.\d+)$/.exec(tag) }))
     .filter(({ match }) => match)
     .map(({ tag, match }) => ({ tag, version: parse(match[1]) }));
   versioned.sort((a, b) => a.version[0] - b.version[0] || a.version[1] - b.version[1] || a.version[2] - b.version[2]);
@@ -328,7 +328,7 @@ async function main() {
   if (process.argv.includes("--apply")) {
     writeVersions(result.next);
     console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md`);
-    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: run scripts/reseal.sh, then commit.");
+    console.log("package.json, src-tauri/Cargo.toml and src-tauri/Cargo.lock are pinned: the pull request that commits them needs an acknowledgement file (see docs/release-process.md).");
   }
 }
 

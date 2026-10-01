@@ -11,7 +11,7 @@ keeps its measurements and adds three things:
 ## Its sibling
 
 [`module-decomposition.md`](./module-decomposition.md) covers **how**: where to cut, what the
-parent keeps, the reseal order, and how to prove a move is pure. This document covers **whether
+parent keeps, the acknowledgement, and how to prove a move is pure. This document covers **whether
 and what**: which files to touch, what counts as a good seam, and the principles behind both.
 Read both before splitting a file.
 [`frontend-module-conventions.md`](./frontend-module-conventions.md) is the TypeScript and React
@@ -20,8 +20,8 @@ counterpart.
 ## The constraint general advice does not know about
 
 Most large files here are **pinned** in `docs/tally/compatibility/compatibility-surface.json`. A
-split changes the pin set, raises `MAX_SURFACE_FILES` by one named reason per new file, and needs
-`scripts/reseal.sh`. The evidence that attests the old file does not automatically
+split changes the pin set (each new pin with its own `reason`) and needs
+an acknowledgement file under `docs/tally/compatibility/acks/`. The evidence that attests the old file does not automatically
 attest the new ones. **The cost of splitting a pinned file is not the edit; it is the
 attestation.** Everything below assumes that cost is real.
 
@@ -96,9 +96,9 @@ non-idiomatic Rust. Treat them as questions only.
      for `include_str!` and script `readFile` calls naming the file. The first `commands.rs` split
      (#472) broke a `lib.rs` test that sliced `include_str!("commands.rs")`; test names were
      identical and CI caught it.
-   - **Also:** `cargo fmt --check`, clippy, and the reseal verification.
-9. **A pinned split carries its reasons.** Record one named reason per new pin beside
-   `MAX_SURFACE_FILES`, and pin every new file that decides what Bridge posts or lets leave the
+   - **Also:** `cargo fmt --check`, clippy, and the compatibility acknowledgement when a pinned path changed.
+9. **A pinned split carries its reasons.** Record one `reason` per new pin in the pin
+   list, and pin every new file that decides what Bridge posts or lets leave the
    machine ([`module-decomposition.md`](./module-decomposition.md)).
 10. **Don't reach for a new crate** unless you need something a module cannot give:
     - a compile or incremental-build boundary worth its dependency management;
@@ -137,7 +137,7 @@ Answer these in the PR body before splitting a file:
 9. Can the parent stay a pure façade?
 10. Is this one named group, small enough to review as a move?
 11. Do test *names* match before and after on both workspaces, with fmt and clippy clean?
-12. Did you reseal in order (regenerate, verify, stage) and leave `git status` clean?
+12. Did you add the acknowledgement (`acks/pr-<N>.txt`) listing every changed pinned path and every new pin, and leave `git status` clean?
 
 ## The current map
 
@@ -190,7 +190,7 @@ shared items:
 - live reads: companies, ledgers, outstandings, selected ledger entries;
 - client group labels and preferences;
 - exports and party statements;
-- thin delegations to documents, Axal and the desktop journal.
+- thin delegations to the desktop journal.
 
 `commands_trial_balance.rs` already shows the per-feature pattern as `commands::trial_balance`.
 

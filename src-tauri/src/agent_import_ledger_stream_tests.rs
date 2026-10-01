@@ -435,6 +435,99 @@ fn a_batch_intent_records_distinct_remoteids_that_the_journal_finds() {
     );
 }
 
+/// What a deletion would have to keep (#local-data): the settlement counts.
+#[test]
+fn settlement_counts_sent_and_unsettled_batches() {
+    let response = |line: &ImportLedgerLine| {
+        StatusRecord::response(
+            line,
+            DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: None,
+            },
+        )
+    };
+    let status = |id: &str, status: &str| {
+        let mut line = batch(id, "n");
+        line.status = status.into();
+        StatusRecord::from(&line)
+    };
+    let mut bytes = Vec::new();
+    // Only built: not sent, nothing to settle.
+    bytes.extend(record(&batch("built", "n")));
+    // Sent, no response recorded: unsettled.
+    let sent = batch("sent", "n");
+    bytes.extend(record(&sent));
+    bytes.extend(record(&StatusRecord::dispatch(&sent)));
+    // Sent, answered and verified: settled.
+    let settled = batch("settled", "n");
+    bytes.extend(record(&settled));
+    bytes.extend(record(&StatusRecord::dispatch(&settled)));
+    bytes.extend(record(&response(&settled)));
+    bytes.extend(record(&status("settled", "posted_verified")));
+    // Sent and answered but the readback was incomplete: unsettled.
+    let incomplete = batch("incomplete", "n");
+    bytes.extend(record(&incomplete));
+    bytes.extend(record(&StatusRecord::dispatch(&incomplete)));
+    bytes.extend(record(&response(&incomplete)));
+    bytes.extend(record(&status("incomplete", "verification_incomplete")));
+    // Verified with no response recorded: still unsettled.
+    let unanswered = batch("unanswered", "n");
+    bytes.extend(record(&unanswered));
+    bytes.extend(record(&StatusRecord::dispatch(&unanswered)));
+    bytes.extend(record(&status("unanswered", "posted_verified")));
+    // A legacy full record already marked posted, never dispatched: found,
+    // and nothing left to settle.
+    let mut found = batch("found", "n");
+    found.status = "posted_verified".into();
+    bytes.extend(record(&found));
+    // Verified by a hand import first, then posted natively: the dispatch
+    // intent and response make the batch unverified again until it is read back.
+    let hand_then_posted = batch("hand_then_posted", "n");
+    bytes.extend(record(&hand_then_posted));
+    bytes.extend(record(&status("hand_then_posted", "posted_verified")));
+    bytes.extend(record(&StatusRecord::dispatch(&hand_then_posted)));
+    bytes.extend(record(&response(&hand_then_posted)));
+    // Found posted by a hand import, then a later readback reads incomplete,
+    // never dispatched: still found, so the double-post memory of it counts.
+    let found_then_incomplete = batch("found_then_incomplete", "n");
+    bytes.extend(record(&found_then_incomplete));
+    bytes.extend(record(&status("found_then_incomplete", "posted_verified")));
+    bytes.extend(record(&status(
+        "found_then_incomplete",
+        "verification_incomplete",
+    )));
+
+    assert_eq!(
+        settlement(Cursor::new(bytes)).unwrap(),
+        Settlement {
+            batches: 8,
+            sent_or_found: 7,
+            unsettled: 4,
+            unsettled_no_response: 2,
+            no_dispatch_never_verified: 1
+        }
+    );
+    assert_eq!(
+        settlement(Cursor::new(Vec::new())).unwrap(),
+        Settlement {
+            batches: 0,
+            sent_or_found: 0,
+            unsettled: 0,
+            unsettled_no_response: 0,
+            no_dispatch_never_verified: 0
+        }
+    );
+    assert_eq!(
+        settlement(Cursor::new(b"not json\n".to_vec()))
+            .err()
+            .as_deref(),
+        Some("import_ledger_invalid")
+    );
+}
+
 const STATEMENT_ID: &str = "st-20260901-0123456789abcdef";
 
 /// One voucher, dated 1 Sep 2026, over `entries` (ledger, amount, side).

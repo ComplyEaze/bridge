@@ -20,7 +20,6 @@ function companyScopedState() {
     profileSha256: "profile-old",
     reviewId: "review-old",
     reviewCommitmentSha256: "commitment-old",
-    selectedReadScope: { company: "old-company" },
     passportSnapshotId: "passport-old",
     syncEvidence: { company: "old-company" },
     syncEvidenceError: "old evidence error",
@@ -44,7 +43,6 @@ function cleanupFor(state) {
       state.profileSha256 = null;
       state.reviewId = null;
       state.reviewCommitmentSha256 = null;
-      state.selectedReadScope = null;
     },
     clearPassportSnapshot: () => { state.passportSnapshotId = null; },
     clearSyncEvidence: () => {
@@ -77,7 +75,6 @@ test("an automatic probe drop clears old company state before installing a usabl
     profileSha256: "profile-new",
     reviewId: "review-new",
     reviewCommitmentSha256: "commitment-new",
-    selectedReadScope: null,
     passportSnapshotId: null,
   };
 
@@ -92,7 +89,6 @@ test("an automatic probe drop clears old company state before installing a usabl
   assert.deepEqual(transition, { selectedCompany: "", dropped: true });
   assert.deepEqual(state, {
     ...freshProbe,
-    selectedReadScope: null,
     passportSnapshotId: null,
     syncEvidence: null,
     syncEvidenceError: null,
@@ -137,7 +133,6 @@ test("a manual company selection clears the existing review and all company-scop
   assert.equal(state.profileSha256, null);
   assert.equal(state.reviewId, null);
   assert.equal(state.reviewCommitmentSha256, null);
-  assert.equal(state.selectedReadScope, null);
   assert.equal(state.passportSnapshotId, null);
   assert.equal(state.syncEvidence, null);
   assert.equal(state.proofPreview, null);
@@ -151,7 +146,6 @@ test("a manual company selection clears the existing review and all company-scop
 
 test("a manual company selection clears an unqualified probe review", () => {
   const state = companyScopedState();
-  state.selectedReadScope = null;
 
   clearCompanyScopedState(cleanupFor(state));
 
@@ -159,7 +153,6 @@ test("a manual company selection clears an unqualified probe review", () => {
   assert.equal(state.profileSha256, null);
   assert.equal(state.reviewId, null);
   assert.equal(state.reviewCommitmentSha256, null);
-  assert.equal(state.selectedReadScope, null);
 });
 
 test("choosing from a fresh probe preserves only its unused reviewed scope", () => {

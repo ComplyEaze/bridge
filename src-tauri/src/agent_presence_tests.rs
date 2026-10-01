@@ -242,8 +242,10 @@ fn the_published_schema_names_the_three_numbering_methods_and_its_bounds() {
         schema["required"],
         json!(["company_guid", "from", "to", "numbering", "vouchers"])
     );
-    // The tool reads; it must not be annotated as a write.
-    assert!(tool.get("annotations").is_none());
+    // The tool reads; it is annotated read-only and never as a write. An absent
+    // annotation would read to a host as "destructive".
+    assert_eq!(tool["annotations"]["readOnlyHint"], json!(true));
+    assert_eq!(tool["annotations"]["destructiveHint"], json!(false));
     let description = tool["description"].as_str().expect("tool description");
     assert!(description.contains("manual"));
     // The spelling matters: `safe_reason_code` returns the `presence_`-prefixed
@@ -881,16 +883,20 @@ async fn a_narration_marker_decides_a_present_from_a_nonempty_partial_window() {
 ///
 /// The test is not redundant now, and the reason is worth being exact about,
 /// because "the file is pinned" sounds like it subsumes this. A pin detects
-/// that bytes changed; it does not judge how. Resealing is a normal part of
-/// editing any pinned file, so an edit that loosened admission and then
-/// resealed passes the gate — correctly, because the gate's question is
-/// whether the manifest describes the tree, not whether the tree is sound.
+/// that bytes changed; it does not judge how. Acknowledging the change is a
+/// normal part of editing any pinned file, so an edit that loosened admission
+/// and then added its acknowledgement passes the gate — correctly, because the
+/// gate's question is whether the manifest describes the tree, not whether the
+/// tree is sound.
 ///
 /// So the two guard different things. The pin makes a change to this file
-/// *visible*, and impossible to land without the manifest moving with it.
+/// *visible*: a change needs an acknowledgement moving with it, which
+/// `scripts/merge-gate.sh` enforces and CI reports (report-only until the check
+/// is made enforcing).
 /// This test makes a change *fail*, by digesting the parsed schema structure:
-/// `reseal.sh` knows how to update a file hash and has no idea how to update
-/// this digest, which is exactly why the two diverge. Its sibling
+/// the acknowledgement records which pinned files a pull request changed and has
+/// no idea how to update this digest, which is exactly why the two diverge. Its
+/// sibling
 /// `the_admission_contract_cannot_be_loosened_without_failing_something`
 /// names the specific losses -- dropping `additionalProperties`, widening the
 /// numbering enum, removing a required field -- where this one is blunter and
@@ -910,8 +916,9 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     // This file is pinned into the compatibility surface, so changing the
     // schema now forces this constant to change, which moves the surface
     // digest, which is exactly the visibility the seal is for. If this fails
-    // and the schema change was deliberate, update the constant *and* reseal
-    // — that pairing is the point, not an inconvenience.
+    // and the schema change was deliberate, update the constant *and* add the
+    // acknowledgement (docs/release-process.md) — that pairing is the point, not
+    // an inconvenience.
     const PINNED: &str = "785b14835f3235ec009a248ac2b443316e764c584b31f2532aa1335365c5fb40";
     let definitions = tool_definitions(true, false);
     let schema = definitions
@@ -925,7 +932,7 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     assert_eq!(
         digest, PINNED,
         "the published admission contract changed; update this digest in the same commit that \
-         reseals the compatibility surface"
+         carries the compatibility-surface acknowledgement (docs/release-process.md)"
     );
 }
 

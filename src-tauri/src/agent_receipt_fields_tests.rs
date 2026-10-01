@@ -24,6 +24,7 @@ fn receipt_for(directory: &Path, response: &Value) -> Value {
                 tool: "outstandings".into(),
                 args_sha256: sha256_json(&json!({})),
                 company_guid: None,
+                request_trail: None,
             },
             response,
             &wire,
@@ -56,6 +57,8 @@ fn final_outstandings_receipt_covers_dates_directions_derived_totals_and_envelop
         party: "Private Supplier".into(),
         amount: bridge_tally_core::ExactDecimal::parse("3").unwrap(),
         direction: ExposureDirection::Payable,
+        opening_balance: None,
+        composition: None,
     }];
     let structured = redact_value(
         json!({

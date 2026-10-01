@@ -21,15 +21,21 @@ support cells. Every cell starts as `unknown`; absence of evidence is never
 success. `compatibility-surface.json` binds evidence freshness to the exact
 Bridge Tally request, parser, transport, runtime, lockfile, and gate sources.
 
-When a pinned source file changes, reseal the surface deliberately before
-running this gate: `rehash-surface <surface.json> <repository-root>` refreshes
-every pinned file's raw-byte digest, and that is the whole reseal. The surface
-stores only those per-file digests; the surface digest that receipts and
-attestations bind is computed by the gate, never stored, and the matrix holds
-no copy of it (bridge#760). The exact command is in the
-[release process](../../release-process.md#compatibility-surface-reseal).
-CI validates this evidence boundary; it does not reseal changed sources. To
-change the pin set itself, see
+`compatibility-surface.json` (schema 3) is an authored list of pinned paths, each
+with an optional `reason`, and stores no hashes. The surface digest that receipts
+and attestations bind is computed by the gate from the live bytes of every pinned
+file, never stored, and the matrix holds no copy of it (bridge#760). So changing a
+pinned file changes the digest and makes evidence bound to the old digest stale.
+
+A pull request whose diff changes a pinned file (any status, old and new names),
+adds a pin, or removes a pin adds an acknowledgement file, `acks/pr-<N>.txt`, listing
+the changed pinned paths; there is nothing to regenerate. An edit to the pin list
+that adds or removes no pin (only a `reason`) needs none, and adding one when
+nothing pinned changed is an error. The procedure is in the
+[release process](../../release-process.md#compatibility-surface-reseal). The CI
+check that the acknowledgement matches the diff fails a pull request that lacks one
+(it prints `surface ack check FAILED: <reason>`); `scripts/merge-gate.sh`, run
+locally by whoever merges, checks the same rule. Neither rewrites any file. To change the pin set itself, see
 [Adding or removing a pin](../../release-process.md#adding-or-removing-a-pin).
 
 An evidenced `observed`, `supported`, or `unsupported` cell requires all of the

@@ -2134,7 +2134,7 @@ fn admit_fresh_saved_voucher(
 /// is held in memory), is never made. Exactly the 100-character line cap.
 pub(super) fn agent_post_timing_lines() -> [String; 1] {
     [format!(
-        "Bridge posts this now or when asked again within {} minutes, unless cancelled, refused or restarted.",
+        "ComplyEaze Bridge posts now or if asked again within {} min, unless cancelled, refused or restarted.",
         approval::APPROVAL_TTL.as_secs() / 60
     )]
 }
@@ -2215,7 +2215,7 @@ fn review_preview_with(
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
@@ -2366,11 +2366,11 @@ fn batch_review_text(
     text.push(format!("Batch: {}", line.batch_id));
     text.push(String::new());
     text.push(
-        "Ledgers checked by identity against the build; Bridge adds its batch reference.".into(),
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.".into(),
     );
     text.push("Do not post a file already imported manually.".into());
     text.push(
-        "Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes."
+        "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
             .into(),
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());

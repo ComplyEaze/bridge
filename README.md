@@ -123,7 +123,8 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
   (#485, #703)
 - A base currency other than INR. On a book with several currencies: the
   foreign-currency ledgers and vouchers themselves (they are set aside or
-  withheld, and named), ledger movement, the purchase register, and posting
+  withheld, and named), ledger movement, Profit and Loss and Balance Sheet,
+  the purchase register, and posting
 - Tally Cloud Access or any remote Tally host
 - Intel Macs, and a code-signed installer
 <!-- llms:end -->

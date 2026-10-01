@@ -659,6 +659,10 @@ It checks every file first and writes none if one fails. Then:
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
    description name the same build.
+   Also update the sentences that say a tool is "in source but not in the
+   0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
+   and the `README.md` lines that describe the published package, so no line
+   describes the previous build as the newest.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.

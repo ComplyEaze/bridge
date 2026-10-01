@@ -17,14 +17,15 @@ Apache-2.0 builds from current source stays unambiguous.
 ### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)
 
 These changes are in ComplyEaze Bridge 0.4.0. Each line names the pull
-requests it comes from.
+requests it comes from, except where it names an issue.
 
 **What you can do now**
 
 - Read a company's masters as a list: voucher types (with their numbering
   method), godowns, units, stock groups, or ledger groups, in pages. The book is
-  checked before and after the read. A book with very many masters is refused,
-  with the size named, rather than answered in part (#952).
+  checked before and after the read. For godowns, units and stock groups, a book
+  with very many masters is refused, with the size named, rather than answered
+  in part (#952).
 - See what a party's unallocated amount is made of, from data the tool already
   reads, and what that data cannot tell apart. Each bill now carries its own
   date and credit period, and payable and receivable follow the sign of the
@@ -32,28 +33,33 @@ requests it comes from.
 - See what ComplyEaze Bridge keeps on this computer. `local_data_report` (and
   `bridge_mcp --local-data-report` on the command line) counts files, bytes and
   the age of the oldest file by kind, and gives the state of the import journal
-  and how many saved batches are not settled. It reads only: it changes and
-  deletes nothing, and it names no file path unless you ask on the command line
-  (#925).
+  and how many saved batches are not settled. It changes no book and deletes
+  nothing; like every call, it records its own receipt line in the local log. It
+  names no file path unless you ask on the command line (#925).
 - Read the purchase register of tax in the books: the Purchase and Debit Note
   vouchers of a date window that touch a ledger under Duties & Taxes, with the
   tax amount each entry records under the ledger's GST duty head. Other voucher
   types that touch those ledgers (Sales, Journal, Payment) are listed apart with
-  totals, and an entry whose ledger has no recognised GST head is listed and
+  exact counts (at most 100 are listed), and an entry whose ledger has no recognised GST head is listed and
   never given one. Nothing is posted and nothing is inferred: whether an entry
   belongs in a return is for you to decide (#971).
 - Ask `outstandings` for one party, with `detail`, to see why a bill is open and
-  what an unallocated amount holds, party by party. A bill trail lists every
-  allocation of each of the party's bills, oldest first, and says whether they
+  what an unallocated amount holds, party by party. A bill trail lists the
+  allocations of each of the party's bills, oldest first, leaving out those in
+  cancelled and optional vouchers, and says whether they
   add up to Tally's own balance for the bill. The unadjusted view lists the
   party's on-account, advance and pending credit or debit note allocations and
-  compares the on-account total with its unallocated amount. A bill that does
+  compares the on-account total with its unallocated amount; a note is
+  recognised only when its voucher type is named exactly Credit Note or Debit
+  Note. A bill that does
   not tie, or whose identity is ambiguous, is shown as such and nothing is
   merged. The detail reads the company's vouchers from the start of the books,
   so a large book can be refused, with a next step (#981).
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
-  line for line to Tally's own statement; otherwise it is refused, and the
-  lines that differ are named. A book with stock items is expected to be
+  line for line to Tally's own statement. Otherwise ComplyEaze Bridge's own
+  statement is withheld; Tally's own amount for each line is still returned,
+  with the derived amount on each line that differs, and the lines that differ
+  are named. A book with stock items is expected to be
   refused, because no such book has been measured, and the tie-out itself has
   been measured on two synthetic books only (#774).
 - Read closing stock values per item. An item is returned only when the values
@@ -77,6 +83,8 @@ requests it comes from.
   refuses an unknown ledger before it reads any voucher (#679, #885, #891, #936,
   #938, #939, #960).
 - Recognise SGST/UTGST as a GST duty head (#968).
+- The app and the extension carry the ComplyEaze Bridge tick logo as their icon
+  (#950, #978).
 - A ledger read on a several-currency book, or one whose base currency is not
   INR, is refused before any request to Tally, instead of returning bare
   numbers (#751).
@@ -94,6 +102,12 @@ requests it comes from.
   figure, check or withheld line changes (#984).
 - Every tool is refused until the Terms of Use are accepted, and the extension
   carries a privacy policy (#943).
+- The party-master balance snapshot ends at today's date, not at a stray voucher
+  date (#896).
+- The Markdown proof shows the verification status and any duplicate vouchers in
+  the batch (#811).
+- ComplyEaze Bridge sends one request to Tally at a time, across all its
+  running processes (#883).
 - Each send to Tally is recorded in the local log with its place, kind, size,
   outcome and time, and no book content (#918, #941).
 - ComplyEaze Bridge refuses to build or post a row that another batch already
@@ -135,7 +149,10 @@ requests it comes from.
 
 - Stock: the closing-value total is checked against Tally's own Stock Summary on
   one synthetic book, and the item count against the rows on one synthetic
-  company. A book in which no item carries a value returns nothing. A book with
+  company, and the sign of a value was measured on one synthetic company. A
+  book with many stock items is refused: the read is for small books, and
+  typical stock-heavy books refuse today. A book in which no item carries a value
+  returns nothing. A book with
   stock items is expected to be refused by Profit and Loss and Balance Sheet,
   because no such book has been measured (#774, #980, #1001).
 - A book with very many masters is refused by `masters` for godowns, units and
@@ -149,9 +166,9 @@ requests it comes from.
   inventory allocation, and books with several currencies are not covered, and
   it does not decide whether a Debit Note is a purchase return or a debit note to
   a customer (#971).
-- The party detail of `outstandings` has been measured on one synthetic book,
-  and its cost on a large book is not measured: a long window can take minutes,
-  and a window that needs too many requests is refused (#981).
+- The party detail of `outstandings` has been measured on one synthetic book.
+  Its cost on a large book is not measured, and a window that needs too many
+  requests is refused (#981).
 
 **Also in source**
 

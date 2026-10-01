@@ -91,13 +91,28 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   Gold 7.1 with one client book, on 28 September 2026, in a session separate
   from the development-build posting above (reported by the owner; no logs were
   kept).
+- A candidate build of 0.4.0 on Windows 11, on 1 October 2026 (the build CI
+  produced for the version pull request: the same code as the release apart
+  from a comment in one test file). The maintainer installed it in Claude
+  Desktop with a new Claude account that has no paid plan, against licensed
+  TallyPrime Silver 7.1 holding one synthetic company. With the Terms setting
+  off, a call was refused and nothing was read. With it on, `tally_status`,
+  `vouchers`, `validate_masters`, `purchase_register`, `stock_summary` and
+  `local_data_report` answered. One voucher post was declined in the Windows
+  approval window and nothing was sent; one was approved, and one Journal was
+  posted and then verified by `verify_import`. The same candidate's macOS build
+  was started and read the company list, and in Claude Desktop on macOS its
+  tools loaded in a chat. The record is the maintainer's dated notes and
+  screenshots, kept privately. This was one run, not a controlled test of each
+  key of the window.
 
 Not yet run by us in a controlled test: posting with a published package
-against a live TallyPrime; the approval window on Windows; posting on TallyPrime
-Education; posting on TallyPrime Gold with its approval step recorded. Each
-release package is built and launched, its tool list checked and a synthetic
-encrypted bank statement parsed, on hosted CI runners for Windows x64 and Apple
-Silicon Mac.
+against a live TallyPrime; each way of declining in the Windows approval window
+(one was tried); the tools answering through Claude Desktop on macOS after the
+Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold
+with its approval step recorded. Each release package is built and launched,
+its tool list checked and a synthetic encrypted bank statement parsed, on
+hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 

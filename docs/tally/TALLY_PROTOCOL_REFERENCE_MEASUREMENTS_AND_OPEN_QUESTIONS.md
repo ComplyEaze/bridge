@@ -1279,10 +1279,14 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 seeded by this project; seeded data is not evidence about a client book). Each row below was read
 from Tally's own Bills Receivable and Bills Payable reports and from the vouchers' bill allocations
 at one as-of date, and the `outstandings` party detail (#945) ties the two. The captures committed
-with that change are the voucher window, the two bills reports, and every response of two whole
+with that change are the voucher window, the two bills reports, and the responses of two whole
 `outstandings` calls with a party detail (`native-outstandings-detail-*`, with an ordered record of
 each call's 66 requests): an `unadjusted` detail of the on-account debtor, tied (on-account sum and
-residual both 3,000), and a `bill_trail` of one named bill, tied. The unreferenced-opening row rests
+residual both 3,000), and a `bill_trail` of one named bill, tied. Every response body is kept byte
+for byte (UTF-16LE with no byte-order mark, as received; the status read as received) except three
+listings, the company list, the book extent and the company marks, which answer for every loaded
+company and are trimmed to this company's row, with the untrimmed size and hash in their records.
+The HTTP heads are described in the sequence records, not kept. The unreferenced-opening row rests
 on a read-back through ComplyEaze Bridge that is not captured as a fixture:
 
 | What was measured | Result |

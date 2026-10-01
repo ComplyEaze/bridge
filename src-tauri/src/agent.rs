@@ -1047,8 +1047,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              The same call refuses again.",
         ),
         "named_bill_window_too_large" => Some(
-            "The company's vouchers from the named bill's date to as_of need more requests \
-             than one call may spend (`reads.needed_at_least` against `reads.allowed`), so \
+            "The company's vouchers from the named bill's earliest date in Tally's bills \
+             reports (or from the start of the books, when they do not list it) to as_of \
+             need more requests than one call may spend (`reads.needed_at_least` against `reads.allowed`), so \
              the bill's trail was refused rather than read in part; `window` lists any part \
              already read. Nothing narrows it further, so this bill's trail is not available \
              on this book. The party's vouchers, with their bill allocations, can still be \

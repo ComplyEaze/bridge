@@ -1195,8 +1195,9 @@ skip them), oldest first, each with its own bill date, and gives each bill a sta
 signed allocations equal Tally's own balance for that bill, or zero for a bill the report no
 longer lists), `trail_does_not_tie` (both numbers shown) or `bill_identity_ambiguous` (more than
 one native row or bill date for one reference, or one native row dated differently from the
-allocations; nothing is merged, and the native dates are shown). Naming a `reference` starts the
-window at the earliest date Tally lists for it, so allocations dated earlier are not read: a
+allocations; nothing is merged, and the native dates are shown). Naming a `reference` that Tally's
+bills reports list starts the window at the earliest date they list for it, so allocations dated
+earlier are not read (a reference they do not list is read from the start of the books): a
 reference that carries two bill dates over the whole history, and is ambiguous there, can tie
 when named. The detail's own `state` is `bills_listed`, or, for an empty list,
 `not_bill_wise_ledger` (the ledger snapshot says the ledger keeps no bills) or
@@ -1223,13 +1224,14 @@ tied or listed, when the voucher read returned no voucher: unlike `vouchers`, th
 corroborate an empty read.
 
 The detail reads the whole company's vouchers from the books' beginning (or from the earliest
-date Tally lists for the named bill) to `as_of` and keeps the entries on the party's own ledger,
+date Tally lists for the named bill, when it lists one) to `as_of` and keeps the entries on the party's own ledger,
 so its cost is that of a `vouchers` read over the same span. That cost is unmeasured on a large
 book, and any refusal of that read fails the whole `outstandings` call: one foreign-currency
 composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
 `bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
-every window read is. It may spend at most 128 requests, and before anything is measured a request
-holds at most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
+every window read is. It may send at most 128 data requests (each sent twice, as every read is, with its
+census and the company marks besides), and before anything is measured a data request holds at
+most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
 refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
 data request when the census shows it (the census stops as soon as it has counted more vouchers
 than the allowed requests can hold), and otherwise when a measured part does, as

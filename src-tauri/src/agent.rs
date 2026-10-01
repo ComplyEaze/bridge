@@ -1038,21 +1038,32 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // spend (`reads` gives how many against how many). Refused, never read
         // in part; `window` lists any part already read before the refusal.
         "trail_window_too_large" => Some(
-            "The party's vouchers from the start of the books (or from the named bill's date) \
-             to as_of need more requests than one call may spend (`reads.needed_at_least` \
-             against `reads.allowed`), so the bill trail was refused rather than read in part; \
-             `window` lists any part already read. Ask for one bill with `reference`, using a \
-             reference that `open_bills` lists for the party: its window starts at that bill's \
-             date, so a recent bill reads less. The same call refuses again.",
+            "The company's vouchers from the start of the books to as_of, which a bill trail \
+             reads to find the party's allocations, need more requests than one call may \
+             spend (`reads.needed_at_least` against `reads.allowed`), so the bill trail was \
+             refused rather than read in part; `window` lists any part already read. Ask for \
+             one bill with `reference`, using a reference that `open_bills` lists for the \
+             party: the read then starts at that bill's date, so a recent bill reads less. \
+             The same call refuses again.",
+        ),
+        "named_bill_window_too_large" => Some(
+            "The company's vouchers from the named bill's date to as_of need more requests \
+             than one call may spend (`reads.needed_at_least` against `reads.allowed`), so \
+             the bill's trail was refused rather than read in part; `window` lists any part \
+             already read. Nothing narrows it further, so this bill's trail is not available \
+             on this book. The party's vouchers, with their bill allocations, can still be \
+             read untied with `vouchers` and `ledger` over shorter date windows. The same call \
+             refuses again.",
         ),
         "unadjusted_window_too_large" => Some(
-            "The party's vouchers from the start of the books to as_of need more requests than \
-             one call may spend (`reads.needed_at_least` against `reads.allowed`), so the \
-             unadjusted detail was refused rather than read in part; `window` lists any part \
-             already read. Nothing narrows it, because it needs every voucher from the start of \
-             the books, so it is not available for this party on this book. The party's \
-             vouchers, with their bill allocations, can still be read untied with `vouchers` \
-             and `ledger` over shorter date windows. The same call refuses again.",
+            "The company's vouchers from the start of the books to as_of, which the \
+             unadjusted detail reads to find the party's allocations, need more requests than \
+             one call may spend (`reads.needed_at_least` against `reads.allowed`), so it was \
+             refused rather than read in part; `window` lists any part already read. Nothing \
+             narrows it, because it needs every voucher from the start of the books, so it is \
+             not available for this party on this book. The party's vouchers, with their bill \
+             allocations, can still be read untied with `vouchers` and `ledger` over shorter \
+             date windows. The same call refuses again.",
         ),
         "unadjusted_detail_too_large" => Some(
             "The party's unadjusted detail has more than 500 on-account, advance and pending \

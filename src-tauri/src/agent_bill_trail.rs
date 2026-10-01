@@ -777,14 +777,21 @@ pub(super) struct DetailLimits {
 
 /// The window read refused as needing more data requests than one call may
 /// spend (`voucher_window_too_many_reads`), told as the detail's own refusal:
-/// each kind has a different next step, so each has its own code, with the
-/// window's code as the cause and its planned size kept beside it.
-pub(super) fn window_too_large(mut failure: ToolFailure, kind: DetailKind) -> ToolFailure {
+/// each call has a different next step, so each has its own code, with the
+/// window's code as the cause and its planned size kept beside it. A bill
+/// trail can still be narrowed to one bill; one already narrowed, and the
+/// unadjusted detail, cannot.
+pub(super) fn window_too_large(
+    mut failure: ToolFailure,
+    kind: DetailKind,
+    reference: Option<&str>,
+) -> ToolFailure {
     const TOO_MANY_READS: &str = "voucher_window_too_many_reads";
     if failure.code == TOO_MANY_READS {
-        failure.code = match kind {
-            DetailKind::BillTrail => "trail_window_too_large",
-            DetailKind::Unadjusted => "unadjusted_window_too_large",
+        failure.code = match (kind, reference) {
+            (DetailKind::BillTrail, None) => "trail_window_too_large",
+            (DetailKind::BillTrail, Some(_)) => "named_bill_window_too_large",
+            (DetailKind::Unadjusted, _) => "unadjusted_window_too_large",
         }
         .to_string();
         failure.cause = Some(TOO_MANY_READS);
@@ -886,7 +893,11 @@ impl Server {
                 |xml| parse_agent_rows(xml, identity.company_guid()),
             )
             .await
-            .map_err(|failure| window_too_large(failure, kind))?;
+            // Refused, it keeps the catalogue read's evidence before its own,
+            // as the detail's later refusals do.
+            .map_err(|failure| {
+                with_evidence(window_too_large(failure, kind, reference), &evidence)
+            })?;
         evidence = combine_evidence(evidence, read.all_evidence());
         let late = |failure: ToolFailure| with_evidence(failure, &evidence);
         let rows = read.rows;

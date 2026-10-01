@@ -840,6 +840,19 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
         content["evidence"]["reason_code"],
         "detail_requires_a_complete_read"
     );
+    // The refusal keeps the evidence of every read before it: the company,
+    // the currency and the outstandings read, the same reads the plain call
+    // made.
+    let plain_evidence = &plain["structuredContent"]["evidence"];
+    assert_eq!(content["evidence"]["bytes"], plain_evidence["bytes"]);
+    assert_eq!(
+        content["evidence"]["request_sha256"],
+        plain_evidence["request_sha256"]
+    );
+    assert_eq!(
+        content["evidence"]["response_sha256"],
+        plain_evidence["response_sha256"]
+    );
     // The ledger the reason concerns is a party name, and is not carried.
     assert!(!error.to_string().contains("Ageing Customer A"), "{error}");
 }

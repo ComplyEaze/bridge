@@ -1998,6 +1998,7 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         let mut failure = window_too_large(
             ToolFailure::from("voucher_window_too_many_reads".to_string()),
             DetailKind::Unadjusted,
+            None,
         );
         failure = failure.with_planned_reads(PlannedReads {
             needed_at_least: 5,
@@ -2024,7 +2025,8 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
     assert!(
         error["remediation"]
             .as_str()
-            .is_some_and(|text| text.contains("Nothing narrows it")),
+            .is_some_and(|text| text.contains("Nothing narrows it")
+                && text.starts_with("The company's vouchers")),
         "{error}"
     );
     // Another tool that reads a window keeps its refusal shape.

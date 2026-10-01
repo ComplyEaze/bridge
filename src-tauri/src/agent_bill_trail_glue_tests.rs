@@ -378,9 +378,22 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
         default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
         max_reads: 2,
     };
-    for (kind, code) in [
-        (DetailKind::BillTrail, "trail_window_too_large"),
-        (DetailKind::Unadjusted, "unadjusted_window_too_large"),
+    // (kind, named reference, code, requests the plan needs): a named bill's
+    // window starts at its date, so the empty day before it is not read.
+    for (kind, reference, code, needed) in [
+        (DetailKind::BillTrail, None, "trail_window_too_large", 5),
+        (
+            DetailKind::BillTrail,
+            Some("GLUE-1"),
+            "named_bill_window_too_large",
+            4,
+        ),
+        (
+            DetailKind::Unadjusted,
+            None,
+            "unadjusted_window_too_large",
+            5,
+        ),
     ] {
         let cycle = import_cycle_plans();
         let mut plans = company_and_catalogue();
@@ -393,8 +406,11 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             cycle[1].clone(),
             cycle[0].clone(),
         ]);
+        let expected_bytes = detail_evidence_bytes(&plans);
         let mut call = Call::new(kind);
         call.limits = Some(DetailLimits { rows: 500, window });
+        call.reference = reference;
+        call.open_bills = vec![native_bill("GLUE-1")];
         let (result, served) = run(plans, call).await;
         let failure = result.unwrap_err();
         assert_eq!(failure.code, code);
@@ -404,11 +420,22 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             // The day's three vouchers at one a request, and one request each
             // for the empty days before and after it: the plan tiles the window.
             Some(&crate::agent::PlannedReads {
-                needed_at_least: 5,
+                needed_at_least: needed,
                 allowed: 2,
-            })
+            }),
+            "{code}"
         );
         assert!(failure.window_timings.is_some());
+        // The catalogue's evidence is kept before the window read's own: both
+        // bodies of the catalogue, the mark and the census.
+        assert_eq!(
+            failure
+                .evidence
+                .as_ref()
+                .map(|evidence| evidence.bytes as u64),
+            Some(expected_bytes),
+            "{code}"
+        );
         // The company, the catalogue, the marks and the census: no data part.
         assert_eq!(served, 22, "{code}");
         assert!(

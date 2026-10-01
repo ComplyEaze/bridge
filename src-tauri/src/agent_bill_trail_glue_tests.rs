@@ -267,7 +267,8 @@ async fn the_handler_refuses_an_answer_over_its_row_limit_with_the_reads_evidenc
 }
 
 /// An as-of before the books begin is refused after the catalogue and before
-/// any voucher request.
+/// any voucher request: by the window read's own range check, which the
+/// handler relies on rather than repeating.
 #[tokio::test]
 async fn an_as_of_before_the_books_is_refused_before_the_window_read() {
     let mut call = Call::new(DetailKind::Unadjusted);

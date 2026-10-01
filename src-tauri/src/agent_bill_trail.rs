@@ -812,9 +812,8 @@ impl Server {
             .clone()
             .ok_or_else(|| ToolFailure::from("trail_books_from_missing".to_string()))?;
         let from = trail_window_start(kind, reference, &party, open_bills, &books_from);
-        if from.as_str() > as_of {
-            return Err("invalid_date_range".to_string().into());
-        }
+        // A window that ends before it starts is refused by the window read
+        // itself (`invalid_date_range`), before any request is sent.
         let read = self
             .read_entry_window_rows(
                 identity,

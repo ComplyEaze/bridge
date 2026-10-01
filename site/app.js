@@ -49,6 +49,9 @@ const BANK_TOTAL = 142;
 
 async function boot() {
   const mobile = window.matchMedia('(max-width: 760px)').matches;
+  // the closing card starts hidden only once this script is running to reveal it (home.css, html.ce-live)
+  document.documentElement.classList.add('ce-live');
+  let dead = false; // set when WebGL cannot start: the page is then the plain page and nothing here touches it again
 
   const panels = Array.from(document.querySelectorAll('.panel'));
   if (mobile) {
@@ -160,6 +163,7 @@ async function boot() {
   }
 
   function masterUpdate(progress) {
+    if (dead) return;
     const chapterPos = progress * CHAPTER_COUNT;
     window.__ceProgress = progress; // read by the local scroll-latency test only
     lastChapterPos = chapterPos;
@@ -389,8 +393,14 @@ async function boot() {
     try {
       built = new FileScene(canvas, { mobile, externalTicker: true });
     } catch (e) {
-      // no WebGL: the page reads as it does without the 3D book (home.css, "the story as a plain page")
+      // no WebGL: the page reads as it does without the 3D book (home.css, "the story as a plain page"),
+      // with the counters at their final values and every link back in the tab order
+      dead = true;
       document.documentElement.classList.add('ce-static');
+      document.documentElement.classList.remove('ce-live');
+      counterBank.textContent = String(BANK_READY);
+      counterReadback.textContent = String(BANK_TOTAL);
+      panelLinks.forEach((links) => links.forEach((a) => a.removeAttribute('tabindex')));
       return;
     }
     scene = built;

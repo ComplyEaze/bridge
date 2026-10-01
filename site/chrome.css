@@ -248,7 +248,7 @@ html[data-theme="red"] {
   height: 34px;
   padding: 0 10px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--cobalt-line);
+  border: 1px solid rgba(246, 248, 251, 0.45);
   background: rgba(246, 248, 251, 0.06);
   color: var(--on-cobalt-soft);
   text-decoration: none;
@@ -455,11 +455,11 @@ html[data-theme="red"] {
 /* ComplyEaze Bridge lockup (F1, Outfit; Lane Y1, final 30 Sep): one symbol in
    brand/lockup.svg, coloured by currentColor so each world's
    on-dark ink applies (paper on cobalt, cream on bahi-khata red). Clear space
-   is the lowercase x-height on every side; never smaller than 21 px tall. */
+   is the lowercase x-height on every side; 24 px tall gives the 16 px cap height
+   the usage note sets as the minimum. */
 .ce-logo { display: block; height: 24px; width: auto; aspect-ratio: 898.5 / 105; color: var(--on-cobalt); flex: none; }
 .ce-brand { padding: 4px 0; }
 .ce-footer__brand .ce-logo--footer { height: 24px; color: var(--on-cobalt); }
-@media (max-width: 480px) { .ce-logo { height: 23px; } }
 
 /* The wordmark and the footer brand line */
 .ce-brand, .ce-footer__brand { font-family: var(--font-head); font-weight: var(--w-brand); font-size: 16px; }
@@ -468,6 +468,9 @@ html[data-theme="red"] {
 /* Built by chrome.js (no script, no switch), in the header at every width: two swatches, the
    pressed one ringed. Each button is named for a screen reader and has a tooltip. */
 .ce-theme { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+/* the word that says what the two swatches are, where the header has room for it */
+.ce-theme::before { content: 'Theme'; margin-right: 4px; font: 500 14px/1 var(--font-display); color: var(--on-cobalt-soft); }
+@media (max-width: 900px) { .ce-theme::before { content: none; } }
 .ce-theme__opt {
   display: grid;
   place-items: center;
@@ -506,6 +509,7 @@ html[data-theme="red"] {
 
 /* Without JavaScript the menu button cannot open anything: it is not shown, and the footer carries the links. */
 html:not(.js) .ce-menu-toggle { display: none; }
+@media (max-width: 640px) { html:not(.js) .ce-cta { display: inline-flex; } }
 
 /* ------------------------------------------------------------- inner pages */
 /* Download, Releases, Changelog, Privacy and Terms: a title band on the world's dark ground

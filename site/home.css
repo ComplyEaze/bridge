@@ -391,10 +391,10 @@ a { color: inherit; }
 }
 /* hidden only when the script that reveals it runs (html.js, set in <head>),
    so a visitor or crawler without JS still gets the install card */
-html.js .download-block { opacity: 0; transform: translateY(20px); transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1); }
-html.js .download-block.is-in { opacity: 1; transform: none; }
+html.ce-live .download-block { opacity: 0; transform: translateY(20px); transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1); }
+html.ce-live .download-block.is-in { opacity: 1; transform: none; }
 /* a keyboard visitor tabbing into the card sees it at once (it is never focused while invisible) */
-html.js .download-block:focus-within { opacity: 1; transform: none; transition-duration: 0.1s; }
+html.ce-live .download-block:focus-within { opacity: 1; transform: none; transition-duration: 0.1s; }
 .download-block h2 {
   font-size: 32px;
   line-height: 1.1;
@@ -760,7 +760,7 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 }
 
 /* The approval window's caption: what the replica is, and that Windows differs. */
-.dialog-cap { margin: 10px auto 0; max-width: 46ch; text-align: center; font-size: 12px; line-height: 1.4; color: var(--on-cobalt); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+.dialog-cap { margin: 10px auto 0; max-width: 46ch; padding: 6px 10px; border-radius: var(--r-sm); background: rgba(8, 8, 12, 0.72); text-align: center; font-size: 12px; line-height: 1.4; color: #fff; }
 
 /* =====================================================================
    The story as a plain page: without JavaScript, with reduced motion, or when WebGL cannot start
@@ -800,3 +800,24 @@ html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bot
 
 .coming-line, .next-line { flex-wrap: wrap; row-gap: 4px; }
 .coming-first { margin: 0 0 var(--space-3); }
+
+/* phone: the caption cannot sit between the window and the words, so it is a line of the chapter's text */
+.cap-phone { display: none; }
+@media (max-width: 760px) {
+  .dialog-cap, .cap-wide { display: none; }
+  .cap-phone { display: block; }
+  /* the book's pages slide under the header in chapters 1-3: it is opaque here */
+  .ce-header.is-scrolled { background: var(--header-ground); }
+  .download-block .btn { height: auto; min-height: 44px; padding-top: 10px; padding-bottom: 10px; text-align: center; justify-content: center; line-height: 1.2; }
+}
+:is(html:not(.js), html.ce-static) .cap-phone { display: none; }
+:is(html:not(.js), html.ce-static) :is(.dialog-cap, .cap-wide) { display: block; }
+:is(html:not(.js), html.ce-static) .dialog-cap { background: none; padding: 0; color: var(--on-cobalt-soft); }
+:is(html:not(.js), html.ce-static) .panel[data-chapter="0"] .coming-line { display: none; } /* no book, so no tabs to label */
+:is(html:not(.js), html.ce-static) .prop-row { width: min(100%, 640px); box-sizing: border-box; }
+.tag { border-color: rgba(246, 248, 251, 0.55); }
+/* a short phone (360x740): the approval window gives up size so the chapter's headline stays clear of it */
+@media (max-width: 760px) and (max-height: 780px) {
+  .dialog-replica { zoom: 0.58; }
+  .prop-dialog { top: calc(var(--header-h, 64px) + 140px); }
+}

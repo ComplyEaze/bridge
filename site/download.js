@@ -60,6 +60,7 @@ function platformCard(release, platformKey, kind) {
   var sep = document.createTextNode(" · ");
   var checksumLink = el("a", null, ".sha256 checksum");
   checksumLink.href = assets.checksum.browser_download_url;
+  checksumLink.setAttribute("aria-label", ".sha256 checksum for " + info.label);
   meta.appendChild(tag);
   meta.appendChild(sep);
   meta.appendChild(checksumLink);

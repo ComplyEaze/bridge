@@ -35,8 +35,10 @@ function assetRow(release, platformKey) {
   }
   var link = el("a", null, "Download");
   link.href = assets.bundle.browser_download_url;
+  link.setAttribute("aria-label", "Download " + versionLabel(release) + " for " + PLATFORM_NAMES[platformKey]);
   var checksum = el("a", "rel-asset__sha", ".sha256");
   checksum.href = assets.checksum.browser_download_url;
+  checksum.setAttribute("aria-label", ".sha256 checksum of " + versionLabel(release) + " for " + PLATFORM_NAMES[platformKey]);
   row.appendChild(link);
   row.appendChild(checksum);
   return row;
@@ -92,6 +94,7 @@ function releaseCard(release, isLatest) {
 
   var notesLink = el("a", "rel-notes", "Full release notes on GitHub");
   notesLink.href = releasePageUrl(release);
+  notesLink.setAttribute("aria-label", "Full release notes for " + versionLabel(release) + " on GitHub");
   notesLink.target = "_blank";
   notesLink.rel = "noopener noreferrer";
   card.appendChild(notesLink);

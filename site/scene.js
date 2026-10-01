@@ -108,6 +108,7 @@ THEMES.hybrid = { ...THEMES.red, flags: null, flagEdge: false, flagOutlineFill: 
 let THEME = THEMES.cobalt;
 export function setTheme(name) {
   THEME = THEMES[name] || THEMES.cobalt;
+  flagTextureCache.clear(); // flag textures are drawn in the theme's palette
 }
 
 // The colour law. One colour per finding kind, never decorative. Cyan is

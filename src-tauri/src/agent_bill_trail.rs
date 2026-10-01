@@ -970,12 +970,12 @@ pub(super) fn detail_requires_a_complete_read(
     partial_reason: String,
     partial_reasons: Vec<&'static str>,
 ) -> ToolFailure {
-    let mut failure = ToolFailure::from("detail_requires_a_complete_read".to_string());
-    failure.incomplete_read = Some(Box::new(IncompleteRead {
-        partial_reason,
-        partial_reasons,
-    }));
-    failure
+    ToolFailure::from("detail_requires_a_complete_read".to_string()).with_incomplete_read(
+        IncompleteRead {
+            partial_reason,
+            partial_reasons,
+        },
+    )
 }
 
 /// A refusal that follows the voucher read keeps that read's evidence, with

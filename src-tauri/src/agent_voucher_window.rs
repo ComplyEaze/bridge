@@ -219,14 +219,14 @@ impl PlanRefusal {
     /// The refusal as a tool failure. Too many reads keeps its size beside the
     /// code, so that a caller can say how far over the allowance the window is.
     pub(super) fn into_failure(self) -> ToolFailure {
-        let mut failure = ToolFailure::from(self.code().to_string());
-        if let Self::TooManyReads { reads, allowed } = self {
-            failure.planned_reads = Some(Box::new(PlannedReads {
+        let failure = ToolFailure::from(self.code().to_string());
+        match self {
+            Self::TooManyReads { reads, allowed } => failure.with_planned_reads(PlannedReads {
                 needed_at_least: reads,
                 allowed,
-            }));
+            }),
+            Self::VoucherOverBudget { .. } => failure,
         }
-        failure
     }
 }
 

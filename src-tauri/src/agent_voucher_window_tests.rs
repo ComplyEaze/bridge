@@ -4022,7 +4022,7 @@ async fn a_census_past_what_the_allowed_reads_can_hold_stops_before_its_next_spa
     let failure = outcome.err().expect("refused");
     assert_eq!(failure.code, "voucher_window_too_many_reads");
     assert_eq!(
-        failure.planned_reads.as_deref(),
+        failure.planned_reads(),
         Some(&crate::agent::PlannedReads {
             needed_at_least: 2,
             allowed: 1,
@@ -4077,7 +4077,7 @@ async fn a_census_over_the_allowance_on_its_last_span_is_refused_by_the_plan() {
     let failure = outcome.err().expect("refused");
     assert_eq!(failure.code, "voucher_window_too_many_reads");
     assert_eq!(
-        failure.planned_reads.as_deref(),
+        failure.planned_reads(),
         Some(&crate::agent::PlannedReads {
             needed_at_least: 2,
             allowed: 1,
@@ -4125,7 +4125,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
     assert_eq!(failure.code, "voucher_window_too_many_reads");
     // One request sent, and day two now needs two more, against two in all.
     assert_eq!(
-        failure.planned_reads.as_deref(),
+        failure.planned_reads(),
         Some(&crate::agent::PlannedReads {
             needed_at_least: 3,
             allowed: 2,

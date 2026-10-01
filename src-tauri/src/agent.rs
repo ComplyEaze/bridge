@@ -454,14 +454,44 @@ struct ToolFailure {
     /// one (bridge#625, bridge#664). Boxed to keep the refusal small on every
     /// other path.
     candidates: Option<Box<Candidates>>,
-    /// Why a read the refused operation depends on was not complete (#945):
-    /// the partial result's own reason, kept beside the refusal's code instead
-    /// of being replaced by it. Codes only; boxed to keep the refusal small.
-    incomplete_read: Option<Box<IncompleteRead>>,
+    /// What the refusal says about the read it depends on (#945): why that
+    /// read was not complete, or how many requests it needed. Codes and
+    /// numbers only; both in one box to keep the refusal under clippy's
+    /// 128-byte large-error limit.
+    read_detail: Option<Box<ReadDetail>>,
+}
+
+/// See [`ToolFailure::read_detail`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ReadDetail {
+    /// The partial result's own reason, kept beside a refusal that needed a
+    /// complete read instead of being replaced by its code.
+    incomplete_read: Option<IncompleteRead>,
     /// How many data requests a refused window read needed, at least, against
-    /// the allowance it may spend. Numbers only; boxed to keep the refusal
-    /// small.
-    planned_reads: Option<Box<PlannedReads>>,
+    /// the allowance it may spend.
+    planned_reads: Option<PlannedReads>,
+}
+
+impl ToolFailure {
+    /// The planned size of a refused window read, when it is one.
+    #[cfg(test)]
+    fn planned_reads(&self) -> Option<&PlannedReads> {
+        self.read_detail.as_ref()?.planned_reads.as_ref()
+    }
+
+    fn with_planned_reads(mut self, reads: PlannedReads) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .planned_reads = Some(reads);
+        self
+    }
+
+    fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .incomplete_read = Some(read);
+        self
+    }
 }
 
 /// A window read refused as needing more requests than one call may spend:
@@ -645,8 +675,7 @@ impl From<String> for ToolFailure {
             unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
-            incomplete_read: None,
-            planned_reads: None,
+            read_detail: None,
         }
     }
 }
@@ -1198,8 +1227,7 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            incomplete_read: None,
-            planned_reads: None,
+            read_detail: None,
         }
     }
 
@@ -1333,8 +1361,7 @@ impl Server {
                 unsupported_parent_ledgers,
                 unanswered,
                 candidates,
-                incomplete_read,
-                planned_reads,
+                read_detail,
             }) => {
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
@@ -1433,6 +1460,9 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
+                let (incomplete_read, planned_reads) = read_detail
+                    .map(|detail| (detail.incomplete_read, detail.planned_reads))
+                    .unwrap_or_default();
                 if let Some(read) = incomplete_read {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["partial_reason"] = json!(read.partial_reason);

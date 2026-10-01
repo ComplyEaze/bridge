@@ -395,7 +395,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
         assert_eq!(failure.code, code);
         assert_eq!(failure.cause, Some("voucher_window_too_many_reads"));
         assert_eq!(
-            failure.planned_reads.as_deref(),
+            failure.planned_reads(),
             // The day's three vouchers at one a request, and one request each
             // for the empty days before and after it: the plan tiles the window.
             Some(&crate::agent::PlannedReads {

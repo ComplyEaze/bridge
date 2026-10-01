@@ -1,0 +1,16 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE OUTSTANDINGS LAB, seeded for #945: one request of an `outstandings` party-detail call made through a debug `bridge_mcp` built from commit 3f097e8654bb389126b7e7a0002d0cc8cce2601f (binary sha256 6b3ecf49c54ed5a2ed93c04a94ad819fe86ae69a13145293c290862dba0d303a), recorded by a serial read-only relay between the binary and the gateway",
+  "observed_date": "2026-10-01",
+  "source_response_bytes": 54290,
+  "source_response_sha256": "1b90f676a211116596437659d940db2a6095e675e13574b7ba591b73135c6b24",
+  "source_request_bytes": 1080,
+  "source_request_sha256": "35f8a0702fcec51f42f13794081951c3adef8f712bf6491d884174bb6068c648",
+  "request_rendered_by": "render_native_group_snapshot_request(company)",
+  "fixture_bytes": 54290,
+  "fixture_sha256": "1b90f676a211116596437659d940db2a6095e675e13574b7ba591b73135c6b24",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "28 groups; the company GUID compute matches the target. Tally writes raw 0x03 characters around each group's parent chain; they are kept.",
+  "provenance_limit": "One synthetic book on one build, seeded by this project over raw import (15 ledgers, 20 vouchers), so the capture shows how Tally answers these requests for those shapes; it is not evidence about a client's book. The request is the one Bridge itself sent during the tool call. Bridge sent it 2 times in the `unadjusted` call and 2 times in the `bill_trail` call (its paired reads and its brackets). Every answer to it was byte-identical to this one.",
+  "sensitivity_review": "Synthetic company name, synthetic ledger names (prefix OL), synthetic GUIDs; no party, person, GSTIN, address or credential."
+}

@@ -160,10 +160,21 @@ looked at in the review.
   with all of them, never the first only). A path that a commit pins and none of its
   parents pinned, and that is in neither the base list nor the head list, counts as a
   removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
-  pin must be restored. Both fail closed on a shallow clone and on a commit whose pin
-  list cannot be read or parsed. What stays open: a pin lost in a rebase, a
-  force-push or a squash before the push leaves no history to read, and only a
-  stay-pinned guard test covers that.
+  pin must be restored. In an older commit only the paths matter, so both read them
+  leniently (valid JSON with a `files` array whose rows each have a path string); the
+  strict rules (sorted, unique, exact keys, schema) stay as they are for the list at
+  the head and at the base, so a branch is never stuck because an old commit had its
+  list out of order. Both fail closed on a shallow clone and on a commit whose list
+  cannot be read at all (the script fails, the gate is indeterminate). The CI job
+  blocks only once its step no longer runs with `--report-only`; the merge gate blocks
+  regardless. A pin that follows a rename inside the branch (one commit pins a new
+  file, a later one renames it and moves the pin) reports the old name as withdrawn:
+  declare it with one `removed-pin:` line for the old name. What these checks cannot
+  see: a pin lost in a rebase, a force-push, an amend or a squash before the push
+  leaves no history to read, and the merge group and the push to master each check one
+  squash commit, which has no branch history, so there the pull-request-time check
+  and the merge gate are the control. Only a stay-pinned guard test covers a rewritten
+  history, and only for the pins it names.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed

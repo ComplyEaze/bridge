@@ -277,6 +277,18 @@ class MergeGateControls(unittest.TestCase):
     def test_a_merge_commit_is_compared_with_all_of_its_parents(self):
         self.assert_pass("history-merge-parent-compared-with-all", "all pinned paths touched")
 
+    def test_an_out_of_order_list_in_an_older_branch_commit_passes_once_the_head_list_is_sorted(self):
+        self.assert_pass("history-out-of-order-then-sorted", "all pinned paths touched")
+
+    def test_the_same_out_of_order_history_blocks_when_the_pin_is_then_dropped(self):
+        self.assert_blocked(
+            "history-out-of-order-then-dropped",
+            "pinned by a commit of this PR but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line: src/own.rs",
+        )
+
+    def test_the_same_out_of_order_history_passes_when_the_withdrawal_is_declared(self):
+        self.assert_pass("history-out-of-order-then-dropped-declared", "all pinned paths touched")
+
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
         self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
 

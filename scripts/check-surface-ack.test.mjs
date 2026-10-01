@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, withdrawnPins } from "./check-surface-ack.mjs";
+import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, historicPaths, withdrawnPins } from "./check-surface-ack.mjs";
 
 // ---- the pure core ----
 
@@ -761,4 +761,62 @@ test("history check, pure: a merge is compared with all of its parents, not the 
   // A commit whose list is the same blob as a parent's adds nothing, and an unreadable list throws.
   assert.deepEqual(withdrawnPins({ commits: [{ sha: "n", parents: ["n"] }], pinsOf, basePaths: set(), headPaths: set() }), []);
   assert.throws(() => withdrawnPins({ commits: [{ sha: "x", parents: [] }], pinsOf: () => { throw new Error("unreadable"); }, basePaths: set(), headPaths: set() }), /unreadable/);
+});
+
+// ---- historic pin lists are read for their paths only ----
+
+// main: M0 pins a and b. The branch's first commit pins a new file n with the list out of order
+// (a, n, b); its second commit sorts it, or drops n. The strict rules apply to the list at the head
+// and at the base; a list in an older commit of the branch is read for its paths only.
+function outOfOrderThen({ keep, ackText = "n.txt\nreviewer: octocat\n" }) {
+  const r = prRepo();
+  r.sh("switch", "-q", "-c", "own", "main");
+  r.write("n.txt", "n\n");
+  r.surface([{ path: "a.txt" }, { path: "n.txt", reason: OWN_REASON }, { path: "b.txt" }]);
+  r.commit("pin n, list out of order");
+  r.surface(keep ? [{ path: "a.txt" }, { path: "b.txt" }, { path: "n.txt", reason: OWN_REASON }] : [{ path: "a.txt" }, { path: "b.txt" }]);
+  r.write(`${ACK_DIR}pr-7.txt`, ackText);
+  const tip = r.commit(keep ? "sort the list" : "drop the pin");
+  r.sh("switch", "-q", "main");
+  mergeBranch(r, "own");
+  return { r, tip };
+}
+
+test("history check: an out-of-order list in an older branch commit passes once the head list is sorted", () => {
+  const out = run(outOfOrderThen({ keep: true }));
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /surface ack check ok/);
+});
+
+test("history check: the same out-of-order history fails when the pin is then dropped, and passes when declared", () => {
+  const out = run(outOfOrderThen({ keep: false }));
+  assert.equal(out.status, 1, out.stdout);
+  assert.doesNotMatch(out.stdout, /cannot be parsed/);
+  assert.match(out.stdout, /touched pinned files \(1: n\.txt\)/);
+  const declared = run(outOfOrderThen({ keep: false, ackText: "reviewer: octocat\nremoved-pin: n.txt\n" }));
+  assert.equal(declared.status, 0, declared.stdout);
+});
+
+test("history check: a historic list that is not readable at all still fails closed", () => {
+  const r = prRepo();
+  r.sh("switch", "-q", "-c", "own", "main");
+  r.write(SURFACE_PATH, JSON.stringify({ schema_version: 3, files: [{ path: 3 }] }));
+  r.commit("a list whose rows are not paths");
+  r.surface([{ path: "a.txt" }, { path: "b.txt" }]);
+  r.write("other.txt", "changed\n");
+  const tip = r.commit("repair it");
+  r.sh("switch", "-q", "main");
+  mergeBranch(r, "own");
+  const out = cli(r.dir, ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /cannot be parsed/);
+});
+
+test("historicPaths reads paths only: unsorted, duplicated and extra-key rows are fine, unreadable lists are not", () => {
+  const rows = (...r) => JSON.stringify({ files: r });
+  assert.deepEqual([...historicPaths(rows({ path: "b" }, { path: "a", extra: 1 }, { path: "a" }))].sort(), ["a", "b"]);
+  assert.deepEqual([...historicPaths(JSON.stringify({ schema_version: 2, files: [{ path: "a", sha256: "0".repeat(64) }] }))], ["a"]);
+  for (const bad of ["{ not json", "[]", "{}", JSON.stringify({ files: "x" }), rows({ path: 3 }), rows({}), rows(null), rows({ path: "" })]) {
+    assert.throws(() => historicPaths(bad), /pin list/, bad);
+  }
 });

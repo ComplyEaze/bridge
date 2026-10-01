@@ -239,8 +239,33 @@ function collectAcks(changed, headRev) {
   return acks;
 }
 
-// The pin list at one commit, for the history check: {blob, paths}. A schema 2 list (a branch cut
-// before schema 3) is read for its paths only. It must exist and parse; anything else throws.
+// The paths in a pin list from an older commit of the branch. Only the paths matter there, so the
+// list needs to be valid JSON with a `files` array of rows that each have a path string: the strict
+// rules (sorted, unique, exact keys, schema) apply to the list at the head and at the base, and a
+// branch must not be left with no way to go green because one old commit had its list out of order.
+// scripts/merge-gate.sh reads the same thing (`.files[].path`), so the two checks agree.
+export function historicPaths(text) {
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    throw new Error("the pin list is not valid JSON");
+  }
+  if (!doc || typeof doc !== "object" || Array.isArray(doc) || !Array.isArray(doc.files)) {
+    throw new Error("the pin list has no files array");
+  }
+  const paths = doc.files.map((row, i) => {
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.path !== "string" || row.path === "") {
+      throw new Error(`pin list row ${i + 1} has no path string`);
+    }
+    return row.path;
+  });
+  return new Set(paths);
+}
+
+// The pin list at one commit, for the history check: {blob, paths}, read for its paths only (see
+// historicPaths, which also covers a schema 2 list from a branch cut before schema 3). It must exist
+// and be readable; anything else throws.
 function pinsAtCommit(sha, cache) {
   if (!/^[0-9a-f]{40,64}$/.test(sha)) throw new Error(`refusing commit ${JSON.stringify(sha)}`);
   if (!cache.has(sha)) {
@@ -253,7 +278,7 @@ function pinsAtCommit(sha, cache) {
     let paths = cache.get(blob)?.paths;
     if (!paths) {
       try {
-        paths = new Set(parsePins(git("cat-file", "blob", blob), { allowSchema2: true }).map((p) => p.path));
+        paths = historicPaths(git("cat-file", "blob", blob));
       } catch (error) {
         throw new Error(`the pin list at commit ${sha.slice(0, 12)} cannot be parsed (${error.message}); the branch history cannot be checked`);
       }

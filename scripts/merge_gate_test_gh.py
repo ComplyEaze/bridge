@@ -408,6 +408,24 @@ def state():
                 s["surface_head"] = with_own
                 set_changes(s, ("modified", "src/example.rs"), ("modified", SURFACE_PATH))
                 with_ack(s, ack_text(["src/example.rs", own]))
+            elif scenario.startswith("history-out-of-order-"):
+                # An older commit of the branch pinned the new file with the list out of order. Only
+                # its paths matter there (scripts/check-surface-ack.mjs reads the same thing).
+                unsorted = {"schema_version": 3, "files": [
+                    {"path": "src/example.rs"}, {"path": own, "reason": "decides what is posted"}, {"path": "src/other.rs"}]}
+                s["surface_at"] = {c1: unsorted}
+                if scenario == "history-out-of-order-then-sorted":
+                    s["surface_head"] = with_own
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([own]))
+                elif scenario == "history-out-of-order-then-dropped":
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([own]))
+                elif scenario == "history-out-of-order-then-dropped-declared":
+                    set_changes(s, ("modified", SURFACE_PATH))
+                    with_ack(s, ack_text([], removed=[own]))
+                else:
+                    fail("unknown history scenario")
             elif scenario == "history-commit-list-unreadable":
                 s["surface_at"] = {}
                 s["surface_at_fail"] = {c1}

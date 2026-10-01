@@ -352,7 +352,8 @@ godown and in-year negatives are not counted), `zero_quantity_count`, and
 `value_sum`, which is `null` with `partial` true whenever any item's closing value
 is empty, whatever its quantity (that a zero quantity makes an empty value zero is
 unmeasured); a book whose closing values are all empty has no sum, not a sum of
-zero, and a book with no items has a `value_sum` of zero. `inventory`
+zero, and a book with no items has a `value_sum` of zero (a book with inventory on
+but no stock items has not been measured live). `inventory`
 reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
 and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
 that these are the stock items' closing values exactly as Tally sends them, and that
@@ -371,8 +372,11 @@ returned rows from the held read; a GUID that is not found is listed under
 compares the grand total only, so `matched` can stand beside `partial: true` when
 some items have no closing value. A differing read is not held: a later page
 continues only from an earlier read of the same date that was returned (matched or
-not checked), if one is still held. Without a `snapshot_id` it otherwise reads
-afresh; with one, the call is refused as `snapshot_not_held`.
+not checked), if one is still held. On a later page (offset > 0) without a
+`snapshot_id`, the call otherwise reads afresh; with one, it is refused as
+`listing_snapshot_changed` (cause `snapshot_not_held`, or
+`book_changed_since_first_page` when the book moved). A first page always reads
+afresh.
 
 The read runs inside the same company, mode and identity brackets as `masters`:
 the company's inventory flags (a Company collection filtered to the company's GUID),

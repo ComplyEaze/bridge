@@ -360,10 +360,9 @@ are not masked: they are configuration labels, not counterparties.
 ### Stock Summary
 
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
-closing stock quantity and value per stock item, whether inventory is integrated
-with the accounts, and how many items have a negative closing quantity. The items'
-closing values (not their quantities) are checked against the sum of the top-level
-lines of Tally's own Stock Summary. `as_of` must be a 31 March (a
+the closing stock value per stock item, with the total of those values checked
+against Tally's own Stock Summary, and whether inventory is integrated with the
+accounts. `as_of` must be a 31 March (a
 financial-year end), the only date measured for stock, and not before the book's
 start or after today. Any other date is refused as
 `stock_summary_as_of_not_measured` before any request, and retrying the same date
@@ -372,53 +371,100 @@ refuses again. The only period measured is the period ending 31 March 2026
 measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
 or the book's start if that is later.
 
+A row is returned only when a check ran and held. The top-level `state` is one of
+three values:
+
+- `value_total_matched`: the items are returned. Their closing values add up to
+  the sum of the top-level lines of Tally's own Stock Summary, and only that total
+  was compared.
+- `no_stock_items`: Tally's own stock item count is 0, the item list is empty and
+  the Stock Summary is empty. `items` is an empty list.
+- `not_established`: no item is returned (`items` is `null`). `reason` says why and
+  `remediation` says what to do next:
+  - `tally_stock_summary_differs`: the report has a total the items do not add up
+    to.
+  - `tally_stock_summary_shows_no_value`: the items carry a value and the report
+    came back with no amount. An empty report is not told apart from one Tally did
+    not render, so this is not called a contradiction.
+  - `stock_values_not_comparable`: nothing could be compared (no item has a closing
+    value and the report shows no amount or a total of zero, or the values add up
+    to zero and the report shows no amount). Values that add up to zero against a
+    report total of zero are a match.
+
+A `not_established` result carries `unchecked_comparison` in place of `tie_out`:
+its `state`, and what each side of the comparison that did not hold added up to
+(`items_closing_values_added`, and `tally_stock_summary_lines_added` when the
+report had a total). Nothing checked them: the closing-value total of a matched
+read is the only thing `stock_summary` checks, and `checks` says so field by
+field. They are for investigation only (`use` says so); neither is a stock value
+or a total, and the items' side adds only the closing values present.
+
+**Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
+`checks` says per field what is `checked`, `not_checked` or `withheld`: the
+closing-value total is checked; each value on its own, the names, parents and base
+units, whether the date was honoured and whether the item list is complete are
+not; the closing quantity is withheld. A quantity Bridge could not read (a compound
+unit, or a unit with a space in it) is counted in
+`totals.closing_quantity_unread_count` and does not refuse the read.
+
 Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
-holds `quantity` (`amount`, signed as Tally sent it, and `unit`) and `value` (a
-plain signed decimal exactly as Tally sends it: the sign is kept, never flipped,
-and not interpreted). Either is `null` where Tally sent none, which is not zero,
-and is counted in `totals` (`empty_closing_quantity_count`,
-`empty_closing_value_count`). The opening quantity and value are read but not
-returned, because their as-at date is unmeasured. Values and their signs are
-exactly as Tally sends them: the one capture had items with a positive quantity and
-a negative value, what the sign means is unmeasured, and `value_sum` adds the
-values as sent, signs included: `totals.value_sum_signs` is always
-`as_sent_meaning_unmeasured` beside it, whether or not `value_sum` is null, saying
-the values were added with the signs Tally sent and that what a negative value
-means is unmeasured. `totals` also holds
-`item_count`, `negative_closing_quantity_count` (company totals at `as_of`: batch,
-godown and in-year negatives are not counted), `zero_quantity_count`, and
-`value_sum`, which is `null` with `partial` true whenever any item's closing value
-is empty, whatever its quantity (that a zero quantity makes an empty value zero is
-unmeasured); a book whose closing values are all empty has no sum, not a sum of
-zero, and a book with no items has a `value_sum` of zero (a book with inventory on
-but no stock items has not been measured live). `inventory`
+holds `value` only (a plain signed decimal exactly as Tally sends it: the sign is
+kept and never flipped). It is `null` where Tally sent none,
+which is not zero, and is counted in `totals` (`empty_closing_value_count`); a
+value Tally sent as `0.00` is a value. The opening quantity and value are read but
+not returned, because their as-at date is unmeasured.
+
+**The sign of a value.** Values keep the sign Tally sends, as in the Trial
+Balance: **a negative value is a debit, which is stock held**, and Tally's own
+Stock Summary screen shows it as a positive value. A positive value is what that
+screen shows as negative, `(-)`. So ordinary closing stock is a negative number
+here, and `value_sum` adds the values with those signs: stock held gives a
+negative sum. `totals.value_sum_signs` is always `as_sent_negative_is_debit`
+beside it, whether or not `value_sum` is null. This was measured on one synthetic
+company on licensed TallyPrime 7.1 Silver against Tally's own screen (the protocol
+reference, §12a.13). The committed captures come from a synthetic book most of
+whose values are positive on the wire, that is, values Tally's screen shows as
+negative.
+
+`totals` also holds `item_count` and `value_sum`, which
+is written at the scale of the values it adds and is `null` with `partial` true
+whenever any item's closing value is empty. `inventory`
 reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
 and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
-that these are the stock items' closing values exactly as Tally sends them, and that
+that these are the stock items' closing values exactly as Tally sends them, that
 how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
-measured. It then says either that they equal the sum of the top-level lines of
-Tally's own Stock Summary, or that they were NOT checked against it, with the
-reason.
-
-The top-level `state` is one of three values. `observed`: the items were returned
-and matched that sum. `unchecked`: the items were returned without having been
-compared with it (an empty, unknown or all-empty report), so `tie_out.state` is
-`not_checked` with its `reason`. `not_established`: the sum differs, and no item is returned.
+measured, and that the values of all the company's items (not only those on the
+page) add up to the report's total, the only thing compared.
 
 `tie_out` compares the sum of the items' closing values with the sum of the
-top-level lines of Tally's own Stock Summary. If they are equal it is `matched`. If the
-report is empty, unknown or has only empty amounts it is `not_checked` with a
-`reason`, the items are returned and `basis` says they are unchecked. If they
-differ the result is `not_established` with reason `tally_stock_summary_differs`
-and both totals, and no item is returned. `items` (one to fifty GUIDs) filters the
-returned rows from the held read; a GUID that is not found is listed under
-`items_not_found`. `totals` and `tie_out` always cover the whole book. The tie-out
-compares the grand total only, so `matched` can stand beside `partial: true` when
-some items have no closing value. A differing read is not held: a later page
-continues only from an earlier read of the same date that was returned (matched or
-not checked), if one is still held. On a later page (offset > 0) without a
-`snapshot_id`, the call otherwise reads afresh; with one, it is refused as
-`listing_snapshot_changed` (cause `snapshot_not_held`, or
+top-level lines of Tally's own Stock Summary. It compares the grand total only, so
+`value_total_matched` can stand beside `partial: true` when some items have no
+closing value, and a match needs at least one value on the items' side and a total
+on the report's.
+
+An item valued at zero or with no value adds nothing to either total, so only
+Tally's own stock item count vouches for it. That count followed the one delete
+measured (one synthetic company, one sample: the protocol reference, §12a.13),
+which is not proof of a complete list, so `checks.item_list_complete` is
+`not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`
+`matched`: items are returned only when the two are equal. A read whose rows differ
+from Tally's count, either way, is refused as `stock_summary_item_count_differs`,
+with both numbers under `counts` and the next call in `remediation`: with fewer
+rows the list may be incomplete, and with more rows the count is not counting the
+list Bridge read. A count
+Tally did not give (missing, empty or not a number; never read as zero) refuses as
+`stock_summary_read_failed` with cause `stock_item_count_unavailable`. A Stock
+Summary answered without the report refuses with cause `stock_report_unknown`;
+Bridge cannot tell why Tally did so. None of these three asks for a retry: every
+source was read twice and the book's extent was the same before and after.
+
+`items` (one to fifty GUIDs) filters the returned rows from the held read; a GUID
+that is not found is listed under `items_not_found`. `totals`, `tie_out` and
+`item_count_cross_check` always cover the whole book. A `not_established` result
+or a refusal is not held, and it replaces any earlier read of the same date. On a
+later page (offset > 0) without a `snapshot_id`, the call reads afresh when
+nothing is held or the book moved; with one, it is refused
+as `listing_snapshot_changed` (cause `snapshot_not_held`, or
 `book_changed_since_first_page` when the book moved). A first page always reads
 afresh.
 
@@ -446,14 +492,14 @@ Evidence: one synthetic book on one licensed TallyPrime 7.1
 (`src-tauri/crates/bridge-tally-protocol/tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`,
 protocol reference §12a.13), and the tie once on a client book. The size bound
 rests on the same assumed limits as `masters` (128 characters a name, four aliases)
-and a fixed-size allowance for a row that one synthetic book has measured. No godown
-or batch split and no rates are returned.
+and a fixed-size allowance for a row that one synthetic book has measured. No
+quantity, no godown or batch split and no rates are returned. A book in which no
+item has a closing value returns no item today; it waits for a capture of such a
+book.
 
 A company split by year, whose sibling companies share the GUID, is refused: the
 company-flags read requires exactly one Company row for the GUID
-(`company_flags_not_one_row`). A quantity whose unit has a space in it or is
-compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes
-such units is unmeasured.
+(`company_flags_not_one_row`).
 
 Under `mask_parties`, an item's `name` and `parent` are masked like a party name,
 because stock-item and stock-group names are free text that can carry a customer's

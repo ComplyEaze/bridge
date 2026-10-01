@@ -626,7 +626,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         (
             "stock_summary",
-            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"quantity":{"amount":"100","unit":"Box"},"value":"2500.00"}}],"offset":0}),
+            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
         ),
         (
             "profit_and_loss",

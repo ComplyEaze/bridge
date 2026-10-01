@@ -623,6 +623,12 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             ),
         ),
         (
+            "sales_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
+        ),
+        (
             "trial_balance",
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),

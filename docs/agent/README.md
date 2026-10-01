@@ -84,9 +84,9 @@ The ordinary default tools are `tally_status`, `list_companies`,
 `ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
 `stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` are in
-source but not in the 0.3.0 release.) `local_data_report` (also
+`read_evidence`, `egress_log`, `local_data_report`, and `sales_register`. (`masters`,
+`stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register`,
+`local_data_report` and `sales_register` are in source but not in the 0.3.0 release.) `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -708,6 +708,39 @@ or vouchers.
   with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
+
+### Sales register (`sales_register`)
+
+The mirror of `purchase_register`: it lists the Sales and Credit Note vouchers
+of a date window that touch a ledger under Duties & Taxes, and says per entry
+what the books record. It is the same code with two things changed: the register's
+voucher classes (Sales and Credit Note instead of Purchase and Debit Note) and
+the group of the taxable ledgers (Sales Accounts instead of Purchase Accounts).
+Everything else is shared: the reads, the company pin, the snapshot binding, the
+states, the refusals, the paging, the masking, and the rule that tax comes only
+from the GST duty head on the ledger master, never from a name or an amount.
+Read the purchase register's section above for each of them. The response's
+`profile` is `agent_sales_register_v1`; vouchers with no Duties & Taxes entry are
+counted in `sales_vouchers_without_duties_taxes_entry`; each row carries
+`party_group` and the tool does not decide whether a Credit Note is a sales
+return or a credit note issued to a supplier. It decides no place of supply, tax
+rate or return section, and matches nothing against any portal.
+
+- **Measured.** The voucher window of two Sales item invoices imported into one
+  lab company (TallyPrime 7.1 Silver), read through the purchase register's own
+  request: voucher type Sales, the invoice view, the party as a debit entry, the
+  sales ledger as an ordinary credit entry with the goods line nested under it,
+  and, for the taxed one, two plain credit entries on tax ledgers. And one Sales
+  accounting voucher (not an invoice) classified against the ledger masters of
+  the purchase register's lab book, with CGST and SGST heads.
+- **Not measured, and said so in the tool's text and in each response's
+  `coverage`:** credit notes; an inter-state (IGST) line on a sale; a tax Tally
+  computes itself (rate or HSN on the item); a sale typed on Tally's screen
+  (only imported sales were read); accounting-invoice mode; optional, cancelled
+  and post-dated sales (returned flagged, as the purchase register does); a
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
+  returned); books with several currencies. The two item invoices' own ledger
+  masters were not captured, so no test classifies them end to end.
 
 ### Foreign-currency composites in `vouchers`
 

@@ -168,6 +168,40 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
 }
 
 #[tokio::test]
+async fn the_sales_register_sends_the_same_requests_and_lists_the_purchase_apart() {
+    // The sales register reads exactly as the purchase register does, so the recorded
+    // answers of the purchase register's read serve it: the one voucher of that day is a
+    // Purchase, which the sales register does not list as a row but names.
+    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            "sales_register",
+            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+        )
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["vouchers_observed"], 1);
+    let other = &result["other_voucher_types_touching_duties_taxes"];
+    assert_eq!(other["total"], 1);
+    assert_eq!(other["listed"][0]["voucher_class"], "Purchase");
+    let observed = simulator.finish().unwrap();
+    assert_eq!(observed.len(), RECORDED_ORDER.len());
+    for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
+        assert_eq!(
+            request.request_body_sha256,
+            recorded_request_sha256(Kind::of(letter)),
+            "request {position} ({letter}) is not the recorded one"
+        );
+    }
+}
+
+#[tokio::test]
 async fn the_requests_sent_are_the_recorded_ones_in_the_recorded_order() {
     // The scripted transport answers by position, so this is what pins the order and shape of
     // Bridge's reads: each request body's fingerprint must be the recorded one.

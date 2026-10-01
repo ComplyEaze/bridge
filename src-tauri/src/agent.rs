@@ -929,6 +929,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
         ),
+        // The `outstandings` party detail (#945) refuses, never cuts, an answer
+        // over its row limit; each kind has its own code and its own remedy.
+        "trail_too_large" => Some(
+            "The party's bill trail has more than 500 allocations, so it was refused rather \
+             than cut. Ask for one bill at a time with `reference`, using a reference that \
+             `open_bills` lists for the party.",
+        ),
+        "unadjusted_detail_too_large" => Some(
+            "The party's unadjusted detail has more than 500 on-account, advance and pending \
+             note rows, so it was refused rather than cut, and no argument narrows it: \
+             `reference` applies only to `bill_trail`. The detail is not available for this \
+             party. Its vouchers, with their bill allocations, can still be read with \
+             `vouchers` and `ledger` over shorter date windows, without the tie-out.",
+        ),
         // #697: every Bridge process sends to one Tally one request at a time.
         "tally_endpoint_busy" => Some(
             "Another Bridge window or AI client was talking to this Tally for the whole \

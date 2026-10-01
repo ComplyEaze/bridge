@@ -1447,9 +1447,35 @@ fn a_detail_asks_for_a_party_and_a_kind_and_a_reference_only_for_a_trail() {
 #[test]
 fn an_answer_of_more_than_five_hundred_allocations_is_refused_never_cut() {
     use super::bill_trail::within_detail_cap;
-    assert_eq!(within_detail_cap(0), Ok(()));
-    assert_eq!(within_detail_cap(500), Ok(()));
-    assert_eq!(within_detail_cap(501), Err(TrailRefusal("trail_too_large")));
+    for (kind, code) in [
+        (DetailKind::BillTrail, "trail_too_large"),
+        (DetailKind::Unadjusted, "unadjusted_detail_too_large"),
+    ] {
+        assert_eq!(within_detail_cap(kind, 0), Ok(()));
+        assert_eq!(within_detail_cap(kind, 500), Ok(()));
+        assert_eq!(within_detail_cap(kind, 501), Err(TrailRefusal(code)));
+    }
+}
+
+/// The advice a refusal over the row limit carries can be followed: a bill
+/// trail is narrowed by `reference`, while `reference` with `unadjusted` is
+/// itself refused, so the unadjusted refusal says plainly that nothing narrows
+/// it instead of sending the caller to `reference`.
+#[test]
+fn each_over_the_limit_refusal_carries_advice_that_can_be_followed() {
+    let trail = crate::agent::refusal_remediation("trail_too_large").unwrap();
+    assert!(trail.contains("`reference`"), "{trail}");
+    let unadjusted = crate::agent::refusal_remediation("unadjusted_detail_too_large").unwrap();
+    assert!(
+        unadjusted.contains("`reference` applies only to `bill_trail`"),
+        "{unadjusted}"
+    );
+    assert!(unadjusted.contains("not available"), "{unadjusted}");
+    // Which is why: the call its advice would otherwise name is refused.
+    assert_eq!(
+        super::bill_trail::parse_detail_request(Some("P"), Some("unadjusted"), Some("R")),
+        Err("reference_requires_bill_trail")
+    );
 }
 
 #[test]
@@ -1571,7 +1597,10 @@ fn the_size_of_a_trail_answer_counts_every_bills_allocations_in_every_state() {
         },
     ];
     assert_eq!(trail_row_count(&outcomes), 500);
-    assert_eq!(within_detail_cap(trail_row_count(&outcomes)), Ok(()));
+    assert_eq!(
+        within_detail_cap(DetailKind::BillTrail, trail_row_count(&outcomes)),
+        Ok(())
+    );
     let mut more = outcomes;
     more.push(BillOutcome::DoesNotTie {
         reference: "C".into(),
@@ -1582,7 +1611,7 @@ fn the_size_of_a_trail_answer_counts_every_bills_allocations_in_every_state() {
     });
     assert_eq!(trail_row_count(&more), 501);
     assert_eq!(
-        within_detail_cap(trail_row_count(&more)),
+        within_detail_cap(DetailKind::BillTrail, trail_row_count(&more)),
         Err(TrailRefusal("trail_too_large"))
     );
 }

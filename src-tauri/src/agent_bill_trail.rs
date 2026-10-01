@@ -634,8 +634,9 @@ pub(super) fn bill_trail_state(
 }
 
 /// The most allocation rows one detail answer carries. Past it the read is
-/// refused (`trail_too_large`; narrow it with `reference`) instead of cut, so a
-/// trail is never a silently partial one.
+/// refused instead of cut, so a detail is never a silently partial one: a bill
+/// trail as `trail_too_large` (narrow it with `reference`), the unadjusted
+/// detail as `unadjusted_detail_too_large` (nothing narrows it).
 const MAX_DETAIL_ROWS: usize = 500;
 
 /// Allocations a bill-trail answer carries, whatever each bill's state.
@@ -651,10 +652,15 @@ pub(super) fn trail_row_count(bills: &[BillOutcome]) -> usize {
         .sum()
 }
 
-/// Refuse, never cut, an answer of more than [`MAX_DETAIL_ROWS`] allocations.
-pub(super) fn within_detail_cap(rows: usize) -> Result<(), TrailRefusal> {
+/// Refuse, never cut, an answer of more than [`MAX_DETAIL_ROWS`] rows, with the
+/// kind's own code: `reference` narrows a bill trail and nothing narrows the
+/// unadjusted detail, so the two refusals carry different advice.
+pub(super) fn within_detail_cap(kind: DetailKind, rows: usize) -> Result<(), TrailRefusal> {
     if rows > MAX_DETAIL_ROWS {
-        return Err(TrailRefusal("trail_too_large"));
+        return Err(TrailRefusal(match kind {
+            DetailKind::BillTrail => "trail_too_large",
+            DetailKind::Unadjusted => "unadjusted_detail_too_large",
+        }));
     }
     Ok(())
 }
@@ -824,7 +830,7 @@ pub(super) fn party_detail(
     match kind {
         DetailKind::BillTrail => {
             let bills = bill_trails(party, reference, entries, open_bills)?;
-            within_detail_cap(trail_row_count(&bills))?;
+            within_detail_cap(kind, trail_row_count(&bills))?;
             Ok(json!({
                 "kind": kind.label(),
                 "state": bill_trail_state(&bills, row),
@@ -833,7 +839,7 @@ pub(super) fn party_detail(
         }
         DetailKind::Unadjusted => {
             let detail = unadjusted_detail(entries, open_bills, party, row)?;
-            within_detail_cap(detail.rows.len())?;
+            within_detail_cap(kind, detail.rows.len())?;
             let mut value = detail.json();
             value["kind"] = json!(kind.label());
             Ok(value)

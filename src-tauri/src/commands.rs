@@ -3,8 +3,7 @@ use crate::db::tally_mirror::{
     company_profile_correlation_key, CapabilityItemInput, CapabilityKind as MirrorCapabilityKind,
     CapabilitySnapshotInput, CapabilityState as MirrorCapabilityState, Confidence, FreshnessState,
     LocalReconciliationMismatch, ProofSummary, RedactedProofExport, ReviewedSetupInput,
-    SelectedReadObservationInput, SelectedReadScopeInput, SourceIdentityInput,
-    WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
+    SourceIdentityInput, WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
 };
 use crate::gst::{GstDraftRequest, GstReturnDraft};
 use crate::reports::bulk_party_statement::{
@@ -38,9 +37,8 @@ use crate::tally::validators::{
 pub use crate::tally::VerifiedCompanyIdentity;
 use crate::tally::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, ConnectionStatus,
-    EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, SelectedReadScopeEvidence,
-    TallyCompany, TallyConfig, TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport,
-    VerifiedCompanyIdentityError,
+    EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, TallyCompany, TallyConfig,
+    TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport, VerifiedCompanyIdentityError,
 };
 use bridge_tally_core::{
     CapabilityFeatureId, CapabilityPackId, CapabilityState, CompanyRef as CoreCompanyRef,
@@ -584,7 +582,6 @@ fn persisted_tally_probe_result(
         connection: probe.connection,
         companies,
         profile: probe.profile,
-        selected_read_scope: probe.selected_read_scope,
         profile_sha256,
         review_commitment_sha256,
         passport_snapshot_id: None,
@@ -737,22 +734,6 @@ pub async fn save_tally_setup(
             .find(|company| selected_identity.matches_observed_company(company))
             .cloned()
             .ok_or_else(reviewed_probe_changed_error)?;
-        if probe.selected_read_scope.as_ref().is_some_and(|scope| {
-            !company.guid.as_deref().is_some_and(|guid| {
-                guid.to_ascii_lowercase() == scope.company_guid_ascii_casefolded
-            }) || company.company_number.as_deref() != Some(scope.company_number.as_str())
-                || company.books_from.as_deref() != Some(scope.books_from_yyyymmdd.as_str())
-        }) {
-            return Err(tally_command_error(
-                "qualified_company_scope_changed",
-                "Tally application",
-                "The selected company does not match the qualified read scope.",
-                "after_change",
-                false,
-                "Select the qualified company or probe and qualify the replacement company.",
-            ));
-        }
-
         let saved = mirror
             .save_reviewed_setup(ReviewedSetupInput {
                 review_commitment_sha256: request.expected_review_commitment_sha256.clone(),
@@ -780,44 +761,7 @@ pub async fn save_tally_setup(
                 },
                 company_number: request.selected_company.company_number.clone(),
                 books_from_yyyymmdd: request.selected_company.books_from_yyyymmdd.clone(),
-                selected_read_scope: probe.selected_read_scope.as_ref().map(|scope| {
-                    SelectedReadScopeInput {
-                        scope_commitment_sha256: scope.scope_commitment_sha256.clone(),
-                        parent_review_sha256: scope.parent_review_sha256.clone(),
-                        ledger_profile_id: scope.ledger_profile_id.clone(),
-                        voucher_profile_id: scope.voucher_profile_id.clone(),
-                        voucher_from_yyyymmdd: scope.voucher_from_yyyymmdd.clone(),
-                        voucher_to_yyyymmdd: scope.voucher_to_yyyymmdd.clone(),
-                        company_number: scope.company_number.clone(),
-                        books_from_yyyymmdd: scope.books_from_yyyymmdd.clone(),
-                        observed_at_unix_ms,
-                        observations: scope
-                            .observations
-                            .iter()
-                            .map(|observation| SelectedReadObservationInput {
-                                capability_key: observation.capability_key.to_string(),
-                                state: mirror_capability_state(observation.state),
-                                confidence: mirror_confidence(observation.confidence),
-                                safe_reason_code: observation.safe_reason_code.to_string(),
-                                result_bucket: observation.result_bucket.to_string(),
-                                request_sha256: observation.request_sha256.clone(),
-                                decoded_response_sha256: observation
-                                    .decoded_response_sha256
-                                    .clone(),
-                                response_encoding: observation
-                                    .response_encoding
-                                    .map(str::to_string),
-                                company_context_verified: observation.company_context_verified,
-                                schema_verified: observation.schema_verified,
-                                record_count_verified: observation.record_count_verified,
-                                identity_evidence_state: observation
-                                    .identity_evidence_state
-                                    .to_string(),
-                                date_window_verified: observation.date_window_verified,
-                            })
-                            .collect(),
-                    }
-                }),
+                selected_read_scope: None,
             })
             .await
             .map_err(|_| {
@@ -1091,7 +1035,6 @@ pub struct PersistedTallyProbeResult {
     pub connection: ConnectionStatus,
     pub companies: Vec<PersistedTallyCompany>,
     pub profile: bridge_tally_core::CapabilityProfile,
-    pub selected_read_scope: Option<SelectedReadScopeEvidence>,
     pub profile_sha256: String,
     pub review_commitment_sha256: String,
     pub passport_snapshot_id: Option<String>,

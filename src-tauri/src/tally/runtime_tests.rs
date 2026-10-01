@@ -852,7 +852,6 @@ fn synthetic_probe_result() -> TallyProbeResult {
             features: BTreeMap::new(),
             packs: BTreeMap::new(),
         },
-        selected_read_scope: None,
         passport_snapshot_id: None,
     }
 }
@@ -1477,39 +1476,6 @@ fn reviewed_probe_cache_rejects_future_expired_and_invalid_freshness() {
 }
 
 #[test]
-fn replacing_a_qualified_review_does_not_renew_its_freshness_origin() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9003,
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let freshness_origin_unix_ms = chrono::Utc::now().timestamp_millis() - 299_000;
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-original".to_string(),
-        observed_at_unix_ms: freshness_origin_unix_ms,
-        freshness_origin_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    let mut reservation = runtime
-        .reserve_cached_probe_fresh(&config, "review-original", 300_000)
-        .expect("reserve original")
-        .expect("original remains barely fresh");
-    assert!(reservation
-        .replace(
-            "review-qualified".to_string(),
-            chrono::Utc::now().timestamp_millis(),
-            synthetic_probe_result(),
-        )
-        .expect("replace reservation"));
-    assert!(runtime
-        .reserve_cached_probe_fresh(&config, "review-qualified", 298_000)
-        .expect("check inherited freshness")
-        .is_none());
-}
-
-#[test]
 fn ordinary_read_admission_and_review_reservation_are_mutually_exclusive() {
     let runtime = TallyRuntime::default();
     let config = TallyConfig {
@@ -1641,48 +1607,6 @@ fn stale_guard_cannot_release_or_consume_a_newer_reserved_review() {
         reserved: true,
     });
     assert!(!stale.consume().expect("stale consume is inert"));
-    drop(stale);
-    let cache = session.cached_probe.read().expect("capability cache");
-    let current = cache.as_ref().expect("new review remains");
-    assert_eq!(current.review_id, "review-new");
-    assert!(current.reserved);
-}
-
-#[test]
-fn stale_guard_cannot_replace_a_newer_reserved_review() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9008,
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-old".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    let mut stale = runtime
-        .reserve_cached_probe_fresh(&config, "review-old", 300_000)
-        .expect("reserve old")
-        .expect("old review");
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-new".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: true,
-    });
-
-    assert!(!stale
-        .replace(
-            "review-illegal-replacement".to_string(),
-            observed_at_unix_ms,
-            synthetic_probe_result(),
-        )
-        .expect("stale replace is inert"));
     drop(stale);
     let cache = session.cached_probe.read().expect("capability cache");
     let current = cache.as_ref().expect("new review remains");

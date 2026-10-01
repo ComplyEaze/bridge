@@ -648,7 +648,6 @@ fn reviewed_probe_commitment_binds_time_company_name_and_full_company_list() {
             features: BTreeMap::new(),
             packs: BTreeMap::new(),
         },
-        selected_read_scope: None,
         passport_snapshot_id: None,
     };
     let first = reviewed_probe_commitment_sha256(

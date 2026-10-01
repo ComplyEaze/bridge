@@ -9,6 +9,7 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
+use crate::encode_tally_xml_request_utf16le;
 #[cfg(feature = "voucher-scan")]
 use crate::outstandings::{
     render_empty_partition_witness_template, render_ledger_opening_coverage,
@@ -18,10 +19,6 @@ use crate::outstandings::{
 use crate::outstandings_shared::PinnedCompany;
 use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
 use crate::xml_text::escape_text as xml_escape;
-use crate::{
-    encode_tally_xml_request_utf16le, BRIDGE_LEDGER_EXPORT_SCHEMA,
-    BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-};
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
 const TEMPLATE_FROM: &str = "20000101";
@@ -30,18 +27,12 @@ const TEMPLATE_TO: &str = "20000102";
 const TEMPLATE_ALTER_ID_START: u64 = 0;
 #[cfg(feature = "voucher-scan")]
 const TEMPLATE_ALTER_ID_END: u64 = 1;
-const TEMPLATE_CANARY_LEDGER: &str = "BRIDGE-CANARY-LEDGER-001";
-const BRIDGE_CANARY_LEDGER_PREFIX: &str = "BRIDGE-CANARY-";
-const TEMPLATE_IDENTITY_QUERY_SHA256: &str =
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
     CompanyInvalid,
     DateInvalid,
     DateRangeInvalid,
-    CanaryLedgerInvalid,
-    IdentityQueryInvalid,
 }
 
 impl fmt::Display for ReadProfileValidationError {
@@ -50,8 +41,6 @@ impl fmt::Display for ReadProfileValidationError {
             Self::CompanyInvalid => "read profile company input was invalid",
             Self::DateInvalid => "read profile date input was invalid",
             Self::DateRangeInvalid => "read profile date range was invalid",
-            Self::CanaryLedgerInvalid => "read profile canary ledger input was invalid",
-            Self::IdentityQueryInvalid => "read profile identity query input was invalid",
         })
     }
 }
@@ -78,63 +67,6 @@ impl ValidatedCompanyName {
 impl fmt::Debug for ValidatedCompanyName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("ValidatedCompanyName([redacted])")
-    }
-}
-
-/// A deliberately narrow name for a Bridge-generated write-canary ledger.
-/// It is safe to place in the exact TDL filter formula used by the readback
-/// profile and cannot represent an arbitrary operator-supplied ledger name.
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedCanaryLedgerName(String);
-
-impl ValidatedCanaryLedgerName {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.is_empty()
-            || value.len() > 128
-            || value
-                .strip_prefix(BRIDGE_CANARY_LEDGER_PREFIX)
-                .is_none_or(str::is_empty)
-            || !value.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-' | b'_' | b'.')
-            })
-        {
-            return Err(ReadProfileValidationError::CanaryLedgerInvalid);
-        }
-        Ok(Self(value))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedCanaryLedgerName {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedCanaryLedgerName([redacted])")
-    }
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct ValidatedIdentityQuerySha256(String);
-
-impl ValidatedIdentityQuerySha256 {
-    pub fn new(value: impl Into<String>) -> Result<Self, ReadProfileValidationError> {
-        let value = value.into();
-        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(ReadProfileValidationError::IdentityQueryInvalid);
-        }
-        Ok(Self(value.to_ascii_lowercase()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for ValidatedIdentityQuerySha256 {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("ValidatedIdentityQuerySha256([redacted])")
     }
 }
 
@@ -183,9 +115,7 @@ pub enum ReadOnlyProfileId {
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
     LedgersV1,
-    LedgerCanaryReadbackV1,
     VouchersV2,
-    VouchersV3,
     #[cfg(feature = "voucher-scan")]
     VoucherOutstandingsV1,
     #[cfg(feature = "voucher-scan")]
@@ -208,9 +138,7 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
             Self::LedgersV1 => "ledgers_v1",
-            Self::LedgerCanaryReadbackV1 => "ledger_canary_readback_v1",
             Self::VouchersV2 => "vouchers_v2",
-            Self::VouchersV3 => "vouchers_v3",
             #[cfg(feature = "voucher-scan")]
             Self::VoucherOutstandingsV1 => "voucher_outstandings_v1",
             #[cfg(feature = "voucher-scan")]
@@ -240,10 +168,7 @@ impl ReadOnlyProfileId {
     /// [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`]. A test renders every profile
     /// and checks this against [`first_spaced_function_argument`].
     pub fn education_refuses_report_formula(self) -> bool {
-        matches!(
-            self,
-            Self::LedgersV1 | Self::LedgerCanaryReadbackV1 | Self::VouchersV2 | Self::VouchersV3
-        )
+        matches!(self, Self::LedgersV1 | Self::VouchersV2)
     }
 
     /// The exact request rendered with fixed safe sentinels in every dynamic
@@ -259,15 +184,7 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
-            Self::LedgerCanaryReadbackV1 => render_ledger_canary_readback(
-                TEMPLATE_COMPANY,
-                TEMPLATE_CANARY_LEDGER,
-                TEMPLATE_IDENTITY_QUERY_SHA256,
-            ),
             Self::VouchersV2 => render_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO),
-            Self::VouchersV3 => {
-                render_selected_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
-            }
             #[cfg(feature = "voucher-scan")]
             Self::VoucherOutstandingsV1 => render_outstandings_template(
                 TEMPLATE_COMPANY,
@@ -380,19 +297,7 @@ pub enum ReadOnlyProfile<'a> {
     LedgersV1 {
         company: &'a ValidatedCompanyName,
     },
-    /// A one-ledger export used only to verify a separately approved,
-    /// Bridge-generated synthetic write canary. It is not a general ledger
-    /// query and remains read-only.
-    LedgerCanaryReadbackV1 {
-        company: &'a ValidatedCompanyName,
-        ledger_name: &'a ValidatedCanaryLedgerName,
-        identity_query_sha256: &'a ValidatedIdentityQuerySha256,
-    },
     VouchersV2 {
-        company: &'a ValidatedCompanyName,
-        range: &'a ValidatedDateRange,
-    },
-    VouchersV3 {
         company: &'a ValidatedCompanyName,
         range: &'a ValidatedDateRange,
     },
@@ -441,9 +346,7 @@ impl ReadOnlyProfile<'_> {
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
-            Self::LedgerCanaryReadbackV1 { .. } => ReadOnlyProfileId::LedgerCanaryReadbackV1,
             Self::VouchersV2 { .. } => ReadOnlyProfileId::VouchersV2,
-            Self::VouchersV3 { .. } => ReadOnlyProfileId::VouchersV3,
             #[cfg(feature = "voucher-scan")]
             Self::VoucherOutstandingsV1 { .. } => ReadOnlyProfileId::VoucherOutstandingsV1,
             #[cfg(feature = "voucher-scan")]
@@ -480,23 +383,9 @@ impl ReadOnlyProfile<'_> {
                 render_standard_ledger_identity(company.as_str())
             }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
-            Self::LedgerCanaryReadbackV1 {
-                company,
-                ledger_name,
-                identity_query_sha256,
-            } => render_ledger_canary_readback(
-                company.as_str(),
-                ledger_name.as_str(),
-                identity_query_sha256.as_str(),
-            ),
             Self::VouchersV2 { company, range } => {
                 render_vouchers(company.as_str(), range.from_yyyymmdd(), range.to_yyyymmdd())
             }
-            Self::VouchersV3 { company, range } => render_selected_vouchers(
-                company.as_str(),
-                range.from_yyyymmdd(),
-                range.to_yyyymmdd(),
-            ),
             #[cfg(feature = "voucher-scan")]
             Self::VoucherOutstandingsV1 {
                 company,
@@ -551,10 +440,6 @@ pub mod compatibility {
 
     pub fn vouchers_request(company: &str, from: &str, to: &str) -> String {
         super::render_vouchers(company, from, to)
-    }
-
-    pub fn selected_vouchers_request(company: &str, from: &str, to: &str) -> String {
-        super::render_selected_vouchers(company, from, to)
     }
 }
 
@@ -798,43 +683,6 @@ fn render_ledgers(company: &str) -> String {
     .to_string()
 }
 
-fn render_ledger_canary_readback(
-    company: &str,
-    ledger_name: &str,
-    identity_query_sha256: &str,
-) -> String {
-    let collection_filter = r#"                        <FILTERS>BRIDGE Ledger Exact Canary Name V1</FILTERS>
-"#;
-    let filter_formula = r#"                    <SYSTEM TYPE="Formulae" NAME="BRIDGE Ledger Exact Canary Name V1">$Name = "__BRIDGE_CANARY_LEDGER_NAME__"</SYSTEM>
-"#;
-    render_ledgers(company)
-        .replace("BRIDGE Ledger Export V1", "BRIDGE Ledger Canary Readback V1")
-        .replace(
-            BRIDGE_LEDGER_EXPORT_SCHEMA,
-            BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-        )
-        .replacen(
-            "                        <XMLTAG>\"COMPANYCONTEXT\"</XMLTAG>",
-            &format!(
-                "                        <XMLTAG>\"COMPANYCONTEXT\"</XMLTAG>\n                        <XMLATTR>\"QUERYIDENTITYSETSHA256\" : \"{identity_query_sha256}\"</XMLATTR>",
-            ),
-            1,
-        )
-        .replacen(
-            "                        <TYPE>Ledger</TYPE>",
-            &format!("                        <TYPE>Ledger</TYPE>\n{collection_filter}"),
-            1,
-        )
-        .replacen(
-            "                </TDLMESSAGE>",
-            &format!(
-                "{}                </TDLMESSAGE>",
-                filter_formula.replace("__BRIDGE_CANARY_LEDGER_NAME__", ledger_name),
-            ),
-            1,
-        )
-}
-
 fn render_vouchers(company: &str, from: &str, to: &str) -> String {
     format!(
         r#"
@@ -971,31 +819,6 @@ fn render_vouchers(company: &str, from: &str, to: &str) -> String {
     )
     .trim()
     .to_string()
-}
-
-fn render_selected_vouchers(company: &str, from: &str, to: &str) -> String {
-    let request = render_vouchers(company, from, to)
-        .replace("BRIDGE Voucher Export V2", "BRIDGE Voucher Export V3")
-        .replace("bridge.tally.vouchers/2", "bridge.tally.vouchers/3")
-        .replace(
-            "BRIDGE Voucher Company GUID V1, BRIDGE Voucher Record Count V1",
-            "BRIDGE Voucher Company GUID V1, BRIDGE Voucher From Date V3, BRIDGE Voucher To Date V3, BRIDGE Voucher Record Count V1",
-        );
-    let record_count_field = r#"                    <FIELD NAME="BRIDGE Voucher Record Count V1">"#;
-    let window_fields = r#"                    <FIELD NAME="BRIDGE Voucher From Date V3">
-                        <SET>$$String:##SVFromDate:"YYYYMMDD"</SET>
-                        <XMLTAG>"FROMDATE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher To Date V3">
-                        <SET>$$String:##SVToDate:"YYYYMMDD"</SET>
-                        <XMLTAG>"TODATE"</XMLTAG>
-                    </FIELD>
-"#;
-    request.replacen(
-        record_count_field,
-        &format!("{window_fields}{record_count_field}"),
-        1,
-    )
 }
 
 /// FETCHLIST of the tally-read v1 `company` part (`AuditCompanyObjectV1`).

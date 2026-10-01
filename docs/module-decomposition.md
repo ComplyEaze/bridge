@@ -253,8 +253,7 @@ jq -r '.files[].path' docs/tally/compatibility/compatibility-surface.json | sort
 
 The acknowledgement names every pinned path the diff changes and every pin it adds.
 If you edit a pinned file after writing it, update it: CI compares the file with the
-diff and reports a missing or extra path (report-only today), and `scripts/merge-gate.sh`
-blocks on one.
+diff and fails on a missing or extra path, and `scripts/merge-gate.sh` blocks on one.
 
 ## Proving a decomposition changed nothing
 

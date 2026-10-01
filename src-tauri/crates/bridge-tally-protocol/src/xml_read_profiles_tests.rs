@@ -3,9 +3,7 @@ use super::*;
 fn profiles<'a>(
     company: &'a ValidatedCompanyName,
     range: &'a ValidatedDateRange,
-    canary_ledger: &'a ValidatedCanaryLedgerName,
-    identity_query_sha256: &'a ValidatedIdentityQuerySha256,
-) -> [ReadOnlyProfile<'a>; 9] {
+) -> [ReadOnlyProfile<'a>; 7] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
@@ -13,13 +11,7 @@ fn profiles<'a>(
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
         ReadOnlyProfile::LedgersV1 { company },
-        ReadOnlyProfile::LedgerCanaryReadbackV1 {
-            company,
-            ledger_name: canary_ledger,
-            identity_query_sha256,
-        },
         ReadOnlyProfile::VouchersV2 { company, range },
-        ReadOnlyProfile::VouchersV3 { company, range },
     ]
 }
 
@@ -55,42 +47,13 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         assert_eq!(ValidatedDateRange::new(from, to), Err(expected));
     }
     assert!(ValidatedDateRange::new("20240229", "20240229").is_ok());
-    for ledger_name in [
-        "",
-        "Cash",
-        "BRIDGE-CANARY-",
-        "canary\nledger",
-        "canary\"ledger",
-        "canary:$ledger",
-    ] {
-        assert_eq!(
-            ValidatedCanaryLedgerName::new(ledger_name),
-            Err(ReadProfileValidationError::CanaryLedgerInvalid)
-        );
-    }
-    assert_eq!(
-        ValidatedCanaryLedgerName::new("x".repeat(129)),
-        Err(ReadProfileValidationError::CanaryLedgerInvalid)
-    );
-    assert!(ValidatedCanaryLedgerName::new("BRIDGE-CANARY-LEDGER-001").is_ok());
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("a".repeat(63)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
-    assert_eq!(
-        ValidatedIdentityQuerySha256::new("g".repeat(64)),
-        Err(ReadProfileValidationError::IdentityQueryInvalid)
-    );
 }
 
 #[test]
 fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     let company = ValidatedCompanyName::new("BRIDGE & <SYNTHETIC> \"BOOK\"").unwrap();
     let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
-    let canary_ledger = ValidatedCanaryLedgerName::new(TEMPLATE_CANARY_LEDGER).unwrap();
-    let identity_query_sha256 =
-        ValidatedIdentityQuerySha256::new(TEMPLATE_IDENTITY_QUERY_SHA256).unwrap();
-    for profile in profiles(&company, &range, &canary_ledger, &identity_query_sha256) {
+    for profile in profiles(&company, &range) {
         let request = profile.render();
         let upper = request.to_ascii_uppercase();
         assert!(upper.contains("<TALLYREQUEST>EXPORT</TALLYREQUEST>"));
@@ -101,22 +64,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     let ledger = ReadOnlyProfile::LedgersV1 { company: &company }.render();
     assert!(ledger.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
     assert!(!ledger.contains("BRIDGE & <SYNTHETIC>"));
-
-    let canary = ReadOnlyProfile::LedgerCanaryReadbackV1 {
-        company: &company,
-        ledger_name: &canary_ledger,
-        identity_query_sha256: &identity_query_sha256,
-    }
-    .render();
-    assert!(canary.contains(BRIDGE_LEDGER_WRITE_READBACK_SCHEMA));
-    assert!(canary.contains("<FILTERS>BRIDGE Ledger Exact Canary Name V1</FILTERS>"));
-    assert!(canary.contains(
-        "<SYSTEM TYPE=\"Formulae\" NAME=\"BRIDGE Ledger Exact Canary Name V1\">$Name = \"BRIDGE-CANARY-LEDGER-001\"</SYSTEM>"
-    ));
-    assert!(canary.contains("$Name = \"BRIDGE-CANARY-LEDGER-001\""));
-    assert!(canary.contains(
-        "<XMLATTR>\"QUERYIDENTITYSETSHA256\" : \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"</XMLATTR>"
-    ));
 
     let injection =
         ValidatedCompanyName::new("X</SVCURRENTCOMPANY><TALLYREQUEST>IMPORT</TALLYREQUEST>")
@@ -255,16 +202,8 @@ fn profile_ids_and_template_hashes_are_stable() {
             "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
         ),
         (
-            ReadOnlyProfileId::LedgerCanaryReadbackV1,
-            "e580b53ed7420ea15de08cb91b3aaf629028d32ddc79949eab6d8ca886628062",
-        ),
-        (
             ReadOnlyProfileId::VouchersV2,
             "81cc3da69ab58cd857603342898a2b3142ade321d5fea38de76c425612ccf6df",
-        ),
-        (
-            ReadOnlyProfileId::VouchersV3,
-            "8dbe02d0645ff6b055ea8f6fb63d27af90dc41e81ee42b39ee7d2b407ab4aa3b",
         ),
         (
             ReadOnlyProfileId::AuditCompanyObjectV1,
@@ -337,18 +276,6 @@ fn compatibility_renderers_preserve_validated_profile_bytes() {
             range.to_yyyymmdd(),
         ),
         ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        }
-        .render()
-    );
-    assert_eq!(
-        compatibility::selected_vouchers_request(
-            company.as_str(),
-            range.from_yyyymmdd(),
-            range.to_yyyymmdd(),
-        ),
-        ReadOnlyProfile::VouchersV3 {
             company: &company,
             range: &range,
         }
@@ -720,9 +647,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
             | ReadOnlyProfileId::LedgersV1
-            | ReadOnlyProfileId::LedgerCanaryReadbackV1
             | ReadOnlyProfileId::VouchersV2
-            | ReadOnlyProfileId::VouchersV3
             | ReadOnlyProfileId::AuditCompanyObjectV1
             | ReadOnlyProfileId::AuditLedgersV1
             | ReadOnlyProfileId::AuditVouchersV1
@@ -742,9 +667,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
         ReadOnlyProfileId::LedgersV1,
-        ReadOnlyProfileId::LedgerCanaryReadbackV1,
         ReadOnlyProfileId::VouchersV2,
-        ReadOnlyProfileId::VouchersV3,
         ReadOnlyProfileId::AuditCompanyObjectV1,
         ReadOnlyProfileId::AuditLedgersV1,
         ReadOnlyProfileId::AuditVouchersV1,
@@ -777,12 +700,7 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
     let vouchers = spaced("NumItems", "BRIDGE Voucher Collection V1");
     assert_eq!(
         refused,
-        [
-            ("ledgers_v1", ledgers.clone()),
-            ("ledger_canary_readback_v1", ledgers),
-            ("vouchers_v2", vouchers.clone()),
-            ("vouchers_v3", vouchers),
-        ]
+        [("ledgers_v1", ledgers), ("vouchers_v2", vouchers)]
     );
 }
 

@@ -111,6 +111,14 @@
       "reason": "the only leg that blocks an unacknowledged pinned change while the CI acknowledgement check is report-only, so weakening it is itself a pinned change"
     },
     {
+      "path": "scripts/merge_gate_diff.py",
+      "reason": "parses the pull-request diff that scripts/merge-gate.sh scans and reconciles against the REST file list; a change there can hide added lines or binary files from the privacy scan"
+    },
+    {
+      "path": "scripts/merge_gate_privacy.py",
+      "reason": "the privacy classifier the merge gate blocks on (customer emails, credentials, identifier shapes, home paths); weakening it would let customer data through the gate"
+    },
+    {
       "path": "scripts/outstandings-copy.test.mjs"
     },
     {

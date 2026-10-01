@@ -69,19 +69,9 @@ type TallyProbeResult = {
   connection: ConnectionStatus;
   companies: TallyCompany[];
   profile: CapabilityProfile;
-  selected_read_scope?: SelectedReadScope;
   profile_sha256: string;
   review_commitment_sha256: string;
   passport_snapshot_id?: string;
-};
-
-type SelectedReadScope = {
-  scope_version: number;
-  ledger_profile_id: string;
-  voucher_profile_id: string;
-  voucher_from_yyyymmdd: string;
-  voucher_to_yyyymmdd: string;
-  scope_commitment_sha256: string;
 };
 
 type SavedTallySetup = {
@@ -178,7 +168,6 @@ function App() {
   const [profileSha256, setProfileSha256] = React.useState<string | null>(null);
   const [reviewId, setReviewId] = React.useState<string | null>(null);
   const [reviewCommitmentSha256, setReviewCommitmentSha256] = React.useState<string | null>(null);
-  const [selectedReadScope, setSelectedReadScope] = React.useState<SelectedReadScope | null>(null);
   const [passportSnapshotId, setPassportSnapshotId] = React.useState<string | null>(null);
   const { runtimeSessions, runtimeError, refreshRuntime, cancelTallyRequest } = useTallyRuntimeSessions();
   const [companies, setCompanies] = React.useState<TallyCompany[]>([]);
@@ -494,7 +483,6 @@ function App() {
     setProfileSha256(null);
     setReviewId(null);
     setReviewCommitmentSha256(null);
-    setSelectedReadScope(null);
     setPassportSnapshotId(null);
     setLiveCompanyKeys([]);
     setOpenCompanyNames([]);
@@ -531,7 +519,6 @@ function App() {
         if (!preserveCurrentProbeReview) {
           setReviewId(null);
           setReviewCommitmentSha256(null);
-          setSelectedReadScope(null);
         }
       },
       clearPassportSnapshot: () => setPassportSnapshotId(null),
@@ -652,7 +639,6 @@ function App() {
               setProfileSha256(result.profile_sha256);
               setReviewId(result.review_id);
               setReviewCommitmentSha256(result.review_commitment_sha256);
-              setSelectedReadScope(result.selected_read_scope ?? null);
               setPassportSnapshotId(result.passport_snapshot_id ?? null);
               setCompanies((current) => mergeTallyCompanies(liveCompanies, current));
               setLiveCompanyKeys(nextLiveCompanyKeys);
@@ -687,7 +673,6 @@ function App() {
         setProfileSha256(null);
         setReviewId(null);
         setReviewCommitmentSha256(null);
-        setSelectedReadScope(null);
         setPassportSnapshotId(null);
         setLiveCompanyKeys([]);
         setOpenCompanyNames([]);
@@ -750,7 +735,6 @@ function App() {
             setProfileSha256(result.profile_sha256);
             setReviewId(result.review_id);
             setReviewCommitmentSha256(result.review_commitment_sha256);
-            setSelectedReadScope(result.selected_read_scope ?? null);
             setPassportSnapshotId(result.passport_snapshot_id ?? null);
             setCompanies((current) => mergeTallyCompanies(liveCompanies, current));
             // MERGE, never replace. This probe is scoped to one company via

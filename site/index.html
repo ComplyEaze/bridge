@@ -132,7 +132,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
               <span class="dbtn dbtn-default">Cancel</span>
             </div>
           </div>
-          <p class="dialog-cap">The approval window in release 0.3.0 on a Mac. On Windows it asks Yes or No.</p>
+          <p class="dialog-cap">The approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; we have not yet run that window on Windows.</p>
         </div>
 
         <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
@@ -156,21 +156,23 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
         </article>
 
         <article class="panel" data-chapter="2">
+          <p class="coming-line coming-first"><span class="tag">In development, not in the download</span></p>
           <h2>Every finding, tied to its voucher.</h2>
           <p class="proof">Payment 1187 to Demo Packaging Supplies, flagged 40A(3).</p>
-          <p class="coming-line"><span class="tag">In development, not in the download</span>One finding per row, cited to its clause. Its accuracy is not yet proven.</p>
+          <p class="proof-sub">One finding per row, cited to its clause. Its accuracy is not yet proven.</p>
         </article>
 
         <article class="panel" data-chapter="3">
           <h2>From bank statement to a voucher file.</h2>
-          <p class="proof">142 statement lines, <span class="counter" id="counterBank">139</span> vouchers ready.</p>
-          <p class="proof-sub">3 near-miss ledger names wait for your decision. ComplyEaze Bridge creates no ledger. It reads a few banks' PDF statements so far.</p>
+          <p class="proof">142 statement lines, <span class="counter" id="counterBank">139</span> matched to your ledgers.</p>
+          <p class="proof-sub">3 near-miss ledger names wait for your decision; the voucher file is built once every name is exact. ComplyEaze Bridge creates no ledger. It reads password-protected PDF statements from three banks so far.</p>
         </article>
 
         <article class="panel" data-chapter="4">
           <h2>Nothing posts until you approve it.</h2>
           <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
-          <p class="proof-sub">Posting is off by default in a new install. For many vouchers, import the prepared file in Tally yourself instead.</p>
+          <p class="proof-sub">Posting is off by default in a new install. Post a voucher this way or import it in the prepared file, never both.</p>
+          <p class="proof-sub">Posting from the released package has not yet been run by us against a live TallyPrime.</p>
         </article>
 
         <article class="panel" data-chapter="5">
@@ -201,11 +203,11 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       flags fold back into the edge, it opens to an ageing page, and the five overdue parties are ringed in pencil. The page turns
       to a voucher, two pencil ticks are drawn, and its 40A(3) flag leaves the page and lands as row 1 of a working
       paper titled &ldquo;Working paper &middot; Tax audit FY 2025-26&rdquo; (flagging is in development and not in the download). The page turns
-      again to a bank statement; a slip lifts off each of five rows and the pile reads 139 ready, and three
+      again to a bank statement; a slip lifts off each of five rows and the pile reads 139 matched, and three
       question-mark flags mark near-miss ledger names that wait for your decision; you decide them one after
-      another, each turns into a tick, and the count of ready vouchers, the voucher file ComplyEaze Bridge prepares for you to import in Tally, rises from 139 to 142. A replica of
+      another, each turns into a tick, and the count of lines matched to your ledgers rises from 139 to 142; ComplyEaze Bridge then prepares the voucher file for you to import in Tally. A replica of
       the approval window of release 0.3.0 on a Mac rises from one row, asks you to post that one voucher, and shrinks back into the row with a
-      red tick: one voucher per approval. After you import the prepared file in Tally yourself, each voucher is ticked as ComplyEaze Bridge
+      red tick: one voucher per approval, and a voucher is posted this way or imported in the file, never both. After you import the prepared file in Tally yourself, each voucher is ticked as ComplyEaze Bridge
       reads it back, counting up to 142 of 142. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
       one tick, and the four install steps and the download follow.
     </p>

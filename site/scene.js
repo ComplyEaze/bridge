@@ -993,7 +993,7 @@ const BANK_ROWS = [
   { date: '03 Mar', narration: 'NEFT DR-VAYUNATH ELECTRICALS', ref: 'N26030301', dr: '27,500.00', cr: '', bal: '9,22,500.00' },
   { date: '05 Mar', narration: 'CHQ DEP-SHRAVIKA STL', ref: '004512', dr: '', cr: '42,500.00', bal: '9,65,000.00' },
   { date: '07 Mar', narration: 'SALARY FEB 2026', ref: 'SAL0226', dr: '65,000.00', cr: '', bal: '9,00,000.00' },
-  { date: '09 Mar', narration: 'UPI-KAVYARTH STATIONERY', ref: 'UPI4471', dr: '12,300.00', cr: '', bal: '8,87,700.00', query: 'kavyarth' },
+  { date: '09 Mar', narration: 'UPI-KAVYARTH STATIONERY', ref: '606812447103', dr: '12,300.00', cr: '', bal: '8,87,700.00', query: 'kavyarth' },
   { date: '11 Mar', narration: 'NEFT CR-KESARVAN TEX', ref: 'N26031102', dr: '', cr: '38,750.00', bal: '9,26,450.00' },
   { date: '12 Mar', narration: 'NEFT CR-NEVRIKA AGRO FOOD', ref: 'N26031204', dr: '', cr: '1,24,600.00', bal: '10,51,050.00', query: 'nevrika' },
   { date: '14 Mar', narration: 'NEFT DR-GST PAYMENT', ref: 'N26031401', dr: '22,000.00', cr: '', bal: '10,29,050.00' },
@@ -1102,7 +1102,7 @@ function drawBankFace(ctx, w, h) {
 // ellipsis.
 const RECEIPT_ROWS = [
   ['tool', 'post_import'],
-  ['ts', '2026-03-12T08:32:05.114Z'],
+  ['ts', '2026-04-02T08:32:05.114Z'],
   ['redaction_preset', 'none'],
   ['response_sha256', 'a91f2c7e90\u2026'],
 ];
@@ -1977,10 +1977,10 @@ export class FileScene {
       if (cx.roundRect) cx.roundRect(2, 2, 220, 60, 14); else cx.rect(2, 2, 220, 60);
       cx.fill();
       cx.fillStyle = '#ffffff';
-      cx.font = '650 34px "Geist Mono Variable", monospace';
+      cx.font = '650 29px "Geist Mono Variable", monospace';
       cx.textAlign = 'center';
       cx.textBaseline = 'middle';
-      cx.fillText('139 ready', 112, 34);
+      cx.fillText('139 matched', 112, 34);
       const tx = new CanvasTexture(c);
       tx.colorSpace = SRGBColorSpace;
       tx.anisotropy = 4;

@@ -1331,6 +1331,31 @@ fn a_mixed_sign_set_is_summed_algebraically_on_both_sides() {
     };
     assert!(items_total.numeric_eq(&decimal("5000.01")));
     assert!(report_total.numeric_eq(&decimal("3000.01")));
+    // An edit of captured text: every report amount has its sign flipped, so
+    // the report's sum is `-3000.01`, equal in magnitude to the items' and
+    // opposite in sign. A comparison of the two totals' magnitudes would match.
+    let negated = [
+        ("18750.00", "-18750.00"),
+        ("14500.00", "-14500.00"),
+        ("-30249.99", "30249.99"),
+    ]
+    .iter()
+    .fold(report_response(), |xml, (from, to)| {
+        replaced(
+            &xml,
+            &format!("<DSPCLAMTA>{from}</DSPCLAMTA>"),
+            &format!("<DSPCLAMTA>{to}</DSPCLAMTA>"),
+        )
+    });
+    let NativeStockGate::Differs {
+        items_total,
+        report_total,
+    } = gate(&items_response(), &negated)
+    else {
+        panic!("totals of opposite sign must not match");
+    };
+    assert!(items_total.numeric_eq(&decimal("3000.01")));
+    assert!(report_total.numeric_eq(&decimal("-3000.01")));
 }
 
 #[test]

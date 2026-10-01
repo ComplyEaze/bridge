@@ -21,7 +21,8 @@ const AS_OF: &str = "20260331";
 /// identity bracket compares them.
 const BOOKS_FROM: &str = "20250401";
 /// The basis sentence for a read whose report lines summed to the items' sum.
-const MATCHED_SENTENCE: &str = "The items' closing values equal the sum of the top-level lines of Tally's own Stock Summary.";
+const MATCHED_SENTENCE: &str =
+    "The items' closing values equal the sum of the top-level lines of Tally's own Stock Summary.";
 /// The start of the basis sentence for a read that was not compared.
 const UNCHECKED_SENTENCE: &str =
     "They were NOT checked against the sum of the top-level lines of Tally's own Stock Summary";
@@ -521,7 +522,10 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     );
     // The note beside `value_sum`, which is null here: always present.
     assert_eq!(page["totals"]["value_sum"], Value::Null);
-    assert_eq!(page["totals"]["value_sum_signs"], "as_sent_meaning_unmeasured");
+    assert_eq!(
+        page["totals"]["value_sum_signs"],
+        "as_sent_meaning_unmeasured"
+    );
     // No returned item carries `opening`: it is read but not returned.
     assert!(page["items"]
         .as_array()
@@ -728,7 +732,10 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     let page = result(&response);
     assert_eq!(page["totals"]["value_sum"], "3000.01");
     // Present beside a non-null sum too.
-    assert_eq!(page["totals"]["value_sum_signs"], "as_sent_meaning_unmeasured");
+    assert_eq!(
+        page["totals"]["value_sum_signs"],
+        "as_sent_meaning_unmeasured"
+    );
     assert_eq!(page["totals"]["partial"], false);
     assert_eq!(page["totals"]["empty_closing_value_count"], 0);
     assert_eq!(page["tie_out"]["state"], "matched");
@@ -865,7 +872,7 @@ async fn a_not_checked_read_is_held_and_a_later_page_continues_it() {
 }
 
 #[tokio::test]
-async fn an_empty_or_unknown_report_returns_the_items_and_says_they_are_unchecked() {
+async fn an_empty_unknown_or_all_empty_report_returns_the_items_and_says_they_are_unchecked() {
     let text = report();
     let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
     let hollow = format!(
@@ -876,9 +883,19 @@ async fn an_empty_or_unknown_report_returns_the_items_and_says_they_are_unchecke
     let unknown =
         text.replacen("<ENVELOPE>", "<RESPONSE>", 1)
             .replacen("</ENVELOPE>", "</RESPONSE>", 1);
+    // An edit of captured text: every report amount emptied.
+    let all_empty =
+        ["18750.00", "14500.00", "-30249.99"]
+            .iter()
+            .fold(text.clone(), |xml, amount| {
+                let from = format!("<DSPCLAMTA>{amount}</DSPCLAMTA>");
+                assert!(xml.contains(&from), "the capture has no {from}");
+                xml.replacen(&from, "<DSPCLAMTA></DSPCLAMTA>", 1)
+            });
     for (report, reason) in [
         (hollow, "stock_report_empty"),
         (unknown, "stock_unknown_report"),
+        (all_empty, "stock_report_amounts_all_empty"),
     ] {
         let book = Book {
             report,
@@ -1212,7 +1229,10 @@ async fn a_stock_group_parent_is_marked_under_mask_parties_and_the_reserved_root
         .as_array()
         .unwrap()
         .iter()
-        .any(|line| line.as_str().unwrap().contains("`name` and `parent` are masked")));
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("`name` and `parent` are masked")));
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 

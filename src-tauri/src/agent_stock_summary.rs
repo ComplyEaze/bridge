@@ -67,22 +67,21 @@ impl Server {
                     })?;
                 let read_evidence = evidence_from_runtime_read(read.evidence);
                 let integrated = read.inventory.integrated;
-                let build_frame = |state: &str,
-                                   basis: String,
-                                   totals: &NativeStockTotals,
-                                   tie_out: Value| {
-                    stock_frame(
-                        guid,
-                        state,
-                        (&read.from, &read.to),
-                        &read.inventory,
-                        basis,
-                        totals,
-                        tie_out,
-                    )
-                };
+                let build_frame =
+                    |state: &str, basis: String, totals: &NativeStockTotals, tie_out: Value| {
+                        stock_frame(
+                            guid,
+                            state,
+                            (&read.from, &read.to),
+                            &read.inventory,
+                            basis,
+                            totals,
+                            tie_out,
+                        )
+                    };
                 let (items, frame) = match &read.gate {
-                    // Tally's own total contradicts the items: none is shown.
+                    // The sum of Tally's own report lines contradicts the items: none
+                    // is shown.
                     NativeStockGate::Differs {
                         items_total,
                         report_total,

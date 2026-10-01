@@ -331,8 +331,9 @@ are not masked: they are configuration labels, not counterparties.
 
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
 closing stock quantity and value per stock item, whether inventory is integrated
-with the accounts, and how many items have a negative closing quantity, checked
-against the sum of the top-level lines of Tally's own Stock Summary. `as_of` must be a 31 March (a
+with the accounts, and how many items have a negative closing quantity. The items'
+closing values (not their quantities) are checked against the sum of the top-level
+lines of Tally's own Stock Summary. `as_of` must be a 31 March (a
 financial-year end), the only date measured for stock, and not before the book's
 start or after today. Any other date is refused as
 `stock_summary_as_of_not_measured` before any request, and retrying the same date

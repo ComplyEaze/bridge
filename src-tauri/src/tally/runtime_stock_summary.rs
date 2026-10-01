@@ -17,8 +17,8 @@ use bridge_tally_protocol::outstandings_shared::OutstandingsError;
 use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
 
 /// A completed observation of a company's stock at a date: its inventory
-/// flags, and its stock items after Tally's own Stock Summary total has been
-/// compared with their closing values.
+/// flags, and its stock items after the sum of the top-level lines of Tally's
+/// own Stock Summary has been compared with their closing values.
 pub(crate) struct StockSummaryRead {
     pub(crate) from: TallyDate,
     pub(crate) to: TallyDate,
@@ -158,7 +158,8 @@ impl TallyRuntime {
     /// or the read refuses. In that bracket it reads the company's inventory
     /// flags, the stock items (only when the flags do not say inventory is off
     /// and the master mark admits them) and Tally's own Stock Summary, each
-    /// paired, and compares the report's total with the items' closing values.
+    /// paired, and compares the sum of the report's top-level lines with the
+    /// items' closing values.
     /// Also returns the extent, so a caller can tell later whether the book has
     /// moved. A refusal of how the answer parsed returns at once; a refusal of
     /// what the mark admitted is held until the closing extent is read, so a

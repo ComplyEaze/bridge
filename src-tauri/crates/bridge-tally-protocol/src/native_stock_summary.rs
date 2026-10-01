@@ -1,6 +1,6 @@
 //! Native `stock_summary` reads: the company's inventory flags, its stock
 //! items with their closing quantity and value, and Tally's own Stock Summary
-//! report, whose total gates the items.
+//! report, whose top-level lines' sum gates the items.
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
 //! (`tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`; PARTIAL), and, by role, one
@@ -168,7 +168,7 @@ pub struct NativeStockItem {
     pub parent: Option<String>,
     pub base_unit: Option<String>,
     /// Read and validated (a malformed opening quantity or value still refuses),
-    /// but never serialized: it is returned unchecked, and its as-at date is
+    /// but never serialized: nothing checks it, and its as-at date is
     /// unmeasured (the only capture's books start where its period starts).
     #[serde(skip)]
     pub opening: NativeStockPosition,
@@ -936,8 +936,8 @@ fn present_closing_value_sum(items: &[NativeStockItem]) -> Result<ExactDecimal, 
         .map_err(|_| NativeStockError::SumInvalid)
 }
 
-/// The items after Tally's own Stock Summary total has been compared with
-/// their closing values. Items are reachable only where Tally does not
+/// The items after the sum of the top-level lines of Tally's own Stock Summary
+/// has been compared with their closing values. Items are reachable only where Tally does not
 /// contradict them: `Differs` carries none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeStockGate {

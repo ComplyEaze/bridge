@@ -474,7 +474,7 @@
     },
     {
       "path": "src-tauri/src/agent_stock_summary.rs",
-      "reason": "The stock_summary tool: presents stock items with their closing quantity and value and states whether they tie to Tally's own Stock Summary total; a defect there shows stock that Tally's report contradicts, or hides the contradiction."
+      "reason": "The stock_summary tool: presents stock items with their closing quantity and value and states whether they tie to the sum of the top-level lines of Tally's own Stock Summary; a defect there shows stock that Tally's report contradicts, or hides the contradiction."
     },
     {
       "path": "src-tauri/src/agent_tests.rs"

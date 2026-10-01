@@ -553,6 +553,34 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
     }
 }
 
+/// What an agent must know before it relies on a party detail is in the
+/// description it reads: what `tied` does and does not prove, what an absent
+/// residual row and an empty read mean, and what the detail costs.
+#[test]
+fn the_outstandings_description_carries_the_party_details_caveats() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "`tied` means the two figures are equal, not that the composition is proven",
+        "two changes that compensate, or allocations that net to zero, can still read `tied`",
+        "`no_residual_row_for_party` (with `residual` null)",
+        "`no_named_bill_for_party`",
+        "`window_returned_no_vouchers`",
+        "reads the whole company's vouchers from the start of the books",
+        "its cost is that of a `vouchers` read over that span, which is unmeasured on a large book",
+        "any refusal of that read fails the whole `outstandings` call",
+        "`unadjusted_detail_too_large` (nothing narrows it",
+        "with the read's own `partial_reason`",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
 /// The party detail's conflicting arguments are refused before any read: the
 /// tool names the code before any request is attempted.
 #[tokio::test]

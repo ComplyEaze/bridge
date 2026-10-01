@@ -1055,23 +1055,37 @@ first, each with its own bill date, and gives each bill a state: `tied` (the sig
 equal Tally's own balance for that bill, or zero for a bill the report no longer lists),
 `trail_does_not_tie` (both numbers shown) or `bill_identity_ambiguous` (more than one native row
 or bill date for one reference, or one native row dated differently from the allocations;
-nothing is merged, and the native dates are shown). `detail: unadjusted` lists the party's
-on-account, advance and pending credit or debit note allocations and ties the on-account sum to
-the party's unallocated amount, or reports `residual_not_explained_by_vouchers` with the
-difference and whether it equals the ledger's opening balance, as a fact and not a label. `tied`
-here means the on-account sum equals the residual; it says nothing about components that net to
-zero. It
-reads the company's vouchers from the books' beginning (or from the earliest date Tally lists for
-the named bill) to `as_of` and keeps the entries on the party's own ledger, so its cost is that of
-a `vouchers` read over the same window, which on a large book can take minutes; it needs a
-complete read (`detail_requires_a_complete_read` otherwise), refuses a result of more than 500
-allocations (`trail_too_large`; name a `reference`) and a reference neither the vouchers nor
-Tally's report know for the party (`bill_reference_not_found`). The detail ignores `direction`,
-`top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's vouchers in the
-window, not the party's. A named bill's window never starts before the books. Measured on one
-synthetic book only (reference 12a.13); an `as_of` earlier than the last voucher and post-dated
-vouchers were not measured, and a trail that does not tie, because a voucher was posted between
-the voucher read and the bills read, is reported as such and never as tied.
+nothing is merged, and the native dates are shown). The detail's own `state` is `bills_listed`,
+or, for an empty list, `not_bill_wise_ledger` (the ledger snapshot says the ledger keeps no bills)
+or `no_named_bill_for_party` (no voucher read allocates a named bill on the ledger and Tally lists
+none for it; a ledger that keeps no bills, one that is not a party's and a party with no bills are
+not told apart). `detail: unadjusted` lists the party's on-account, advance and pending credit or
+debit note allocations and compares the on-account sum with the party's unallocated amount.
+`tied` there means the two figures are equal, not that the composition is proven: components that
+net to zero are not seen. `residual_not_explained_by_vouchers` gives the difference and whether it
+equals the ledger's opening balance, as a fact and not a label. `no_residual_row_for_party`, with
+`residual` null, means Tally's ledger snapshot lists no unallocated amount for the ledger (a zero
+residual, a ledger that is not a party's and a name that matched no row are not told apart), so
+nothing is tied; `not_bill_wise_ledger` lists no rows. Either kind is
+`window_returned_no_vouchers`, with nothing tied or listed, when the voucher read returned no
+voucher: unlike `vouchers`, the detail does not corroborate an empty read.
+
+The detail reads the whole company's vouchers from the books' beginning (or from the earliest
+date Tally lists for the named bill) to `as_of` and keeps the entries on the party's own ledger,
+so its cost is that of a `vouchers` read over the same span. That cost is unmeasured on a large
+book, and any refusal of that read fails the whole `outstandings` call. It needs a complete read
+(`detail_requires_a_complete_read`, with the read's own `partial_reason` beside it), and refuses
+rather than cuts an answer of more than 500 rows: `trail_too_large` for a bill trail (name a
+`reference`) and `unadjusted_detail_too_large` for the unadjusted detail (nothing narrows it, so
+the detail is not available for that party; its vouchers can still be read with `vouchers` and
+`ledger`, untied). A reference neither the vouchers nor Tally's report know for the party is
+refused (`bill_reference_not_found`). The detail ignores `direction`, `top`, `offset` and `limit`;
+`window.company_vouchers_read` counts the company's vouchers in the window, not the party's. A
+named bill's window never starts before the books. The vouchers and the bills reports are two
+reads whose extents are not compared: a voucher posted between them usually shows as
+`trail_does_not_tie`, but two changes that compensate, or allocations that net to zero, can still
+read `tied`. Measured on one synthetic book only (reference 12a.13); an `as_of` earlier than the
+last voucher and post-dated vouchers were not measured.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

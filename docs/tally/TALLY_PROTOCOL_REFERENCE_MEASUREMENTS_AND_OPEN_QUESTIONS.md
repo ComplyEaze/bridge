@@ -1265,7 +1265,17 @@ unreferenced-opening rows rest on read-backs through Bridge that are not capture
 **Not shown:** any client book; a multi-currency book; cost centres; an as-of date earlier than the last
 voucher; post-dated vouchers; whether a `PARTYLEDGERNAME`
 term in the request would be lossless for the journal above (it was not tried, which is why the
-party detail reads the whole window and filters by each entry's own ledger).
+party detail reads the whole window and filters by each entry's own ledger); the cost of that
+whole-window read on a large book.
+
+**What the tie-out does not prove.** The voucher read and the bills reports are two reads whose
+extents are not compared, so a voucher posted between them usually breaks a bill's tie, but two
+changes that compensate, or allocations that net to zero, can still tie. An unadjusted `tied`
+means the on-account sum equals the residual, not that the residual's composition is proven. The
+unadjusted tie-out has no captured fixture: its residuals in the tests are typed from the seeded
+vouchers, not captured ledger rows. A ledger the snapshot lists no residual for is reported as
+having no residual row, never as a residual of zero, and an empty voucher read is reported as
+such, never corroborated.
 
 ---
 

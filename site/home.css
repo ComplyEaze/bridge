@@ -1,0 +1,800 @@
+
+/* Direction C "Flagged" v2: one client file, pinned for nine chapters, on
+   file cobalt from the hero to the close. Paper objects (the ageing sheet,
+   the dialog, the download block) are the only light surfaces. */
+
+
+* { box-sizing: border-box; }
+
+html { background: var(--cobalt-darker); scrollbar-gutter: stable; }
+
+body {
+  margin: 0;
+  background: var(--cobalt-darker);
+  color: var(--on-cobalt);
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img, canvas { display: block; max-width: 100%; }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  z-index: 1000;
+  border-radius: 0 0 8px 0;
+}
+.skip-link:focus { left: 0; }
+.nw { white-space: nowrap; }
+/* Focus ring, two tones so it holds 3:1 on every ground: a white ring outside an ink ring. On the dark
+   and cobalt ground the white ring carries it (8:1 or more), on paper the ink ring does (15:1). */
+:focus-visible { outline: 2px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 2px var(--ink); }
+.download-block :focus-visible { outline-color: var(--ink); box-shadow: 0 0 0 2px #fff; }
+a { color: inherit; }
+
+/* ---------------------------------------------------------------- story */
+/* #story is the ScrollTrigger pin target: plain height, GSAP supplies the
+   fixed positioning and the scroll-length spacer. */
+
+/* The story is pinned by CSS on the compositor (position: sticky), not by a
+   script switching it to position:fixed: the section is as tall as the whole
+   take (1 + 8 screens) from the first paint, and only its first screen
+   sticks, carrying the background and the seam. Measured identical to the
+   ScrollTrigger pin on the owner's Mac (30 Sep) and needs no library. */
+.story {
+  position: relative;
+  height: 900vh;
+  --story-bg: radial-gradient(75% 95% at 30% 42%, var(--cobalt) 0%, var(--cobalt-deep) 45%, var(--cobalt-darker) 80%, var(--cobalt-ground) 100%);
+}
+/* the pin exit's seam: the story's radial gradient meets the flat close
+   colour at a hard horizontal line without this soft hand-off. It exists
+   only for the exit: app.js drives --seam from 0 (until chapter 7.8) to 1
+   (at 8.0), because always on it washed the bottom of the 3D object grey
+   through every chapter. */
+.story-sticky::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 28vh;
+  background: linear-gradient(to bottom, transparent, var(--cobalt-darker));
+  opacity: var(--seam, 0);
+  z-index: 3; /* over the canvas (2) so the file fades into the ground; under the props (4), panels and caption (6) */
+  pointer-events: none;
+}
+
+.story-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  min-height: 560px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  background: var(--story-bg);
+}
+
+
+.panels {
+  position: relative;
+  z-index: 6; /* above the .story::after seam, which greyed the mobile hero button and text */
+  flex: 0 0 42%;
+  min-width: 0;
+}
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+/* the hero chapter is visible at first paint, before any script runs */
+.panel[data-chapter="0"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.panel .btn { pointer-events: auto; }
+
+/* the hero's right padding gives its headline the width for three lines */
+/* its right edge is the header's content edge (builderF): the header's inner box is at most 1280 wide, so
+   from 1280 up the padding is the margin outside it */
+@media (min-width: 761px) { .panel[data-chapter="0"] { padding-right: clamp(var(--gutter), calc((100vw - 1280px) / 2), 96px); } }
+/* short laptop windows (a 1366x768 screen gives about 657 px): the centred hero overflowed upward under the fixed
+   header. Pad it below the header and centre with auto margins, which fall back to top-aligned when the copy is taller
+   than the room; the headline also steps down with the window height. Taller windows are unchanged. */
+@media (min-width: 761px) and (max-height: 760px) {
+  .panel[data-chapter="0"] { justify-content: flex-start; padding-top: calc(var(--header-h, 64px) + 12px); padding-bottom: 12px; }
+  .panel[data-chapter="0"] > :first-child { margin-top: auto; }
+  .panel[data-chapter="0"] > :last-child { margin-bottom: auto; }
+  html .panel[data-chapter="0"] h1 { font-size: clamp(30px, min(4.3vw, 5.4vh), 62px); }
+}
+
+/* Hero gets the top of the scale; chapters sit one step down. Both wrap on
+   whole words (text-wrap: balance) so a headline never leaves an orphan. */
+.panel[data-chapter="0"] h1 {
+  font-size: clamp(34px, 2.95vw, 50px); /* three lines at 1440x900 and 1280x800 (measured), inside the header's content edge */
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  max-width: 20ch;
+  margin: 0 0 14px;
+  color: var(--on-cobalt);
+  text-wrap: balance;
+}
+.panel h2 {
+  font-size: clamp(var(--fs-xl), 2.9vw, 44px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  font-weight: 600;
+  max-width: 17ch;
+  color: var(--on-cobalt);
+  text-wrap: balance;
+}
+.panel .proof {
+  font-size: clamp(var(--fs-sm), 1.3vw, var(--fs-md));
+  color: var(--on-cobalt-soft);
+  max-width: 40ch;
+  margin: 0 0 6px;
+  text-wrap: pretty;
+}
+.panel .proof-sub {
+  font-size: var(--fs-xs);
+  color: var(--on-cobalt-faint);
+  max-width: 38ch;
+  margin: 0 0 6px;
+  text-wrap: pretty;
+}
+.panel .counter {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--on-cobalt);
+  font-weight: 600;
+}
+.coming-line + .proof { margin-top: var(--space-4); }
+.coming-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--on-cobalt-faint);
+  max-width: 38ch;
+  margin: var(--space-3) 0 0;
+  text-wrap: pretty;
+}
+.tag {
+  display: inline-block;
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: rgba(246, 248, 251, 0.14);
+  color: var(--on-cobalt);
+  border: 1px solid rgba(246, 248, 251, 0.32);
+  white-space: nowrap;
+}
+/* Lead decision: green means "resolved" only. "Next release" is a neutral
+   outline pill, not a second meaning for green. */
+.tag-next { background: transparent; border-color: rgba(246, 248, 251, 0.4); }
+
+.cta-row { display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; margin-top: var(--space-5); }
+/* .btn itself (size, radius, weight) is defined once in pages/chrome.css so
+   the hero, the close card and every page share one button spec (#36). This
+   file only carries the colour inversion needed on the dark story ground. */
+.panel .btn-primary { background: var(--paper); color: var(--ink); }
+.fineprint {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-cobalt-soft);
+  margin: var(--space-3) 0 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+/* the required signing line is its own line; "code-signed" (.nw) never breaks at its hyphen */
+.fineprint .fp-line { display: block; }
+.close-full .fineprint { color: var(--ink-soft); }
+
+/* --------------------------------------------------------------- canvas box */
+
+.canvas-box {
+  position: relative;
+  flex: 0 0 58%;
+  min-width: 0;
+  overflow: hidden;
+}
+/* a CSS silhouette of the object, not an empty transparent div: it holds
+   the shape until the first WebGL frame, then crossfades out quickly (the
+   canvas itself is visible from frame one, so nothing fades in as a ghost) */
+.canvas-poster {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.canvas-poster::before {
+  content: '';
+  width: min(230px, 34%);
+  aspect-ratio: 0.76;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--cobalt-deep) 0% 86%, #eef1f7 86% 100%);
+  box-shadow: 0 30px 60px rgba(3, 7, 25, 0.4);
+}
+.canvas-box.is-ready .canvas-poster { opacity: 0; }
+#fileCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+/* Lane X1 motion spec, section 3 (desktop only): the 3D is not clipped at the
+   58% box edge. The canvas spans the whole pinned story (the box is 58% of it,
+   so 100%/0.58 of the box), behind .panels; the box stays the frame the HTML
+   props are placed in, and scene.js keeps the object where it was with an
+   off-centre projection (setViewOffset). */
+@media (min-width: 761px) {
+  .canvas-box { overflow: visible; }
+  #fileCanvas { left: 0; top: 0; right: auto; bottom: auto; width: calc(100% / 0.58); max-width: none; height: 100%; }
+  /* the open cover lies out of frame to the left in chapters 1-6 (fitting it whole would shrink the file about a
+     quarter): the last 120 px at the left edge fade into the ground instead of ending in a hard cut */
+  #fileCanvas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 120px); mask-image: linear-gradient(to right, transparent 0, #000 120px); }
+  /* W3 fix 3: the bahi worlds' lining is flat paper; a 120 px fade over it read as a brass highlight band, so theirs is 60 px */
+  html[data-theme="red"] #fileCanvas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px); mask-image: linear-gradient(to right, transparent 0, #000 60px); }
+}
+
+.demo-caption {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  z-index: 6; /* above the .story::after seam, which would hide the synthetic-data label */
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--on-cobalt-faint);
+  pointer-events: none;
+}
+/* desktop: the caption sits at the foot of the text column, clear of the open cover and the pages
+   (at the box's own corner it lay over the cover, and over the statement's foot in chapter 3) */
+@media (min-width: 761px) {
+  .demo-caption { left: calc(100% + var(--gutter)); bottom: 16px; width: max-content; max-width: min(380px, calc(42vw - 2 * var(--gutter))); }
+}
+
+.prop {
+  position: absolute;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+/* the visitor's question: right-aligned, tinted, with its tail at the
+   bottom right; the assistant's answer below is white with its tail at the
+   bottom left and an "Answer" label, so the two are never mistaken */
+.prop-question {
+  top: calc(var(--header-h, 64px) + 28px);
+  right: 6%;
+  left: auto;
+  max-width: 360px;
+  background: #e8ecf8;
+  color: var(--ink);
+  border-radius: 14px 14px 4px 14px;
+  padding: 12px 16px;
+  box-shadow: 0 16px 40px rgba(4, 10, 40, 0.35);
+}
+.prop-question p { margin: 0; font-size: 14px; font-style: italic; text-align: right; white-space: nowrap; }
+/* the assistant's reply, not a second copy of the 3D page: the full
+   breakdown lives on the page itself (pencil-underlined rows) */
+.prop-ageing {
+  left: 6%;
+  bottom: 8%;
+  width: min(320px, 42vw);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 14px 14px 14px 4px;
+  padding: 10px 16px 12px;
+  box-shadow: 0 20px 50px rgba(4, 10, 40, 0.4);
+}
+.bubble-label { margin: 0 0 3px; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+.ageing-reply { margin: 0; font-size: 14px; line-height: 1.4; }
+
+.prop-dialog {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  /* it grows out of a row (scale 0.04 -> 1): its own layer, rasterised at full size, so the
+     growth is a compositor scale, not a re-raster of a big shadowed box on every frame */
+  will-change: transform, opacity;
+}
+/* The macOS alert (NSAlert, warning style) the build raises for one voucher:
+   no title bar, the app icon with a caution badge, a bold message, the
+   preview as informative text, two buttons. Set in the system font, never
+   in the page's fonts or theme colours; the default button is the system
+   blue. In the shipped build "Cancel" is added first, so it is the default
+   (right, blue) and "Post voucher" is the plain button beside it. */
+.dialog-replica {
+  width: min(440px, 88vw);
+  padding: 20px 20px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: 0 30px 70px rgba(3, 7, 25, 0.55);
+  background: #f4f4f5;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: auto;
+  text-align: left;
+}
+.dialog-head { display: flex; gap: 16px; align-items: flex-start; }
+.dialog-icon { position: relative; flex: none; width: 64px; height: 64px; }
+.dialog-icon__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #5b6bc0, #33428f);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.dialog-icon__badge { position: absolute; right: 0; bottom: 0; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); }
+.dialog-text { min-width: 0; flex: 1 1 auto; }
+.dialog-msg { margin: 0 0 8px; font-size: 13px; font-weight: 700; line-height: 1.3; }
+.dialog-info { margin: 0; font-size: 11px; line-height: 1.36; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.dbtn {
+  min-width: 84px;
+  padding: 3px 14px 4px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+  border-radius: 6px;
+  border: 0.5px solid rgba(0, 0, 0, 0.22);
+  background: #fff;
+  color: #1d1d1f;
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.18);
+}
+.dbtn-default { background: #007aff; border-color: #007aff; color: #fff; } /* the system blue, never themed */
+.dbtn-post.is-pressed { background: #cfcfd3; transform: scale(0.97); }
+.dbtn-default.is-pressed { background: #0060cc; transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .prop, .panel { opacity: 1 !important; transform: none !important; }
+}
+
+/* ------------------------------------------------------------ static story */
+/* prefers-reduced-motion fallback: normal document flow, nine stills. */
+
+.static-story { padding: 72px var(--gutter); max-width: 1100px; margin: 0 auto; }
+.static-figure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  margin: 0 0 56px;
+}
+.static-figure:last-child { margin-bottom: 0; }
+.static-still { border-radius: 14px; box-shadow: 0 20px 50px rgba(3, 7, 25, 0.4); }
+/* each caption is a clone of the live chapter panel: same headline, Coming tags and
+   buttons, laid out in the flow instead of stacked in the pinned column */
+.static-figure .panel { position: static; inset: auto; padding: 0; opacity: 1; pointer-events: auto; }
+.static-figure .panel h1 { max-width: none; }
+.static-figure .panel h2 { max-width: none; }
+.static-figure .dialog-replica { margin-top: 20px; width: min(440px, 100%); zoom: 1; }
+/* the chapter-2 working paper, cloned into its caption (the Coming feature is shown, not only described):
+   in the flow, filled, and in the two-row layout the phone uses, since a caption is too narrow for five columns */
+.static-figure .prop-row { position: static; opacity: 1; width: 100%; max-width: 560px; margin-top: 20px; font-size: 13px; }
+.static-figure .prop-row .wp-title { font-size: 13px; padding: 8px 12px 6px; }
+.static-figure .prop-row .wp-sec { opacity: 1; width: 84px; height: 24px; line-height: 24px; padding: 0; text-align: center; font-size: 12px; }
+.static-figure .prop-row .row-sheet, .static-figure .prop-row .row-sheet tbody, .static-figure .prop-row .row-sheet tr { display: block; font-size: 13px; }
+.static-figure .prop-row .row-sheet thead { display: none; }
+.static-figure .prop-row .row-sheet tr { display: grid; grid-template-columns: 1.15fr 1.1fr 1fr 1.6fr; }
+.static-figure .prop-row .row-sheet td { display: block; height: auto; padding: 5px 8px; border-width: 1px 0 0 1px; white-space: normal; }
+.static-figure .prop-row .row-sheet td:first-child { grid-column: 1 / -1; border-left: 0; font-weight: 600; }
+.static-figure .prop-row .row-sheet td[data-l]::before { content: attr(data-l); display: block; font-size: 10px; font-weight: 600; color: #5a6384; }
+.static-figure .prop-row .row-sheet td:first-child::before { display: none; }
+.static-figure .prop-row .row-sheet td:nth-child(2) { border-left: 0; }
+
+/* ---------------------------------------------------------------- close */
+
+.close-full { padding: var(--space-8) var(--gutter) var(--space-6); max-width: 760px; margin: 0 auto; }
+.download-block {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--r-lg);
+  padding: var(--space-6);
+  max-width: 720px;
+  margin: 0 auto;
+  box-shadow: 0 30px 70px rgba(3, 7, 25, 0.35);
+}
+/* hidden only when the script that reveals it runs (html.js, set in <head>),
+   so a visitor or crawler without JS still gets the install card */
+html.js .download-block { opacity: 0; transform: translateY(20px); transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1); }
+html.js .download-block.is-in { opacity: 1; transform: none; }
+/* a keyboard visitor tabbing into the card sees it at once (it is never focused while invisible) */
+html.js .download-block:focus-within { opacity: 1; transform: none; transition-duration: 0.1s; }
+.download-block h2 {
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 var(--space-5);
+}
+/* the four steps: 16 px type, 24 px numbered markers (motion spec v2, J) */
+.install-steps { margin: 0 0 var(--space-6); padding: 0; list-style: none; counter-reset: step; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-soft); display: grid; gap: var(--space-4); }
+.install-steps li { position: relative; padding-left: 40px; counter-increment: step; }
+.install-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: center;
+}
+.install-steps code { font-family: var(--font-mono); font-size: 14px; background: var(--paper-line); padding: 1px 5px; border-radius: var(--r-sm); }
+/* one primary button: the story's white button, given an ink edge so it keeps its contrast on the card's light ground */
+.download-block .btn-primary { background: #fff; color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.download-block .fineprint { font-size: 14px; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------------------------------------------------------------- mobile */
+
+@media (max-width: 760px) {
+  .story-sticky { flex-direction: column; }
+  /* the hero text needs ~400px below the object; the object gives up height
+     on short phones rather than pushing the Download button past the fold */
+  .canvas-box { flex: 0 0 clamp(200px, calc(100% - 400px), 58%); }
+  .panels { flex: 1 1 auto; }
+  /* item 10 (text part): the object keeps the top half; words start right
+     under the header instead of centring in a half-empty column. */
+  /* item 25: the words centre in the space under the object. Auto margins
+     rather than justify-content:center, so a tall hero panel overflows at
+     the bottom instead of both ends. */
+  .panel { padding: var(--space-4) var(--gutter); justify-content: flex-start; }
+  .panel[data-chapter="0"] .coming-line { margin-top: var(--space-2); }
+  .panel[data-chapter="0"] .coming-line + .proof { margin-top: var(--space-3); }
+  .panel[data-chapter="0"] .cta-row { margin-top: var(--space-4); }
+  .panel > :first-child { margin-top: auto; }
+  .panel > :last-child { margin-bottom: auto; }
+  .panel[data-chapter="0"] h1 { max-width: none; font-size: clamp(24px, 7vw, var(--fs-xl)); }
+  .panel h2 { max-width: none; font-size: clamp(22px, 6vw, var(--fs-xl)); }
+  .static-figure { grid-template-columns: minmax(0, 1fr); }
+  /* the story leaves an empty panel area as it scrolls off; the install card
+     rises into it instead of arriving after half a screen of bare gradient */
+  .close-full { padding: var(--space-3) var(--gutter) var(--space-5); position: relative; z-index: 1; }
+  .close-full { margin-top: 0; } /* the card's rise starts after the panel has gone (7.99), not over it */
+  .download-block { padding: var(--space-5); }
+}
+
+/* One tag, one line of text: two small paragraphs rather than one paragraph
+   carrying two tags, so neither can misalign against the other (critique #30). */
+.next-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--on-cobalt-soft, #c9d3f5);
+  margin: var(--space-2) 0 0;
+  max-width: 60ch;
+}
+.next-line:first-of-type { margin-top: var(--space-4); }
+.download-block .next-line { color: var(--ink-soft); }
+.download-block .next-line .tag { background: #e8ecf8; color: #1b2a6b; border: 1px solid #c3cdee; }
+/* stable ink/paper-line tokens: no theme redefines them, so this pill stays
+   neutral on the red and green paper too, with no extra per-world rule. */
+.download-block .next-line .tag-next { background: transparent; color: var(--ink-soft); border: 1px solid var(--paper-line); }
+
+/* the working paper the 40A(3) flag lands in (motion spec v2, D): a card in
+   the band under the voucher, 14 px type, from 2.40 at about 0.35 opacity with a
+   title, the brief's real columns and a dashed empty row 1. It sits UNDER the
+   canvas (z-index 1 < 2) so the 3D flag flies over it and lands on the chip in
+   the clause cell; the chip takes over the flag's lettering at the same screen
+   spot and the row's other cells reveal from it with clip-path. Never scaled. */
+.prop-row {
+  left: 24px;
+  top: calc(62.5% + 80px);
+  width: min(780px, calc(100% - 8px));
+  z-index: 1;
+  background: #fff;
+  color: var(--ink);
+  border-radius: var(--r-md);
+  box-shadow: 0 20px 50px rgba(4, 10, 40, 0.4);
+  overflow: hidden;
+  border-left: 3px solid var(--ink); /* ink, not the 41(1) green: green means resolved */
+  font-size: 14px;
+  line-height: 1.35;
+}
+.wp-title { margin: 0; padding: 8px 14px 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.row-sheet { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.row-sheet th {
+  background: #f3f5f9;
+  color: #5a6384;
+  font-weight: 600;
+  text-align: left;
+  padding: 5px 12px;
+  border: 1px solid #d9deea;
+  border-width: 1px 0 1px 1px;
+  white-space: nowrap;
+}
+.row-sheet td { padding: 9px 12px; border: 1px dashed #b3bdd6; border-width: 1px 0 1px 1px; white-space: nowrap; height: 46px; }
+.row-sheet td:first-child { white-space: normal; }
+.row-sheet .cell { display: inline-block; }
+.row-sheet td:nth-child(4) .cell { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+.row-sheet td:nth-child(5) { color: #0b1436; font-weight: 700; }
+.row-sheet.is-filled td { border-style: solid; border-color: #d9deea; }
+/* the flag, as a cell: as tall as the flag lands, in the flag's yellow, its lettering
+   the flag's mono 700 at the size the 3D flag reaches (HERO_FONT) and at the flag's
+   own position in it (a little right of centre) */
+.wp-sec {
+  display: inline-block;
+  vertical-align: middle;
+  width: 124px;
+  height: 32px;
+  line-height: 32px;
+  padding-left: 43px;
+  background: #f7e733;
+  color: rgba(11, 20, 54, 0.9);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  border-radius: 1px;
+}
+
+/* the 3 near-miss ledger names the bank chapter names: a "?" chip that
+   turns into the same white/ink resolved tick as the query flags on approval */
+.prop-names {
+  right: 6%;
+  top: 10%;
+  background: #fff;
+  color: var(--ink);
+  border-radius: var(--r-md);
+  box-shadow: 0 20px 50px rgba(4, 10, 40, 0.4);
+  padding: 12px 16px 14px;
+  min-width: min(320px, 68vw);
+}
+.names-cap { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: #5a6384; }
+.names-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.names-list li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.name-chip {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #37d5f0;
+  color: #0b1436;
+}
+/* the tick face: white with an ink border, faded in by --r (0..1, set from chapterPos) */
+.name-chip::before { content: ''; position: absolute; inset: 0; border-radius: 4px; background: #fff; border: 1.5px solid #0b1436; opacity: var(--r, 0); }
+.name-chip i { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-style: normal; line-height: 1; }
+.name-chip .q { opacity: calc(1 - var(--r, 0)); }
+.name-chip .t { opacity: var(--r, 0); }
+/* undecided: the statement's name reads plainly, the book's candidate is
+   faint; decided: the statement's spelling is struck and the book's holds */
+.name-parsed { color: rgba(11, 20, 54, calc(1 - var(--r, 0) * 0.32)); text-decoration: line-through; text-decoration-color: rgba(11, 20, 54, calc(var(--r, 0) * 0.35)); }
+.names-list li .name-book { opacity: calc(0.8 + var(--r, 0) * 0.2); } /* the undecided candidate was 50% ink (3.4:1 on the card); 80% stays fainter than the decided one and clears AA */
+.name-arrow { color: var(--ink-faint); }
+.name-book { font-weight: 600; }
+
+/* dims the page while the approval dialog is up, over the canvas only */
+.prop-scrim { inset: 0; background: rgba(8, 18, 63, 0.35); z-index: 3; }
+@media (min-width: 761px) { .prop-scrim { right: auto; width: calc(100% / 0.58); } }
+
+/* Over the live WebGL file a backdrop blur re-samples the canvas every frame
+   and caused intermittent frame hitches; the home page uses a solid tint. */
+.ce-header.is-scrolled {
+  background: color-mix(in srgb, var(--header-ground) 94%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+@media (max-width: 640px) {
+  .ce-nav { background: color-mix(in srgb, var(--header-ground) 98%, transparent); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* mobile props: after their base rules, which would otherwise win on order.
+   Below the object, not on it (motion spec v2, I): the names card and the working
+   paper sit in the strip between the object and the words. */
+@media (max-width: 760px) {
+  .canvas-box { overflow: visible; }
+  .prop-names { top: calc(100% + 6px); right: auto; left: 4%; width: 92%; min-width: 0; }
+  /* both chapter-1 bubbles sit in the band under the object (they used to keep their desktop places
+     and covered the ageing page's title and top rows) */
+  .prop-question { top: calc(100% + 4px); right: 4%; max-width: 92%; padding: 8px 14px; }
+  .prop-ageing { top: calc(100% + 50px); bottom: auto; left: 4%; width: min(320px, 82vw); }
+  .prop-row { left: 4%; right: 4%; top: calc(100% + 6px); width: auto; min-width: 0; font-size: 13px; }
+  .wp-title { font-size: 12px; padding: 8px 12px 6px; }
+  /* a 2-row stacked layout: the finding on row 1; vouchers, date, amount and clause on row 2 */
+  .row-sheet, .row-sheet tbody, .row-sheet tr { display: block; font-size: 13px; }
+  .row-sheet thead { display: none; }
+  .row-sheet tr { display: grid; grid-template-columns: 1.15fr 1.1fr 1fr 1.6fr; }
+  .row-sheet td { display: block; height: auto; padding: 5px 8px; border-width: 1px 0 0 1px; white-space: normal; }
+  .row-sheet td:first-child { grid-column: 1 / -1; border-left: 0; font-weight: 600; }
+  .row-sheet td[data-l]::before { content: attr(data-l); display: block; font-size: 10px; font-weight: 600; color: #5a6384; }
+  .row-sheet td:first-child::before { display: none; }
+  .row-sheet td:nth-child(2) { border-left: 0; }
+  .wp-sec { width: 84px; height: 24px; line-height: 24px; padding: 0; text-align: center; font-size: 12px; }
+  .prop-dialog { top: calc(var(--header-h, 64px) + 164px); } /* centred in the box below the header, clear of the caption */
+  .dialog-replica { width: 440px; zoom: 0.7; }
+  /* the synthetic caption is one 12 px line inside each panel, under its words (desktop keeps it where it is) */
+  .demo-caption { font-size: 12px; }
+  .panel .panel-synthetic { margin: var(--space-3) 0 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.4; color: var(--on-cobalt-faint); }
+  .demo-caption.is-moved { display: none; }
+}
+
+/* ------------------------------------------------ material worlds (data-theme) */
+/* Bahi-khata: dark madder cloth, cream pages, oxblood ink (research critique/bahikhata-research-2026-09-30.md, section 6).
+   Every rule here is under html[data-theme="red"]; nothing above or below it changes for another world. */
+/* item 3 (silhouette): the book sits on the darker end of the ground, not on its lit centre. The dark-madder cloth is
+   only 1.5:1 against the old #5a1410 centre; against #3c0e0a it is 1.85:1, and the cream tape, stitching and the warm rim
+   carry the rest of the outline */
+html[data-theme="red"] .story { --story-bg: radial-gradient(75% 95% at 30% 42%, #2a1512 0%, #1d0f0d 55%, #120a09 100%); }
+/* ---- per-world details (critique 29 Sep) ---- */
+html[data-theme="red"] .prop-question, html[data-theme="red"] .prop-ageing, html[data-theme="red"] .prop-row, html[data-theme="red"] .prop-names { background: #fbf3dc; border: 1px solid var(--red-card-line); box-shadow: var(--red-card-shadow); }
+html[data-theme="red"] .download-block .next-line .tag { background: transparent; color: var(--ink); border-color: var(--ink-soft); }
+/* W2 fix 9: paper, not plastic: a 4 px card and an ink button with paper lettering, in place of the white sticker */
+html[data-theme="red"] .download-block { border-radius: 4px; }
+html[data-theme="red"] .download-block .btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: 0 2px 0 rgba(43, 14, 12, 0.5); }
+html[data-theme="red"] .download-block :focus-visible { box-shadow: 0 0 0 2px var(--paper); }
+/* W2 fix 1: the working paper's flag cell is the 3D flag's muted 40A(3) tab */
+html[data-theme="red"] .wp-sec { background: #efd96a; }
+/* W2 fix 10: the chapter-3 decide state in blue-black ink (today's hand), not cyan */
+html[data-theme="red"] .name-chip { background: #1e2b4f; color: #fbeec9; }
+html[data-theme="red"] .name-chip::before { background: #fbeec9; border-color: #1e2b4f; }
+/* the decided face is cream, so the tick takes the closing tick's ink (it inherited the chip's cream and vanished) */
+html[data-theme="red"] .name-chip .t { color: #1e2b4f; }
+/* the paper props, the working paper and the names card: the cobalt blue-greys are replaced by warm browns (item 7/9) */
+html[data-theme="red"] .bubble-label { color: var(--ink-faint); }
+html[data-theme="red"] .row-sheet th { background: #f3e8c8; color: var(--ink-soft); border-color: var(--red-card-line); }
+html[data-theme="red"] .row-sheet td { border-color: #c9b588; }
+html[data-theme="red"] .row-sheet.is-filled td { border-color: var(--red-card-line); }
+html[data-theme="red"] .row-sheet td:nth-child(5) { color: var(--ink); }
+html[data-theme="red"] .row-sheet td[data-l]::before, html[data-theme="red"] .static-figure .prop-row .row-sheet td[data-l]::before { color: var(--ink-soft); }
+html[data-theme="red"] .wp-sec { color: rgba(43, 14, 12, 0.9); }
+html[data-theme="red"] .names-cap { color: var(--ink-soft); }
+html[data-theme="red"] .name-parsed { color: rgba(43, 14, 12, calc(1 - var(--r, 0) * 0.32)); text-decoration-color: rgba(43, 14, 12, calc(var(--r, 0) * 0.35)); }
+html[data-theme="red"] .names-list li .name-book { opacity: calc(0.8 + var(--r, 0) * 0.2); } /* the undecided candidate was 50% ink (3.4:1 on the card); 80% keeps it fainter than the decided one and above 4.5:1 */
+/* the dark-ground pills and the scrim: cream-tinted, not the cobalt-white tint */
+html[data-theme="red"] .tag { background: rgba(255, 240, 220, 0.14); border-color: rgba(255, 240, 220, 0.34); }
+html[data-theme="red"] .tag-next { background: transparent; border-color: rgba(255, 240, 220, 0.42); }
+html[data-theme="red"] .prop-scrim { background: rgba(26, 5, 4, 0.4); }
+/* the pre-WebGL poster is the book's own colours: cloth, then the cream page block */
+html[data-theme="red"] .canvas-poster::before { background: linear-gradient(90deg, #7a170f 0% 86%, #e6d6ad 86% 100%); box-shadow: 0 30px 60px rgba(10, 1, 1, 0.5); }
+/* tag-next is a neutral outline pill everywhere (lead decision): no green,
+   no per-world tint, just the ink/paper-line tokens that never change. */
+
+/* =====================================================================
+   Typography variant (round 2) B+. Bricolage Grotesque (96 pt cut) for headlines and the wordmark; Geist for text and UI; Geist Mono for figures (round-1 B, larger headings)
+   Everything below and the @font-face rules above are the only differences from v2m.
+   ===================================================================== */
+body { font-weight: 400; }
+.panel[data-chapter="0"] h1 { font-family: var(--font-head); font-size: clamp(38px, 4.3vw, 62px); font-weight: 700; line-height: 1.04; letter-spacing: -0.03em; }
+.panel h2 { font-family: var(--font-head); font-size: clamp(30px, 3.75vw, 54px); font-weight: 650; line-height: 1.08; letter-spacing: -0.02em; }
+.download-block h2 { font-family: var(--font-head); font-size: 40px; font-weight: 650; letter-spacing: -0.02em; }
+.panel .proof { font-size: clamp(17px, 1.25vw, 18px); line-height: 1.55; }
+.panel .proof-sub, .coming-line { font-size: 14px; line-height: 1.5; }
+.tag { font-size: 12px; font-weight: 500; letter-spacing: 0.01em; }
+.fineprint { font-size: 14px; font-weight: 400; line-height: 1.5; text-wrap: balance; }
+.next-line { font-size: 14px; }
+.demo-caption, .panel .panel-synthetic { font-family: var(--font-display); font-size: 12px; font-weight: 400; }
+.names-list li { font-size: 12px; }
+.install-steps li::before { font-size: 12px; }
+.row-sheet td:nth-child(4) .cell { font-size: 14px; }
+.counter { font-weight: 600; }
+.proof, .proof-sub, .coming-line, .ageing-reply, .row-sheet { font-variant-numeric: tabular-nums; }
+.font-warm { position: absolute; left: -9999px; top: 0; visibility: hidden; pointer-events: none; }
+.font-warm[data-i="0"] { font-family: var(--font-head); font-weight: 700; }
+.font-warm[data-i="1"] { font-family: var(--font-display); font-weight: 400; }
+.font-warm[data-i="2"] { font-family: var(--font-mono); font-weight: 400; }
+@media (max-width: 760px) {
+  .panel[data-chapter="0"] h1 { font-size: clamp(29px, 8.7vw, 34px); }
+  .panel h2 { font-size: clamp(26px, 7.7vw, 30px); }
+  .download-block h2 { font-size: 30px; }
+  .row-sheet, .row-sheet tbody, .row-sheet tr, .prop-row { font-size: 13px; }
+}
+
+/* =====================================================================
+   Cobalt world, W5 (critic 1 Oct, fixes 1, 4, 5, 6). Every rule is under html:not([data-theme]), which only the cobalt
+   build matches (the other worlds set data-theme), so the red, green and light worlds are untouched.
+   ===================================================================== */
+/* fix 1, the ink room: the file is the only saturated mass; the ground is a desaturated deep ink lit from the text side */
+html:not([data-theme]) { --room: #0b1027; --ink-margin: rgba(179, 38, 30, 0.6); --ink-feint: rgba(31, 63, 191, 0.22); background: var(--room); }
+html:not([data-theme]) body { background: var(--room); }
+html:not([data-theme]) .story { --story-bg: radial-gradient(70% 90% at 74% 40%, #1a2250 0%, #121936 48%, #0b1027 100%); }
+html:not([data-theme]) .story-sticky::after { background: linear-gradient(to bottom, transparent, var(--room)); }
+/* the first paint matches the brighter board */
+html:not([data-theme]) .canvas-poster::before { background: linear-gradient(90deg, #1a2fb0 0% 86%, #eef1f7 86% 100%); }
+
+/* fix 5: the working paper's flag cell is the 40A(3) stationery flag */
+html:not([data-theme]) .wp-sec { background: #f2d33b; }
+
+/* fix 4: queries are blue pencil, and the decision tick is red pencil */
+html:not([data-theme]) .name-chip { background: #1f3fbf; color: #f6f8fb; border-radius: 2px; }
+html:not([data-theme]) .name-chip::before { border-color: #1f3fbf; border-radius: 2px; }
+html:not([data-theme]) .name-chip .t { color: var(--tick); }
+
+/* fix 6: the working paper and the names card are paper, not cards: square corners, a red margin rule, blue feint ruling */
+.wp-ref { display: none; }
+html:not([data-theme]) .wp-ref { display: block; float: right; margin-left: 12px; font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; color: #4f587a; }
+html:not([data-theme]) .prop-row,
+html:not([data-theme]) .prop-names {
+  border-radius: 2px;
+  background-color: #fbfbf8;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+html:not([data-theme]) .prop-row {
+  border-left: 0;
+  background-image: linear-gradient(90deg, transparent 31px, var(--ink-margin) 31px, var(--ink-margin) 32px, transparent 32px);
+}
+html:not([data-theme]) .wp-title { padding: 10px 14px 8px 40px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; overflow: hidden; }
+html:not([data-theme]) .row-sheet th { background: transparent; color: #4f587a; border: 0; border-bottom: 1.5px solid var(--ink); padding: 5px 12px; }
+html:not([data-theme]) .row-sheet td,
+html:not([data-theme]) .row-sheet.is-filled td { border-style: solid; border-color: var(--ink-feint); }
+html:not([data-theme]) .row-sheet th:first-child,
+html:not([data-theme]) .row-sheet td:first-child { padding-left: 46px; }
+html:not([data-theme]) .names-cap { padding-bottom: 7px; margin-bottom: 9px; border-bottom: 1.5px solid var(--ink); color: #4f587a; }
+html:not([data-theme]) .names-list { gap: 0; }
+html:not([data-theme]) .names-list li { padding: 6px 0; border-bottom: 1px solid var(--ink-feint); }
+html:not([data-theme]) .names-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+/* the stacked two-row layout (a phone, and the reduced-motion caption): the margin rule stays clear of the text, every row starts at its right */
+@media (max-width: 760px) {
+  html:not([data-theme]) .wp-title { padding: 8px 10px 6px 40px; font-size: 11px; letter-spacing: 0.02em; }
+  html:not([data-theme]) .wp-ref { font-size: 11px; letter-spacing: 0.02em; margin-left: 8px; }
+  html:not([data-theme]) .row-sheet tr { padding-left: 34px; grid-template-columns: 1.4fr 1.05fr 1fr 1.45fr; }
+  html:not([data-theme]) .row-sheet td:first-child { padding-left: 8px; }
+}
+/* fix 5, phone (chapters 4-7): the words centre in the space under the book. The old auto margins never reached the last child (a hidden element follows it), so the block sat on the bottom edge and left one 190-250 px bare band between picture and words; centred, the same space is two halves of about 70-140 px. The hero and chapters 1-3 keep their layout. */
+@media (max-width: 760px) {
+  html:not([data-theme]) .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) { justify-content: center; }
+  html:not([data-theme]) .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) > :first-child { margin-top: 0; }
+}
+/* a narrow phone: the reference takes its own line rather than pushing the title onto two */
+@media (max-width: 389px) { html:not([data-theme]) .wp-ref { float: none; margin: 0 0 2px; text-align: right; } }
+html:not([data-theme]) .static-figure .prop-row .wp-title { padding: 8px 12px 6px 40px; font-size: 12px; letter-spacing: 0.02em; }
+@media (max-width: 760px) { html:not([data-theme]) .static-figure .prop-row .wp-title { font-size: 11px; } }
+/* the reduced-motion stills sit on the ink room without a drop shadow (the old one showed as a darker box on the near-black ground) */
+html:not([data-theme]) .static-still { box-shadow: none; }
+html:not([data-theme]) .static-figure .prop-row .row-sheet tr { padding-left: 34px; grid-template-columns: 1.4fr 1.05fr 1fr 1.45fr; }
+html:not([data-theme]) .static-figure .prop-row .row-sheet td:first-child { padding-left: 8px; }
+
+/* Red world, X1 W7, phone (chapters 4-7): the same centring as the cobalt rule above, so the words sit midway in the space under the book and no bare band is left between them (under html[data-theme="red"]: no other world changes) */
+@media (max-width: 760px) {
+  html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) { justify-content: center; }
+  html[data-theme="red"] .panel:is([data-chapter="4"], [data-chapter="5"], [data-chapter="6"], [data-chapter="7"]) > :first-child { margin-top: 0; }
+}

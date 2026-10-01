@@ -1185,8 +1185,9 @@ tied; `not_bill_wise_ledger` lists no rows. Its rows carry `row_amounts: as_allo
 amount is the allocation as it was made, never net of what later allocations adjusted against its
 reference, so an advance shows what was received, not what is left. What is still open on an
 advance's or a note's reference is Tally's own `native_balance` beside the row, from its bills
-reports at the same as-of (null when they do not list the reference, or list it more than once;
-`native_rows` says how many). No captured book shows how Tally records a later adjustment of an
+reports at the same as-of. It is null in two different cases, told apart only by `native_rows`: 0
+means the reports do not list the reference, and 2 or more means they list it more than once, so
+no balance is chosen. No captured book shows how Tally records a later adjustment of an
 advance, so no netting is built on one. Either kind is `window_returned_no_vouchers`, with nothing
 tied or listed, when the voucher read returned no voucher: unlike `vouchers`, the detail does not
 corroborate an empty read.
@@ -1197,11 +1198,14 @@ so its cost is that of a `vouchers` read over the same span. That cost is unmeas
 book, and any refusal of that read fails the whole `outstandings` call: one foreign-currency
 composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
 `bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
-every window read is: a window that needs more requests than one call may spend is refused, before
-any data request when its census shows that (the census stops as soon as it has counted more
-vouchers than the allowed requests can hold), and otherwise when a measured part shows it, as
-`trail_window_too_large` (name a `reference` that `open_bills` lists for the party; a recent
-bill's window is shorter) or `unadjusted_window_too_large` (nothing narrows it, so it is not
+every window read is. It may spend at most 128 requests, and before anything is measured a request
+holds at most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
+refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
+data request when the census shows it (the census stops as soon as it has counted more vouchers
+than the allowed requests can hold), and otherwise when a measured part does, as
+`trail_window_too_large` (name a `reference` that `open_bills` lists for the party; the read then
+starts at that bill's date), `named_bill_window_too_large` (a reference was named already, so
+nothing narrows it further) or `unadjusted_window_too_large` (nothing narrows it, so it is not
 available for that party on that book). Either refusal carries `reads.needed_at_least` against
 `reads.allowed`, and `window` lists any part already read. It needs a complete read
 (`detail_requires_a_complete_read`, with the read's own `partial_reason` beside it), and refuses

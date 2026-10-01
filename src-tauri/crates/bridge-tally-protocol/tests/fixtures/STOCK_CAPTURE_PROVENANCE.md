@@ -14,6 +14,7 @@ Every file is a live capture, never hand-written.
   - The company was confirmed loaded before anything was sent.
 - **Book:** `BRIDGE SHAPE LAB`, a synthetic lab company.
   - Its book extent (`ALTMSTID` 289, `ALTVCHID` 111) was read before and after the two requests, and was equal.
+- **Sender:** a lab capture script, not `bridge_mcp`. It sent the exact request bytes tabled below, one request at a time. Those bytes are the production renderers' own output: `every_request_is_byte_equal_to_its_committed_fixture` (`src/native_stock_summary_tests.rs`) asserts that each renderer's output equals its committed request, so the responses answer the request Bridge sends.
 - **Encoding:** responses are **BOM-less UTF-16LE**, exactly as received. Requests are the exact bytes sent: **UTF-16LE with a BOM**. `.gitattributes` marks this tree `-text`.
 - **Request shape:**
   - Stock items: the production `render_audit_stock_items` text (`AuditStockItemsV1`), period 2025-04-01 to 2026-03-31.

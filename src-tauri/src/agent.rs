@@ -45,6 +45,8 @@ mod changes;
 mod ledgers;
 #[path = "agent_masters.rs"]
 mod masters;
+#[path = "agent_stock_summary.rs"]
+mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
 #[path = "agent_outstandings.rs"]
 mod outstandings;
@@ -505,6 +507,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -642,6 +658,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(reason);
         }
+        if let Some(stock) =
+            cause.downcast_ref::<bridge_tally_protocol::native_stock_summary::NativeStockError>()
+        {
+            return Some(stock.code());
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -746,6 +772,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              reads Tally's own period figures per ledger without this catalogue read (a \
              whole-book read of its own, on a different basis: not literal voucher \
              movement).",
+        ),
+        // The stock summary read's own size refusal (`size` carries the mark).
+        "stock_summary_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case stock-item row is over Bridge's response budget (`size.limit_bytes`), \
+             so no request for stock items was sent. The mark counts masters of every kind, so \
+             a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
@@ -1016,6 +1050,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -1507,6 +1545,7 @@ impl Server {
             "ledger_movement" => self.ledger_movement(args).await,
             "trial_balance" => self.trial_balance(args).await,
             "masters" => self.masters(args).await,
+            "stock_summary" => self.stock_summary(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),

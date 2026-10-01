@@ -475,6 +475,14 @@
       "path": "src-tauri/src/agent_receipt_fields.rs"
     },
     {
+      "path": "src-tauri/src/agent_register.rs",
+      "reason": "Decides which vouchers the purchase register lists and how each entry's tax is classified from the master's GST duty head, so a change to it changes what a client is shown as tax in books."
+    },
+    {
+      "path": "src-tauri/src/agent_register_tests.rs",
+      "reason": "Pins what the purchase register's classifier must do over real captures (tax only from a recognised head, no-head and unrecognised entries never assigned, masking of every ledger), so weakening these tests needs an acknowledgement like changing the classifier."
+    },
+    {
       "path": "src-tauri/src/agent_responses.rs"
     },
     {

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Download ComplyEaze Bridge, the local TallyPrime MCP server for Claude</title>
+<meta name="description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed; your computer may warn you." />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html" aria-current="page">Download</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html" aria-current="page">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="page-hero__inner">
+      <h1>Download ComplyEaze Bridge</h1>
+      <p>
+        A Claude&nbsp;Desktop extension that connects Claude to TallyPrime on your computer.
+        For Windows&nbsp;x64 and Apple&nbsp;Silicon Macs. Not yet code-signed; your computer may warn you.
+      </p>
+    </div>
+  </section>
+
+  <div class="page-body">
+    <section class="page-section">
+      <h2>Choose your build</h2>
+      <div class="dl-panel">
+        <p class="dl-state" id="dlLoading" role="status">Checking the latest release&hellip;</p>
+        <noscript><p class="dl-state">The download buttons need JavaScript. Without it, open the <a href="https://github.com/ComplyEaze/bridge/releases">releases page on GitHub</a>, take the newest release whose tag starts with <code>mcp-</code> and that lists a <code>.mcpb</code> file for your computer, and compare it with the matching <code>.sha256</code> file.</p></noscript>
+        <div class="dl-state" id="dlError" hidden>
+          <p>We could not reach GitHub for the latest build.</p>
+          <a class="btn btn-primary" href="https://github.com/ComplyEaze/bridge/releases/latest">See releases on GitHub</a>
+        </div>
+        <div class="dl-buttons" id="dlReady" hidden></div>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <h2>Before you install</h2>
+      <ul class="before-list">
+        <li>ComplyEaze Bridge is still being developed and may contain errors. Try it first on a test company, and take a backup before you turn posting on.</li>
+        <li>Posting is off by default in a new install. If you upgraded from an earlier version, check the setting. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
+        <li>Each download has a matching <code>.sha256</code> file on the same release. Compare it with your download before opening the package.</li>
+        <li>What has been run against a real TallyPrime, and what has not, is listed in the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">README</a>.</li>
+        <li>Tally must be running on the same computer as Claude&nbsp;Desktop.</li>
+        <li>On a Mac, run Tally in a Windows virtual machine on that same Mac with its gateway port forwarded to the Mac's localhost, or reach it through local port forwarding your organisation has approved. ComplyEaze Bridge talks to Tally only on localhost, so a separate PC, or a Tally elsewhere on your network, cannot be reached.</li>
+      </ul>
+    </section>
+
+    <section class="page-section">
+      <h2>Install, once</h2>
+      <ol class="steps-list">
+        <li>In TallyPrime, turn on the HTTP gateway (Tally acts as &ldquo;Both&rdquo;).</li>
+        <li>Open the downloaded .mcpb file. If Claude&nbsp;Desktop doesn&rsquo;t pick it up: Settings &rarr; Extensions &rarr; Advanced settings &rarr; Install Extension.</li>
+        <li>Check the Tally port in the extension settings (usually <code>9000</code>).</li>
+        <li>Save, restart Claude&nbsp;Desktop if the tools don&rsquo;t appear, and ask about your books in plain language.</li>
+      </ol>
+      <p class="dl-note">ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Questions and problems: <a href="https://github.com/ComplyEaze/bridge/issues">open an issue on GitHub</a>.</p>
+    </section>
+  </div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>A loopback address on this computer.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html" aria-current="page">Download</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+<script type="module" src="download.js"></script>
+</body>
+</html>

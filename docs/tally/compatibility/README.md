@@ -33,9 +33,9 @@ the changed pinned paths; there is nothing to regenerate. An edit to the pin lis
 that adds or removes no pin (only a `reason`) needs none, and adding one when
 nothing pinned changed is an error. The procedure is in the
 [release process](../../release-process.md#compatibility-surface-reseal). The CI
-check that the acknowledgement matches the diff is report-only for now (it prints
-`WOULD FAIL` and exits 0); `scripts/merge-gate.sh`, run locally by whoever merges,
-is the blocking leg. Neither rewrites any file. To change the pin set itself, see
+check that the acknowledgement matches the diff fails a pull request that lacks one
+(it prints `surface ack check FAILED: <reason>`); `scripts/merge-gate.sh`, run
+locally by whoever merges, checks the same rule. Neither rewrites any file. To change the pin set itself, see
 [Adding or removing a pin](../../release-process.md#adding-or-removing-a-pin).
 
 An evidenced `observed`, `supported`, or `unsupported` cell requires all of the

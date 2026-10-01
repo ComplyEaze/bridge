@@ -77,7 +77,7 @@ test("release catalogue requires immutable package and checksum names together",
 
 test("user-facing site text does not call a release a preview or say it is for evaluation only", async () => {
   const { readFile } = await import("node:fs/promises");
-  for (const file of ["index.html", "app.mjs"]) {
+  for (const file of ["index.html", "download.html", "releases.html", "changelog.template.html", "download.js", "releases.js", "release-source.mjs", "app.js"]) {
     const text = await readFile(new URL(`../site/${file}`, import.meta.url), "utf8");
     // The tag prefix is how a user finds the release; it is a name, not prose.
     const prose = text.replaceAll("mcp-preview", "");

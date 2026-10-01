@@ -5,7 +5,8 @@ All notable changes to Bridge are documented here. The project follows
 
 ## [Unreleased]
 
-Published builds are unsigned MCPB previews (tags `mcp-preview-*`): so far
+Published builds are MCPB packages that are not yet code-signed (tags
+`mcp-preview-*`): so far
 `mcp-preview-0.2.0` and `mcp-preview-0.3.0`. The number of the next build is
 chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and

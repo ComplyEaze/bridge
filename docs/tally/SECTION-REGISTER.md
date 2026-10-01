@@ -112,9 +112,9 @@ request. Nothing in a docs diff suggests a compatibility gate is involved.
 What actually happens: the `Tally portable core` job does not fail on such an edit by itself (no
 per-file hash is stored any more; the surface digest is computed from the live bytes, and the test
 `real_tree_has_complete_migration_and_report_surface_coverage` checks pin coverage, not bytes). The
-missing acknowledgement is reported by the CI check `scripts/check-surface-ack.mjs`, which is
-report-only today (it prints `WOULD FAIL` and exits 0), and is blocked by `scripts/merge-gate.sh`,
-the local tool run by whoever merges. Removing or renaming a declared part also edits the pin list.
+missing acknowledgement fails the CI check `scripts/check-surface-ack.mjs`
+(`surface ack check FAILED: <reason>`), and `scripts/merge-gate.sh`, the local tool run by whoever
+merges, checks it too. Removing or renaming a declared part also edits the pin list.
 
 The procedure is in **[`docs/release-process.md`](../release-process.md#compatibility-surface-reseal)**.
 It is not repeated here: a second copy drifts, and a section author following a stale one leaves

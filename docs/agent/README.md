@@ -81,11 +81,12 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `masters`, `stock_summary`,
+`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
+`stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
 `read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet` and `local_data_report` are in source but not
-in the 0.3.0 release.) `local_data_report` (also
+`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` are in
+source but not in the 0.3.0 release.) `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -646,6 +647,67 @@ setup commitment. Historical commitments without a tier retain their exact bytes
 If discovery rejects company identity fields, `tally_status` reports the profile
 refusal reason and partial evidence with the completed source commitments. A
 valid empty collection remains distinguishable from invalid discovery.
+
+### Purchase register (`purchase_register`)
+
+Lists the Purchase and Debit Note vouchers of a date window that touch a ledger
+under Duties & Taxes (#969), and says per entry what the books record. Nothing is
+posted and nothing is inferred. It is a register of the books, not a GST return:
+it does not decide input tax credit eligibility or blocked credit, matches
+nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
+only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+classify an item invoice's purchase as taxable, and never sums tax across heads
+or vouchers.
+
+- **Rows are selected by the ledger, not the voucher type.** A voucher is a
+  candidate when one of its entries is on a ledger whose nearest predefined
+  group is Duties & Taxes (by its `RESERVEDNAME`, so a renamed group or a user
+  sub-group still counts). Purchase and Debit Note are the register. Every
+  other voucher type that touches those ledgers (Sales, Journal, Payment) is
+  listed apart in `other_voucher_types_touching_duties_taxes` with exact counts:
+  whether such a voucher belongs in a return is the CA's call, not the tool's.
+  A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
+  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
+  returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
+  masters and the window, so rows can shift between pages); every ledger name in every list is
+  masked when parties are masked, the same way `vouchers` masks it.
+  A Debit Note can be a purchase return or a debit note issued to a customer, and a GST duty head
+  does not say whether a ledger is input or output, so each row carries `party_group` (the party's
+  predefined group, such as Sundry Creditors or Sundry Debtors) and the tool does not guess which it
+  is. Reverse-charge journals, imports and input service distribution get no special treatment.
+- **Tax comes only from the GST duty head on the ledger master.** An entry on a
+  ledger with a recognised head is listed in `tax_in_books` as
+  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
+  assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
+  ledger whose own tax type is not GST (usually TDS or another payable), and
+  `absent` is a ledger with no head whose tax type is GST or was not reported,
+  which may be a GST ledger whose head is missing (`tax_type` is returned).
+  An entry whose head is not in the recognised vocabulary, or contradicts the
+  ledger's tax type, is listed with its raw spelling in
+  `duties_taxes_entries_with_unrecognised_head`. No name is ever matched and no
+  amount is ever used to decide a head.
+- **Amounts are as the books state them** (negative is a debit), never
+  re-signed from the deemed-positive flag and never summed across heads. There
+  is no direction field and nothing is called input credit.
+- **Other fields.** `reference`, `party_gstin`, `is_invoice` and `post_dated`
+  follow `vouchers` (absent means not observed). Cancelled, optional and
+  post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
+  returned yet.
+- **Snapshot binding.** The ledger masters are read before the window (and the
+  window is planned against their marks), the company's marks are read again
+  after it, and the masters are read a second time and must classify exactly as
+  the first read did, because whether a duty-head change, a re-parent or a
+  delete moves the master mark is unmeasured. A difference refuses as
+  `voucher_window_changed_during_read` or `ledger_snapshot_drifted` and releases
+  no rows. A voucher that names a ledger the masters do not list refuses the
+  same way; one the compliance read set aside for its currency refuses as
+  `register_ledger_currency_excluded`.
+- **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
+  in an inventory allocation (`taxable_entries` may be empty for them); books
+  with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
+  post-dated voucher in the captures the tests use. The captures are one
+  synthetic lab book and one month.
 
 ### Foreign-currency composites in `vouchers`
 
@@ -1237,6 +1299,76 @@ parts add up to the totals. A row saved without a composition (older saved data)
 counts under `composition_not_observed`, which appears only when such a row exists.
 Each row is about 100 bytes wider than before, so under a byte cap a page can now
 hold fewer rows and `next_offset` can move; no figure changes.
+
+`outstandings` also takes `party` (a ledger name) with `detail`, which adds a `detail` object for
+that one party, tied to the same as-of (#945). Without them nothing changes, and passing `detail`
+is the request to read the company's vouchers from the start of the books (below). `detail:
+bill_trail` (optionally with one `reference`) lists every allocation of each of the party's bills
+in vouchers that are neither cancelled nor optional (those are skipped, as Tally's own reports
+skip them), oldest first, each with its own bill date, and gives each bill a state: `tied` (the
+signed allocations equal Tally's own balance for that bill, or zero for a bill the report no
+longer lists), `trail_does_not_tie` (both numbers shown) or `bill_identity_ambiguous` (more than
+one native row or bill date for one reference, or one native row dated differently from the
+allocations; nothing is merged, and the native dates are shown). Naming a `reference` that Tally's
+bills reports list starts the window at the earliest date they list for it, so allocations dated
+earlier are not read (a reference they do not list is read from the start of the books): a
+reference that carries two bill dates over the whole history, and is ambiguous there, can tie
+when named. The detail's own `state` is `bills_listed`, or, for an empty list,
+`not_bill_wise_ledger` (the ledger snapshot says the ledger keeps no bills) or
+`no_named_bill_for_party` (no voucher read allocates a named bill on the ledger and Tally lists
+none for it; a ledger that keeps no bills, one that is not a party's and a party with no bills are
+not told apart).
+
+`detail: unadjusted` lists the party's on-account, advance and pending credit or debit note
+allocations and compares the on-account sum with the party's unallocated amount. `tied` there
+means the two figures are equal, not that the composition is proven: components that net to zero
+are not seen. `residual_not_explained_by_vouchers` gives the difference and whether it equals the
+ledger's opening balance, as a fact and not a label. `no_residual_row_for_party`, with `residual`
+null, means Tally's ledger snapshot lists no unallocated amount for the ledger (a zero residual, a
+ledger that is not a party's and a name that matched no row are not told apart), so nothing is
+tied; `not_bill_wise_ledger` lists no rows. Its rows carry `row_amounts: as_allocated`: each
+amount is the allocation as it was made, never net of what later allocations adjusted against its
+reference, so an advance shows what was received, not what is left. What is still open on an
+advance's or a note's reference is Tally's own `native_balance` beside the row, from its bills
+reports at the same as-of. It is null in two different cases, told apart only by `native_rows`: 0
+means the reports do not list the reference, and 2 or more means they list it more than once, so
+no balance is chosen. No captured book shows how Tally records a later adjustment of an
+advance, so no netting is built on one. Either kind is `window_returned_no_vouchers`, with nothing
+tied or listed, when the voucher read returned no voucher: unlike `vouchers`, the detail does not
+corroborate an empty read.
+
+The detail reads the whole company's vouchers from the books' beginning (or from the earliest
+date Tally lists for the named bill, when it lists one) to `as_of` and keeps the entries on the party's own ledger,
+so its cost is that of a `vouchers` read over the same span. That cost is unmeasured on a large
+book, and any refusal of that read fails the whole `outstandings` call: one foreign-currency
+composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
+`bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
+every window read is. It may send at most 128 data requests (each sent twice, as every read is, with its
+census and the company marks besides), and before anything is measured a data request holds at
+most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
+refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
+data request when the census shows it (the census stops as soon as it has counted more vouchers
+than the allowed requests can hold), and otherwise when a measured part does, as
+`trail_window_too_large` (name a `reference` that `open_bills` lists for the party; the read then
+starts at that bill's date), `named_bill_window_too_large` (a reference was named already, so
+nothing narrows it further) or `unadjusted_window_too_large` (nothing narrows it, so it is not
+available for that party on that book). Either refusal carries `reads.needed_at_least` against
+`reads.allowed`, and `window` lists any part already read. It needs a complete read
+(`detail_requires_a_complete_read`, with the read's own `partial_reason` beside it), and refuses
+rather than cuts an answer of more than 500 allocations: `trail_too_large` for a bill trail (name
+a `reference`) and `unadjusted_detail_too_large` for the unadjusted detail (nothing narrows it, so
+the detail is not available for that party; its vouchers can still be read with `vouchers` and
+`ledger`, untied). That limit counts allocations, not bills, so bills Tally lists that no voucher
+allocates to (opening bills) are not counted by it, and a party with very many of them can meet
+the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
+nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
+`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
+vouchers in the window, not the party's. A named bill's window never starts before the books.
+The vouchers and the bills reports are two reads whose extents are not compared: a voucher posted
+between them usually shows as `trail_does_not_tie`, but two changes that compensate, or
+allocations that net to zero, can still read `tied`. Measured on one synthetic book only
+(reference 12a.14); an `as_of` earlier than the last voucher and post-dated vouchers were not
+measured.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

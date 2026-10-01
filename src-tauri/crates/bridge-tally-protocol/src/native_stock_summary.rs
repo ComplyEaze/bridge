@@ -72,11 +72,6 @@ const _: () = assert!(stock_item_worst_row_bytes() < MASTERS_RESPONSE_BUDGET_BYT
 /// ([`NativeStockItemCount`]); the rest stay in the request so that it is
 /// byte-equal to the committed capture. A GUID that could break the formula's
 /// string is refused, not escaped.
-///
-/// The formula is named `BridgeR3CompanyGuid`, an internal lab-capture name,
-/// because the request must stay byte-equal to the request Tally actually
-/// received; it is renamed together with a capture of this request through
-/// Bridge (bridge#979).
 pub fn render_company_inventory_flags_request(
     company: &str,
     company_guid: &str,
@@ -89,7 +84,7 @@ pub fn render_company_inventory_flags_request(
         return Err(NativeStockError::CompanyFlagsGuidUnsupported);
     }
     Ok(format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyBookExtentV2</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeR3CompanyGuid">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyBookExtentV2" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{COMPANY_EXTENT_V2_FETCH}, ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON, NUMLEDGERS, NUMGROUPS, NUMSTOCKITEMS, NUMSTOCKCATEGORIES, NUMGODOWNS, NUMUNITS, NUMVOUCHERTYPES</FETCH><FILTERS>BridgeR3CompanyGuid</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeCompanyBookExtentV2</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeCompanyGuidFilter">$GUID = "{company_guid}"</SYSTEM><COLLECTION NAME="BridgeCompanyBookExtentV2" ISMODIFY="No"><TYPE>Company</TYPE><FETCH>{COMPANY_EXTENT_V2_FETCH}, ISINTEGRATED, ISINVENTORYON, ISBATCHWISEON, NUMLEDGERS, NUMGROUPS, NUMSTOCKITEMS, NUMSTOCKCATEGORIES, NUMGODOWNS, NUMUNITS, NUMVOUCHERTYPES</FETCH><FILTERS>BridgeCompanyGuidFilter</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
     ))
 }

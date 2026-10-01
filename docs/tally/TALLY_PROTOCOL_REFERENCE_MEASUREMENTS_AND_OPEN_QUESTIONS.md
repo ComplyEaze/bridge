@@ -1263,6 +1263,7 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 - **Not measured:**
   - a book whose inventory is not integrated with the accounts (what the report and the items then show);
   - an `SVTODATE` other than 31 March 2026 (another year's 31 March, a day 1 or 2, any other date);
+  - the date a stock item's `OPENINGBALANCE` and `OPENINGVALUE` are as at: the captured book's `BOOKSFROM` (20250401) equals the request's `SVFROMDATE`, so this capture cannot tell an opening at the period start from one at the books' beginning. `stock_summary` reads and validates both and returns neither;
   - a quantity in a compound unit, or one with a unit that has a space;
   - the report with a godown or batch split, and the explode flag;
   - a foreign-currency book;

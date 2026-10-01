@@ -218,13 +218,23 @@ acknowledgement file, which `workflow-consistency` enforces in CI on pull reques
 in the merge queue and on the push to master. A pull request that adds or removes a
 pin without its acknowledgement fails, whatever else it edits.
 
-One case no check can see: a branch adds a pin, and a later merge of master is
-resolved by taking master's pin list. Against the base the list is then unchanged, so
-the new file lands unpinned. Before the bound replaced the exact count, a reviewer
-comparing the constant with the pin count could notice the mismatch; that signal is
-gone. So a review of a pull request that touches the pin list compares the list with
-the last reviewed head as well as with the base, and names any pin that was present
-at the last reviewed head and is gone.
+One narrower case remains. A branch adds a pin, and a later merge of master is
+resolved by taking master's pin list, which drops that pin. While the
+acknowledgement still names the pin, the check already fails: against the base the
+list no longer differs by that pin, so the acknowledgement "lists path(s) that are
+not changed pinned paths" (or, when nothing else pinned changed, "an ack was added
+but no pinned path changed"). It is silent only when the acknowledgement is also
+edited or deleted to match, or when history is rewritten (a rebase, a force-push or a
+squash before the push) so that no commit records the pin. Before the bound replaced
+the exact count, a reviewer comparing the constant with the pin count could notice
+that mismatch too; that signal is gone. So a review of a pull request that touches
+the pin list compares the list with the last reviewed head as well as with the base,
+and names any pin that was present at the last reviewed head and is gone.
+
+What remains of the old collision: two pull requests that insert a pin at the same
+sorted position still conflict in the pin list itself. Resolve it by keeping both
+entries (see "When the surface conflicts in a merge"); the cap is no longer part of
+it.
 
 #### What the coverage report shows
 

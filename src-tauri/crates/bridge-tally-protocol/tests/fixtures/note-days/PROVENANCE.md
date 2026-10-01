@@ -1,10 +1,11 @@
-# `note-days/`: a credit note and a debit note, each read once through a register tool
+# `note-days/`: a credit note, a debit note and a cancelled purchase, each read once through a register tool
 
-Thirty files from two live tool calls on one synthetic company: `sales_register` for a day that
-holds one Credit Note, and `purchase_register` for a day that holds one Debit Note. They are here
+Thirty-six files from three live tool calls on one synthetic company: `sales_register` for a day
+that holds one Credit Note, `purchase_register` for a day that holds one Debit Note, and
+`purchase_register` for a day that holds one cancelled Purchase. They are here
 for the sales register's tests. No test reads them yet.
 
-## Three facts first
+## Four facts first
 
 1. **A credit note is returned as a row with its signs reversed, as Tally sends them.** Tax is
    `-90.00` twice, the sales ledger `-1000.00`, the party `1180.00`. Nothing is netted or flipped by
@@ -16,11 +17,17 @@ for the sales register's tests. No test reads them yet.
    currencies defined and a voucher mark above the read planner's threshold, so each call adds a
    voucher census and base-currency reads.
 
+4. **A cancelled Purchase is not returned as a row.** It is listed, with `cancelled: true`, under
+   `purchase_vouchers_without_duties_taxes_entry`: a cancelled voucher keeps no entries, so it has
+   none under Duties & Taxes. A reader of that list's count alone would take it for an untaxed
+   purchase.
+
 ## Provenance
 
 - **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, `education_mode=false`,
   `http://127.0.0.1:9001` (a lab instance).
-- **Date:** 2026-10-01, 23:24 IST (the credit note day) and 23:24 to 23:25 IST (the debit note day).
+- **Date:** 2026-10-01, 23:24 IST (the credit note day), 23:24 to 23:25 IST (the debit note day) and
+  23:36 IST (the cancelled purchase day).
 - **Book:** `BRIDGE SHAPE LAB`, a **synthetic** company seeded by this project: 44 ledgers, 33
   groups, two currencies. Its ledger names are labels in a test book. Where a name resembles a
   real organisation (two bank-style ledger names do), it is a label, not an account of that
@@ -34,9 +41,9 @@ for the sales register's tests. No test reads them yet.
   request and response bytes of every exchange. It forwards only exports and refuses anything else.
   No request was refused in either call.
 - **The calls:** `sales_register` with `from` and `to` `20250429`; `purchase_register` with `from`
-  and `to` `20250428`. One voucher on each day. `tally_status` was read before and after each call
+  and `to` `20250428`; `purchase_register` with `from` and `to` `20250703`. One voucher on each day. `tally_status` was read before and after each call
   and the loaded companies were the same.
-- **Requests per call: 118** (66 exports and 52 status reads), the same in both calls.
+- **Requests per call: 118** (66 exports and 52 status reads), the same in all three calls.
   Exports by request id: `BridgeCompanyExtent` 20, `BridgeCompanyBookExtentV2` 16, `BridgeCompanyCurrencies` 8, `BridgeCompanyBaseCurrency` 4, `List of Ledgers` 8, `List of Groups` 4, `Bridge Agent Voucher Census` 2, `Bridge Agent Vouchers` 2, `Bridge Agent Company High Water` 2.
   On the other lab book (8 ledgers, one currency, three vouchers) the same tool sent 96 (54 exports
   and 42 status reads): no census and no base-currency read, and half the currency reads.
@@ -51,8 +58,8 @@ for the sales register's tests. No test reads them yet.
   body's length.
 - **One file per distinct request.** Bridge sends most requests more than once in a call (paired
   reads and brackets). Every answer to the same request bytes was byte-identical within a call.
-- **`shape_lab_*` files are shared by both calls.** Nine requests were sent byte for byte in both
-  calls and answered byte for byte the same; they are kept once. The census and the window differ
+- **`shape_lab_*` files are shared by all three calls.** Nine requests were sent byte for byte in
+  every call and answered byte for byte the same; they are kept once. The census and the window differ
   by day and are kept per day.
 - **`*_answer.json` is a tool answer, not a wire capture.** It is the structured content the tool
   returned for the call, written with one-space indentation. Its `evidence` hashes are the tool's
@@ -86,6 +93,12 @@ fixture's own hash differs and is the one in the table below.
 
 | file | bytes | sha256 | content |
 |---|---|---|---|
+| `cancelled_purchase_day_answer.json` | 2060 | `ad9f8de7f6582219565893d607983792fc6037732168b9e2552dbe63eac6ed5e` | TOOL ANSWER, not a wire capture: the structured content the tool returned |
+| `cancelled_purchase_day_sequence.json` | 36582 | `e1275debf242f64b1e50a7ad6d6d704cd5119708a2d867d609d7d493124bf045` | record, not a wire capture: every request of the call in order, with hashes |
+| `cancelled_purchase_day_voucher_census_request.utf16le.xml` | 1436 | `27a22111f294ee36efc81c0f7c69683408c596cf94938d47d311792511b7ae54` | request for the voucher census for the one day (`GUID, ALTERID, DATE`); wire bytes, UTF-16LE with a byte-order mark |
+| `cancelled_purchase_day_voucher_census_response.utf16le.xml` | 5434 | `71c527b65edcb2aaee81561d581528ce3f620a10deaca764f6bd050fd2842973` | response: the voucher census for the one day (`GUID, ALTERID, DATE`); wire bytes |
+| `cancelled_purchase_day_voucher_window_request.utf16le.xml` | 3088 | `a216c2be79685a0e935f62257ca550cae3d5081280c90347bf4d41076baae000` | request for the class-shaped voucher window for the one day; wire bytes, UTF-16LE with a byte-order mark |
+| `cancelled_purchase_day_voucher_window_response.utf16le.xml` | 7734 | `5a275b35313efec202141229c43e867e51647cfb740b70c9d7edbf9a3d679bed` | response: the class-shaped voucher window for the one day; wire bytes |
 | `credit_note_day_answer.json` | 3990 | `de90fdd4ff98f862d23dfc462d6e090500899ffd4bbb219d61f1986337d08b00` | TOOL ANSWER, not a wire capture: the structured content the tool returned |
 | `credit_note_day_sequence.json` | 36550 | `37f390396eb4cbce6e4ec5f07e0020f008d45788afac39e69ac6ac4882d7769b` | record, not a wire capture: every request of the call in order, with hashes |
 | `credit_note_day_voucher_census_request.utf16le.xml` | 1436 | `5793fcabdb94f48c005c77cd31d5dac4c548f372e5161f761b40774d7ccfed01` | request for the voucher census for the one day (`GUID, ALTERID, DATE`); wire bytes, UTF-16LE with a byte-order mark |
@@ -130,12 +143,18 @@ fixture's own hash differs and is the one in the table below.
 - **Signs.** They are Tally's own: a debit is negative. A caller that sums a tax head across a
   window gets sales net of credit notes only because it adds signed amounts.
 
+- **The cancelled purchase (2025-07-03).** One voucher, `Purchase` no. 9. The tool answered
+  `complete` with no item and `vouchers_observed: 1`, and listed the voucher's identity (date,
+  number, type, class, GUID, `cancelled: true`, `optional: false`, `post_dated: false`) under
+  `purchase_vouchers_without_duties_taxes_entry`, total 1. No amount of the cancelled voucher is
+  returned anywhere in the answer.
+
 ## Not settled
 
-- One credit note and one debit note, one run each, one synthetic book: this is not evidence about
+- One credit note, one debit note and one cancelled purchase, one run each, one synthetic book: this is not evidence about
   a client's book.
 - Not shown: a credit note in invoice mode or with goods lines; an inter-state note (`igst`); a
-  note against a bill reference; a cancelled or optional note; a note whose duty ledger has no
+  note against a bill reference; a cancelled or optional note; a cancelled sale; an optional voucher of either register's classes; a note whose duty ledger has no
   head or an unrecognised one; several vouchers in one window; paging.
 - Why this book's state-side ledger carries `State Tax` and the other book's `SGST/UTGST` was not
   investigated: each is what its ledger master holds.

@@ -2038,3 +2038,73 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         .get("window")
         .is_none());
 }
+
+/// A named reference keeps only that bill among the bills Tally lists that no
+/// voucher allocates to: the other listed bills of the party are not returned.
+#[test]
+fn a_named_reference_keeps_only_its_own_bill_among_the_listed_bills_no_voucher_allocates() {
+    let natives = vec![
+        open_bill(
+            "P",
+            "OPEN-A",
+            "20250301",
+            "10",
+            ExposureDirection::Receivable,
+        ),
+        open_bill(
+            "P",
+            "OPEN-B",
+            "20250302",
+            "20",
+            ExposureDirection::Receivable,
+        ),
+    ];
+    let trails = bill_trails("P", Some("OPEN-A"), &[], &natives).unwrap();
+    assert_eq!(
+        trails
+            .iter()
+            .map(BillOutcome::reference)
+            .collect::<Vec<_>>(),
+        ["OPEN-A"]
+    );
+    // Without the reference both are listed.
+    assert_eq!(bill_trails("P", None, &[], &natives).unwrap().len(), 2);
+}
+
+/// Naming a reference starts the window at the earliest date Tally's report
+/// lists for it, so allocations dated before that are not read. Over the whole
+/// history the same reference can carry two bill dates and be ambiguous; named,
+/// only the listed bill's allocations are read, and it can tie.
+#[test]
+fn naming_a_reference_can_turn_an_ambiguous_bill_into_a_tied_one() {
+    use super::bill_trail::trail_window_start;
+    let mut older = trail_entry(1);
+    older.date = "20250105".into();
+    older.bill_date = Some("20250105".into());
+    let mut settling = trail_entry(2);
+    settling.date = "20250110".into();
+    settling.bill_date = Some("20250105".into());
+    settling.amount = decimal("1");
+    let mut listed = trail_entry(3);
+    listed.date = "20260101".into();
+    listed.bill_date = Some("20260101".into());
+    let entries = vec![older, settling, listed];
+    let natives = vec![open_bill(
+        "P",
+        "R",
+        "20260101",
+        "1",
+        ExposureDirection::Receivable,
+    )];
+    let whole = bill_trails("P", None, &entries, &natives).unwrap();
+    assert_eq!(whole[0].state(), "bill_identity_ambiguous");
+    let start = trail_window_start(DetailKind::BillTrail, Some("R"), "P", &natives, "20250101");
+    assert_eq!(start, "20260101");
+    let read = entries
+        .iter()
+        .filter(|entry| entry.date.as_str() >= start.as_str())
+        .cloned()
+        .collect::<Vec<_>>();
+    let named = bill_trails("P", Some("R"), &read, &natives).unwrap();
+    assert_eq!(named[0].state(), "tied");
+}

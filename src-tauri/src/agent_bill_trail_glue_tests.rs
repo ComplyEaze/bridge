@@ -1,9 +1,10 @@
-//! The `outstandings` party detail's handler glue (#945), on a scripted
-//! transport: the verified company, the ledger catalogue and the window read
-//! are served from the captured import cycle and the captured three-voucher
-//! window; the native figures the detail is tied against are typed values,
-//! because the outstandings read that would produce them is not part of this
-//! glue. Each voucher of that window carries one On Account allocation on its
+//! The `outstandings` party detail's own handler, `outstandings_detail`
+//! (#945), on a scripted transport: the verified company, the ledger catalogue
+//! and the window read are served from the captured import cycle and the
+//! captured three-voucher window. These tests call the detail's handler, not
+//! the `outstandings` tool: the native figures the detail is tied against are
+//! typed values, because no company in the tree has a captured outstandings
+//! read and a captured catalogue and window together. Each voucher of that window carries one On Account allocation on its
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
 use crate::agent::bill_trail::{DetailKind, DetailLimits};
@@ -86,8 +87,9 @@ struct Call {
     open_bills: Vec<OpenBillRow>,
     unallocated: Vec<UnallocatedParty>,
     redaction: Redaction,
-    cap: usize,
-    window: WindowReadLimits,
+    /// `None` calls the production entry, `outstandings_detail`, with its own
+    /// limits; `Some` calls `outstandings_detail_within` with these.
+    limits: Option<DetailLimits>,
     books_from_missing: bool,
 }
 
@@ -99,15 +101,14 @@ impl Call {
             open_bills: Vec::new(),
             unallocated: Vec::new(),
             redaction: Redaction::None,
-            cap: 500,
-            window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+            limits: None,
             books_from_missing: false,
         }
     }
 }
 
-/// Runs `outstandings_detail_within` over `plans` and returns its result and
-/// how many requests the simulator served.
+/// Runs the detail's handler over `plans` and returns its result and how many
+/// requests the simulator served.
 async fn run(
     plans: Vec<ScenarioPlan>,
     call: Call,
@@ -131,22 +132,37 @@ async fn run(
     if call.books_from_missing {
         company.books_from = None;
     }
-    let result = server
-        .outstandings_detail_within(
-            &identity,
-            &company,
-            call.as_of,
-            PARTY,
-            call.kind,
-            None,
-            &call.open_bills,
-            &call.unallocated,
-            DetailLimits {
-                rows: call.cap,
-                window: call.window,
-            },
-        )
-        .await;
+    let result = match call.limits {
+        None => {
+            server
+                .outstandings_detail(
+                    &identity,
+                    &company,
+                    call.as_of,
+                    PARTY,
+                    call.kind,
+                    None,
+                    &call.open_bills,
+                    &call.unallocated,
+                )
+                .await
+        }
+        Some(limits) => {
+            server
+                .outstandings_detail_within(
+                    &identity,
+                    &company,
+                    call.as_of,
+                    PARTY,
+                    call.kind,
+                    None,
+                    &call.open_bills,
+                    &call.unallocated,
+                    limits,
+                )
+                .await
+        }
+    };
     simulator.cancel();
     let served = simulator
         .finish()
@@ -159,14 +175,25 @@ async fn run(
     (result, served)
 }
 
-/// The handler end to end: catalogue, window from the books' start to the
-/// as-of, the party's own allocation, the residual it ties to, and the window
-/// it says it read.
+/// The evidence one detail read carries: both bodies of each paired read it
+/// made, the catalogue, the high-water mark and the window, in that order.
+fn detail_evidence_bytes(plans: &[ScenarioPlan]) -> u64 {
+    2 * [5, 11, 17]
+        .iter()
+        .map(|index| response_bytes(&plans[*index]).len() as u64)
+        .sum::<u64>()
+}
+
+/// The detail's handler through its production limits: the catalogue, the
+/// window from the books' start to the as-of, the party's own allocation, the
+/// residual it ties to, and the window it says it read.
 #[tokio::test]
-async fn the_unadjusted_detail_runs_end_to_end_on_a_captured_window() {
+async fn the_handler_reads_and_ties_an_unadjusted_detail_on_a_captured_window() {
     let mut call = Call::new(DetailKind::Unadjusted);
     call.unallocated = vec![residual("102.02")];
-    let (result, served) = run(detail_plans(captured_window()), call).await;
+    let plans = detail_plans(captured_window());
+    let expected_bytes = detail_evidence_bytes(&plans);
+    let (result, served) = run(plans, call).await;
     let (detail, evidence) = result.unwrap();
     assert_eq!(served, 22);
     assert_eq!(detail["kind"], "unadjusted");
@@ -183,8 +210,10 @@ async fn the_unadjusted_detail_runs_end_to_end_on_a_captured_window() {
     assert_eq!(rows.len(), 1, "{detail}");
     assert_eq!(rows[0]["class"], "on_account");
     assert_eq!(rows[0]["date"], "20260801");
-    // The evidence covers the catalogue and the window, not just one of them.
-    assert!(evidence.bytes > 0);
+    // The evidence is the catalogue's, the mark's and the window's, each read
+    // in full: not just one of them.
+    assert_eq!(evidence.bytes as u64, expected_bytes);
+    assert_eq!(evidence.state, "complete");
 }
 
 /// Without a residual row the same answer ties nothing, through the handler.
@@ -261,15 +290,25 @@ async fn the_handler_reports_an_empty_window_read_and_ties_nothing() {
 /// and the refusal keeps the evidence of the reads before it.
 #[tokio::test]
 async fn the_handler_refuses_an_answer_over_its_row_limit_with_the_reads_evidence() {
+    let limits = |rows| DetailLimits {
+        rows,
+        window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+    };
     let mut call = Call::new(DetailKind::Unadjusted);
-    call.cap = 0;
-    let (result, _) = run(detail_plans(captured_window()), call).await;
+    call.limits = Some(limits(0));
+    let plans = detail_plans(captured_window());
+    let expected_bytes = detail_evidence_bytes(&plans);
+    let (result, _) = run(plans, call).await;
     let failure = result.unwrap_err();
     assert_eq!(failure.code, "unadjusted_detail_too_large");
-    assert!(failure.evidence.is_some_and(|evidence| evidence.bytes > 0));
+    assert_eq!(
+        failure.evidence.map(|evidence| evidence.bytes as u64),
+        Some(expected_bytes),
+        "the refusal keeps every read before it"
+    );
     // At the limit the same answer is given whole.
     let mut call = Call::new(DetailKind::Unadjusted);
-    call.cap = 1;
+    call.limits = Some(limits(1));
     let (result, _) = run(detail_plans(captured_window()), call).await;
     assert_eq!(result.unwrap().0["rows"].as_array().unwrap().len(), 1);
 }
@@ -350,7 +389,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
             cycle[0].clone(),
         ]);
         let mut call = Call::new(kind);
-        call.window = window;
+        call.limits = Some(DetailLimits { rows: 500, window });
         let (result, served) = run(plans, call).await;
         let failure = result.unwrap_err();
         assert_eq!(failure.code, code);
@@ -383,4 +422,23 @@ async fn other_window_refusals_keep_their_own_code() {
     let failure = result.unwrap_err();
     assert_eq!(failure.code, "invalid_date_range");
     assert_eq!(failure.cause, None);
+}
+
+/// One foreign-currency composite voucher anywhere in the window fails the
+/// whole detail: the window is read refusing composites, so the voucher is not
+/// withheld as `vouchers` withholds it, and nothing is tied without it.
+#[tokio::test]
+async fn a_composite_voucher_anywhere_in_the_window_fails_the_detail() {
+    let composite = ScenarioPlan::new(Fixture::SyntheticXml(
+        crate::agent::voucher_parse::window_with_composite_vouchers(1),
+    ))
+    .with_encoding(WireEncoding::Utf16Le)
+    .with_framing(ResponseFraming::ContentLength);
+    for kind in [DetailKind::BillTrail, DetailKind::Unadjusted] {
+        let (result, _) = run(detail_plans(composite.clone()), Call::new(kind)).await;
+        let failure = result.unwrap_err();
+        // The capture's composite sits on the party's bill allocation too,
+        // which is parsed first.
+        assert_eq!(failure.code, "bill_allocation_amount_invalid");
+    }
 }

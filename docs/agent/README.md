@@ -81,11 +81,12 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `trial_balance`, `masters`, `stock_summary`,
+`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
+`stock_summary`,
 `profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
 `read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet` and `local_data_report` are in source but not
-in the 0.3.0 release.) `local_data_report` (also
+`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` are in
+source but not in the 0.3.0 release.) `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -646,6 +647,67 @@ setup commitment. Historical commitments without a tier retain their exact bytes
 If discovery rejects company identity fields, `tally_status` reports the profile
 refusal reason and partial evidence with the completed source commitments. A
 valid empty collection remains distinguishable from invalid discovery.
+
+### Purchase register (`purchase_register`)
+
+Lists the Purchase and Debit Note vouchers of a date window that touch a ledger
+under Duties & Taxes (#969), and says per entry what the books record. Nothing is
+posted and nothing is inferred. It is a register of the books, not a GST return:
+it does not decide input tax credit eligibility or blocked credit, matches
+nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned
+only when the voucher carries one), does not return `REFERENCEDATE` yet, does not
+classify an item invoice's purchase as taxable, and never sums tax across heads
+or vouchers.
+
+- **Rows are selected by the ledger, not the voucher type.** A voucher is a
+  candidate when one of its entries is on a ledger whose nearest predefined
+  group is Duties & Taxes (by its `RESERVEDNAME`, so a renamed group or a user
+  sub-group still counts). Purchase and Debit Note are the register. Every
+  other voucher type that touches those ledgers (Sales, Journal, Payment) is
+  listed apart in `other_voucher_types_touching_duties_taxes` with exact counts:
+  whether such a voucher belongs in a return is the CA's call, not the tool's.
+  A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
+  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
+  returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
+  masters and the window, so rows can shift between pages); every ledger name in every list is
+  masked when parties are masked, the same way `vouchers` masks it.
+  A Debit Note can be a purchase return or a debit note issued to a customer, and a GST duty head
+  does not say whether a ledger is input or output, so each row carries `party_group` (the party's
+  predefined group, such as Sundry Creditors or Sundry Debtors) and the tool does not guess which it
+  is. Reverse-charge journals, imports and input service distribution get no special treatment.
+- **Tax comes only from the GST duty head on the ledger master.** An entry on a
+  ledger with a recognised head is listed in `tax_in_books` as
+  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
+  assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
+  ledger whose own tax type is not GST (usually TDS or another payable), and
+  `absent` is a ledger with no head whose tax type is GST or was not reported,
+  which may be a GST ledger whose head is missing (`tax_type` is returned).
+  An entry whose head is not in the recognised vocabulary, or contradicts the
+  ledger's tax type, is listed with its raw spelling in
+  `duties_taxes_entries_with_unrecognised_head`. No name is ever matched and no
+  amount is ever used to decide a head.
+- **Amounts are as the books state them** (negative is a debit), never
+  re-signed from the deemed-positive flag and never summed across heads. There
+  is no direction field and nothing is called input credit.
+- **Other fields.** `reference`, `party_gstin`, `is_invoice` and `post_dated`
+  follow `vouchers` (absent means not observed). Cancelled, optional and
+  post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
+  returned yet.
+- **Snapshot binding.** The ledger masters are read before the window (and the
+  window is planned against their marks), the company's marks are read again
+  after it, and the masters are read a second time and must classify exactly as
+  the first read did, because whether a duty-head change, a re-parent or a
+  delete moves the master mark is unmeasured. A difference refuses as
+  `voucher_window_changed_during_read` or `ledger_snapshot_drifted` and releases
+  no rows. A voucher that names a ledger the masters do not list refuses the
+  same way; one the compliance read set aside for its currency refuses as
+  `register_ledger_currency_excluded`.
+- **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
+  in an inventory allocation (`taxable_entries` may be empty for them); books
+  with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
+  post-dated voucher in the captures the tests use. The captures are one
+  synthetic lab book and one month.
 
 ### Foreign-currency composites in `vouchers`
 

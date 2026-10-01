@@ -255,6 +255,35 @@ fn the_journal_is_absent_unreadable_or_counted() {
     );
 }
 
+/// Whether serialized JSON `text` holds `path`, written as it is and as JSON
+/// writes it (a Windows path's backslashes doubled), so the check means the same
+/// on every platform.
+fn names_the_path(text: &str, path: &Path) -> bool {
+    let plain = path.to_string_lossy();
+    let escaped = serde_json::to_string(&*plain).unwrap();
+    text.contains(&*plain) || text.contains(&escaped[1..escaped.len() - 1])
+}
+
+/// A Windows-style path is found in JSON that writes its backslashes doubled, and
+/// the raw-text check this helper replaced is not: so the no-path assertions below
+/// mean something on Windows, and this proves it on any platform.
+#[test]
+fn a_path_with_backslashes_is_found_in_json_that_doubles_them() {
+    let path = Path::new("C:\\Users\\runner\\AppData\\Local\\Temp\\.tmpAbCd");
+    let json = serde_json::json!({"folder_path": path.display().to_string()}).to_string();
+    assert!(
+        json.contains("C:\\\\Users"),
+        "the JSON doubles every backslash: {json}"
+    );
+    assert!(
+        !json.contains(&*path.to_string_lossy()),
+        "a raw substring check cannot find it: {json}"
+    );
+    assert!(names_the_path(&json, path));
+    assert!(!names_the_path(&json, Path::new("C:\\Users\\someone-else")));
+    assert!(!names_the_path("{}", path));
+}
+
 #[test]
 fn no_path_is_in_the_json_unless_asked() {
     let directory = tempfile::tempdir().unwrap();
@@ -262,10 +291,15 @@ fn no_path_is_in_the_json_unless_asked() {
     write(&root.join("imports/b.xml"), b"<x/>");
     let report = build(root, None);
     let plain = to_json(&report, SystemTime::now(), None).to_string();
-    assert!(!plain.contains(&*root.to_string_lossy()), "{plain}");
+    assert!(!names_the_path(&plain, root), "{plain}");
     assert!(!plain.contains("path"), "{plain}");
-    let shown = to_json(&report, SystemTime::now(), Some((root, Some(root)))).to_string();
-    assert!(shown.contains(&*root.to_string_lossy()), "{shown}");
+    // The value, not the serialized text: on Windows the text doubles every
+    // backslash of the path, so a substring check on it proves nothing.
+    let shown = to_json(&report, SystemTime::now(), Some((root, Some(root))));
+    let path = root.display().to_string();
+    assert_eq!(shown["folder_path"], path, "{shown}");
+    assert_eq!(shown["lock_folder_path"], path, "{shown}");
+    assert!(names_the_path(&shown.to_string(), root), "{shown}");
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {
@@ -305,7 +339,7 @@ async fn the_tool_reports_without_a_path_and_takes_no_arguments() {
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let text = response.to_string();
-    assert!(!text.contains(&*root.to_string_lossy()), "no path: {text}");
+    assert!(!names_the_path(&text, root), "no path: {text}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["folder"], "present");
     assert_eq!(result["classes"]["egress_log"]["files"], 1);

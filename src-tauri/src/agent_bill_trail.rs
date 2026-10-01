@@ -847,6 +847,20 @@ pub(super) fn party_detail(
     }
 }
 
+/// The refusal of a party detail on a partial read: `code` says the detail
+/// needs a complete read, and the read's own reason stays in band beside it.
+pub(super) fn detail_requires_a_complete_read(
+    partial_reason: String,
+    partial_reasons: Vec<&'static str>,
+) -> ToolFailure {
+    let mut failure = ToolFailure::from("detail_requires_a_complete_read".to_string());
+    failure.incomplete_read = Some(Box::new(IncompleteRead {
+        partial_reason,
+        partial_reasons,
+    }));
+    failure
+}
+
 /// A refusal that follows the voucher read keeps that read's evidence, with
 /// whatever the failure already carried.
 pub(super) fn with_evidence(mut failure: ToolFailure, evidence: &Evidence) -> ToolFailure {

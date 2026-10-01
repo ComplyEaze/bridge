@@ -133,13 +133,22 @@ impl Server {
                     }
                     (figures, truncated)
                 }
-                OutstandingsLoadResult::Partial { .. }
-                | OutstandingsLoadResult::BaseCurrencyLedgersOnly { .. }
+                // The bills a party detail is tied against are not the whole
+                // book's here, so nothing is tied and nothing is shown; the
+                // refusal keeps the read's own reason beside its code.
+                OutstandingsLoadResult::Partial { reason, .. } if detail_request.is_some() => {
+                    return Err(super::bill_trail::detail_requires_a_complete_read(
+                        reason.reason_code.clone(),
+                        Vec::new(),
+                    ));
+                }
+                OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }
                     if detail_request.is_some() =>
                 {
-                    // The bills a party detail is tied against are not the whole
-                    // book's here, so nothing is tied and nothing is shown.
-                    return Err("detail_requires_a_complete_read".to_string().into());
+                    return Err(super::bill_trail::detail_requires_a_complete_read(
+                        crate::tally::CurrencyExclusions::PARTIAL_REASON.to_string(),
+                        exclusions.partial_reasons(),
+                    ));
                 }
                 OutstandingsLoadResult::Partial { reason, .. } => {
                     result_evidence.state = "partial";

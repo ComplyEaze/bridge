@@ -627,8 +627,179 @@ async fn mcp_outstandings_refuse_a_party_detail_on_a_partial_read() {
     )
     .await;
     assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "detail_requires_a_complete_read");
+    // The read's own reason stays in band beside the refusal's code.
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"],
+        error["partial_reason"], "currency_ledgers_excluded",
+        "{error}"
+    );
+    assert_eq!(
+        error["partial_reasons"],
+        json!(["foreign_currency_ledgers_excluded"]),
+        "{error}"
+    );
+}
+
+/// The ageing lab book's captured `outstandings` sequence (currency read, then
+/// the native read), with `ledgers` as the native read's ledger source, called
+/// through the MCP tool with `extra_arguments`. The sequence is the one
+/// `currency_then_native_plans_with_ledgers` scripts for the runtime.
+async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    fn decode(bytes: &[u8]) -> String {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+    let xml = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body)).with_encoding(WireEncoding::Utf16Le)
+    };
+    let status = || ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let pair = |plans: &mut Vec<ScenarioPlan>, source: ScenarioPlan| {
+        plans.extend([source.clone(), status(), source, status()]);
+    };
+    let companies = xml(decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    )));
+    let extent = xml(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    )
+    .to_string());
+    let mut plans = Vec::new();
+    pair(&mut plans, companies.clone());
+    // The one-master currency read.
+    plans.push(companies.clone());
+    pair(&mut plans, extent.clone());
+    pair(
+        &mut plans,
+        xml(decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+        ))),
+    );
+    pair(&mut plans, extent.clone());
+    plans.push(companies.clone());
+    // The native outstandings read.
+    plans.extend([status(), companies.clone(), companies.clone()]);
+    pair(&mut plans, extent.clone());
+    for bytes in [
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
+        )
+        .as_slice(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-groups.utf16le.xml"
+        )
+        .as_slice(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-payable.utf16le.xml"
+        )
+        .as_slice(),
+    ] {
+        pair(&mut plans, xml(decode(bytes)));
+    }
+    pair(&mut plans, xml(ledgers));
+    pair(&mut plans, extent);
+    plans.extend([companies.clone(), status(), companies]);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mut arguments =
+        json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
+    for (key, value) in extra_arguments.as_object().into_iter().flatten() {
+        arguments[key] = value.clone();
+    }
+    let response = server.call_tool("outstandings", arguments).await;
+    simulator.cancel();
+    response
+}
+
+/// The captured ageing ledgers predate `CURRENCYNAME`; this is the labelled
+/// edit `ageing_ledgers_with_currency` makes for the runtime's tests: the
+/// field in its captured position on every row, the book's single master
+/// `I₹` on every row but `Ageing Customer A`, which gets `customer_a`.
+fn ageing_ledgers_with_currency(customer_a: &str) -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-ledgers.utf16le.xml"
+    );
+    let captured = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let mut pieces = captured.split("<LEDGER ");
+    let mut ledgers = pieces.next().unwrap().to_string();
+    let mut rows = 0;
+    for piece in pieces {
+        let tag_end = piece.find('>').unwrap() + 1;
+        let currency = if piece.starts_with("NAME=\"Ageing Customer A\"") {
+            customer_a
+        } else {
+            "I\u{20b9}"
+        };
+        ledgers.push_str("<LEDGER ");
+        ledgers.push_str(&piece[..tag_end]);
+        ledgers.push_str(&format!(
+            "\r\n     <CURRENCYNAME TYPE=\"String\">{currency}</CURRENCYNAME>"
+        ));
+        ledgers.push_str(&piece[tag_end..]);
+        rows += 1;
+    }
+    assert_eq!(rows, 6);
+    ledgers
+}
+
+/// The `Partial` arm: a ledger kept in a currency the book's base does not
+/// match makes the native read an in-band partial, and a party detail asked of
+/// it is refused with the read's own reason beside the refusal's code.
+#[tokio::test]
+async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail() {
+    // Without a detail the same read is the in-band partial the refusal names.
+    let plain = ageing_outstandings(ageing_ledgers_with_currency("$"), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    let result = &plain["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["partial_reason"], "ledger_currency_base_unmatched");
+
+    let response = ageing_outstandings(
+        ageing_ledgers_with_currency("$"),
+        json!({"party": "Ageing Customer A", "detail": "unadjusted"}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let content = &response["structuredContent"];
+    let error = &content["result"]["error"];
+    assert_eq!(error["code"], "detail_requires_a_complete_read", "{error}");
+    assert_eq!(
+        error["partial_reason"], "ledger_currency_base_unmatched",
+        "{error}"
+    );
+    // This arm has no derived list, so none is invented.
+    assert!(error.get("partial_reasons").is_none(), "{error}");
+    assert_eq!(
+        content["evidence"]["reason_code"],
         "detail_requires_a_complete_read"
     );
+    // The ledger the reason concerns is a party name, and is not carried.
+    assert!(!error.to_string().contains("Ageing Customer A"), "{error}");
 }

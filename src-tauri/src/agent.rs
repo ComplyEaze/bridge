@@ -452,6 +452,19 @@ struct ToolFailure {
     /// one (bridge#625, bridge#664). Boxed to keep the refusal small on every
     /// other path.
     candidates: Option<Box<Candidates>>,
+    /// Why a read the refused operation depends on was not complete (#945):
+    /// the partial result's own reason, kept beside the refusal's code instead
+    /// of being replaced by it. Codes only; boxed to keep the refusal small.
+    incomplete_read: Option<Box<IncompleteRead>>,
+}
+
+/// The reason a partial read gave, carried by a refusal that needed a complete
+/// one: its scalar `partial_reason` and, where the result derives them, its
+/// `partial_reasons`. Codes only, never a name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IncompleteRead {
+    partial_reason: String,
+    partial_reasons: Vec<&'static str>,
 }
 
 /// The types a refusal offers instead, and the name the caller asked for when
@@ -603,6 +616,7 @@ impl From<String> for ToolFailure {
             unsupported_parent_ledgers: None,
             unanswered: None,
             candidates: None,
+            incomplete_read: None,
         }
     }
 }
@@ -1105,6 +1119,7 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
+            incomplete_read: None,
         }
     }
 
@@ -1238,6 +1253,7 @@ impl Server {
                 unsupported_parent_ledgers,
                 unanswered,
                 candidates,
+                incomplete_read,
             }) => {
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
@@ -1331,6 +1347,16 @@ impl Server {
                             candidate_fields(&candidates.items, self.settings.max_bytes / 4);
                         for (key, value) in fields {
                             error[key] = value;
+                        }
+                    }
+                }
+                // The partial read's own reason, under the same budget rule:
+                // a few codes, kept beside the refusal's code.
+                if let Some(read) = incomplete_read {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["partial_reason"] = json!(read.partial_reason);
+                        if !read.partial_reasons.is_empty() {
+                            error["partial_reasons"] = json!(read.partial_reasons);
                         }
                     }
                 }

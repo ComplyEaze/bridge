@@ -746,14 +746,22 @@ rate or return section, and matches nothing against any portal.
   mode; optional, cancelled and post-dated sales; a `REFERENCE` or a populated
   `PARTYGSTIN` on a sale; `REFERENCEDATE` (not returned); books with several
   currencies.
-- **A row of a kind no capture covers says so.** It is returned, not withheld,
-  with `not_measured_live` listing why: `credit_note`, `inter_state_line`,
+- **A row of a kind no capture covers says so, where the row itself shows the
+  kind.** It is returned, not withheld, with `not_measured_live` listing why: `credit_note`, `inter_state_line`,
   `invoice_voucher_classification` (an invoice-view voucher),
   `sales_ledger_not_an_entry` (tax is present but no entry is on a Sales
   Accounts ledger: the sales ledger may sit in an inventory allocation),
   `cancelled`, `optional`, `post_dated`, `party_gstin_present`,
   `reference_present`. A row the captures cover has no such field, and the
-  purchase register's rows never carry it. `sales_vouchers_without_duties_taxes_entry`
+  purchase register's rows never carry it. Some kinds a row cannot show, so they
+  are never marked and are not vouched for: a sale typed on Tally's screen in
+  voucher view, a tax Tally computed itself, a duty head no sales capture has
+  (such as cess, or `sgst_utgst` on a sale), a row whose invoice flag was not
+  observed, and several currencies; an unmarked row is not a measured one in
+  those respects. A row is marked `inter_state_line` only when a tax entry's
+  ledger master carries a recognised IGST head; an IGST ledger with no head, or
+  an unrecognised head, is listed under the without-head or unrecognised list
+  and the status is not complete. `sales_vouchers_without_duties_taxes_entry`
   lists such vouchers by identity only; the tool does not say why one carries no
   tax entry. A Debit Note, even to a customer, is not a sales row: it is listed
   apart by identity and ledger names, with no amount.

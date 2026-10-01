@@ -968,6 +968,9 @@ fn the_sales_result_names_its_own_profile_classes_and_list() {
     for named in [
         "measured for sales so far",
         "(not classified end to end)",
+        "only where the row itself shows it",
+        "not vouched for",
+        "a recognised IGST head",
         "the classification of a Sales item invoice",
         "a Sales voucher with no entry on a Duties & Taxes ledger",
         "credit notes",
@@ -1107,7 +1110,7 @@ fn derived_sales_tail() -> String {
         ),
         (
             "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
-            "Measured so far: the voucher window of two Sales item invoices imported into one company (one untaxed, one with two plain credit entries on tax ledgers whose masters carry the heads CGST and SGST/UTGST; the goods line sits nested under the sales ledger's own entry), which the purchase register read and which no test classifies end to end; and the classification of one Sales accounting voucher (not an invoice) against the ledger masters of a second company. `sales_register` itself has not been run against a live Tally. Not measured: the classification of a Sales item invoice; a Sales voucher with no entry on a Duties & Taxes ledger; credit notes; an inter-state (IGST) line; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; optional, cancelled and post-dated sales; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, invoice_voucher_classification, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present).",
+            "Measured so far: the voucher window of two Sales item invoices imported into one company (one untaxed, one with two plain credit entries on tax ledgers whose masters carry the heads CGST and SGST/UTGST; the goods line sits nested under the sales ledger's own entry), which the purchase register read and which no test classifies end to end; and the classification of one Sales accounting voucher (not an invoice) against the ledger masters of a second company. `sales_register` itself has not been run against a live Tally. Not measured: the classification of a Sales item invoice; a Sales voucher with no entry on a Duties & Taxes ledger; credit notes; an inter-state (IGST) line; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; optional, cancelled and post-dated sales; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and books with several currencies. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (credit_note, inter_state_line, invoice_voucher_classification, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess, or sgst_utgst on a sale), a row whose invoice flag was not observed, and several currencies; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
         ),
     ];
     let mut text = shared.to_string();
@@ -1161,6 +1164,9 @@ fn the_sales_description_says_nothing_only_the_purchase_register_would() {
         "a Sales voucher with no entry on a Duties & Taxes ledger",
         "REFERENCEDATE (not returned)",
         "`not_measured_live`",
+        "only where the row itself shows the kind",
+        "Kinds a row cannot show are never marked and are not vouched for",
+        "a recognised IGST head",
         "heads CGST and SGST/UTGST",
     ] {
         assert!(sales.contains(stated), "sales text lacks: {stated}");
@@ -1264,20 +1270,8 @@ fn the_purchase_result_keeps_its_profile_and_classes() {
     );
 }
 
-// Waiting for the lab: the ledger masters and group collection of the company that holds the two
+// Waiting for the lab (no test stands in for them): the ledger masters and group collection of the company that holds the two
 // Sales item invoices (`sales-day/`), read by the same build as the voucher windows. With them
 // the first test below classifies both invoices end to end, and the untaxed invoice is the
 // positive case for `sales_vouchers_without_duties_taxes_entry` (a Sales voucher with no entry
 // on a Duties & Taxes ledger). Neither is written by hand; each reads the captures once they exist.
-
-#[test]
-#[ignore = "waits for the ledger masters and groups of the company that holds the two Sales item invoices"]
-fn the_two_sales_item_invoices_classify_end_to_end_against_their_own_masters() {
-    todo!("read the captured masters and groups, then assert the taxed invoice's heads and taxable entry");
-}
-
-#[test]
-#[ignore = "waits for the ledger masters and groups of the company that holds the two Sales item invoices"]
-fn the_untaxed_sales_item_invoice_is_counted_in_the_list_of_sales_without_a_duties_taxes_entry() {
-    todo!("assert the untaxed invoice lands in sales_vouchers_without_duties_taxes_entry, total 1, with no row");
-}

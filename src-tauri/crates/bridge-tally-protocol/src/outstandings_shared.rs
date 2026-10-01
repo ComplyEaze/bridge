@@ -767,7 +767,8 @@ fn is_valid_company_number(value: &str) -> bool {
 const COMPANY_EXTENT_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV1";
 const COMPANY_EXTENT_FETCH: &str = "Name, GUID, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
 const COMPANY_EXTENT_V2_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV2";
-const COMPANY_EXTENT_V2_FETCH: &str =
+/// Also the head of the inventory-flags request's `FETCH` (`native_stock_summary`).
+pub(crate) const COMPANY_EXTENT_V2_FETCH: &str =
     "Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
 
 pub(crate) fn render_company_book_extent(company: &str) -> String {

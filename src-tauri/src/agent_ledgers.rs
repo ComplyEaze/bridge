@@ -343,8 +343,9 @@ const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 /// Which read a listing snapshot holds. A `basic` listing with a `group`
 /// filter also holds the group collection, so it is a different read; a
 /// trial balance is keyed by its period; a masters listing by its kind; a
-/// compliance listing by the date its rows' `party_gstin` was read as of
-/// (#653), since that date is rendered into the rows it holds.
+/// stock summary by its date; a compliance listing by the date its rows'
+/// `party_gstin` was read as of (#653), since that date is rendered into the
+/// rows it holds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ListingKind {
     Basic,
@@ -352,6 +353,7 @@ pub(super) enum ListingKind {
     Compliance { gstin_as_of: String },
     TrialBalance { from: TallyDate, to: TallyDate },
     Masters { kind: MastersKind },
+    StockSummary { as_of: TallyDate },
 }
 
 /// A group collection held with a snapshot, and the bytes it counts toward
@@ -772,7 +774,9 @@ impl Server {
                     .collect::<Vec<_>>();
                 (rows, None, listing.extent, listing.evidence, Value::Null)
             }
-            ListingKind::TrialBalance { .. } | ListingKind::Masters { .. } => {
+            ListingKind::TrialBalance { .. }
+            | ListingKind::Masters { .. }
+            | ListingKind::StockSummary { .. } => {
                 return Err("listing_kind_not_a_ledger_listing".to_string().into());
             }
         };

@@ -372,6 +372,9 @@ base revision.
 <a id="12a12-master-collections-on-licensed-71"></a>
 
 [12a.12 Master collections on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)
+<a id="12a13-stock-items-and-the-stock-summary-by-name-on-licensed-71"></a>
+
+[12a.13 Stock items and the Stock Summary by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a13-stock-items-and-the-stock-summary-by-name-on-licensed-71)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

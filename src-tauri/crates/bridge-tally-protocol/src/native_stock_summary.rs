@@ -952,8 +952,9 @@ fn read_report_closing(
     }
 }
 
-/// What the items add up to, as a caller reports it beside them. No count is
-/// derived from a quantity: quantities are withheld.
+/// What the items add up to, as a caller reports it beside them. Quantities
+/// are withheld; the one count that concerns them says how many Bridge could
+/// not read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeStockTotals {
     pub item_count: usize,

@@ -450,7 +450,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "closing_quantity_unread_count",
         "do not refuse the read",
         "A `not_established` result is not held for paging",
-        "These are the only figures this tool returns unchecked",
+        "the closing-value total of a matched read is the only thing this tool checks",
         "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
         "what a negative value means is unmeasured",
         "`not_established`",
@@ -992,7 +992,7 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
             "use": "investigation_only",
             "items_closing_values_added": "3000.01",
             "tally_stock_summary_lines_added": "3000.02",
-            "note": "Two figures from Tally that disagree. Neither was confirmed and neither is the stock value.",
+            "note": "Two figures from Tally that disagree. Neither was confirmed and neither is the stock value. The items' side adds only the closing values present: an item with no closing value adds nothing to it.",
         })
     );
     assert!(page["remediation"]

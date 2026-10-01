@@ -357,15 +357,17 @@ three values:
     came back with no amount. An empty report is not told apart from one Tally did
     not render, so this is not called a contradiction.
   - `stock_values_not_comparable`: nothing could be compared (no item has a closing
-    value, or the values add up to zero, and the report shows no amount or a total
-    of zero).
+    value and the report shows no amount or a total of zero, or the values add up
+    to zero and the report shows no amount). Values that add up to zero against a
+    report total of zero are a match.
 
 A `not_established` result carries `unchecked_comparison` in place of `tie_out`:
 its `state`, and what each side of the comparison that did not hold added up to
 (`items_closing_values_added`, and `tally_stock_summary_lines_added` when the
-report had a total). These are the only figures `stock_summary` returns unchecked.
-They are for investigation only (`use` says so); neither is a stock value or a
-total.
+report had a total). Nothing checked them: the closing-value total of a matched
+read is the only thing `stock_summary` checks, and `checks` says so field by
+field. They are for investigation only (`use` says so); neither is a stock value
+or a total, and the items' side adds only the closing values present.
 
 **Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
 `checks` says per field what is `checked`, `not_checked` or `withheld`: the

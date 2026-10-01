@@ -215,6 +215,13 @@ fn report_with_amounts(to: [&str; 3]) -> String {
 
 #[test]
 fn every_request_is_byte_equal_to_its_committed_fixture() {
+    // Compared as the bytes Bridge sends: UTF-16LE after a byte-order mark.
+    fn sent(text: &str) -> Vec<u8> {
+        std::iter::once(0xFEFF)
+            .chain(text.encode_utf16())
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    }
     let period = NativeLedgerSnapshotPeriod::new(
         DateBoundaryProfile::ModeAgnostic,
         TallyDate::parse("20250401").unwrap(),
@@ -279,6 +286,50 @@ fn every_request_is_byte_equal_to_its_committed_fixture() {
             )[..]
         )
     );
+    // And as bytes: each fixture is exactly what was sent, with nothing before
+    // the byte-order mark and nothing after the text.
+    let lab = ValidatedCompanyName::new(LAB).unwrap();
+    let sent_and_kept: [(String, &[u8]); 6] = [
+        (
+            render_native_stock_summary_request(LAB, &period),
+            include_bytes!("../tests/fixtures/stock_summary_report_fy_request.utf16le.xml"),
+        ),
+        (
+            ReadOnlyProfile::AuditStockItemsV1 {
+                company: &lab,
+                period: &range,
+            }
+            .render(),
+            include_bytes!("../tests/fixtures/stock_items_fy_request.utf16le.xml"),
+        ),
+        (
+            render_company_inventory_flags_request(LAB, COMPANY).unwrap(),
+            include_bytes!("../tests/fixtures/company_inventory_flags_request.utf16le.xml"),
+        ),
+        (
+            render_native_stock_summary_request(EMPTY_BOOK_LAB, &period),
+            include_bytes!(
+                "../tests/fixtures/stock_summary_report_empty_book_fy_request.utf16le.xml"
+            ),
+        ),
+        (
+            ReadOnlyProfile::AuditStockItemsV1 {
+                company: &company,
+                period: &range,
+            }
+            .render(),
+            include_bytes!("../tests/fixtures/stock_items_empty_book_fy_request.utf16le.xml"),
+        ),
+        (
+            render_company_inventory_flags_request(EMPTY_BOOK_LAB, EMPTY_BOOK).unwrap(),
+            include_bytes!(
+                "../tests/fixtures/company_inventory_flags_empty_book_request.utf16le.xml"
+            ),
+        ),
+    ];
+    for (rendered, kept) in sent_and_kept {
+        assert_eq!(sent(&rendered), kept);
+    }
 }
 
 #[test]
@@ -1317,6 +1368,15 @@ fn a_book_with_no_stock_items_is_an_answer_only_when_three_sources_agree() {
         ),
         Ok(NativeStockGate::NotComparable)
     );
+    // Rows, a count of zero and the empty company's own empty report: the
+    // answer rests on there being no row, not on the count. The rows carry a
+    // value the report does not show.
+    assert_eq!(
+        gate_with(&items_response(), zero, &empty_book_report()),
+        Ok(NativeStockGate::ReportShowsNoValue {
+            items_total: decimal("3000.01")
+        })
+    );
     // Rows, with a count of zero: not "no stock" (the count is lower; the
     // capture's rows tie to its report).
     assert!(matches!(
@@ -1629,8 +1689,9 @@ fn totals_after(edit: impl Fn(&mut NativeStockItem)) -> NativeStockTotals {
 fn the_totals_count_the_items_and_withhold_a_sum_when_any_closing_value_is_empty() {
     let totals = totals_of(&items_response());
     // Four closing values are empty: Zero Stock Item holds -50 Kgs with none,
-    // and three items have neither a quantity nor a value. No count is derived
-    // from a quantity: quantities are withheld.
+    // and three items have neither a quantity nor a value. Quantities are
+    // withheld; the one count that concerns them is of those Bridge could not
+    // read, which is none here.
     assert_eq!(
         totals,
         NativeStockTotals {

@@ -434,3 +434,254 @@ fn a_batch_intent_records_distinct_remoteids_that_the_journal_finds() {
         Some("import_ledger_invalid")
     );
 }
+
+const STATEMENT_ID: &str = "st-20260901-0123456789abcdef";
+
+/// One voucher, dated 1 Sep 2026, over `entries` (ledger, amount, side).
+fn row_batch(
+    id: &str,
+    company: &str,
+    txn_id: &str,
+    sha: char,
+    entries: &[(&str, &str, &str)],
+) -> ImportLedgerLine {
+    let mut line = batch(id, "n");
+    line.company_guid = company.into();
+    line.sha256 = sha.to_string().repeat(64);
+    line.txn_ids = vec![txn_id.into()];
+    line.vouchers[0].bridge_txn_id = txn_id.into();
+    line.vouchers[0].entries = entries
+        .iter()
+        .map(|(ledger, amount, side)| {
+            serde_json::from_value(json!({"ledger":ledger,"amount":amount,"side":side})).unwrap()
+        })
+        .collect();
+    line
+}
+
+fn plain(id: &str, txn_id: &str, entries: &[(&str, &str, &str)]) -> ImportLedgerLine {
+    row_batch(id, "synthetic-guid", txn_id, 'a', entries)
+}
+
+const BANK_TO_A: &[(&str, &str, &str)] = &[("Bank", "500", "Cr"), ("Ledger A", "500", "Dr")];
+const BANK_TO_B: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger B", "500", "Dr")];
+
+fn sent(batch: &ImportLedgerLine) -> Vec<u8> {
+    record(&StatusRecord::dispatch_native(
+        batch,
+        "c".repeat(64),
+        Uuid::new_v4(),
+    ))
+}
+
+fn found(batch: &ImportLedgerLine) -> Vec<u8> {
+    record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":batch.batch_id,
+            "batch_sha256":batch.sha256,"status":"posted_verified"
+        }))
+        .unwrap(),
+    )
+}
+
+fn blocker(journal: Vec<Vec<u8>>, candidate: &ImportLedgerLine) -> Option<String> {
+    rows_already_posted(Cursor::new(journal.concat()), candidate).unwrap()
+}
+
+fn already_posted(journal: Vec<Vec<u8>>, candidate: &ImportLedgerLine) -> bool {
+    blocker(journal, candidate).is_some()
+}
+
+/// #876: a journal written before compact status records holds the verified
+/// status on the full batch record itself; that batch's row still counts.
+#[test]
+fn a_full_record_already_marked_posted_verified_blocks_its_row() {
+    let mut old = plain("old", STATEMENT_ID, BANK_TO_A);
+    old.status = "posted_verified".into();
+    let rebuilt = plain("new", STATEMENT_ID, BANK_TO_B);
+    assert!(already_posted(vec![record(&old)], &rebuilt));
+    old.status = "built".into();
+    assert!(!already_posted(vec![record(&old)], &rebuilt));
+}
+
+/// #876: the row a statement build derived is one row wherever it is posted, so
+/// a rebuild that only remaps its ledger, dispatched or found posted before,
+/// is refused; a batch only built, another company, and the batch itself are not.
+#[test]
+fn a_statement_row_another_batch_sent_or_found_posted_is_already_posted() {
+    let old = plain("old", STATEMENT_ID, BANK_TO_A);
+    let remapped = plain("new", STATEMENT_ID, BANK_TO_B);
+    assert!(already_posted(
+        vec![record(&old), sent(&old), record(&remapped)],
+        &remapped
+    ));
+    assert!(already_posted(
+        vec![record(&old), found(&old), record(&remapped)],
+        &remapped
+    ));
+    // The refusal names the earlier batch to verify, never the candidate.
+    assert_eq!(
+        blocker(vec![record(&old), sent(&old), record(&remapped)], &remapped),
+        Some("old".to_string())
+    );
+    // Only built, or only a readback that did not match: nothing was posted.
+    assert!(!already_posted(
+        vec![record(&old), record(&remapped)],
+        &remapped
+    ));
+    let incomplete = serde_json::from_value::<StatusRecord>(json!({
+        "record_type":"verification_status","batch_id":"old",
+        "batch_sha256":old.sha256,"status":"verification_incomplete"
+    }))
+    .unwrap();
+    assert!(!already_posted(
+        vec![record(&old), record(&incomplete), record(&remapped)],
+        &remapped
+    ));
+    // The candidate's own attempt is not a twin of itself.
+    assert!(!already_posted(
+        vec![record(&remapped), sent(&remapped)],
+        &remapped
+    ));
+    assert!(!already_posted(vec![], &remapped));
+}
+
+#[test]
+fn a_row_of_another_company_is_not_already_posted_and_a_guid_compares_without_case() {
+    let other = row_batch("old", "OTHER-GUID", STATEMENT_ID, 'a', BANK_TO_A);
+    let candidate = plain("new", STATEMENT_ID, BANK_TO_B);
+    assert!(!already_posted(
+        vec![record(&other), sent(&other)],
+        &candidate
+    ));
+    let upper = row_batch("old", "SYNTHETIC-GUID", STATEMENT_ID, 'a', BANK_TO_A);
+    assert!(already_posted(
+        vec![record(&upper), sent(&upper)],
+        &candidate
+    ));
+}
+
+/// Batch order is irrelevant: the earlier-built batch may be the one sent later.
+#[test]
+fn the_order_the_batches_were_built_in_does_not_matter() {
+    let old = plain("old", STATEMENT_ID, BANK_TO_A);
+    let candidate = plain("new", STATEMENT_ID, BANK_TO_B);
+    assert!(already_posted(
+        vec![record(&candidate), record(&old), sent(&old)],
+        &candidate
+    ));
+    assert!(already_posted(
+        vec![record(&old), sent(&old), record(&candidate)],
+        &candidate
+    ));
+}
+
+/// Only the latest record of a batch counts: a batch re-recorded without the
+/// row and then sent posted no such row; and of two matching batches it is
+/// enough that one was sent.
+#[test]
+fn only_a_batchs_latest_record_holds_a_row_and_any_sent_match_counts() {
+    let candidate = plain("new", STATEMENT_ID, BANK_TO_B);
+    let old = plain("old", STATEMENT_ID, BANK_TO_A);
+    let rebuilt = row_batch("old", "synthetic-guid", "other-row", 'b', BANK_TO_A);
+    assert!(!already_posted(
+        vec![record(&old), record(&rebuilt), sent(&rebuilt)],
+        &candidate
+    ));
+    let (first, second) = (
+        plain("first", STATEMENT_ID, BANK_TO_A),
+        plain("second", STATEMENT_ID, BANK_TO_A),
+    );
+    assert!(already_posted(
+        vec![record(&first), record(&second), sent(&second)],
+        &candidate
+    ));
+}
+
+/// A label an agent typed repeats across batches ("t1"), so it counts only
+/// with the same date and amounts; an id no other batch holds never counts.
+#[test]
+fn a_typed_transaction_id_matches_only_the_same_shape() {
+    let old = plain("old", "t1", BANK_TO_A);
+    let journal = |old: &ImportLedgerLine| vec![record(old), sent(old)];
+    // Same id and shape, other ledger and the entries listed the other way.
+    let same = plain(
+        "new",
+        "t1",
+        &[("Ledger B", "500.0", "Dr"), ("Bank", "500", "Cr")],
+    );
+    assert!(already_posted(journal(&old), &same));
+    // Same id, other amount or date: another transaction.
+    let amount = plain(
+        "new",
+        "t1",
+        &[("Bank", "600", "Cr"), ("Ledger B", "600", "Dr")],
+    );
+    assert!(!already_posted(journal(&old), &amount));
+    // The shape holds the amounts and their sides, not which ledger takes
+    // which, so the same amount reversed is refused: the safe direction.
+    let reversed = plain(
+        "new",
+        "t1",
+        &[("Bank", "500", "Dr"), ("Ledger B", "500", "Cr")],
+    );
+    assert!(already_posted(journal(&old), &reversed));
+    // An extra Dr entry changes the sides, so it is not the same row.
+    let extra = plain(
+        "new",
+        "t1",
+        &[
+            ("Bank", "500", "Cr"),
+            ("Ledger B", "300", "Dr"),
+            ("Ledger C", "200", "Dr"),
+        ],
+    );
+    assert!(!already_posted(journal(&old), &extra));
+    let mut later = same.clone();
+    later.vouchers[0].date = "20260902".into();
+    assert!(!already_posted(journal(&old), &later));
+    // Another id with the same shape is another transaction.
+    let renamed = plain("new", "t2", BANK_TO_B);
+    assert!(!already_posted(journal(&old), &renamed));
+}
+
+/// A statement-derived id is refused on the id alone: a row with a TDS line or
+/// split, whose shape changed, is still the row.
+#[test]
+fn a_statement_row_is_the_same_row_although_its_shape_changed() {
+    let old = plain("old", STATEMENT_ID, BANK_TO_A);
+    let split = plain(
+        "new",
+        STATEMENT_ID,
+        &[
+            ("Bank", "500", "Cr"),
+            ("Ledger A", "450", "Dr"),
+            ("TDS", "50", "Dr"),
+        ],
+    );
+    assert!(already_posted(vec![record(&old), sent(&old)], &split));
+}
+
+/// An amount that cannot be read does not open a way round the check.
+#[test]
+fn an_unreadable_amount_fails_closed() {
+    let old = plain(
+        "old",
+        "t1",
+        &[("Bank", "not-a-number", "Cr"), ("Ledger A", "1", "Dr")],
+    );
+    let candidate = plain("new", "t1", BANK_TO_B);
+    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+}
+
+/// The same holds when it is the candidate's own amount that cannot be read.
+#[test]
+fn an_unreadable_candidate_amount_fails_closed() {
+    let old = plain("old", "t1", BANK_TO_A);
+    let candidate = plain(
+        "new",
+        "t1",
+        &[("Bank", "not-a-number", "Cr"), ("Ledger B", "1", "Dr")],
+    );
+    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+}

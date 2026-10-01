@@ -1,0 +1,12 @@
+package.json
+src-tauri/Cargo.toml
+src-tauri/crates/bridge-bank-statement/Cargo.toml
+src-tauri/crates/bridge-tally-core/Cargo.toml
+src-tauri/crates/bridge-tally-primitives/Cargo.toml
+src-tauri/crates/bridge-tally-protocol/Cargo.toml
+src-tauri/crates/bridge-tally-transport/Cargo.toml
+src-tauri/crates/tally-protocol-simulator/Cargo.toml
+tools/bridge-tally-compatibility/Cargo.toml
+tools/bridge-tally-live-read/Cargo.toml
+tools/bridge-tally-read-transport/Cargo.toml
+reviewer: lamemustafa

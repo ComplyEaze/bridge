@@ -1,4 +1,8 @@
 //! Admission tests for locally generated batches, not authored Tally responses.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;
 
@@ -26,6 +30,21 @@ fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
     (line, endpoint)
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 #[test]
 fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
     let (line, endpoint) = batch();
@@ -41,11 +60,13 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
         "Cr",
         "REF-1",
         "Synthetic test only",
-        "Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.",
+        "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.",
         &line.batch_id,
     ] {
         assert!(preview.contains(field), "missing {field}");
     }
+    every_bridge_is_the_brand(&preview);
 }
 
 #[test]
@@ -405,6 +426,32 @@ fn a_busy_readback_after_a_recorded_send_names_verify_import_never_a_rebuild() {
         "verification_transport_failed",
     );
     assert!(other["result"]["error"].get("next_step").is_none());
+}
+
+/// #876: a refused row says not to rebuild it, even when the blocking batch
+/// could not be named.
+#[test]
+fn a_row_refusal_without_a_named_blocker_still_says_not_to_rebuild() {
+    let mut payload = reconciliation_failure_payload(
+        "bridge-test",
+        Some(false),
+        None,
+        "import_txn_already_posted",
+    );
+    name_blocking_batch(&mut payload, None);
+    let error = &payload["result"]["error"];
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .contains("Nothing was sent"));
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.contains("Never rebuild a row"), "{step}");
+    assert!(step.contains("recent batches"), "{step}");
+    assert!(step.contains("whatever ledger it names"), "{step}");
+    assert!(step.contains("Do not decide which yourself"), "{step}");
+    assert!(step.contains("and say which"), "{step}");
+    assert!(step.contains("Never rename a statement row"), "{step}");
+    assert!(error.get("blocking_batch_id").is_none());
 }
 
 /// A wire refusal replaces a generic failure code with the refusal's own, but
@@ -1610,6 +1657,156 @@ fn a_bank_preview_is_refused_at_each_cap_rather_than_truncated() {
         admit_fresh_saved_voucher(&payment_with(1, |_| "N".repeat(90)), &endpoint).unwrap_err(),
         "import_review_too_large"
     );
+}
+
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// A batch of two Payments over the same `parties` ledgers named by `names`, in
+/// the company `company`.
+fn payment_batch_with(names: &[String], company: &str) -> ImportLedgerLine {
+    let mut line = payment_with(names.len(), |index| names[index].clone());
+    line.company.as_mut().unwrap().name = company.into();
+    let mut second = line.vouchers[0].clone();
+    second.bridge_txn_id = "journal-test-2".into();
+    line.vouchers.push(second);
+    line.txn_ids.push("journal-test-2".into());
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// The lengths of fields that grow together: `pad` more characters are dealt out
+/// round-robin from `start`, and each field stops at its own cap, so the total
+/// grows by one, or by nothing, per step.
+fn grown_lengths(pad: usize, start: usize, caps: &[usize]) -> Vec<usize> {
+    caps.iter()
+        .enumerate()
+        .map(|(field, cap)| {
+            (start + pad / caps.len() + usize::from(field < pad % caps.len())).min(*cap)
+        })
+        .collect()
+}
+
+/// The longest length, up to 200, at which `fits` still holds.
+fn widest(fits: impl Fn(usize) -> bool) -> usize {
+    (1..=200)
+        .take_while(|&length| fits(length))
+        .last()
+        .expect("fits at one character")
+}
+
+/// A name of `length` characters: a letter for `field`, so names differ, then
+/// `filler`.
+fn name_of(field: usize, length: usize, filler: &str) -> String {
+    format!(
+        "{}{}",
+        char::from_u32(0x0915 + field as u32).expect("a Devanagari letter"),
+        filler.repeat(length.saturating_sub(1))
+    )
+}
+
+/// One Payment of six parties and a balancing ledger in a company, whose every
+/// free-text field (the company, each entry's ledger, the narration and the
+/// reference) has the length `lengths` gives: company, six parties, the balancing
+/// ledger, narration, reference.
+fn payment_of(lengths: &[usize]) -> ImportLedgerLine {
+    let mut line = payment_with(6, |party| name_of(party, lengths[1 + party], "N"));
+    line.company.as_mut().unwrap().name = name_of(9, lengths[0], "N");
+    let voucher = &mut line.vouchers[0];
+    voucher.entries.last_mut().unwrap().ledger = name_of(6, lengths[7], "N");
+    voucher.narration = Some(name_of(7, lengths[8], "N"));
+    voucher.reference = Some(name_of(8, lengths[9], "N"));
+    refresh_batch_sha256(&mut line);
+    line
+}
+
+/// The single-voucher preview's 1,600-character cap is exact: with every field
+/// grown to its own width (the company and the balancing ledger as well as the
+/// parties, narration and reference), a preview of exactly 1,600 characters in 24
+/// lines fits and one more is refused. Branding the dialog text added characters
+/// to every preview, so a preview near the cap is refused loudly, never cut, and
+/// the boundary is pinned here.
+#[test]
+fn a_single_voucher_preview_fits_at_exactly_1600_characters_and_not_one_more() {
+    let (_, endpoint) = batch();
+    let fits = |lengths: &[usize]| admit_fresh_saved_voucher(&payment_of(lengths), &endpoint);
+    let caps: Vec<usize> = (0..10)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; 10];
+                lengths[field] = length;
+                fits(&lengths).is_ok()
+            })
+        })
+        .collect();
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 10 * 100);
+    assert_eq!(fit.chars().count(), 1_600, "{fit}");
+    assert_eq!(fit.lines().count(), 24, "{fit}");
+    assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
+}
+
+/// The batch post preview's caps (3,200 characters, 7,000 bytes) against what 40
+/// lines allow, with the company, all 22 parties and the balancing ledger grown to
+/// their own width: ASCII names and three-byte names. At full width the preview
+/// still fits all 40 lines and is under both caps (3,123 characters, 6,725 bytes
+/// with three-byte names when measured), so the character and byte caps do not
+/// bind for it: the line caps do. Measured, not derived: a change that lets this
+/// preview grow past them fails here and needs its own boundary test.
+#[test]
+fn the_batch_post_preview_at_full_width_against_its_caps() {
+    let (_, endpoint) = batch();
+    for filler in ["N", "न"] {
+        let fits = |lengths: &[usize]| {
+            // The company, 22 parties and the balancing ledger.
+            let names: Vec<String> = (0..22)
+                .map(|party| name_of(party, lengths[1 + party], filler))
+                .collect();
+            let mut line = payment_batch_with(&names, &name_of(24, lengths[0], filler));
+            for voucher in &mut line.vouchers {
+                voucher.entries.last_mut().unwrap().ledger = name_of(23, lengths[23], filler);
+            }
+            refresh_batch_sha256(&mut line);
+            review_preview_with(&line, &endpoint, &[])
+        };
+        let caps: Vec<usize> = (0..24)
+            .map(|field| {
+                widest(|length| {
+                    let mut lengths = vec![1; 24];
+                    lengths[field] = length;
+                    fits(&lengths).is_ok()
+                })
+            })
+            .collect();
+        let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+        assert_eq!(refusal, None, "every field at its width still fits");
+        assert_eq!(fit.lines().count(), 40, "{fit}");
+        assert!(
+            fit.chars().count() < 3_200,
+            "{} characters",
+            fit.chars().count()
+        );
+        assert!(fit.len() < 7_000, "{} bytes", fit.len());
+    }
 }
 
 fn captured_currencies(bytes: &[u8]) -> String {

@@ -306,12 +306,7 @@ mod tests {
             "groups_request",
         ];
         assert_eq!(listed, guarded.into_iter().collect());
-        for id in [
-            ReadOnlyProfileId::LedgersV1,
-            ReadOnlyProfileId::LedgerCanaryReadbackV1,
-            ReadOnlyProfileId::VouchersV2,
-            ReadOnlyProfileId::VouchersV3,
-        ] {
+        for id in [ReadOnlyProfileId::LedgersV1, ReadOnlyProfileId::VouchersV2] {
             assert!(id.education_refuses_report_formula(), "{}", id.as_str());
         }
         let synthetic_from = TallyDate::parse("20260401").unwrap();

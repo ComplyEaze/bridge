@@ -1,18 +1,20 @@
-//! `parse_bank_statement`: a local, read-only capability that turns a
-//! password-protected bank-statement PDF into voucher proposals.
+//! `parse_bank_statement`: a local capability that turns a password-protected
+//! bank-statement PDF into voucher proposals. It reads the statement and writes
+//! the proposals to a new private file; it never contacts Tally.
 //!
 //! **What may leave the machine is decided here.** The statement's rows are
 //! a client's banking record, and a tool result reaches the AI conversation.
 //! So the full proposals — every row's date, amount, bank reference and
 //! narration — are written to a private local file, and the result carries
 //! only what an operator needs to write the mapping: each counterparty's
-//! spelling as printed, its row count and total, its disposition and whether
-//! it reached suspense, and the ledger names to check with `validate_masters`.
-//! Every name in that summary is marked as a party name, so the
-//! `mask_parties` redaction preset masks it. Beyond a total built from one row,
-//! which is that row's amount, the only row-level values returned are an open
-//! cash line's: `cash_questions` identifies it by its id, date, amount, party
-//! name and movement so a person can answer it (owner ruling b1).
+//! spelling as printed, its row count, its disposition and whether it reached
+//! suspense, and the ledger names to check with `validate_masters`. It carries
+//! no amount of its own: only the figures the caller supplied are echoed, and
+//! an open cash line's amount (below). Every name in that summary is marked as
+//! a party name, so the `mask_parties` redaction preset masks it. The only
+//! row-level values returned are an open cash line's: `cash_questions`
+//! identifies it by its id, date, amount, party name and movement so a person
+//! can answer it (owner ruling b1).
 //!
 //! **The password never enters the conversation.** It is read from a local
 //! owner-only file named by `password_file`, held in a zeroizing buffer, handed
@@ -100,7 +102,7 @@ pub(super) fn input_schema() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, total, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. Only SBI 'ATM WDL' withdrawals and Union Bank 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows and total; a line's own date and label stay in the local file, and so does its amount, except where a total is built from one row, which is then that row's amount: a counterparty listed with rows 1 (one row of a party under one disposition, or one answered cash line), bank_ledger_out or bank_ledger_in over a window holding one such row, or a total_debits or total_credits summed from one row; a from/to window holding one row makes rows_in_window and these totals describe that row. An open cash line is the other exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
+pub(super) const DESCRIPTION: &str = "Read a local, password-protected SBI, HDFC or Union Bank of India bank-statement PDF and propose one Payment, Receipt or Contra per row (none for a cash line not yet answered), for build_import_xml's voucher shape. The whole run is refused unless the statement's account-number line ends with the digits in account_label, and every row's running balance, the closing balance, and (where the statement prints them) the debit and credit totals reproduce the figures supplied exactly. The password is read from password_file, a local file only its owner can read, and is never returned. Full proposals stay in a private local file; the result is a counterparty summary (spelling as printed, row count, disposition, suspense) for writing `mapping`, and the ledger names to check with validate_masters. A party the mapping does not name, or the parser could not identify, goes to suspense_ledger, tagged UNIDENTIFIED; `skip` omits a transfer already carried by another account's Contra. Only SBI 'ATM WDL' withdrawals and Union Bank 'BY CASH' deposits are recognised as cash. Other cash text is not: where the parser names a party it is an ordinary party, and where it cannot (as for SBI deposits and HDFC cash text) it goes to the UNIDENTIFIED fallback. A recognised cash line is never mapped or defaulted: it is returned in cash_questions with its question and answers, and build_import_xml refuses the proposals (cash_questions_open) until each is answered in cash_answers. Only a dont_know answer posts one to suspense_ledger, tagged \"Bridge: purpose not confirmed; reclassify\"; every line sent to suspense is counted (suspense_rows, and suspense_by_reason by why), and suspense parties are listed first in counterparties, within its bound, with their rows; a line's own date, amount and label stay in the local file. The result carries no amount except the figures the caller supplied, echoed in reconciled (closing_balance, and total_debits and total_credits where given), and an open cash line's amount (below). Arithmetic on the caller's own inputs can still give a row's amount, for example total_debits minus the open cash amounts when one other debit row remains, and when a direction has a single row the caller's own total is that row's amount and counterparties names its party; and a from/to window holding one row shows through rows_in_window that a row falls in it, and through counterparties that row's party and direction; no result can hide what follows from the caller's inputs. An open cash line is the one exception: its cash_questions entry carries its bridge_txn_id, date and amount, its party name (masked when BRIDGE_AGENT_REDACTION is mask_parties) and whether it is a withdrawal or a deposit, so the person can tell which line is asked about. No other value of any row is returned. Every list in the result is bounded by the response size and counts what it left out (cash_questions_omitted, counterparties_omitted, ledgers_to_validate_omitted); cash_questions_open, suspense_rows and skipped count them all. An answer for a row outside from/to is refused (cash_answer_outside_window). An ambiguous mapping is refused, never guessed. Re-run with a corrected mapping: bridge_txn_id labels depend only on the statement row, so they do not change. To build, pass the returned proposals_id and sha256 to build_import_xml as proposals_id and proposals_sha256; to correct a batch already built from an earlier run, add amends_batch_id. Never contacts Tally.";
 
 impl Server {
     pub(super) async fn parse_bank_statement(
@@ -453,13 +455,29 @@ fn summary(
         .iter()
         .filter(|record| record.disposition == Disposition::Skipped)
         .count();
-    // Suspense parties first (largest first within each): the unmapped and
-    // unidentified, but also parties mapped to the suspense ledger and
-    // dont_know cash lines, which the group cannot tell apart. Mapping some of
-    // those listed and re-running brings others into view; parties kept in
-    // suspense stay at the head.
+    // Suspense parties first (most rows first within each, then by name and
+    // disposition, so the order says nothing of amounts): the unmapped and unidentified, but
+    // also parties mapped to the suspense ledger and dont_know cash lines,
+    // which the group cannot tell apart. Mapping some of those listed and
+    // re-running brings others into view; parties kept in suspense stay at the
+    // head.
     let mut groups = parsed.counterparties.iter().collect::<Vec<_>>();
-    groups.sort_by_key(|group| !group.suspense);
+    // The key is unique per group (a group is one party's spelling, one
+    // disposition, suspense or not), so the order is total.
+    groups.sort_by(|left, right| {
+        (
+            !left.suspense,
+            std::cmp::Reverse(left.rows),
+            &left.party,
+            &left.disposition,
+        )
+            .cmp(&(
+                !right.suspense,
+                std::cmp::Reverse(right.rows),
+                &right.party,
+                &right.disposition,
+            ))
+    });
     let counterparties: Vec<Value> = groups
         .into_iter()
         .map(|group| {
@@ -470,7 +488,6 @@ fn summary(
                 "disposition": group.disposition,
                 "suspense": group.suspense,
                 "rows": group.rows,
-                "total": group.total,
             })
         })
         .collect();
@@ -486,10 +503,9 @@ fn summary(
     ledgers.dedup();
     // Row-level content (a line's date, amount or label) stays in the local
     // file, except the four fields an open cash question carries (see
-    // cash_questions) and a total built from one row, which is that row's
-    // amount (a counterparty with rows 1, or a bank ledger or reconciled total
-    // over one row); suspense lines are counted by reason, and
-    // each suspense party is in counterparties with its rows and total. Every list grows with the
+    // cash_questions); no amount is returned but the caller's own. Suspense
+    // lines are counted by reason, and each suspense party is in
+    // counterparties with its rows. Every list grows with the
     // statement, so each is bounded, with what was left out counted. The MCP
     // frame carries the result twice, so the lists together take under half:
     // a quarter for the cash questions, an eighth for the counterparties
@@ -509,7 +525,7 @@ fn summary(
         &mut (max_bytes / 16),
     );
     let next_step = if open == 0 {
-        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists suspense parties first, largest first: unmapped and unidentified parties, parties mapped to the suspense ledger, and dont_know cash lines. When counterparties_omitted is above zero, mapping some of those listed and re-running brings others into view, unless the listed ones are parties kept in suspense. Otherwise raise BRIDGE_AGENT_MAX_BYTES); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
+        "Write mapping from counterparties and re-run until no row needs a ledger it should not reach (counterparties lists suspense parties first, most rows first: unmapped and unidentified parties, parties mapped to the suspense ledger, and dont_know cash lines. When counterparties_omitted is above zero, mapping some of those listed and re-running brings others into view, unless the listed ones are parties kept in suspense. Otherwise raise BRIDGE_AGENT_MAX_BYTES); check ledgers_to_validate with validate_masters. Then call build_import_xml with company_guid, proposals_id and proposals_sha256 set to this proposals_id and sha256. To correct a batch already built from an earlier run of this statement, also pass amends_batch_id; never rebuild it as a new batch."
     } else {
         "Ask the person each cash_questions entry in its own words, and re-run with their answers in cash_answers (by bridge_txn_id, with the ledger the answer asks for). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
     };
@@ -527,14 +543,13 @@ fn summary(
         "cash_questions_open": open,
         "cash_questions": cash_questions,
         "cash_questions_omitted": cash_questions_omitted,
-        "bank_ledger_out": format_amount(&parsed.check.bank_out),
-        "bank_ledger_in": format_amount(&parsed.check.bank_in),
+        // Only the caller's own figures are echoed. Totals the caller did not
+        // give (a layout that prints none) are not returned.
         "reconciled": {
             "running_balance_every_row": true,
-            "closing_balance": parsed.closing.as_str(),
-            "total_debits": format_amount(&parsed.totals.debits),
-            "total_credits": format_amount(&parsed.totals.credits),
-            // false for a layout that prints no totals: they were summed, not checked
+            "closing_balance": format_amount(&request.controls.closing),
+            "total_debits": request.controls.debits.as_ref().map(format_amount),
+            "total_credits": request.controls.credits.as_ref().map(format_amount),
             "totals_match_statement": request.controls.debits.is_some(),
         },
         "counterparties": counterparties,

@@ -80,6 +80,13 @@ or request shape. A mandatory manual-numbering preflight would require a
 separately observed voucher-type read contract; it cannot be inferred from the
 failed-`Alter` case.
 
+*Note, 2026-09-30.* A voucher-type read now exists: the `masters` tool with
+`kind=voucher_types` returns each type's numbering method as Tally reported it, measured on one
+synthetic book on licensed TallyPrime 7.1 Silver
+([§12a.12](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a12-master-collections-on-licensed-71)).
+`Default` numbering remains unmeasured, so a numbering preflight is still not
+qualified and the rule above stands until that is measured.
+
 **Native mutation selector — verified 2026-09-07, bounded fresh-dispatch observation.**
 A new native attempt uses a fresh private `REMOTEID`, separate from the selected
 public file's identity. The narration keeps the original batch attribution.

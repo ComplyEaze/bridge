@@ -648,7 +648,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
     ]);
-    assert_eq!(samples.len(), 18);
+    assert_eq!(samples.len(), 19);
     for (tool, sample) in samples {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);

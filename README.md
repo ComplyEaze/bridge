@@ -10,7 +10,7 @@ vouchers as a file. If you turn posting on in the extension, it posts them one
 at a time, after you approve each one.
 
 **Current release:**
-<!-- managed:current-release -->[`mcp-preview-0.3.0`](https://github.com/ComplyEaze/bridge/releases/latest) (26 September 2026)<!-- /managed:current-release -->,
+<!-- managed:current-release -->[`mcp-v0.4.0`](https://github.com/ComplyEaze/bridge/releases/latest) (2 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs. We check each release before we
 publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
@@ -101,9 +101,8 @@ Silicon Mac.
 
 ## Not in the latest release
 
-- Profit and Loss and Balance Sheet (in source, not yet released)
-- Stock or inventory reads; sales, purchase or tax posting; creating masters;
-  bill-wise allocation
+- Stock quantities, and stock reads on books with many stock items; sales,
+  purchase or tax posting; creating masters; bill-wise allocation
 - Deleting or undoing a posted voucher (correct it in Tally)
 - Reads on very large books can fail or take longer than the assistant waits
   (#485, #703)
@@ -182,13 +181,12 @@ With writing on:
 ## The desktop app
 
 **The extension is built from the same source library as the desktop app.**
-The published 0.3.0 package still contains an unfinished document-upload
-feature and an AXAL sign-in. In that package no tool of the extension reaches
-them. The source after 0.3.0 no longer has them
-([#914](https://github.com/ComplyEaze/bridge/pull/914)), so the next release
-will not contain them; in that source the only network client in ComplyEaze
-Bridge's own code connects to Tally on your own computer. No desktop installer
-is published. See [Security and privacy](./docs/security-and-privacy.md).
+Packages up to 0.3.0 contained an unfinished document-upload feature and an
+AXAL sign-in, which no tool of the extension reached. That code was removed
+([#914](https://github.com/ComplyEaze/bridge/pull/914)) and release 0.4.0 does
+not contain it; the only network client in ComplyEaze Bridge's own code
+connects to Tally on your own computer. No desktop installer is published.
+See [Security and privacy](./docs/security-and-privacy.md).
 
 ## Before you use it with client data
 
@@ -227,10 +225,10 @@ it. Before you do, know what it is and is not:
   exactly which bytes and which source commit you downloaded.
 - **Checked only as far as launching.** The release build confirms the package
   starts and lists its tools. It does **not** establish that it works against
-  your Tally, or in conversation inside Claude Desktop. The owner reports one
-  read-only session of the published 0.3.0 package in Claude Desktop on Windows
-  x64 against a live licensed TallyPrime Gold 7.1, with no logs kept; posting
-  and the approval window have not been run on Windows.
+  your Tally, or in conversation inside Claude Desktop. What has been run
+  against a real TallyPrime, and on which builds, is
+  [listed above](#what-has-been-run-against-a-real-tallyprime); the published
+  0.4.0 package itself has not been run by us against a live TallyPrime.
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on

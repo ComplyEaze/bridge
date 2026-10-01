@@ -15,12 +15,12 @@ function region(html, open, close) {
   return html.slice(start, end + close.length);
 }
 
-// Text a visitor can read: tags, scripts, styles and comments removed.
+// Text a visitor can read or hear: comments, scripts and styles removed, tags dropped, and the
+// descriptions, labels and tooltips carried in attributes kept.
 function visibleText(html) {
-  return html
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, " ")
-    .replace(/<[^>]+>/g, " ");
+  const body = html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style)\b[\s\S]*?<\/\1>/g, " ");
+  const spoken = [...body.matchAll(/\b(?:content|aria-label|alt|title)="([^"]*)"/g)].map((match) => match[1]);
+  return `${body.replace(/<[^>]+>/g, " ")} ${spoken.join(" ")}`;
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {

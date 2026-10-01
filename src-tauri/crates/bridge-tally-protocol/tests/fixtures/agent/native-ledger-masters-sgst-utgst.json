@@ -1,0 +1,20 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver response to render_party_ledger_master_request (ledger_masters fields=compliance, period 20250401..20250804) from the disposable BRIDGE GST RECON LAB book, recorded by a read-only relay between bridge_mcp and the gateway: the response body exactly as Tally sent it (HTTP head removed)",
+  "observed_date": "2026-09-30",
+  "observed_at": "2026-09-30T23:30+05:30",
+  "executor": "Claude Sonnet 5.5 (Lane M2) under the lab owner's seeding ruling relayed by the orchestrator",
+  "binary": "bridge_mcp debug build of bef4ecfd338238a0c27df839423aea592fe057d4 (source-equivalent to e648bfb5), sha256 758e39805f00dc7e282f4fd16db81669bbd1895f2b381ed1d7bfd7213561f8fd; writes disabled at run time",
+  "relay": "serial read-only allowlist relay v3.5, sha256 3436269e04a9847642b0eeb597fdd140fb82d52eafb574e5e6346dbf51d224ab, forwarding to 127.0.0.1:9001 only",
+  "request_sha256_utf8": "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
+  "request_bytes_on_wire": 1744,
+  "fixture_bytes": 73030,
+  "fixture_sha256": "aa60bced8c4c332d50b945af35b7ff63e9d10e77b24faf24025d758d8b2077a4",
+  "encoding": "UTF-16LE without BOM, CRLF line endings, as received",
+  "rows": 36,
+  "transformation": "none (the body is byte-identical to the gateway response; only the HTTP head was removed)",
+  "how_the_heads_were_made": "8 of the 36 ledgers (names ending '(M2)' or '(probe)') were created by raw Import Data Create messages (TAXTYPE GST plus the GSTDUTYHEAD shown) minutes before this read, one probe and one batch of seven; Tally returned each head verbatim. The other 28 ledgers are the earlier book.",
+  "provenance_limit": "Backs the acceptance of the literal GSTDUTYHEAD 'SGST/UTGST' on one TallyPrime 7.1 Silver instance, written by import, not typed in the UI; whether the UI offers that spelling, and whether other versions or localisations use it, is not established. The earlier capture native-ledger-masters-duty-heads is unchanged.",
+  "sensitivity_review": "Disposable synthetic lab book; no customer data or credentials; scanned against the client-name list (0 hits) and for local paths, user names and addresses (0).",
+  "source_response_bytes": 73030,
+  "source_response_sha256": "aa60bced8c4c332d50b945af35b7ff63e9d10e77b24faf24025d758d8b2077a4"
+}

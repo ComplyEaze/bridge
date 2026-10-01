@@ -16,6 +16,21 @@ fn row_json(entries: usize, narration: &str) -> Value {
     })
 }
 
+/// The product is named "ComplyEaze Bridge" in every line a person reads in a
+/// dialog: each "Bridge" in `text` follows "ComplyEaze ".
+fn every_bridge_is_the_brand(text: &str) {
+    assert!(
+        text.contains("ComplyEaze Bridge"),
+        "the product is not named at all: {text}"
+    );
+    for (at, _) in text.match_indices("Bridge") {
+        assert!(
+            text[..at].ends_with("ComplyEaze "),
+            "a bare Bridge at {at}: {text}"
+        );
+    }
+}
+
 fn doubt() -> Value {
     json!({"state":"posted_under_changed_masters","ledgers":["Cash"]})
 }
@@ -40,6 +55,17 @@ fn the_review_shows_the_doubt_and_the_voucher() {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
     assert!(preview.starts_with("Record that you reviewed ONE Journal"));
+    assert!(
+        preview.contains("\nComplyEaze Bridge posted it, but these ledgers no longer resolve\n"),
+        "{preview}"
+    );
+    every_bridge_is_the_brand(&preview);
+    assert!(
+        preview.contains(
+            "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required."
+        ),
+        "{preview}"
+    );
     assert!(
         preview.contains(&format!("Choosing \"{REVIEW_BUTTON}\"")),
         "names the button the platform shows: {preview}"
@@ -508,16 +534,20 @@ fn the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read() {
         &format!("Batch: {BATCH}"),
         "I reviewed these 3 vouchers in Tally.",
         "reconciliation_required",
+        "ComplyEaze Bridge posted them, but cannot confirm that only they",
+        "They are correct as they stand.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
+    every_bridge_is_the_brand(&preview);
     let masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
     let preview =
         batch_review_preview(&line, DoubtKind::Masters, "Books", &masters, &rows).unwrap();
     assert!(
-        preview.contains("these ledgers no longer resolve"),
+        preview.contains("ComplyEaze Bridge posted them, but these ledgers no longer resolve"),
         "{preview}"
     );
+    every_bridge_is_the_brand(&preview);
     assert!(preview.contains("  \"Cash\""), "{preview}");
     // Too many ledgers for one dialog.
     let wide = (0..40)
@@ -547,7 +577,7 @@ fn each_kind_of_step_doubt_is_shown_in_its_own_words() {
     for (step, said, never) in [
         (
             Value::Null,
-            "changed this company's vouchers:\nBridge could not read its voucher mark after posting.\n",
+            "changed this company's vouchers:\nComplyEaze Bridge could not read its voucher mark after posting.\n",
             "Tally reported",
         ),
         (
@@ -811,4 +841,173 @@ fn a_second_doubt_after_the_read_refuses_an_unnamed_review() {
         let after = [(DoubtKind::Masters, masters), (DoubtKind::BatchStep, step)];
         assert_eq!(still_the_only_doubt(&after), expected, "{after:?}");
     }
+}
+
+/// Grow a preview one character at a time with `build(pad)`: it fits up to some
+/// size and is refused beyond it, never the other way round. The largest preview
+/// that fit, and the refusal that followed it (`None` if none did by `max_pad`).
+fn largest_fit(
+    build: impl Fn(usize) -> Result<String, String>,
+    max_pad: usize,
+) -> (String, Option<String>) {
+    let (mut fit, mut refusal) = (None, None);
+    for pad in 0..=max_pad {
+        match build(pad) {
+            Ok(preview) => {
+                assert!(refusal.is_none(), "a fit after a refusal, at pad {pad}");
+                fit = Some(preview);
+            }
+            Err(code) => {
+                refusal.get_or_insert(code);
+            }
+        }
+    }
+    (fit.expect("the smallest preview fits"), refusal)
+}
+
+/// The lengths of fields that grow together: `pad` more characters are dealt out
+/// round-robin from `start`, and each field stops at its own cap, so the total
+/// grows by one, or by nothing, per step.
+fn grown_lengths(pad: usize, start: usize, caps: &[usize]) -> Vec<usize> {
+    caps.iter()
+        .enumerate()
+        .map(|(field, cap)| {
+            (start + pad / caps.len() + usize::from(field < pad % caps.len())).min(*cap)
+        })
+        .collect()
+}
+
+/// The longest length, up to 200, at which `fits` still holds.
+fn widest(fits: impl Fn(usize) -> bool) -> usize {
+    (1..=200)
+        .take_while(|&length| fits(length))
+        .last()
+        .expect("fits at one character")
+}
+
+/// A name of `length` characters: a letter for `field`, so names differ, then
+/// `filler`.
+fn name_of(field: usize, length: usize, filler: &str) -> String {
+    format!(
+        "{}{}",
+        char::from_u32(0x0915 + field as u32).expect("a Devanagari letter"),
+        filler.repeat(length.saturating_sub(1))
+    )
+}
+
+/// A voucher as read back with one entry per name and this narration and number.
+fn row_named(names: &[String], narration: &str, number: &str) -> ReadVoucher {
+    let mut voucher = row_json(names.len(), narration);
+    voucher["voucher_number"] = json!(number);
+    for (index, name) in names.iter().enumerate() {
+        voucher["amounts"][index]["ledger"] = json!(name);
+    }
+    serde_json::from_value(voucher).unwrap()
+}
+
+/// A batch review of one voucher with `count` ledgers, in a company, whose names
+/// are `filler` letters of the lengths `lengths` gives: the company, then each
+/// ledger.
+fn batch_review_of(lengths: &[usize], filler: &str) -> Result<String, String> {
+    let line = posted_batch(2);
+    let step: Value = serde_json::from_slice(STEP_DOUBT).unwrap();
+    let names: Vec<String> = (0..lengths.len() - 1)
+        .map(|ledger| name_of(ledger, lengths[1 + ledger], filler))
+        .collect();
+    let rows = [row_named(&names, "Paid", "2")];
+    let rows = rows.iter().collect::<Vec<_>>();
+    batch_review_preview(
+        &line,
+        DoubtKind::BatchStep,
+        &name_of(30, lengths[0], filler),
+        &step,
+        &rows,
+    )
+}
+
+/// The caps of each of `fields` fields: the longest each can be, alone, with the
+/// rest at one character.
+fn field_caps(fields: usize, fits: impl Fn(&[usize]) -> bool) -> Vec<usize> {
+    (0..fields)
+        .map(|field| {
+            widest(|length| {
+                let mut lengths = vec![1; fields];
+                lengths[field] = length;
+                fits(&lengths)
+            })
+        })
+        .collect()
+}
+
+/// The batch review's 3,200-character cap is exact: the company and twenty-six
+/// ledger names (40 lines in all) grown to their own width, a character at a
+/// time, fit at exactly 3,200 characters and one more is refused. Branding added
+/// characters to this preview, so the boundary is pinned: what sits at it is
+/// refused loudly, never cut.
+#[test]
+fn a_batch_review_fits_at_exactly_3200_characters_and_not_one_more() {
+    let fits = |lengths: &[usize]| batch_review_of(lengths, "N");
+    let caps = field_caps(27, |lengths| fits(lengths).is_ok());
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
+    assert_eq!(fit.chars().count(), 3_200, "{fit}");
+    assert_eq!(fit.lines().count(), 40, "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+}
+
+/// The batch review's 7,000-byte cap binds before its character cap when the
+/// names are three-byte letters: grown the same way, the review fits up to the
+/// last size within 7,000 bytes (each step adds up to three) and the next is
+/// refused, at fewer than 3,200 characters. Branding added bytes to this preview
+/// too, so this boundary is pinned as well.
+#[test]
+fn a_batch_review_of_three_byte_names_is_refused_past_7000_bytes() {
+    let fits = |lengths: &[usize]| batch_review_of(lengths, "न");
+    let caps = field_caps(27, |lengths| fits(lengths).is_ok());
+    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 27 * 100);
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+    let bytes = fit.len();
+    assert!(bytes <= 7_000 && bytes + 3 > 7_000, "{bytes} bytes");
+    assert!(
+        fit.chars().count() < 3_200,
+        "{} characters",
+        fit.chars().count()
+    );
+}
+
+/// One single review whose fields have the lengths `lengths` gives: the company,
+/// nine entry ledgers, the narration, the voucher number and the doubted ledger.
+fn single_review_of(lengths: &[usize]) -> Result<String, String> {
+    let names: Vec<String> = (0..9)
+        .map(|entry| name_of(entry, lengths[1 + entry], "N"))
+        .collect();
+    let doubt =
+        json!({"state":"posted_under_changed_masters","ledgers":[name_of(12, lengths[12], "N")]});
+    review_preview(
+        BATCH,
+        MARKER,
+        &name_of(30, lengths[0], "N"),
+        &doubt,
+        &row_named(
+            &names,
+            &name_of(10, lengths[10], "N"),
+            &name_of(11, lengths[11], "N"),
+        ),
+    )
+}
+
+/// The single review's 1,600-character cap is exact: the company, nine ledgers,
+/// the narration, the voucher number and the doubted ledger grown to their own
+/// width fit at exactly 1,600 characters and one more is refused. Branding added
+/// characters to this preview, so the boundary is pinned: what sits at it is
+/// refused loudly, never cut.
+#[test]
+fn a_single_review_fits_at_exactly_1600_characters_and_not_one_more() {
+    let caps = field_caps(13, |lengths| single_review_of(lengths).is_ok());
+    let (fit, refusal) = largest_fit(
+        |pad| single_review_of(&grown_lengths(pad, 1, &caps)),
+        13 * 100,
+    );
+    assert_eq!(fit.chars().count(), 1_600, "{fit}");
+    assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
+    assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
 }

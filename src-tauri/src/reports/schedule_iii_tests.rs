@@ -64,6 +64,7 @@ fn maps_only_immutable_group_evidence_and_lists_everything_else() {
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
     let view = build_schedule_iii_view(&source).unwrap();
     assert_eq!(view.lines.len(), 1);
@@ -101,6 +102,7 @@ fn contra_signed_sundry_debtor_is_excluded_not_netted_against_its_group_subtotal
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
 
     let view = build_schedule_iii_view(&source).unwrap();
@@ -141,6 +143,7 @@ fn contra_signed_sundry_creditor_is_excluded_not_netted_against_its_group_subtot
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
 
     let view = build_schedule_iii_view(&source).unwrap();
@@ -188,6 +191,7 @@ fn cash_in_hand_and_bank_accounts_keep_separate_group_subtotals_and_totals() {
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
 
     let view = build_schedule_iii_view(&source).unwrap();
@@ -242,6 +246,7 @@ fn contra_signed_bank_account_is_excluded_not_netted_against_its_group_subtotal(
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
 
     let view = build_schedule_iii_view(&source).unwrap();
@@ -277,6 +282,7 @@ fn empty_closing_balance_is_excluded_not_manufactured_as_zero() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
 
     let view = build_schedule_iii_view(&source).unwrap();

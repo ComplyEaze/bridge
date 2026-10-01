@@ -689,9 +689,12 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
 const POST_WORDS: &str = r#"#[cfg(not(windows))]
 fn post_words(count: VoucherCount) -> (String, String) {
     match count.batch() {
-        None => ("Bridge — approve one voucher".into(), POST_LABEL.into()),
+        None => (
+            "ComplyEaze Bridge — approve one voucher".into(),
+            POST_LABEL.into(),
+        ),
         Some(count) => (
-            format!("Bridge — approve {count} vouchers"),
+            format!("ComplyEaze Bridge — approve {count} vouchers"),
             format!("Post {count} vouchers"),
         ),
     }
@@ -702,24 +705,26 @@ fn post_words(count: VoucherCount) -> (String, String) {
 const REVIEW_TITLE: &str = r#"#[cfg(not(windows))]
 fn review_title(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed one voucher".into(),
-        Some(count) => format!("Bridge — record that you reviewed {count} vouchers"),
+        None => "ComplyEaze Bridge — record that you reviewed one voucher".into(),
+        Some(count) => format!("ComplyEaze Bridge — record that you reviewed {count} vouchers"),
     }
 }"#;
 
 const REVIEW_QUESTION: &str = r#"#[cfg(windows)]
 fn review_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — record that you reviewed this voucher?".into(),
-        Some(count) => format!("Bridge — record that you reviewed these {count} vouchers?"),
+        None => "ComplyEaze Bridge — record that you reviewed this voucher?".into(),
+        Some(count) => {
+            format!("ComplyEaze Bridge — record that you reviewed these {count} vouchers?")
+        }
     }
 }"#;
 
 const POST_QUESTION: &str = r#"#[cfg(windows)]
 fn post_question(count: VoucherCount) -> String {
     match count.batch() {
-        None => "Bridge — post this voucher?".into(),
-        Some(count) => format!("Bridge — post {count} vouchers?"),
+        None => "ComplyEaze Bridge — post this voucher?".into(),
+        Some(count) => format!("ComplyEaze Bridge — post {count} vouchers?"),
     }
 }"#;
 
@@ -951,25 +956,25 @@ fn each_dialog_answers_only_on_its_positive_button() {
         // The Windows post dialog asks the review's question, so Yes reads as
         // recording a review while it posts (#746).
         source.replacen(
-            "None => \"Bridge — post this voucher?\".into(),",
-            "None => \"Bridge — record that you reviewed this voucher?\".into(),",
+            "None => \"ComplyEaze Bridge — post this voucher?\".into(),",
+            "None => \"ComplyEaze Bridge — record that you reviewed this voucher?\".into(),",
             1,
         ),
         source.replacen(
-            "format!(\"Bridge — post {count} vouchers?\")",
-            "format!(\"Bridge — record that you reviewed these {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — post {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed these {count} vouchers?\")",
             1,
         ),
         // A review dialog's title reads as approving a post (#746).
         source.replacen(
-            "format!(\"Bridge — record that you reviewed {count} vouchers\")",
-            "format!(\"Bridge — approve {count} vouchers\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed {count} vouchers\")",
+            "format!(\"ComplyEaze Bridge — approve {count} vouchers\")",
             1,
         ),
         // The Windows review dialog asks the post's question (#746).
         source.replacen(
-            "format!(\"Bridge — record that you reviewed these {count} vouchers?\")",
-            "format!(\"Bridge — post {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — record that you reviewed these {count} vouchers?\")",
+            "format!(\"ComplyEaze Bridge — post {count} vouchers?\")",
             1,
         ),
         // rfd post dialog discards its answer: it still computes the comparison, then returns true.

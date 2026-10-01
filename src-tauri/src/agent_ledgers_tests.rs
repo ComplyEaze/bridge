@@ -285,6 +285,120 @@ fn live_capture_backs_the_recognised_duty_head_vocabulary() {
     );
 }
 
+fn captured_live_ledger_masters_with_sgst_utgst() -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-masters-sgst-utgst.utf16le.xml"
+    );
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
+    // Bytes TallyPrime 7.1 Silver sent for ledger_masters fields=compliance (see the
+    // fixture's JSON sidecar for the binary, relay and times): ledgers created with the
+    // literal head `SGST/UTGST` come back with exactly that string, and TAXTYPE GST.
+    // Before this head was recognised the same bytes classified as `unrecognized`,
+    // and a caller could not tell those ledgers from a misspelt head.
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20250401").unwrap(),
+        TallyDate::parse("20250804").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
+        "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
+        "the fixture answers exactly the request ledger_masters sends"
+    );
+    let parsed = parse_native_party_ledger_master_records_with_evidence(
+        &captured_live_ledger_masters_with_sgst_utgst(),
+        COMPANY_GUID,
+    )
+    .expect("the live SGST/UTGST capture parses");
+    assert_eq!(parsed.records.len(), 36);
+
+    let mut heads: Vec<(String, GstDutyHead)> = parsed
+        .records
+        .iter()
+        .filter_map(|row| match &row.record.fields.gst_duty_head {
+            GstDutyHeadObservation::Recognized { raw, head } => Some((raw.clone(), *head)),
+            _ => None,
+        })
+        .collect();
+    heads.sort_by(|left, right| left.0.cmp(&right.0));
+    heads.dedup();
+    assert_eq!(
+        heads,
+        vec![
+            ("CGST".to_string(), GstDutyHead::Cgst),
+            ("Cess".to_string(), GstDutyHead::Cess),
+            ("IGST".to_string(), GstDutyHead::Igst),
+            ("SGST/UTGST".to_string(), GstDutyHead::SgstUtgst),
+            ("State Tax".to_string(), GstDutyHead::StateTax),
+            ("UT Tax".to_string(), GstDutyHead::UtTax),
+        ],
+        "every recognised spelling is backed by bytes Tally sent"
+    );
+
+    let sgst_utgst_rows: Vec<_> = parsed
+        .records
+        .iter()
+        .filter(|row| {
+            matches!(
+                &row.record.fields.gst_duty_head,
+                GstDutyHeadObservation::Recognized {
+                    head: GstDutyHead::SgstUtgst,
+                    ..
+                }
+            )
+        })
+        .collect();
+    assert_eq!(
+        sgst_utgst_rows.len(),
+        2,
+        "the probe ledger and the batch ledger"
+    );
+    for row in sgst_utgst_rows {
+        assert_eq!(
+            row.record.ledger.parent.returned_text(),
+            Some("Duties & Taxes")
+        );
+        assert_eq!(row.record.fields.tax_type.returned_text(), Some("GST"));
+    }
+    assert!(captured_live_ledger_masters_with_sgst_utgst().contains(">SGST/UTGST</GSTDUTYHEAD>"));
+
+    // The serialised wire shape a caller of ledger_masters sees.
+    let wire = serde_json::to_value(&GstDutyHeadObservation::Recognized {
+        raw: "SGST/UTGST".to_string(),
+        head: GstDutyHead::SgstUtgst,
+    })
+    .unwrap();
+    assert_eq!(
+        wire,
+        json!({"observation": "recognized", "raw": "SGST/UTGST", "head": "sgst_utgst"})
+    );
+}
+
+#[test]
+fn sgst_utgst_on_a_non_gst_ledger_is_contradictory_not_recognised() {
+    assert_eq!(
+        GstDutyHeadObservation::from_observations(
+            &PartyLedgerMasterFieldObservation::Returned("Others".to_string()),
+            &PartyLedgerMasterFieldObservation::Returned("SGST/UTGST".to_string()),
+        ),
+        GstDutyHeadObservation::Contradictory {
+            tax_type: "Others".to_string(),
+            raw: "SGST/UTGST".to_string(),
+        }
+    );
+}
+
 #[test]
 fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     // bridge#624, over a live TallyPrime 7.1 Silver capture of the request this
@@ -505,6 +619,7 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         ("CGST", GstDutyHead::Cgst),
         ("IGST", GstDutyHead::Igst),
         ("State Tax", GstDutyHead::StateTax),
+        ("SGST/UTGST", GstDutyHead::SgstUtgst),
         ("UT Tax", GstDutyHead::UtTax),
         ("Cess", GstDutyHead::Cess),
     ] {
@@ -527,6 +642,10 @@ fn gst_duty_head_vocabulary_is_explicit_and_irregular() {
         "State",
         "Integrated",
         "Union Territory Tax",
+        "sgst/utgst",
+        "SGST / UTGST",
+        "SGST/UTGST ",
+        "UTGST",
     ] {
         assert_eq!(
             GstDutyHeadObservation::from_observations(
@@ -1741,6 +1860,34 @@ mod through_the_tool {
         plans
     }
 
+    /// The company-count answer for the test company: the captured company-extent
+    /// answer reduced to this company's row holding `NUMLEDGERS` (`None`: the field
+    /// absent). The row's shape (name attribute, NAME, GUID, NUMLEDGERS with a
+    /// leading space) is the live capture's (`company-ledger-count`, bridge#938);
+    /// only the company it names is the test company's.
+    fn company_count_body(numledgers: Option<&str>) -> String {
+        let capture = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+        );
+        let at = capture.find(GUID).expect("the captured company");
+        let start = capture[..at].rfind("<COMPANY ").unwrap();
+        let end = at + capture[at..].find("</COMPANY>").unwrap() + "</COMPANY>".len();
+        let row = &capture[start..end];
+        let name = row[row.find("NAME=\"").unwrap() + 6..]
+            .split('"')
+            .next()
+            .unwrap();
+        let field = numledgers
+            .map(|value| format!("     <NUMLEDGERS TYPE=\"Number\"> {value}</NUMLEDGERS>\n"))
+            .unwrap_or_default();
+        let new_row = format!(
+            "<COMPANY NAME=\"{name}\" RESERVEDNAME=\"\">\n     <NAME TYPE=\"String\">{name}</NAME>\n     <GUID TYPE=\"String\">{GUID}</GUID>\n{field}    </COMPANY>"
+        );
+        let first = capture.find("<COMPANY ").unwrap();
+        let last_end = capture.rfind("</COMPANY>").unwrap() + "</COMPANY>".len();
+        format!("{}{}{}", &capture[..first], new_row, &capture[last_end..])
+    }
+
     /// `census_plans` for a census that completes: the book's extent is read
     /// again after the last slice, before any read is admitted by the count
     /// (#679). `after` is that extent's text.
@@ -1751,8 +1898,34 @@ mod through_the_tool {
         reads: Vec<String>,
         closing: Option<String>,
     ) -> Vec<ScenarioPlan> {
+        // Tally's own count of the ledgers agrees with the census's.
+        let counted: usize = slices
+            .iter()
+            .map(|body| body.matches("<LEDGER NAME=\"").count())
+            .sum();
+        census_plans_counted(
+            mark,
+            slices,
+            company_count_body(Some(&counted.to_string())),
+            after,
+            reads,
+            closing,
+        )
+    }
+
+    /// [`census_plans_after`] with the company's own ledger-count answer given.
+    fn census_plans_counted(
+        mark: u64,
+        slices: Vec<String>,
+        company_count: String,
+        after: String,
+        reads: Vec<String>,
+        closing: Option<String>,
+    ) -> Vec<ScenarioPlan> {
         let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
         plans.extend(slices.into_iter().map(xml));
+        // One read, not a pair, before the extent is read again.
+        plans.push(xml(company_count));
         pair(&mut plans, xml(after));
         for source in reads {
             pair(&mut plans, xml(source));
@@ -1931,6 +2104,227 @@ mod through_the_tool {
         assert_eq!(refusal(&response)["cause"], "ledger_count_differs");
     }
 
+    /// The plans of a census that stops at the company's own ledger count: the
+    /// slices and that one answer, and nothing after it.
+    fn census_plans_to_the_count(
+        mark: u64,
+        slices: Vec<String>,
+        company_count: String,
+    ) -> Vec<ScenarioPlan> {
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(slices.into_iter().map(xml));
+        plans.push(xml(company_count));
+        plans
+    }
+
+    /// Tally's own count of the company's ledgers is higher than the census
+    /// counted (as would follow if a company closed and reopened during the
+    /// census with equal marks answered the slices after that with the empty
+    /// body, which is reasoned, not reproduced; or a ledger added during the
+    /// read): the call is refused
+    /// right after that one read, before the extent is read again and before any
+    /// master or catalogue read could be sized from the low count (#938).
+    #[tokio::test]
+    async fn a_census_below_the_companys_own_ledger_count_is_refused_before_anything_is_sized() {
+        let mark = 102_161_u64;
+        // The census holds nine ledgers: ten is the smallest higher count.
+        for company in ["10", "20"] {
+            let plans = census_plans_to_the_count(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                company_count_body(Some(company)),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(error["code"], "party_ledger_master_read_failed");
+            assert_eq!(error["cause"], "ledger_count_company_differs");
+            assert_eq!(
+                error["remediation"],
+                crate::agent::refusal_remediation("ledger_count_company_differs").unwrap()
+            );
+        }
+    }
+
+    /// The company-count read is accounted in the evidence even when it refuses
+    /// the call: two refusals that differ only in the size of that answer differ
+    /// in evidence bytes by exactly that difference.
+    #[tokio::test]
+    async fn a_refused_company_count_read_is_accounted_in_the_evidence() {
+        let mark = 102_161_u64;
+        let wire = |body: &str| 2 + 2 * body.encode_utf16().count() as u64;
+        let mut bytes = Vec::new();
+        let mut sizes = Vec::new();
+        for answer in ["20", "2000000"] {
+            let body = company_count_body(Some(answer));
+            sizes.push(wire(&body));
+            let plans =
+                census_plans_to_the_count(mark, census_bodies(mark, GUID, &[(24, 0..9)]), body);
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(refusal(&response)["cause"], "ledger_count_company_differs");
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_ne!(sizes[0], sizes[1]);
+        assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+    }
+
+    /// The same in a read that goes on: the company-count answer is in the
+    /// successful read's evidence, so two reads that differ only in its size
+    /// differ in evidence bytes by exactly that difference.
+    #[tokio::test]
+    async fn the_company_count_read_is_accounted_in_a_successful_reads_evidence() {
+        let mark = 102_161_u64;
+        let wire = |body: &str| 2 + 2 * body.encode_utf16().count() as u64;
+        let mut bytes = Vec::new();
+        let mut sizes = Vec::new();
+        for answer in ["8", "000000000008"] {
+            let body = company_count_body(Some(answer));
+            sizes.push(wire(&body));
+            let plans = census_plans_counted(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                body,
+                extent_with_master_mark(mark),
+                vec![masters(), balances(), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let (response, _) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_ne!(response["isError"], true, "{response}");
+            bytes.push(
+                response["structuredContent"]["evidence"]["bytes"]
+                    .as_u64()
+                    .unwrap(),
+            );
+        }
+        assert_ne!(sizes[0], sizes[1]);
+        assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
+    }
+
+    /// A transport failure on the company-count read (here an answer past the
+    /// response cap) is not a damaged answer: it keeps its own cause and nothing
+    /// is sent after it.
+    #[tokio::test]
+    async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
+        let mark = 102_161_u64;
+        let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+        plans.extend(
+            census_bodies(mark, GUID, &[(24, 0..9)])
+                .into_iter()
+                .map(xml),
+        );
+        plans.push(xml(company_count_body(Some("9"))).with_framing(
+            ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            },
+        ));
+        let total = plans.len();
+        let (response, requests) =
+            call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+        assert_eq!(requests, total, "a request was sent after the count read");
+        assert_eq!(response["isError"], true, "{response}");
+        for other in [
+            "ledger_count_company_invalid",
+            "ledger_count_company_differs",
+        ] {
+            assert_ne!(refusal(&response)["cause"], other);
+        }
+    }
+
+    /// The cross-check flag is added to a result whatever the frame was, and a
+    /// read with no census leaves the frame as it was.
+    #[test]
+    fn the_cross_check_flag_joins_an_object_frame_and_replaces_any_other() {
+        use crate::tally::connection::CountCrossCheck;
+        let flag = json!({"status": "matched"});
+        let joined = count_cross_check_frame(json!({"rows": 3}), Some(CountCrossCheck::Matched));
+        assert_eq!(joined["rows"], 3);
+        assert_eq!(joined["ledger_count_cross_check"], flag);
+        for other in [json!(null), json!([1, 2]), json!("text")] {
+            let framed = count_cross_check_frame(other, Some(CountCrossCheck::Matched));
+            assert_eq!(framed, json!({"ledger_count_cross_check": flag}));
+        }
+        let untouched = json!({"rows": 3});
+        assert_eq!(count_cross_check_frame(untouched.clone(), None), untouched);
+    }
+
+    /// A count the company does not give, or gives in a form that is not a plain
+    /// integer, or gives for another company, is refused or unavailable, never
+    /// read as agreement.
+    #[tokio::test]
+    async fn an_unusable_company_count_answer_refuses_the_call_after_that_read() {
+        let mark = 102_161_u64;
+        let other = company_count_body(Some("9")).replace(GUID, LAB_COMPANY_GUID);
+        assert_ne!(other, company_count_body(Some("9")));
+        for bad in [
+            company_count_body(Some("9,000")),
+            company_count_body(Some("-1")),
+            company_count_body(Some("")),
+            other,
+            company_count_body(Some("9")).replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>"),
+        ] {
+            let plans =
+                census_plans_to_the_count(mark, census_bodies(mark, GUID, &[(24, 0..9)]), bad);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            assert_eq!(response["isError"], true, "{response}");
+            assert_eq!(refusal(&response)["cause"], "ledger_count_company_invalid");
+        }
+    }
+
+    /// Whether the check ran is in the result: `matched` when Tally's count equals
+    /// the census's, `company_count_lower` when it is below (the read goes on),
+    /// `unavailable` when the answer carries no count; and nothing at all when no
+    /// census ran.
+    #[tokio::test]
+    async fn the_result_says_whether_the_census_count_was_cross_checked() {
+        let mark = 102_161_u64;
+        for (answer, status) in [
+            (Some("9"), "matched"),
+            (Some("8"), "company_count_lower"),
+            (None, "unavailable"),
+        ] {
+            let plans = census_plans_counted(
+                mark,
+                census_bodies(mark, GUID, &[(24, 0..9)]),
+                company_count_body(answer),
+                extent_with_master_mark(mark),
+                vec![masters(), balances(), groups()],
+                Some(extent_with_master_mark(mark)),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "{status}");
+            assert_ne!(response["isError"], true, "{status}: {response}");
+            assert_eq!(
+                response["structuredContent"]["result"]["ledger_count_cross_check"]["status"],
+                status
+            );
+        }
+        // No census (a whole read by the mark alone): no such field.
+        let (unsized_response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        assert!(
+            unsized_response["structuredContent"]["result"]
+                .get("ledger_count_cross_check")
+                .is_none(),
+            "{unsized_response}"
+        );
+    }
+
     /// A company closed, reopened or switched during the census answers the
     /// slices after that moment with the same empty body as a slice past every
     /// ledger, so the count can be low, and the count sizes the next read. The
@@ -1941,8 +2335,9 @@ mod through_the_tool {
     /// The refusal comes from the extent alone whatever the slices held; the
     /// three positions keep a partial count (5, 10 and 15 ledgers against the
     /// nine master rows) from being read as a match. A company closed and
-    /// reopened with equal marks is not caught here: its low count meets the
-    /// count-versus-master-rows test above, after the master pair is sent.
+    /// reopened with equal marks is not caught by the extent. Tally's own count
+    /// of the ledgers (#938) is meant to catch it (by reasoning, no live
+    /// reproduction), before the extent is read again.
     #[tokio::test]
     async fn a_book_that_changes_during_the_census_is_refused_before_the_next_read_is_sized() {
         let mark = 102_161_u64;

@@ -180,6 +180,31 @@ class BundleSmokeTests(unittest.TestCase):
                     smoke.SmokeError, "writes_environment_mapping_mismatch"):
                 smoke.resolve_environment(manifest)
 
+    def test_terms_setting_defaults_to_not_accepted_and_is_mapped(self):
+        template = Path(__file__).resolve().parents[1] / "packaging/mcpb/manifest.json"
+        manifest = json.loads(template.read_text(encoding="utf-8"))
+        self.assertEqual(smoke.resolve_environment(manifest)["BRIDGE_TERMS_ACCEPTED"], "false")
+        for field, value in (("default", True), ("required", False), ("type", "string")):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["user_config"]["accept_terms_2026_10"][field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(
+                    smoke.SmokeError, "terms_setting_must_be_required_and_off"):
+                smoke.resolve_environment(broken)
+        broken = json.loads(template.read_text(encoding="utf-8"))
+        del broken["user_config"]["accept_terms_2026_10"]
+        with self.assertRaisesRegex(smoke.SmokeError, "terms_setting_must_be_required_and_off"):
+            smoke.resolve_environment(broken)
+        for mapping in ("true", "${user_config.enable_writes}"):
+            broken = json.loads(template.read_text(encoding="utf-8"))
+            broken["server"]["mcp_config"]["env"]["BRIDGE_TERMS_ACCEPTED"] = mapping
+            with self.subTest(mapping=mapping), self.assertRaisesRegex(
+                    smoke.SmokeError, "terms_environment_mapping_mismatch"):
+                smoke.resolve_environment(broken)
+        broken = json.loads(template.read_text(encoding="utf-8"))
+        del broken["server"]["mcp_config"]["env"]["BRIDGE_TERMS_ACCEPTED"]
+        with self.assertRaisesRegex(smoke.SmokeError, "unexpected_environment_mapping"):
+            smoke.resolve_environment(broken)
+
     def test_server_output_is_bounded(self):
         command = [sys.executable, "-c", "import sys; sys.stdout.write('x' * 1048576); sys.stdout.flush()"]
         with self.assertRaisesRegex(smoke.SmokeError, "server_output_limit"):

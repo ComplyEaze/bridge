@@ -1277,6 +1277,9 @@ pub(crate) struct PartyLedgerMasterListing {
         Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
     /// Base-currency ledgers set aside because a balance is a currency composite.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted the book was checked against the
+    /// company's own ledger count (#938); `None` when no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
     /// The master request's SVFROMDATE (the admitted BOOKSFROM).
     pub(crate) opening_as_of: TallyDate,
     pub(crate) extent: CompanyBookExtent,
@@ -2988,6 +2991,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3011,6 +3015,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| read.listing)
@@ -3033,6 +3038,7 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
+                ReadRetryPolicy::transient_default(),
             )
             .await?;
         let Some(groups) = read.groups else {
@@ -3062,6 +3068,10 @@ impl TallyRuntime {
             Some(from),
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            // Sent once. A catalogue that outlived its deadline is abandoned, and
+            // sending it again queues more work behind a gateway still building
+            // the response: agent voucher reads take the same rule (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3074,13 +3084,15 @@ impl TallyRuntime {
         opening_date: Option<TallyDate>,
         read_groups: bool,
         currency_gate: LedgerCurrencyGate,
+        retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
             config,
             ReadOperation::MasterExport,
-            ReadRetryPolicy::transient_default(),
+            // The caller's: a movement sends its catalogue once (#485, #937).
+            retry,
             move |client| {
                 let identity = identity.clone();
                 let opening_date = opening_date.clone();
@@ -3299,6 +3311,7 @@ impl TallyRuntime {
         let groups = source.groups.clone();
         let foreign = source.foreign_currency_ledgers_excluded.clone();
         let mixed = source.mixed_currency_ledgers_excluded.clone();
+        let count_cross_check = source.count_cross_check;
         // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
         let opening_as_of = source.from.clone();
         let records = source
@@ -3319,6 +3332,7 @@ impl TallyRuntime {
             groups,
             foreign_currency_ledgers_excluded: foreign,
             mixed_currency_ledgers_excluded: mixed,
+            count_cross_check,
             opening_as_of,
             extent,
             evidence,

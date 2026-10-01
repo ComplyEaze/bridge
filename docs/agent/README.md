@@ -19,6 +19,17 @@ Build and run it with Rust 1.96:
 rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
 ```
 
+Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
+(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
+is on, Bridge appends a line per terms version (version, time, source) to
+`terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
+can each add one), and refuses if that file cannot be read or written. This is a local
+record that the gate opened, not a security boundary and not proof of who accepted, when
+they ticked the box, or which text they saw. A value of `true` set by hand names no
+version, so it also opens the gate for a later terms version: re-read the Terms whenever
+the version changes.
+
 Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 `BRIDGE_TALLY_PORT` (default `9000`), `BRIDGE_AGENT_DATA_DIR` (Bridge's
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
@@ -54,16 +65,17 @@ Claude Desktop example:
   "mcpServers": {
     "bridge-tally": {
       "command": "/absolute/path/to/bridge_mcp",
-      "env": {"BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
+      "env": {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "localhost", "BRIDGE_TALLY_PORT": "9000"}
     }
   }
 }
 ```
 
-Cursor uses the same server object in `.cursor/mcp.json`:
+Cursor uses the same server object in `.cursor/mcp.json`, with the same
+`BRIDGE_TERMS_ACCEPTED` setting:
 
 ```json
-{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp"}}}
+{"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
 The ordinary default tools are `tally_status`, `list_companies`,
@@ -125,7 +137,17 @@ an empty slice is the answer a closed or absent company gives too) or a slice pa
 limit (`ledger_span_slice_response_too_large`) refuses the call. The census's count then admits the
 read like a catalogue's; a count that needs the catalogue to name its parents and whose catalogue
 would pass the response limit is refused as `ledger_count_catalogue_too_large`, and two counts, or a
-count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. A mark
+count and the ledgers the read returned, that differ are refused as `ledger_count_differs`. After the
+slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
+(`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
+higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
+company or held something other than a plain number; a count that is equal, lower or absent never admits
+or sizes anything, and the
+result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
+`company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured
+on three books only (one synthetic with its answer captured in the tree, two real books read by
+another lane and recorded in #938), and the other direction (Tally's count below the census's) is covered by the count
+against the rows the read returns, not by this check. A mark
 above 400,000 is refused right after the opening extent with cause `ledger_catalogue_too_large` and a
 `size` object (`master_alter_id`, `estimated_bytes`, `limit_bytes`, `limit_master_alter_id`): the
 census reaches `limit_master_alter_id`, and the catalogue that would count the ledgers instead is
@@ -316,6 +338,18 @@ or immediate parent groups. A missing opening keeps both opening and closing
 unestablished, including at book start. Qualification covers the recorded account
 groups and instances; it is not a claim of universal ledger-report parity.
 
+`ledger_movement` reads the book's whole ledger catalogue twice, once before the
+voucher window and once after it, whatever `ledger` names. Each catalogue read is
+sent once: a read that outlived its deadline is not sent again, because the
+gateway may still be building the abandoned response. A catalogue read that
+outlives the deadline or passes the response cap refuses with
+`ledger_movement_read_failed` and the cause `movement_catalogue_deadline_exceeded`
+or `movement_catalogue_too_large`. The catalogue lists every ledger in the book, so
+it does not shrink with the voucher window and narrowing `from` and `to` is not
+known to help; the refusal's remediation says so. A
+`ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
+after it, before any voucher is read.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after
@@ -439,6 +473,41 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 - **Every other voucher reader still refuses such a window** (for example
   `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
   voucher screen), because each of them sums, matches or verifies amounts.
+
+### Bill allocations in voucher reads
+
+Each ledger entry's `bill_allocations` lists its typed allocations: `reference`
+(`{"kind": "named", "name": ...}` or `{"kind": "on_account"}`), `bill_type` and
+`amount`. Since #945 an allocation also carries the bill's own date and credit
+period when Tally sends them (New Ref and Agst Ref allocations do):
+
+- `bill_date` is the bill's date (`YYYYMMDD`), which for an Agst Ref is the
+  original bill's date, not its voucher's. A malformed date refuses the read
+  (`bill_allocation_date_invalid`).
+- `credit_period` is `{"value": 30, "unit": "days"}` (units `days`, `weeks`,
+  `months`). A text that is not one of those (including `10000 Days`, above the
+  measured ceiling) is carried as `{"unit": "unrecognised", "text": ...}`, the
+  text cut to 40 characters (characters, not bytes) with `"truncated": true`
+  when it was cut. It is never read as a number of days and does not refuse the
+  window.
+- An element that is absent or empty is not observed: the key is omitted. It is
+  never `""` or a zero period. The On Account allocations in the live captures
+  carry no such element, or an empty one; if Tally sent a value it would be
+  carried like any other.
+- The unrecognised credit-period text is the only new free text from the book in
+  the output. (The allocation's `reference.name`, the voucher's narration and
+  party were already there.)
+- Like every other scalar the parser reads, a repeated `BILLDATE` or
+  `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
+  refuses the read as a protocol error (`agent_read_protocol_invalid`). So does a
+  malformed `BILLDATE`. Both reach every reader that shares the voucher parser,
+  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
+  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  screen. Write-side verification is not affected, because its fetch names no
+  allocation fields.
+- An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
+  if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
+  name, it refuses the read (`bill_allocation_field_missing`).
 
 ## Voucher-file preparation and verification
 
@@ -946,6 +1015,22 @@ and payable fields kept separate. `totals.scope` is `open_bills_only`.
 `unallocated.totals` contains `receivable`, `payable`, and `gross_unallocated`.
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
 been removed. Gross exposure is not net money due.
+
+`receivable` and `payable` follow the sign of each bill's balance, as Tally's own
+Bills Receivable and Bills Payable reports scope them, not the type of party, and
+those reports carry no bill type. A customer's advance, or a credit note raised to
+a customer, appears under `payable`; a supplier's advance, or a debit note raised
+to a supplier, appears under `receivable`. That holds for an advance or a note
+kept as its own bill: an on-account advance goes to `unallocated` instead, and a
+credit note set against an open invoice reduces that invoice. It was measured on one
+synthetic book (TallyPrime Silver 7.1). An open bill's `kind` is therefore a
+direction, not "owed by a customer" or "owed to a supplier": with a 50,000
+supplier bill, a 20,000 customer advance and a 10,000 credit note to a customer,
+`payable` reads 80,000 and only 50,000 of it is owed to a supplier. The direction
+of an `unallocated` amount is the sign of the party's net unallocated balance, so
+an on-account receipt and an on-account payment on one party net into one figure.
+Separating advances, credit and debit notes and on-account amounts by their
+voucher's bill type is tracked in #945.
 
 A fingerprint match without a retained transaction marker is
 `matching_content_observed`, with attribution unestablished; it is not counted

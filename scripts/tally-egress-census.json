@@ -3,9 +3,7 @@
     ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpListener::bind", 1],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpStream::connect_timeout", 2],
-    ["src-tauri/src/axal.rs", "reqwest::RequestBuilder::send", 2],
     ["src-tauri/src/commands.rs", "std::process::Command::new", 1],
-    ["src-tauri/src/documents.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/src/tally/approved_import.rs", "tokio::process::Command::new", 1]
   ],
   "Windows": [
@@ -21,9 +19,7 @@
     ["src-tauri/crates/bridge-tally-transport/src/lib.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpListener::bind", 1],
     ["src-tauri/crates/tally-protocol-simulator/src/server.rs", "std::net::TcpStream::connect_timeout", 2],
-    ["src-tauri/src/axal.rs", "reqwest::RequestBuilder::send", 2],
     ["src-tauri/src/commands.rs", "std::process::Command::new", 1],
-    ["src-tauri/src/documents.rs", "reqwest::RequestBuilder::send", 4],
     ["src-tauri/src/tally/approved_import.rs", "tokio::process::Command::new", 1]
   ]
 }

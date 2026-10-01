@@ -32,7 +32,7 @@ This document defines agent-level expectations and review responsibilities for t
 - PRs that touch existing workflows must include rollback notes and migration compatibility.
 - Keep issue triage actionable:
   - assign exactly one area label (`area:tally`,
-    `area:documents`, `area:infra`, or `area:security`)
+    `area:tax-audit`, `area:infra`, or `area:security`)
   - set one bug severity label (`severity:p1` urgent / `severity:p2`
     production impact / `severity:p3` medium / `severity:p4` cleanup)
   - avoid open "wip" tasks without acceptance evidence.

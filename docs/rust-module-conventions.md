@@ -190,7 +190,7 @@ shared items:
 - live reads: companies, ledgers, outstandings, selected ledger entries;
 - client group labels and preferences;
 - exports and party statements;
-- thin delegations to documents, Axal and the desktop journal.
+- thin delegations to the desktop journal.
 
 `commands_trial_balance.rs` already shows the per-feature pattern as `commands::trial_balance`.
 

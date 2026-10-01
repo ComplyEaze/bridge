@@ -509,9 +509,6 @@
       "path": "src-tauri/src/agent_vouchers.rs"
     },
     {
-      "path": "src-tauri/src/axal.rs"
-    },
-    {
       "path": "src-tauri/src/commands.rs"
     },
     {
@@ -611,16 +608,10 @@
       "path": "src-tauri/src/db/tally_write_store.rs"
     },
     {
-      "path": "src-tauri/src/documents.rs"
-    },
-    {
       "path": "src-tauri/src/endpoint_coordination.rs"
     },
     {
       "path": "src-tauri/src/endpoint_wire.rs"
-    },
-    {
-      "path": "src-tauri/src/export_registry.rs"
     },
     {
       "path": "src-tauri/src/lib.rs"

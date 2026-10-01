@@ -59,8 +59,6 @@ Each line names the pull requests it comes from.
   covers (#755, #769, #809, #813, #831).
 - Tally's own error text on a rejected line is read safely, including text
   with an `&` in it (#763).
-- The desktop app's documents upload skips unchanged copies of the
-  party-statement batches it wrote (#847).
 - Each tool now says whether it changes anything. Reads are marked read-only
   and say they only record local receipt lines for the call, never book
   content. Some assistants may now run the read tools without asking each
@@ -79,6 +77,26 @@ Each line names the pull requests it comes from.
   #744, #788).
 - The desktop app moved to a Tauri release that fixes GHSA-w28w-mhc8-qvjv
   (#805).
+
+**Removed**
+
+- The unfinished document-sync feature is gone from the source, and so from
+  both the desktop app and the binary the Claude Desktop extension runs: the
+  AXAL sign-in, the code that scanned a folder and uploaded the files you chose
+  to ComplyEaze cloud storage, and the two hidden screens for them. No Bridge
+  tool could reach them, and no navigation led to them. After this change the
+  only network client in Bridge's own code connects to Tally on your own
+  computer. The CI egress gate fails if a first-party crate other than the Tally
+  transport depends on reqwest in its shipped dependencies (the app crate keeps
+  it only as a dev-dependency) or if any first-party crate depends on hyper. It
+  also counts the calls that send, connect or start a process in library and
+  binary code, and refuses any outside the reviewed Tally files; test code is
+  not counted. The unused delivery types in the portable core crate (no network
+  code) went with it. The bulk party-statement export no longer records a hash
+  for each file it writes and no longer refuses to write a file it cannot
+  record; a record file left by an earlier development build is never read. The
+  feature can be rebuilt from the git history if it is needed
+  again (#914).
 
 ## [0.3.0] - 2026-09-26
 

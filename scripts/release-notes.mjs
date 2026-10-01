@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const REPOSITORY_URL = "https://github.com/lamemustafa/bridge";
+const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
 // The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
 const previewTag = /^mcp-(?:preview-|v)([0-9]+\.[0-9]+\.[0-9]+)$/;
 const sectionHeading = /^## \[(?:v(?=\d))?([^\]]+)\](?:\s+[-\u2013\u2014]\s+(\S.*))?\s*$/;

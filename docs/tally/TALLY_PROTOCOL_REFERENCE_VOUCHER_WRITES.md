@@ -583,8 +583,7 @@ used Bridge's native post; the upsert block used the gateway. Each states its ow
 
 **Not measured in the Journal block above (see the Gold block below for Payment, Receipt and Contra):** other voucher types, Gold concurrency, an edit in Tally's
 own screens, and repeatability beyond one run (except the `REFERENCE` merge above, repeated
-once on 2026-09-26). A masters delete in the same session drew no
-response, and its cause is **UNVERIFIED**; nothing is recorded about it here.
+once on 2026-09-26). A gateway delete of a master (a ledger or a group) is **not qualified** on any build: do not send one without maintainer approval, and add no Bridge path that does.
 
 **Payment, Receipt and Contra on Gold: an upsert alters in place. VERIFIED on one run (licensed
 TallyPrime 7.1 Gold, one client book, 2026-09-28).**

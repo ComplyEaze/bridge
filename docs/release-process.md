@@ -618,6 +618,11 @@ It checks every file first and writes none if one fails. Then:
 2. Rewrite the draft notes it prints in plain words, in `CHANGELOG.md`.
 3. Commit, and open the version pull request.
 4. After it merges, dispatch the preview release with the matching tag.
+5. After the release is published, change the tag and date in the two managed
+   spans that name the newest published build (`managed:current-release` in
+   `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
+   for `managed:`), and check that the install page and the repository
+   description name the same build.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
@@ -640,6 +645,9 @@ disagree.
 
 - Each release gets an "In plain words" section above the detailed entries,
   written from the merged pull requests since the last build.
+- While the changes are unreleased, head the first part "What the next build
+  adds", so nothing unpublished reads as available. Rename it "What you can do
+  now" when the section becomes the release.
 - Keep the detailed entries as they are. They serve maintainers and
   integrators.
 - `CHANGELOG.md` is the one source for the notes. The publish workflow takes
@@ -658,8 +666,10 @@ disagree.
   published one. With no template, or one without the marker, the deploy uses
   a plain built-in page and never fails.
 - At cut time, in the pull request that bumps the version: rename the
-  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, and
-  leave a fresh `## [Unreleased]` above it. If the section is missing, the
+  plain-words block under `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, change
+  its first part's heading from "What the next build adds" to "What you can do
+  now" and its "in source since" title to name the new build, and leave a fresh
+  `## [Unreleased]` above it. If the section is missing, the
   release carries the `[Unreleased]` text instead (with a warning), which may
   describe changes that build does not have, so read the release body; if that
   is empty too, only the standard text and GitHub's list. Headings must read

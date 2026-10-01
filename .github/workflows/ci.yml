@@ -207,6 +207,7 @@ jobs:
       - run: node scripts/check-unbounded-reads.mjs
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
+      - run: node --test scripts/master-push-reuse.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
       - run: python3 scripts/bank_statement_import.test.py
@@ -808,7 +809,8 @@ jobs:
     name: Retain current compiler caches
     # Every job that saves a Rust cache has finished, so no save races the listing.
     needs: [bundle-smoke, native, tally-portable, workflow-consistency]
-    if: ${{ always() && github.ref == 'refs/heads/master' && needs.workflow-consistency.result == 'success' }}
+    # Not on the scheduled run: the pruner admits only a master push or a manual run.
+    if: ${{ always() && github.ref == 'refs/heads/master' && github.event_name != 'schedule' && needs.workflow-consistency.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

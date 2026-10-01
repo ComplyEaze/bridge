@@ -39,7 +39,7 @@ const surfaceAckStep = [
   "          PR_NUMBER: ${{ github.event.pull_request.number }}",
   "          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}",
   "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
-  "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}",
+  "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || github.event_name == 'push' && 'push' || 'workflow_dispatch' }}",
   '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only',
 ].join("\n");
 // The step block runs from its `- name:` line up to the next step (or the job end), so a line
@@ -72,7 +72,7 @@ const expectedSeamControl = [
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
   "    # platforms as bundle-smoke, whose runs it guards.",
-  "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'",
+  "    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",
   "    permissions:",
@@ -146,7 +146,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "19892c5846921e054d6cb4dc5376b5814917bec9f31133c63ff5a91a7e24c0f5"],
+  ], "e3b499cd5834b252e2c1e011ce279d2dea3fc276238a84879888aea90f825075"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -157,7 +157,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "a328a5925bcd988ab70f3fc3d671bcadff3cae47700740afa103ccf6f03ac29a"],
+  ], "46040bb19d8d7c64eb6c04e3e4fc02f0d8531638112f9deabede5da7db53aecf"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -176,7 +176,7 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "d97e58832b09663100294b170e1a3f43958fbd3e31db2ee6a089d92ff8f2db75"],
+  ["ci.yml", workflow, "f4d56791d30393f5e76ff16cf6dd72dea67ae75853ca21e03af3035420775f8c"],
   ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
@@ -192,7 +192,7 @@ const localActionsDigest = localActions.digest("hex");
 if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
-if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'") {
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
@@ -249,7 +249,10 @@ const expectedChanges = [
   "    timeout-minutes: 5",
   "    permissions:",
   "      contents: read",
+  "      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).",
+  "      actions: read",
   "    outputs:",
+  "      full: ${{ steps.scope.outputs.full }}",
   "      bundle: ${{ steps.scope.outputs.bundle }}",
   "      native: ${{ steps.scope.outputs.native }}",
   "      tax_audit: ${{ steps.scope.outputs.tax_audit }}",
@@ -265,31 +268,52 @@ const expectedChanges = [
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
   "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
+  "          GH_TOKEN: ${{ github.token }}",
   "        run: |",
   "          set -euo pipefail",
   "",
-  "          if [[ \"$EVENT_NAME\" == \"workflow_dispatch\" ]]; then",
+  "          # `full` is the unscoped run: every heavy job runs, whatever changed.",
+  "          full_run() {",
+  "            echo 'full=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
+  "            exit 0",
+  "          }",
+  "",
+  "          if [[ \"$EVENT_NAME\" == \"workflow_dispatch\" || \"$EVENT_NAME\" == \"schedule\" ]]; then",
+  "            full_run",
+  "          fi",
+  "",
+  "          # A push to master is a full run unless the merge queue already ran this exact commit green",
+  "          # (scripts/master-push-reuse.mjs). Any error or doubt in that lookup is a full run: the",
+  "          # `|| true` and the exact-line match mean only a printed `reuse=true` skips anything.",
+  "          # To turn the reuse off, delete this block: every push is then a full run again.",
+  "          if [[ \"$EVENT_NAME\" == \"push\" ]]; then",
+  "            decision=\"$(node scripts/master-push-reuse.mjs || true)\"",
+  "            printf '%s\\n' \"$decision\"",
+  "            if ! printf '%s\\n' \"$decision\" | grep -qx 'reuse=true'; then",
+  "              full_run",
+  "            fi",
+  "            echo 'full=false' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
+  "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "            exit 0",
   "          fi",
   "",
   "          if [[ \"$EVENT_NAME\" == \"pull_request\" ]]; then",
   "            base=\"$PR_BASE_SHA\"",
-  "          elif [[ \"$EVENT_NAME\" == \"merge_group\" ]]; then",
-  "            base=\"$MERGE_GROUP_BASE_SHA\"",
   "          else",
-  "            base=\"$BEFORE_SHA\"",
+  "            base=\"$MERGE_GROUP_BASE_SHA\"",
   "          fi",
   "",
-  "          # A new branch has no useful predecessor. Keep the conservative path.",
+  "          # A missing base has no useful predecessor. Keep the conservative path.",
   "          if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]]; then",
-  "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
-  "            exit 0",
+  "            full_run",
   "          fi",
+  "",
+  "          echo 'full=false' >> \"$GITHUB_OUTPUT\"",
   "",
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",

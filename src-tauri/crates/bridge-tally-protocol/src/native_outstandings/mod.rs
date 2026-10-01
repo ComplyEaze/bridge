@@ -14,7 +14,7 @@
 //!   `DATA`-scoped Ledger collection grammar (`CMPINFO` counter trap).
 //! - [`model`] — row and result types; reuses `OutstandingsReport` so this
 //!   path is a drop-in for the UI.
-//! - [`compute`] — assembles the report and the on-account residual
+//! - [`compute`] — assembles the report and the unallocated residual
 //!   cross-check.
 
 mod compute;

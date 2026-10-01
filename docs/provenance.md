@@ -29,10 +29,28 @@ contain customer data in release artifacts.
 - `scripts/capture-package-log.py` and its test are project-authored CI
   diagnostic tooling contributed under Apache-2.0; no upstream implementation
   is copied into them.
-- `src-tauri/app-icon.svg` is the project-authored source icon contributed by
-  the repository owner under Apache-2.0.
-- Raster, ICO, and ICNS files under `src-tauri/icons/` are generated derivatives
-  of that vector source and carry the same project license.
+- `src-tauri/app-icon.svg`, the files under `src-tauri/icons/` and the brand
+  masters under `docs/brand/` are the ComplyEaze Bridge logo and icons: the "y"
+  of ComplyEaze drawn as an auditor's tick. They were drawn as SVG code by
+  Claude (Anthropic) for ComplyEaze on 30 September 2026; no stock artwork was
+  used. The logo artwork was drawn with Claude (Anthropic) at the direction of
+  the project owner, who chose among variants and directed its revisions. The
+  letters are the Outfit typeface (Copyright 2021 The Outfit Project Authors,
+  SIL Open Font License 1.1) converted to outlines; no font file is
+  distributed. The raster, ICO and ICNS files under `src-tauri/icons/` are
+  rendered from `src-tauri/app-icon.svg`, except the 16 px entries of
+  `icon.ico` and `icon.icns`, which are rendered from
+  `docs/brand/svg/favicon.svg` (the same mark drawn on the 16 px grid).
+  ComplyEaze and ComplyEaze Bridge, and the related logos and visual
+  identity, are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze)
+  uses to identify its products. They are not registered trade marks. The
+  Apache License 2.0 does not grant permission to use them, except to describe
+  where the software came from and to reproduce the NOTICE file (section 6 of
+  the license); see TRADEMARKS.md. The logo and icon files — docs/brand/,
+  src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are
+  not licensed under Apache-2.0: all rights in them are reserved. They are
+  included so that official builds carry the ComplyEaze Bridge identity. A fork
+  or modified build must replace them and use a different name.
 - Tally XML and JSON files under `src-tauri/crates/tally-protocol-simulator/`
   and `src-tauri/crates/bridge-tally-protocol/tests/fixtures/` are
   project-authored synthetic interoperability fixtures contributed under

@@ -632,7 +632,7 @@ The table below covers `bridge-tally-protocol/src/xml_read_profiles.rs`, which h
 | `ledgers_request` | `BRIDGE Ledger Collection V1` | `connector.rs:122` |
 | `groups_request` | `BRIDGE Group Collection V1` | `connector.rs:109` |
 | `voucher_types_request` | `BRIDGE Voucher Type Collection V1` | `connector.rs:136` |
-| `vouchers_request` (and `selected_vouchers_request`) | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
+| `vouchers_request` | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
 | `ledger_period_balances_request` | `BRIDGE Ledger Period Collection V1` | `connector.rs:286` |
 
 **Consequence:** the CoreAccounting snapshot reads groups, ledgers, voucher types, vouchers and ledger period balances. Every one of those five builders carries the defect. The snapshot pipeline — and therefore the canonical model, reconciliation, Proof-of-Sync and the mirror that depend on it — cannot ever have completed against a real Tally. Three of the five object types (Groups, Voucher Types, Ledger Period Balances) were never probed on 2026-07-29 and remain entirely unverified.

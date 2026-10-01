@@ -1,4 +1,5 @@
 //! Ledgers for the local MCP adapter.
+use crate::tally::runtime::MastersKind;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupIndex};
 use bridge_tally_protocol::gst_registration::GstRegistrationHistory;
@@ -285,6 +286,29 @@ fn currency_scope_frame(
     })
 }
 
+/// Adds to a listing's frame, when a census counted the book (#679), whether its
+/// count was checked against the company's own ledger count (#938): `matched`,
+/// `company_count_lower` (Tally's count is below the census's: the read went on)
+/// or `unavailable` (Tally's answer carried no count, so the check did not run).
+/// Nothing is added when no census ran.
+fn count_cross_check_frame(
+    frame: Value,
+    check: Option<crate::tally::connection::CountCrossCheck>,
+) -> Value {
+    let Some(check) = check else {
+        return frame;
+    };
+    let mut frame = match frame {
+        Value::Object(frame) => frame,
+        _ => serde_json::Map::new(),
+    };
+    frame.insert(
+        "ledger_count_cross_check".to_owned(),
+        json!({"status": check.code()}),
+    );
+    Value::Object(frame)
+}
+
 /// The caller's `as_of`, the date `party_gstin` is read as of (bridge#653);
 /// `None` leaves it to the Bridge host's date, taken where the rows are built.
 /// `as_of` selects only the GSTIN, so it is refused unless fields=compliance
@@ -318,15 +342,18 @@ const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 
 /// Which read a listing snapshot holds. A `basic` listing with a `group`
 /// filter also holds the group collection, so it is a different read; a
-/// trial balance is keyed by its period; a compliance listing by the date its
-/// rows' `party_gstin` was read as of (#653), since that date is rendered into
-/// the rows it holds.
+/// trial balance is keyed by its period; a masters listing by its kind; a
+/// stock summary by its date; a compliance listing by the date its rows'
+/// `party_gstin` was read as of (#653), since that date is rendered into the
+/// rows it holds.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ListingKind {
     Basic,
     BasicWithGroups,
     Compliance { gstin_as_of: String },
     TrialBalance { from: TallyDate, to: TallyDate },
+    Masters { kind: MastersKind },
+    StockSummary { as_of: TallyDate },
 }
 
 /// A group collection held with a snapshot, and the bytes it counts toward
@@ -703,9 +730,12 @@ impl Server {
                         row
                     })
                     .collect::<Vec<_>>();
-                let frame = currency_scope_frame(
-                    &listing.foreign_currency_ledgers_excluded,
-                    &listing.mixed_currency_ledgers_excluded,
+                let frame = count_cross_check_frame(
+                    currency_scope_frame(
+                        &listing.foreign_currency_ledgers_excluded,
+                        &listing.mixed_currency_ledgers_excluded,
+                    ),
+                    listing.count_cross_check,
                 );
                 (rows, Some(groups), listing.extent, listing.evidence, frame)
             }
@@ -744,7 +774,9 @@ impl Server {
                     .collect::<Vec<_>>();
                 (rows, None, listing.extent, listing.evidence, Value::Null)
             }
-            ListingKind::TrialBalance { .. } => {
+            ListingKind::TrialBalance { .. }
+            | ListingKind::Masters { .. }
+            | ListingKind::StockSummary { .. } => {
                 return Err("listing_kind_not_a_ledger_listing".to_string().into());
             }
         };

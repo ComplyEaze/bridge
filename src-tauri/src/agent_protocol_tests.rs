@@ -325,6 +325,7 @@ async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recove
             tool: "build_import_xml".into(),
             args_sha256: sha256_json(&json!({})),
             company_guid: None,
+            request_trail: None,
         }),
         Some(batch_id.into()),
         true,

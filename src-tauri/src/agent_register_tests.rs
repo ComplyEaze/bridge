@@ -151,35 +151,30 @@ fn an_entry_on_a_duties_ledger_without_a_head_is_listed_and_never_assigned_one()
 }
 
 #[test]
-fn a_head_the_classifier_does_not_recognise_is_listed_with_its_raw_spelling() {
-    // The ledger `Input SGST 9% (M2)` was created with the head `SGST/UTGST`. Whether that
-    // spelling is recognised depends on a separate change; what must hold either way is that
-    // the entry is named with the spelling Tally returned and is never folded into a head.
+fn an_sgst_utgst_ledger_is_tax_under_its_own_head_and_never_folded_into_state_tax() {
+    // The ledger `Input SGST 9% (M2)` was created with the head `SGST/UTGST`, which the
+    // classifier recognises as its own head. It is tax, under that head, with the spelling
+    // Tally returned; it is not listed as unrecognised and it is not `state_tax`.
     let page = classify_register(&captured_index(), &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250909");
-    let in_tax = row["tax_in_books"]
+    assert_eq!(row["status"], "complete");
+    assert!(row["duties_taxes_entries_with_unrecognised_head"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let entry = row["tax_in_books"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|entry| entry["ledger"] == "Input SGST 9% (M2)");
-    let unrecognised = row["duties_taxes_entries_with_unrecognised_head"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|entry| entry["ledger"] == "Input SGST 9% (M2)");
-    match (in_tax, unrecognised) {
-        (Some(entry), None) => {
-            assert_eq!(entry["raw_head"], "SGST/UTGST");
-            assert_eq!(row["status"], "complete");
-        }
-        (None, Some(entry)) => {
-            assert_eq!(entry["raw_head"], "SGST/UTGST");
-            assert_eq!(entry["observation"], "unrecognized");
-            assert_eq!(row["status"], "has_unrecognised_head");
-        }
-        other => panic!("the entry must be in exactly one list, got {other:?}"),
-    }
+        .find(|entry| entry["ledger"] == "Input SGST 9% (M2)")
+        .expect("the SGST/UTGST ledger is in tax_in_books");
+    assert_eq!(entry["head"], "sgst_utgst");
+    assert_eq!(entry["raw_head"], "SGST/UTGST");
+    assert_eq!(entry["amount"], "-450.00");
     assert_eq!(row["tax_in_books"][0]["ledger"], "Input CGST");
+    // The ledger with the other state spelling keeps its own head.
+    let other = row_on(&page.rows, "20250903");
+    assert_eq!(other["tax_in_books"][1]["head"], "state_tax");
 }
 
 #[test]

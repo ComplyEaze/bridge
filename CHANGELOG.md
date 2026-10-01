@@ -24,11 +24,12 @@ Each line names the pull requests it comes from.
   refused, because no such book has been measured, and the tie-out itself has
   been measured on two synthetic books only (#774).
 - Read closing stock values per item. An item is returned only when the
-  values add up to Tally's own Stock Summary and Bridge read no fewer items
-  than Tally's own count; otherwise no item is returned, with the reason and
-  the next step. A company with no stock items is told so. Quantities are not
-  returned yet, because nothing checks them. Only a 31 March and small books
-  are read (#980, #979, #1001).
+  values add up to Tally's own Stock Summary and Bridge read exactly as many
+  items as Tally's own count; otherwise no item is returned, with the reason and
+  the next step. A company with no stock items is told so. A value keeps
+  Tally's sign, as in the Trial Balance: stock held is a negative number.
+  Quantities are not returned yet, because nothing checks them. Only a
+  31 March and small books are read (#980, #979, #1001).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read

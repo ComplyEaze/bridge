@@ -16,8 +16,9 @@ const MAX_ITEM_FILTER: usize = 50;
 const MAX_ITEM_GUID_CHARS: usize = 64;
 
 /// Beside `value_sum`, whenever `totals` is returned: the values were added with
-/// the signs Tally sent, and what a negative value means is unmeasured.
-const VALUE_SUM_SIGNS: &str = "as_sent_meaning_unmeasured";
+/// the signs Tally sent, and a negative value is a debit, which is stock held
+/// (§12a.13: one synthetic company against Tally's own screen).
+const VALUE_SUM_SIGNS: &str = "as_sent_negative_is_debit";
 
 const VERIFICATION: &str = "stable_paired_sources_with_company_mode_and_extent_guards";
 
@@ -361,7 +362,7 @@ fn inventory_basis(integrated: NativeFlag) -> String {
         NativeFlag::Unknown => "Tally did not send ISINTEGRATED",
     };
     format!(
-        "{reported}. These are the stock items' closing values exactly as Tally sends them; how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them."
+        "{reported}. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held); how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them."
     )
 }
 
@@ -410,7 +411,7 @@ fn stock_frame(
             "An empty closing value is not zero: it is returned as null and counted (`empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty. A value Tally sent as 0.00 is a value",
             "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; a read whose rows differ from that count either way is refused. The count followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
             "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
-            "Values and their signs are exactly as Tally sends them: the one capture had items holding stock with a negative value beside others with a positive one, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
+            "Values keep the sign Tally sends, as in the trial balance: a negative value is a debit, which is stock held, and Tally's own Stock Summary screen shows it as a positive value; a positive value is what that screen shows as negative, `(-)`. Measured on one synthetic company on licensed TallyPrime 7.1 Silver against Tally's own screen. `value_sum` adds the values with those signs, so stock held gives a negative sum (`totals.value_sum_signs` says so)",
             "`totals`, `tie_out` and `item_count_cross_check` cover the whole book, whatever `items` filters",
             "Item names, parents and base units come from one source and are not checked against another",
             ONE_PERIOD_MEASURED,

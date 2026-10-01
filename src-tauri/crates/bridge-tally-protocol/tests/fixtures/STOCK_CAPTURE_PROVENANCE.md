@@ -23,7 +23,7 @@ Every file is a live capture, never hand-written.
   - Stock items:
     - 11 rows, every GUID carries the company's prefix;
     - closing quantity as `<number> <unit>`, some empty;
-    - closing value as a plain signed decimal, some empty.
+    - closing value as a plain signed decimal, some empty. On the wire a negative value is stock held and a positive one is what Tally's Stock Summary screen shows as negative (protocol reference §12a.13, measured on another synthetic company on 2026-10-01). Most of this book's values are positive on the wire, so this capture is mostly of values Tally's screen shows as negative; how they came to be entered that way is not recorded.
   - Stock Summary: no `HEADER`/`STATUS`, and 3 `DSPACCNAME`/`DSPSTKINFO` pairs (the top-level stock groups).
   - **The report's closing-amount total equals the sum of the stock items' `CLOSINGVALUE` exactly (3000.01).** The same tie held on a larger real book at the same period end (recorded privately, by role only).
 

@@ -409,15 +409,24 @@ unit, or a unit with a space in it) is counted in
 
 Each item carries `name`, `guid`, `parent`, `base_unit` and `closing`; `closing`
 holds `value` only (a plain signed decimal exactly as Tally sends it: the sign is
-kept, never flipped, and not interpreted). It is `null` where Tally sent none,
+kept and never flipped). It is `null` where Tally sent none,
 which is not zero, and is counted in `totals` (`empty_closing_value_count`); a
 value Tally sent as `0.00` is a value. The opening quantity and value are read but
-not returned, because their as-at date is unmeasured. Values and their signs are
-exactly as Tally sends them: the one committed capture had items holding stock with
-a negative value beside others with a positive one, what the sign means is
-unmeasured, and `value_sum` adds the values as sent, signs included:
-`totals.value_sum_signs` is always `as_sent_meaning_unmeasured` beside it, whether
-or not `value_sum` is null. `totals` also holds `item_count` and `value_sum`, which
+not returned, because their as-at date is unmeasured.
+
+**The sign of a value.** Values keep the sign Tally sends, as in the Trial
+Balance: **a negative value is a debit, which is stock held**, and Tally's own
+Stock Summary screen shows it as a positive value. A positive value is what that
+screen shows as negative, `(-)`. So ordinary closing stock is a negative number
+here, and `value_sum` adds the values with those signs: stock held gives a
+negative sum. `totals.value_sum_signs` is always `as_sent_negative_is_debit`
+beside it, whether or not `value_sum` is null. This was measured on one synthetic
+company on licensed TallyPrime 7.1 Silver against Tally's own screen (the protocol
+reference, §12a.13). The committed captures come from a synthetic book most of
+whose values are positive on the wire, that is, values Tally's screen shows as
+negative.
+
+`totals` also holds `item_count` and `value_sum`, which
 is written at the scale of the values it adds and is `null` with `partial` true
 whenever any item's closing value is empty. `inventory`
 reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,

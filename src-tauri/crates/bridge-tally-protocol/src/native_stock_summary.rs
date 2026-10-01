@@ -192,8 +192,9 @@ impl NativeQuantityRead {
 pub struct NativeStockPosition {
     #[serde(skip)]
     pub quantity: NativeQuantityRead,
-    /// A plain signed decimal exactly as Tally sends it: the sign is kept,
-    /// never flipped, and not interpreted.
+    /// A plain signed decimal exactly as Tally sends it: the sign is kept and
+    /// never flipped. A negative value is a debit, which is stock held
+    /// (§12a.13).
     pub value: Option<ExactDecimal>,
 }
 

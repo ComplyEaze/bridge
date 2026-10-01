@@ -428,7 +428,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "an empty closing value is returned as null and counted",
         "a value sent as 0.00 is a value",
         "The opening quantity and value are read but not returned, because their as-at date is unmeasured",
-        "what the sign means is unmeasured, and `value_sum` adds the values as sent, signs included",
+        "a negative value is a debit, which is stock held, and Tally's own Stock Summary screen shows it as a positive value",
         "the sum of the top-level lines of Tally's own Stock Summary",
         "The top-level `state` is one of three",
         "`value_total_matched`: the items are returned",
@@ -451,8 +451,8 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "do not refuse the read",
         "A `not_established` result is not held for paging",
         "the closing-value total of a matched read is the only thing this tool checks",
-        "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
-        "what a negative value means is unmeasured",
+        "`totals.value_sum_signs` is always `as_sent_negative_is_debit`",
+        "so stock held gives a negative sum",
         "`not_established`",
         "not measured",
         "ISINTEGRATED",
@@ -526,7 +526,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     );
     let basis = page["basis"].as_str().unwrap();
     assert!(basis.starts_with(
-        "Tally reported ISINTEGRATED Yes. These are the stock items' closing values exactly as Tally sends them"
+        "Tally reported ISINTEGRATED Yes. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held)"
     ));
     assert!(basis.contains(UNMEASURED_USE), "{basis}");
     assert!(basis.ends_with(MATCHED_SENTENCE), "{basis}");
@@ -603,14 +603,14 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
             "closing_quantity_unread_count": 0,
             "value_sum": null,
             "partial": true,
-            "value_sum_signs": "as_sent_meaning_unmeasured",
+            "value_sum_signs": "as_sent_negative_is_debit",
         })
     );
     // The note beside `value_sum`, which is null here: always present.
     assert_eq!(page["totals"]["value_sum"], Value::Null);
     assert_eq!(
         page["totals"]["value_sum_signs"],
-        "as_sent_meaning_unmeasured"
+        "as_sent_negative_is_debit"
     );
     // No returned item carries `opening`: it is read but not returned.
     assert!(page["items"]
@@ -622,7 +622,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     let limitations = page["limitations"].as_array().unwrap();
     for line in [
         "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
-        "Values and their signs are exactly as Tally sends them: the one capture had items holding stock with a negative value beside others with a positive one, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
+        "Values keep the sign Tally sends, as in the trial balance: a negative value is a debit, which is stock held, and Tally's own Stock Summary screen shows it as a positive value; a positive value is what that screen shows as negative, `(-)`. Measured on one synthetic company on licensed TallyPrime 7.1 Silver against Tally's own screen. `value_sum` adds the values with those signs, so stock held gives a negative sum (`totals.value_sum_signs` says so)",
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
@@ -885,7 +885,7 @@ async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     // Present beside a non-null sum too.
     assert_eq!(
         page["totals"]["value_sum_signs"],
-        "as_sent_meaning_unmeasured"
+        "as_sent_negative_is_debit"
     );
     assert_eq!(page["totals"]["partial"], false);
     assert_eq!(page["totals"]["empty_closing_value_count"], 0);

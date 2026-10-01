@@ -1,14 +1,116 @@
 # ComplyEaze Bridge
 
-ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime
-running on your own computer. Nothing in that path copies your books to a server
-of ours. What the assistant reads does reach the AI provider you chose, exactly as
-the rest of that conversation does — see *One thing to understand before you use it*
-below before you point this at client data.
+<!-- llms:begin -->
+ComplyEaze Bridge is an MCP server that connects Claude Desktop to the
+TallyPrime running on your own computer. It is built for CA firms and
+accountants. You can ask about outstanding receivables and payables with
+ageing, the trial balance, ledger movement and vouchers. It checks ledger
+names before you post, and it prepares Journal, Payment, Receipt and Contra
+vouchers as a file. If you turn posting on in the extension, it posts them one
+at a time, after you approve each one.
 
-It connects to Tally over Tally's own local XML gateway, on `localhost` only. A
-remote Tally host is refused outright rather than supported, so there is no
-configuration in which Bridge reaches a book across the internet.
+**Current release:**
+<!-- managed:current-release -->[`mcp-preview-0.3.0`](https://github.com/ComplyEaze/bridge/releases/latest) (26 September 2026)<!-- /managed:current-release -->,
+for Windows x64 and Apple Silicon Macs. We check each release before we
+publish it: the release check confirms that each package launches, lists its
+tools and parses a synthetic encrypted bank statement. It does not run against
+TallyPrime, and nothing we can run covers every
+Tally edition, set of books or setting. What has been run against a real
+TallyPrime, and what has not, is listed below.
+[Install it](./docs/agent/INSTALL.md) · [What changed](./CHANGELOG.md) ·
+[Security and privacy](./docs/security-and-privacy.md)
+
+Not yet code-signed; your computer may warn you before opening it.
+
+**Try asking** (on a test company first):
+
+- "List the loaded companies."
+- "Show the outstanding receivables and payables, with ageing, as of 31 March."
+- "Show the trial balance for 1 April to 31 March."
+- "Check these ledger names against the book before I post: …"
+
+## How it handles your books
+
+- **Local connection only.** It talks to Tally's own XML gateway on
+  a loopback address, so it cannot be pointed at a remote Tally host. It cannot
+  tell whether that local port is forwarded to another machine; do not forward
+  one across the internet. The Tally connection sends nothing to a ComplyEaze
+  server.
+- **Your AI provider sees what the assistant reads**, just as it sees the
+  rest of the conversation: company names, party names and amounts. You can
+  mask party names or drop narration. Amounts are always sent. See
+  *Before you use it with client data* below.
+- **Posting is off by default in the extension.** If you installed an
+  earlier version, check the setting: an earlier default may still be saved as
+  on. When you turn posting on, each voucher waits for your approval in a
+  separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
+  it, and an approval counts only when that window returns a fresh one-time
+  token. After posting, the voucher is read back from Tally so you can see what
+  landed. Three known limits remain: ComplyEaze Bridge cannot undo a posted
+  voucher (you correct it in Tally); a company renamed to, or loaded under, the
+  target company's name (or one differing only in case or spacing) just after
+  its last check could still receive the voucher, if it has the voucher's
+  ledgers, and ComplyEaze Bridge cannot always say where it went or prevent it;
+  and a ledger renamed and replaced in that same moment could receive the
+  entry, and not every such change is noticed. Read *Before you turn on
+  posting* first.
+- **Tool calls leave receipts** in a log on your computer: the company's Tally
+  identifier, and a fingerprint of what was asked and of what came back,
+  written whether the call succeeds or is refused.
+- **You accept the Terms of Use first.** The extension asks you to accept the
+  ComplyEaze Bridge Terms of Use (version 2026-10) in its settings, and every
+  tool refuses with `terms_not_accepted` until you do.
+- **Open source** under Apache-2.0.
+
+## What has been run against a real TallyPrime
+
+Each line below is recorded in the repository or on the linked issue or pull
+request, unless marked as reported by the owner. Each ran on licensed
+TallyPrime Silver 7.1 and synthetic companies unless stated. The
+[MCP guide](./docs/agent/README.md) and
+[ADR 0004](./docs/adr/0004-tally-write-safety.md) hold the full record.
+
+- Reads: 27 checks on an unpublished macOS arm64 build (PR #228), recorded in
+  the [6 September 2026 assessment](./docs/agent/ASSESSMENT-2026-09-06.md).
+  Some later reads were also run live on development builds, for example the
+  trial balance on a debug build with synthetic companies (#246, whose record
+  does not name the Tally release or licence tier). Not every read has its own
+  recorded live run.
+- Posting one Journal, on a development build from 22 September 2026
+  ([issue #579](https://github.com/ComplyEaze/bridge/issues/579#issuecomment-5773745569)),
+  and a Payment, a Contra and two Receipts (one of three entries) with the
+  approval dialog on macOS ([PR #600](https://github.com/ComplyEaze/bridge/pull/600#issuecomment-5781144386)),
+  each read back as posted. These builds predate the release published on
+  26 September 2026 (version 0.3.0).
+- Native posts of ten batches on licensed TallyPrime Gold 7.1, in one session
+  on 28 September 2026, on a development build and one client book (the import
+  request was captured for nine of them); their approval step was not recorded
+  ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
+- The published 0.3.0 package on Windows x64, in Claude Desktop (on a free plan;
+  we make no claim about other plans): reads only, against licensed TallyPrime
+  Gold 7.1 with one client book, on 28 September 2026, in a session separate
+  from the development-build posting above (reported by the owner; no logs were
+  kept).
+
+Not yet run by us in a controlled test: posting with a published package
+against a live TallyPrime; the approval window on Windows; posting on TallyPrime
+Education; posting on TallyPrime Gold with its approval step recorded. Each
+release package is built and launched, its tool list checked and a synthetic
+encrypted bank statement parsed, on hosted CI runners for Windows x64 and Apple
+Silicon Mac.
+
+## Not in the latest release
+
+- Profit and Loss and Balance Sheet (in source, not yet released)
+- Stock or inventory reads; sales, purchase or tax posting; creating masters;
+  bill-wise allocation
+- Deleting or undoing a posted voucher (correct it in Tally)
+- Reads on very large books can fail or take longer than the assistant waits
+  (#485, #703)
+- Books with more than one currency, or a base currency other than INR
+- Tally Cloud Access or any remote Tally host
+- Intel Macs, and a code-signed installer
+<!-- llms:end -->
 
 ## Is this for you
 
@@ -26,12 +128,14 @@ them, through an AI assistant such as Claude Desktop.
   biggest cause of an import being rejected wholesale when it is skipped.
 - **Records what it did.** Every tool call Bridge runs — read or write, and
   whether it succeeds or is refused — appends a receipt to a log on your own
-  machine, naming the company it touched and fingerprinting what was asked and
+  machine, identifying the company it touched and fingerprinting what was asked and
   what came back. Reads keep those fingerprints as evidence alongside. A
   prepared batch records the local endpoint it was built for, and a native posting
   is refused if that endpoint has changed since; that is a safety check kept in
   Bridge's internal import ledger, not a line in the proof report a reviewer
   opens. A reviewer can read the log rather than take a summary on trust.
+
+## Before you turn on posting
 
 **Whether writing is on depends on how you installed it.** Everything above is
 reading. When writing is off, the write tools do not merely refuse — they are
@@ -39,7 +143,7 @@ reading. When writing is off, the write tools do not merely refuse — they are
 exist.
 
 - **The Claude Desktop extension turns voucher posting off by default.** Three
-  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/lamemustafa/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/lamemustafa/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/lamemustafa/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/lamemustafa/bridge/issues/579), [#582](https://github.com/lamemustafa/bridge/pull/582)). Turning on
+  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). Turning on
   **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the extension
   settings adds `post_import`, which posts one saved voucher of those types; every
   posting still waits for your approval in a separate Bridge dialog. Leave it
@@ -50,6 +154,8 @@ exist.
 - **A source build turns writing off by default.** Preparing a file needs
   `BRIDGE_AGENT_ENABLE_IMPORT`; posting additionally needs
   `BRIDGE_AGENT_ENABLE_WRITES`, which grants both.
+- **A source build also needs `BRIDGE_TERMS_ACCEPTED=true`.** The extension asks
+  for that as its "I accept" setting; without it every tool refuses.
 
 With writing on:
 
@@ -66,21 +172,21 @@ With writing on:
 
 **What it does not do**
 
-- **Your Tally data is never uploaded.** Bridge reads it over a local
+- **The Tally path uploads nothing to ComplyEaze.** Bridge reads it over a local
   connection and hands it to the assistant you are talking to; nothing in the
   Tally path sends it to a server of ours.
 - It will not post anything without a separate, explicit step after the file is
   prepared.
 - It is not a Tally replacement, a reporting suite, or a filing tool.
 
-**One part of the app does upload, and it is not this one.** Bridge also
-contains a document feature that uploads files *you* choose to ComplyEaze cloud
-storage, and an AXAL sign-in. Those are separate and user-initiated, and share
-no code with the Tally path described here. They are compiled into the same
-binary the Claude Desktop extension runs, and no Bridge tool can reach them, but
-you should know they are present before deciding what to run on a machine
-holding client books. Both are documented under *Integration trust
-boundaries* below.
+## The desktop app
+
+**The extension is built from the same source library as the desktop app,
+which still contains a document-upload feature and an AXAL sign-in.** No
+published build exposes them and no tool of the extension reaches them. They
+are being removed ([#914](https://github.com/ComplyEaze/bridge/pull/914)).
+No desktop installer is published. See
+[Security and privacy](./docs/security-and-privacy.md).
 
 A folder you choose to sync can also hold files Bridge exported from Tally,
 such as party statements. Bridge records the content hash of each party
@@ -94,6 +200,8 @@ export can go unrecorded; keep one copy open while exporting. Not yet
 recognised: exports Bridge wrote before this version, and the working paper,
 single statement, outstandings CSV, trial balance and ledger master saved to
 your Downloads folder (bridge#833). Move those out of a synced folder yourself.
+
+## Before you use it with client data
 
 **One thing to understand before you use it.** When you ask an AI assistant for
 financial data through Bridge, the assistant's provider sees what it reads —
@@ -118,19 +226,22 @@ forwarding described below is missing rather than that the gateway is off.
 If instead it hangs without answering, Tally may simply be busy behind
 another request — wait and retry rather than changing the setting.
 
-An **unsigned evaluation preview** of the Claude Desktop extension is published
-as [`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0).
+The [latest published release](https://github.com/ComplyEaze/bridge/releases/latest)
+of the Claude Desktop extension is the one to install.
 Follow the [installation guide](./docs/agent/INSTALL.md) to install and configure
 it. Before you do, know what it is and is not:
 
-- **It is a preview for evaluation, not a production release.** It is not
-  code-signed or notarized, so your operating system may warn before opening it.
+- **Bridge is still being developed.** A release may contain errors, so try it
+  on test data first and keep current backups. It is not yet code-signed or
+  notarized, so your operating system may warn before opening it.
   Each package has a `.sha256` file and a provenance record so you can confirm
   exactly which bytes and which source commit you downloaded.
 - **Checked only as far as launching.** The release build confirms the package
   starts and lists its tools. It does **not** establish that it works against
-  your Tally, or in conversation inside Claude Desktop. Validation against Tally
-  on Windows is still outstanding.
+  your Tally, or in conversation inside Claude Desktop. The owner reports one
+  read-only session of the published 0.3.0 package in Claude Desktop on Windows
+  x64 against a live licensed TallyPrime Gold 7.1, with no logs kept; posting
+  and the approval window have not been run on Windows.
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on
@@ -154,9 +265,8 @@ database operations.
 
 ## First useful result
 
-An unsigned evaluation preview of the Claude Desktop extension is published as
-[`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0);
-install it with the [installation guide](./docs/agent/INSTALL.md). For source
+Install the [latest published release](https://github.com/ComplyEaze/bridge/releases/latest)
+of the Claude Desktop extension with the [installation guide](./docs/agent/INSTALL.md). For source
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).
 
@@ -297,5 +407,7 @@ for private reporting and handling requirements.
 
 Bridge is licensed under the [Apache License, Version 2.0](./LICENSE).
 Attribution notices are provided in [NOTICE](./NOTICE).
+The ComplyEaze logo and icon files are not licensed under Apache-2.0; see
+[NOTICE](./NOTICE) and [TRADEMARKS.md](./TRADEMARKS.md).
 The historical `v0.1.0` release remains under the MIT license shipped with
 that tag; current development source is version `0.3.0` under Apache-2.0.

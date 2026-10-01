@@ -620,6 +620,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
+            "masters",
+            json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
+        ),
+        (
+            "stock_summary",
+            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"quantity":{"amount":"100","unit":"Box"},"value":"2500.00"}}],"offset":0}),
+        ),
+        (
             "profit_and_loss",
             json!({"unclassified":[{"ledger":party_name("Entry Ledger")}]}),
         ),
@@ -638,7 +646,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ("read_evidence", json!({"records":[]})),
         ("egress_log", json!({"records":[]})),
     ]);
-    assert_eq!(samples.len(), 17);
+    assert_eq!(samples.len(), 19);
     for (tool, sample) in samples {
         let redacted = redact_value(sample, Redaction::MaskParties);
         assert_no_known_party_name(&redacted, &known_parties, tool);
@@ -1367,6 +1375,8 @@ fn outstandings_top_ranking_includes_wholly_unallocated_parties() {
         amount: bridge_tally_core::ExactDecimal::parse("100".to_string())
             .expect("synthetic amount"),
         direction: ExposureDirection::Receivable,
+        opening_balance: None,
+        composition: None,
     }];
 
     let ranked = redact_value(
@@ -1420,12 +1430,16 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
             amount: bridge_tally_core::ExactDecimal::parse("30".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Receivable,
+            opening_balance: None,
+            composition: None,
         },
         UnallocatedParty {
             party: "Supplier B".to_string(),
             amount: bridge_tally_core::ExactDecimal::parse("40".to_string())
                 .expect("synthetic amount"),
             direction: ExposureDirection::Payable,
+            opening_balance: None,
+            composition: None,
         },
     ];
     let payable_unallocated = mixed_unallocated
@@ -1436,7 +1450,7 @@ fn payable_outstandings_views_exclude_mixed_receivable_rows() {
     assert_eq!(payable_unallocated[0].party, "Supplier B");
     assert_eq!(
         unallocated_totals_from_parties(&payable_unallocated).expect("payable unallocated"),
-        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40"})
+        json!({"receivable":"0", "payable":"40", "gross_unallocated":"40", "by_composition": {"not_bill_wise_ledger":{"receivable":"0","payable":"0"}, "bill_wise_ledger_components_not_separated":{"receivable":"0","payable":"0"}, "composition_not_observed":{"receivable":"0","payable":"40"}}})
     );
 }
 

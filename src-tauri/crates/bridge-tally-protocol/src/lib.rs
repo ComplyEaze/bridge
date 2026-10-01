@@ -41,9 +41,12 @@ pub mod india_tax_observation;
 pub mod jsonex;
 #[cfg(feature = "jsonex-request-builder")]
 pub mod jsonex_request;
+pub mod ledger_census;
 mod native_ledger_collection;
+pub mod native_masters;
 pub mod native_outstandings;
 pub mod native_statement_reports;
+pub mod native_stock_summary;
 pub mod native_trial_balance;
 /// The legacy voucher-scan outstandings path: date/AlterID-partitioned
 /// wildcard voucher fetch, segment/witness completeness proofs, and bill
@@ -59,6 +62,7 @@ pub mod outstandings;
 /// `outstandings` would break the always-on native path. See the module docs
 /// for why this is scoped the way it is.
 pub mod outstandings_shared;
+pub mod parent_partition;
 mod standard_ledger_catalog;
 mod text_encoding;
 mod tolerant_xml;
@@ -83,10 +87,10 @@ pub use native_ledger_collection::{
     NativeLedgerAmountError, PartyLedgerMasterFields, PartyLedgerMasterRecord,
 };
 pub use standard_ledger_catalog::{
-    parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, StandardLedgerCatalog,
-    StandardLedgerCatalogBinding, StandardLedgerCatalogError, StandardLedgerIdentityObservation,
-    MAX_STANDARD_LEDGER_IDENTITY_ROWS,
+    parse_ledger_census_slice, parse_standard_ledger_catalog,
+    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
+    StandardLedgerCatalog, StandardLedgerCatalogBinding, StandardLedgerCatalogError,
+    StandardLedgerIdentityObservation, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 pub use text_encoding::{
     decode_tally_text_bytes_limited, decode_tally_xml_response_bytes_limited, decode_xml_bytes,
@@ -101,7 +105,6 @@ pub const BRIDGE_LEDGER_WRITE_READBACK_SCHEMA: &str = "bridge.tally.ledger-write
 pub const BRIDGE_GROUP_EXPORT_SCHEMA: &str = "bridge.tally.groups/1";
 pub const BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA: &str = "bridge.tally.voucher-types/1";
 pub const BRIDGE_VOUCHER_EXPORT_SCHEMA: &str = "bridge.tally.vouchers/2";
-pub const BRIDGE_SELECTED_VOUCHER_EXPORT_SCHEMA: &str = "bridge.tally.vouchers/3";
 pub const BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA: &str = "bridge.tally.ledger-period-balances/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
 
@@ -2275,12 +2278,6 @@ pub fn parse_voucher_source_records_with_evidence(
     parse_voucher_source_records_for_schema(xml, BRIDGE_VOUCHER_EXPORT_SCHEMA)
 }
 
-pub fn parse_selected_voucher_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyVoucher>>> {
-    parse_voucher_source_records_for_schema(xml, BRIDGE_SELECTED_VOUCHER_EXPORT_SCHEMA)
-}
-
 fn parse_voucher_source_records_for_schema(
     xml: &str,
     expected_schema: &str,
@@ -2378,139 +2375,6 @@ pub fn verify_company_context(
         Some(_) => anyhow::bail!("Tally response company context did not match the request"),
         None => anyhow::bail!("Tally response did not include verifiable company context"),
     }
-}
-
-pub fn verify_selected_voucher_window_context(
-    evidence: &ExportEvidence,
-    expected_from_yyyymmdd: &str,
-    expected_to_yyyymmdd: &str,
-) -> anyhow::Result<()> {
-    let company = evidence
-        .company_context
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Tally response did not include selected window context"))?;
-    if company.requested_from_yyyymmdd.as_deref() != Some(expected_from_yyyymmdd)
-        || company.requested_to_yyyymmdd.as_deref() != Some(expected_to_yyyymmdd)
-    {
-        anyhow::bail!("Tally response selected window context did not match the request");
-    }
-    Ok(())
-}
-
-/// Enforces the narrow response skeleton used as selected-read capability evidence. Compatibility
-/// parsers remain intentionally separate and may accept broader Tally wrapper shapes.
-pub fn validate_exact_selected_export_structure(
-    xml: &str,
-    expected_primary_row: &str,
-) -> anyhow::Result<()> {
-    let expected_primary_row = expected_primary_row.as_bytes().to_ascii_uppercase();
-    if ![b"LEDGER".as_slice(), b"VOUCHER".as_slice()]
-        .iter()
-        .any(|candidate| *candidate == expected_primary_row)
-    {
-        anyhow::bail!("Selected Tally read primary row type was invalid");
-    }
-    let mut reader = configured_reader(xml);
-    let mut path = Vec::<Vec<u8>>::new();
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
-                if !selected_structure_child_allowed(&path, &name, &expected_primary_row) {
-                    anyhow::bail!("Selected Tally read contained an unexpected structural element");
-                }
-                validate_selected_wrapper_attributes(&element, &name)?;
-                path.push(name);
-            }
-            Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
-                if !selected_structure_child_allowed(&path, &name, &expected_primary_row) {
-                    anyhow::bail!("Selected Tally read contained an unexpected empty element");
-                }
-                validate_selected_wrapper_attributes(&element, &name)?;
-            }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
-            Event::Text(text)
-                if !text.decode()?.trim().is_empty()
-                    && !selected_structure_text_allowed(&path, &expected_primary_row) =>
-            {
-                anyhow::bail!("Selected Tally read contained unexpected structural text");
-            }
-            Event::CData(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Selected Tally read contained unexpected CDATA");
-            }
-            Event::DocType(_) | Event::PI(_) => {
-                anyhow::bail!("Selected Tally read contained a forbidden XML construct");
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    if !path.is_empty() {
-        anyhow::bail!("Selected Tally read ended before its structure closed");
-    }
-    Ok(())
-}
-
-fn validate_selected_wrapper_attributes(
-    element: &quick_xml::events::BytesStart<'_>,
-    name: &[u8],
-) -> anyhow::Result<()> {
-    if matches!(
-        name,
-        b"ENVELOPE" | b"HEADER" | b"BODY" | b"DATA" | b"COLLECTION" | b"VERSION" | b"STATUS"
-    ) {
-        validate_only_attributes(element, &[])
-            .map_err(|_| anyhow::anyhow!("Selected Tally read wrapper attributes were invalid"))?;
-    }
-    Ok(())
-}
-
-fn selected_structure_child_allowed(path: &[Vec<u8>], name: &[u8], expected: &[u8]) -> bool {
-    if path
-        .iter()
-        .any(|part| part == expected || part.as_slice() == b"COMPANYCONTEXT")
-    {
-        return true;
-    }
-    match path {
-        [] => name == b"ENVELOPE",
-        [envelope] if envelope.as_slice() == b"ENVELOPE" => {
-            matches!(name, b"HEADER" | b"BODY")
-        }
-        [envelope, header]
-            if envelope.as_slice() == b"ENVELOPE" && header.as_slice() == b"HEADER" =>
-        {
-            matches!(name, b"VERSION" | b"STATUS")
-        }
-        [envelope, body] if envelope.as_slice() == b"ENVELOPE" && body.as_slice() == b"BODY" => {
-            name == b"DATA" || name == b"COMPANYCONTEXT" || name == expected
-        }
-        [envelope, body, data]
-            if envelope.as_slice() == b"ENVELOPE"
-                && body.as_slice() == b"BODY"
-                && data.as_slice() == b"DATA" =>
-        {
-            name == b"COMPANYCONTEXT" || name == b"COLLECTION" || name == expected
-        }
-        [envelope, body, data, collection]
-            if envelope.as_slice() == b"ENVELOPE"
-                && body.as_slice() == b"BODY"
-                && data.as_slice() == b"DATA"
-                && collection.as_slice() == b"COLLECTION" =>
-        {
-            name == expected
-        }
-        _ => false,
-    }
-}
-
-fn selected_structure_text_allowed(path: &[Vec<u8>], expected: &[u8]) -> bool {
-    path.iter().any(|part| {
-        part == expected
-            || part.as_slice() == b"COMPANYCONTEXT"
-            || matches!(part.as_slice(), b"VERSION" | b"STATUS")
-    })
 }
 
 fn path_eq(path: &[Vec<u8>], expected: &[&[u8]]) -> bool {

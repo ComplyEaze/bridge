@@ -294,10 +294,9 @@ async fn only_the_summary_leaves_and_the_password_appears_nowhere() {
         .expect("northwind group");
     assert_eq!(northwind["ledger"], "Northwind Traders");
     assert_eq!(northwind["disposition"], "Receipt");
-    assert_eq!(northwind["total"], "10000.00");
-    // A known gap, pinned so it cannot pass unseen: a party of one row shows
-    // that row's amount as its total.
+    // Its rows, and no amount.
     assert_eq!(northwind["rows"], 1);
+    assert!(northwind.get("total").is_none(), "{northwind}");
 
     // row-level content stays in the file: no reference, narration, label or
     // transaction date reaches the response
@@ -576,8 +575,10 @@ async fn a_union_bank_statement_parses_without_printed_totals() {
         result["suspense_by_reason"]["cash_purpose_not_confirmed"], 1,
         "{response}"
     );
-    assert_eq!(result["reconciled"]["total_debits"], "13250.50");
-    assert_eq!(result["reconciled"]["total_credits"], "3750.50");
+    // Union Bank prints no totals and none were supplied, so none is echoed.
+    assert_eq!(result["reconciled"]["total_debits"], Value::Null);
+    assert_eq!(result["reconciled"]["total_credits"], Value::Null);
+    assert_eq!(result["reconciled"]["closing_balance"], "500.00");
     assert_eq!(result["reconciled"]["totals_match_statement"], false);
 
     // a closing balance the rows do not reach is still refused
@@ -1128,8 +1129,6 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
         [
             "account_last4",
             "bank",
-            "bank_ledger_in",
-            "bank_ledger_out",
             "cash_questions",
             "cash_questions_omitted",
             "cash_questions_open",
@@ -1285,12 +1284,13 @@ fn slashed_date(iso: &str) -> String {
     format!("{}/{}/{}", &iso[8..10], &iso[5..7], &iso[0..4])
 }
 
-/// A known gap, pinned so it cannot pass unseen: a counterparty of one row
-/// reports that row's amount as its total, for a party paid once and for one
-/// answered cash line alike, and so does a bank ledger total over one row. This predates the cash questions; whether to
-/// withhold such a total is a separate decision.
+/// The parse result carries no amount of its own: a counterparty gives its
+/// rows only, and reconciled echoes only what the caller supplied. An open
+/// cash line's amount is the one exception (owner ruling b1). Checked by
+/// structure: every string in the result that reads as an amount sits at one
+/// of those places.
 #[test]
-fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
+fn the_parse_result_carries_no_amount_but_the_callers_own() {
     use bridge_bank_statement::parse::Row;
     use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
     let sbi = |date: &str, narration: &str, dr: &str, cr: &str, bal: &str| {
@@ -1305,31 +1305,66 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
             ("bal", bal),
         ])
     };
+    // An answered cash line and a once-paid party (each a group of one row),
+    // and an open cash line.
     let rows = [
-        sbi(
+        (
             "01Aug2026",
             "ATM WDL ATM CASH 4417 SYNTHETIC QUAYSIDE",
             "512.00",
             "",
             "9488.00",
         ),
-        sbi(
+        (
             "03Aug2026",
             "BY TRANSFER-UPI/CR/612345678901/SYNTHETIC PAYER/XYZ",
             "",
             "71.00",
             "9559.00",
         ),
-    ];
+        (
+            "05Aug2026",
+            "ATM WDL ATM CASH 6639 SYNTHETIC LOCKSIDE",
+            "64.00",
+            "",
+            "9495.00",
+        ),
+        // A second unmapped payer, first by name but later in the statement
+        // and smaller, so neither appearance nor amount puts it first.
+        (
+            "06Aug2026",
+            "BY TRANSFER-UPI/CR/698765432109/AARDVARK BUYER/XYZ",
+            "",
+            "9.00",
+            "9504.00",
+        ),
+        // The first payer again, spelled otherwise, and the second payer
+        // again, so both groups have two rows and one has two spellings.
+        (
+            "07Aug2026",
+            "BY TRANSFER-UPI/CR/611111111111/Synthetic Payer/XYZ",
+            "",
+            "10.00",
+            "9514.00",
+        ),
+        (
+            "08Aug2026",
+            "BY TRANSFER-UPI/CR/622222222222/AARDVARK BUYER/XYZ",
+            "",
+            "2.00",
+            "9516.00",
+        ),
+    ]
+    .map(|(date, narration, dr, cr, bal)| sbi(date, narration, dr, cr, bal));
     let mut args = json!({
         "statement_path": never_opened("statement.pdf"),
         "password_file": never_opened("statement.password"),
         "bank": "sbi",
         "account_label": "Synthetic SB xx1234",
         "opening_balance": "10,000.00",
-        "closing_balance": "9,559.00",
-        "total_debits": "512.00",
-        "total_credits": "71.00",
+        "closing_balance": "9,516.00",
+        "total_debits": "576.00",
+        "total_credits": "92.00",
         "bank_ledger": "Synthetic Bank Ledger",
         "suspense_ledger": "Suspense"
     });
@@ -1352,38 +1387,212 @@ fn a_one_row_counterparty_group_reveals_its_row_amount_known_gap() {
         ParsedStatement {
             account_number: "00000000001234".into(),
             statement_rows: rows.len(),
-            closing: bridge_tally_core::ExactDecimal::parse("9559.00").unwrap(),
+            closing: bridge_tally_core::ExactDecimal::parse("9516.00").unwrap(),
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
             build,
         }
     };
-    let open = parsed_with(&OwnedRequest::from_args(&args).unwrap());
+    let unanswered = parsed_with(&OwnedRequest::from_args(&args).unwrap());
     args["cash_answers"] = json!([{
-        "bridge_txn_id": open.build.records[0].bridge_txn_id,
+        "bridge_txn_id": unanswered.build.records[0].bridge_txn_id,
         "answer": "owner_use",
         "ledger": "Drawings"
     }]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let parsed = parsed_with(&request);
     let summary = summary(&request, &parsed, "statement-x", "0", 200_000);
-    assert_eq!(summary["cash_questions"], json!([]));
-    let total_of = |party: &str| {
-        let group = summary["counterparties"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|group| group["party"] == serde_json::to_value(party_name(party)).unwrap())
-            .unwrap_or_else(|| panic!("{party}: {summary}"));
-        assert_eq!(group["rows"], 1, "{party}");
-        group["total"].clone()
-    };
-    assert_eq!(total_of("ATM CASH WITHDRAWAL"), "512.00");
-    assert_eq!(total_of("SYNTHETIC PAYER"), "71.00");
-    // The bank ledger's totals are built from the same single rows.
-    assert_eq!(summary["bank_ledger_out"], "512.00");
-    assert_eq!(summary["bank_ledger_in"], "71.00");
-    assert_eq!(summary["reconciled"]["total_debits"], "512.00");
-    assert_eq!(summary["reconciled"]["total_credits"], "71.00");
+    assert_eq!(summary["cash_questions"].as_array().unwrap().len(), 1);
+
+    // Every leaf of the result, by path (array positions as *), so no field
+    // can be added anywhere unseen; every number must be a count; and every
+    // string holding a digit is listed with where it sits.
+    // A path with array positions as *.
+    fn shape_of(path: &str) -> String {
+        path.split('/')
+            .map(|part| {
+                if part.parse::<usize>().is_ok() {
+                    "*"
+                } else {
+                    part
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+    fn leaves(value: &Value, path: &str, found: &mut Vec<(String, String, Value)>) {
+        match value {
+            Value::Array(items) => {
+                found.push((shape_of(path), path.to_string(), json!([])));
+                for (index, item) in items.iter().enumerate() {
+                    leaves(item, &format!("{path}/{index}"), found);
+                }
+            }
+            Value::Object(fields) => {
+                found.push((shape_of(path), path.to_string(), json!({})));
+                for (key, field) in fields {
+                    leaves(field, &format!("{path}/{key}"), found);
+                }
+            }
+            leaf => found.push((shape_of(path), path.to_string(), leaf.clone())),
+        }
+    }
+    let mut found = Vec::new();
+    leaves(&summary, "", &mut found);
+    let shape: std::collections::BTreeSet<&str> =
+        found.iter().map(|(shape, _, _)| shape.as_str()).collect();
+    let marker = "$bridge_agent_party_name";
+    let expected: std::collections::BTreeSet<String> = [
+        "",
+        "/account_last4",
+        "/bank",
+        "/cash_questions",
+        "/cash_questions/*",
+        "/cash_questions/*/amount",
+        "/cash_questions/*/answers",
+        "/cash_questions/*/answers/*",
+        "/cash_questions/*/answers/*/answer",
+        "/cash_questions/*/answers/*/ledger_needed",
+        "/cash_questions/*/answers/*/not_built",
+        "/cash_questions/*/answers/*/text",
+        "/cash_questions/*/bridge_txn_id",
+        "/cash_questions/*/date",
+        "/cash_questions/*/movement",
+        "/cash_questions/*/printed_as",
+        "/cash_questions/*/printed_as/{marker}",
+        "/cash_questions/*/question",
+        "/cash_questions_omitted",
+        "/cash_questions_open",
+        "/counterparties",
+        "/counterparties/*",
+        "/counterparties/*/also_printed_as",
+        "/counterparties/*/also_printed_as/*",
+        "/counterparties/*/also_printed_as/*/{marker}",
+        "/counterparties/*/disposition",
+        "/counterparties/*/ledger",
+        "/counterparties/*/ledger/{marker}",
+        "/counterparties/*/party",
+        "/counterparties/*/party/{marker}",
+        "/counterparties/*/rows",
+        "/counterparties/*/suspense",
+        "/counterparties_omitted",
+        "/ledgers_to_validate",
+        "/ledgers_to_validate/*",
+        "/ledgers_to_validate/*/{marker}",
+        "/ledgers_to_validate_omitted",
+        "/next_step",
+        "/proposals_id",
+        "/reconciled",
+        "/reconciled/closing_balance",
+        "/reconciled/running_balance_every_row",
+        "/reconciled/total_credits",
+        "/reconciled/total_debits",
+        "/reconciled/totals_match_statement",
+        "/rows_in_window",
+        "/sha256",
+        "/skipped",
+        "/statement_rows",
+        "/suspense_by_reason",
+        "/suspense_by_reason/cash_purpose_not_confirmed",
+        "/suspense_by_reason/party_unmapped_or_mapped_to_suspense",
+        "/suspense_rows",
+        "/vouchers",
+    ]
+    .iter()
+    .map(|path| path.replace("{marker}", marker))
+    .collect();
+    // Every path, containers included, so an empty list's path is pinned too.
+    assert_eq!(
+        shape,
+        expected.iter().map(String::as_str).collect(),
+        "{summary}"
+    );
+    let numbers: std::collections::BTreeSet<&str> = found
+        .iter()
+        .filter(|(_, _, leaf)| leaf.is_number())
+        .map(|(shape, _, _)| shape.as_str())
+        .collect();
+    // Numbers are counts, and only counts.
+    assert_eq!(
+        numbers,
+        [
+            "/cash_questions_omitted",
+            "/cash_questions_open",
+            "/counterparties/*/rows",
+            "/counterparties_omitted",
+            "/ledgers_to_validate_omitted",
+            "/rows_in_window",
+            "/skipped",
+            "/statement_rows",
+            "/suspense_by_reason/cash_purpose_not_confirmed",
+            "/suspense_by_reason/party_unmapped_or_mapped_to_suspense",
+            "/suspense_rows",
+            "/vouchers",
+        ]
+        .into_iter()
+        .collect(),
+        "{summary}"
+    );
+    let mut digits: Vec<(String, String)> = found
+        .iter()
+        .filter_map(|(_, path, leaf)| {
+            leaf.as_str()
+                .filter(|text| text.chars().any(|c| c.is_ascii_digit()))
+                .map(|text| (path.clone(), text.to_string()))
+        })
+        .collect();
+    digits.sort();
+    // A digit appears only in the caller's echoes, the open cash line's
+    // fields (b1), the account's last four digits and the file digest.
+    let open_id = summary["cash_questions"][0]["bridge_txn_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        digits,
+        [
+            ("/account_last4", "1234"),
+            ("/cash_questions/0/amount", "64.00"),
+            ("/cash_questions/0/bridge_txn_id", open_id.as_str()),
+            ("/cash_questions/0/date", "2026-08-05"),
+            ("/reconciled/closing_balance", "9516.00"),
+            ("/reconciled/total_credits", "92.00"),
+            ("/reconciled/total_debits", "576.00"),
+            ("/sha256", "0"),
+        ]
+        .map(|(path, text)| (path.to_string(), text.to_string())),
+        "{summary}"
+    );
+    assert!(open_id.starts_with("st-20260805-"), "{open_id}");
+    // Ordered by suspense, rows, name and disposition, never by amount: the
+    // answered 512.00 line and the open 64.00 line share a spelling, and the
+    // open one (NeedsAnswer) comes first by disposition.
+    let order: Vec<(Value, Value)> = summary["counterparties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|group| (group["party"].clone(), group["disposition"].clone()))
+        .collect();
+    let party = |name: &str| serde_json::to_value(party_name(name)).unwrap();
+    assert_eq!(
+        order,
+        [
+            (party("AARDVARK BUYER"), json!("Receipt")),
+            (party("SYNTHETIC PAYER"), json!("Receipt")),
+            (party("ATM CASH WITHDRAWAL"), json!("NeedsAnswer")),
+            (party("ATM CASH WITHDRAWAL"), json!("Payment")),
+        ]
+    );
+    // The payer printed two ways is one group of two rows, shown by the first
+    // spelling by name, with the other listed.
+    assert_eq!(summary["counterparties"][0]["rows"], 2, "{summary}");
+    let payer = &summary["counterparties"][1];
+    assert_eq!(payer["rows"], 2, "{payer}");
+    assert_eq!(payer["also_printed_as"], json!([party("Synthetic Payer")]));
+    // A counterparty gives its rows, and no total.
+    for group in summary["counterparties"].as_array().unwrap() {
+        assert!(group.get("total").is_none(), "{group}");
+        assert!(group["rows"].as_u64().unwrap() >= 1, "{group}");
+    }
 }

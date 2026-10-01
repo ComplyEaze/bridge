@@ -21,13 +21,13 @@ function setDownload(option, asset) {
 function renderRelease() {
   const release = selectRelease(releases);
   if (!release) {
-    status.textContent = "No installable unsigned preview is published.";
+    status.textContent = "No installable release is published yet.";
     channelNote.textContent = "See all releases for release notes and availability.";
     document.querySelectorAll(".download-option").forEach((option) => setDownload(option));
     return;
   }
   status.textContent = releaseLabel(release);
-  channelNote.textContent = "Unsigned previews are for evaluation. Review the checksum and release notes before opening one.";
+  channelNote.textContent = "Not yet code-signed; your computer may warn you before opening it. Compare the checksum with the .sha256 file on the release.";
   document.querySelectorAll(".download-option").forEach((option) => {
     setDownload(option, releaseAssets(release, option.dataset.platform));
   });
@@ -60,7 +60,7 @@ async function loadReleases() {
   releases = combined.releases;
   renderRelease();
   if (combined.snapshotOnly && selectRelease(releases)) {
-    channelNote.textContent = "Showing the release list saved when this page was published; a newer preview may be listed under All releases. Review the checksum and release notes before opening one.";
+    channelNote.textContent = "Showing the release list saved when this page was published; a newer release may be listed under All releases. Compare the checksum with the .sha256 file before opening it.";
   }
 }
 

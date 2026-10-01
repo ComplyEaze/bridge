@@ -183,7 +183,7 @@ impl Server {
 /// them all. The lists are not paged with the rows, so they are bounded here.
 const EXCLUDED_TRIAL_BALANCE_LEDGERS_NAMED: usize = 20;
 
-fn page_boundary(offset: usize, returned: usize, total: usize) -> (bool, Option<usize>) {
+pub(super) fn page_boundary(offset: usize, returned: usize, total: usize) -> (bool, Option<usize>) {
     let Some(next_offset) = offset.checked_add(returned) else {
         return (false, None);
     };

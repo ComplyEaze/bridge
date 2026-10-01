@@ -16,7 +16,7 @@ Apache-2.0 builds from current source stays unambiguous.
 These changes are on the main branch. They are not yet in a published package.
 Each line names the pull requests it comes from.
 
-**What you can do now**
+**What the next build adds**
 
 - Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
   line for line to Tally's own statement; otherwise it is refused, and the
@@ -56,6 +56,16 @@ Each line names the pull requests it comes from.
   with an `&` in it (#763).
 - The desktop app's documents upload skips unchanged copies of the
   party-statement batches it wrote (#847).
+- Each tool now says whether it changes anything. Reads are marked read-only
+  and say they only record local receipt lines for the call, never book
+  content. Some assistants may now run the read tools without asking each
+  time (#909, #921).
+- The tools that save a file on this computer are marked as writes: preparing
+  an import file and reading a bank statement add new files, while
+  verification and acknowledgement replace the batch's saved proof and are
+  marked destructive. Posting stays marked destructive, and no tool is marked
+  as reaching outside this computer. `parse_bank_statement` had been marked
+  read-only by mistake (#909, #921).
 
 **Also in source**
 
@@ -270,7 +280,7 @@ there is no summary for that build.
 ### Security
 
 - SQLCipher/keyring-backed local Tally state, immutable proof/checkpoint
-  receipts, loopback-only proxy-free HTTP, bounded incremental decoding,
+  receipts, loopback-only HTTP without a proxy, bounded incremental decoding,
   cancellation and lease enforcement, idempotent crash replay, and sealed
   no-write qualification boundaries.
 - SQLCipher pool replacement connections now receive raw key bytes from

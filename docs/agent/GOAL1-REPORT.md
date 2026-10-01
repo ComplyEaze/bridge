@@ -1,5 +1,9 @@
 # Goal 1 report — Bridge MCP
 
+> Historical: this report was written before the live runs now recorded in
+> [docs/agent/README.md](./README.md), and its statement that no live Tally was run describes
+> that report's own run only.
+
 ## Delivered
 
 - `src-tauri/src/agent.rs`: newline-delimited JSON-RPC MCP handler, the nine

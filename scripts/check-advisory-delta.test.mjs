@@ -20,7 +20,7 @@
 // CI job (.github/workflows/ci.yml), which has no Rust toolchain and does not
 // install cargo-audit -- see .github/workflows/dependency-security.yml for
 // the job that does. These tests need `cargo audit` (any lockfile-scanning
-// invocation, not the pinned 1.96.0 toolchain reseal.sh needs) and skip
+// invocation, not one particular pinned toolchain) and skip
 // themselves with a clear reason when it is unavailable, rather than failing
 // a job that was never given the tool. See docs/proposed-dependency-policy.md
 // for the proposed CI wiring that would let them actually run.

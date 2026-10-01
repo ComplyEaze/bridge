@@ -17,7 +17,7 @@ import zipfile
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
     "tally_status", "list_companies", "voucher_schema", "validate_masters", "outstandings",
-    "ledger_masters", "ledger_movement", "trial_balance", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "verify_import",
+    "ledger_masters", "ledger_movement", "trial_balance", "masters", "stock_summary", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "local_data_report", "verify_import",
 }
 # The bundle always enables file preparation and bank-statement parsing; they
 # write nothing to Tally. Posting, and recording a person's review of a doubted
@@ -41,7 +41,10 @@ def expected_tools(environment):
 PDFIUM_NOTICE = "THIRD_PARTY_LICENSES_PDFIUM.txt"
 PDFIUM_LIBRARIES = {"darwin": "libpdfium.dylib", "win32": "pdfium.dll"}
 PDFIUM_PLATFORMS = {("darwin", "arm64"): "macos-arm64", ("win32", "amd64"): "windows-x64"}
-ARCHIVE_MEMBERS = len(RESOURCES) + 4  # manifest, binary, PDFium library, PDFium notice
+ICON = "icon.png"
+ICON_SOURCE = Path("packaging/mcpb") / ICON
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ARCHIVE_MEMBERS = len(RESOURCES) + 5  # manifest, icon, binary, PDFium library, PDFium notice
 STATEMENT_FIXTURE = Path("src-tauri/crates/bridge-bank-statement/tests/fixtures/hdfc-synthetic.pdf")
 STATEMENT_PASSWORD = "synthetic-user-4321"
 MAX_BUNDLE_BYTES = 128 * 1024 * 1024
@@ -86,8 +89,13 @@ def unpack_bundle(archive, destination, repository):
         member_path(entry)
         require(entry.startswith("bin/"), "invalid_entry_point")
         library = str(PurePosixPath(entry).parent / PDFIUM_LIBRARIES.get(sys.platform, ""))
-        require(set(names) == set(RESOURCES) | {"manifest.json", entry, library, PDFIUM_NOTICE},
+        require(set(names) == set(RESOURCES) | {"manifest.json", ICON, entry, library, PDFIUM_NOTICE},
                 "unexpected_archive_members")
+        # The icon is the file committed in packaging/mcpb, unmodified, and the manifest names it.
+        require(manifest.get("icon") == ICON, "icon_declaration_mismatch")
+        icon = bundle.read(ICON)
+        require(icon.startswith(PNG_SIGNATURE), "icon_is_not_png")
+        require(icon == (repository / ICON_SOURCE).read_bytes(), "icon_bytes_differ")
         config = manifest["server"]["mcp_config"]
         require(manifest["server"]["type"] == "binary"
                 and config["command"] == "${__dirname}/" + entry
@@ -200,9 +208,17 @@ def run_bounded(command, payload, environment, timeout=15):
 
 def resolve_environment(manifest):
     mappings = manifest["server"]["mcp_config"]["env"]
-    require(set(mappings) == {"BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT", "BRIDGE_AGENT_REDACTION",
-                              "BRIDGE_AGENT_ENABLE_IMPORT", "BRIDGE_AGENT_ENABLE_WRITES"},
+    require(set(mappings) == {"BRIDGE_TERMS_ACCEPTED", "BRIDGE_TALLY_HOST", "BRIDGE_TALLY_PORT",
+                              "BRIDGE_AGENT_REDACTION", "BRIDGE_AGENT_ENABLE_IMPORT",
+                              "BRIDGE_AGENT_ENABLE_WRITES"},
             "unexpected_environment_mapping")
+    # The Terms of Use are accepted by the user, never by default: the setting is required and
+    # off, and the server refuses every tool until it is on (see agent_terms.rs).
+    terms = manifest["user_config"].get("accept_terms_2026_10", {})
+    require(terms.get("type") == "boolean" and terms.get("required") is True
+            and terms.get("default") is False, "terms_setting_must_be_required_and_off")
+    require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10}",
+            "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
     writes = manifest["user_config"].get("enable_writes", {})
     require(writes.get("type") == "boolean" and isinstance(writes.get("default"), bool),
@@ -260,9 +276,37 @@ def smoke(archive, repository):
         destination = Path(temporary) / "bundle"
         manifest, binary = unpack_bundle(archive, destination, repository)
         environment = {key: value for key, value in os.environ.items()
-                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_"))}
+                       if not key.startswith(("BRIDGE_AGENT_", "BRIDGE_TALLY_", "BRIDGE_PDFIUM_", "BRIDGE_TERMS_"))}
         environment.update(resolve_environment(manifest))
         environment["BRIDGE_AGENT_DATA_DIR"] = str(Path(temporary) / "data")
+        # With the manifest's defaults the Terms of Use are not accepted: the server must still
+        # answer initialize and tools/list, and refuse a tool call in band. Own data folder, so
+        # this run's receipts do not mix with the accepted run's below.
+        require(environment["BRIDGE_TERMS_ACCEPTED"] == "false", "terms_must_default_to_not_accepted")
+        refused_requests = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-06-18", "capabilities": {},
+                "clientInfo": {"name": "bridge-mcpb-smoke", "version": "1.0.0"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "voucher_schema", "arguments": {}}},
+        ]
+        refused_command = manifest["server"]["mcp_config"]["command"].replace("${__dirname}", str(destination))
+        refused_output, _ = run_bounded(
+            [refused_command],
+            b"".join(json.dumps(request).encode() + b"\n" for request in refused_requests),
+            dict(environment, BRIDGE_AGENT_DATA_DIR=str(Path(temporary) / "data-refused")))
+        refused = [json.loads(line) for line in refused_output.splitlines()]
+        require([reply.get("id") for reply in refused] == [1, 2, 3], "terms_refusal_response_ids")
+        require(bool(refused[1]["result"]["tools"]), "terms_refusal_hid_the_tool_list")
+        refusal = refused[2]["result"]
+        require(refusal.get("isError") is True
+                and refusal.get("structuredContent", {}).get("result", {}).get("error", {}).get("code")
+                == "terms_not_accepted", "terms_refusal_missing")
+        require(not (Path(temporary) / "data-refused" / "terms-acceptance.jsonl").exists(),
+                "terms_recorded_without_acceptance")
+        environment["BRIDGE_TERMS_ACCEPTED"] = "true"
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
                 "protocolVersion": "2025-06-18", "capabilities": {},
@@ -307,6 +351,10 @@ def smoke(archive, repository):
             (Path(temporary) / "data" / "agent-egress.jsonl").read_bytes(),
             output.splitlines(keepends=True)[2],
         )
+        # Accepting the Terms is recorded once, next to the receipts, in the data folder.
+        acceptance = (Path(temporary) / "data" / "terms-acceptance.jsonl").read_bytes().splitlines()
+        require(len(acceptance) == 1 and json.loads(acceptance[0]).get("source") == "setting",
+                "terms_acceptance_not_recorded")
         statement_vouchers = statement_smoke(command, environment, temporary, repository)
         return {
             "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),

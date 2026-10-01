@@ -36,27 +36,13 @@ async fn sends_only_the_rendered_sealed_read_profile() {
 
 #[tokio::test]
 async fn an_education_transport_refuses_the_report_formula_profiles_before_sending() {
-    use bridge_tally_protocol::xml_read_profiles::{
-        ValidatedCanaryLedgerName, ValidatedCompanyName, ValidatedDateRange,
-        ValidatedIdentityQuerySha256,
-    };
+    use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
     use tally_protocol_simulator::SequenceSimulator;
     let company = ValidatedCompanyName::new("Synthetic Co").unwrap();
     let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
-    let canary = ValidatedCanaryLedgerName::new("BRIDGE-CANARY-0").unwrap();
-    let identity = ValidatedIdentityQuerySha256::new("a".repeat(64)).unwrap();
     let refused = [
         ReadOnlyProfile::LedgersV1 { company: &company },
-        ReadOnlyProfile::LedgerCanaryReadbackV1 {
-            company: &company,
-            ledger_name: &canary,
-            identity_query_sha256: &identity,
-        },
         ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        },
-        ReadOnlyProfile::VouchersV3 {
             company: &company,
             range: &range,
         },

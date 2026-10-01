@@ -14,10 +14,21 @@ use thiserror::Error;
 pub mod bills_native_outstandings_probe_receipt;
 
 pub const LIVE_RECEIPT_SCHEMA_VERSION: u16 = 1;
-pub const SURFACE_SCHEMA_VERSION: u16 = 2;
+/// The surface file is an authored pin list (schema 3): paths and optional reasons, no stored
+/// hashes. The resolved in-memory manifest carries the same version.
+pub const SURFACE_SCHEMA_VERSION: u16 = 3;
+/// Longest `reason` a pin may carry.
+pub const MAX_PIN_REASON_CHARS: usize = 500;
 pub const SUPPORT_MANIFEST_SCHEMA_VERSION: u16 = 2;
 pub const TRUST_MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const ATTESTATION_SCHEMA_VERSION: u16 = 1;
+/// The review URL of an attestation must point at this repository: it is part of the signed bytes.
+/// The repository moved from the lamemustafa account to the ComplyEaze organization; GitHub keeps
+/// the old name as a permanent redirect, so a URL under either name is accepted.
+pub const REVIEW_URL_PREFIXES: [&str; 2] = [
+    "https://github.com/lamemustafa/bridge/",
+    "https://github.com/ComplyEaze/bridge/",
+];
 pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// Capacity deliberately reserved for one small cohesive surface change.
 pub const RESERVED_SURFACE_FILES: usize = 15;
@@ -302,7 +313,7 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 /// `voucher_presence`, `ledger_movement` and the import-verification read.
 // The canonical protocol-reference index is retained for legacy links while
 // bridge#317 moves its content into six separately pinned parts. The cap grows
-// by those six pins; it remains an exact count after the coordinated reseal.
+// by those six pins; it remains an exact count after the coordinated pin-list change.
 // `src-tauri/src/agent_import_post_location.rs` (bridge#574) confirms which
 // loaded company a native post is aimed at, last before the POST, and reports
 // which companies' voucher marks moved after it.
@@ -347,7 +358,24 @@ pub const RESERVED_SURFACE_FILES: usize = 15;
 // request renderer uses, the voucher-import write path included; a defect there
 // changes which ledger or company a posted voucher names, or lets a value
 // break out of the element it belongs to.
-pub const MAX_SURFACE_FILES: usize = 291;
+// `bridge-tally-protocol/src/parent_partition.rs` (bridge#679) decides whether a
+// ledger read too large for one request may be split by parent group, and
+// whether the parts together returned every ledger the catalogue named, once;
+// a defect there returns a book with ledgers missing or repeated.
+// `bridge-tally-protocol/src/ledger_census.rs` (bridge#679) renders the request
+// that counts a book's ledgers by AlterID span, and decides whether the slices
+// added up to a count (order, duplicates, span, an empty census); a defect there
+// sizes the next ledger read for fewer ledgers than the book holds, and a
+// request past the response cap is cut off mid-read.
+// `src-tauri/src/request_trail.rs` (bridge#918) builds, field by field, the
+// record of a call's Tally sends that reaches the egress receipt; a defect
+// there puts request or response text, a company name or a row value into a
+// journal the user keeps.
+//
+// Since schema 3 the reason for a pin added from now on lives in that pin's own entry (`reason`
+// in compatibility-surface.json), not as another paragraph here: two pull requests that each add a
+// pin no longer collide on this comment block, only on this constant when both raise it.
+pub const MAX_SURFACE_FILES: usize = 311;
 pub const MAX_OPERATIONS: usize = 16;
 pub const MAX_CLAIMS: usize = 128;
 pub const MAX_KEYS: usize = 32;
@@ -362,7 +390,7 @@ const REQUIRED_SURFACE_DIRECTORIES: [&str; 2] =
 /// `agent_ledgers.rs` renders the agent ledger reads. It is here rather than left as a
 /// judgment pin because a judgment pin can be dropped during a conflict resolution and
 /// the gate still returns `compatibility_gate_passed` -- measured, by deleting this very
-/// entry and resealing. A required path cannot be dropped silently, and
+/// entry and acknowledging the change. A required path cannot be dropped silently, and
 /// `gate_rejects_each_omitted_required_lifecycle_path` iterates this list, so adding it
 /// here is what covers its omission.
 const REQUIRED_SURFACE_FILES: [&str; 14] = [
@@ -921,9 +949,135 @@ pub struct SurfaceFile {
     pub sha256: String,
 }
 
-/// The surface stores only its pins. Its digest is computed, never stored, so
-/// two changes to different pins merge without touching a shared line
-/// (docs/proposed-order-independent-seal.md, bridge#760).
+/// One pin in the authored surface file: a repository path and, for a pin added after the cut-over
+/// to schema 3, the reason it is sealed (the per-pin rationale that used to be appended to one
+/// shared comment block).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SurfacePin {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// The authored surface file (schema 3): the pin list only. It stores no hashes, so two pull
+/// requests that edit one pinned file no longer collide on a stored value. The surface digest that
+/// receipts and attestations bind is computed from the live bytes of every pinned file by
+/// [`SurfacePins::resolve`]; a pinned change is acknowledged in review (an acknowledgement file per
+/// pull request, checked by `scripts/check-surface-ack.mjs`), not by rewriting a hash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SurfacePins {
+    pub schema_version: u16,
+    pub files: Vec<SurfacePin>,
+}
+
+impl SurfacePins {
+    pub fn validate(&self) -> Result<(), CompatibilityError> {
+        if self.schema_version != SURFACE_SCHEMA_VERSION {
+            return Err(invalid("surface_schema_unsupported"));
+        }
+        if self.files.is_empty() || self.files.len() > MAX_SURFACE_FILES {
+            return Err(invalid("surface_file_count_invalid"));
+        }
+        let mut previous: Option<&str> = None;
+        for pin in &self.files {
+            validate_relative_path(&pin.path)?;
+            if let Some(reason) = &pin.reason {
+                if reason.trim().is_empty()
+                    || reason.chars().count() > MAX_PIN_REASON_CHARS
+                    || reason.chars().any(char::is_control)
+                {
+                    return Err(invalid("surface_pin_reason_invalid"));
+                }
+            }
+            if previous.is_some_and(|value| value >= pin.path.as_str()) {
+                return Err(invalid("surface_files_not_unique_sorted"));
+            }
+            previous = Some(&pin.path);
+        }
+        Ok(())
+    }
+
+    /// Reads every pinned file and returns the resolved manifest: each pinned path with the
+    /// SHA-256 of its bytes now. Also enforces the required files and directories.
+    pub fn resolve(
+        &self,
+        repository_root: &Path,
+    ) -> Result<CompatibilitySurfaceManifest, CompatibilityError> {
+        self.validate()?;
+        let mut files = Vec::with_capacity(self.files.len());
+        for pin in &self.files {
+            refuse_symlink_on_path(repository_root, &pin.path)?;
+            let bytes = fs::read(repository_root.join(&pin.path))
+                .map_err(|_| invalid("surface_file_unavailable"))?;
+            files.push(SurfaceFile {
+                path: pin.path.clone(),
+                sha256: sha256_bytes(&bytes),
+            });
+        }
+        let resolved = CompatibilitySurfaceManifest {
+            schema_version: SURFACE_SCHEMA_VERSION,
+            files,
+        };
+        resolved.validate_required_directory_coverage(repository_root)?;
+        Ok(resolved)
+    }
+
+    /// Reads the file. A file still in schema 1 or 2 (stored hashes) is refused with a code that
+    /// names the migration, before any shape check, so it is not reported as generic bad JSON.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, CompatibilityError> {
+        if bytes.is_empty() || bytes.len() > MAX_ARTIFACT_BYTES {
+            return Err(invalid("artifact_size_invalid"));
+        }
+        // A hand-edited pin list with a trailing comma is bad JSON, not an unsupported schema.
+        let document: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|_| invalid("artifact_json_invalid"))?;
+        let version = document
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64);
+        match version {
+            Some(value) if value == u64::from(SURFACE_SCHEMA_VERSION) => {}
+            Some(1 | 2) => return Err(invalid("surface_schema_needs_migration")),
+            _ => return Err(invalid("surface_schema_unsupported")),
+        }
+        let value: Self = parse_bounded_json(bytes)?;
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn to_pretty_json(&self) -> Result<Vec<u8>, CompatibilityError> {
+        self.validate()?;
+        let bytes = serde_json::to_vec_pretty(self).map_err(|_| invalid("serialization_failed"))?;
+        if bytes.len() > MAX_ARTIFACT_BYTES {
+            return Err(invalid("artifact_too_large"));
+        }
+        Ok(bytes)
+    }
+}
+
+/// Refuses a pinned path that is, or sits under, a symbolic link. Reading through one would make
+/// the digest follow an unpinned target, so an edit there would move the digest with no pinned
+/// path in any diff (the acknowledgement checks look only at pinned paths).
+fn refuse_symlink_on_path(
+    repository_root: &Path,
+    relative: &str,
+) -> Result<(), CompatibilityError> {
+    let mut current = repository_root.to_path_buf();
+    for component in relative.split('/') {
+        current.push(component);
+        let metadata =
+            fs::symlink_metadata(&current).map_err(|_| invalid("surface_file_unavailable"))?;
+        if metadata.file_type().is_symlink() {
+            return Err(invalid("surface_file_symlink"));
+        }
+    }
+    Ok(())
+}
+
+/// The RESOLVED surface: each pinned path with the SHA-256 of its live bytes, built by
+/// [`SurfacePins::resolve`]. It is what the digest is computed over. Its digest is computed, never
+/// stored (bridge#760); schema 3 also stopped storing the per-file hashes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompatibilitySurfaceManifest {
@@ -1028,41 +1182,6 @@ impl CompatibilitySurfaceManifest {
             return Err(invalid("surface_required_directory_file_unpinned"));
         }
         Ok(())
-    }
-
-    /// Refreshes every pinned file's digest from its bytes. With no stored manifest checksum,
-    /// this is the whole reseal, for a changed pin list too.
-    pub fn rehash_files(
-        &self,
-        repository_root: &Path,
-    ) -> Result<(Self, usize), CompatibilityError> {
-        self.validate()?;
-        let mut rehashed = self.clone();
-        let mut changed = 0;
-        for file in &mut rehashed.files {
-            let digest = sha256_file(&repository_root.join(&file.path))
-                .map_err(|_| invalid("surface_file_unavailable"))?;
-            if file.sha256 != digest {
-                file.sha256 = digest;
-                changed += 1;
-            }
-        }
-        Ok((rehashed, changed))
-    }
-
-    pub fn from_json(bytes: &[u8]) -> Result<Self, CompatibilityError> {
-        let value: Self = parse_bounded_json(bytes)?;
-        value.validate()?;
-        Ok(value)
-    }
-
-    pub fn to_pretty_json(&self) -> Result<Vec<u8>, CompatibilityError> {
-        self.validate()?;
-        let bytes = serde_json::to_vec_pretty(self).map_err(|_| invalid("serialization_failed"))?;
-        if bytes.len() > MAX_ARTIFACT_BYTES {
-            return Err(invalid("artifact_too_large"));
-        }
-        Ok(bytes)
     }
 }
 
@@ -1231,9 +1350,9 @@ impl ReviewedEvidenceAttestation {
         if self.reviewed_at_unix_ms <= 0 || self.expires_at_unix_ms <= self.reviewed_at_unix_ms {
             return Err(invalid("attestation_time_invalid"));
         }
-        if !self
-            .review_url
-            .starts_with("https://github.com/lamemustafa/bridge/")
+        if !REVIEW_URL_PREFIXES
+            .iter()
+            .any(|prefix| self.review_url.starts_with(prefix))
             || self.review_url.len() > 256
             || self.review_url.chars().any(char::is_control)
         {

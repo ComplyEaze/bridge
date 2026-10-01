@@ -80,10 +80,10 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 
 The ordinary default tools are `tally_status`, `list_companies`,
 `voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`,
-`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`, `read_evidence`, and
-`egress_log`. (`profit_and_loss` and `balance_sheet` are in source but not in
-the 0.3.0 release, and neither is `purchase_register`.) For a command-line
+`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
+`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
+`read_evidence`, and `egress_log`. (`masters`, `profit_and_loss`, `balance_sheet` and
+`purchase_register` are in source but not in the 0.3.0 release.) For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
@@ -256,6 +256,74 @@ It may include dormant ledgers hidden by Tally's screen. Paired response,
 company, mode and extent checks detect observed changes, but do not prove an
 atomic snapshot or voucher-level reconciliation. Keep the company quiet during
 reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
+
+### Masters
+
+Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
+`units`, `stock_groups` or `groups`. It lists a company's masters of that
+kind, for example a voucher type's numbering method (`automatic`, `manual` or
+`default`, as Tally reports it) and its `active` and `optional` flags. Each row
+carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
+`decimal_places` and `simple`. A `groups` row carries `name`,
+`parent` and `reserved_name` only, as the group snapshot returns them, and a
+parent that is Tally's reserved root keeps its marker form, as in
+`trial_balance`. Alias names are not returned.
+
+The read runs inside the same company, mode and identity brackets as
+`trial_balance`, with the book extent read before and after (they must be
+equal) and the collection read twice and compared. Education mode is refused.
+`offset` and `limit` restrict output, not the source read; a first page holds
+its read in memory and a later page continues from it while the extent is
+unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
+`trial_balance` does.
+
+Godowns, units and stock groups are read whole only when the master-alteration
+mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
+mark counts the masters of every kind, so a book with few of this kind can be
+refused. That admits a mark of at most 1,152 for godowns, 1,168 for units and
+1,160 for stock groups; a larger book is refused before any collection request
+as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
+read at). Retrying refuses again. Both stock-heavy client books measured, with
+marks of about 100,000 and 300,000, refuse these three kinds; how common such
+marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
+before the read: voucher types keep the policy of Bridge's other voucher-type
+read, and groups that of the group read `profit_and_loss` and `balance_sheet`
+make.
+
+The size rests on premises that are checked after the read, not assumed. For
+every kind but `groups`, each row's length is checked against the assumed
+worst-case row (`masters_row_exceeds_bound`), and the rows, their AlterIDs and
+the response size (each collection is read twice, and the size check runs after
+both reads) are checked against the mark and the admitted size: more rows
+than the mark, an AlterID above it, a repeated AlterID or an oversize response
+refuses the whole read as `masters_bound_premise_violated`, unless the closing
+extent shows the book moved, which is reported instead
+(`masters_extent_changed`). A response Bridge cannot read refuses at once with
+a `masters_*` cause, without waiting for the closing extent. A `voucher_types`
+answer with no rows refuses as `masters_voucher_types_empty`, because every
+company has predefined voucher types; the other kinds may answer with none.
+
+Evidence for the row shape: one synthetic book on one licensed TallyPrime 7.1
+(`src-tauri/crates/bridge-tally-protocol/tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`).
+`Default`, `Automatic` and `Manual` are the only numbering methods observed; any
+other value is returned as `{"unrecognised": "<raw text>"}` rather than refused.
+`default` is Tally's reported value, not evidence that a type numbers
+automatically. The company's voucher-type count (`NUMVOUCHERTYPES`) did not
+equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book it
+equalled the number-series count (inferred to count series, unmeasured), so the
+rows are not checked against it. The completeness of the voucher-type list is
+unverified: absence from it is not evidence that a voucher type is absent from
+the book. The size bound rests on assumed limits (128
+characters a name, four aliases a master) that no capture has measured; a row
+that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
+hints (the company's `NUM*` fields), stock items or writes are part of this tool.
+
+Under `mask_parties`, godown and stock-group names and their `parent` values
+are masked like a party name, because a job-work godown or a supplier-named
+stock group can carry a party's name; Tally's reserved root as a parent is a
+fixed marker and is left as it is. Voucher-type, unit and account-group names
+are not masked: they are configuration labels, not counterparties.
 
 ### Profit and Loss and Balance Sheet
 
@@ -1012,9 +1080,34 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
-`unallocated.totals` contains `receivable`, `payable`, and `gross_unallocated`.
+`unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
+`by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
 been removed. Gross exposure is not net money due.
+
+Each `unallocated.parties[]` row says what the ledger data can and cannot say about
+its amount, without reading vouchers (#945). `ledger_bill_wise` is the ledger's own
+`ISBILLWISEON`, written from the `composition` that carries it so the two cannot
+disagree. `opening_balance` is the ledger's own opening as of the start of the books
+(not the current year's), shown and never interpreted; it is absent when Tally sent
+an empty element, which is unknown and not zero. It keeps Tally's sign (a debit
+opening is negative) while `amount` is a magnitude and `direction` says which side.
+`composition` is `not_bill_wise_ledger` when the ledger's bill-wise flag is off (it
+keeps no bills; seen on one ledger that never had bills, while a flag switched off
+after bills existed is unmeasured, and the flag is read as of the read, not of
+`as_of`) and `bill_wise_ledger_components_not_separated` for what is left on a
+bill-wise ledger after its named bills: on-account entries, an opening balance not
+allocated to a reference, notes with no reference and anything else all land there
+and are not told apart, because the bills reports carry none of them. No unallocated
+figure is labelled on-account. Advances and credit or debit notes kept as their own
+bills are in the bills, not here.
+
+`unallocated.totals.by_composition` splits the gross by composition, receivable and
+payable apart, over every party in the requested direction before paging, so its
+parts add up to the totals. A row saved without a composition (older saved data)
+counts under `composition_not_observed`, which appears only when such a row exists.
+Each row is about 100 bytes wider than before, so under a byte cap a page can now
+hold fewer rows and `next_offset` can move; no figure changes.
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

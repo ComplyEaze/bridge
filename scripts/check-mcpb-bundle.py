@@ -17,7 +17,7 @@ import zipfile
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
     "tally_status", "list_companies", "voucher_schema", "validate_masters", "outstandings",
-    "ledger_masters", "ledger_movement", "purchase_register", "trial_balance", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "verify_import",
+    "ledger_masters", "ledger_movement", "purchase_register", "trial_balance", "masters", "profit_and_loss", "balance_sheet", "vouchers", "voucher_presence", "read_evidence", "egress_log", "verify_import",
 }
 # The bundle always enables file preparation and bank-statement parsing; they
 # write nothing to Tally. Posting, and recording a person's review of a doubted
@@ -41,7 +41,10 @@ def expected_tools(environment):
 PDFIUM_NOTICE = "THIRD_PARTY_LICENSES_PDFIUM.txt"
 PDFIUM_LIBRARIES = {"darwin": "libpdfium.dylib", "win32": "pdfium.dll"}
 PDFIUM_PLATFORMS = {("darwin", "arm64"): "macos-arm64", ("win32", "amd64"): "windows-x64"}
-ARCHIVE_MEMBERS = len(RESOURCES) + 4  # manifest, binary, PDFium library, PDFium notice
+ICON = "icon.png"
+ICON_SOURCE = Path("packaging/mcpb") / ICON
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ARCHIVE_MEMBERS = len(RESOURCES) + 5  # manifest, icon, binary, PDFium library, PDFium notice
 STATEMENT_FIXTURE = Path("src-tauri/crates/bridge-bank-statement/tests/fixtures/hdfc-synthetic.pdf")
 STATEMENT_PASSWORD = "synthetic-user-4321"
 MAX_BUNDLE_BYTES = 128 * 1024 * 1024
@@ -86,8 +89,13 @@ def unpack_bundle(archive, destination, repository):
         member_path(entry)
         require(entry.startswith("bin/"), "invalid_entry_point")
         library = str(PurePosixPath(entry).parent / PDFIUM_LIBRARIES.get(sys.platform, ""))
-        require(set(names) == set(RESOURCES) | {"manifest.json", entry, library, PDFIUM_NOTICE},
+        require(set(names) == set(RESOURCES) | {"manifest.json", ICON, entry, library, PDFIUM_NOTICE},
                 "unexpected_archive_members")
+        # The icon is the file committed in packaging/mcpb, unmodified, and the manifest names it.
+        require(manifest.get("icon") == ICON, "icon_declaration_mismatch")
+        icon = bundle.read(ICON)
+        require(icon.startswith(PNG_SIGNATURE), "icon_is_not_png")
+        require(icon == (repository / ICON_SOURCE).read_bytes(), "icon_bytes_differ")
         config = manifest["server"]["mcp_config"]
         require(manifest["server"]["type"] == "binary"
                 and config["command"] == "${__dirname}/" + entry

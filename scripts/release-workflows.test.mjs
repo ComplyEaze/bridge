@@ -460,15 +460,34 @@ test("the MCPB smoke binds initialize serverInfo.version to the archived manifes
   assert.match(smoke, /validate_server_version\(replies\[0\], manifest\)/);
 });
 
-test("unsigned preview notes state the host-validation scope and remaining gaps", async () => {
+test("the release footer states what the release check covers, the true limits, and does not call the release a preview", async () => {
   const notes = await readFile(new URL("../packaging/mcpb/UNSIGNED_PREVIEW_RELEASE.md", import.meta.url), "utf8");
+  assert.match(notes, /still being developed/);
+  assert.match(notes, /not yet\s+code-signed or notarized, so your computer may warn you/);
+  assert.match(notes, /Compare each download with its \.sha256 file/);
+  assert.match(notes, /unsigned third-party PDFium shared library/);
   assert.match(notes, /hosted Windows x64 and Apple Silicon Mac runners/);
-  assert.match(notes, /does not establish\nlive Tally behaviour or Claude Desktop conversational tool calls/);
-  assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains outstanding/);
+  assert.match(notes, /does not\s+establish live Tally behaviour or Claude Desktop conversational tool calls/);
+  assert.match(notes, /What has and has not been run against a real TallyPrime is listed\s+in the README/);
+  assert.match(notes, /Native Windows Tally\/Claude Desktop validation remains\s+outstanding/);
   assert.match(notes, /Intel Mac is not qualified/);
   // The attestation line is scoped: where and by what a file was built, never a signature or a safety claim.
   assert.match(notes, /gh attestation verify <file>\.mcpb --repo ComplyEaze\/bridge --signer-workflow\s+ComplyEaze\/bridge\/\.github\/workflows\/release-mcpb-preview\.yml --source-ref\s+refs\/heads\/master --deny-self-hosted-runners/);
   assert.match(notes, /It is not a code\s+signature and does not show the code is safe\./);
+  // User-facing text says what is true; it neither calls the release a preview nor claims signing.
+  // File and tag names (`release-mcpb-preview.yml`, `mcp-preview-*`) are names, not prose.
+  const prose = notes.replaceAll("release-mcpb-preview", "").replaceAll("mcp-preview", "");
+  assert.doesNotMatch(prose, /\bpreviews?\b|for evaluation|production/i);
+  const claims = prose.replace(/not yet\s+code-signed or notarized/g, "").replace(/unsigned/g, "");
+  assert.doesNotMatch(claims, /\b(?:code-)?signed\b|\bnotarized\b|\bnotarised\b/i, "the footer may not claim signing or notarization");
+});
+
+test("the install guide does not call a release a preview or say it is for evaluation", async () => {
+  const guide = await readFile(new URL("../docs/agent/INSTALL.md", import.meta.url), "utf8");
+  const prose = guide.replaceAll("mcp-preview", "");
+  assert.doesNotMatch(prose, /\bpreviews?\b|for evaluation|production release/i);
+  assert.match(prose, /not yet code-signed or\s+notarized/);
+  assert.match(prose, /try it on\s+test data first and keep current backups/);
 });
 
 // The two existence checks of the publish step run against stubs, so "the lookup failed" is shown

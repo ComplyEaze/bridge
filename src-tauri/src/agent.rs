@@ -43,6 +43,8 @@ use company::*;
 mod changes;
 #[path = "agent_ledgers.rs"]
 mod ledgers;
+#[path = "agent_masters.rs"]
+mod masters;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
 #[path = "agent_outstandings.rs"]
 mod outstandings;
@@ -95,7 +97,7 @@ mod terms;
 use crate::tally::runtime::RuntimeReadEvidence;
 use crate::tally::{
     ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor, OutstandingsLoadResult, TallyConfig,
-    TallyRuntime, UnallocatedParty, VerifiedCompanyIdentity,
+    TallyRuntime, UnallocatedComposition, UnallocatedParty, VerifiedCompanyIdentity,
 };
 use bridge_tally_protocol::xml_read_profiles::{
     ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange,
@@ -197,6 +199,17 @@ fn open_bill_json(bill: &OpenBillRow) -> Value {
 fn unallocated_party_json(party: &UnallocatedParty) -> Value {
     let mut value = serde_json::to_value(party).unwrap_or_default();
     mark_party_field(&mut value, "party");
+    // The ledger's bill-wise flag, written from the composition that carries it
+    // so the two cannot disagree. Absent with the composition.
+    if let (Some(object), Some(composition)) = (value.as_object_mut(), party.composition) {
+        object.insert(
+            "ledger_bill_wise".to_string(),
+            Value::Bool(matches!(
+                composition,
+                UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+            )),
+        );
+    }
     value
 }
 
@@ -480,6 +493,20 @@ fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
 
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
     error.chain().find_map(|cause| {
+        if let Some(crate::tally::runtime::MastersReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -607,6 +634,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(amount.safe_code());
         }
+        if let Some(masters) =
+            cause.downcast_ref::<bridge_tally_protocol::native_masters::NativeMastersError>()
+        {
+            return Some(masters.code());
+        }
+        if let Some(crate::tally::runtime::MastersReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -705,6 +742,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. Bridge \
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
+        ),
+        // The masters read's own size refusal (`size` carries the mark).
+        "masters_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row of this kind is over Bridge's response budget \
+             (`size.limit_bytes`), so no request for masters was sent. The mark also counts \
+             masters of every other kind, so a company with fewer masters of this kind may \
+             be refused. A larger book refuses; retrying this call refuses again.",
         ),
         // Causes of `ledger_movement_read_failed`: the ledger catalogue is read whole,
         // whatever voucher window is asked for (#485).
@@ -983,6 +1028,10 @@ impl ToolFailure {
             "window_part_boundary_unsupported_in_education"
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::TrialBalanceReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -1474,6 +1523,7 @@ impl Server {
             "ledger_movement" => self.ledger_movement(args).await,
             "purchase_register" => self.purchase_register(args).await,
             "trial_balance" => self.trial_balance(args).await,
+            "masters" => self.masters(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),

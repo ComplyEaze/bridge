@@ -468,17 +468,23 @@ fn validate_guid_suffix(
     guid: &str,
     expected_company_guid: &str,
 ) -> Result<(), NativeTrialBalanceError> {
-    let suffix = guid
-        .get(expected_company_guid.len().saturating_add(1)..)
-        .ok_or(NativeTrialBalanceError::InvalidResponse(
+    if guid_suffix_is_valid(guid, expected_company_guid) {
+        Ok(())
+    } else {
+        Err(NativeTrialBalanceError::InvalidResponse(
             "trial_balance_guid_suffix_invalid",
-        ))?;
-    if suffix.len() != 8 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(NativeTrialBalanceError::InvalidResponse(
-            "trial_balance_guid_suffix_invalid",
-        ));
+        ))
     }
-    Ok(())
+}
+
+/// Whether what follows the company GUID and its separator is eight hex
+/// digits, the object suffix every captured row GUID carries. Shared with the
+/// masters parser, which admits a row GUID by the same rule.
+pub(crate) fn guid_suffix_is_valid(guid: &str, expected_company_guid: &str) -> bool {
+    guid.get(expected_company_guid.len().saturating_add(1)..)
+        .is_some_and(|suffix| {
+            suffix.len() == 8 && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
 }
 
 /// A fully observed native row must satisfy Tally's signed movement identity.

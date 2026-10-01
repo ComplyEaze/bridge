@@ -3,9 +3,9 @@
 //! The compatibility gate cannot notice a pin disappearing: it digests the pins
 //! that are listed and never adds paths. `docs/release-process.md` requires the
 //! pin list to be merged rather than resolved by taking one side; a resolution
-//! that takes the base side anyway drops every entry a branch added while
-//! keeping the raised `MAX_SURFACE_FILES`, and the gate passes. So does the cap
-//! assertion, which bounds headroom and would pass with all of them dropped.
+//! that takes the base side anyway drops every entry a branch added, and the
+//! gate passes. So does the parse bound `MAX_SURFACE_FILES`, which only refuses a
+//! runaway list and would pass with all of them dropped.
 //! `book_presence_tests.rs` guards its own contract's pins the same way.
 //!
 //! This file is deliberately not pinned itself: a guard that lived in the
@@ -67,10 +67,9 @@ fn assert_still_pinned(required: &[&str]) {
     assert!(
         missing.is_empty(),
         "dropped from the compatibility surface: {missing:?}. A merge that took \
-         the base side of compatibility-surface.json loses added pins while \
-         keeping the raised cap, and the gate cannot see it. Restore the entries \
-         in the pin list, keep MAX_SURFACE_FILES equal to the pin count, and add \
-         the acknowledgement file, as described in docs/release-process.md \
+         the base side of compatibility-surface.json loses added pins, and the \
+         gate cannot see it. Restore the entries in the pin list and add the \
+         acknowledgement file, as described in docs/release-process.md \
          (\"Adding or removing a pin\")."
     );
 }

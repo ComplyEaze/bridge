@@ -1,6 +1,6 @@
 # Trade marks
 
-ComplyEaze™, ComplyEaze Bridge™ and the related names, logos and product marks are trade marks of SPMS Comply Eaze Solutions LLP.
+ComplyEaze, ComplyEaze Bridge and the related names, logos and product marks are the names and marks SPMS Comply Eaze Solutions LLP uses to identify its products. They are not registered trade marks.
 
 The Apache License 2.0 that covers this repository's source code does not grant permission to use them, except to describe where the software came from and to reproduce the NOTICE file (Apache License, section 6).
 

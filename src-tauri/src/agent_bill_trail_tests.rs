@@ -512,6 +512,87 @@ fn rows_that_are_not_shaped_as_a_trail_needs_are_refused_not_guessed() {
     );
 }
 
+/// Every field a trail reads from a voucher row is required: a row missing
+/// one is refused as `trail_voucher_malformed`, never skipped or defaulted.
+#[test]
+fn a_voucher_row_missing_a_field_the_trail_reads_is_refused_as_malformed() {
+    let good = || {
+        voucher(
+            "20260701",
+            "Sales",
+            "A",
+            vec![entry(
+                "A",
+                "-5.00",
+                vec![allocation("New Ref", Some("X"), "-5.00", Some("20260701"))],
+            )],
+        )
+    };
+    assert_eq!(entries_for_party(&[good()], "A").unwrap().len(), 1);
+    for pointer in [
+        "/date",
+        "/voucher_type",
+        "/guid",
+        "/amounts",
+        "/amounts/0/bill_allocations",
+        "/amounts/0/bill_allocations/0/bill_type",
+        "/amounts/0/bill_allocations/0/amount",
+    ] {
+        let mut row = good();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        let removed = if parent.is_empty() {
+            row.as_object_mut().unwrap().remove(key)
+        } else {
+            row.pointer_mut(parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .remove(key)
+        };
+        assert!(removed.is_some(), "{pointer}");
+        assert_eq!(
+            entries_for_party(&[row], "A"),
+            Err(TrailRefusal("trail_voucher_malformed")),
+            "{pointer}"
+        );
+    }
+    // A field of the wrong type is as missing as an absent one.
+    let mut row = good();
+    row["amounts"][0]["bill_allocations"] = json!("none");
+    assert_eq!(
+        entries_for_party(&[row], "A"),
+        Err(TrailRefusal("trail_voucher_malformed"))
+    );
+}
+
+/// A named allocation without its bill date is refused by the trail itself,
+/// not given an empty date, whether or not Tally lists the bill.
+#[test]
+fn a_named_allocation_without_its_bill_date_is_refused_not_given_an_empty_date() {
+    let mut undated = trail_entry(1);
+    undated.bill_date = None;
+    assert_eq!(
+        bill_trails("P", None, std::slice::from_ref(&undated), &[]),
+        Err(TrailRefusal("trail_bill_date_missing"))
+    );
+    // A settled pair with no native row would otherwise have tied, dated "".
+    let mut opening = trail_entry(2);
+    opening.bill_date = None;
+    let mut settling = trail_entry(3);
+    settling.bill_date = None;
+    settling.amount = decimal("1");
+    assert_eq!(
+        bill_trails("P", None, &[opening, settling], &[]),
+        Err(TrailRefusal("trail_bill_date_missing"))
+    );
+    // One dated and one undated allocation of one bill is refused too.
+    let dated = trail_entry(4);
+    assert_eq!(
+        bill_trails("P", None, &[dated, undated], &[]),
+        Err(TrailRefusal("trail_bill_date_missing"))
+    );
+}
+
 fn unallocated(
     amount: &str,
     direction: ExposureDirection,
@@ -619,10 +700,19 @@ fn a_residual_the_vouchers_do_not_explain_is_reported_with_the_difference_and_th
     assert_eq!(opening_fact(Some("-100.00")), Some(false));
     // An opening Tally did not send is neither equal nor unequal.
     assert_eq!(opening_fact(None), None);
-    // The JSON never calls the difference an opening.
-    let text = detail.json().to_string();
-    assert!(text.contains("difference_equals_opening_balance"));
-    assert!(!text.contains("unreferenced_opening"));
+    // The JSON states the comparison as a fact and nothing else: these exact
+    // fields, so no label for the difference can creep in beside them.
+    assert_eq!(
+        detail.json(),
+        json!({
+            "state": "residual_not_explained_by_vouchers",
+            "residual": "-20000",
+            "on_account_sum": "0",
+            "rows": [],
+            "difference": "-20000",
+            "difference_equals_opening_balance": true,
+        })
+    );
 }
 
 /// Absent is not zero: a ledger the snapshot lists no residual for (a bank,

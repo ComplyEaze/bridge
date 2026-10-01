@@ -315,18 +315,32 @@ pub(super) fn bill_trails(
     if let Some(wanted) = reference {
         by_reference.entry(wanted).or_default();
     }
+    // The party's own rows of Tally's report, picked out once.
+    let party_natives = native_bills
+        .iter()
+        .filter(|bill| bill.party == party)
+        .collect::<Vec<_>>();
     let mut out = Vec::new();
     let mut seen = std::collections::BTreeSet::<String>::new();
     for (name, group) in by_reference {
         seen.insert(name.to_string());
-        let natives = native_bills
+        let natives = party_natives
             .iter()
-            .filter(|bill| bill.party == party && bill.reference == name)
+            .copied()
+            .filter(|bill| bill.reference == name)
             .collect::<Vec<_>>();
+        // Every named allocation carries its bill date (`entries_for_party`
+        // refuses one that does not); one without is refused here too rather
+        // than given an empty date or left out of the comparison.
         let mut bill_dates = group
             .iter()
-            .filter_map(|entry| entry.bill_date.clone())
-            .collect::<Vec<_>>();
+            .map(|entry| {
+                entry
+                    .bill_date
+                    .clone()
+                    .ok_or(TrailRefusal("trail_bill_date_missing"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         bill_dates.sort();
         bill_dates.dedup();
         let owned = group
@@ -348,10 +362,15 @@ pub(super) fn bill_trails(
             continue;
         }
         let trail_sum = sum(&group)?;
-        let bill_date = bill_dates.first().cloned().unwrap_or_default();
+        // `None` only for an empty group: every allocation in a group was
+        // checked above to carry its date.
+        let bill_date = bill_dates.first().cloned();
         match natives.first() {
             Some(native) => {
-                if !group.is_empty() && native.bill_date != bill_date {
+                if bill_date
+                    .as_deref()
+                    .is_some_and(|date| date != native.bill_date)
+                {
                     // One native row, but it is not this bill: its date differs
                     // from the allocations' own bill date.
                     out.push(BillOutcome::Ambiguous {
@@ -383,6 +402,9 @@ pub(super) fn bill_trails(
                 }
             }
             None => {
+                // No native row: the group is not empty (an empty group with
+                // no native row was skipped above), so it has its date.
+                let bill_date = bill_date.ok_or(TrailRefusal("trail_bill_date_missing"))?;
                 if trail_sum.is_zero() {
                     out.push(BillOutcome::Tied(BillTrail {
                         reference: name.to_string(),
@@ -409,10 +431,8 @@ pub(super) fn bill_trails(
     // Several rows for one reference are ambiguous here exactly as they are
     // when vouchers carry the reference, never one shown and the rest dropped.
     let mut native_only = BTreeMap::<&str, Vec<&OpenBillRow>>::new();
-    for native in native_bills.iter().filter(|bill| {
-        bill.party == party
-            && !seen.contains(&bill.reference)
-            && reference.is_none_or(|wanted| wanted == bill.reference)
+    for native in party_natives.iter().copied().filter(|bill| {
+        !seen.contains(&bill.reference) && reference.is_none_or(|wanted| wanted == bill.reference)
     }) {
         native_only
             .entry(native.reference.as_str())
@@ -562,6 +582,11 @@ pub(super) fn unadjusted_detail(
             rows: Vec::new(),
         });
     }
+    let party_references = native_bills
+        .iter()
+        .filter(|bill| bill.party == party)
+        .map(|bill| bill.reference.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
     let mut rows = Vec::new();
     let mut on_account = Vec::<&TrailEntry>::new();
     for entry in entries {
@@ -573,11 +598,10 @@ pub(super) fn unadjusted_detail(
             AllocationKind::Advance => rows.push(("advance", entry.clone())),
             AllocationKind::NewRef
                 if matches!(entry.voucher_type.as_str(), "Credit Note" | "Debit Note")
-                    && entry.reference.as_deref().is_some_and(|reference| {
-                        native_bills
-                            .iter()
-                            .any(|bill| bill.party == party && bill.reference == reference)
-                    }) =>
+                    && entry
+                        .reference
+                        .as_deref()
+                        .is_some_and(|reference| party_references.contains(reference)) =>
             {
                 rows.push(("pending_note_with_reference", entry.clone()));
             }

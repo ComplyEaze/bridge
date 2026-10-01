@@ -45,6 +45,8 @@ mod changes;
 mod ledgers;
 #[path = "agent_masters.rs"]
 mod masters;
+#[path = "agent_stock_summary.rs"]
+mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
 #[path = "agent_outstandings.rs"]
 mod outstandings;
@@ -507,6 +509,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -644,6 +660,16 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(reason);
         }
+        if let Some(stock) =
+            cause.downcast_ref::<bridge_tally_protocol::native_stock_summary::NativeStockError>()
+        {
+            return Some(stock.code());
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(reason);
+        }
         if let Some(statement) = cause
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
@@ -762,6 +788,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              reads Tally's own period figures per ledger without this catalogue read (a \
              whole-book read of its own, on a different basis: not literal voucher \
              movement).",
+        ),
+        // The stock summary read's own size refusal (`size` carries the mark).
+        "stock_summary_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case stock-item row is over Bridge's response budget (`size.limit_bytes`), \
+             so no request for stock items was sent. The mark counts masters of every kind, so \
+             a company with few stock items may be refused. A larger book refuses; retrying \
+             this call refuses again.",
+        ),
+        // The stock summary's date refusal: it costs no Tally request.
+        "stock_summary_as_of_not_measured" => Some(
+            "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \
+             and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
+             refuses again. Only the period ending 31 March 2026 has been measured for \
+             stock: another year's 31 March is read, but its figures are unmeasured.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
@@ -1032,6 +1073,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -1524,10 +1569,12 @@ impl Server {
             "purchase_register" => self.purchase_register(args).await,
             "trial_balance" => self.trial_balance(args).await,
             "masters" => self.masters(args).await,
+            "stock_summary" => self.stock_summary(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "egress_log" => self.egress_log(args).map_err(Into::into),
+            "local_data_report" => self.local_data_report().map_err(Into::into),
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -1575,6 +1622,35 @@ impl Server {
             evidence,
             company_guid: None,
             truncated,
+        })
+    }
+
+    /// What Bridge stores locally, by class: counts, sizes, ages and whether the
+    /// import journal is settled. Reads Bridge's own data folder and the per-user
+    /// lease-lock folder, and names no path: the result enters the AI conversation. The call is logged in the
+    /// egress log like any tool call.
+    fn local_data_report(&self) -> Result<ToolOutcome, String> {
+        let (payload, incomplete) = agent_import::local_data::tool_payload(&self.settings.data_dir);
+        let evidence = Evidence {
+            request_sha256: sha256_hex(b"local_data_report"),
+            response_sha256: sha256_json(&payload),
+            bytes: 0,
+            // A report that could not read part of what it reports on says so
+            // in its evidence too, not only in its body.
+            state: if incomplete.is_some() {
+                "partial"
+            } else {
+                "complete"
+            },
+            read_at: None,
+            duration_ms: None,
+            reason_code: incomplete.map(str::to_string),
+        };
+        Ok(ToolOutcome {
+            payload: json!({"result": payload}),
+            evidence,
+            company_guid: None,
+            truncated: false,
         })
     }
 
@@ -2022,6 +2098,24 @@ fn mask(value: &str) -> String {
         chars[chars.len() - 2],
         chars[chars.len() - 1]
     )
+}
+
+/// `bridge_mcp --local-data-report [--show-paths]`: a read-only report of the
+/// local data Bridge keeps. `None` when the first argument is not this mode; a
+/// malformed use exits 2 with the usage, never starts the server.
+pub fn run_local_data_report_from_args(mut args: impl Iterator<Item = String>) -> Option<i32> {
+    if args.next().as_deref() != Some("--local-data-report") {
+        return None;
+    }
+    let show_paths = match (args.next().as_deref(), args.next()) {
+        (None, _) => false,
+        (Some("--show-paths"), None) => true,
+        _ => {
+            eprintln!("usage: bridge_mcp --local-data-report [--show-paths]");
+            return Some(2);
+        }
+    };
+    Some(agent_import::local_data::run(show_paths))
 }
 
 pub async fn run_stdio() -> Result<(), String> {

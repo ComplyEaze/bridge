@@ -69,6 +69,14 @@ pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
 #[path = "runtime_masters_tests.rs"]
 mod masters_tests;
 
+#[path = "runtime_stock_summary.rs"]
+mod stock_summary;
+pub(crate) use stock_summary::StockSummaryReadError;
+
+#[cfg(test)]
+#[path = "runtime_stock_summary_tests.rs"]
+mod stock_summary_tests;
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;
@@ -2473,43 +2481,6 @@ impl CachedProbeReservation {
 
     pub fn consume(&mut self) -> anyhow::Result<bool> {
         self.finish(true)
-    }
-
-    pub fn replace(
-        &mut self,
-        replacement_review_id: String,
-        observed_at_unix_ms: i64,
-        result: TallyProbeResult,
-    ) -> anyhow::Result<bool> {
-        if replacement_review_id.is_empty()
-            || replacement_review_id.len() > 128
-            || replacement_review_id.chars().any(char::is_control)
-        {
-            anyhow::bail!("Tally replacement review ID is invalid");
-        }
-        let mut cache = self
-            .session
-            .cached_probe
-            .write()
-            .map_err(|_| anyhow::anyhow!("Tally capability cache is unavailable"))?;
-        let Some(current) = cache.as_ref() else {
-            self.armed = false;
-            return Ok(false);
-        };
-        if !self.armed || current.review_id != self.review_id || !current.reserved {
-            self.armed = false;
-            return Ok(false);
-        }
-        let freshness_origin_unix_ms = current.freshness_origin_unix_ms;
-        *cache = Some(CachedProbe {
-            review_id: replacement_review_id,
-            observed_at_unix_ms,
-            freshness_origin_unix_ms,
-            result,
-            reserved: false,
-        });
-        self.armed = false;
-        Ok(true)
     }
 
     fn finish(&mut self, consume: bool) -> anyhow::Result<bool> {

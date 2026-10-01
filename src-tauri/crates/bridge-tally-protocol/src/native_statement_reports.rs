@@ -139,9 +139,20 @@ pub fn render_native_statement_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_built_in_report_request(kind.report_id(), company, period)
+}
+
+/// The same envelope for any built-in report named by `id`. The Stock Summary
+/// (`native_stock_summary`) is requested through it, so its request is this
+/// shape by construction.
+pub(crate) fn render_built_in_report_request(
+    id: &str,
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        id = kind.report_id(),
+        id = xml_escape(id),
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),

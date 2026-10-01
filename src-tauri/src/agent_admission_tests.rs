@@ -103,6 +103,8 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "read_evidence",
         "egress_log",
         "masters",
+        "local_data_report",
+        "stock_summary",
     ];
     // The exact sentence each description ends with, written out here so an edit
     // to the catalogue's constants cannot pass by agreeing with itself.

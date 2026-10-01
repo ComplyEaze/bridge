@@ -11,6 +11,9 @@
 //! The parser is closed and fails closed with a typed error (AGENTS.md P3):
 //! it is not the tolerant generic collection reader. Groups are not read
 //! here; they stay on the group snapshot.
+//!
+//! The element-reading helpers at the end are `pub(crate)`: `native_stock_summary`
+//! reads its collections with them rather than with a second copy.
 use crate::native_ledger_guid_has_company_prefix;
 use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
@@ -424,7 +427,7 @@ pub fn parse_native_masters(
 /// not part of the closed shape: only XML whitespace (space, tab, carriage
 /// return, line feed) may sit between elements. `str::trim` is not that set: it
 /// also drops U+00A0 and other Unicode spaces, which are text.
-fn refuse_stray_text(text: &BytesText<'_>) -> Result<(), NativeMastersError> {
+pub(crate) fn refuse_stray_text(text: &BytesText<'_>) -> Result<(), NativeMastersError> {
     let decoded = text
         .decode()
         .map_err(|_| NativeMastersError::Malformed("masters_xml_invalid_encoding"))?;
@@ -561,7 +564,7 @@ fn parse_row(
 /// row's aliases, into `names` (one count per row, across every language
 /// list it carries), and refuses one past the assumed bounds. Aliases are
 /// not kept.
-fn read_language_names(
+pub(crate) fn read_language_names(
     reader: &mut Reader<&[u8]>,
     names: &mut usize,
 ) -> Result<(), NativeMastersError> {
@@ -605,7 +608,7 @@ fn read_language_names(
     }
 }
 
-fn skip_subtree(reader: &mut Reader<&[u8]>) -> Result<(), NativeMastersError> {
+pub(crate) fn skip_subtree(reader: &mut Reader<&[u8]>) -> Result<(), NativeMastersError> {
     let mut depth = 1_u32;
     loop {
         match reader
@@ -631,7 +634,10 @@ fn skip_subtree(reader: &mut Reader<&[u8]>) -> Result<(), NativeMastersError> {
 
 /// An element's text, refusing nested markup. Not trimmed: a name or parent
 /// is matched by exact codepoint, as the group snapshot reads its `PARENT`.
-fn read_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> Result<String, NativeMastersError> {
+pub(crate) fn read_text(
+    reader: &mut Reader<&[u8]>,
+    name: QName<'_>,
+) -> Result<String, NativeMastersError> {
     let raw = reader
         .read_text(name)
         .map_err(|_| NativeMastersError::Malformed("masters_xml_malformed"))?;
@@ -660,7 +666,7 @@ fn read_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> Result<String, Nati
 
 /// The row's `NAME`, required and not blank. Its `RESERVEDNAME`, when present,
 /// is checked against the name bound too.
-fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeMastersError> {
+pub(crate) fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeMastersError> {
     let mut name = None;
     for attribute in element.attributes() {
         let attribute =
@@ -683,7 +689,7 @@ fn name_attribute(element: &BytesStart<'_>) -> Result<String, NativeMastersError
         .ok_or(NativeMastersError::RowWithoutName)
 }
 
-fn within_name_bound(name: &str) -> Result<(), NativeMastersError> {
+pub(crate) fn within_name_bound(name: &str) -> Result<(), NativeMastersError> {
     if name.chars().count() > MASTERS_ASSUMED_NAME_CHARS {
         return Err(NativeMastersError::RowExceedsBound);
     }
@@ -733,18 +739,18 @@ fn numbering_method(text: &str) -> Result<NativeNumberingMethod, NativeMastersEr
     })
 }
 
-fn upper(name: QName<'_>) -> Vec<u8> {
+pub(crate) fn upper(name: QName<'_>) -> Vec<u8> {
     name.as_ref().to_ascii_uppercase()
 }
 
-fn refuse_error_element(name: &[u8]) -> Result<(), NativeMastersError> {
+pub(crate) fn refuse_error_element(name: &[u8]) -> Result<(), NativeMastersError> {
     if name == b"LINEERROR" || name == b"ERROR" {
         return Err(NativeMastersError::TallyReportedFailure);
     }
     Ok(())
 }
 
-fn path_is(path: &[Vec<u8>], expected: &[&[u8]]) -> bool {
+pub(crate) fn path_is(path: &[Vec<u8>], expected: &[&[u8]]) -> bool {
     path.len() == expected.len()
         && path
             .iter()

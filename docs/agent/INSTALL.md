@@ -6,6 +6,10 @@ books.
 
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
 
+The TallyPrime keys, the Claude Desktop screens and buttons, and the Mac keys in these steps are as seen on
+2 October 2026 with TallyPrime 7.1 and Claude Desktop. Those are other companies' programs and they change, so a
+screen of yours may differ a little.
+
 ## Before you start
 
 **You need three things on one computer:**
@@ -53,8 +57,10 @@ key; **Ctrl** is the **Control** key.
      port number:
 
      > Please add a port forwarding rule to the Windows virtual machine on this Mac: TCP, from port 9000 on the Mac
-     > to port 9000 in Windows, reachable from this Mac only and not from the network or the internet. When it is
-     > right, `http://localhost:9000/status` opens in Safari on the Mac.
+     > to port 9000 in Windows. The Mac side must listen on the Mac's own loopback address only (127.0.0.1), not on
+     > all of the Mac's addresses. If the rule cannot be limited like that, the Mac's firewall must block the port
+     > from outside. Two tests: (1) `http://localhost:9000/status` opens in Safari on the Mac; (2) from another
+     > computer on the same network, `http://<this Mac's network address>:9000/status` must NOT open.
 
 In Claude Desktop on a Mac, a candidate build of 0.4.0 has been installed and its tools have loaded in a chat. A
 question answered from Tally through it, after the Terms are accepted, is not yet something we have run. The
@@ -64,6 +70,13 @@ question answered from Tally through it, after the Terms are accepted, is not ye
 
 Tally can answer other programs on the same computer, such as ComplyEaze Bridge. This is switched off until you turn
 it on. It changes one setting in TallyPrime and no data.
+
+**A caution before you turn it on.** As we understand TallyPrime, once this setting is on, Tally answers on that port,
+without a password, to anything that can reach it. ComplyEaze Bridge only ever calls Tally from this same computer,
+but the setting is Tally's own. What keeps other computers out is this computer's firewall. Check that the firewall
+does not allow incoming connections to that port, and that you are on a network you trust. We have not measured this
+ourselves.
+<!-- OWNER TO CONFIRM on the lab machine: what TallyPrime answers to another computer on the network once "acts as Both" is on. Reword this caution from the measurement. -->
 
 1. Open TallyPrime and open your test company.
 2. Press **F1**. A Help menu opens. Choose **Settings**, then **Connectivity**.
@@ -107,8 +120,9 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 5. A page opens with the name **ComplyEaze Bridge** and a **notice from Claude Desktop, in red**. The notice is
    Claude Desktop's own. It tells you that an extension is a program that gets access to your computer, and that this
    one is **not verified by Anthropic**. Both are true. Read it.
-   - What ComplyEaze Bridge does with that access: it talks to Tally on this computer, and it keeps a receipt of each
-     tool call on this computer.
+   - What ComplyEaze Bridge does with that access: it talks to Tally on this computer; it keeps a receipt of each
+     tool call on this computer; it saves there the voucher files it prepares and the bank statements it reads; and
+     it reads a file when a request names one.
    - If you do not want to go on, close the page and stop here.
 6. To go on, click **Install**.
 7. A small box asks **"Do you want to install ComplyEaze Bridge?"** Click **Install**.
@@ -124,7 +138,7 @@ A settings window opens with five lines. Go from top to bottom.
 | **I accept the ComplyEaze Bridge Terms of Use (version 2026-10)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then switch this **on**. If you do not own the practice, the owner should read and agree first. | Your agreement. While it is off, ComplyEaze Bridge refuses every request and reads nothing from Tally. |
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
-| **Response redaction** | Do not change it. It says `none`. | A way to hide things from Claude. The other two values are `mask_parties` (hides party names) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts are never hidden. |
+| **Response redaction** | Do not change it. It says `none`. | A way to hide things from Claude. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts are never hidden. |
 | **Allow voucher posting (Journal, Payment, Receipt, Contra)** | Leave it **off**. | Lets Claude make entries in Tally, each one only after you approve it. |
 
 Click **Save**.
@@ -149,7 +163,8 @@ Do this on both. In our one test of each, a Mac needed it and Windows did not.
 3. Claude Desktop shows its own box asking whether Claude may use a tool from ComplyEaze Bridge. The buttons are
    **Deny**, **Always allow** and **Allow once**. Click **Allow once**. Claude will then ask you each time it wants to
    use a tool, which is the careful choice while you are trying it out. One question can need more than one tool.
-4. Claude answers with the name of your test company. That is all. It is installed.
+4. Claude answers with the name of your test company. That is all. It is installed. (On a Mac this last result is
+   the one we have not yet run ourselves; see the end of [Step 0](#step-0-mac-only-let-the-mac-reach-tally).)
 
 **If something else happens:**
 
@@ -184,7 +199,8 @@ voucher:
 
 ![The two approval windows, drawn as a diagram. Windows: "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel. Mac: "ComplyEaze Bridge — approve one voucher" with Cancel and Post voucher.](./img/install-approval.svg)
 
-- **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts.
+- **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
+  is the button already chosen, so pressing Enter does not post.
 - **Mac:** the window says "approve one voucher" with **Cancel** and **Post voucher**. Only **Post voucher** posts.
 
 There is no tool to undo or delete a posted voucher. A wrong entry must be corrected by hand in Tally.
@@ -192,7 +208,10 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 ## Remove or update it
 
 - **Remove:** open Settings, then Extensions, click ComplyEaze Bridge and uninstall it there. This changes nothing in
-  Tally. If you want Tally as it was, set **TallyPrime acts as** back to what you wrote down in Step 1.
+  Tally. If you want Tally as it was, set **TallyPrime acts as** back to what you wrote down in Step 1. Removing it
+  does not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
+  masked, stay on the computer. Section 7 of the [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how
+  to archive or remove them.
 - **Update:** it does not update by itself. Quit Claude Desktop (Step 5), open it, and install the newer file as in
   Step 3. Then look at the settings in Step 4. If you had an earlier version, check **Allow voucher posting**: an
   earlier default may still be saved as on.
@@ -209,6 +228,9 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   newest first. Each archive has a same-named `.sha256` file and a small provenance record on its release, so an
   organization can identify the downloaded bytes and the source commit. Run `certutil -hashfile <file> SHA256` on
   Windows or `shasum -a 256 <file>` on a Mac and compare the result with the `.sha256` file.
+- **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
+  check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
+  yet, and it does not show that the code is safe.
 - **Platforms.** The packages target Windows x64 and Apple Silicon Mac (ARM64); Intel Mac and other platforms are not
   qualified. Package availability is not a host-validation claim; read each release's notes for its current gaps.
 - **Other ways in.** Opening the `.mcpb` file directly may also start the install. To run from source instead, use the

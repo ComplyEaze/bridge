@@ -152,6 +152,18 @@ looked at in the review.
   master commit that added a pin is not reported as indeterminate. It also
   requires a review or comment that names the head commit, the acknowledgement
   path and every touched path. The `reviewer:` login must be that review's author.
+- **Branch history, in both checks.** The diff against the base cannot see a pin
+  the branch added and then lost, for example when a merge of master is resolved by
+  taking master's pin list: at the head the list equals the base's. So
+  `scripts/check-surface-ack.mjs` and `scripts/merge-gate.sh` also read the pin list at
+  every commit of the pull request and at each commit's parents (a merge is compared
+  with all of them, never the first only). A path that a commit pins and none of its
+  parents pinned, and that is in neither the base list nor the head list, counts as a
+  removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
+  pin must be restored. Both fail closed on a shallow clone and on a commit whose pin
+  list cannot be read or parsed. What stays open: a pin lost in a rebase, a
+  force-push or a squash before the push leaves no history to read, and only a
+  stay-pinned guard test covers that.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed

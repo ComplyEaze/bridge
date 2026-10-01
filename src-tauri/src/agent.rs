@@ -792,10 +792,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // Causes, reached through `stock_summary_read_failed`.
         "stock_report_unknown" => Some(
             "Tally answered Bridge's request for its Stock Summary without the report, both \
-             times it was asked, so stock values cannot be checked and nothing is returned. Do \
-             not call stock_summary again for this company. Tell the user Bridge cannot read \
-             stock from this Tally and that the Stock Summary in Tally itself is the place to \
-             read it.",
+             times it was asked, so stock values cannot be checked and nothing is returned. \
+             Bridge cannot tell why. The book did not change during the read, so do not retry. \
+             Tell the user Bridge could not read stock from this Tally and that the Stock \
+             Summary in Tally itself is the place to read it.",
         ),
         "stock_item_count_unavailable" => Some(
             "Tally gave no usable count of this company's stock items, both times it was asked, \

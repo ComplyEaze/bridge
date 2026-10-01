@@ -163,7 +163,7 @@ pub struct NativeCompanyInventory {
 
 /// A quantity as Tally writes it, `<number> <unit>`. The amount is signed: it
 /// keeps the sign Tally sent, so a negative stock is a negative amount.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeStockQuantity {
     pub amount: ExactDecimal,
     pub unit: String,
@@ -210,8 +210,8 @@ pub struct NativeStockItem {
     /// the group snapshot keeps it; absent or blank is `None`.
     pub parent: Option<String>,
     pub base_unit: Option<String>,
-    /// Read and validated (a malformed opening quantity or value still refuses),
-    /// but never serialized: nothing checks it, and its as-at date is
+    /// Read and validated (a malformed opening value still refuses), but
+    /// never serialized: nothing checks it, and its as-at date is
     /// unmeasured (the only capture's books start where its period starts).
     #[serde(skip)]
     pub opening: NativeStockPosition,
@@ -581,8 +581,8 @@ pub fn parse_company_inventory_flags(
     })
 }
 
-/// Tally's own stock item count: plain digits after trimming (Tally writes a
-/// non-zero count with a leading space, ` 11`, and zero as `0`). Missing,
+/// Tally's own stock item count: plain digits after trimming (the committed
+/// capture writes it with a leading space, ` 11`). Missing,
 /// empty, signed, grouped, fractional or too large for a count: unavailable,
 /// never zero. It does not refuse here: the gate decides what a read without a
 /// count is.
@@ -1089,9 +1089,9 @@ pub enum NativeStockGate {
 /// 4. the report has a total: the items' closing values must add up to it, with
 ///    at least one value on their side (two empty sides never match);
 /// 5. the report shows no amount: a non-zero sum on the items' side is not
-///    confirmed, and anything else was not comparable. Tally's Stock Summary
-///    has no line for a group worth zero, so a sum of zero against an empty
-///    report is not a contradiction.
+///    confirmed, and anything else was not comparable. Whether Tally's Stock
+///    Summary shows a line for a group worth zero is unmeasured, so a sum of
+///    zero against an empty report is not called a contradiction.
 ///
 /// A present `0.00` is a value. More rows than the count is not a refusal: each
 /// row is this company's by its GUID.

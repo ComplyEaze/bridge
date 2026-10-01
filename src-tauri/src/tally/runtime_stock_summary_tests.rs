@@ -721,7 +721,7 @@ async fn a_transport_failure_stays_a_transport_failure_at_every_read() {
 }
 
 #[tokio::test]
-async fn a_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause() {
+async fn an_items_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause() {
     let items_text = items();
     let start = items_text.find("<COLLECTION").unwrap();
     let end = items_text.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
@@ -764,7 +764,20 @@ async fn a_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause(
         );
         assert_eq!(observed.len(), AT_ITEMS, "{label}");
     }
+}
+
+#[tokio::test]
+async fn a_report_that_does_not_parse_or_is_not_recognised_is_refused_after_the_closing_extent() {
+    let unknown =
+        report()
+            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
+            .replacen("</ENVELOPE>", "</RESPONSE>", 1);
     for (label, text, expected) in [
+        (
+            "a report Tally answered without",
+            unknown.clone(),
+            NativeStockError::ReportUnknown,
+        ),
         (
             "a failure element",
             replaced(
@@ -788,15 +801,30 @@ async fn a_response_that_does_not_parse_is_refused_at_once_with_its_typed_cause(
             report: text,
             ..Book::captured()
         };
-        let (result, observed) = run(book.through_report()).await;
+        // Held until the closing extent was read, and it had not moved.
+        let (result, observed) = run(book.through_closing_extent()).await;
         let error = result.err().expect("refused");
         assert_eq!(
             cause::<NativeStockError>(&error),
             Some(&expected),
             "{label}"
         );
-        assert_eq!(observed.len(), AT_REPORT, "{label}");
+        assert_eq!(observed.len(), AT_CLOSING_EXTENT, "{label}");
     }
+    // A book that moved says so, not what its report would have refused.
+    let book = Book {
+        report: unknown,
+        closing_extent: extent_with_mark(260),
+        ..Book::captured()
+    };
+    let (result, observed) = run(book.through_closing_extent()).await;
+    let error = result.err().expect("refused");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&error),
+        Some(PairedReadValidationError::StockSummaryExtent)
+    ));
+    assert!(cause::<NativeStockError>(&error).is_none());
+    assert_eq!(observed.len(), AT_CLOSING_EXTENT);
 }
 
 #[tokio::test]
@@ -924,27 +952,6 @@ async fn valued_items_against_an_empty_report_complete_the_read_and_return_no_it
         parse_native_stock_summary_report(&hollow_report()),
         Ok(NativeStockReport::Empty)
     );
-}
-
-#[tokio::test]
-async fn a_report_tally_did_not_recognise_is_refused_at_once_with_its_typed_cause() {
-    let unknown =
-        report()
-            .replacen("<ENVELOPE>", "<RESPONSE>", 1)
-            .replacen("</ENVELOPE>", "</RESPONSE>", 1);
-    let book = Book {
-        report: unknown,
-        ..Book::captured()
-    };
-    let (result, observed) = run(book.through_report()).await;
-    let error = result.err().expect("refused");
-    assert_eq!(
-        cause::<NativeStockError>(&error),
-        Some(&NativeStockError::ReportUnknown)
-    );
-    // The answer's shape is wrong whether or not the book moved: no closing
-    // extent is read.
-    assert_eq!(observed.len(), AT_REPORT);
 }
 
 /// The flags capture with its stock item count element as given: `Some(text)`

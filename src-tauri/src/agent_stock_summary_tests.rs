@@ -22,7 +22,7 @@ const AS_OF: &str = "20260331";
 const BOOKS_FROM: &str = "20250401";
 /// The end of the basis of a read whose value total matched: exactly what was
 /// compared, and what was not.
-const MATCHED_SENTENCE: &str = "The closing values returned add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them.";
+const MATCHED_SENTENCE: &str = "The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them.";
 /// The part of a basis that is the same whatever Tally reported.
 const UNMEASURED_USE: &str =
     "how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured";
@@ -421,7 +421,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "`closing` holds `value` only",
         "tally_stock_summary_shows_no_value",
         "stock_values_not_comparable",
-        "Tally's Stock Summary has no line for a stock group worth zero",
+        "only Tally's own stock item count vouches for it",
         "`item_count_cross_check` reports `rows`, `tally_count` and `status`",
         "company_count_lower",
         "stock_summary_rows_below_item_count",
@@ -429,7 +429,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "stock_report_unknown",
         "closing_quantity_unread_count",
         "do not refuse the read",
-        "A result that returns no item is not held for paging",
+        "A `not_established` result is not held for paging",
         "`totals.value_sum_signs` is always `as_sent_meaning_unmeasured`",
         "what a negative value means is unmeasured",
         "`not_established`",
@@ -524,6 +524,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         page["checks"],
         json!({
             "closing_value_total": "checked",
+            "item_list_complete": "not_checked",
             "closing_value_each": "not_checked",
             "closing_quantity": "withheld",
             "name_parent_unit": "not_checked",
@@ -600,12 +601,12 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     let limitations = page["limitations"].as_array().unwrap();
     for line in [
         "Opening quantity and value are read but not returned, because their as-at date is unmeasured",
-        "Values and their signs are exactly as Tally sends them: the one capture had items with a positive quantity and a negative value, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
+        "Values and their signs are exactly as Tally sends them: the one capture had items holding stock with a negative value beside others with a positive one, and what the sign means is unmeasured; `value_sum` adds the values as sent, signs included (`totals.value_sum_signs` says so)",
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
     for line in [
-        "Quantities are withheld: nothing checks them, so no quantity and no count derived from one is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
+        "Quantities are withheld: nothing checks them, so none is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
         "Item names, parents and base units come from one source and are not checked against another",
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
@@ -801,6 +802,14 @@ fn assert_withheld(response: &Value, reason: &str) {
         "{remediation}"
     );
     assert!(!remediation.contains("offset 0"), "{remediation}");
+    // Nor does any other line of the result.
+    for line in page["limitations"].as_array().unwrap() {
+        let line = line.as_str().unwrap().to_lowercase();
+        assert!(
+            !line.contains("call again") && !line.contains("offset 0"),
+            "{line}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -936,14 +945,13 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
         .as_str()
         .unwrap()
         .contains("present neither figure as the stock value"));
-    // The limitation says this read is not held, and does not say that nothing
-    // is: an earlier read of the same date that returned rows may still be.
+    // The limitation says this read is not held and that no earlier one is.
     assert!(page["limitations"]
         .as_array()
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap()
-            == "This read is not held: a later page continues only from an earlier read of the same date that returned rows, if one is still held; call again with offset 0 to read afresh"));
+            == "This read is not held, and it replaces any earlier read of the same date: a later page reads afresh"));
     // A later page naming no snapshot: the differing read was not held, so
     // this reads afresh and serves its second page from that new read.
     let next = one.call(args(AS_OF, 5, 5, None)).await;
@@ -961,6 +969,43 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
             "Sulphuric Acid 98pc"
         ]
     );
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_read_that_returns_no_item_drops_the_earlier_read_a_later_page_would_have_served() {
+    // A matched read is held. A second first page of the same date then
+    // differs. A later page naming no snapshot, at an unchanged extent, must
+    // not be served the first read's rows: it reads afresh and is withheld too.
+    let differing = Book {
+        report: replaced(
+            &report(),
+            "<DSPCLAMTA>18750.00</DSPCLAMTA>",
+            "<DSPCLAMTA>18750.01</DSPCLAMTA>",
+        ),
+        ..Book::captured()
+    };
+    let mut plans = Book::captured().first_page(14, MARK);
+    plans.extend(differing.first_page(14, MARK));
+    plans.extend(continuation_plans(14));
+    plans.extend(differing.first_page(14, MARK).into_iter().skip(4));
+    plans.extend(continuation_plans(14));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(args(AS_OF, 0, 5, None)).await;
+    assert_eq!(result(&first)["state"], "value_total_matched");
+    let id = result(&first)["snapshot"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let second = one.call(args(AS_OF, 0, 5, None)).await;
+    assert_withheld(&second, "tally_stock_summary_differs");
+    let later = one.call(args(AS_OF, 5, 5, None)).await;
+    assert_withheld(&later, "tally_stock_summary_differs");
+    // And the first read's snapshot, named, is no longer held.
+    let named = one.call(args(AS_OF, 5, 5, Some(&id))).await;
+    assert_eq!(error(&named)["code"], "listing_snapshot_changed");
+    assert_eq!(error(&named)["cause"], "snapshot_not_held");
     assert_eq!(one.requests(), total);
 }
 
@@ -1065,6 +1110,16 @@ async fn a_book_with_no_stock_items_is_an_answer_with_an_empty_list() {
         page["item_count_cross_check"],
         json!({"status":"matched","rows":0,"tally_count":0})
     );
+    // Its limitations are its own: none speaks of a field it does not carry.
+    assert!(page.get("checks").is_none() && page.get("tie_out").is_none());
+    assert_eq!(page["limitations"].as_array().unwrap().len(), 3);
+    for line in page["limitations"].as_array().unwrap() {
+        let line = line.as_str().unwrap();
+        assert!(
+            !line.contains("checks") && !line.contains("tie_out"),
+            "{line}"
+        );
+    }
     assert!(page["basis"].as_str().unwrap().starts_with(
         "This company has no stock items: Tally's own item count is 0, the stock item list is empty and Tally's Stock Summary is empty."
     ));
@@ -1104,6 +1159,10 @@ async fn no_rows_without_a_count_of_zero_and_an_empty_report_is_not_that_answer(
     let one = OneServer::spawn(book.first_page(14, MARK));
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     assert_withheld(&response, "tally_stock_summary_differs");
+    // No row was read, so the text does not say that stock items exist.
+    let remediation = result(&response)["remediation"].as_str().unwrap();
+    assert!(!remediation.contains("Stock items exist"), "{remediation}");
+    assert_eq!(result(&response)["tie_out"]["items_value_sum"], Value::Null);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1124,7 +1183,9 @@ async fn an_item_count_tally_did_not_give_refuses_with_its_next_step() {
         let remediation = refusal["remediation"].as_str().unwrap();
         assert!(remediation.contains("Do not retry"), "{remediation}");
         assert!(remediation.contains("has to be read in Tally itself"));
-        assert!(refused["structuredContent"]["result"]["items"].is_null());
+        assert!(refused["structuredContent"]["result"]
+            .get("items")
+            .is_none());
         assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4 + 4);
     }
 }
@@ -1145,7 +1206,9 @@ async fn fewer_rows_than_tallys_own_item_count_refuses_with_both_numbers() {
     let remediation = refusal["remediation"].as_str().unwrap();
     assert!(remediation.contains("do not retry"), "{remediation}");
     assert!(remediation.contains("why they differ is not known"));
-    assert!(refused["structuredContent"]["result"]["items"].is_null());
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1177,19 +1240,22 @@ async fn a_stock_summary_tally_does_not_recognise_refuses_with_its_next_step() {
         ),
         ..Book::captured()
     };
-    let mut plans = book.through_flags(14, MARK);
-    pair(&mut plans, xml(book.items.clone()));
-    pair(&mut plans, xml(book.report.clone()));
-    let one = OneServer::spawn(plans);
+    // Held until the closing extent is read, like the item count.
+    let one = OneServer::spawn(book.through_closing_extent(14, MARK));
     let refused = one.call(args(AS_OF, 0, 500, None)).await;
     let refusal = error(&refused);
     assert_eq!(refusal["code"], "stock_summary_read_failed");
     assert_eq!(refusal["cause"], "stock_report_unknown");
     let remediation = refusal["remediation"].as_str().unwrap();
-    assert!(remediation.contains("Do not call stock_summary again for this company"));
-    assert!(refused["structuredContent"]["result"]["items"].is_null());
-    // Returned at once: no closing extent.
-    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4);
+    assert!(remediation.contains("do not retry"), "{remediation}");
+    assert!(
+        remediation.contains("Bridge cannot tell why"),
+        "{remediation}"
+    );
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4 + 4);
 }
 
 #[tokio::test]
@@ -1275,7 +1341,9 @@ async fn a_book_too_large_for_a_whole_read_is_refused_with_its_size_before_any_i
         .as_str()
         .unwrap()
         .contains("A larger book refuses"));
-    assert!(refused["structuredContent"]["result"]["items"].is_null());
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
     // Identity, then the runtime read's mode probe, identity, opening extent
     // and flags: no stock item and no report request.
     assert_eq!(one.requests(), 4 + 3 + 4 + 4);
@@ -1353,7 +1421,9 @@ async fn a_response_that_breaks_the_marks_premise_is_refused_with_its_cause() {
         "stock_summary_bound_premise_violated"
     );
     assert_eq!(error(&refused)["cause"], "stock_rows_exceed_master_mark");
-    assert!(refused["structuredContent"]["result"]["items"].is_null());
+    assert!(refused["structuredContent"]["result"]
+        .get("items")
+        .is_none());
     // The reads completed, so their evidence is kept.
     assert_ne!(refused["structuredContent"]["evidence"]["bytes"], 0);
     // Held until the closing extent was read, and it had not moved.

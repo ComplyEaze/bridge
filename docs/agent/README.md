@@ -357,13 +357,14 @@ three values:
     came back with no amount. An empty report is not told apart from one Tally did
     not render, so this is not called a contradiction.
   - `stock_values_not_comparable`: nothing could be compared (no item has a closing
-    value, or the values add up to zero, and the report gave no amount).
+    value, or the values add up to zero, and the report shows no amount or a total
+    of zero).
 
-**Quantities are withheld.** Nothing checks a quantity yet, so no quantity and no
-count derived from one is returned. `checks` says per field what is `checked`,
-`not_checked` or `withheld`: the closing-value total is checked; each value on its
-own, the names, parents and base units, and whether the date was honoured are not;
-the closing quantity is withheld. A quantity Bridge could not read (a compound
+**Quantities are withheld.** Nothing checks a quantity yet, so none is returned.
+`checks` says per field what is `checked`, `not_checked` or `withheld`: the
+closing-value total is checked; each value on its own, the names, parents and base
+units, whether the date was honoured and whether the item list is complete are
+not; the closing quantity is withheld. A quantity Bridge could not read (a compound
 unit, or a unit with a space in it) is counted in
 `totals.closing_quantity_unread_count` and does not refuse the read.
 
@@ -384,7 +385,8 @@ reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`
 and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
 that these are the stock items' closing values exactly as Tally sends them, that
 how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not
-measured, and that only the total was compared.
+measured, and that the values of all the company's items (not only those on the
+page) add up to the report's total, the only thing compared.
 
 `tie_out` compares the sum of the items' closing values with the sum of the
 top-level lines of Tally's own Stock Summary. It compares the grand total only, so
@@ -392,25 +394,26 @@ top-level lines of Tally's own Stock Summary. It compares the grand total only, 
 closing value, and a match needs at least one value on the items' side and a total
 on the report's.
 
-Tally's Stock Summary has no line for a stock group worth zero, so only Tally's
-own stock item count vouches for an item valued at zero or with no value.
-`item_count_cross_check` reports `rows`, `tally_count` and `status`: `matched`, or
+An item valued at zero or with no value adds nothing to either total, so only
+Tally's own stock item count vouches for it. Whether that count stays exact after
+an item is deleted is unmeasured, which is why `checks.item_list_complete` is
+`not_checked`. `item_count_cross_check` reports `rows`, `tally_count` and `status`: `matched`, or
 `company_count_lower` when Tally's count is below the rows read (every row is this
 company's, so the read goes on). The count is a cross-check, not a bound. A read
 with fewer rows than Tally's count is refused as
 `stock_summary_rows_below_item_count`, with both numbers under `counts`. A count
 Tally did not give (missing, empty or not a number; never read as zero) refuses as
 `stock_summary_read_failed` with cause `stock_item_count_unavailable`. A Stock
-Summary this Tally does not recognise refuses with cause `stock_report_unknown`.
-No refusal here asks for a retry: every source is read twice inside an unchanged
-book extent, so the same call gives the same answer.
+Summary answered without the report refuses with cause `stock_report_unknown`;
+Bridge cannot tell why Tally did so. None of these three asks for a retry: every
+source was read twice and the book's extent was the same before and after.
 
 `items` (one to fifty GUIDs) filters the returned rows from the held read; a GUID
 that is not found is listed under `items_not_found`. `totals`, `tie_out` and
-`item_count_cross_check` always cover the whole book. A result that returns no
-item is not held: a later page continues only from an earlier read of the same
-date that returned rows, if one is still held. On a later page (offset > 0)
-without a `snapshot_id`, the call otherwise reads afresh; with one, it is refused
+`item_count_cross_check` always cover the whole book. A `not_established` result
+or a refusal is not held, and it replaces any earlier read of the same date. On a
+later page (offset > 0) without a `snapshot_id`, the call reads afresh when
+nothing is held or the book moved; with one, it is refused
 as `listing_snapshot_changed` (cause `snapshot_not_held`, or
 `book_changed_since_first_page` when the book moved). A first page always reads
 afresh.

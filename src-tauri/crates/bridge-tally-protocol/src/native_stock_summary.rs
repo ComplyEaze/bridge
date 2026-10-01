@@ -103,8 +103,10 @@ pub fn render_native_stock_summary_request(
 /// because only a 31 March period end (a financial-year end) has been measured
 /// for stock, the report tie-out included. Any other date, one that the boundary
 /// rule of Bridge's other reads would admit included, is refused as
-/// [`NativeStockError::AsOfNotMeasured`]. Other dates will be admitted in a later
-/// change, once captures back them.
+/// [`NativeStockError::AsOfNotMeasured`]. Of the 31 Marches, only the period
+/// ending 31 March 2026 has been measured: another year's 31 March is admitted
+/// here, sharing the request shape but not the measurement. Other dates will be
+/// admitted in a later change, once captures back them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StockSummaryAsOf(TallyDate);
 
@@ -878,11 +880,11 @@ pub struct NativeStockTotals {
     /// Items whose closing quantity element was empty or absent: not zero.
     pub empty_closing_quantity_count: usize,
     pub empty_closing_value_count: usize,
-    /// The sum of the closing values, or `None` (with `partial`) whenever an
-    /// item's closing value is empty, unless its closing quantity is present and
-    /// zero: an empty value is not zero, so a sum that leaves one out is not the
-    /// stock's value, and an item whose quantity is empty or non-zero may hold
-    /// stock.
+    /// The sum of the closing values, or `None` (with `partial`) whenever any
+    /// item's closing value is empty, whatever its quantity: an empty value is
+    /// not zero, and that a zero quantity makes it so is unmeasured (no capture
+    /// shows it). A book with no items at all has a sum of zero and is not
+    /// partial: a present, empty collection is zero rows.
     pub value_sum: Option<ExactDecimal>,
     pub partial: bool,
 }
@@ -899,26 +901,18 @@ impl NativeStockTotals {
             partial: false,
         };
         for item in items {
-            let zero_quantity = match &item.closing.quantity {
-                None => {
-                    totals.empty_closing_quantity_count += 1;
-                    false
-                }
-                Some(quantity) if quantity.amount.is_zero() => {
-                    totals.zero_quantity_count += 1;
-                    true
-                }
+            match &item.closing.quantity {
+                None => totals.empty_closing_quantity_count += 1,
+                Some(quantity) if quantity.amount.is_zero() => totals.zero_quantity_count += 1,
                 Some(quantity) => {
                     if quantity.amount.is_negative() {
                         totals.negative_closing_quantity_count += 1;
                     }
-                    false
                 }
-            };
+            }
             if item.closing.value.is_none() {
                 totals.empty_closing_value_count += 1;
-                // An empty value is a gap unless the item is known to hold none.
-                totals.partial |= !zero_quantity;
+                totals.partial = true;
             }
         }
         if !totals.partial {

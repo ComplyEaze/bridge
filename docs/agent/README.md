@@ -337,7 +337,7 @@ start or after today. Any other date is refused as
 `stock_summary_as_of_not_measured` before any request, and retrying the same date
 refuses again. The only period measured is the period ending 31 March 2026
 (FY 2025-26); other years' 31 March share its request shape but not its
-measurement. The period is the financial year containing `as_of`, from 1 April,
+measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
 or the book's start if that is later.
 
 Each item carries `name`, `guid`, `parent`, `base_unit`, `opening` and `closing`;
@@ -349,9 +349,10 @@ counted, and an empty closing one is returned as `null` and counted in `totals`
 (`empty_closing_quantity_count`, `empty_closing_value_count`). `totals` also holds
 `item_count`, `negative_closing_quantity_count` (company totals at `as_of`: batch,
 godown and in-year negatives are not counted), `zero_quantity_count`, and
-`value_sum`, which is `null` with `partial` true whenever an item's closing value
-is empty, unless its closing quantity is present and zero; a book whose closing
-quantities and values are all empty has no sum, not a sum of zero. `inventory`
+`value_sum`, which is `null` with `partial` true whenever any item's closing value
+is empty, whatever its quantity (that a zero quantity makes an empty value zero is
+unmeasured); a book whose closing values are all empty has no sum, not a sum of
+zero, and a book with no items has a `value_sum` of zero. `inventory`
 reports `integrated`, `inventory_on` and `batchwise` as `yes`, `no` or `unknown`,
 and `basis` states only what Tally reported (`ISINTEGRATED` Yes, No or not sent),
 that these are the stock items' closing values exactly as Tally sends them, and that
@@ -369,8 +370,9 @@ returned rows from the held read; a GUID that is not found is listed under
 `items_not_found`. `totals` and `tie_out` always cover the whole book. The tie-out
 compares the grand total only, so `matched` can stand beside `partial: true` when
 some items have no closing value. A differing read is not held: a later page
-continues only from an earlier read of the same date that matched, if one is still
-held, and otherwise reads afresh.
+continues only from an earlier read of the same date that was returned (matched or
+not checked), if one is still held. Without a `snapshot_id` it otherwise reads
+afresh; with one, the call is refused as `snapshot_not_held`.
 
 The read runs inside the same company, mode and identity brackets as `masters`:
 the company's inventory flags (a Company collection filtered to the company's GUID),

@@ -97,7 +97,7 @@ impl Server {
                                     "verification": VERIFICATION,
                                     "limitations": [
                                         "The items' closing-value sum differs from Tally's own Stock Summary total, so no item is returned: a figure Tally contradicts is not shown",
-                                        "This read is not held: a later page continues only from an earlier read of the same date that matched, if one is still held; call again with offset 0 to read afresh",
+                                        "This read is not held: a later page continues only from an earlier read of the same date that was returned (matched or not checked), if one is still held; call again with offset 0 to read afresh",
                                     ],
                                 },
                             }),
@@ -192,10 +192,11 @@ impl Server {
         result["limitations"] = json!([
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "Company totals at `as_of` only, with no godown or batch split: `negative_closing_quantity_count` does not count batch, godown or in-year negatives",
-            "An empty quantity or value is not zero: an empty opening one is returned as null and not counted; an empty closing one is returned as null and counted (`empty_closing_quantity_count`, `empty_closing_value_count`), and `value_sum` is null with `partial` true whenever an item's closing value is empty, unless its closing quantity is present and zero",
+            "An empty quantity or value is not zero: an empty opening one is returned as null and not counted; an empty closing one is returned as null and counted (`empty_closing_quantity_count`, `empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty, whatever its quantity (that a zero quantity makes an empty value zero is unmeasured); a book with no items has a `value_sum` of zero",
             "`totals` and `tie_out` cover the whole book, whatever `items` filters",
             "The tie-out compares the grand total only, so `matched` can stand beside `partial: true` when some items have no closing value",
             "A quantity whose unit has a space in it or is compound refuses the whole read (`stock_quantity_unparseable`); how Tally writes such units is unmeasured",
+            "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted, sharing the request shape but not the measurement",
             "A company split by year, whose sibling companies share its GUID, is refused (`company_flags_not_one_row`)",
             "Small books only: a book whose master-alteration mark is over the admitted size is refused before any item is read",
             "Stock item names are not masked by mask_parties: they are not party names. An item's `parent` is a stock-group name, which can carry a party's name, so it is masked; Tally's reserved root as a parent is left as it is",

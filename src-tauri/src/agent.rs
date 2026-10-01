@@ -783,9 +783,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
-            "Only a financial-year end (31 March) has been measured for stock so far, so \
-             stock_summary reads only an `as_of` of 31 March, and no request was sent. Ask \
-             for a 31 March `as_of`; retrying the same date refuses again.",
+            "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \
+             and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
+             refuses again. Only the period ending 31 March 2026 has been measured for \
+             stock: another year's 31 March is read, but its figures are unmeasured.",
         ),
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(

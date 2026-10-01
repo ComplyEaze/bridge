@@ -1,6 +1,7 @@
 //! The stock summary parsers and request builders against the live captures
 //! (`tests/fixtures/stock_*`, `company_inventory_flags_*`). Every negative case
-//! is the captured text with one edit; none has a hand-written response.
+//! edits captured text, or the parsed rows of a capture, inside the test; none
+//! uses a hand-written response.
 use super::*;
 use crate::native_statement_reports::{render_native_statement_request, NativeStatementKind};
 use crate::outstandings_shared::DateBoundaryProfile;
@@ -1207,11 +1208,10 @@ fn totals_after(edit: impl Fn(&mut NativeStockItem)) -> NativeStockTotals {
 }
 
 #[test]
-fn the_totals_count_each_kind_of_item_and_withhold_a_sum_with_an_unexplained_empty_value() {
+fn the_totals_count_each_kind_of_item_and_withhold_a_sum_when_any_closing_value_is_empty() {
     let totals = totals_of(&items_response());
     // Four closing values are empty: Zero Stock Item holds -50 Kgs with none,
-    // and three items have neither a quantity nor a value. None of them has a
-    // quantity of zero, so the sum is withheld.
+    // and three items have neither a quantity nor a value.
     assert_eq!(
         totals,
         NativeStockTotals {
@@ -1224,8 +1224,8 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_with_an_unexplained_emp
             partial: true,
         }
     );
-    // An empty quantity does not explain an empty value: blanking Zero Stock
-    // Item's quantity too leaves the sum withheld.
+    // An empty quantity does not change that: blanking Zero Stock Item's
+    // quantity too leaves the sum withheld.
     let unstocked = replaced(
         &items_response(),
         "<CLOSINGBALANCE TYPE=\"Quantity\">-50.000 Kgs</CLOSINGBALANCE>",
@@ -1243,62 +1243,69 @@ fn the_totals_count_each_kind_of_item_and_withhold_a_sum_with_an_unexplained_emp
             partial: true,
         }
     );
-    // A closing quantity that is present and zero is the one thing that
-    // explains an empty value: with all four at zero the sum is the tie's.
-    let zero = |item: &mut NativeStockItem| {
+    // Nor does a closing quantity that is present and zero: that it makes an
+    // empty value zero is unmeasured, so the sum is withheld.
+    let zero_quantity = totals_after(|item| {
         if item.closing.value.is_none() {
             item.closing.quantity = quantity_of("0.000", "Nos");
         }
-    };
-    assert_eq!(
-        totals_after(zero),
-        NativeStockTotals {
-            item_count: 11,
-            negative_closing_quantity_count: 0,
-            zero_quantity_count: 4,
-            empty_closing_quantity_count: 0,
-            empty_closing_value_count: 4,
-            value_sum: Some(decimal("3000.01")),
-            partial: false,
-        }
-    );
-    // One of the four with no quantity again: the sum is withheld again.
-    let one_without_quantity = totals_after(|item| {
-        zero(item);
-        if item.name == "Label Roll" {
-            item.closing.quantity = None;
-        }
     });
     assert_eq!(
         (
-            one_without_quantity.partial,
-            one_without_quantity.value_sum,
-            one_without_quantity.zero_quantity_count,
-            one_without_quantity.empty_closing_quantity_count,
+            zero_quantity.partial,
+            zero_quantity.value_sum,
+            zero_quantity.zero_quantity_count,
+            zero_quantity.empty_closing_value_count,
         ),
-        (true, None, 3, 1)
-    );
-    // A stocked item's value blanked on top of the zeros: withheld.
-    let stocked_blank = totals_after(|item| {
-        zero(item);
-        if item.name == "Carton Box Small" {
-            item.closing.value = None;
-        }
-    });
-    assert_eq!(
-        (
-            stocked_blank.partial,
-            stocked_blank.value_sum,
-            stocked_blank.empty_closing_value_count
-        ),
-        (true, None, 5)
+        (true, None, 4, 4)
     );
 }
 
 #[test]
-fn a_book_whose_closing_quantities_and_values_are_all_empty_has_no_value_sum() {
-    // Every item with no quantity and no value: nothing says any holds none,
-    // so the sum is not zero, it is withheld.
+fn a_sum_is_formed_only_when_every_closing_value_is_present() {
+    // An edit of the captured text, not a capture: each of the four empty
+    // closing values is given an explicit `0.00`, so none is empty.
+    let explicit = items_response().replace(
+        "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>",
+        "<CLOSINGVALUE TYPE=\"Amount\">0.00</CLOSINGVALUE>",
+    );
+    assert_eq!(
+        explicit
+            .matches("<CLOSINGVALUE TYPE=\"Amount\">0.00<")
+            .count(),
+        4
+    );
+    let totals = totals_of(&explicit);
+    assert!(!totals.partial);
+    assert_eq!(totals.empty_closing_value_count, 0);
+    // Quantities are as captured: three are empty, and one is negative.
+    assert_eq!(totals.empty_closing_quantity_count, 3);
+    assert_eq!(totals.negative_closing_quantity_count, 1);
+    assert!(totals
+        .value_sum
+        .expect("every value present")
+        .numeric_eq(&decimal("3000.01")));
+    // One value blanked again (Carton Box Small's): withheld.
+    let blanked = replaced(
+        &explicit,
+        "<CLOSINGVALUE TYPE=\"Amount\">2500.00</CLOSINGVALUE>",
+        "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>",
+    );
+    let totals = totals_of(&blanked);
+    assert_eq!(
+        (
+            totals.partial,
+            totals.value_sum,
+            totals.empty_closing_value_count
+        ),
+        (true, None, 1)
+    );
+}
+
+#[test]
+fn a_book_whose_closing_values_are_all_empty_has_no_value_sum() {
+    // Every item with no quantity and no value: the sum is not zero, it is
+    // withheld.
     let totals = totals_after(|item| {
         item.closing.quantity = None;
         item.closing.value = None;
@@ -1318,6 +1325,20 @@ fn a_book_whose_closing_quantities_and_values_are_all_empty_has_no_value_sum() {
     let json = serde_json::to_value(&totals).unwrap();
     assert_eq!(json["value_sum"], serde_json::Value::Null);
     assert_eq!(json["partial"], true);
+}
+
+#[test]
+fn a_book_with_no_items_has_a_sum_of_zero_and_is_not_partial() {
+    // A present, empty collection is zero rows (see the zero-row parse test):
+    // nothing is missing, so the sum is zero, not withheld.
+    let totals = NativeStockTotals::of(&[]).unwrap();
+    assert_eq!(totals.item_count, 0);
+    assert!(!totals.partial);
+    assert_eq!(totals.empty_closing_value_count, 0);
+    assert!(totals
+        .value_sum
+        .expect("no value is missing")
+        .numeric_eq(&decimal("0")));
 }
 
 #[test]

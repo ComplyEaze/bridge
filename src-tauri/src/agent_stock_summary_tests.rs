@@ -372,6 +372,12 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
     assert_eq!(schema["required"], json!(["company_guid", "as_of"]));
     assert_eq!(schema["properties"]["items"]["minItems"], 1);
     assert_eq!(schema["properties"]["items"]["maxItems"], 50);
+    // The schema's bound on each GUID is the one `item_filter` enforces.
+    assert_eq!(schema["properties"]["items"]["items"]["maxLength"], 64);
+    assert_eq!(
+        schema["properties"]["items"]["items"]["maxLength"],
+        super::MAX_ITEM_GUID_CHARS
+    );
     assert_eq!(schema["properties"]["items"]["uniqueItems"], true);
     assert_eq!(schema["properties"]["offset"]["minimum"], 0);
     assert_eq!(schema["properties"]["limit"]["minimum"], 1);
@@ -386,13 +392,15 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "must be a 31 March",
         "the period ending 31 March 2026",
         "other years' 31 March",
+        "admitted but unmeasured",
+        "whenever any item's closing value is empty, whatever its quantity",
+        "a book with no items has a `value_sum` of zero",
         "stock_summary_too_large",
         "Typical stock-heavy client books refuse today",
         "16,000,000 bytes",
         "company totals only",
         "Empty is not zero",
         "an empty opening quantity or value is returned as null and not counted",
-        "closing value is empty, unless its closing quantity is present and zero",
         "not measured",
         "ISINTEGRATED",
         "Education mode is refused",
@@ -417,6 +425,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "NOT reconciled to the Balance",
         "day 1, 2 or 31",
         "stock_summary_as_of_unsupported",
+        "unless its closing quantity is present and zero",
     ] {
         assert!(!description.contains(phrase), "{phrase}");
     }
@@ -466,6 +475,14 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     assert_eq!(page["total"], 11);
     assert_eq!(page["offset"], 0);
     assert_eq!(page["next_offset"], 5);
+    // Only the 2026 year end was measured; another year's is admitted, said so.
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line.as_str().unwrap().starts_with(
+            "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted"
+        )));
     assert_eq!(first["structuredContent"]["truncated"], true);
     assert_eq!(page["snapshot"]["reused"], false);
     assert_eq!(
@@ -592,9 +609,10 @@ fn unstocked_items() -> String {
     )
 }
 
-/// A book whose every item with an empty closing value has a closing quantity
-/// of zero: Zero Stock Item's -50 Kgs becomes zero, and the three items with
-/// neither a quantity nor a value are given one.
+/// The captured items with every item that has an empty closing value given a
+/// closing quantity of zero: Zero Stock Item's -50 Kgs becomes zero, and the
+/// three items with neither a quantity nor a value are given one. An edit of
+/// captured text.
 fn zeroed_items() -> String {
     replaced(
         &items(),
@@ -607,8 +625,18 @@ fn zeroed_items() -> String {
     )
 }
 
+/// The captured items with every empty closing value given an explicit `0.00`.
+/// This is an edit of captured text, not a capture: it is how a book with no
+/// empty closing value is made from the one capture there is.
+fn explicit_zero_values() -> String {
+    let from = "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>";
+    let text = items();
+    assert_eq!(text.matches(from).count(), 4);
+    text.replace(from, "<CLOSINGVALUE TYPE=\"Amount\">0.00</CLOSINGVALUE>")
+}
+
 #[tokio::test]
-async fn the_value_sum_is_withheld_unless_every_empty_value_belongs_to_a_zero_quantity() {
+async fn the_value_sum_is_withheld_whenever_any_closing_value_is_empty() {
     // The capture itself: -50 Kgs with an empty value, and three items with
     // neither a quantity nor a value.
     let one = OneServer::spawn(Book::captured().first_page(14, MARK));
@@ -620,7 +648,7 @@ async fn the_value_sum_is_withheld_unless_every_empty_value_belongs_to_a_zero_qu
     assert_eq!(totals["empty_closing_quantity_count"], 3);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 
-    // Blanking that quantity too does not explain the empty value.
+    // Blanking that quantity too changes nothing.
     let book = Book {
         items: unstocked_items(),
         ..Book::captured()
@@ -635,7 +663,9 @@ async fn the_value_sum_is_withheld_unless_every_empty_value_belongs_to_a_zero_qu
     assert_eq!(page["tie_out"]["state"], "matched");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 
-    // A present zero quantity does: with all four at zero the sum is the tie's.
+    // Nor does a present zero quantity: that it makes an empty value zero is
+    // unmeasured. The four items with an empty value are given a zero quantity
+    // (an edit of captured text).
     let book = Book {
         items: zeroed_items(),
         ..Book::captured()
@@ -643,20 +673,32 @@ async fn the_value_sum_is_withheld_unless_every_empty_value_belongs_to_a_zero_qu
     let one = OneServer::spawn(book.first_page(14, MARK));
     let response = one.call(args(AS_OF, 0, 500, None)).await;
     let totals = &result(&response)["totals"];
-    assert_eq!(totals["value_sum"], "3000.01");
-    assert_eq!(totals["partial"], false);
+    assert_eq!(totals["value_sum"], Value::Null);
+    assert_eq!(totals["partial"], true);
     assert_eq!(totals["zero_quantity_count"], 4);
-    assert_eq!(totals["empty_closing_quantity_count"], 0);
-    assert_eq!(totals["negative_closing_quantity_count"], 0);
+    assert_eq!(totals["empty_closing_value_count"], 4);
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 
-    // One stocked item's value blanked, with the report's Packaging amount
-    // lowered by that value so the tie-out still matches: a sum that leaves out
-    // an item that holds stock is withheld whatever the tie says, and the tie
-    // is of the grand total only.
+    // With no empty closing value the sum is formed, and is the tie's.
+    let book = Book {
+        items: explicit_zero_values(),
+        ..Book::captured()
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["totals"]["value_sum"], "3000.01");
+    assert_eq!(page["totals"]["partial"], false);
+    assert_eq!(page["totals"]["empty_closing_value_count"], 0);
+    assert_eq!(page["tie_out"]["state"], "matched");
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+
+    // One item's value blanked on top of that, with the report's Packaging
+    // amount lowered by that value so the tie-out still matches: the sum is
+    // withheld whatever the tie says, and the tie is of the grand total only.
     let book = Book {
         items: replaced(
-            &zeroed_items(),
+            &explicit_zero_values(),
             "<CLOSINGVALUE TYPE=\"Amount\">2500.00</CLOSINGVALUE>",
             "<CLOSINGVALUE TYPE=\"Amount\"></CLOSINGVALUE>",
         ),
@@ -718,15 +760,14 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
     assert_eq!(page["as_of"], "20260331");
     assert_eq!(response["structuredContent"]["truncated"], false);
     // The limitation says this read is not held, and does not say that nothing
-    // is: an earlier matched read of the same date may still be.
+    // is: an earlier read of the same date that was returned, matched or not
+    // checked, may still be.
     assert!(page["limitations"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|line| line
-            .as_str()
-            .unwrap()
-            .starts_with("This read is not held: a later page continues only from an earlier read of the same date that matched")));
+        .any(|line| line.as_str().unwrap()
+            == "This read is not held: a later page continues only from an earlier read of the same date that was returned (matched or not checked), if one is still held; call again with offset 0 to read afresh"));
     // A later page naming no snapshot: the differing read was not held, so
     // this reads afresh and serves its second page from that new read.
     let next = one.call(args(AS_OF, 5, 5, None)).await;
@@ -744,6 +785,37 @@ async fn a_report_that_differs_withholds_every_item_and_is_not_held() {
             "Sulphuric Acid 98pc"
         ]
     );
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_not_checked_read_is_held_and_a_later_page_continues_it() {
+    // What the differing read's limitation names: a returned read that was not
+    // checked against the report is held like a matched one.
+    let text = report();
+    let start = text.find("<ENVELOPE>").unwrap() + "<ENVELOPE>".len();
+    let hollow = format!(
+        "{}{}",
+        &text[..start],
+        &text[text.rfind("</ENVELOPE>").unwrap()..]
+    );
+    let book = Book {
+        report: hollow,
+        ..Book::captured()
+    };
+    let mut plans = book.first_page(14, MARK);
+    plans.extend(continuation_plans(14));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(args(AS_OF, 0, 5, None)).await;
+    let page = result(&first);
+    assert_eq!(page["tie_out"]["state"], "not_checked");
+    assert_eq!(page["snapshot"]["reused"], false);
+    let id = page["snapshot"]["id"].as_str().unwrap().to_string();
+    let second = one.call(args(AS_OF, 5, 5, Some(&id))).await;
+    let page = result(&second);
+    assert_eq!(page["snapshot"]["reused"], true);
+    assert_eq!(page["tie_out"]["state"], "not_checked");
     assert_eq!(one.requests(), total);
 }
 

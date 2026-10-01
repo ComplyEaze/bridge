@@ -39,7 +39,7 @@ reading. When writing is off, the write tools do not merely refuse — they are
 exist.
 
 - **The Claude Desktop extension turns voucher posting off by default.** Three
-  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/lamemustafa/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/lamemustafa/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/lamemustafa/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/lamemustafa/bridge/issues/579), [#582](https://github.com/lamemustafa/bridge/pull/582)). Turning on
+  known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). Turning on
   **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the extension
   settings adds `post_import`, which posts one saved voucher of those types; every
   posting still waits for your approval in a separate Bridge dialog. Leave it
@@ -121,7 +121,7 @@ If instead it hangs without answering, Tally may simply be busy behind
 another request — wait and retry rather than changing the setting.
 
 An **unsigned evaluation preview** of the Claude Desktop extension is published
-as [`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0).
+as [`mcp-preview-0.2.0`](https://github.com/ComplyEaze/bridge/releases/tag/mcp-preview-0.2.0).
 Follow the [installation guide](./docs/agent/INSTALL.md) to install and configure
 it. Before you do, know what it is and is not:
 
@@ -157,7 +157,7 @@ database operations.
 ## First useful result
 
 An unsigned evaluation preview of the Claude Desktop extension is published as
-[`mcp-preview-0.2.0`](https://github.com/lamemustafa/bridge/releases/tag/mcp-preview-0.2.0);
+[`mcp-preview-0.2.0`](https://github.com/ComplyEaze/bridge/releases/tag/mcp-preview-0.2.0);
 install it with the [installation guide](./docs/agent/INSTALL.md). For source
 use, the contributor quick start below builds the desktop app; to run the MCP
 server from source, follow the [source MCP setup](./docs/agent/README.md).

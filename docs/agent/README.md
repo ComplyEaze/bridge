@@ -735,8 +735,9 @@ page. Now a `complete` window is held in memory (its rows after every check and
 selector, unredacted; never written to disk) and a later page (`offset` above 0)
 is served from it with one paired marks read in place of the window, while the
 company's two marks (`ALTVCHID` and `ALTMSTID`) equal the ones read when the
-window read began. A change since then moves a mark, so it can only make a later
-page read afresh, never serve an older read as current. Redaction and party
+window read began. Each screen action measured so far moved a mark (below), so a
+change of that kind makes a later page read afresh, or refuse when it names its
+snapshot, instead of serving the older read as current. Redaction and party
 marking are applied to each page as it is served. The result carries `snapshot`
 (`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`); a served
 page's `window` timings and `read_at` are the first page's, and its `evidence`
@@ -746,7 +747,11 @@ covers only the identity and marks reads it sent.
   `snapshot_id` is refused as `listing_snapshot_changed` (cause
   `book_changed_since_first_page`, or `snapshot_not_held` when the window has
   expired, was replaced, was evicted by the byte cap, or was dropped by a write
-  through this server). `snapshot_id` is read on later pages only.
+  through this server). `snapshot_id` is read on later pages only. Only a page
+  whose `snapshot.reused` is true continues the earlier pages: a later page with
+  `reused` false, or with no `snapshot`, is a fresh read, and its offsets may not
+  continue them (a held window dropped by a write through this server, expired or
+  evicted leaves no trace to flag).
 - **An unnamed page says when the book moved.** Without the name, a page that
   cannot be served reads the window again, as before. If a held window of the
   same question was found and the book had moved on, the result carries
@@ -756,8 +761,9 @@ covers only the identity and marks reads it sent.
 - **What is held.** Only a `complete` window; a `partial` one (an uncounted
   small book, a withheld foreign-currency voucher) is read again by each page.
   One window per company and question (dates, ledger, voucher-type selector),
-  for ten minutes after the read finished, within 64 MiB of its own (the ledger
-  listings have another 64 MiB); a window larger than that is not held and its
+  for ten minutes after the read finished, within 64 MiB of its own, counted as
+  the rows' JSON text, a proxy for memory (the ledger listings have another
+  64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
   held windows. The desktop screen holds nothing.
 - **What a page cannot see.** A change that moves neither mark. The screen
@@ -773,9 +779,7 @@ covers only the identity and marks reads it sent.
   never reaches this server's store; the marks read is then the only check.
 - **What it costs.** A page served from a held window sends the identity read
   and one marks read in place of the whole window. The saving was not measured
-  against Tally: a first read of a window of about two and a half thousand
-  vouchers took about a minute on a synthetic book, and each later page before
-  this change took the same again.
+  against Tally; before this change each later page repeated the whole read.
 
 ### Foreign-currency composites in `vouchers`
 

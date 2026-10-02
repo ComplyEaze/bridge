@@ -43,8 +43,9 @@ impl VoucherPageKey {
 /// check and selector, unredacted and unmarked, held in process memory only,
 /// never persisted. Redaction and party marking are applied to each page as it
 /// is served. Valid while the company's two marks equal the ones the read
-/// opened on: a change since then moves a mark, so it can only make a later
-/// page read afresh, never serve an older read as current.
+/// opened on: each screen action measured so far moved a mark (protocol
+/// reference §11c.5), so a change of that kind makes a later page read afresh
+/// or refuse; a change that moves neither mark is not seen (see the README).
 pub(super) struct VoucherPageSnapshot {
     id: String,
     key: VoucherPageKey,

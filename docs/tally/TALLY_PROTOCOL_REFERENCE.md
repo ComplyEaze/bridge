@@ -192,6 +192,9 @@ base revision.
 <a id="94f-a-name-filter-folds-ascii-case-not-accented-capitals"></a>
 
 [9.4f A `$Name` filter folds ASCII case, not accented capitals](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94f-a-name-filter-folds-ascii-case-not-accented-capitals)
+<a id="94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance"></a>
+
+[9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94g-a-ledger-create-on-an-existing-name-replaced-its-parent-bill-wise-flag-and-opening-balance)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

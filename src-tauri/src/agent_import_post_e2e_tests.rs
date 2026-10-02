@@ -4185,7 +4185,13 @@ fn assert_reported_not_created(posted: &Value) {
     assert_eq!(result["dispatch"]["counters"]["created"], 0, "{posted}");
     assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
-    assert_eq!(result["counts"]["sent_not_attributed"], 0, "{posted}");
+    // Only the status a voucher moved to is counted: none moved to
+    // sent_not_attributed.
+    assert_eq!(
+        result["counts"].get("sent_not_attributed"),
+        None,
+        "{posted}"
+    );
     assert_eq!(
         result["counts"]["tally_reported_not_created"], 1,
         "{posted}"

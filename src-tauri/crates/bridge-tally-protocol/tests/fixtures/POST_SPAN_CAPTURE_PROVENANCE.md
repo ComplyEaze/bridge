@@ -45,10 +45,11 @@ its own POST's AlterID span, with no narration tag.
 - **The mark:** the target company's `ALTVCHID` went from 1795 to 1805, a step of exactly 10. `ALTMSTID` stayed at 234. The other two companies' marks did not move.
 - **The span:** it holds exactly the ten vouchers.
   - ALTERIDs are 1796 to 1805 in request order for every voucher that can be told apart; the identical pair is at
-    1797 and 1798, and its own order cannot be observed (the two read back identical, and no sent REMOTEID comes back).
-  - MASTERIDs are 1724 to 1733 in request order; the last equals `LASTVCHID`.
+    1797 and 1798, and its own order cannot be observed (the two are identical in content, and no sent REMOTEID comes back).
+  - MASTERIDs are 1724 to 1733 in request order for every voucher that can be told apart (the identical pair as above);
+    the last equals `LASTVCHID`.
   - Type, date, `EFFECTIVEDATE`, signed entries and the untagged narration read back as sent.
-- **The GUID filter:** `$GUID` returns exactly one voucher for a present GUID (voucher 2, not its twin) and an empty collection for an absent one.
+- **The GUID filter:** `$GUID` returns exactly one voucher for a present GUID (one voucher of the identical pair, not both) and an empty collection for an absent one.
 
 ## What it does not establish
 
@@ -97,7 +98,7 @@ it and the read of its own AlterID span. It extends the binding fixture above to
 - **The mark:** `ALTVCHID` went from 1805 to 1810, a step of exactly 5; `ALTMSTID` stayed at 234; the other three
   companies' marks did not move.
 - **The span:** exactly the five Journals, ALTERIDs 1806 to 1810 and MASTERIDs 1734 to 1738 in request order (the
-  identical pair at 1807 and 1808, whose order this read cannot show, since the two are identical and no sent REMOTEID comes back), the last MASTERID equal to `LASTVCHID`; narration and signed entries as sent,
+  identical pair at 1807 and 1808, whose own order this read cannot show, since the two are identical in content and no sent REMOTEID comes back), the last MASTERID equal to `LASTVCHID`; narration and signed entries as sent,
   the three-leg split included. Tally filled `EFFECTIVEDATE`, which was not sent, with the date.
 
 ## What it does not establish

@@ -212,7 +212,8 @@ A client's narration is print-ready and carries no product marker (owner
 decision, 2026-09-28), so a native post no longer writes `[BRIDGE:…]`, and the
 marker basis cannot reach it. A fourth basis takes its place for vouchers
 Bridge posts natively: **position in the post's own AlterID span** (protocol
-reference §9.15, VERIFIED on one run).
+reference §9.15, VERIFIED on two raw gateway runs: 10 Payment, Receipt and
+Contra vouchers, and 5 Journals).
 
 - **Decisive:** the target's voucher mark recorded with the dispatch intent
   before the POST; a clean response with `CREATED = N` and `LASTVCHID`; the
@@ -244,7 +245,7 @@ reference §9.15, VERIFIED on one run).
   `not_found`. A refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
 - **Known limits:** identical twins are bound by position alone, since they
-  read back identical and their own order cannot be observed (the request
+  are identical in content and their own order cannot be observed (the request
   order of vouchers that can be told apart was measured in two raw runs);
   the local journal is the trust root; writes from another Gold process are
   unmeasured; whether a restore or rewrite reuses AlterIDs or MasterIDs is

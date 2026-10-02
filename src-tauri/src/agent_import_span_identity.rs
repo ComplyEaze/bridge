@@ -4,9 +4,12 @@
 //!
 //! One import of N vouchers moved the company's voucher mark by exactly N, and
 //! the span (before, after] then held exactly those N vouchers, AlterIDs and
-//! MasterIDs in request order, the last MasterID equal to the response's
-//! `LASTVCHID` (`fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`, one licensed Silver
-//! 7.1 run; Journal order in `fixtures/D3_BATCH_CAPTURE_PROVENANCE.md`).
+//! MasterIDs in request order for every voucher that can be told apart, the
+//! last MasterID equal to the response's `LASTVCHID`
+//! (`fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`: two raw runs on licensed Silver
+//! 7.1, 10 Payment, Receipt and Contra vouchers and 5 Journals). Vouchers
+//! identical in content cannot be told apart in a read, so they are bound by
+//! position alone.
 //!
 //! The identity is the span's exclusivity plus the count; content only refuses.
 //! Nothing here reads Tally: every input is already parsed, and every type that

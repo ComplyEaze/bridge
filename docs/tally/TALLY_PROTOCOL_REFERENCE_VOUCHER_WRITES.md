@@ -617,8 +617,8 @@ One `Import Data` request carried 10 Payment, Receipt and Contra vouchers in Bri
 | --- | --- |
 | Counters | `CREATED=10`, every other counter 0, no `LINEERROR`, all seven present, `LASTVCHID=1733` |
 | Company `ALTVCHID`, read just before and just after the POST | 1795 → 1805, a step of exactly 10; `ALTMSTID` unchanged; the other loaded companies unchanged |
-| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order** for every voucher that can be told apart, the identical pair at 1797 and 1798 (the two read back identical and no sent REMOTEID comes back, so their own order cannot be observed); the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
-| MasterIDs | 1724–1733 in request order; the last equals `LASTVCHID` |
+| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order** for every voucher that can be told apart, the identical pair at 1797 and 1798 (the two are identical in content and no sent REMOTEID comes back, so their own order cannot be observed); the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
+| MasterIDs | 1724–1733 in request order for every voucher that can be told apart (the identical pair as above); the last equals `LASTVCHID` |
 | Content | type, date, `EFFECTIVEDATE`, signed entries and the untagged narration as sent |
 | GUID | the company GUID, `-`, then the MasterID in 8 hex digits (`…-000006bc` = 1724); the `REMOTEID` attribute equals it (§9.3) |
 | `$GUID = "<guid>"` added to the day's formula | one row for a present GUID (a GUID of the identical pair returned that voucher alone, not both); an empty collection for an absent one |

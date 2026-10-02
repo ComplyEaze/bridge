@@ -12,6 +12,39 @@ next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+## [0.4.1] - 2026-10-02
+
+### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)
+
+These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
+request it comes from.
+
+**What you can do now**
+
+- Nothing new. This build fixes three things in 0.4.0; every tool otherwise
+  works as it did.
+
+**Safer or fixed**
+
+- `parse_bank_statement` admits a statement or password file path only when
+  its text names a local disk, and refuses any other path (#1024).
+- `vouchers` returns a voucher's `master_id` as the plain number (`"1"`), not
+  as Tally sends it with a leading space (`" 1"`), so it matches the same id
+  returned by `verify_import` (#1021).
+- When a post is refused before its checks (the import journal is busy, the
+  batch is not found, or it belongs to another company), an approval you had
+  already clicked for that batch is withdrawn and you are asked again. Before,
+  that approval stayed held for up to 15 minutes, and every other batch's post
+  was refused until it lapsed (#904).
+
+**Known limits**
+
+- None of the three fixes has been run against a live TallyPrime; each is
+  covered by automated tests.
+- Before release, the macOS package was installed and started on one Mac. The
+  Windows package was not installed or run by us; the release check only
+  launches each package and lists its tools.
+
 ## [0.4.0] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)

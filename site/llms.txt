@@ -13,6 +13,7 @@ What the assistant reads goes to your AI provider, including party names (unless
 ## Reference
 
 - [MCP guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/README.md): the tools, their arguments and the settings
+- [Questions and answers](https://bridge.complyeaze.com/faq.html): what leaves the computer, what it can change, what it can do, how to set it up, and what has been tested
 - [Download](https://bridge.complyeaze.com/download.html): the extension for Windows x64 and Apple Silicon Macs
 - [Releases](https://bridge.complyeaze.com/releases.html) and [changelog](https://bridge.complyeaze.com/changelog.html)
 - [Terms of Use](https://bridge.complyeaze.com/terms.html) and [Privacy Policy](https://bridge.complyeaze.com/privacy.html)

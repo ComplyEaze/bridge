@@ -300,10 +300,10 @@ test("the list above the questions tells a person asked to try it out the four t
   for (const needle of ["test company", "backup", "firewall", "Keep posting off"]) assert.ok(list.includes(needle), needle);
 });
 
-// The liability and contact answers paraphrase the Terms of Use and the Privacy Policy. Each figure, section number
-// and qualifier in them is pinned to the words of the clause it summarises: a qualifier dropped from the page, a new
-// figure or section number without a pin, or a clause reworded under the page fails here, so the page cannot quietly
-// say more or less than the documents.
+// The liability and contact answers paraphrase the Terms of Use and the Privacy Policy. Each figure and section
+// number in them, and each qualifier listed below, is pinned to the words of the clause it summarises: a pinned
+// qualifier dropped from the page, a figure or section number with no pin of its own, or a clause reworded under the
+// page fails here. Wording outside the pins is checked by reading, not by this test.
 const legalText = (name) => readFileSync(new URL(`../docs/legal/${name}.md`, import.meta.url), "utf8");
 const flat = (text) => text.replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
 function clause(doc, number) {
@@ -317,15 +317,17 @@ function clause(doc, number) {
   assert.ok(paragraph, `${doc} has no clause ${number}`);
   return flat(paragraph[0]);
 }
+// [what the page says, document, clause, what the clause says]
 const legalPins = {
   liability: [
     ["section 14 of the Terms of Use is what applies", "terms", "14", "Limitation of liability"],
-    ["sections 7 and 8 apply as well (section 5.2)", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
+    ["own disclaimer and limit of liability also apply (section 5.2)", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
     ["To the extent the law allows, we, our partners, employees and agents, and the contributors to ComplyEaze Bridge are not liable at all", "terms", "14.1", "To the maximum extent permitted by applicable law, none of ComplyEaze, its partners, employees and agents, or the contributors to Bridge, will be liable"],
     ["however it is caused, including through negligence (section 14.1)", "terms", "14.1", "however it is caused. It applies whether the claim is in contract, tort (including negligence)"],
-    ["indirect loss, and lost profits, revenue or clients", "terms", "14.1", "any loss of profits, revenue, business, goodwill, clients"],
+    ["indirect, consequential or similar loss", "terms", "14.1", "any indirect, incidental, special, consequential, exemplary or punitive loss or damage"],
+    ["lost profits, revenue or clients", "terms", "14.1", "any loss of profits, revenue, business, goodwill, clients"],
     ["lost or corrupted data, including your Tally books, and the cost of restoring it", "terms", "14.1", "any loss or corruption of data, including your Tally books, or the cost of restoring or re-entering it"],
-    ["any tax, interest, penalty or late fee imposed on you or your clients, or the cost of correcting a return or books", "terms", "14.1", "any tax, interest, penalty, fee or late fee imposed on you or your Clients, or the cost of correcting a return, filing or set of books"],
+    ["any tax, interest, penalty, fee or late fee imposed on you or your clients, or the cost of correcting a return or books", "terms", "14.1", "any tax, interest, penalty, fee or late fee imposed on you or your Clients, or the cost of correcting a return, filing or set of books"],
     ["any claim your clients or anyone else makes against you", "terms", "14.1", "any claim by your Clients or any other third party against you"],
     ["loss caused by your AI assistant, your AI provider, Tally or other third-party software", "terms", "14.1", "any loss caused by your AI Assistant, your AI Provider, Tally or other third-party software"],
     ["To the extent the law allows, our total liability to you for all claims connected with ComplyEaze Bridge, our website or our services", "terms", "14.2", "To the maximum extent permitted by applicable law, our total liability to you for all claims arising out of or in connection with Bridge, the Services or these Terms"],
@@ -340,19 +342,26 @@ const legalPins = {
     ["makes a claim or demand against us, our partners, employees or agents, you cover it", "terms", "15", "you will indemnify ComplyEaze and its partners, employees and agents against third-party claims"],
     ["you cover it and any resulting loss, cost or expense, including reasonable legal fees", "terms", "15", "any claim, demand, loss, cost or expense (including reasonable legal fees) brought by a third party, including your Clients"],
     ["to the extent the law allows and to the extent it arises from your breach of the Terms or the law", "terms", "15", "To the extent permitted by applicable law"],
-    ["without the authority section 8 requires", "terms", "15", "without the authority required by section 8"],
+    ["or of Tally’s or your AI provider’s terms", "terms", "15", "or of Tally's or your AI Provider's terms"],
+    ["from a voucher you approved, or data you accessed or shared, without the authority section 8 requires", "terms", "15", "a voucher you approved, or data you accessed or shared, without the authority required by section 8"],
+    ["without the authority section 8 requires", "terms", "8", "Having the right to access each Tally company you connect Bridge to"],
     ["your breach of a duty you owe your clients", "terms", "15", "your breach of any duty you owe your Clients"],
     ["You do not cover a claim to the extent it results from our breach of the Terms, our negligence or our wilful misconduct.", "terms", "15", "It does not apply to the extent a claim results from our breach of these Terms or our negligence or wilful misconduct."],
     ["Nor do you cover any penalty imposed on us for our own breach of the law (section 15)", "terms", "15", "It does not cover any penalty imposed on us for our own breach of the law."],
     ["your decision to approve a voucher or a batch and its accounting consequences, whoever proposed it", "terms", "9.3", "You are responsible for that decision and its accounting consequences, whoever proposed the voucher"],
     ["that responsibility does not extend to any difference between what the approval window showed and what ComplyEaze Bridge actually posted (section 9.3)", "terms", "9.3", "This does not apply to any difference between what the window showed and what Bridge actually posted"],
-    ["Any liability we have for such a difference is still subject to sections 13.3 and 14", "terms", "13.3", "We do not warrant that anything Bridge reads, reports, prepares or posts matches what is recorded in Tally"],
+    ["Section 14 still limits any liability we have for such a difference", "terms", "14.2", "our total liability to you for all claims arising out of or in connection with Bridge"],
+    ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "8", "Your responsibilities"],
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "9", "AI assistants, posting and approvals"],
+    ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "13", "No warranty"],
+    ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "14", "Limitation of liability"],
+    ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "15", "Indemnity"],
   ],
   contact: [
-    ["contact@complyeaze.com (SPMS Comply Eaze Solutions LLP; the address is in section 1.1", "terms", "19", "contact@complyeaze.com, SPMS Comply Eaze Solutions LLP, at the address in section 1.1"],
-    ["the address is in section 1.1", "terms", "1.1", "Our registered office is at"],
-    ["Do not send real client data, passwords or other confidential information (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information"],
+    ["contact@complyeaze.com (SPMS Comply Eaze Solutions LLP; its postal address is in section 1.1", "terms", "19", "contact@complyeaze.com, SPMS Comply Eaze Solutions LLP, at the address in section 1.1"],
+    ["its postal address is in section 1.1", "terms", "1.1", "Our registered office is at"],
+    ["Do not put real client data, passwords or other confidential information in issues, bug reports, logs or screenshots you share with us or post publicly (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information in issues, bug reports, logs or screenshots that you share with us or post publicly"],
+    ["“Grievance” in the subject", "privacy", "16", "with \"Grievance\" in the subject"],
     ["or write by post to that address", "privacy", "16", "or by post to the address in section 1"],
     ["we acknowledge within 7 days of receiving it and answer within 30 days (section 16 of the Privacy Policy)", "privacy", "16", "We will acknowledge a grievance within 7 days of receiving it and give you our response within 30 days"],
     ["write to security@complyeaze.com or use GitHub private vulnerability reporting for the ComplyEaze Bridge repository", "terms", "19", "security@complyeaze.com, or GitHub private vulnerability reporting for the Bridge repository"],
@@ -360,6 +369,10 @@ const legalPins = {
     ["we are not obliged to provide support (Terms of Use, section 4.4)", "terms", "4.4", "We are not obliged to provide support"],
   ],
 };
+// "section 14.1", "Section 5", "sections 8, 9 and 15", "sections 4 to 6"
+const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)/gi;
+const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|thirty|sixty|ninety|hundred|thousand)\b/gi;
+const withoutCitations = (text) => text.replace(citation, " ");
 
 test("the liability and contact answers say no more and no less than the clauses they summarise", () => {
   const html = read("faq.html");
@@ -371,13 +384,17 @@ test("the liability and contact answers say no more and no less than the clauses
       assert.ok(answer.includes(says), `#${id} no longer says: ${says}`);
       assert.ok(clause(doc, number).includes(reads), `${doc} ${number} no longer reads: ${reads} (reread #${id} against it)`);
     }
-    // every section the answer cites, and every figure it gives, sits inside a pinned phrase
-    const pinned = pins.map(([says]) => says);
-    for (const [cited] of answer.matchAll(/sections? [0-9]+(?:\.[0-9]+)*(?:(?:, | and )[0-9]+(?:\.[0-9]+)*)*/g)) {
-      assert.ok(pinned.some((says) => says.includes(cited)), `#${id} cites "${cited}" without a pin to the clause`);
+    // every section the answer cites has a pin to that very clause or section, inside a phrase that cites it
+    for (const match of answer.matchAll(citation)) {
+      for (const cited of [match[1], ...match[2].split(/, | and | to /).filter(Boolean)]) {
+        const own = pins.filter(([says, , number]) => (number === cited || number.startsWith(`${cited}.`)) && new RegExp(`\\b${cited.replace(".", "\\.")}\\b(?!\\.[0-9])`).test(says));
+        assert.ok(own.length > 0, `#${id} cites section ${cited} without a pin to it`);
+      }
     }
-    for (const [figure] of answer.replace(/sections? [0-9]+(?:\.[0-9]+)*(?:(?:, | and )[0-9]+(?:\.[0-9]+)*)*/g, "").matchAll(/[0-9][0-9,]*/g)) {
-      assert.ok(pinned.some((says) => says.replace(/sections? [0-9]+(?:\.[0-9]+)*(?:(?:, | and )[0-9]+(?:\.[0-9]+)*)*/g, "").includes(figure)), `#${id} gives the figure ${figure} without a pin to the clause`);
+    // every figure, in digits or in words, sits inside a pinned phrase
+    for (const [word] of withoutCitations(answer).matchAll(figure)) {
+      const pinned = pins.some(([says]) => new RegExp(`\\b${word.replace(",", "\\,")}\\b`, "i").test(withoutCitations(says)));
+      assert.ok(pinned, `#${id} gives the figure "${word}" without a pin to the clause`);
     }
   }
 });

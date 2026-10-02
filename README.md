@@ -10,7 +10,7 @@ vouchers as a file. If you turn posting on in the extension, it posts them one
 at a time, after you approve each one.
 
 **Current release:**
-<!-- managed:current-release -->[`mcp-v0.4.0`](https://github.com/ComplyEaze/bridge/releases/latest) (2 October 2026)<!-- /managed:current-release -->,
+<!-- managed:current-release -->[`mcp-v0.4.1`](https://github.com/ComplyEaze/bridge/releases/latest) (2 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs. We check each release before we
 publish it: the release check confirms that each package launches, lists its
 tools and parses a synthetic encrypted bank statement. It does not run against
@@ -105,11 +105,21 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   tools loaded in a chat. The record is the maintainer's dated notes and
   screenshots, kept privately. This was one run, not a controlled test of each
   key of the window.
+- A build of 0.4.1 on a Mac, on 2 October 2026: the package CI built for the
+  version pull request, not the published file (the release is built again on
+  another runner, and the program file inside differs; with no Tally both start
+  as version 0.4.1, list 21 tools and answer the same way). The maintainer
+  upgraded an installed 0.4.0 over it in Claude Desktop. The Terms setting and
+  the other settings carried over, the app restarted the extension itself, and
+  `tally_status` answered against licensed TallyPrime Silver 7.1 with four lab
+  companies loaded. The record is the maintainer's dated notes, kept privately.
+  The published 0.4.1 file was checked only without Tally; we have not installed
+  it in Claude Desktop.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window
-(one was tried); the tools answering through Claude Desktop on macOS after the
-Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold
+(one was tried); the tools other than `tally_status` answering through Claude
+Desktop on macOS after the Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold
 with its approval step recorded. Each release package is built and launched,
 its tool list checked and a synthetic encrypted bank statement parsed, on
 hosted CI runners for Windows x64 and Apple Silicon Mac.
@@ -201,7 +211,7 @@ With writing on:
 **The extension is built from the same source library as the desktop app.**
 Packages up to 0.3.0 contained an unfinished document-upload feature and an
 AXAL sign-in, which no tool of the extension reached. That code was removed
-([#914](https://github.com/ComplyEaze/bridge/pull/914)) and release 0.4.0 does
+([#914](https://github.com/ComplyEaze/bridge/pull/914)) and releases from 0.4.0 on do
 not contain it; the only network client in ComplyEaze Bridge's own code
 connects to Tally on your own computer. No desktop installer is published.
 See [Security and privacy](./docs/security-and-privacy.md).
@@ -246,7 +256,7 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.4.0 package itself has not been run by us against a live TallyPrime.
+  0.4.1 package itself has not been run by us against a live TallyPrime.
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on

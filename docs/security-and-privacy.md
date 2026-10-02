@@ -2,10 +2,13 @@
 
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the latest
-published release (version 0.4.0). It was written from a reading of that
-release's source code, at the tag `mcp-v0.4.0`, on 2 October 2026. It was not
-tested on a running system (see the README's list of what has been run).
-Unless a line says otherwise, each answer rests on reading that source.
+published release (version 0.4.1). It was written from a reading of the source
+code of release 0.4.0, at the tag `mcp-v0.4.0`, on 2 October 2026, and updated
+for 0.4.1 only where the changes between the two tags change an answer on this
+page: the sections on network destinations (3) and on what it reads and
+installs (7). The other answers were not read again against the 0.4.1 tag. It
+was not tested on a running system (see the README's list of what has been
+run). Unless a line says otherwise, each answer rests on reading that source.
 Anything not measured on a running system is marked **Not measured**.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
@@ -121,6 +124,23 @@ settings (section 4).
   The changelog adds that the check does not by itself prove that no data
   leaves the machine.
 
+- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
+  `parse_bank_statement` tool opened any absolute path it was given for the
+  statement or the password file, including a Windows network path. On Windows,
+  opening a path that names another computer makes Windows itself connect to
+  that computer, and may send the signed-in user's network sign-in response to
+  it. That is the operating system opening a file, not a network client in
+  ComplyEaze Bridge's own code, so the checks above do not see it. It needs the
+  assistant to be steered into giving such a path, your approval of the call or
+  an always-allow setting, and outbound file-sharing traffic to that computer.
+  No Tally data is sent. In 0.4.1 both paths are checked as text before
+  anything is opened; a path that begins with two slashes or backslashes, in any
+  mix, is refused, and on Windows only a path that starts with a drive letter is
+  accepted. A drive letter mapped to a network share, a link or junction partway
+  along a path, and on a Mac a mounted network volume still pass. Keep
+  statements and password files on a local disk. See the
+  [advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
+
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
 ## 4. What is stored on my computer, and for how long?
@@ -210,8 +230,9 @@ The package declares only a command to run and its settings. In its source we
 found no service, driver, scheduled task, registry key, launch agent or
 listening port. It writes files only in its data folder and in the lock
 folder described in section 4. It also reads files named in a tool call (often
-by the assistant), such as a bank statement and its password file; on macOS it
-refuses a password file that other users can read. Its one extra process is a
+by the assistant), such as a bank statement and its password file. From 0.4.1 it
+accepts such a path only when its text names a local disk (section 3); on macOS
+it refuses a password file that other users can read. Its one extra process is a
 second copy of itself that shows the approval window.
 
 The approval window is a system dialog. On macOS it is titled "ComplyEaze

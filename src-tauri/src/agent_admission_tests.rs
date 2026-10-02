@@ -605,6 +605,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "a rebuild after an unknown outcome can post the voucher twice",
         ),
         (
+            "acknowledge_post_review",
+            "The model cannot approve it",
+            "only the person, in its own native dialog, records a review",
+        ),
+        (
+            "build_import_xml",
+            "do not re-import or rebuild the same business event",
+            "a second file for an event already imported can post it twice",
+        ),
+        (
+            "tally_status",
+            "only repeat it when the refusal says attempt_recorded is false",
+            "a refused post may be repeated only when no attempt was recorded",
+        ),
+        (
             "tally_status",
             "once an attempt is recorded, follow the refusal's next_step (verify_import) and never call post_import again",
             "a recorded attempt may already be in Tally",
@@ -636,18 +651,40 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
     ];
     let definitions = registered_tool_definitions(true, true);
-    for (tool, phrase, why) in PINNED {
-        let description = definitions
+    let description_of = |tool: &str| -> String {
+        definitions
             .as_array()
-            .and_then(|tools| tools.iter().find(|entry| entry["name"] == *tool))
+            .and_then(|tools| tools.iter().find(|entry| entry["name"] == tool))
             .unwrap_or_else(|| panic!("{tool} is not registered"))["description"]
             .as_str()
-            .expect("tool description");
+            .expect("tool description")
+            .to_owned()
+    };
+    for (tool, phrase, why) in PINNED {
         assert!(
-            description.contains(phrase),
+            description_of(tool).contains(phrase),
             "{tool} lost a safety sentence ({why}): {phrase:?}"
         );
     }
+
+    // The stock_summary pin needs its negation: the clause before "is a stock
+    // value or a total" must say "neither", or "either"/"each" would invert it.
+    // The clause runs back to the nearest `.`, `,`, `:` or `;`, which keeps both
+    // "neither is" and "neither side is" (#1026).
+    let stock = description_of("stock_summary");
+    let at = stock
+        .find("is a stock value or a total")
+        .expect("pinned above");
+    let clause_start = stock[..at]
+        .rfind(['.', ',', ':', ';'])
+        .map_or(0, |index| index + 1);
+    assert!(
+        stock[clause_start..at]
+            .split_whitespace()
+            .any(|word| word == "neither"),
+        "stock_summary must say neither unchecked sum is a stock value: {:?}",
+        &stock[clause_start..at]
+    );
 
     // The extension's own description: what is read goes to the AI provider,
     // and redaction cannot remove amounts.

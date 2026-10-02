@@ -28,6 +28,9 @@ it comes from.
 
 - `parse_bank_statement` accepts a statement file or password file path only
   when its text names a local disk (#1024).
+- A statement or password file path written in the Windows long-path form
+  (starting with `\\?\`) is now refused. Use the ordinary drive path instead
+  (#1024).
 - `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
   the plain number (`"1"`), not as Tally sends it with a leading space
   (`" 1"`), so it matches the same id returned by `verify_import` (#1021).

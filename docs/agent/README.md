@@ -1489,7 +1489,7 @@ source evidence are not fabricated; zero retained bytes does not establish that
 no HTTP request was attempted. Local-only tools and refusals without retained
 source observations carry local evidence.
 
-`outstandings` returns the runtime's paired native result. A complete read has
+`outstandings` returns the runtime's paired native result. Its `result.as_of` (YYYYMMDD) is always the date read as of, in every state: the caller's `as_of`, or this computer's date when it was left out. `tally_status.today` is that date. A complete read has
 billed totals explicitly scoped to open bills, four overdue-age buckets, an
 `unaged` bucket for future-due or unobserved ages, top parties,
 open bills, and unallocated counts and directional totals; a refused runtime read instead has `state: "partial"` and its
@@ -1520,10 +1520,17 @@ serialized, redacted JSON as `structuredContent` for older clients. The `initial
 carries `instructions`, a short text for the client to show its model: start with `list_companies`,
 use the one open company only when the user named no client (or exactly one open company matches the
 name they gave), otherwise ask which and offer the list, state the company, dates and ledger used in
-the first line, anything partial, withheld, not established or not checked ahead of the figures, that
-what is read goes to the AI provider, what to do with a refusal (relay it, take only a different read,
-narrower dates or one repeat of the same read that it names, otherwise ask the user), and to ask before
-preparing or posting anything and never choose a ledger for a voucher. It is left out when
+the first line, anything partial, withheld, not established or not checked ahead of the figures, ask
+before a read that scans vouchers over more than one month unless the user gave the dates or the
+financial year, and always before an outstandings party detail, which reads from the start of the books,
+that what is read goes to the AI provider, and what to do with a refusal (relay it, take only a
+different read, narrower dates or one repeat of the same read that it names, otherwise ask the user).
+Its closing sentences follow the posting settings: with posting on, ask before preparing or posting
+anything and never choose a ledger for a voucher; with import only, this connection cannot post, only
+prepare a local import file the user imports themselves, and the assistant asks before preparing
+anything and never chooses a ledger; with neither, it cannot prepare or post vouchers, and still never
+chooses a ledger. Both of the latter tell the assistant to say so and never say anything was or will
+be posted from the chat. It is left out when
 `max_bytes` is below 4,096 or the request id is over 256 bytes, so that a client asking for tiny
 responses still gets its handshake. The company rule is also in `list_companies`' own description, so
 a client that does not pass the instructions on keeps it; the other sentences are not repeated there.

@@ -204,9 +204,11 @@ function assertInstallPageWorkflow(page) {
   assert.deepEqual(deploy.permissions, { contents: "read", pages: "write", "id-token": "write" }, "only the deploy job holds the Pages permission and the identity token");
   assert.equal(deploy.needs, "build", "the deploy job runs after, and only after, the build job");
   assert.equal(deploy.environment?.name, "github-pages");
+  assert.equal(deploy.environment?.url, "${{ steps.deployment.outputs.page_url }}", "the environment url reads the deploy step's output");
   const upload = build.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   const publish = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/deploy-pages@"));
   assert.ok(upload && publish, "Pages deployment must upload the site artifact and deploy it");
+  assert.equal(publish.id, "deployment", "the deploy step is the one the environment url reads");
   assertUnconditional(upload, "Pages upload step");
   assertUnconditional(publish, "Pages deployment step");
   assert.equal(upload.with.path, "site");
@@ -327,7 +329,7 @@ test("the site summary step is informational, permitted to read deployments, and
   const names = page.jobs.build.steps.map((candidate) => candidate.name ?? candidate.uses);
   assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/upload-pages-artifact@")), "the summary is written before the site is uploaded, and so before the deploy job");
 
-  // This job's own deployment already exists and lists first; a failed one never went live.
+  // An earlier deployment of this same commit (a re-run) lists first; a failed one never went live.
   const own = { sha: "self", states: ["queued", "waiting"] };
   const failed = { sha: "unknown", states: ["failure", "queued"] };
   const live = { sha: "first", states: ["success", "in_progress", "queued"] };

@@ -415,6 +415,54 @@ Further observations from the same runs:
   changed the currency master's `ORIGINALNAME` and the company's `CURRENCYNAME` with it, both ways.
   A non-INR company given a ₹ symbol was not measured.
 
+**A window read whole and admitted against its census (#985, #1020) — PARTIAL, 2026-10-02.**
+Run by the maintainers on a licensed TallyPrime 7.1 Silver lab, through Bridge's own tools, on
+synthetic lab books, one-day windows. The reads ran on builds of two #1020 heads, `5797c9ec` and
+`ff50b571` (before it merged master), with the same results on both; the post ran on `ff50b571`
+only. One run of each. The requests are described from each tool's own request trail (counts,
+hashes and sizes); no request or response was captured into this tree.
+
+When a census is read is derived from the code, not measured: the planner reads one only when a
+book's voucher mark times the shape's default size per voucher exceeds the 16 MiB budget. That is
+a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
+more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
+
+| Call | Book | Window label | Verdicts | Requests |
+| --- | --- | --- | --- | --- |
+| `vouchers`, a day with one voucher | census read | `complete`, total 1 | | 22 |
+| `vouchers`, the same | no census | `partial`, `nonempty_window_unqualified`, total 1 | | 16 |
+| `voucher_presence`, 2 proposals | census read | `complete` | the voucher in the book `present`; one nothing in the book resembles `absent` | 34 |
+| `voucher_presence`, 2 proposals | no census | `partial`, `nonempty_window_unqualified` | the voucher in the book `present`; one sharing its party `possibly_present`, `resembles_book_voucher` | 28 |
+| `voucher_presence`, 1 proposal whose party is bound and is not the book voucher's | no census | `partial`, `nonempty_window_unqualified` | `possibly_present`, `window_not_proven_complete`, no candidates | 28 |
+
+- No `absent` was issued on a `partial` window.
+- The `vouchers` call on the census book sent the same requests as a build without #1020, in the
+  same order, with the same request hashes and response sizes.
+- On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
+  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. That
+  reason names the widened read's neighbouring days, not the window, which returned no row; the
+  wording is a separate matter.
+
+**The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
+`post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
+the read-back read a census. `post_import` returned `posted_verified`: created 1 and every other
+counter 0, one import sent and not resent, and the voucher mark moved by exactly 1. On a day empty
+before the post, the census answer grew from the empty answer to one holding the posted voucher.
+The read was admitted against it and returned complete, and `verify_import` read it again with the
+same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
+nobody changed.
+
+This does not establish:
+
+- a window of several days read in one request and admitted against its census, which is the case
+  `voucher_presence` is mostly asked about (ADR 0017's note of 2026-10-02);
+- the refusal itself: no run produced a disagreement between a census and its read, so what a
+  caller sees then, after a read or after a post, is shown only by #1020's own tests;
+- how often that refusal fires on a book several people are changing;
+- Education mode, or tiers and releases other than Silver 7.1;
+- the voucher types' own numbering: the caller declared them `manual`;
+- anything beyond one run of each, on synthetic lab books.
+
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
 On a TallyPrime 7.1 instance in Education mode, `ledgers_v1`'s custom report raised a modal

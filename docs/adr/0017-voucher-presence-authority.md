@@ -493,7 +493,8 @@ human-approved batch — this ADR does not move.
 - `bridge_tally_core::book_presence` is new and is the only implementation. The
   MCP tool `voucher_presence` is its first consumer; it performs the existing
   qualified ledger-catalogue and `vouchers` window reads, builds a window from
-  the read state it can actually prove — `Partial` over a nonempty range — and
+  the read state it can actually prove — `Partial` over a nonempty range, unless
+  a census counted it (see the note of 2026-10-02 below) — and
   shapes the report through the same party-name marking and egress redaction as
   every other read result.
 - **Catalog coverage is byte-exact.** The typed boundary retains each observed
@@ -589,6 +590,25 @@ human-approved batch — this ADR does not move.
   window read asserts about itself — and that is a separate read contract with
   its own live evidence.
 
+  *Note, 2026-10-02 (#985).* The owner has ruled that the census of
+  [protocol reference §11c.3](../tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c3-the-rule)
+  is this source-side control total. It is a second request, apart from the
+  data read, that names the window's vouchers by AlterID and GUID. It was
+  measured equal to the full read on every whole-day window tried
+  ([§11c.5](../tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21)),
+  and at about a seventeenth of the wildcard payload it is not the response
+  that truncates first. The window reader now admits every read it sized with
+  a census against that census, a window read whole included. A nonempty
+  window whose rows matched the count voucher for voucher is therefore
+  `Complete` and can issue `Absent`, and `vouchers` labels the same read by
+  the same rule. A window that the high-water mark alone proved small (a book
+  of a few dozen vouchers) sends no census and stays `Partial`, with reason
+  `nonempty_window_unqualified`. What remains open: the census and the data
+  read share one date filter, so a voucher that filter drops is missed by
+  both alike and the two agree. Not measured: multi-day windows, Education
+  and tiers other than Silver 7.1, and how often a voucher changed between
+  the count and the read refuses an ordinary read.
+
 - **A widened re-read was built, measured and rejected**, and the reasoning is
   recorded here so the next attempt starts past it rather than at it. The idea
   is to re-read the same range a day wider and compare the two reads on Tally's
@@ -639,8 +659,9 @@ human-approved batch — this ADR does not move.
 - A prior owner-authorized, read-only replay exercised the decision rules using
   proposals built from observed rows. It did not establish source completeness,
   operational `Absent` capability, or a qualified nonempty window. The current
-  adapter therefore emits `present` and `possibly_present` verdicts from a
-  nonempty window but never `absent`: such a window is `Partial`, and the
+  adapter therefore emits `present` and `possibly_present` verdicts from an
+  uncounted nonempty window but never `absent` (a window a census counted can,
+  since #985): such a window is `Partial`, and the
   verdict that would have been `absent` is reported as `possibly_present` with
   reason `window_not_proven_complete`. The replay remains useful for
   controlled rule characterization and for checking admissible perturbation

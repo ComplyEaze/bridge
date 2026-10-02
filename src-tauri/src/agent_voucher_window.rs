@@ -16,6 +16,7 @@
 //! cap stays the final safeguard; this only stops Bridge from *asking* for a
 //! response it already expects to be too large.
 use super::*;
+use bridge_tally_core::book_presence::WindowRead;
 use chrono::NaiveDate;
 
 /// Predicted encoded bytes one windowed read may carry.
@@ -837,6 +838,42 @@ pub(super) struct WindowReadOutcome<T> {
     pub(super) timings: WindowReadTimings,
 }
 
+impl<T> WindowReadOutcome<T> {
+    /// Whether every row was admitted against a census of the window: a
+    /// second request, counted apart from the data, that the rows matched
+    /// voucher for voucher. See [`window_read`].
+    pub(super) fn counted(&self) -> bool {
+        self.witness
+            .as_ref()
+            .is_some_and(|witness| witness.census.is_some())
+    }
+}
+
+/// Why a non-empty window is `partial`: nothing outside its own response
+/// counted its rows.
+pub(super) const NONEMPTY_WINDOW_UNQUALIFIED: &str = "nonempty_window_unqualified";
+
+/// The one completeness rule for a voucher window, shared by `vouchers` and
+/// `voucher_presence` so they cannot label the same read differently (#985).
+///
+/// `empty_window` is the empty-window control's `(partial, reason)`, present
+/// only when the window held no rows. A non-empty window is complete only when
+/// it was [`counted`](WindowReadOutcome::counted): ADR 0017 takes the census
+/// as the source-side control total. A census shares the data read's date
+/// filter, so a voucher that filter drops is missed by both alike; that
+/// residual is the ADR's.
+pub(super) fn window_read(
+    counted: bool,
+    empty_window: Option<(bool, Option<&'static str>)>,
+) -> (WindowRead, Option<&'static str>) {
+    match empty_window {
+        Some((true, reason)) => (WindowRead::Partial, reason),
+        Some((false, reason)) => (WindowRead::Complete, reason),
+        None if counted => (WindowRead::Complete, None),
+        None => (WindowRead::Partial, Some(NONEMPTY_WINDOW_UNQUALIFIED)),
+    }
+}
+
 /// The wall time of every request a window read sent, by what it was for:
 /// the marks and census reads as totals, the data parts one by one in the
 /// order sent, a part Tally could not serve included. Measured around the
@@ -1072,7 +1109,14 @@ fn with_prior_closed(
 /// What the pre-flight established before any data read.
 enum Preflight {
     /// Read undivided: nothing the book or the window holds can exceed the budget.
-    Whole,
+    Whole {
+        /// The census that showed the window small enough, when one was read.
+        /// The undivided read is admitted against it (#985); `None` when the
+        /// marks alone bounded the book, so nothing counted the window.
+        census: Option<WindowCensus>,
+        /// The marks the census was bounded by, when they were read.
+        marks: Option<CompanyMarks>,
+    },
     /// Counted per day; plan it.
     Counted {
         census: WindowCensus,
@@ -1600,11 +1644,22 @@ where
                 WindowPlanSource::Replay { .. } => unreachable!("handled above"),
             };
             match estimate {
-                Preflight::Whole => vec![WindowPart {
-                    from: from.to_string(),
-                    to: to.to_string(),
-                    span: None,
-                }],
+                Preflight::Whole {
+                    census: counted,
+                    marks,
+                } => {
+                    if let Some(counted) = &counted {
+                        ceiling = marks
+                            .map_or(0, |marks| marks.vouchers)
+                            .max(counted.max_alter_id());
+                    }
+                    census = counted;
+                    vec![WindowPart {
+                        from: from.to_string(),
+                        to: to.to_string(),
+                        span: None,
+                    }]
+                }
                 Preflight::Counted {
                     census: counted,
                     marks,
@@ -1872,7 +1927,10 @@ async fn estimate_window_volume<R: WindowReader>(
     // mark (§10), so the book — and therefore any window of it — holds at
     // most `high_water` vouchers.
     if high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes {
-        return Ok(Preflight::Whole);
+        return Ok(Preflight::Whole {
+            census: None,
+            marks: None,
+        });
     }
     let rows = census_window(
         reader,
@@ -2165,6 +2223,9 @@ fn admit_union<T: WindowRow>(rows: &[T]) -> Result<(), String> {
     Ok(())
 }
 
+/// Plan a counted window: whole when its count fits one read, divided
+/// otherwise. Either way the census is kept, so every part, the single whole
+/// one included, is admitted against it (#985).
 fn whole_or_counted(
     census: WindowCensus,
     marks: Option<CompanyMarks>,
@@ -2175,7 +2236,10 @@ fn whole_or_counted(
         .saturating_mul(limits.default_bytes_per_voucher)
         <= limits.budget_bytes
     {
-        Preflight::Whole
+        Preflight::Whole {
+            census: Some(census),
+            marks,
+        }
     } else {
         Preflight::Counted { census, marks }
     }

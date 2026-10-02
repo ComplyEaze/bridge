@@ -1437,8 +1437,14 @@ canonical UUIDs. Failed receipt appends restore the previous file length.
 An incomplete log or failed rollback stops the session; a persisted build still
 returns its recovery batch ID before termination. Reads withheld by the result
 byte cap retain partial source commitments in the in-process evidence store.
-Voucher selectors are applied after source-emptiness corroboration; a nonempty
-source with no matching ledger can return a complete empty selection. Amounts
+`vouchers` and `voucher_presence` label a window by one rule (#985): `complete`
+only when its rows were admitted voucher for voucher against the census that
+sized the read (protocol reference §11c.3), or it was empty and corroborated;
+otherwise `partial` with reason `nonempty_window_unqualified`. A book whose
+voucher high-water mark alone proves it small (a few dozen vouchers) sends no
+census, so its nonempty windows are `partial`. Voucher selectors are applied
+after the window is labelled, so a nonempty counted source with no matching
+ledger returns a complete empty selection, and an uncounted one a partial one. Amounts
 must parse as exact decimals, polarity flags must be `Yes` or `No`, and dates
 must be valid calendar dates before ordinary voucher rows are released. Ledger
 selectors require matching catalogues before and after the voucher read, unique

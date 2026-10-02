@@ -1912,7 +1912,7 @@ fn a_multi_currency_refusal_names_the_masters_in_plain_words_only_when_nothing_w
     assert_eq!(
         error["message"],
         "This company has more than one currency defined (C1, C2, C3, C4, C5, C6, C7, C8 and 2 \
-         more); Bridge does not post into multi-currency books yet. Nothing was posted."
+         more); ComplyEaze Bridge does not post into multi-currency books yet. Nothing was posted."
     );
     assert_eq!(error["currencies_seen"].as_array().unwrap().len(), 8);
     assert_eq!(error["currencies_total"], 10);

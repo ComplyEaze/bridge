@@ -403,7 +403,10 @@ async fn invalid_scope_arguments_are_rejected_before_any_tally_probe() {
             error.get("remediation").is_none(),
             "{tool} refusal gained unearned remediation: {error}"
         );
-        assert_eq!(error["message"], "Bridge refused this operation.", "{tool}");
+        assert_eq!(
+            error["message"], "ComplyEaze Bridge refused this operation.",
+            "{tool}"
+        );
     }
 }
 
@@ -427,7 +430,10 @@ fn an_empty_book_refusal_carries_its_remediation_through_the_real_payload() {
     );
     let error = &response.value["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error["remediation"]
             .as_str()
@@ -460,7 +466,10 @@ fn a_small_response_budget_keeps_the_refusal_code_and_drops_only_the_guidance() 
     // The code is what the caller cannot do without, so it must survive a budget
     // too small to carry the guidance as well.
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error.get("remediation").is_none(),
         "guidance displaced the refusal budget: {error}"
@@ -579,76 +588,38 @@ fn ledger_movement_schema_exposes_offset_and_limit() {
 fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     let known_parties = ["Customer One", "Supplier Two", "PAN Holder", "Entry Ledger"];
     let samples = [
-        ("tally_status", json!({"product":"TallyPrime"})),
         (
-            "list_companies",
-            json!({"companies":[{"name":"Bridge Books"}]}),
-        ),
-        ("voucher_schema", json!({"schema":{"type":"object"}})),
-        (
-            "validate_masters",
-            json!({"masters":[{"requested":party_name("Customer One"),"exact_live_spelling":party_name("Customer One"),"candidates":[party_name("Customer One")]}]}),
+            "balance_sheet",
+            json!({"result":{"profit_and_loss":{"ledger":{"name":party_name("Customer One")}}},"unclassified":[{"ledger":party_name("Supplier Two")}]}),
         ),
         (
             "build_import_xml",
             json!({"masters":[{"requested":party_name("Supplier Two"),"candidates":[party_name("Supplier Two")]}]}),
         ),
-        ("verify_import", json!({"vouchers":[]})),
-        (
-            "ledger_masters",
-            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
-        ),
-        (
-            "vouchers",
-            mark_voucher_party_names(
-                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
-            ),
-        ),
         (
             "changed_since",
             json!({"masters":[mark_changed_master_party_name(json!({"name":"Supplier Two"}))]}),
         ),
+        ("egress_log", json!({"records":[]})),
         (
-            "outstandings",
-            json!({"top_parties":[{"party":party_name("Customer One")}],"open_bills":[{"party":party_name("Supplier Two")}],"unallocated":{"parties":[{"party":party_name("Supplier Two")}]}}),
+            "ledger_masters",
+            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
         ),
         (
             "ledger_movement",
             json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
         ),
         (
-            "purchase_register",
-            super::register::mark_register_row(
-                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
-            ),
-        ),
-        (
-            "trial_balance",
-            json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
+            "list_companies",
+            json!({"companies":[{"name":"Bridge Books"}]}),
         ),
         (
             "masters",
             json!({"masters":[{"name":"Main Location","guid":"g-1","master_id":99,"alter_id":100,"parent":null}],"offset":0}),
         ),
         (
-            "stock_summary",
-            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
-        ),
-        (
-            "profit_and_loss",
-            json!({"unclassified":[{"ledger":party_name("Entry Ledger")}]}),
-        ),
-        (
-            "balance_sheet",
-            json!({"result":{"profit_and_loss":{"ledger":{"name":party_name("Customer One")}}},"unclassified":[{"ledger":party_name("Supplier Two")}]}),
-        ),
-        (
-            "voucher_presence",
-            json!({"vouchers":[super::presence::mark_presence_party_names(json!({
-                "party":{"party_state":"bound","catalog_name":"Customer One"},
-                "presence":"present",
-                "differences":[{"field":"party","proposed":"Customer One","observed":"Supplier Two"}],
-            }))]}),
+            "outstandings",
+            json!({"top_parties":[{"party":party_name("Customer One")}],"open_bills":[{"party":party_name("Supplier Two")}],"unallocated":{"parties":[{"party":party_name("Supplier Two")}]}}),
         ),
         (
             "parse_bank_statement",
@@ -662,8 +633,46 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             "post_import",
             json!({"error":{"ledgers_changed":[party_name("Customer One"),party_name("Supplier Two")]}}),
         ),
+        (
+            "profit_and_loss",
+            json!({"unclassified":[{"ledger":party_name("Entry Ledger")}]}),
+        ),
+        (
+            "purchase_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
+        ),
         ("read_evidence", json!({"records":[]})),
-        ("egress_log", json!({"records":[]})),
+        (
+            "stock_summary",
+            json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
+        ),
+        ("tally_status", json!({"product":"TallyPrime"})),
+        (
+            "trial_balance",
+            json!({"ledgers":[{"ledger":party_name("Entry Ledger")}]}),
+        ),
+        (
+            "validate_masters",
+            json!({"masters":[{"requested":party_name("Customer One"),"exact_live_spelling":party_name("Customer One"),"candidates":[party_name("Customer One")]}]}),
+        ),
+        ("verify_import", json!({"vouchers":[]})),
+        (
+            "voucher_presence",
+            json!({"vouchers":[super::presence::mark_presence_party_names(json!({
+                "party":{"party_state":"bound","catalog_name":"Customer One"},
+                "presence":"present",
+                "differences":[{"field":"party","proposed":"Customer One","observed":"Supplier Two"}],
+            }))]}),
+        ),
+        ("voucher_schema", json!({"schema":{"type":"object"}})),
+        (
+            "vouchers",
+            mark_voucher_party_names(
+                json!({"party":"Customer One","party_ledger_name":"Customer One","amounts":[{"ledger":"Entry Ledger"}]}),
+            ),
+        ),
     ];
     // Tools whose results carry no value marked as a party name, written out by
     // hand: a tool in neither this list nor the samples fails the check below by
@@ -687,6 +696,12 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         sampled.len(),
         sampled.iter().collect::<BTreeSet<_>>().len(),
         "a tool has two samples: {sampled:?}"
+    );
+    // In name order, so two pull requests that add different tools add their
+    // samples on different lines (#995).
+    assert!(
+        sampled.windows(2).all(|pair| pair[0] < pair[1]),
+        "samples must be in tool-name order: {sampled:?}"
     );
     let covered = sampled
         .iter()

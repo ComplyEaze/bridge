@@ -779,19 +779,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
              extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
-             there, then quit Claude completely and reopen it so Bridge starts again. Nothing \
+             there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
              was read from Tally.",
         ),
         "terms_record_unavailable" => Some(
             "ComplyEaze Bridge could not read or write terms-acceptance.jsonl in its local \
              folder, so it is off although the Terms of Use are accepted. Check that the folder \
-             can be written; if the file is damaged, move it aside and Bridge will record your \
+             can be written; if the file is damaged, move it aside and ComplyEaze Bridge will record your \
              acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
-             mark and Bridge has no \"before\" to attribute an import against. Record one \
+             mark and ComplyEaze Bridge has no \"before\" to attribute an import against. Record one \
              voucher in this company by another route and confirm it in Tally, then build \
              this batch again.",
         ),
@@ -799,7 +799,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // `ledger_movement_read_failed` (#716).
         "company_several_currency_masters" => Some(
             "This company keeps more than one Currency master. The opening balances these \
-             reads return (and ledger_movement's movements) name no currency, so Bridge \
+             reads return (and ledger_movement's movements) name no currency, so ComplyEaze Bridge \
              refused before reading any ledger. ledger_masters with fields=compliance reads \
              such a book through the base currency Tally identifies: it returns the plain \
              base-currency ledgers and names the ones it leaves out (#551). The basic read \
@@ -828,14 +828,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
             "A ledger in this company holds its opening balance in a foreign currency, which \
-             Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. Bridge \
+             Tally writes as `<amount> @ <rate> = <base amount>` rather than a number. ComplyEaze Bridge \
              does not read those amounts yet (#551, #683), so this read is refused on purpose, \
              not because the response was damaged. Retrying refuses again.",
         ),
         // The masters read's own size refusal (`size` carries the mark).
         "masters_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
-             worst-case row of this kind is over Bridge's response budget \
+             worst-case row of this kind is over ComplyEaze Bridge's response budget \
              (`size.limit_bytes`), so no request for masters was sent. The mark also counts \
              masters of every other kind, so a company with fewer masters of this kind may \
              be refused. A larger book refuses; retrying this call refuses again.",
@@ -855,7 +855,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The stock summary read's own size refusal (`size` carries the mark).
         "stock_summary_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
-             worst-case stock-item row is over Bridge's response budget (`size.limit_bytes`), \
+             worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
              so no request for stock items was sent. The mark counts masters of every kind, so \
              a company with few stock items may be refused. A larger book refuses; retrying \
              this call refuses again.",
@@ -864,9 +864,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // (`counts` carries both numbers).
         "stock_summary_item_count_differs" => Some(
             "Tally's own count of this company's stock items (`counts.counted`) differs from \
-             the number Bridge read (`counts.returned`), so nothing is returned: with fewer \
+             the number ComplyEaze Bridge read (`counts.returned`), so nothing is returned: with fewer \
              rows the list may be incomplete, and with more rows the count is not counting \
-             the list Bridge read. The book did not change during the read, so the same call \
+             the list ComplyEaze Bridge read. The book did not change during the read, so the same call \
              now gives the same refusal. Give the user both numbers and ask them to open the \
              Stock Summary in Tally for this company; why they differ is not known. Once the \
              user has looked, the next call is stock_summary with the same `company_guid` \
@@ -874,15 +874,15 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // Causes, reached through `stock_summary_read_failed`.
         "stock_report_unknown" => Some(
-            "Tally answered Bridge's request for its Stock Summary without the report, both \
+            "Tally answered ComplyEaze Bridge's request for its Stock Summary without the report, both \
              times it was asked, so stock values cannot be checked and nothing is returned. \
-             Bridge cannot tell why. The book did not change during the read, so do not retry. \
-             Tell the user Bridge could not read stock from this Tally and that the Stock \
+             ComplyEaze Bridge cannot tell why. The book did not change during the read, so do not retry. \
+             Tell the user ComplyEaze Bridge could not read stock from this Tally and that the Stock \
              Summary in Tally itself is the place to read it.",
         ),
         "stock_item_count_unavailable" => Some(
             "Tally gave no usable count of this company's stock items, both times it was asked, \
-             so Bridge cannot tell whether it read every item and returns nothing. Do not \
+             so ComplyEaze Bridge cannot tell whether it read every item and returns nothing. Do not \
              retry. Tell the user that stock for this company has to be read in Tally itself.",
         ),
         // The stock summary's date refusal: it costs no Tally request.
@@ -895,7 +895,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // A cause, reached through the shared `party_ledger_master_read_failed`.
         "ledger_catalogue_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) is above what \
-             Bridge can count ledgers for (400,000), so no request for ledgers was sent: a \
+             ComplyEaze Bridge can count ledgers for (400,000), so no request for ledgers was sent: a \
              response past the transport's response cap is cut off mid-read, which can leave \
              Tally's gateway unable to answer (#637). The mark is an UPPER BOUND on ledgers, \
              since stock items, units and every other master raise it too, so a company with \
@@ -908,35 +908,35 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "ledger_span_slice_over_bound"
         | "ledger_span_duplicate_identity"
         | "ledger_span_census_empty" => Some(
-            "Bridge counts this book's ledgers by AlterID span before reading them, because its \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span before reading them, because its \
              master-alteration mark is too high to read a catalogue for, and the count could not \
              be trusted: a slice returned more ledgers than its span can hold (Tally may have \
              ignored its filter), a ledger was seen twice, no ledger was found at all (a closed or \
              absent company answers an empty slice exactly like a book without ledgers). No \
              master was requested. A ledger added or deleted \
              during the count can cause it; retry once while the book is quiet. A repeat means \
-             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             Tally's answer to the slice request is not what ComplyEaze Bridge expects: call ledger_masters \
              with fields=basic instead.",
         ),
         "ledger_span_slice_malformed" | "ledger_span_identity_mismatch" => Some(
-            "Bridge counts this book's ledgers by AlterID span before reading them, and a slice \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span before reading them, and a slice \
              of the answer was damaged, held a field it should not, or answered for another \
              company. No master was requested. Switching or closing the company in Tally during \
              the count can cause it; retry once with the company left alone. A repeat means \
-             Tally's answer to the slice request is not what Bridge expects: call ledger_masters \
+             Tally's answer to the slice request is not what ComplyEaze Bridge expects: call ledger_masters \
              with fields=basic instead.",
         ),
         // Not reachable after admission (the plan is bounded before it is made); named so
         // a refusal here is never read as a transient one.
         "ledger_span_too_many_slices" | "ledger_span_plan_invalid" | "ledger_span_incomplete" => Some(
-            "Bridge could not plan or finish the AlterID-span count of this book's ledgers. No \
+            "ComplyEaze Bridge could not plan or finish the AlterID-span count of this book's ledgers. No \
              master was requested. Retrying this call refuses again; call ledger_masters with \
              fields=basic instead.",
         ),
         "ledger_span_slice_response_too_large" => Some(
-            "Bridge counts this book's ledgers by AlterID span, and one slice's answer was \
-             larger than Bridge's response limit, far more than the slice's span can account \
-             for: Tally may have ignored the slice's filter. Bridge sent nothing after that \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and one slice's answer was \
+             larger than ComplyEaze Bridge's response limit, far more than the slice's span can account \
+             for: Tally may have ignored the slice's filter. ComplyEaze Bridge sent nothing after that \
              response and released nothing. Retrying is expected to refuse again; call \
              ledger_masters with fields=basic.",
         ),
@@ -946,11 +946,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              against the ledgers the master read returned. A ledger added or deleted during the \
              read can cause it; retry once while the book is quiet. A repeat means Tally answers \
              one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
-             book's master-alteration mark: call ledger_masters with fields=basic instead. Bridge \
+             book's master-alteration mark: call ledger_masters with fields=basic instead. ComplyEaze Bridge \
              released nothing.",
         ),
         "ledger_count_company_differs" => Some(
-            "Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
              company's ledgers is higher than that census found: the census missed ledgers, either \
              because a ledger was added during the read or (reasoned, not reproduced) because \
              the company was closed and reopened while it ran, and a read sized from the low \
@@ -959,54 +959,54 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              about this book: call ledger_masters with fields=basic instead."
         ),
         "ledger_count_company_invalid" => Some(
-            "Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span and asked Tally for the company's \
              own count of its ledgers to check it, and the answer was damaged, named another \
              company (or the company is no longer loaded), or held a count that is not a plain \
              number. No master was requested. Retry once with the company left alone. A repeat \
-             means Tally's answer to that request is not what Bridge expects: call ledger_masters \
+             means Tally's answer to that request is not what ComplyEaze Bridge expects: call ledger_masters \
              with fields=basic instead."
         ),
         "ledger_count_catalogue_too_large" => Some(
-            "The census counted more ledgers than one compliance read holds, so Bridge would \
+            "The census counted more ledgers than one compliance read holds, so ComplyEaze Bridge would \
              read them in parts by parent group, but the catalogue that names their parents \
-             would itself be larger than Bridge's response limit. Nothing was requested after \
+             would itself be larger than ComplyEaze Bridge's response limit. Nothing was requested after \
              the census. Call ledger_masters with fields=basic. Retrying this call refuses again.",
         ),
         // Causes reached through `party_ledger_master_read_failed` when a book too
         // large for one compliance read is read as parts by parent group (#679).
         "parent_over_budget" | "parent_partition_too_many_parts" => Some(
-            "This book has more ledgers than one compliance read may carry, so Bridge reads it \
+            "This book has more ledgers than one compliance read may carry, so ComplyEaze Bridge reads it \
              as parts by immediate parent group, and it cannot be split that way: either one \
              group holds more ledgers than a part may, or the ledgers under parent groups whose \
              names a filter cannot carry, read together as one last part, are more than a part \
-             may hold (Bridge splits neither), or the groups need more parts than Bridge will \
+             may hold (ComplyEaze Bridge splits neither), or the groups need more parts than ComplyEaze Bridge will \
              send. No master was requested. Call \
              ledger_masters with fields=basic, which returns names, parents and opening \
              balances without the compliance fields. Retrying this call refuses again.",
         ),
         "parent_part_response_too_large" => Some(
             "This book is read as parts by parent group, and one part's answer was larger than \
-             Bridge's response limit, more than the catalogue can account for under that \
-             part's groups: Tally may have ignored the part's filter. Bridge sent nothing \
+             ComplyEaze Bridge's response limit, more than the catalogue can account for under that \
+             part's groups: Tally may have ignored the part's filter. ComplyEaze Bridge sent nothing \
              after that response and released nothing. Retrying is expected to refuse again; call \
              ledger_masters with fields=basic.",
         ),
         "parent_complement_over_budget" => Some(
-            "This book is too large for one compliance read and Bridge reads it by parent \
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
              group, but reaching the ledgers under parent groups whose names a filter cannot \
-             carry needs a filter larger than Bridge will send. No master was requested. Call \
+             carry needs a filter larger than ComplyEaze Bridge will send. No master was requested. Call \
              ledger_masters with fields=basic. Retrying this call refuses again.",
         ),
         "parent_partition_voucher_witness_absent" => Some(
-            "This book is too large for one compliance read, so Bridge reads it as several \
+            "This book is too large for one compliance read, so ComplyEaze Bridge reads it as several \
              parts, and balances read at different moments only agree if no voucher was \
-             written between them. Bridge proves that with the company's voucher high-water \
+             written between them. ComplyEaze Bridge proves that with the company's voucher high-water \
              (`voucher_alter_id` in the company extent), and this Tally did not report one. \
              No part was requested. Call ledger_masters with fields=basic. Retrying this \
              call refuses again.",
         ),
         "parent_name_unsupported" => Some(
-            "This book is too large for one compliance read and Bridge reads it by parent \
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
              group, but all `unsupported_parent_ledgers` of its ledgers sit under parent \
              groups whose names a filter cannot carry (a quotation mark, a control character, \
              an empty name or an unexpected replacement character), so there is no named \
@@ -1014,7 +1014,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              fields=basic. Retrying this call refuses again.",
         ),
         "ledger_without_parent" | "parent_partition_duplicate_ledger_identity" => Some(
-            "This book is too large for one compliance read and Bridge reads it by parent \
+            "This book is too large for one compliance read and ComplyEaze Bridge reads it by parent \
              group, but its ledger catalogue holds a ledger with no parent group or a repeated \
              ledger identity. No master was requested. Call ledger_masters with fields=basic. \
              Retrying this call refuses again.",
@@ -1026,7 +1026,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "parent_part_row_repeated"
         | "parent_part_rows_missing" => Some(
             "The parts of this parent-group read did not add up to the ledger catalogue that \
-             planned them, so Bridge released nothing: a part returned a ledger it should not \
+             planned them, so ComplyEaze Bridge released nothing: a part returned a ledger it should not \
              have, returned one twice, or missed one, or a ledger's name or group differs \
              between the catalogue and the part. A part whose master came back with a different \
              ledger count ends the read after that master: its balance, any later part and the \
@@ -1045,7 +1045,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "The voucher number is empty, longer than the schema allows, holds a control \
              character, or — the one cause that is not visible by inspection — begins a \
              literal U+FFFD immediately followed by `#`, digits and `;` (for example \
-             U+FFFD#5;). Bridge's own agent readers rewrite exactly that sequence before \
+             U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite exactly that sequence before \
              parsing, so a voucher number carrying it would read back as different text and \
              could never be confirmed as posted. Remove that sequence from the voucher number \
              and resubmit; narration and reference may carry it freely.",
@@ -1056,7 +1056,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "A ledger name is empty, longer than the schema allows, holds a control character, \
              pairs with an amount that is not a valid two-decimal figure, or — the one cause \
              that is not visible by inspection — begins a literal U+FFFD immediately followed \
-             by `#`, digits and `;` (for example U+FFFD#5;). Bridge's own agent readers rewrite \
+             by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite \
              exactly that sequence before parsing, so a ledger name carrying it would read back \
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
@@ -1066,12 +1066,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // it, so this is reachable on an ordinary day's read, not only on a
         // divided one.
         "part_census_mismatch" => Some(
-            "Bridge counted this window's vouchers before reading them, and the read returned \
+            "ComplyEaze Bridge counted this window's vouchers before reading them, and the read returned \
              different vouchers from the ones it counted (`counts` gives returned against \
              counted), so it released nothing. A voucher created, altered, re-dated or deleted \
              between the count and the read causes it: call the same tool again with the same \
              arguments, once, while the book is quiet. A repeat on a quiet book may mean Tally \
-             did not honour the read's filter, or a fault in Bridge; read this window in Tally \
+             did not honour the read's filter, or a fault in ComplyEaze Bridge; read this window in Tally \
              itself.",
         ),
         // A product limit of the bounded window read (protocol reference §11c):
@@ -1079,7 +1079,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // obvious retry — a shorter window — cannot succeed, and saying so is
         // the whole point of naming a step.
         "voucher_window_book_too_large" => Some(
-            "This company's voucher history is too large for Bridge to count before reading \
+            "This company's voucher history is too large for ComplyEaze Bridge to count before reading \
              it in bounded requests: its voucher high-water mark is above about 2.1 million. \
              A shorter date window will not help, because the count covers the whole book. \
              Read this company with Tally's own reports, or split the company in Tally so \
@@ -1133,12 +1133,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // #697: every Bridge process sends to one Tally one request at a time.
         "tally_endpoint_busy" => Some(
-            "Another Bridge window or AI client was talking to this Tally for the whole \
+            "Another ComplyEaze Bridge window or AI client was talking to this Tally for the whole \
              bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
              same request is safe to repeat.",
         ),
         "import_post_window_not_bounded" => Some(
-            "Before posting, Bridge checks the batch's whole date range in one request, and \
+            "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
         ),
@@ -1445,7 +1445,8 @@ impl Server {
                 });
                 evidence.state = "partial";
                 evidence.reason_code = Some(code.clone());
-                let mut error = json!({"code": code, "message": "Bridge refused this operation."});
+                let mut error =
+                    json!({"code": code, "message": "ComplyEaze Bridge refused this operation."});
                 // Retryable as it stands (#697): another Bridge window or AI
                 // client held the Tally endpoint for the whole bounded wait.
                 // A few bytes, so it is kept under any response budget.
@@ -1698,15 +1699,16 @@ impl Server {
         }
         validate_tool_arguments(name, args)?;
         match name {
-            "tally_status" => {
-                let (result, evidence) = self.status().await?;
-                Ok(ToolOutcome {
-                    payload: json!({"result": result}),
-                    evidence,
-                    company_guid: None,
-                    truncated: false,
-                })
+            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "balance_sheet" => self.balance_sheet(args).await,
+            "build_import_xml" => {
+                self.import_enabled()?;
+                self.build_import_xml(args).await
             }
+            "changed_since" => self.changed_since(args).await,
+            "egress_log" => self.egress_log(args).map_err(Into::into),
+            "ledger_masters" => self.ledger_masters(args).await,
+            "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {
                 let (companies, evidence) = self.companies().await?;
                 let flagged = companies
@@ -1720,34 +1722,33 @@ impl Server {
                     truncated: false,
                 })
             }
-            "voucher_schema" => self.voucher_schema().map_err(Into::into),
-            "validate_masters" => self.validate_masters(args).await,
-            "post_import" => self.post_import(args).await,
-            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
-            "build_import_xml" => {
-                self.import_enabled()?;
-                self.build_import_xml(args).await
-            }
-            "verify_import" => self.verify_import(args).await,
+            "local_data_report" => self.local_data_report().map_err(Into::into),
+            "masters" => self.masters(args).await,
+            "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
                 self.parse_bank_statement(args).await
             }
-            "ledger_masters" => self.ledger_masters(args).await,
-            "vouchers" => self.vouchers(args).await,
-            "voucher_presence" => self.voucher_presence(args).await,
-            "changed_since" => self.changed_since(args).await,
-            "outstandings" => self.outstandings(args).await,
-            "ledger_movement" => self.ledger_movement(args).await,
-            "purchase_register" => self.purchase_register(args).await,
-            "trial_balance" => self.trial_balance(args).await,
-            "masters" => self.masters(args).await,
-            "stock_summary" => self.stock_summary(args).await,
+            "post_import" => self.post_import(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
-            "balance_sheet" => self.balance_sheet(args).await,
+            "purchase_register" => self.purchase_register(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
-            "egress_log" => self.egress_log(args).map_err(Into::into),
-            "local_data_report" => self.local_data_report().map_err(Into::into),
+            "stock_summary" => self.stock_summary(args).await,
+            "tally_status" => {
+                let (result, evidence) = self.status().await?;
+                Ok(ToolOutcome {
+                    payload: json!({"result": result}),
+                    evidence,
+                    company_guid: None,
+                    truncated: false,
+                })
+            }
+            "trial_balance" => self.trial_balance(args).await,
+            "validate_masters" => self.validate_masters(args).await,
+            "verify_import" => self.verify_import(args).await,
+            "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_schema" => self.voucher_schema().map_err(Into::into),
+            "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]
@@ -1947,9 +1948,9 @@ fn ledger_master_fields(fields: &str) -> Result<bool, String> {
 
 fn response_too_large(name: &str, code: &str) -> Value {
     let message = if code == "agent_response_too_large" {
-        "Bridge response exceeds the configured byte cap."
+        "ComplyEaze Bridge response exceeds the configured byte cap."
     } else {
-        "Bridge withheld this response; recover the retained batch before continuing."
+        "ComplyEaze Bridge withheld this response; recover the retained batch before continuing."
     };
     json!({
         "content": [{"type":"text", "text": format!("{name}: read withheld\\n{code}")}],

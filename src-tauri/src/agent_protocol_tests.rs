@@ -65,13 +65,15 @@ async fn initialize_carries_the_server_instructions() {
         "State the company, the exact dates and any ledger you used in the first line of your answer",
         "Everything you read through these tools, amounts included, goes to the AI provider.",
         "Otherwise, whether several are open or the name matches none or more than one, ask which",
-        "take a next step it names only if it is a different read or narrower dates, and say what you changed; for any other next step, ask the user.",
+        "Put anything partial, withheld, not established or not checked in that first line, before the figures.",
+        "Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user.",
+        "Ask the user before you prepare or post anything, and never choose a ledger for a voucher on their behalf.",
         "Never get around a refusal by another route.",
     ] {
         assert!(instructions.contains(needle), "missing: {needle}");
     }
     assert!(
-        instructions.len() < 1_500,
+        instructions.len() < 1_800,
         "kept short: {}",
         instructions.len()
     );
@@ -101,6 +103,22 @@ async fn initialize_omits_the_instructions_below_the_guidance_floor() {
     let responses = session(small, &[long_id]).await;
     assert_eq!(responses[0]["result"]["protocolVersion"], "2025-06-18");
     assert!(responses[0]["result"].get("instructions").is_none());
+    // The id bound is on its serialized length: 256 bytes, quotes included,
+    // still carries the instructions and 257 does not.
+    for (characters, carries) in [(254, true), (255, false)] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut request = initialize("2025-06-18");
+        request["id"] = json!("i".repeat(characters));
+        let mut small = server(directory.path());
+        small.settings.max_bytes = 4_096;
+        let responses = session(small, &[request]).await;
+        assert_eq!(responses[0]["result"]["protocolVersion"], "2025-06-18");
+        assert_eq!(
+            responses[0]["result"]["instructions"].is_string(),
+            carries,
+            "{characters}"
+        );
+    }
 }
 
 #[tokio::test]

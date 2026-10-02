@@ -261,6 +261,8 @@ impl Server {
     ) -> anyhow::Result<String> {
         #[cfg(test)]
         let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
+        #[cfg(test)]
+        let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(None));
         let first = crate::tally::runtime::with_operation_wire_budget(
             self.runtime
                 .read_company_marks_once(self.tally_config(), request.clone()),
@@ -277,6 +279,8 @@ impl Server {
         else {
             return first;
         };
+        #[cfg(test)]
+        let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(Some(budget)));
         crate::tally::runtime::with_operation_wire_budget_of(
             budget,
             self.runtime
@@ -1946,6 +1950,10 @@ tokio::task_local! {
     pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
     /// Test-only: the start each pass of a post call took its budgets from.
     pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
+    /// Test-only: one entry per marks readback attempt after a post (#998): `None`
+    /// for the first read, on the operation's own budget, and the retry's budget.
+    pub(super) static MARKS_READS:
+        std::sync::Arc<std::sync::Mutex<Vec<Option<std::time::Duration>>>>;
 }
 
 /// A fresh random REMOTEID for one native post.

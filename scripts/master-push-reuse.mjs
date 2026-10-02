@@ -140,12 +140,11 @@ async function decideUnchecked({ env, fetcher, changedFiles, isAncestor, sleep, 
     + `bundle and seam jobs ${bundle ? "passed" : "did not all run and pass"}`);
 }
 
+// The four lines the scope step reads: the first two are the decisions, the rest are for people.
+export const render = (result) => [
+  `reuse_native=${result.native}`, `reuse_bundle=${result.bundle}`, `code=${result.code}`, `reason=${result.reason}`,
+];
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await decide();
-  console.log(`reuse_native=${result.native}`);
-  console.log(`reuse_bundle=${result.bundle}`);
-  // A reason can carry a file name, and a name may hold newlines or backticks. Neither may add a line
-  // the scope step could read as a decision, a workflow command, or a break in the job summary.
-  console.log(`code=${result.code}`);
-  console.log(`reason=${result.reason}`);
+  console.log(render(await decide()).join("\n"));
 }

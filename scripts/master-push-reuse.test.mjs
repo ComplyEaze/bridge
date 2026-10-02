@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { FAMILIES, decide, forcesFullRun, printable } from "./master-push-reuse.mjs";
+import { FAMILIES, decide, forcesFullRun, printable, render } from "./master-push-reuse.mjs";
 
 const SHA = "a".repeat(40);
 const BEFORE = "b".repeat(40);
@@ -187,7 +187,7 @@ test("a git failure while testing ancestry or listing changed files runs everyth
 
 test("the ancestry test is git's own: an ancestor passes, a stranger and a missing commit do not", async () => {
   const { spawnSync } = await import("node:child_process");
-  const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+  const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   const dir = mkdtempSync(join(tmpdir(), "reuse-ancestry-"));
@@ -213,6 +213,19 @@ test("the ancestry test is git's own: an ancestor passes, a stranger and a missi
     // A commit on another line of history is refused; one the clone does not hold is an error, not a "no".
     assert.equal(await codeFor(stranger, second), "not_a_fast_forward");
     assert.equal(await codeFor("d".repeat(40), second), "lookup_failed");
+    // The real changed-file listing, not an injected one: a lockfile changed beside a non-ASCII path
+    // (git quotes such a path unless asked for NUL-separated names) must still force a full run.
+    git("checkout", "-q", "main");
+    mkdirSync(join(dir, "src-tauri"));
+    writeFileSync(join(dir, "src-tauri", "Cargo.lock"), "lock");
+    writeFileSync(join(dir, "\u00e9.md"), "x");
+    git("add", "-A");
+    git("commit", "-q", "-m", "lock");
+    const realListing = (await decide({
+      env: { ...env, BEFORE_SHA: second, GITHUB_SHA: git("rev-parse", "HEAD") }, cwd: dir,
+      fetcher: github({ runs: listing([]) }).fetcher, sleep: async () => {},
+    })).code;
+    assert.equal(realListing, "forced_full_path");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -315,4 +328,27 @@ test("the jobs gated on the native and bundle scope outputs are exactly the jobs
   }
   assert.deepEqual([...gated.native], ["native"]);
   assert.deepEqual([...gated.bundle].sort(), ["bundle-smoke", "seam-control"]);
+});
+
+test("the script prints the decision lines first, in a fixed order, and never swaps the families", () => {
+  assert.deepEqual(render({ native: true, bundle: false, code: "evaluated", reason: "r" }),
+    ["reuse_native=true", "reuse_bundle=false", "code=evaluated", "reason=r"]);
+  assert.deepEqual(render({ native: false, bundle: true, code: "evaluated", reason: "r" }).slice(0, 2),
+    ["reuse_native=false", "reuse_bundle=true"]);
+});
+
+test("run as a command outside a master push, the script prints exactly four lines and no reuse", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(process.execPath, [new URL("./master-push-reuse.mjs", import.meta.url).pathname], {
+    encoding: "utf8", env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: "pull_request" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "reuse_native=false\nreuse_bundle=false\ncode=not_a_master_push\nreason=not a push to master\n");
+});
+
+test("a commit SHA must be a full-length hex SHA", async () => {
+  for (const GITHUB_SHA of ["a".repeat(39), "abcd", "A".repeat(40)]) {
+    const outcome = await decide({ env: { ...env, GITHUB_SHA }, fetcher: github().fetcher, changedFiles: ordinaryChange, isAncestor: () => true, sleep: async () => {} });
+    assert.equal(outcome.code, "bad_sha", GITHUB_SHA);
+  }
 });

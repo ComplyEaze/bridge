@@ -6,7 +6,7 @@
 // that exited zero ever turns a heavy job off on a push, and that no other event is changed.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -51,7 +51,7 @@ function runScope(event, { script = "silent", changed = [] } = {}) {
     const head = commit("change");
     mkdirSync(join(dir, "bin"));
     const [printed, exitCode] = stand[script];
-    writeFileSync(join(dir, "bin", "node"), `#!/bin/bash\ncat <<'EOF'\n${printed}EOF\nexit ${exitCode}\n`);
+    writeFileSync(join(dir, "bin", "node"), `#!/bin/bash\nprintf '%s' "$1" > "$STUB_ARGS"\ncat <<'EOF'\n${printed}EOF\nexit ${exitCode}\n`);
     chmodSync(join(dir, "bin", "node"), 0o755);
     writeFileSync(join(dir, "scope.sh"), scopeScript());
     const outputFile = join(dir, "out");
@@ -62,13 +62,14 @@ function runScope(event, { script = "silent", changed = [] } = {}) {
       cwd: dir, encoding: "utf8",
       env: {
         PATH: `${join(dir, "bin")}:${process.env.PATH}`, HOME: dir,
-        GITHUB_OUTPUT: outputFile, GITHUB_STEP_SUMMARY: summaryFile, GITHUB_SHA: head, GH_TOKEN: "synthetic",
+        GITHUB_OUTPUT: outputFile, GITHUB_STEP_SUMMARY: summaryFile, STUB_ARGS: join(dir, "args"), GITHUB_SHA: head, GH_TOKEN: "synthetic",
         EVENT_NAME: event, BEFORE_SHA: base, PR_BASE_SHA: base, MERGE_GROUP_BASE_SHA: base,
       },
     });
     assert.equal(result.status, 0, result.stderr);
     const outputs = Object.fromEntries(readFileSync(outputFile, "utf8").trim().split("\n").map((line) => line.split("=")));
-    return { outputs, summary: readFileSync(summaryFile, "utf8") };
+    const args = existsSync(join(dir, "args")) ? readFileSync(join(dir, "args"), "utf8") : null;
+    return { outputs, summary: readFileSync(summaryFile, "utf8"), args };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -88,8 +89,10 @@ test("a push runs everything when the script says no, says nothing, crashes, or 
   }
 });
 
-test("a push records the decision in the step summary", () => {
-  assert.match(runScope("push", { script: "both" }).summary, /reuse_native=true\nreuse_bundle=true/);
+test("a push records the decision in the step summary, in a fenced block, and runs the lookup script", () => {
+  const { summary, args } = runScope("push", { script: "both" });
+  assert.equal(summary, "### Master push reuse\n```\nreuse_native=true\nreuse_bundle=true\nreason=stub\n```\n");
+  assert.equal(args, "scripts/master-push-reuse.mjs");
 });
 
 test("a scheduled or manual run is a full run and never asks the script", () => {

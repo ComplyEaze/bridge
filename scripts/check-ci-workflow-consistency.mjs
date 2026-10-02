@@ -349,6 +349,13 @@ const expectedChanges = [
 if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
   failures.push("changes changed shape; review its scope rules and update expectedChanges");
 }
+// compiler-cache-retention lists and prunes the Rust caches once every job that saves one has finished; a job that
+// saves a cache and is not among its needs can write between the prune's list and its re-list and fail the prune.
+const retentionNeeds = jobBlock(workflow, "compiler-cache-retention").match(/^    needs: \[(.*)\]$/m)?.[1].split(",").map((id) => id.trim()) ?? [];
+for (const id of jobIds(workflow)) {
+  if (![...jobBlock(workflow, id).matchAll(/^\s+save-if: (.+)$/gm)].some((match) => match[1].trim() !== "false")) continue;
+  if (!retentionNeeds.includes(id)) failures.push(`${id} saves a Rust cache but is not among compiler-cache-retention's needs`);
+}
 // The native job runs on a pull request only when the scope above selects it. A test in it that reads
 // a file the scope does not list is skipped, with the file's change, by the queue, and only a master
 // push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/

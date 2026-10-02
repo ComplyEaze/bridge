@@ -48,7 +48,7 @@ function requiredChecksNeeds() {
   return needs.slice("    needs: [".length, -1).split(", ");
 }
 
-const conditionalJobs = new Set(["native", "bundle-smoke", "seam-control", "compiler-cache-retention", "tax-audit-mutations"]);
+const conditionalJobs = new Set(["native", "legacy-features", "bundle-smoke", "seam-control", "compiler-cache-retention", "tax-audit-mutations"]);
 const baseNeeds = Object.fromEntries(
   requiredChecksNeeds().map((job) => [job, { result: conditionalJobs.has(job) ? "skipped" : "success" }]),
 );

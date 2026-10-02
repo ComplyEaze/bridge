@@ -6742,5 +6742,77 @@
   "file": "src/findings.rs",
   "from": "            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });",
   "to": "            self.figures.push(Figure {\n                id: id.clone(),\n                value,\n                unit,\n                definition: definition.to_string(),\n                evidence,\n            });\n            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });"
+ },
+ {
+  "id": "S1-01",
+  "by": "author",
+  "what": "a [snapshot] table is accepted for a held book",
+  "file": "src/lib.rs",
+  "from": "        if in_memory && cfg.contains_key(\"snapshot\") {",
+  "to": "        if false && cfg.contains_key(\"snapshot\") {"
+ },
+ {
+  "id": "S1-02",
+  "by": "author",
+  "what": "a legacy_json source is accepted for a held book",
+  "file": "src/lib.rs",
+  "from": "        if in_memory\n            && roles\n                .get(\"trade_creditors_source\")",
+  "to": "        if false\n            && roles\n                .get(\"trade_creditors_source\")"
+ },
+ {
+  "id": "S1-03",
+  "by": "author",
+  "what": "a held-book engagement can be loaded as a directory",
+  "file": "src/lib.rs",
+  "from": "    if engagement.in_memory {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\",",
+  "to": "    if false {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\","
+ },
+ {
+  "id": "S1-04",
+  "by": "author",
+  "what": "a directory engagement is marked as held",
+  "file": "src/lib.rs",
+  "from": "            in_memory,\n",
+  "to": "            in_memory: true,\n"
+ },
+ {
+  "id": "S1-05",
+  "by": "author",
+  "what": "a held-book engagement keeps a directory path",
+  "file": "src/lib.rs",
+  "from": "            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),",
+  "to": "            read_dir: PathBuf::from(\"x\"),"
+ },
+ {
+  "id": "S1-06",
+  "by": "author",
+  "what": "a directory engagement skips the format check",
+  "file": "src/lib.rs",
+  "from": "        if !in_memory\n            && snapshot.get(\"format\")",
+  "to": "        if in_memory\n            && snapshot.get(\"format\")"
+ },
+ {
+  "id": "S1-07",
+  "by": "author",
+  "what": "a held book still looks for a [snapshot] table",
+  "file": "src/lib.rs",
+  "from": "        let snapshot = if in_memory {\n            &empty\n        } else {",
+  "to": "        let snapshot = if false {\n            &empty\n        } else {"
+ },
+ {
+  "id": "S1-08",
+  "by": "author",
+  "what": "a held book reads a legacy creditor file when the source is set after parsing",
+  "file": "src/lib.rs",
+  "from": "        if self.in_memory && legacy {",
+  "to": "        if false && legacy {"
+ },
+ {
+  "id": "S1-09",
+  "by": "author",
+  "what": "a legacy source is taken for any other kind, and the reverse",
+  "file": "src/lib.rs",
+  "from": "            == Some(\"legacy_json\");\n        if self.in_memory && legacy {",
+  "to": "            != Some(\"legacy_json\");\n        if self.in_memory && legacy {"
  }
 ]

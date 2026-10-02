@@ -1276,7 +1276,9 @@ fn a_captured_forbidden_reference_in_voucher_text_reads_as_the_marker() {
 fn a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped() {
     // The rule keeps its rewrite reversible by escaping a literal U+FFFD that
     // is followed by `#`, digits and `;`. A voucher Bridge posted with such
-    // text would read back as other text; `validate_payload` refuses it.
+    // text would read back as other text: `validate_payload` refuses it in a
+    // voucher number or ledger name, and the build and a native post refuse it
+    // in a narration.
     let captured = captured_entry_wildcard_vouchers();
     // The capture's first non-empty narration, whatever it says.
     let open = "<NARRATION TYPE=\"String\">";

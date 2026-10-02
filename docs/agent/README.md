@@ -1245,6 +1245,83 @@ An intent may exist even if the request never reached Tally: this is deliberatel
 an unknown outcome, not permission to build a replacement voucher. The saved
 response metadata helps distinguish clean counters from readback alone.
 
+A native post writes the narration as given, print-ready, with no `[BRIDGE:…]`
+tag. A file built for a person to import by hand keeps the tag, because Bridge
+never sees that import.
+
+The posted vouchers are identified by their place in the post's own range of
+Tally AlterIDs (protocol reference §9.15). The dispatch intent records the
+company's voucher mark from the last read before the POST, and the readback
+binds each voucher to the Tally GUID its POST created. Binding needs a clean
+response (`CREATED` equal to the voucher count, and `LASTVCHID`), the mark after
+the POST moved by exactly `CREATED`, and the vouchers in that range in the order
+sent with the content sent. If the mark after the POST could not be read, the
+range the clean response implies is used instead. A post whose response was lost
+is never bound. The binding, or a refusal of it, is recorded once with the
+batch: a refusal is final, while a read that failed is not, and the next
+`verify_import` tries again. A bound voucher is then verified by its GUID
+(`"marker": "post_span_binding"`).
+
+The readback reports, each as `reconciliation_required`: a bound voucher the
+window no longer holds as `bound_not_in_window`, never `not_found`; and, for a
+company whose voucher mark reads below the mark the post left, every voucher it
+no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
+it. Such a book was rolled back (a backup restored, or another copy put in its
+place). The check sees a rollback only while the mark reads below the post's: a
+book keyed past it again after a restore is not seen as rolled back, and if
+Tally then gave new vouchers the MasterIDs the post's vouchers held (unmeasured),
+a bound voucher names another voucher, which reads `posted_divergent`, or a false
+`posted_verified` when its content is the same (bridge#1050). Bridge still records those rows as posted, so a rebuilt batch holding
+them is refused as `import_txn_already_posted`; re-entering them in that book is
+the person's decision. The result's `post_span_binding` names the binding's
+`state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
+example `binding_effective_date_not_observed`, when the read left out a
+Payment, Receipt or Contra's effective date: never refused for it, and decided
+again by the next verification),
+`not_bound`, `book_rolled_back` or `not_applicable`.
+
+A native post that sent no tag is never attributed by one: a row carrying its
+batch's tag is a hand import of the batch's file, matched by content only. The
+binding compares narration byte for byte. A narration holding the one sequence
+the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
+and `;`) is refused when the batch is built (`voucher_text_invalid`), and
+`post_import` refuses a batch saved before that check in the same way, before
+any request; it is still admitted for review and reconciliation. Other text,
+such as Devanagari or the rupee sign, is admitted, and whether it reads back
+byte for byte is not yet measured: a narration that reads back changed refuses
+that post's binding for good.
+
+A voucher of an untagged native post that was not bound (its binding refused or
+its response lost), and that its content no longer finds (for example after an
+edit in Tally), is `sent_not_attributed`, never `not_found`. A binding refusal
+is final: an edit to one voucher of a batch in Tally before the binding is made
+(a deferred bind, or a later `verify_import`) refuses it for the whole batch,
+whose vouchers are then matched by content only. Such a batch stays
+`reconciliation_required`: the person checks its vouchers in Tally, and
+`acknowledge_post_review` does not apply to it, because it records a review only
+of a doubt beside vouchers that read back verified (closing such a batch inside
+Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+vouchers, because they carry no marker: one edited or re-dated in Tally can read
+`absent` there. Check a natively posted batch with `verify_import`, which finds
+its vouchers by the GUIDs its post created once its binding is made (and
+otherwise reports them as never absent), before posting any of them again.
+
+If the last read before the POST does not yield the company's voucher mark, the
+post is refused as `post_mark_unrecorded` before its dispatch intent is recorded
+and before anything is sent,
+and the approval is withdrawn, so the next call asks again. Known limits:
+identical vouchers in one batch are bound by position alone, since they are
+identical in content and their own order cannot be observed (the request order of
+vouchers that can be told apart was measured in two raw runs); the local journal is the trust root for the bindings (a lost journal
+leaves the batch unknown, `import_batch_not_found`; in an edited journal, a
+bound voucher's GUID, MasterID and content are still read against the book,
+but not whether this post created it); and whether a write from another Gold
+user's process can share or skip the mark Bridge reads is unmeasured. Open
+follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
+the rows of a rolled-back batch needs the person's approval (bridge#1038);
+closing a batch whose binding was refused (bridge#1039); and detecting a restore
+keyed past the post's mark (bridge#1050).
+
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but
 cannot be posted. Only a uniquely selectable loaded company is admitted.
@@ -1256,7 +1333,10 @@ availability without deleting reconciliation evidence.
 record carrying a field it does not know. So after a native post, an older
 connector refuses the whole journal, including reconciliation of batches it
 wrote itself. Since bridge#579, each native dispatch intent records the
-REMOTEID it sent, which 0.2.0 and earlier do not know.
+REMOTEID it sent, which 0.2.0 and earlier do not know. From the first post made
+with this version, the dispatch intent also records the pre-POST voucher mark and
+the journal a binding record, which an older connector refuses: do not downgrade
+after posting with it. A downgrade before that first post is harmless.
 
 This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
@@ -1441,6 +1521,10 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
+`open_bills_total` counts every open bill in the requested direction (the bills `totals` and
+`ageing_buckets` cover; on a partial read, the base-currency ledgers' bills only, beside those figures) and `open_bills_shown` counts the bills on the page returned. A page cut by
+the response size keeps `limit` unchanged and restates `open_bills_shown`, so a page shorter than the
+total is read from `open_bills_shown` and `next_offset`, never from `limit`.
 `unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
 `by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have
@@ -1568,7 +1652,9 @@ narration marker share a UUID derived from the generated batch ID and caller's
 `bridge_txn_id`. The caller ID remains the local transaction label; it is not
 sent directly as Tally's upsert key. Reused labels in independent batches therefore
 have different wire identities, so rebuilding after losing the batch journal
-creates a new identity and does not deduplicate the business event.
+creates a new identity and does not deduplicate the business event. That is the
+file a person imports; a native post sends its own fresh `REMOTEID` and no
+narration marker, and is bound by its own span (Approved voucher posting).
 
 **An unknown outcome requires reconciliation for every voucher type, which writes nothing to Tally.**
 Preserve the original batch and saved file, then call `verify_import`. Do not

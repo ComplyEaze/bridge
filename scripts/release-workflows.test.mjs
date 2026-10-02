@@ -190,20 +190,40 @@ function assertReleaseWorkflow(release) {
 function assertInstallPageWorkflow(page) {
   assert.deepEqual(Object.keys(page.on), ["workflow_dispatch", "workflow_run"], "install page workflow must be manual or follow a preview publication");
   assert.deepEqual(page.on.workflow_run, { workflows: ["Publish MCPB preview release"], types: ["completed"] });
-  const deploy = page.jobs.deploy;
-  assert.ok(deploy, "install page deployment job must be present");
-  assert.equal(deploy.if, installPageGuard, "Pages deployment must be gated to the default branch and to a successful publication");
-  assert.equal(deploy["continue-on-error"], undefined, "Pages deployment must not continue after failure");
-  const upload = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
+  // Least privilege: the workflow is read-only; the job that runs this repository's scripts holds neither the Pages
+  // permission nor an identity token; the job that holds them runs only the two Pages actions.
+  assert.deepEqual(page.permissions, { contents: "read" }, "the workflow-level permissions must be contents: read only");
+  assert.deepEqual(Object.keys(page.jobs), ["build", "deploy"], "install page workflow must have exactly a build job and a deploy job");
+  const { build, deploy } = page.jobs;
+  for (const job of [build, deploy]) {
+    assert.equal(job.if, installPageGuard, "Pages jobs must be gated to the default branch and to a successful publication");
+    assert.equal(job["continue-on-error"], undefined, "Pages jobs must not continue after failure");
+  }
+  assert.deepEqual(build.permissions, { contents: "read", deployments: "read" }, "the build job holds no Pages permission or identity token");
+  assert.equal(build.environment, undefined, "the build job has no deployment environment");
+  assert.deepEqual(deploy.permissions, { contents: "read", pages: "write", "id-token": "write" }, "only the deploy job holds the Pages permission and the identity token");
+  assert.equal(deploy.needs, "build", "the deploy job runs after, and only after, the build job");
+  assert.equal(deploy.environment?.name, "github-pages");
+  assert.equal(deploy.environment?.url, "${{ steps.deployment.outputs.page_url }}", "the environment url reads the deploy step's output");
+  const upload = build.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   const publish = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/deploy-pages@"));
-  assert.ok(upload && publish, "Pages deployment must upload and deploy the site artifact");
+  assert.ok(upload && publish, "Pages deployment must upload the site artifact and deploy it");
+  assert.equal(publish.id, "deployment", "the deploy step is the one the environment url reads");
   assertUnconditional(upload, "Pages upload step");
   assertUnconditional(publish, "Pages deployment step");
   assert.equal(upload.with.path, "site");
-  const snapshot = deploy.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
+  assert.deepEqual(deploy.steps.map((candidate) => candidate.uses?.split("@")[0]), ["actions/configure-pages", "actions/deploy-pages"], "the deploy job runs the Pages actions and nothing else");
+  // These two actions are the only code that runs with the identity token: each must be a full 40-hex commit, never
+  // a tag or branch, and nothing may change what they run: no container, no services, no inputs, no environment.
+  for (const candidate of deploy.steps) {
+    assert.match(candidate.uses, /^actions\/[a-z-]+@[0-9a-f]{40}( |$)/, "each Pages action must be pinned to a full 40-hex commit SHA");
+    assert.deepEqual(Object.keys(candidate).filter((key) => !["name", "id", "uses"].includes(key)), [], "a deploy step takes no run, inputs, environment or conditions");
+  }
+  assert.deepEqual(Object.keys(deploy).sort(), ["environment", "if", "needs", "permissions", "runs-on", "steps", "timeout-minutes"], "the deploy job has no container, services, environment variables or defaults");
+  const snapshot = build.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
   assert.ok(snapshot, "the install page must ship a release snapshot for when the GitHub API refuses it");
   assertUnconditional(snapshot, "release snapshot step");
-  assert.ok(deploy.steps.indexOf(snapshot) < deploy.steps.indexOf(upload), "the snapshot must be written before the site is uploaded");
+  assert.ok(build.steps.indexOf(snapshot) < build.steps.indexOf(upload), "the snapshot must be written before the site is uploaded");
   assert.match(snapshot.run, /set -euo pipefail/);
 }
 
@@ -230,7 +250,7 @@ test("the install page snapshot step drops drafts and refuses a list with no mcp
     return;
   }
   const page = await workflow("../.github/workflows/deploy-install-page.yml");
-  const { run } = page.jobs.deploy.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
+  const { run } = page.jobs.build.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
   const files = (tag) => ["windows-x64", "macos-arm64"].flatMap((platform) => [`bridge-tally-${tag}-${platform}.mcpb`, `bridge-tally-${tag}-${platform}.mcpb.sha256`]);
   const release = (tag_name, draft, names = files(tag_name)) => ({ tag_name, draft, prerelease: true, published_at: "2026-09-26T11:19:29Z", body: "x", assets: names.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}`, size: 1 })) });
 
@@ -306,16 +326,16 @@ test("the site summary step is informational, permitted to read deployments, and
     return;
   }
   const page = await workflow("../.github/workflows/deploy-install-page.yml");
-  assert.equal(page.permissions.deployments, "read");
-  const summary = step(page.jobs.deploy, "Summarize site changes since the last deploy");
+  assert.equal(page.jobs.build.permissions.deployments, "read");
+  const summary = step(page.jobs.build, "Summarize site changes since the last deploy");
   assert.equal(summary["continue-on-error"], true, "a failed summary must not stop the deploy");
   assert.equal(typeof summary["timeout-minutes"], "number", "a hung summary must time out inside the step, where continue-on-error applies");
   assert.ok(summary["timeout-minutes"] <= 5);
   assert.equal(summary.if, undefined);
-  const names = page.jobs.deploy.steps.map((candidate) => candidate.name ?? candidate.uses);
-  assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/deploy-pages@")), "the summary is written before the deploy");
+  const names = page.jobs.build.steps.map((candidate) => candidate.name ?? candidate.uses);
+  assert.ok(names.indexOf(summary.name) < names.findIndex((name) => name?.startsWith("actions/upload-pages-artifact@")), "the summary is written before the site is uploaded, and so before the deploy job");
 
-  // This job's own deployment already exists and lists first; a failed one never went live.
+  // An earlier deployment of this same commit (a re-run) lists first; a failed one never went live.
   const own = { sha: "self", states: ["queued", "waiting"] };
   const failed = { sha: "unknown", states: ["failure", "queued"] };
   const live = { sha: "first", states: ["success", "in_progress", "queued"] };
@@ -517,4 +537,37 @@ test("the publish step refuses on a failed lookup and on a version already relea
   // points at the source commit later) is not "the other form".
   const ownTagExists = { ...ok, git: "case \"$*\" in *refs/tags/mcp-v0.4.0) printf 'abc\\trefs/tags/mcp-v0.4.0\\n';; esac" };
   assert.match(attempt("mcp-v0.4.0", ownTagExists).out, /PASSED/);
+});
+
+test("the install page workflow keeps the Pages permission and the identity token in the deploy job alone", async () => {
+  const page = await workflow("../.github/workflows/deploy-install-page.yml");
+  assertInstallPageWorkflow(page);
+  const refused = (name, mutate, pattern) => {
+    const copy = structuredClone(page);
+    mutate(copy);
+    assert.throws(() => assertInstallPageWorkflow(copy), pattern, name);
+  };
+  refused("identity token at workflow level", (copy) => { copy.permissions["id-token"] = "write"; }, /workflow-level permissions/);
+  refused("Pages write at workflow level", (copy) => { copy.permissions.pages = "write"; }, /workflow-level permissions/);
+  refused("identity token on the build job", (copy) => { copy.jobs.build.permissions["id-token"] = "write"; }, /holds no Pages permission or identity token/);
+  refused("Pages write on the build job", (copy) => { copy.jobs.build.permissions.pages = "write"; }, /holds no Pages permission or identity token/);
+  refused("a Pages action pinned to a tag", (copy) => { copy.jobs.deploy.steps[1].uses = "actions/deploy-pages@v5"; }, /full 40-hex commit SHA/);
+  refused("a Pages action pinned to a short SHA", (copy) => { copy.jobs.deploy.steps[0].uses = "actions/configure-pages@45bfe01"; }, /full 40-hex commit SHA/);
+  refused("a Pages action from another owner", (copy) => { copy.jobs.deploy.steps[1].uses = "someone/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128"; }, /upload the site artifact and deploy it/);
+  refused("an input on the deploy-pages step", (copy) => { copy.jobs.deploy.steps[1].with = { artifact_name: "other" }; }, /takes no run, inputs/);
+  refused("an input on the configure-pages step", (copy) => { copy.jobs.deploy.steps[0].with = { enablement: "true" }; }, /takes no run, inputs/);
+  refused("an environment variable on a deploy step", (copy) => { copy.jobs.deploy.steps[1].env = { X: "y" }; }, /takes no run, inputs/);
+  refused("a container on the deploy job", (copy) => { copy.jobs.deploy.container = "docker.io/library/alpine:3"; }, /no container, services/);
+  refused("services on the deploy job", (copy) => { copy.jobs.deploy.services = { db: { image: "postgres" } }; }, /no container, services/);
+  refused("environment variables on the deploy job", (copy) => { copy.jobs.deploy.env = { X: "y" }; }, /no container, services/);
+  refused("defaults on the deploy job", (copy) => { copy.jobs.deploy.defaults = { run: { shell: "bash" } }; }, /no container, services/);
+  refused("a deploy job without the identity token", (copy) => { delete copy.jobs.deploy.permissions["id-token"]; }, /only the deploy job holds/);
+  refused("a deploy job with an extra write permission", (copy) => { copy.jobs.deploy.permissions.contents = "write"; }, /only the deploy job holds/);
+  refused("an environment on the build job", (copy) => { copy.jobs.build.environment = { name: "github-pages" }; }, /no deployment environment/);
+  refused("a deploy job that does not need the build", (copy) => { delete copy.jobs.deploy.needs; }, /after, and only after/);
+  refused("a command in the deploy job", (copy) => { copy.jobs.deploy.steps.splice(1, 0, { run: "echo hello" }); }, /Pages actions and nothing else/);
+  refused("a checkout in the deploy job", (copy) => { copy.jobs.deploy.steps.unshift({ uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" }); }, /Pages actions and nothing else/);
+  refused("a third job", (copy) => { copy.jobs.extra = { "runs-on": "ubuntu-latest", steps: [{ run: "echo hi" }] }; }, /exactly a build job and a deploy job/);
+  refused("a build job without the guard", (copy) => { copy.jobs.build.if = true; }, /gated to the default branch/);
+  refused("the upload moved into the deploy job", (copy) => { copy.jobs.deploy.steps.unshift(copy.jobs.build.steps.pop()); }, /Pages actions and nothing else|upload the site artifact/);
 });

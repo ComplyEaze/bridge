@@ -467,3 +467,49 @@ fn line_error_text_is_dropped_from_every_element_of_an_array() {
         json!({"outcomes":[{"tally_line_errors_omitted":1},{"tally_line_errors_omitted":2}]})
     );
 }
+
+/// A page the response size cuts keeps `limit` as asked, so the count of the
+/// bills shown is restated from the rows that remain, at either nesting, and
+/// the total stays the count of every bill. A payload that carries no count
+/// gains none.
+#[test]
+fn a_size_cut_outstandings_page_restates_the_bills_shown() {
+    let bills = (0..6)
+        .map(|id| json!({"id": id, "padding": "x".repeat(120)}))
+        .collect::<Vec<_>>();
+    let figures = json!({"offset": 0, "limit": 6, "open_bills_total": 6,
+        "open_bills_shown": 6, "open_bills": bills, "next_offset": null,
+        "unallocated": {"count": 0, "parties": [], "next_offset": null, "truncated": false}});
+    for nested in [false, true] {
+        let result = if nested {
+            json!({"state": "partial", "base_currency_ledgers": figures.clone(),
+                "foreign_currency_ledgers_excluded": {"count": 0, "ledgers": [],
+                    "next_offset": null, "truncated": false}})
+        } else {
+            let mut flat = figures.clone();
+            flat["state"] = json!("complete");
+            flat
+        };
+        let (response, _, _) = enforce_response_byte_cap(json!({"result": result}), 700).unwrap();
+        let figures = if nested {
+            &response["result"]["base_currency_ledgers"]
+        } else {
+            &response["result"]
+        };
+        let shown = figures["open_bills"].as_array().unwrap().len();
+        assert!(shown > 0 && shown < 6, "the cap must cut the page: {shown}");
+        assert_eq!(figures["open_bills_shown"], shown, "nested={nested}");
+        assert_eq!(figures["open_bills_total"], 6, "nested={nested}");
+        assert_eq!(figures["limit"], 6, "nested={nested}");
+        assert_eq!(figures["next_offset"], shown, "nested={nested}");
+    }
+
+    let mut without = outstandings_page(0);
+    without["result"]["open_bills"][0]["padding"] = json!("x".repeat(300));
+    let (response, _, _) = enforce_response_byte_cap(without, 700).unwrap();
+    assert!(
+        response["result"]["open_bills"].as_array().unwrap().len() < 3,
+        "the cap must cut the bills of this page too"
+    );
+    assert!(response["result"].get("open_bills_shown").is_none());
+}

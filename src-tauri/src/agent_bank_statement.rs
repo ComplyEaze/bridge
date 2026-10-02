@@ -30,6 +30,7 @@
 //! admission as inline vouchers, so nothing here decides what is admitted.
 
 use super::*;
+use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
 use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
 use bridge_bank_statement::date::Date;
@@ -135,8 +136,8 @@ impl Server {
 
 /// The admitted arguments, owned so the parse can run off the async runtime.
 struct OwnedRequest {
-    statement_path: PathBuf,
-    password_file: PathBuf,
+    statement_path: LocalDiskPath,
+    password_file: LocalDiskPath,
     bank: Bank,
     account_label: String,
     controls: Controls,
@@ -155,13 +156,12 @@ fn refused(refusal: &Refusal) -> String {
     }
 }
 
-fn absolute_path(args: &Value, key: &str) -> Result<PathBuf, String> {
-    let path = PathBuf::from(required_string(args, key)?);
-    if path.is_absolute() {
-        Ok(path)
-    } else {
-        Err(format!("argument_invalid:{key}"))
-    }
+/// A file argument, admitted by its text before anything is opened: a path
+/// that begins with two separators (a network share, a verbatim or a device
+/// path) or is not rooted on a local disk is refused here, so no open is ever
+/// attempted on it.
+fn local_disk_path(args: &Value, key: &str) -> Result<LocalDiskPath, String> {
+    LocalDiskPath::parse(required_string(args, key)?).map_err(|_| format!("argument_invalid:{key}"))
 }
 
 fn window_date(args: &Value, key: &str) -> Result<Option<Date>, String> {
@@ -245,8 +245,8 @@ impl OwnedRequest {
             });
         let cash_answers = CashAnswers::from_rows(answers).map_err(|refusal| refused(&refusal))?;
         Ok(Self {
-            statement_path: absolute_path(args, "statement_path")?,
-            password_file: absolute_path(args, "password_file")?,
+            statement_path: local_disk_path(args, "statement_path")?,
+            password_file: local_disk_path(args, "password_file")?,
             bank,
             account_label: required_string(args, "account_label")?.to_string(),
             controls,
@@ -265,8 +265,8 @@ impl OwnedRequest {
 /// Refused unless it is a regular file owned by this user with a single link
 /// and, on Unix, no group or other permission bits: a password that anyone
 /// else can read is not one this tool should be trusted to keep.
-fn read_password(path: &Path) -> Result<Zeroizing<String>, String> {
-    let file = local_file::open_local_file(path, false)
+fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
+    let file = local_file::open_local_file(path.as_path(), false)
         .map_err(|_| "statement_password_file_unreadable".to_string())?;
     let metadata = file
         .metadata()
@@ -300,8 +300,8 @@ fn read_password(path: &Path) -> Result<Zeroizing<String>, String> {
     Ok(Zeroizing::new(text.to_string()))
 }
 
-fn read_statement(path: &Path) -> Result<Vec<u8>, String> {
-    let file = local_file::open_local_file(path, false)
+fn read_statement(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+    let file = local_file::open_local_file(path.as_path(), false)
         .map_err(|_| "statement_file_unreadable".to_string())?;
     let limit = MAX_PDF_BYTES as u64;
     let mut bytes = Vec::new();

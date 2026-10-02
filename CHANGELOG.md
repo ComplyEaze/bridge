@@ -16,13 +16,13 @@ Apache-2.0 builds from current source stays unambiguous.
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)
 
-These changes are in ComplyEaze Bridge 0.4.1. Each fix names the pull request
-it comes from.
+These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
+request it comes from.
 
 **What you can do now**
 
-- Nothing new. This build fixes the things listed below; every tool otherwise
-  works as it did in 0.4.0.
+- No new tool. The changes are listed below; every tool otherwise works as it
+  did in 0.4.0.
 
 **Safer or fixed**
 
@@ -31,22 +31,45 @@ it comes from.
 - A statement or password file path written in the Windows long-path form
   (starting with `\\?\`) is now refused. Use the ordinary drive path instead
   (#1024).
+- `vouchers` and `voucher_presence` now call a date range complete by one
+  rule: only when every voucher read was checked against a separate count of
+  that range. Before, `vouchers` called any range with vouchers in it complete,
+  and `voucher_presence` called none complete. On a company with only a few
+  dozen vouchers, which ComplyEaze Bridge does not count first, both now say
+  `partial`. On a larger company, `voucher_presence` can now answer `absent`
+  for a voucher it finds nowhere in a counted range. A voucher changed in Tally
+  between the count and the read now refuses the read, with
+  `part_census_mismatch`, where it used to return without that check; call
+  again once the book is quiet. The same refusal can now come from
+  `ledger_movement`, from verifying an import, and from the party detail of
+  `outstandings` (#985, #1020).
+- When `post_import` refuses a batch because some of its rows are already in
+  the book (`import_preexisting_identity`), the answer now names those rows by
+  their transaction ids and says what to check in Tally next, instead of
+  returning a bare code. The same batches are refused as before (#901, #908).
 - `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
   the plain number (`"1"`), not as Tally sends it with a leading space
-  (`" 1"`), so it matches the same id returned by `verify_import` (#1021).
+  (`" 1"`), so it matches the same id returned by `verify_import` (#989, #1021).
 - If voucher posting is turned on and you click Approve for a batch, and the
   post is then refused before it is sent (for example because the import
   journal is busy, the batch is not found, or it belongs to another company),
   your click is withdrawn and you are asked again. Before, the click stayed
   held for up to 15 minutes, and posting any other batch was refused until it
-  lapsed (#904).
+  lapsed (#857, #904).
 
 **Known limits**
 
-- None of these fixes has been run against a live TallyPrime; each is covered
+- A date range is called complete when the vouchers read match a separate
+  count of the range. The count and the read use the same date filter, so a
+  voucher that filter drops is missed by both (#985).
+- The rows named by `import_preexisting_identity` can be more than the vouchers
+  the book holds, when several rows look the same; count the vouchers in Tally
+  before leaving any row out (#901).
+- None of these changes has been run against a live TallyPrime; each is covered
   by automated tests. The Windows package was not installed or run by us; the
   release check starts each package, lists its tools and reads a sample bank
   statement, and does not run against TallyPrime.
+
 
 ## [0.4.0] - 2026-10-02
 

@@ -1057,6 +1057,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
         ),
+        // A cause, reached through `voucher_window_part_not_admitted`. Since
+        // #985 a window read whole is admitted against the census that sized
+        // it, so this is reachable on an ordinary day's read, not only on a
+        // divided one.
+        "part_census_mismatch" => Some(
+            "Bridge counted this window's vouchers before reading them, and the read returned \
+             different vouchers from the ones it counted (`counts` gives returned against \
+             counted), so it released nothing. A voucher created, altered, re-dated or deleted \
+             between the count and the read causes it: call the same tool again with the same \
+             arguments, once, while the book is quiet. A repeat on a quiet book may mean Tally \
+             did not honour the read's filter, or a fault in Bridge; read this window in Tally \
+             itself.",
+        ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the
         // obvious retry — a shorter window — cannot succeed, and saying so is

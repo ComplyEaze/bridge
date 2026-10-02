@@ -43,7 +43,16 @@ pub(crate) enum LocalDiskPathRefusal {
 /// This is a check on the text. It does not establish that the drive is a
 /// fixed disk (a mapped drive letter can still name a share), that no
 /// component is a link or a reparse point, or that the path names the same
-/// file between this check and the open.
+/// file between this check and the open. Under the Unix rule the same limit
+/// holds on macOS and Linux: a path under a mounted network volume or a
+/// configured automount point passes, as a mapped drive letter does.
+///
+/// Two more things the text rule leaves as they are. A reserved device name
+/// under a drive root (`C:\NUL` and the like) passes the rule and is refused
+/// after the open, as not a regular file. And the verbatim long-path spelling
+/// (`\\?\C:\...`) is refused, where it was accepted before this type
+/// existed: a caller holding such a path must give the plain drive-letter
+/// spelling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct LocalDiskPath(PathBuf);
 

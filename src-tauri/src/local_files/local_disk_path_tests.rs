@@ -13,7 +13,7 @@ fn a_text_beginning_with_two_separators_is_refused_under_both_rules() {
         r"\\host@80\share\statement.pdf",
         r"\\host@SSL@443\DavWWWRoot\statement.pdf",
         r"\\?\UNC\host\share\statement.pdf",
-        r"\\?\C:\Users\someone\statement.pdf",
+        r"\\?\C:\data\statement.pdf",
         r"\\.\C:\statement.pdf",
         r"\\.\pipe\name",
         "//host/share/statement.pdf",
@@ -37,8 +37,8 @@ fn a_text_beginning_with_two_separators_is_refused_under_both_rules() {
 #[test]
 fn the_windows_rule_admits_only_a_drive_letter_root() {
     for text in [
-        r"C:\Users\someone\Downloads\statement.pdf",
-        "C:/Users/someone/Downloads/statement.pdf",
+        r"C:\data\in\statement.pdf",
+        "C:/data/in/statement.pdf",
         r"d:\statement.pdf",
         r"Z:\",
     ] {
@@ -53,11 +53,14 @@ fn the_windows_rule_admits_only_a_drive_letter_root() {
         "C:statement.pdf",
         "C:",
         // rooted on the current drive, whatever that is
-        r"\Users\someone\statement.pdf",
-        "/Users/someone/statement.pdf",
+        r"\data\statement.pdf",
+        "/data/statement.pdf",
         // the NT object-manager spelling of a device path
         r"\??\C:\statement.pdf",
         // not a letter before the colon
+        // a letter, but not an ASCII one: no drive is named by it
+        r"é:\statement.pdf",
+        r"Ж:\statement.pdf",
         r"1:\statement.pdf",
         r"::\statement.pdf",
         // a letter and a separator with no colon between them: a relative path
@@ -76,11 +79,7 @@ fn the_windows_rule_admits_only_a_drive_letter_root() {
 
 #[test]
 fn the_unix_rule_admits_only_a_single_leading_slash() {
-    for text in [
-        "/Users/someone/Downloads/statement.pdf",
-        "/tmp/a b.pdf",
-        "/",
-    ] {
+    for text in ["/data/in/statement.pdf", "/tmp/a b.pdf", "/"] {
         let path = LocalDiskPath::parse_for(text, PathRule::Unix).expect(text);
         assert_eq!(path.as_path(), Path::new(text));
     }
@@ -89,9 +88,9 @@ fn the_unix_rule_admits_only_a_single_leading_slash() {
         "statement.pdf",
         "Downloads/statement.pdf",
         "~/statement.pdf",
-        r"C:\Users\someone\statement.pdf",
-        "C:/Users/someone/statement.pdf",
-        r"\Users\someone\statement.pdf",
+        r"C:\data\statement.pdf",
+        "C:/data/statement.pdf",
+        r"\data\statement.pdf",
     ] {
         assert_eq!(
             refusal(text, PathRule::Unix),

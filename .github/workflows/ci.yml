@@ -134,7 +134,11 @@ jobs:
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The Playwright system packages are about 125 MB from the runner's apt mirror and are not run under `timeout`
+    # (see the install step). Normally that takes about 30 s, but on 2 Oct 2026 one runner fetched at a steady
+    # 77 kB/s, which needs about 27 minutes, and the old 15-minute limit cancelled the job (and, in the merge queue,
+    # dropped the entry). 40 minutes covers that rate with margin; a hung apt is still bounded by it.
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:

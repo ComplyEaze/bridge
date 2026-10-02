@@ -90,6 +90,8 @@ fn the_other_keys_are_refused_as_the_directory_engagement_refuses_them() {
     let dir = Engagement::from_toml(&bad(synthetic_text()), &common::fixtures()).unwrap_err();
     assert!(matches!(held, AuditError::Config(_)), "{held:?}");
     assert!(matches!(dir, AuditError::Config(_)), "{dir:?}");
+    // The same refusal, not only the same variant: the variant and its text are equal.
+    assert_eq!(format!("{held:?}"), format!("{dir:?}"));
 }
 
 #[test]
@@ -135,11 +137,45 @@ fn the_directory_engagement_keeps_refusing_a_wrong_format_mixed_keys_and_a_missi
 }
 
 #[test]
+fn a_legacy_creditor_source_set_after_parsing_is_still_refused_where_it_would_be_read() {
+    let dir = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let book = load_book(&dir).unwrap();
+    let mut held = Engagement::from_toml_for_read(&without_snapshot(&synthetic_text())).unwrap();
+    // The field is public, so the parse-time refusal cannot see a source set afterwards.
+    let legacy =
+        toml::from_str::<toml::Value>("kind = \"legacy_json\"\npath = \"does-not-exist.json\"")
+            .unwrap();
+    held.trade_creditors_source = Some(legacy.clone());
+    let no_directory = |err: AuditError| {
+        matches!(
+            err,
+            AuditError::Refused {
+                code: "CFG-no-directory",
+                ..
+            }
+        )
+    };
+    assert!(no_directory(held.bind(&book).unwrap_err()), "bind");
+    assert!(
+        no_directory(bridge_tax_audit::trade_creditors(&held, &book).unwrap_err()),
+        "trade_creditors"
+    );
+    // The same source on a directory engagement is read, and fails only because the file is absent.
+    let mut with_dir = dir.clone();
+    with_dir.trade_creditors_source = Some(legacy);
+    assert!(matches!(
+        with_dir.bind(&book).unwrap_err(),
+        AuditError::Config(_)
+    ));
+}
+
+#[test]
 fn a_held_book_gives_the_same_dumps_as_the_directory_engagement() {
     let dir = common::engagement(&common::fixtures().join("synthetic-read"), false);
     let held = Engagement::from_toml_for_read(&without_snapshot(&synthetic_text())).unwrap();
     let book = load_book(&dir).unwrap();
     let rules = rules_for(&dir).unwrap();
+    let held_rules = rules_for(&held).unwrap();
     let mut compared = 0;
     for id in [
         "cash_44ab",
@@ -150,7 +186,7 @@ fn a_held_book_gives_the_same_dumps_as_the_directory_engagement() {
     ] {
         let test = registry::find(id).unwrap();
         let a = (test.run_on)(&dir, &book, &rules, &CallerData::default()).unwrap();
-        let b = (test.run_on)(&held, &book, &rules, &CallerData::default()).unwrap();
+        let b = (test.run_on)(&held, &book, &held_rules, &CallerData::default()).unwrap();
         assert!(
             a["figures"].as_array().unwrap().len() >= test.min_figures,
             "{id}"

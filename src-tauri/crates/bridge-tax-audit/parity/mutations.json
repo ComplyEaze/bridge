@@ -6798,5 +6798,21 @@
   "file": "src/lib.rs",
   "from": "        let snapshot = if in_memory {\n            &empty\n        } else {",
   "to": "        let snapshot = if false {\n            &empty\n        } else {"
+ },
+ {
+  "id": "S1-08",
+  "by": "author",
+  "what": "a held book reads a legacy creditor file when the source is set after parsing",
+  "file": "src/lib.rs",
+  "from": "        if self.in_memory && legacy {",
+  "to": "        if false && legacy {"
+ },
+ {
+  "id": "S1-09",
+  "by": "author",
+  "what": "a legacy source is taken for any other kind, and the reverse",
+  "file": "src/lib.rs",
+  "from": "            == Some(\"legacy_json\");\n        if self.in_memory && legacy {",
+  "to": "            != Some(\"legacy_json\");\n        if self.in_memory && legacy {"
  }
 ]

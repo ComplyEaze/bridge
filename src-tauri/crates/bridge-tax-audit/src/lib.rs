@@ -88,6 +88,9 @@ pub struct Engagement {
     pub label: String,
     pub assessment_year: String,
     pub period: Window,
+    /// The directory of the read. Empty for an engagement built for a book the caller holds
+    /// ([`Engagement::from_toml_for_read`]); never give that to `Read::open`. [`load_book`] refuses
+    /// such an engagement, and the field stays `pub` until the engagement is split into two types.
     pub read_dir: PathBuf,
     pub allow_unbracketed_read: bool,
     /// `[client.tally]` `company_guid` + `books_from`: the company every read must come from
@@ -949,6 +952,28 @@ not YYYY-MM-DD"
     pub fn bind(&self, book: &book::Book) -> Result<(Self, binding::BindingReport)> {
         binding::bind(self, book)
     }
+
+    /// The ledger names a `legacy_json` trade-creditor source reads, or `None` for any other
+    /// source. This is the one place an engagement reads such a file, and a held-book engagement
+    /// refuses to: its source can be set after parsing (the field is public), and the parse-time
+    /// refusal (`CFG-legacy-for-read`) cannot see that.
+    pub(crate) fn legacy_creditor_names(
+        &self,
+        source: Option<&toml::Value>,
+    ) -> Result<Option<Vec<String>>> {
+        let legacy = source
+            .and_then(toml::Value::as_table)
+            .and_then(|t| t.get("kind"))
+            .and_then(toml::Value::as_str)
+            == Some("legacy_json");
+        if self.in_memory && legacy {
+            return Err(AuditError::refused(
+                "CFG-no-directory",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        legacy_trade_creditor_names(source, &self.base_dir)
+    }
 }
 
 /// The ledger names a `legacy_json` trade-creditor source reads (`derived.fs.trade_creditors[]
@@ -1021,12 +1046,11 @@ pub fn trade_creditors(engagement: &Engagement, book: &book::Book) -> Result<BTr
                 })
             })
             .collect(),
-        "legacy_json" => Ok(
-            legacy_trade_creditor_names(Some(src), &engagement.base_dir)?
-                .unwrap_or_default()
-                .into_iter()
-                .collect(),
-        ),
+        "legacy_json" => Ok(engagement
+            .legacy_creditor_names(Some(src))?
+            .unwrap_or_default()
+            .into_iter()
+            .collect()),
         other => Err(AuditError::Config(format!(
             "roles.trade_creditors_source: unknown kind {other:?}"
         ))),

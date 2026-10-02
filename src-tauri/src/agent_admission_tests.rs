@@ -98,6 +98,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "profit_and_loss",
         "purchase_register",
         "read_evidence",
+        "sales_register",
         "stock_summary",
         "tally_status",
         "trial_balance",
@@ -121,17 +122,17 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     );
     // The exact sentence each description ends with, written out here so an edit
     // to the catalogue's constants cannot pass by agreeing with itself.
-    const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
+    const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to ComplyEaze Bridge's local log on this computer; it writes nothing to Tally.";
     // Local writers: (name, destructive, the exact sentence).
     const LOCAL_WRITERS: &[(&str, bool, &str)] = &[
         // Fresh batch id and file each call: additive.
-        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally."),
+        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
         // A new file each call: additive.
-        ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally."),
+        ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // A newer verification replaces the saved proof.
-        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
+        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
         // It verifies the batch twice, so it replaces the proof as well.
-        ("acknowledge_post_review", true, "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
+        ("acknowledge_post_review", true, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -503,4 +504,80 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         .iter()
         .all(|record| record.reason_code.as_deref() == Some("argument_unknown")));
     assert!(server.runtime.snapshots().unwrap().is_empty());
+}
+
+/// Two pull requests that add different tools must touch different lines, so
+/// every list a new tool is written into is kept in name order: each new name
+/// then has its own place instead of the same last line (#995). The lists are
+/// read from the source as written, because order is what a merge sees.
+#[test]
+fn every_list_a_new_tool_is_written_into_is_in_name_order() {
+    fn region<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
+        assert_eq!(source.matches(start).count(), 1, "marker moved: {start}");
+        let from = source.find(start).unwrap() + start.len();
+        let to = from + source[from..].find(end).expect(end);
+        &source[from..to]
+    }
+    fn arm_names(region: &str) -> Vec<&str> {
+        region
+            .lines()
+            .filter_map(|line| {
+                let rest = line.trim_start().strip_prefix('"')?;
+                let (name, after) = rest.split_once('"')?;
+                after.trim_start().starts_with("=>").then_some(name)
+            })
+            .collect()
+    }
+    fn assert_in_name_order(list: &str, names: &[&str]) {
+        assert!(names.len() > 1, "{list}: no names found");
+        assert!(
+            names.windows(2).all(|pair| pair[0] < pair[1]),
+            "{list} must be in name order with no duplicate: {names:?}"
+        );
+    }
+    let registered = super::catalog::REGISTERED_TOOL_NAMES;
+
+    let effects = arm_names(region(
+        include_str!("agent_catalog.rs"),
+        "pub(super) fn of(name: &str) -> Option<Self> {",
+        "_ => return None,",
+    ));
+    assert_in_name_order("ToolEffect::of", &effects);
+    assert_eq!(
+        effects, registered,
+        "ToolEffect::of and REGISTERED_TOOL_NAMES"
+    );
+
+    // The lab tools follow under their feature, after the shipped arms.
+    let dispatch = arm_names(region(
+        include_str!("agent.rs"),
+        "validate_tool_arguments(name, args)?;",
+        "#[cfg(feature = \"lab-writes\")]",
+    ));
+    assert_in_name_order("the tool dispatch in agent.rs", &dispatch);
+    assert_eq!(
+        dispatch, registered,
+        "the dispatch and REGISTERED_TOOL_NAMES"
+    );
+
+    let readme = region(
+        include_str!("../../docs/agent/README.md"),
+        "The ordinary default tools, in name order:\n\n",
+        "\n\n",
+    );
+    let listed = readme
+        .lines()
+        .map(|line| {
+            line.strip_prefix("- `")
+                .and_then(|rest| rest.strip_suffix('`'))
+                .unwrap_or_else(|| panic!("not a tool line: {line:?}"))
+        })
+        .collect::<Vec<_>>();
+    assert_in_name_order("the default tools in docs/agent/README.md", &listed);
+    for name in &listed {
+        assert!(
+            registered.contains(name),
+            "README names an unknown tool: {name}"
+        );
+    }
 }

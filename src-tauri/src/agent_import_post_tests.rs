@@ -620,6 +620,25 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
             == Some(WireRefusal::Busy)
     };
 
+    // How many reads a call made is counted, not timed (#998): an upper bound on
+    // elapsed time fails on a loaded runner although the code is right. The
+    // lower bounds stay, because a wait can only add to elapsed time.
+    async fn reads_of(
+        server: &Server,
+        request: crate::tally::agent_read_request::AgentReadRequest,
+        call_started: Instant,
+    ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
+        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let result = MARKS_READS
+            .scope(
+                std::sync::Arc::clone(&reads),
+                server.read_marks_after_post(request, call_started),
+            )
+            .await;
+        let reads = reads.lock().unwrap().clone();
+        (result, reads)
+    }
+
     // Freed after the first budget, inside the second: the retry gets through.
     let held = hold();
     let release = tokio::spawn(async move {
@@ -627,31 +646,29 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         drop(held);
     });
     let started = Instant::now();
-    let result = server
-        .read_marks_after_post(request(), Instant::now())
-        .await;
+    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
+    assert_eq!(reads, [None, Some(budget)]);
     release.await.unwrap();
 
-    // Held throughout: refused once, after both budgets, never a third.
+    // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let result = server
-        .read_marks_after_post(request(), Instant::now())
-        .await;
+    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
-    assert!(started.elapsed() < budget * 3);
+    assert_eq!(reads, [None, Some(budget)], "exactly one retry");
 
-    // A call with no time left waits its first budget and nothing more.
+    // A call with no time left waits its first budget and retries nothing.
     let spent = Instant::now()
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let result = server.read_marks_after_post(request(), spent).await;
+    let (result, reads) = reads_of(&server, request(), spent).await;
     assert!(busy(&result));
-    assert!(started.elapsed() >= budget && started.elapsed() < budget * 2);
+    assert!(started.elapsed() >= budget);
+    assert_eq!(reads, [None], "no retry");
 }
 
 /// A marks readback that failed after a sent post is named in the recorded
@@ -1895,7 +1912,7 @@ fn a_multi_currency_refusal_names_the_masters_in_plain_words_only_when_nothing_w
     assert_eq!(
         error["message"],
         "This company has more than one currency defined (C1, C2, C3, C4, C5, C6, C7, C8 and 2 \
-         more); Bridge does not post into multi-currency books yet. Nothing was posted."
+         more); ComplyEaze Bridge does not post into multi-currency books yet. Nothing was posted."
     );
     assert_eq!(error["currencies_seen"].as_array().unwrap().len(), 8);
     assert_eq!(error["currencies_total"], 10);

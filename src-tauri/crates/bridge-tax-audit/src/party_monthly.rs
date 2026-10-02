@@ -98,24 +98,6 @@ fn abs(a: i64) -> Result<i64> {
     a.checked_abs().ok_or_else(overflow)
 }
 
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
-}
-
 /// (year, month, day) of a validated `YYYYMMDD` date.
 fn ymd(d: &TallyDate) -> (i32, u32, u32) {
     let s = d.as_str();
@@ -399,8 +381,7 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
         for (h, row, label_ref, is_total) in &ordered {
             for (c, name) in MONTHS.iter().zip(MONTH_NAMES) {
                 if let Some(a) = row.cols.get(c).filter(|a| **a != 0) {
-                    fig(
-                        &mut r,
+                    r.fig(
                         &format!("{block}_{c}_{h}"),
                         Value::Int(*a),
                         Unit::Paise,
@@ -410,14 +391,13 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
                 }
             }
             if let Some(a) = row.cols.get("outside").filter(|a| **a != 0) {
-                fig(&mut r, &format!("{block}_outside_{h}"), Value::Int(*a), Unit::Paise,
+                r.fig(&format!("{block}_outside_{h}"), Value::Int(*a), Unit::Paise,
                     &format!("{group}: amount dated outside the period for this row ({sense}; not in the \
                               period total)."),
                     vec![label_ref.clone()])?;
             }
             if row.year != 0 || *is_total {
-                fig(
-                    &mut r,
+                r.fig(
                     &format!("{block}_year_{h}"),
                     Value::Int(row.year),
                     Unit::Paise,
@@ -426,8 +406,7 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
                 )?;
             }
             if row.returns != 0 {
-                fig(
-                    &mut r,
+                r.fig(
                     &format!("{block}_returns_{h}"),
                     Value::Int(row.returns),
                     Unit::Paise,
@@ -437,8 +416,7 @@ Parties are per ledger: one person with two ledgers shows as two rows; nothing i
                     vec![label_ref.clone()],
                 )?;
             }
-            fig(
-                &mut r,
+            r.fig(
                 &format!("{block}_vouchers_{h}"),
                 count(TEST_ID, row.vouchers.len())?,
                 Unit::Count,
@@ -495,8 +473,7 @@ the block's total."
             }
         }
         let tb_movement = tb_movement.checked_mul(sign).ok_or_else(overflow)?;
-        let f_tb = fig(
-            &mut r,
+        let f_tb = r.fig(
             &format!("{block}_tb_movement"),
             Value::Int(tb_movement),
             Unit::Paise,
@@ -510,8 +487,7 @@ the block's total."
                 .collect(),
         )?;
         let diff = total.year.checked_sub(tb_movement).ok_or_else(overflow)?;
-        let f_diff = fig(
-            &mut r,
+        let f_diff = r.fig(
             &format!("{block}_tb_difference"),
             Value::Int(diff),
             Unit::Paise,
@@ -530,7 +506,7 @@ the block's total."
                 .keys()
                 .map(|n| EvidenceRef::new("ledger", n))
                 .collect();
-            let f_open = fig(&mut r, &format!("{block}_opening_balance"),
+            let f_open = r.fig(&format!("{block}_opening_balance"),
                 Value::Int(sum.checked_mul(sign).ok_or_else(overflow)?), Unit::Paise,
                 &format!("{group}: opening balances on its ledgers ({} balance positive). Not in these \
                           figures; the financial statements, which read closing balances, include them.",
@@ -650,9 +626,7 @@ vouchers but no Trial Balance row. It is not balanced away."
                         |w| format!("the {w} vouchers"),
                     );
                     let (sum, evidence) = left_out(&mut es)?;
-                    let f_set = fig(
-                        &mut r,
-                        &format!("{block}_vouchers_left_out_{k}"),
+                    let f_set = r.fig(&format!("{block}_vouchers_left_out_{k}"),
                         Value::Int(sum),
                         Unit::Paise,
                         &format!(
@@ -699,7 +673,7 @@ from the vouchers themselves.",
                 let (word, together) = status_word(k)
                     .map_or_else(|| (all_word(), " together"), |w| (w.to_string(), ""));
                 let (sum, evidence) = left_out(&mut es)?;
-                let f_out = fig(&mut r, &format!("{block}_vouchers_left_out"), Value::Int(sum), Unit::Paise,
+                let f_out = r.fig(&format!("{block}_vouchers_left_out"), Value::Int(sum), Unit::Paise,
                     &format!("{group}: amount on these ledgers ({sense}) of the {word} vouchers cited, which \
                               the books leave out."),
                     evidence.clone())?;

@@ -148,10 +148,35 @@ pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerp
     )
 }
 
+/// How a batch's vouchers can be attributed to rows of the book.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Attribution<'a> {
+    /// By the `[BRIDGE:...]` narration tag: the hand-import file, a native
+    /// post made before the pre-POST mark was recorded, and the check made
+    /// before a native POST.
+    Tag,
+    /// A native post that sent no tag, attributed only by the vouchers its own
+    /// POST was bound to by its AlterID span (`agent_import_span_identity.rs`),
+    /// if it was bound. A row carrying the batch's tag cannot be one of the
+    /// vouchers this POST created, so the tag attributes nothing: such a row
+    /// (a hand import of the batch's file) is matched by content only.
+    Span(Option<&'a [super::span_identity::PostedVoucherIdentity]>),
+}
+
+/// Verifies a batch against a window read. Bound vouchers rank first, so a
+/// bound voucher is found by its GUID, not by a narration tag or its content.
+/// A bound voucher the window does not hold is `bound_not_in_window`, never
+/// `not_found`: it was posted, so its absence here is not evidence that it is
+/// absent.
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
+    attribution: Attribution<'_>,
 ) -> Result<Value, String> {
+    let (bindings, tags_attribute) = match attribution {
+        Attribution::Tag => (None, true),
+        Attribution::Span(bindings) => (bindings, false),
+    };
     // Normalize only the comparison copies. Persisted batches and generated XML
     // retain their original amount lexemes and remain backward compatible.
     let mut comparison_line = line.clone();
@@ -214,14 +239,40 @@ pub(super) fn verify_batch(
                 .flatten()
         })
         .collect::<Vec<_>>();
+    // Each bound voucher's row, found by the GUID its POST created. A bound row
+    // takes part in no tag or fingerprint match: it is already attributed.
+    let bound_rows = line
+        .vouchers
+        .iter()
+        .map(|voucher| {
+            let identity = bindings?
+                .iter()
+                .find(|identity| identity.bridge_txn_id == voucher.bridge_txn_id)?;
+            Some((
+                identity,
+                observed
+                    .iter()
+                    .position(|row| row.guid.as_deref() == Some(identity.guid.as_str())),
+            ))
+        })
+        .collect::<Vec<_>>();
+    let bound_indexes = bound_rows
+        .iter()
+        .filter_map(|bound| bound.and_then(|(_, index)| index))
+        .collect::<BTreeSet<_>>();
     let mut tagged = BTreeMap::<&str, VerificationCandidates>::new();
     let mut fallback = BTreeMap::<&VerificationFingerprint, VerificationCandidates>::new();
     for (index, voucher) in observed.iter().enumerate() {
+        if bound_indexes.contains(&index) {
+            continue;
+        }
         let after_mark = line
             .pre_import_mark
             .value
             .is_some_and(|mark| voucher.alter_id.is_some_and(|id| id > mark));
-        if let Some(tag) = observed_tags[index].filter(|tag| expected_tags.contains(tag)) {
+        if let Some(tag) =
+            observed_tags[index].filter(|tag| tags_attribute && expected_tags.contains(tag))
+        {
             tagged.entry(tag).or_default().insert(index, after_mark);
         } else {
             fallback
@@ -232,6 +283,7 @@ pub(super) fn verify_batch(
     }
     let mut ambiguous_within_batch = Vec::new();
     let mut counts = BTreeMap::from([
+        ("bound_not_in_window", 0_u64),
         ("posted_verified", 0_u64),
         ("matching_content_observed", 0),
         ("posted_not_effective", 0),
@@ -240,12 +292,52 @@ pub(super) fn verify_batch(
         ("not_attributable", 0),
         ("duplicate_fingerprint", 0),
     ]);
-    for ((expected, expected_key), marker_identity) in line
+    for (((expected, expected_key), marker_identity), bound) in line
         .vouchers
         .iter()
         .zip(&expected_fingerprints)
         .zip(&expected_markers)
+        .zip(&bound_rows)
     {
+        if let Some((identity, index)) = bound {
+            let value = match index {
+                None => {
+                    counts
+                        .entry("bound_not_in_window")
+                        .and_modify(|count| *count += 1);
+                    json!({"bridge_txn_id":expected.bridge_txn_id,"status":"bound_not_in_window","marker":"post_span_binding","guid":identity.guid,"master_id":identity.master_id.to_string(),"next_step":plain_next_step("bound_not_in_window")})
+                }
+                Some(index) => {
+                    let matched = &observed[*index];
+                    if matched.master_id.as_deref() != Some(identity.master_id.to_string().as_str())
+                    {
+                        // Refuse-only: the GUID found the row, but its MasterID
+                        // is not the one bound. Nothing is attributed to it.
+                        counts
+                            .entry("not_attributable")
+                            .and_modify(|count| *count += 1);
+                        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"not_attributable","marker":"post_span_binding","reason":"bound_master_id_changed"})
+                    } else {
+                        let mut value = attributed_status(
+                            expected,
+                            matched,
+                            "post_span_binding",
+                            expected_key.2 == observed_fingerprints[*index].2,
+                            &mut counts,
+                        )?;
+                        if value["status"] == "posted_verified" {
+                            fully_verified_identities.insert(observed_identities[*index].clone());
+                        }
+                        if effective_date_not_observed(expected, matched) {
+                            value["not_observed"] = json!(["effective_date"]);
+                        }
+                        value
+                    }
+                }
+            };
+            rows.push(value);
+            continue;
+        }
         let fingerprint_ambiguous_within_batch = expected_fingerprint_counts[expected_key] > 1;
         let tagged_group = tagged.get(marker_identity.as_str());
         let fingerprint_fallback = tagged_group.is_none();
@@ -297,43 +389,23 @@ pub(super) fn verify_batch(
                 matched,
                 expected_key.2 == observed_fingerprints[matched_index].2,
             );
-            let mut matched_value = if fingerprint_fallback {
+            let mut matched_value = if !fingerprint_fallback {
+                let value = attributed_status(
+                    expected,
+                    matched,
+                    marker,
+                    expected_key.2 == observed_fingerprints[matched_index].2,
+                    &mut counts,
+                )?;
+                if value["status"] == "posted_verified" {
+                    fully_verified_identities.insert(observed_identities[matched_index].clone());
+                }
+                value
+            } else {
                 counts
                     .entry("matching_content_observed")
                     .and_modify(|count| *count += 1);
                 json!({"bridge_txn_id":expected.bridge_txn_id,"status":"matching_content_observed","marker":marker,"attribution":"not_established","accounting_effective":voucher_is_accounting_effective(matched)?,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if matched.cancelled == Some(true) {
-                // Tally drops a cancelled voucher's entries from this read
-                // (measured for Journals only: protocol reference §9.14, PARTIAL,
-                // for a gateway cancel; a screen cancel is captured in
-                // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
-                // need not match: it is cancelled, not changed.
-                // Only the header is compared, so a re-date before the cancel
-                // still shows, if it stays inside the read window: a voucher
-                // re-dated out of it is not read, so is not found unless another
-                // voucher in the window has its content. The fingerprint branch
-                // above cannot see a cancelled row whose entries were dropped:
-                // with no entries, no build's fingerprint matches.
-                counts
-                    .entry("posted_not_effective")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
-                fully_verified_identities.insert(observed_identities[matched_index].clone());
-                counts
-                    .entry("posted_verified")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if diffs.is_empty() {
-                counts
-                    .entry("posted_not_effective")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else {
-                counts
-                    .entry("posted_divergent")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_divergent","marker":marker,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
             };
             if effective_date_unobserved {
                 matched_value["not_observed"] = json!(["effective_date"]);
@@ -358,6 +430,90 @@ pub(super) fn verify_batch(
     Ok(
         json!({"counts":counts,"vouchers":rows,"duplicates":batch_duplicates,"unrelated_duplicates_in_window":unrelated_duplicates_in_window,"ambiguous_within_batch":ambiguous_within_batch}),
     )
+}
+
+/// The status of a voucher attributed to `matched` by an identity (its
+/// narration tag, or the GUID its own POST was bound to), counted in `counts`.
+fn attributed_status(
+    expected: &ImportVoucher,
+    matched: &ReadVoucher,
+    marker: &str,
+    entries_match: bool,
+    counts: &mut BTreeMap<&'static str, u64>,
+) -> Result<Value, String> {
+    let diffs = voucher_diffs(expected, matched, entries_match);
+    let mut count = |key: &'static str| {
+        counts.entry(key).and_modify(|count| *count += 1);
+    };
+    Ok(if matched.cancelled == Some(true) {
+        // Tally drops a cancelled voucher's entries from this read
+        // (measured for Journals only: protocol reference §9.14, PARTIAL,
+        // for a gateway cancel; a screen cancel is captured in
+        // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
+        // need not match: it is cancelled, not changed.
+        // Only the header is compared, so a re-date before the cancel
+        // still shows, if it stays inside the read window: a voucher
+        // re-dated out of it is not read, so is not found unless another
+        // voucher in the window has its content. The fingerprint branch
+        // cannot see a cancelled row whose entries were dropped:
+        // with no entries, no build's fingerprint matches.
+        count("posted_not_effective");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
+        count("posted_verified");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else if diffs.is_empty() {
+        count("posted_not_effective");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else {
+        count("posted_divergent");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_divergent","marker":marker,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    })
+}
+
+/// Rewrites a verification of a post into a book that was rolled back after
+/// it: a voucher the window does not hold is `book_rolled_back`, never
+/// `not_found`, because it was posted and the book was then restored or
+/// replaced. A rolled-back post is not evidence that its rows are absent.
+pub(super) fn mark_book_rolled_back(result: &mut Value) {
+    mark_not_found_as(result, "book_rolled_back");
+    result["book_rolled_back"] = json!(true);
+}
+
+/// Rewrites a verification of a native post that carries no tag and was not
+/// bound to its span: a voucher not found by its content is `sent_not_attributed`,
+/// never `not_found`. It was sent, so an edit in Tally (which a tag used to
+/// survive) is as likely as absence, and absence is never reported for it.
+pub(super) fn mark_sent_not_attributed(result: &mut Value) {
+    mark_not_found_as(result, "sent_not_attributed");
+}
+
+/// The one plain line a person reads for each status that is never absence.
+pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
+    match status {
+        "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
+        "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
+        "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
+        _ => None,
+    }
+}
+
+fn mark_not_found_as(result: &mut Value, status: &str) {
+    let mut moved = 0_u64;
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["status"] == "not_found" || voucher["status"] == "bound_not_in_window" {
+                voucher["status"] = json!(status);
+                voucher["next_step"] = json!(plain_next_step(status));
+                moved += 1;
+            }
+        }
+    }
+    let counts = &mut result["counts"];
+    let already = counts[status].as_u64().unwrap_or(0);
+    counts["not_found"] = json!(0);
+    counts["bound_not_in_window"] = json!(0);
+    counts[status] = json!(already + moved);
 }
 
 pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<bool, String> {

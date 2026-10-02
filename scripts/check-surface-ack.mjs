@@ -9,6 +9,9 @@
 //        [--report-only] [--pr N] [--base REV]        (run from the repository root)
 //   Locally, `--mode pull_request --pr N --base origin/master` checks what this branch changed since it
 //   left master (the merge-base of REV and HEAD), even when master has moved on; CI uses HEAD^1 instead.
+//   The local run approximates CI and CI is the authority: it can pass where CI fails, or fail where CI
+//   passes, when master, after the branch left it, unpinned a file the branch edits or already landed the
+//   same change. It does not simulate the merge.
 //
 // Exit 0: pass, or --report-only (prints "WOULD FAIL: ..."). Exit 1: a rule failed, or git could
 // not answer (fail closed). Exit 2: bad command-line usage.

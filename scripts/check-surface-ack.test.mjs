@@ -857,3 +857,14 @@ test("pull_request mode: a pin master added after the cut still needs an ack for
   const ok = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
 });
+
+test("pull_request mode: a named base whose pin list cannot be read fails closed", () => {
+  const r = prRepo();
+  const tip = branch(r, "branch", () => (r.write("a.txt", "changed\n"), r.ackFile(7, ["a.txt"])));
+  r.write(SURFACE_PATH, "{ this is not a pin list");
+  r.commit("master breaks its pin list");
+  r.sh("switch", "-q", "--detach", tip);
+  const local = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(local.status, 1, "an unreadable pin list at the named base is a failure, never an empty pinned set");
+  assert.match(local.stdout, /surface ack check FAILED/);
+});

@@ -14,7 +14,7 @@
 //!   ([`restate_rows`]), so the headline never claims rows the response no
 //!   longer holds.
 //!
-//! The company name is Tally's own free text, so it is written in quotes with
+//! The company name is Tally's own unrestricted text, so it is written in quotes with
 //! control characters removed, and no ledger or party name ever enters a
 //! headline: the headline types hold counts, dates and enums, and one
 //! [`CompanyName`].

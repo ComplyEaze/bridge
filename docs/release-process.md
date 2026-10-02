@@ -619,7 +619,9 @@ every note for them first, and for maintainers second.
 - Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
   weeks, and only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts.
+  both hosts. A master push may show the native, bundle and seam jobs skipped
+  when the merge queue ran them on that same commit; its job summary names the
+  queue run, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the

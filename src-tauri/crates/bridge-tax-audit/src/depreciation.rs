@@ -527,7 +527,7 @@ pub fn run(
 same voucher, confirmed to be separate ledger lines never summed into the asset ledger's own \
 debit amount -- verified on data, not merely asserted.",
         Vec::new(),
-    );
+    )?;
 
     for name in &fa_ledgers {
         let h = stable_ledger_tag(book, name)?;
@@ -543,7 +543,7 @@ debit amount -- verified on data, not merely asserted.",
                 "Depreciation block this Fixed Assets ledger (tag {h}) is mapped to, or 'unmapped'."
             ),
             vec![EvidenceRef::new("ledger", name)],
-        );
+        )?;
     }
 
     r.fig(
@@ -556,7 +556,7 @@ voucher that credits each asset ledger for its year's book depreciation).",
             .iter()
             .map(|n| EvidenceRef::new("ledger", n))
             .collect(),
-    );
+    )?;
 
     if !data.unmapped.is_empty() {
         let ev: Vec<EvidenceRef> = data
@@ -571,7 +571,7 @@ voucher that credits each asset ledger for its year's book depreciation).",
             "Fixed Assets ledgers with a non-zero Trial Balance closing balance, TB movement, or \
 FY voucher activity that the client's setup does not map to a depreciation block.",
             ev.clone(),
-        );
+        )?;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/unmapped"),
             clauses: vec!["s.32".to_string(), "3CD-18".to_string()],
@@ -619,7 +619,7 @@ classified into a block in the client's setup."
             Unit::Paise,
             &format!("Opening (1-4) Income-tax Act WDV for block '{block_key}'."),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("additions_ge180_{block_key}"),
             Value::Int(b.additions_ge180_paise),
@@ -630,7 +630,7 @@ classified into a block in the client's setup."
                 rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("additions_lt180_{block_key}"),
             Value::Int(b.additions_lt180_paise),
@@ -641,7 +641,7 @@ classified into a block in the client's setup."
                 rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("deletions_{block_key}"),
             Value::Int(b.deletions_paise),
@@ -651,7 +651,7 @@ classified into a block in the client's setup."
 depreciation journal)."
             ),
             ev.clone(),
-        );
+        )?;
         let f_act = r.fig(
             &format!("dep_total_act_{block_key}"),
             Value::Int(b.dep_total_paise),
@@ -664,14 +664,14 @@ additions put to use fewer than {days} days before period end, net of any deleti
                 days = rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("closing_wdv_{block_key}"),
             Value::Int(b.closing_paise),
             Unit::Paise,
             &format!("Closing Income-tax Act WDV for block '{block_key}'."),
             ev.clone(),
-        );
+        )?;
         let f_book_dep = r.fig(
             &format!("book_dep_{block_key}"),
             Value::Int(b.book_dep_paise),
@@ -682,7 +682,7 @@ depreciation-journal vouchers (voucher-level; cross-checked against the Trial Ba
 this test's depreciation tie check)."
             ),
             ev.clone(),
-        );
+        )?;
         let diff_val = b
             .book_dep_paise
             .checked_sub(b.dep_total_paise)
@@ -695,7 +695,7 @@ this test's depreciation tie check)."
                 "Book depreciation minus Income-tax Act depreciation for block '{block_key}'."
             ),
             Vec::new(),
-        );
+        )?;
 
         book_dep_from_vouchers = book_dep_from_vouchers
             .checked_add(b.book_dep_paise)
@@ -723,7 +723,7 @@ cost; the proviso is mandatory and has no Rule 6DD-style exception). This is the
 unless the payment mode is shown not to be cash."
                     ),
                     ev.clone(),
-                );
+                )?;
             }
             None => {
                 act_dep_total_excl_cash = act_dep_total_excl_cash
@@ -752,7 +752,7 @@ shows cash of {} ({}), over the rules' s.43(1) cash limit for an addition.",
                     &v.guid,
                     &voucher_label(v),
                 )],
-            );
+            )?;
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/s43_1/{rid}"),
                 clauses: vec!["s.43(1) second proviso".to_string(), "3CD-18".to_string()],
@@ -797,7 +797,7 @@ set for this client (never summed from vouchers).",
             .iter()
             .map(|n| EvidenceRef::new("ledger", n))
             .collect(),
-    );
+    )?;
     let f_act_total = r.fig(
         "act_dep_total",
         Value::Int(act_dep_total),
@@ -805,7 +805,7 @@ set for this client (never summed from vouchers).",
         "Total Income-tax Act depreciation across every mapped block, INCLUDING additions the \
 books show as paid in cash; the Act figure only if that payment mode is shown not to be cash.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "act_dep_total_applying_s43_1_proviso",
         Value::Int(act_dep_total_excl_cash),
@@ -814,7 +814,7 @@ books show as paid in cash; the Act figure only if that payment mode is shown no
 the books show as paid in cash: the Act figure on the books as recorded. Equal to the total across \
 every mapped block including cash-paid additions when none is flagged.",
         Vec::new(),
-    );
+    )?;
     let diff_total = book_dep_from_tb
         .checked_sub(act_dep_total)
         .ok_or_else(overflow)?;
@@ -825,7 +825,7 @@ every mapped block including cash-paid additions when none is flagged.",
         "Book depreciation for the year less the total Income-tax Act depreciation across every \
 mapped block (cash-paid additions included).",
         Vec::new(),
-    );
+    )?;
     let tie_diff = book_dep_from_vouchers
         .checked_sub(book_dep_from_tb)
         .ok_or_else(overflow)?;
@@ -838,7 +838,7 @@ vouchers, minus the Trial Balance movement of the depreciation expense ledgers s
 Non-zero means the \
 depreciation journals do not fully explain the expense ledger's TB movement.",
         Vec::new(),
-    );
+    )?;
 
     // Nothing to compute: no block is mapped, no opening WDV is configured, and no Fixed Assets
     // ledger carries a balance or movement. Act depreciation is then zero by construction, not a

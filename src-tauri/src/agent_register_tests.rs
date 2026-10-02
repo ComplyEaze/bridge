@@ -1127,6 +1127,10 @@ fn derived_sales_tail() -> String {
         .expect("the purchase description has its shared read");
     let swaps = [
         (
+            "whose head Bridge recognises as",
+            "whose head ComplyEaze Bridge recognises as",
+        ),
+        (
             "Return the Purchase and Debit Note vouchers",
             "Return the Sales and Credit Note vouchers",
         ),

@@ -416,23 +416,57 @@ Further observations from the same runs:
   changed the currency master's `ORIGINALNAME` and the company's `CURRENCYNAME` with it, both ways.
   A non-INR company given a ₹ symbol was not measured.
 
-**A window read whole and admitted against its census (#985) — PARTIAL, 2026-10-02.** One run of
-each, on a licensed TallyPrime 7.1 Silver lab, through the product's own `vouchers` and
-`voucher_presence` tools, each call reading one day that held one voucher. Two synthetic lab books:
-one whose voucher mark is above the window planner's whole-book bound, so a census is read (rule
-2 of §11c.3), and one below it, so none is.
+**A window read whole and admitted against its census (#985, #1020) — PARTIAL, 2026-10-02.**
+Run by the maintainers on a licensed TallyPrime 7.1 Silver lab, through Bridge's own tools, on
+synthetic lab books, one-day windows. The reads ran on builds of two #1020 heads, `5797c9ec` and
+`ff50b571` (before it merged master), with the same results on both; the post ran on `ff50b571`
+only. One run of each. The requests are described from each tool's own request trail (counts,
+hashes and sizes); no request or response was captured into this tree.
+
+When a census is read (rule 2 of §11c.3) is derived from the code, not measured: the planner reads
+one only when a book's voucher mark times the shape's default size per voucher exceeds the 16 MiB
+budget. That is
+a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
+more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
 
 | Call | Book | Window label | Verdicts | Requests |
 | --- | --- | --- | --- | --- |
-| `vouchers` | census read | `complete`, total 1 | — | 22 |
-| `vouchers` | no census | `partial`, `nonempty_window_unqualified`, total 1 | — | 16 |
-| `voucher_presence`, 2 proposals | census read | `complete` | the book's voucher `present`; one nothing in the book resembles `absent` | 34 |
-| `voucher_presence`, 2 proposals | no census | `partial`, `nonempty_window_unqualified` | the book's voucher `present`; one sharing its party `possibly_present`, `resembles_book_voucher` | 28 |
-| `voucher_presence`, 1 proposal, a bound party not the book voucher's | no census | `partial`, `nonempty_window_unqualified` | `possibly_present`, `window_not_proven_complete`, 0 candidates | 28 |
+| `vouchers`, a day with one voucher | census read | `complete`, total 1 | | 22 |
+| `vouchers`, the same | no census | `partial`, `nonempty_window_unqualified`, total 1 | | 16 |
+| `voucher_presence`, 2 proposals | census read | `complete` | the voucher in the book `present`; one nothing in the book resembles `absent` | 34 |
+| `voucher_presence`, 2 proposals | no census | `partial`, `nonempty_window_unqualified` | the voucher in the book `present`; one sharing its party `possibly_present`, `resembles_book_voucher` | 28 |
+| `voucher_presence`, 1 proposal whose party is bound and is not the book voucher's | no census | `partial`, `nonempty_window_unqualified` | `possibly_present`, `window_not_proven_complete`, no candidates | 28 |
 
-The caller declared the voucher types' numbering as manual; their real numbering was not
-established. Not measured: a multi-day window, a census mismatch (none arose, so the refusal was not
-seen live), and the read-back after a post. No book other than these two synthetic lab books.
+- No `absent` was issued on a `partial` window.
+- The `vouchers` call on the census book sent the same requests as a build without #1020, in the
+  same order, with the same request hashes and response sizes.
+- On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
+  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
+  code, not the run: that reason is returned when the read widened by a day on each side finds
+  rows, none inside the window, so it names the neighbouring days, not the window, which returned
+  no row; the wording is a separate matter.
+
+**The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
+`post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
+the read-back read a census. `post_import` returned `posted_verified`: created 1 and every other
+counter 0, one import sent and not resent, and the voucher mark moved by exactly 1. On a day empty
+before the post, the census answer grew in size from the empty answer's, as one holding a voucher
+would; that a census was read is taken from request and response sizes in the tool's own request
+trail, not from captured bytes. The read was admitted against it and returned complete.
+`verify_import` then returned `posted_verified`, 1 verified, none unverified and no duplicate,
+reading the window again with the same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
+nobody changed.
+
+This does not establish:
+
+- a window of several days read in one request and admitted against its census, which is the case
+  `voucher_presence` is mostly asked about (ADR 0017's note of 2026-10-02);
+- the refusal itself: no run produced a disagreement between a census and its read, so what a
+  caller sees then, after a read or after a post, is shown only by #1020's own tests;
+- how often that refusal fires on a book several people are changing;
+- Education mode, or tiers and releases other than Silver 7.1;
+- the voucher types' own numbering: the caller declared them `manual`;
+- anything beyond one run of each, on synthetic lab books.
 
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
@@ -694,6 +728,19 @@ read returns and refuses a difference), a mark above 400,000, a slice of names l
 characters, and how a busy or edited book answers a slice (the bracket, not the slice, is what
 detects an edit). Tally's behaviour on a slice that would exceed the 32 MiB response cap is not
 measured and is not to be: Bridge sizes a slice by its width before sending it.
+
+## 11f. How long Claude Desktop waits on one tool call — **PARTIAL**
+
+**PARTIAL: one run per case, one app build, no Tally involved. Not a Tally observation.** This section records how a host treats a long tool call, because the size of a read (§11c) is bounded by it as well as by Tally's own time. No request was sent to Tally.
+
+- **Build, system and date:** Claude Desktop (the chat app) on macOS, 2026-10-02. The build number, 2.19675.0, is the app bundle's version; the probe's own log records neither the build nor the system. A throw-away extension installed in the app, a stdio server with one tool that waits a given number of seconds and logs every message it receives with its time. It sent no progress notifications in the runs below.
+- **Silent calls of 20, 55, 75 and 130 seconds each were answered by the server without a cancel**, one run each (the server's own log; the log has no host-side receipt).
+- **A silent call of 250 seconds was cancelled 240 seconds after it arrived:** the server received a `notifications/cancelled` naming that call with the reason `SdkError: Request timed out`. So the limit seen in this Claude Desktop build is 240 seconds per call. The 60 seconds in #703 and #485 was seen through the Claude Code client, a host this run did not test.
+- **The host offered no `progressToken` on any of the six calls** (five in the first run, one in the second; each call's `_meta` was empty), so the server could not send a progress notification tied to a call. Six calls do not show that it never does; whether progress would extend the limit is **not answered**.
+- **The host started three copies of the probe within the same second,** each initialised by a different client (one named `claude-ai`, two with names derived from the extension's); in the first run all five calls reached the `claude-ai` one, and in the second the one call did.
+- **After the cancel, in the first run, no further message reached that server process,** and its log has no exit record; a later call in the same chat left no record in the server's log. A second run of the same 250-second silent call, with a probe that also logged signals, exit and a 10-second heartbeat, was cancelled the same way, 239.96 seconds after the call arrived, with the same reason. The server process that received it kept writing heartbeats for at least 74 seconds after the cancel, to the end of the log, with no signal, no exit and no closed input. So on this build the host cancelled the call and did not stop or disconnect the server within that time: one run, PARTIAL. Of the other two copies started at install, one logged an exit at once and one kept writing heartbeats with no call.
+- **What Bridge does on a cancel (from reading the code, not from this host; the probe server was not Bridge):** a `notifications/cancelled` naming a read in flight withdraws it before its next Tally operation, and a post not yet dispatched is withdrawn; a read already sent is not abandoned, and a `lab_import_*` write, or a post past its dispatch intent, runs to completion (`agent_protocol.rs`). A cancelled post that has written no intent still runs its operation in flight and any already admitted in full; the code's own comment puts that at about 11 to 13 minutes at worst at the default deadlines, far past a 240-second host limit. On a host timeout like the one seen, the server was not stopped within a minute, so Bridge's own cancel handling applies and a post past its dispatch intent completes while the chat shows an error: a person who sees one should check with `verify_import` before trying again. Whether a host ever stops the Bridge process after a timeout, which would abandon a request in flight, was not measured beyond that one run.
+- **Not measured:** other app builds, Windows, Claude Code (its limits are separate and configurable), the effect of progress, a call between 130 and 240 seconds, the host's behaviour more than a minute after a cancel.
 
 ## 11a. Scale measurements — 11,287-voucher corpus
 
@@ -1428,3 +1475,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
 | 2026-10-01 | §12a.14: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |
 | 2026-10-01 | §12a.7: what a GUID-filtered `Company` collection fetch returned for a company's own details on two synthetic licensed 7.1 Silver companies: the dates, currency, GST flag and company number with their text forms; an unset state or PIN code as an absent element (one company, before and after it was set); no registration type or number on the row of a company that has a registration; nothing for the address list (one sample, the address not confirmed set). VERIFIED for the names returned; PARTIAL for the address |
+| 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |

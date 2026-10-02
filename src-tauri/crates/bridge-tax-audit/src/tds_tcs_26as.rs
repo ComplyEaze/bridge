@@ -26,7 +26,7 @@ use sha1::{Digest, Sha1};
 
 use crate::book::{Book, Voucher};
 use crate::documents::{AisRow, Form26asRow, TisRow};
-use crate::error::{AuditError, Result};
+use crate::error::Result;
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::{iso, Window};
@@ -81,24 +81,6 @@ fn sum_paise(mut values: impl Iterator<Item = i64>) -> Result<i64> {
 
 fn voucher_ref(v: &Voucher) -> EvidenceRef {
     EvidenceRef::with_label("voucher", &v.guid, &voucher_label(v))
-}
-
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
 }
 
 /// The reference's `Agg26AsRow`: one (part, TAN, section) bucket.
@@ -284,8 +266,7 @@ matched."
 
     for (role, ledgers) in [("tds", &cfg.tds_ledgers), ("tcs", &cfg.tcs_ledgers)] {
         for name in ledgers {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("{role}_ledger_{}", stable_ledger_tag(book, name)?),
                 Value::Text(role.to_string()),
                 Unit::Text,
@@ -298,8 +279,7 @@ matched."
         }
     }
     for (tan, ledger) in &cfg.deductor_aliases {
-        fig(
-            &mut r,
+        r.fig(
             &format!("alias_{}", hash8(tan)),
             Value::Text(ledger.clone()),
             Unit::Text,
@@ -312,16 +292,14 @@ matched."
     let pop = book.population()?;
     let alias_targets: BTreeSet<&str> = cfg.deductor_aliases.values().map(String::as_str).collect();
     let claims = books_claim_rows(&pop, &cfg.tds_ledgers, &cfg.tcs_ledgers, &alias_targets)?;
-    fig(
-        &mut r,
+    r.fig(
         "twentysixas_agg_count",
         count(TEST_ID, agg.len())?,
         Unit::Count,
         "Distinct (TAN, section) rows in Form 26AS Part I/VI.",
         Vec::new(),
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "books_claim_count",
         count(TEST_ID, claims.len())?,
         Unit::Count,
@@ -335,8 +313,7 @@ matched."
                 .filter_map(|n| book.tb.get(n))
                 .map(|t| t.debit_paise),
         )?;
-        fig(
-            &mut r,
+        r.fig(
             &format!("books_{role}_ledger_movement_paise"),
             Value::Int(movement),
             Unit::Paise,
@@ -360,8 +337,7 @@ matched."
         ),
     ] {
         let total = sum_paise(agg.iter().filter(|a| a.part == part).map(|a| a.tax_paise))?;
-        fig(
-            &mut r,
+        r.fig(
             name,
             Value::Int(total),
             Unit::Paise,
@@ -394,8 +370,7 @@ matched."
         if claim.is_none() {
             let h = hash8(&format!("{}{}{}", a.tan, a.section, a.part));
             let reason = classify_26as_only(a, alias, period);
-            fig(
-                &mut r,
+            r.fig(
                 &format!("twentysixas_only_row_{h}"),
                 Value::Text(reason.to_string()),
                 Unit::Text,
@@ -454,8 +429,7 @@ matched."
         } else {
             String::new()
         };
-        fig(
-            &mut r,
+        r.fig(
             &format!("match_pair_{kind}_{h}"),
             Value::Text(cat.to_string()),
             Unit::Text,
@@ -467,8 +441,7 @@ matched."
         )?;
         if rows.len() > 1 {
             for a in rows {
-                fig(
-                    &mut r,
+                r.fig(
                     &format!(
                         "pair_section_tax_{kind}_{h}_{}",
                         hash8(&format!("{}{}", a.section, a.part))
@@ -484,8 +457,7 @@ matched."
             }
         }
     }
-    fig(
-        &mut r,
+    r.fig(
         "twentysixas_rows_folded_count",
         count(TEST_ID, folded)?,
         Unit::Count,
@@ -512,8 +484,7 @@ one books claim, beyond the first row of each such group.",
             row.kind,
             stable_ledger_tag(book, &row.party)?
         ));
-        fig(
-            &mut r,
+        r.fig(
             &format!("books_only_row_{h}"),
             Value::Text(reason.to_string()),
             Unit::Text,
@@ -528,24 +499,21 @@ one books claim, beyond the first row of each such group.",
 
     for cat in ["matched", "amount_differs"] {
         let [n, tax26, bamt] = cat_totals[cat];
-        fig(
-            &mut r,
+        r.fig(
             &format!("category_{cat}_count"),
             Value::Int(n),
             Unit::Count,
             &format!("(TAN, section) rows in category '{cat}'."),
             Vec::new(),
         )?;
-        fig(
-            &mut r,
+        r.fig(
             &format!("category_{cat}_26as_tax_paise"),
             Value::Int(tax26),
             Unit::Paise,
             &format!("Sum of 26AS tax, category '{cat}'."),
             Vec::new(),
         )?;
-        fig(
-            &mut r,
+        r.fig(
             &format!("category_{cat}_books_amount_paise"),
             Value::Int(bamt),
             Unit::Paise,
@@ -558,8 +526,7 @@ one books claim, beyond the first row of each such group.",
     let n_26as = |r: &TestResult, reason: &str| text_count(r, &only_prefix, reason);
     for reason in REASONS_26AS {
         let n = n_26as(&r, reason);
-        fig(
-            &mut r,
+        r.fig(
             &format!("twentysixas_only_reason_{reason}_count"),
             count(TEST_ID, n)?,
             Unit::Count,
@@ -568,8 +535,7 @@ one books claim, beyond the first row of each such group.",
         )?;
     }
     let n = n_26as(&r, REASON_26AS_UNCLASSIFIED);
-    fig(
-        &mut r,
+    r.fig(
         "twentysixas_only_unclassified_count",
         count(TEST_ID, n)?,
         Unit::Count,
@@ -580,8 +546,7 @@ one books claim, beyond the first row of each such group.",
     let n_books = |r: &TestResult, reason: &str| text_count(r, &books_prefix, reason);
     for reason in REASONS_BOOKS {
         let n = n_books(&r, reason);
-        fig(
-            &mut r,
+        r.fig(
             &format!("books_only_reason_{reason}_count"),
             count(TEST_ID, n)?,
             Unit::Count,
@@ -590,8 +555,7 @@ one books claim, beyond the first row of each such group.",
         )?;
     }
     let n = n_books(&r, REASON_BOOKS_UNCLASSIFIED);
-    fig(
-        &mut r,
+    r.fig(
         "books_only_unclassified_count",
         count(TEST_ID, n)?,
         Unit::Count,
@@ -632,8 +596,7 @@ one books claim, beyond the first row of each such group.",
             not_separate += 1;
             not_separate_ev.push(voucher_ref(v));
         }
-        fig(
-            &mut r,
+        r.fig(
             &format!("tcs_capitalisation_{}", hash8(&v.guid)),
             Value::Text(
                 if separate {
@@ -649,8 +612,7 @@ Fixed-Assets voucher -- a booking fact, not a tax-treatment conclusion (see 'Veh
             vec![voucher_ref(v)],
         )?;
     }
-    let f_not_separate = fig(
-        &mut r,
+    let f_not_separate = r.fig(
         "tcs_capitalisation_no_separate_line_count",
         count(TEST_ID, not_separate)?,
         Unit::Count,
@@ -712,18 +674,10 @@ Fixed-Assets voucher -- a booking fact, not a tax-treatment conclusion (see 'Veh
 attempted (limit).",
         ),
     ] {
-        fig(
-            &mut r,
-            name,
-            Value::Int(value),
-            Unit::Paise,
-            definition,
-            Vec::new(),
-        )?;
+        r.fig(name, Value::Int(value), Unit::Paise, definition, Vec::new())?;
     }
     for t in tis_rows {
-        fig(
-            &mut r,
+        r.fig(
             &format!("tis_category_{}_accepted_paise", hash8(&t.category)),
             Value::Int(t.accepted_paise),
             Unit::Paise,
@@ -744,8 +698,7 @@ attempted (limit).",
             .filter_map(|n| book.tb.get(n))
             .map(|t| t.debit_paise),
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "books_advance_tax_paise",
         Value::Int(books_advance_tax),
         Unit::Paise,

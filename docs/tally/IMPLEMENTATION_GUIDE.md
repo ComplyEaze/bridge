@@ -852,11 +852,12 @@ subject to a foreign-writer cross-check. It also accepts non-numeric text withou
 ### 3.6 Master re-create is a silent Alter
 
 Re-sending an identical ledger `ACTION="Create"` returned `CREATED=0, ALTERED=1` — the
-existing master was **overwritten** with the retry payload. A `Create` whose fields differ does the same: on licensed 7.1 Silver it regrouped
-the ledger, set bill-wise as supplied and **replaced its opening balance** with the supplied one,
-still reporting only `ALTERED=1` (protocol reference §9.4f, PARTIAL). Read any opening at a stated
-date (I11); a date-less read can hide the change. Persist `CREATED` and `ALTERED` as
-distinct outbox outcomes. A pre-read alone does not authorize creation: use the complete-catalogue
+existing master was **overwritten** with the retry payload.
+A `Create` with the same name and a changed parent, bill-wise flag and opening ended,
+in one run on licensed 7.1 Silver, with all three at the supplied values, the opening
+balance included, still reporting only `ALTERED=1` (protocol reference §9.4f, PARTIAL).
+Read any opening at a stated date (I11): a date-less read showed the new opening as 0.00.
+Persist `CREATED` and `ALTERED` as distinct outbox outcomes. A pre-read alone does not authorize creation: use the complete-catalogue
 and mutation-time prerequisites in `PROMPT_PLAYBOOK.md` Phase 4 step 3a; an unqualified case stays
 unresolved without dispatch.
 

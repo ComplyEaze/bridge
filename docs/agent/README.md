@@ -669,8 +669,8 @@ or vouchers.
   A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
   counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. A cancelled
   voucher is listed there too, with `cancelled` true, whether or not it was taxed: the
-  cancelled vouchers measured came back from Tally with no ledger entries (protocol
-  reference §11c.5 and §9.14), and one cancelled Purchase read this way on 1 October 2026
+  cancelled vouchers measured came back from Tally with no ledger entries (an empty entry
+  list; protocol reference §11c.5 and §9.14), and one cancelled Purchase read this way on 1 October 2026
   (#1013). A cancelled voucher that keeps its entries is not measured. Rows are
   returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
   masters and the window, so rows can shift between pages); every ledger name in every list is

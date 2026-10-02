@@ -1,0 +1,19 @@
+# ComplyEaze Bridge
+
+> ComplyEaze Bridge is an MCP server, packaged as a Claude Desktop extension, that connects Claude to the TallyPrime running on your own computer. It is built for CA firms and accountants. It reads outstanding receivables and payables with ageing, the trial balance, ledger movement and vouchers, checks ledger names before you post, and prepares Journal, Payment, Receipt and Contra vouchers as a file. Posting is off by default in a new install (check the setting if you upgraded from an earlier version); when it is on, each voucher is posted only after you approve it in a separate window. It is open source under Apache-2.0, for Windows x64 and Apple Silicon Macs, still being developed, and not yet code-signed.
+
+What the assistant reads goes to your AI provider, including party names (unless you mask them) and amounts; amounts are always sent. ComplyEaze Bridge connects only to a loopback address on the computer where Claude Desktop runs. It cannot tell whether that port is forwarded to another machine, so do not forward it across the internet. It does not create masters, post sales, purchase or tax entries, or undo a posted voucher.
+
+## Start here
+
+- [README](https://github.com/ComplyEaze/bridge/blob/master/README.md): what it does, what it does not do, and what has and has not been run against a real TallyPrime
+- [Installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md): the steps from nothing to a first question
+- [Security and privacy](https://github.com/ComplyEaze/bridge/blob/master/docs/security-and-privacy.md): where data goes, what is kept on the computer, and what was not measured
+
+## Reference
+
+- [MCP guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/README.md): the tools, their arguments and the settings
+- [Download](https://bridge.complyeaze.com/download.html): the extension for Windows x64 and Apple Silicon Macs
+- [Releases](https://bridge.complyeaze.com/releases.html) and [changelog](https://bridge.complyeaze.com/changelog.html)
+- [Terms of Use](https://bridge.complyeaze.com/terms.html) and [Privacy Policy](https://bridge.complyeaze.com/privacy.html)
+- [Security policy](https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md): how to report a vulnerability privately

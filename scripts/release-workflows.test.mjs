@@ -213,7 +213,13 @@ function assertInstallPageWorkflow(page) {
   assertUnconditional(publish, "Pages deployment step");
   assert.equal(upload.with.path, "site");
   assert.deepEqual(deploy.steps.map((candidate) => candidate.uses?.split("@")[0]), ["actions/configure-pages", "actions/deploy-pages"], "the deploy job runs the Pages actions and nothing else");
-  assert.ok(deploy.steps.every((candidate) => candidate.run === undefined), "the deploy job runs no commands");
+  // These two actions are the only code that runs with the identity token: each must be a full 40-hex commit, never
+  // a tag or branch, and nothing may change what they run: no container, no services, no inputs, no environment.
+  for (const candidate of deploy.steps) {
+    assert.match(candidate.uses, /^actions\/[a-z-]+@[0-9a-f]{40}( |$)/, "each Pages action must be pinned to a full 40-hex commit SHA");
+    assert.deepEqual(Object.keys(candidate).filter((key) => !["name", "id", "uses"].includes(key)), [], "a deploy step takes no run, inputs, environment or conditions");
+  }
+  assert.deepEqual(Object.keys(deploy).sort(), ["environment", "if", "needs", "permissions", "runs-on", "steps", "timeout-minutes"], "the deploy job has no container, services, environment variables or defaults");
   const snapshot = build.steps.find((candidate) => candidate.name === "Snapshot releases for the install page");
   assert.ok(snapshot, "the install page must ship a release snapshot for when the GitHub API refuses it");
   assertUnconditional(snapshot, "release snapshot step");
@@ -545,6 +551,16 @@ test("the install page workflow keeps the Pages permission and the identity toke
   refused("Pages write at workflow level", (copy) => { copy.permissions.pages = "write"; }, /workflow-level permissions/);
   refused("identity token on the build job", (copy) => { copy.jobs.build.permissions["id-token"] = "write"; }, /holds no Pages permission or identity token/);
   refused("Pages write on the build job", (copy) => { copy.jobs.build.permissions.pages = "write"; }, /holds no Pages permission or identity token/);
+  refused("a Pages action pinned to a tag", (copy) => { copy.jobs.deploy.steps[1].uses = "actions/deploy-pages@v5"; }, /full 40-hex commit SHA/);
+  refused("a Pages action pinned to a short SHA", (copy) => { copy.jobs.deploy.steps[0].uses = "actions/configure-pages@45bfe01"; }, /full 40-hex commit SHA/);
+  refused("a Pages action from another owner", (copy) => { copy.jobs.deploy.steps[1].uses = "someone/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128"; }, /upload the site artifact and deploy it/);
+  refused("an input on the deploy-pages step", (copy) => { copy.jobs.deploy.steps[1].with = { artifact_name: "other" }; }, /takes no run, inputs/);
+  refused("an input on the configure-pages step", (copy) => { copy.jobs.deploy.steps[0].with = { enablement: "true" }; }, /takes no run, inputs/);
+  refused("an environment variable on a deploy step", (copy) => { copy.jobs.deploy.steps[1].env = { X: "y" }; }, /takes no run, inputs/);
+  refused("a container on the deploy job", (copy) => { copy.jobs.deploy.container = "docker.io/library/alpine:3"; }, /no container, services/);
+  refused("services on the deploy job", (copy) => { copy.jobs.deploy.services = { db: { image: "postgres" } }; }, /no container, services/);
+  refused("environment variables on the deploy job", (copy) => { copy.jobs.deploy.env = { X: "y" }; }, /no container, services/);
+  refused("defaults on the deploy job", (copy) => { copy.jobs.deploy.defaults = { run: { shell: "bash" } }; }, /no container, services/);
   refused("a deploy job without the identity token", (copy) => { delete copy.jobs.deploy.permissions["id-token"]; }, /only the deploy job holds/);
   refused("a deploy job with an extra write permission", (copy) => { copy.jobs.deploy.permissions.contents = "write"; }, /only the deploy job holds/);
   refused("an environment on the build job", (copy) => { copy.jobs.build.environment = { name: "github-pages" }; }, /no deployment environment/);

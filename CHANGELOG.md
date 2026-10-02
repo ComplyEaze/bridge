@@ -19,6 +19,25 @@ Apache-2.0 builds from current source stays unambiguous.
 These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
 requests it comes from, except where it names an issue.
 
+**Should I upgrade?**
+
+- **If you use 0.3.0 or 0.4.0 on Windows: yes.** 0.4.1 closes the network-share
+  and long-path forms of a medium-severity security issue in how the
+  bank-statement tool opens file paths, published as
+  [advisory GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
+  Some paths still pass; the advisory lists which. If you cannot upgrade yet,
+  follow the advisory's steps.
+- **On a Mac,** the advisory rates the issue low, but the other changes below
+  apply there too.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  quit Claude Desktop, install the newer file from its Extensions settings, and
+  keep ComplyEaze Bridge's data folder, which holds its record of what it has
+  sent to Tally. Then open the extension's settings and check "Allow voucher
+  posting": an earlier default may still be saved as on.
+- **What was tried** is under "Known limits" below. No one on our side
+  installed the Windows package of this build in Claude Desktop on a Windows PC.
+
 **What you can do now**
 
 - No new tool. On a company large enough to be counted first,

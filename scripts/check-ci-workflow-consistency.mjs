@@ -70,7 +70,7 @@ const expectedSeamControl = [
   "    # rather than after it: it builds the bridge lib unit-test executable in",
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
-  "    # platforms as bundle-smoke, whose runs it guards.",
+  "    # platforms as bundle-smoke, whose runs it guards (on a pull request, Windows only).",
   "    if: needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",

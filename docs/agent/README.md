@@ -92,6 +92,7 @@ The ordinary default tools, in name order:
 - `profit_and_loss`
 - `purchase_register`
 - `read_evidence`
+- `sales_register`
 - `stock_summary`
 - `tally_status`
 - `trial_balance`
@@ -102,7 +103,8 @@ The ordinary default tools, in name order:
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
-`local_data_report` were added in release 0.4.0. `local_data_report` (also
+`local_data_report` were added in release 0.4.0; `sales_register` is in source and not
+in a published release. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -622,6 +624,35 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
+A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
+accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
+does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
+the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
+order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
+`candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
+full count in `candidates_total`, and `candidates_total_is_lower_bound` when that count is a floor;
+`candidates_truncated` is true for it and for `withheld`); `withheld` (a whole family of ledgers
+resembles the name and none stands out: counted, not listed); `none` (nothing resembles the name; it
+does not mean the ledger is absent); `unavailable` (the search could not run, with `candidates_reason`
+and no count: a book holding a name the binding rules refuse, such as a bidirectional-control or
+zero-width character, or a name with too many identifiers, or a book past their bounds) or
+`names_masked` (`mask_parties` hides the names; nothing is searched and no count is given, because a
+count would answer "does a ledger start with this?" for every prefix a caller tries). A ledger named
+by an embedded number is shown with the rule `identifier_match`, and the count is a floor
+(`name_search_not_run`): the name search was not made, so it is not every ledger like the name, and
+it is never used as the answer. The refusal's remediation tells the assistant to ask the user which
+ledger they meant. The candidate fields that carry a list are attached only when `max_bytes` is at
+least 16,384 (the list is framed twice and an error has no page to trim, so a list that does not fit
+would cost the refusal its code), each list is cut to a sixteenth of the cap; the states that carry no
+list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
+ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
+writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
+now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
+`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after
@@ -724,6 +755,96 @@ or vouchers.
   with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
+
+### Sales register (`sales_register`)
+
+The mirror of `purchase_register`: it lists the Sales and Credit Note vouchers
+of a date window that touch a ledger under Duties & Taxes, and says per entry
+what the books record. It is the same code with two things changed: the register's
+voucher classes (Sales and Credit Note instead of Purchase and Debit Note) and
+the group of the taxable ledgers (Sales Accounts instead of Purchase Accounts).
+Everything else is shared: the reads, the company pin, the snapshot binding, the
+states, the refusals, the paging, the masking, and the rule that tax comes only
+from the GST duty head on the ledger master, never from a name or an amount.
+Read the purchase register's section above for each of them. The response's
+`profile` is `agent_sales_register_v1`; vouchers with no Duties & Taxes entry are
+counted in `sales_vouchers_without_duties_taxes_entry`; each row carries
+`party_group` and the tool does not decide whether a Credit Note is a sales
+return or a credit note issued to a supplier. It decides no place of supply, tax
+rate or return section, and matches nothing against any portal.
+
+- **Measured.** `sales_register` was run against a live Tally on two synthetic
+  companies (TallyPrime 7.1 Silver). On the first, once per day, for one taxed
+  Sales item invoice and one untaxed one: the taxed sale came back as one row
+  (voucher type Sales in the invoice view, the party as a debit entry, the sales
+  ledger as its taxable entry, and two credit entries on tax ledgers whose
+  masters carry the heads CGST and SGST/UTGST), and the untaxed one was counted
+  under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44
+  ledgers, for one Credit Note in voucher view booked on account: one row with
+  its CGST and state-tax heads and its sales ledger as the taxable entry. The
+  voucher windows of the first two invoices are committed, and the parsed
+  windows have exactly those entries (a test); the requests are the ones the
+  code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
+  by the build at commit 8c674d5e, with the book's own ledger masters, groups and
+  company listings, and is replayed end to end from that recorded call (a test;
+  the answer file carries that build's `coverage` wording). The untaxed
+  invoice's day was read once by an earlier build; only its voucher window is
+  committed, not its masters or the tool's answer, and a test with a Sales
+  voucher whose tax entries are removed stands in for its list. The Credit Note day, and a Debit Note day through
+  `purchase_register`, are also replayed end to end from their recorded calls
+  (tests). One Sales accounting voucher (not an invoice) is also classified, in
+  tests, against the ledger masters of the purchase register's lab book.
+- **What `complete` rests on.** The response `state` is `complete` when the
+  company's marks and the ledger masters read the same before and after the
+  window (and, for an empty window, its corroboration read confirmed it). It
+  does not mean the window was admitted against a separate voucher count: on the
+  small book measured, the call sent no voucher census, and a small window that
+  `vouchers` calls `partial` can be `complete` here. A row's `status` of
+  `complete` is a different thing: every entry the voucher touches classified.
+- **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
+  reversed as Tally sends them: the tool neither nets nor flips, so a caller that
+  sums tax over a window must add signed amounts. The measured Credit Note of
+  1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
+  `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
+  row has the sales and tax entries positive and the party entry negative.
+- **The cost varies by book.** The same call sent 96 requests on a book with 8
+  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
+  voucher census and base-currency reads are added). The result does not report
+  the cost.
+- **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
+  on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
+  recognised heads for the same side of the tax, so a caller must not look for
+  one of them only.
+- **Not shown by any run, and said so in the tool's text and in each
+  response's `coverage`:** an invoice-view Credit Note; an inter-state (IGST)
+  line; a cancelled or optional sales voucher; an unrecognised or missing duty
+  head on a sale; more than one voucher in a window; paging; a company with a
+  registration; a tax Tally computes itself (rate or HSN on the item); a sale
+  typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
+  returned); a ledger or voucher kept in a currency other than the book's base
+  (the Credit Note run's book defines a second currency, but all of its ledgers
+  are in the base).
+- **A row of a kind no capture covers says so, where the row itself shows the
+  kind.** It is returned, not withheld, with `not_measured_live` listing why:
+  `invoice_view_credit_note`, `inter_state_line`, `sales_ledger_not_an_entry`
+  (tax is present but no entry is on a Sales Accounts ledger: the sales ledger
+  may sit in an inventory allocation), `cancelled`, `optional`, `post_dated`,
+  `party_gstin_present`, `reference_present`. A row the captures cover has no
+  such field, and the purchase register's rows never carry it. Some kinds a row
+  cannot show, so they are never marked and are not vouched for: a sale typed on
+  Tally's screen in voucher view, a tax Tally computed itself, a duty head no
+  sales capture has (such as cess), an invoice of another shape than the one run
+  (for example several goods lines), and a ledger or voucher kept in a currency
+  other than the book's base; an unmarked row is
+  not a measured one in those respects. A row is marked `inter_state_line` only
+  when a tax entry's ledger master carries a recognised IGST head; an IGST
+  ledger with no head, or an unrecognised head, is listed under the without-head
+  or unrecognised list and the status is not complete.
+  `sales_vouchers_without_duties_taxes_entry` lists such vouchers by identity
+  only; the tool does not say why one carries no tax entry. A Debit Note, even
+  to a customer, is not a sales row: it is listed apart by identity and ledger
+  names, with no amount.
 
 ### Foreign-currency composites in `vouchers`
 
@@ -1263,7 +1384,17 @@ requests. Incoming frames are limited to 5 MB. All responses obey the configured
 byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
 catalogue that cannot fit returns `agent_response_too_large`; the session remains
 usable. Text content contains the same
-serialized, redacted JSON as `structuredContent` for older clients.
+serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
+carries `instructions`, a short text for the client to show its model: start with `list_companies`,
+use the one open company only when the user named no client (or exactly one open company matches the
+name they gave), otherwise ask which and offer the list, state the company, dates and ledger used in
+the first line, anything partial, withheld, not established or not checked ahead of the figures, that
+what is read goes to the AI provider, what to do with a refusal (relay it, take only a different read,
+narrower dates or one repeat of the same read that it names, otherwise ask the user), and to ask before
+preparing or posting anything and never choose a ledger for a voucher. It is left out when
+`max_bytes` is below 4,096 or the request id is over 256 bytes, so that a client asking for tiny
+responses still gets its handshake. The company rule is also in `list_companies`' own description, so
+a client that does not pass the instructions on keeps it; the other sentences are not repeated there.
 
 `tally_status.education_mode` is a boolean: `true` for observed Education mode,
 `false` for observed Licensed mode, and `null` when mode is unobserved. Product

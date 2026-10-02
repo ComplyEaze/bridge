@@ -606,6 +606,31 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "a rebuild after an unknown outcome can post the voucher twice",
         ),
         (
+            "post_import",
+            "never post_import again and never rebuild",
+            "a post that was sent may already be in Tally",
+        ),
+        (
+            "post_import",
+            "record that review with acknowledge_post_review, and do not rebuild it",
+            "a doubted batch is reviewed in Tally, never posted again",
+        ),
+        (
+            "post_import",
+            "never change a row to get it past the check",
+            "a row edited past the duplicate check posts a duplicate",
+        ),
+        (
+            "post_import",
+            "never posted_verified, on this and every later verify_import",
+            "a voucher posted under changed masters is never reported verified",
+        ),
+        (
+            "post_import",
+            "which can never post",
+            "a lapsed approval is a note, not an approval",
+        ),
+        (
             "acknowledge_post_review",
             "The model cannot approve it",
             "only the person, in its own native dialog, records a review",
@@ -614,6 +639,31 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "build_import_xml",
             "do not re-import or rebuild the same business event",
             "a second file for an event already imported can post it twice",
+        ),
+        (
+            "build_import_xml",
+            "preserve the original batch and saved file, then reconcile with verify_import without writing",
+            "an uncertain import is reconciled, not repeated",
+        ),
+        (
+            "build_import_xml",
+            "an amendment is not recovery",
+            "an amendment after an unknown outcome can post twice",
+        ),
+        (
+            "build_import_xml",
+            "if someone has edited it, correct it there instead of amending",
+            "an amendment overwrites an edit made in Tally",
+        ),
+        (
+            "build_import_xml",
+            "an edit made there in between is overwritten without warning",
+            "the check runs at build time, not at import",
+        ),
+        (
+            "build_import_xml",
+            "A batch you imported by hand blocks nothing until verify_import records the whole batch posted",
+            "an unverified hand import does not stop a duplicate",
         ),
         (
             "tally_status",
@@ -650,6 +700,111 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "never suggest deleting them",
             "the journal and imports folder are what was already sent to Tally",
         ),
+        (
+            "verify_import",
+            "This never dispatches import XML to Tally.",
+            "the recovery read writes nothing to Tally",
+        ),
+        (
+            "verify_import",
+            "never cut to fit",
+            "a voucher not posted_verified is never hidden by the response cap",
+        ),
+        (
+            "voucher_presence",
+            "is only ever produced from one proven complete",
+            "absent is never claimed from a partial window",
+        ),
+        (
+            "voucher_presence",
+            "Date, party and amount only ever produce candidates",
+            "a likeness is never reported as the voucher",
+        ),
+        (
+            "voucher_presence",
+            "is a finding for a person, not a work item",
+            "correcting a voucher by Alter or Cancel creates a duplicate",
+        ),
+        (
+            "voucher_presence",
+            "no ComplyEaze Bridge path can correct a voucher it did not write",
+            "no tool path corrects a voucher another writer made",
+        ),
+        (
+            "purchase_register",
+            "not a GST return",
+            "the register is what the books record, not a filing",
+        ),
+        (
+            "purchase_register",
+            "It does not decide input tax credit eligibility or blocked credit",
+            "eligibility is the CA's call, not the tool's",
+        ),
+        (
+            "purchase_register",
+            "never from a ledger name and never from an amount",
+            "tax comes only from the duty head on the ledger master",
+        ),
+        (
+            "purchase_register",
+            "never re-signed and never summed across heads",
+            "amounts are as the books state them",
+        ),
+        (
+            "purchase_register",
+            "the tool does not guess which it is",
+            "a Debit Note's direction is not inferred",
+        ),
+        (
+            "purchase_register",
+            "and releases no rows",
+            "a read that drifted returns nothing partial",
+        ),
+        (
+            "ledger_masters",
+            "both are reported, neither is chosen",
+            "two GSTIN sources that disagree are not resolved",
+        ),
+        (
+            "ledger_masters",
+            "An incomplete chain is never padded or guessed",
+            "an ancestry gap is never filled in",
+        ),
+        (
+            "ledger_masters",
+            "check `complete` before treating it as exhaustive",
+            "an incomplete chain is not the whole ancestry",
+        ),
+        (
+            "ledger_masters",
+            "does NOT include ledgers under sub-groups of `group`",
+            "an immediate group filter is not a subtree",
+        ),
+        (
+            "ledger_masters",
+            "a gap in a chain never counts as a match",
+            "an unresolved ledger is never placed under a group",
+        ),
+        (
+            "masters",
+            "absence from it is not evidence that a voucher type is absent from the book",
+            "the voucher-type list is not proven complete",
+        ),
+        (
+            "masters",
+            "not evidence that a type numbers automatically",
+            "a reported Default is not Automatic",
+        ),
+        (
+            "masters",
+            "so do not check these rows against it",
+            "NUMVOUCHERTYPES does not count the rows",
+        ),
+        (
+            "masters",
+            "returns no partial list",
+            "a read that breached its bound returns nothing partial",
+        ),
     ];
     let definitions = registered_tool_definitions(true, true);
     let description_of = |tool: &str| -> String {
@@ -671,7 +826,8 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
     // The stock_summary pin needs its negation: the clause before "is a stock
     // value or a total" must say "neither", or "either"/"each" would invert it.
     // The clause runs back to the nearest `.`, `,`, `:` or `;`, which keeps both
-    // "neither is" and "neither side is" (#1026).
+    // "neither is" and "neither side is" (#1026), and the word is matched in any
+    // case, so a sentence that opens with "Neither" passes too.
     let stock = description_of("stock_summary");
     let at = stock
         .find("is a stock value or a total")
@@ -682,7 +838,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
     assert!(
         stock[clause_start..at]
             .split_whitespace()
-            .any(|word| word == "neither"),
+            .any(|word| word.eq_ignore_ascii_case("neither")),
         "stock_summary must say neither unchecked sum is a stock value: {:?}",
         &stock[clause_start..at]
     );

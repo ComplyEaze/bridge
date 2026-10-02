@@ -50,5 +50,10 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   assert.match(vouchers, /async fn read_entry_window_rows(?:(?!\bfn\s)[\s\S])*?self\.read_voucher_window\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
   assert.match(vouchers, /type_selector\.is_some\(\) \{\s*VoucherReadShape::ClassEntryWildcard\s*\} else \{\s*VoucherReadShape::EntryWildcard/);
   assert.match(vouchers, /fn read_entry_wildcard_window[\s\S]*?VoucherReadShape::EntryWildcard/);
-  assert.match(vouchers, /filter_voucher_rows_for_ledger[\s\S]*?skip\(offset\)[\s\S]*?take\(limit\)/);
+  // The page is taken from the filtered and selected rows: the ledger filter runs first, then the rows are held for later
+  // pages and `page_items` (which applies `skip(offset)` then `take(limit)`) cuts the page. A served later page calls the same
+  // `page_items` on the held rows (neither pattern may cross into another function).
+  assert.match(vouchers, /filter_voucher_rows_for_ledger(?:(?!\bfn\s)[\s\S])*?page_items\(server, &rows, offset, limit\)/);
+  assert.match(vouchers, /fn page_items(?:(?!\bfn\s)[\s\S])*?skip\(offset\)(?:(?!\bfn\s)[\s\S])*?take\(limit\)/);
+  assert.match(vouchers, /page_items\(self, &snapshot\.rows, offset, limit\)/);
 });

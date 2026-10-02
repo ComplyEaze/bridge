@@ -803,8 +803,8 @@ default handling.
 | `ISBILLWISEON` | `Yes` | `No` | `No` |
 | Opening balance | `-1000.00` | `-2500.00` | `-2500.00` |
 
-In step 1, `PARENT` and the opening were read back. `ISBILLWISEON` was also read back, from a
-date-less `Ledger` collection read.
+The "Before" values were read back after step 1. A date-less `Ledger` collection read showed all
+three fields. The trial balance showed the parent and the opening.
 
 **Two reads show the new opening.**
 - The trial balance for April 2025, the company's first month, shows `-1000.00` before and
@@ -817,7 +817,7 @@ returned `OPENINGBALANCE` `0.00` for this ledger after the `Create`. Before it, 
 Creditors`, the same date-less read returned `-1000.00`.
 
 The cause was not isolated. It may be either of these:
-- the date-less read reporting the opening at the start of the loaded period (§5.5);
+- the date-less read reporting the opening at the start of the loaded period (by analogy with §5.5);
 - the ledger now sitting under a nominal group (§5.5's 2026-09-06 correction).
 
 Either way, a date-less read showed a replaced opening as `0.00` (observed once). Read an opening at

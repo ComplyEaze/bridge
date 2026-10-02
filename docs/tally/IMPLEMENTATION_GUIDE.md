@@ -857,7 +857,8 @@ A `Create` with the same name and a changed parent, bill-wise flag and opening e
 in one run on licensed 7.1 Silver, with all three at the supplied values, the opening
 balance included, still reporting only `ALTERED=1` (protocol reference §9.4f, PARTIAL).
 Read any opening at a stated date (I11): a date-less read showed the new opening as 0.00.
-Persist `CREATED` and `ALTERED` as distinct outbox outcomes. A pre-read alone does not authorize creation: use the complete-catalogue
+Persist `CREATED` and `ALTERED` as distinct outbox outcomes.
+A pre-read alone does not authorize creation: use the complete-catalogue
 and mutation-time prerequisites in `PROMPT_PLAYBOOK.md` Phase 4 step 3a; an unqualified case stays
 unresolved without dispatch.
 

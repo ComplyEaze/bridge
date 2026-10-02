@@ -624,6 +624,35 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
+A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
+accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
+does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
+the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
+order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
+`candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
+full count in `candidates_total`, and `candidates_total_is_lower_bound` when that count is a floor;
+`candidates_truncated` is true for it and for `withheld`); `withheld` (a whole family of ledgers
+resembles the name and none stands out: counted, not listed); `none` (nothing resembles the name; it
+does not mean the ledger is absent); `unavailable` (the search could not run, with `candidates_reason`
+and no count: a book holding a name the binding rules refuse, such as a bidirectional-control or
+zero-width character, or a name with too many identifiers, or a book past their bounds) or
+`names_masked` (`mask_parties` hides the names; nothing is searched and no count is given, because a
+count would answer "does a ledger start with this?" for every prefix a caller tries). A ledger named
+by an embedded number is shown with the rule `identifier_match`, and the count is a floor
+(`name_search_not_run`): the name search was not made, so it is not every ledger like the name, and
+it is never used as the answer. The refusal's remediation tells the assistant to ask the user which
+ledger they meant. The candidate fields that carry a list are attached only when `max_bytes` is at
+least 16,384 (the list is framed twice and an error has no page to trim, so a list that does not fit
+would cost the refusal its code), each list is cut to a sixteenth of the cap; the states that carry no
+list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
+ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
+writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
+now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
+`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after

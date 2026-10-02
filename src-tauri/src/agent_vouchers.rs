@@ -98,9 +98,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             let (ledgers, catalogue_evidence) =
                 server.read_ledger_catalogue(&identity, &company.name).await?;
             accumulate_evidence(&mut accumulated, catalogue_evidence);
-            let resolved = resolve_ledger_name(
+            let resolved = resolve_ledger_or_refuse(
                 ledgers.iter().map(String::as_str),
                 &requested,
+                server.settings.redaction,
             )?;
             Some((resolved, ledgers))
         } else {
@@ -177,6 +178,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     failure.candidates = Some(Box::new(Candidates {
                         requested: None,
                         items: refusal.candidates.iter().map(WindowVoucherType::json).collect(),
+                        miss: None,
                     }));
                 }
                 failure
@@ -193,6 +195,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     failure.candidates = Some(Box::new(Candidates {
                         requested: Some(name.clone()),
                         items: nearest.into_iter().map(BookVoucherType::json).collect(),
+                        miss: None,
                     }));
                     return Err(failure);
                 }

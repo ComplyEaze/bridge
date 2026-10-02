@@ -727,7 +727,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "voucher_presence",
-            "can correct a voucher it did not write",
+            "no ComplyEaze Bridge path can correct a voucher it did not write",
             "no tool path corrects a voucher another writer made",
         ),
         (

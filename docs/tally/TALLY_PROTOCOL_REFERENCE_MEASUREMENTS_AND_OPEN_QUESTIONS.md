@@ -695,6 +695,18 @@ characters, and how a busy or edited book answers a slice (the bracket, not the 
 detects an edit). Tally's behaviour on a slice that would exceed the 32 MiB response cap is not
 measured and is not to be: Bridge sizes a slice by its width before sending it.
 
+## 11f. How long Claude Desktop waits on one tool call — **PARTIAL**
+
+**PARTIAL: one run per case, one app build, no Tally involved. Not a Tally observation.** This section records how a host treats a long tool call, because the size of a read (§11c) is bounded by it as well as by Tally's own time. No request was sent to Tally.
+
+- **Build and date:** Claude Desktop 2.19675.0 (the chat app), 2026-10-02. A throw-away extension installed in the app, a stdio server with one tool that waits a given number of seconds and logs every message it receives with its time. It sent no progress notifications in the runs below.
+- **Silent calls of 20, 55, 75 and 130 seconds each were answered by the server without a cancel**, one run each (the server's own log; the log has no host-side receipt).
+- **A silent call of 250 seconds was cancelled 240 seconds after it arrived:** the server received a `notifications/cancelled` naming that call with the reason `SdkError: Request timed out`. So the limit seen in this build is 240 seconds per call, not 60.
+- **No `progressToken` accompanied any call** (the call's `_meta` was empty), so the server could not send a progress notification tied to a call. No progress token was sent, so per-call progress is not available on this build; whether progress would extend the limit is therefore **not answered**.
+- **After the cancel no further message reached that server process.** Whether the host stopped the process or it only stopped receiving calls was not established: the log has no exit record. A later call in the same chat left no record in the server's log.
+- **What Bridge does on a cancel (from reading the code, not from this host; the probe server was not Bridge):** a `notifications/cancelled` naming a read in flight withdraws it before its next Tally operation, and a post not yet dispatched is withdrawn; a read already sent is not abandoned, and a `lab_import_*` write, or a post past its dispatch intent, runs to completion (`agent_protocol.rs`). Whether the host stops the Bridge process after a timeout, which would abandon a request in flight, was not measured.
+- **Not measured:** other app builds, Windows, Claude Code (its limits are separate and configurable), the effect of progress, a call between 130 and 240 seconds.
+
 ## 11a. Scale measurements — 11,287-voucher corpus
 
 **VERIFIED 2026-07-29** on a generated production-shaped corpus: 25 customers and 15
@@ -1428,3 +1440,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
 | 2026-10-01 | §12a.14: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |
 | 2026-10-01 | §12a.7: what a GUID-filtered `Company` collection fetch returned for a company's own details on two synthetic licensed 7.1 Silver companies: the dates, currency, GST flag and company number with their text forms; an unset state or PIN code as an absent element (one company, before and after it was set); no registration type or number on the row of a company that has a registration; nothing for the address list (one sample, the address not confirmed set). VERIFIED for the names returned; PARTIAL for the address |
+| 2026-10-02 | §11f: how long Claude Desktop (chat app, build 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s returned, a 250 s call was cancelled at 240 s with `Request timed out`; no `progressToken` was sent, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |

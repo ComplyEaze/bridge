@@ -1591,9 +1591,12 @@ fn the_agent_preview_says_when_the_post_happens() {
                 "a bare Bridge at {at}: {text}"
             );
         }
+        // A native post adds no marker to the narration (#864), so the
+        // dialog must not claim one.
         assert!(text.contains(
-            "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference."
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added."
         ));
+        assert!(!text.contains("batch reference"), "{text}");
         assert!(text.contains(
             "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
         ));

@@ -12,6 +12,9 @@ submitted for inclusion in Bridge is provided under the Apache License,
 Version 2.0, without additional terms or conditions. Mark material that is
 not a contribution conspicuously as `Not a Contribution`.
 
+The logo and icon files listed in [NOTICE](./NOTICE) are not licensed under
+Apache-2.0: all rights in them are reserved (see [TRADEMARKS.md](./TRADEMARKS.md)).
+
 Only submit work that you have the right to license. Identify third-party
 material in the pull request and preserve all applicable copyright,
 attribution, and license notices. Update [NOTICE](./NOTICE) when a required
@@ -70,7 +73,7 @@ details, PINs, tokens, usernames, and absolute local paths.
 ## Issue and triage requirements
 
 - Use the bug or feature template in `.github/ISSUE_TEMPLATE`.
-- Assign exactly one area label: `area:tally`, `area:documents`,
+- Assign exactly one area label: `area:tally`, `area:tax-audit`,
   `area:infra`, or `area:security`.
 - Assign a severity label for bugs: `severity:p1` through `severity:p4`.
 - Use `type:rectify` for a regression introduced by a merged change and link

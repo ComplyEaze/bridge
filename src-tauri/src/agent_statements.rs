@@ -71,6 +71,12 @@ impl Server {
         // established; until then they are withheld, and the gates show how
         // each of Tally's own lines compared.
         let lines = matches!(established, Established::Established { .. }).then_some(lines);
+        let outcome = match kind {
+            NativeStatementKind::ProfitAndLoss => {
+                weakest(&[&derived.net_result, &derived.gross_result])
+            }
+            NativeStatementKind::BalanceSheet => &derived.balance_sheet_profit_and_loss,
+        };
         let unclassified_total = derived.unclassified.len();
         let unclassified = derived
             .unclassified
@@ -84,11 +90,8 @@ impl Server {
                 })
             })
             .collect::<Vec<_>>();
-        Ok(ToolOutcome {
-            payload: json!({
-                "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": {
-                    "state": "observed",
+        let mut result = json!({
+                    "state": top_level(outcome).0,
                     "basis": "tally_native_trial_balance_classified_by_reserved_primary_group",
                     "from": trial_balance.from, "to": trial_balance.to,
                     "currency": trial_balance.currency, "read_at": trial_balance.read_at,
@@ -112,13 +115,41 @@ impl Server {
                         "The Balance Sheet gate has been measured over one full year on one book and one month on another; a window spanning more than one financial year is unmeasured",
                         "Not voucher-level reconciliation or an atomic snapshot",
                     ],
-                },
+        });
+        // The reason a caller reads beside the state is the one the nested result carries.
+        if let (Some(reason), Some(result)) = (top_level(outcome).1, result.as_object_mut()) {
+            result.insert("reason".to_string(), json!(reason));
+        }
+        Ok(ToolOutcome {
+            payload: json!({
+                "company": company_json(&company, std::slice::from_ref(&company)),
+                "result": result,
             }),
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: unclassified_total > MAX_UNCLASSIFIED_RETURNED,
         })
     }
+}
+
+/// The top-level state and reason: `observed` only when this tool's result is
+/// established, so the field an agent reads first does not say `observed` over a
+/// refusal; the reason is the one the nested result carries (#984).
+fn top_level(outcome: &Established) -> (&'static str, Option<&'static str>) {
+    match outcome {
+        Established::Established { .. } => ("observed", None),
+        Established::NotEstablished { reason, .. } => ("not_established", Some(reason)),
+    }
+}
+
+/// The result the top-level state follows: the first that is not established,
+/// so the weaker outcome wins when a tool carries more than one.
+fn weakest<'a>(results: &[&'a Established]) -> &'a Established {
+    results
+        .iter()
+        .copied()
+        .find(|result| matches!(result, Established::NotEstablished { .. }))
+        .unwrap_or(results[0])
 }
 
 /// A result, with any line names that failed the gate masked as party names:

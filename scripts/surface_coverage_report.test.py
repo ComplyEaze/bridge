@@ -54,8 +54,8 @@ class Repo:
                 target.write_text(content, encoding="utf-8")
 
     def pin(self, *paths: str) -> None:
-        entries = [{"path": p, "sha256": "0" * 64} for p in sorted(paths)]
-        self.write({"surface.json": json.dumps({"files": entries})})
+        entries = [{"path": p} for p in sorted(paths)]
+        self.write({"surface.json": json.dumps({"schema_version": 3, "files": entries})})
 
     def commit(self, message: str) -> None:
         self.git("add", "-A")
@@ -101,6 +101,17 @@ class SurfaceCoverageReport(unittest.TestCase):
         self.base({"src/lib.rs": ""}, ("src/lib.rs",))
         self.repo.write({"src/lib.rs": "mod admit;\n", "src/admit.rs": ""})
         self.assertEqual(self.repo.newly_unsealed(), {"src/admit.rs"})
+
+    def test_schema_2_and_schema_3_rows_both_read_as_pins(self):
+        # Only `path` is read: a schema 3 row may carry a `reason`, and a
+        # branch cut before the cut-over still holds schema 2 rows (`sha256`).
+        self.repo.write({"Cargo.toml": CARGO, "src/lib.rs": "", "src/a.rs": ""})
+        rows = [{"path": "src/a.rs", "reason": "why"}, {"path": "src/lib.rs", "sha256": "0" * 64}]
+        self.repo.write({"surface.json": json.dumps({"schema_version": 3, "files": rows})})
+        self.repo.commit("base")
+        self.repo.git("checkout", "-q", "-b", "work")
+        self.change({"surface.json": json.dumps({"schema_version": 3, "files": rows[1:]})})
+        self.assertTrue(any("src/a.rs" in line for line in self.repo.report()))
 
     def test_a_dropped_pin_is_reported(self):
         self.base({"src/lib.rs": "", "src/gate.rs": ""}, ("src/gate.rs", "src/lib.rs"))
@@ -352,8 +363,8 @@ class SurfaceCoverageReport(unittest.TestCase):
         self.assertEqual(self.repo.report(),
                          ["surface coverage: surface.json absent at merge-base; nothing compared"])
 
-    def test_the_command_accepts_the_surface_path_the_hook_passes(self):
-        # reseal.sh passes an absolute path; a person may pass one relative to
+    def test_the_command_accepts_an_absolute_or_a_relative_surface_path(self):
+        # A caller may pass an absolute path; a person may pass one relative to
         # where they stand. Both must reach the same comparison.
         self.base({"src/lib.rs": ""}, ("src/lib.rs",))
         # Run from a subdirectory, so a relative path only works if it is taken

@@ -67,7 +67,13 @@ fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
             widths.into_iter().max().unwrap_or(0),
         ));
     }
-    ["items", "ledgers"].into_iter().find_map(|key| {
+    ["items", "ledgers", "masters"].into_iter().find_map(|key| {
+        // `masters` also keys the unpaged results of validate_masters and
+        // build_import_xml, which carry no `offset`: only a paged result can be
+        // trimmed with a resumable cursor.
+        if key == "masters" && !result["offset"].is_u64() {
+            return None;
+        }
         result[key]
             .as_array()
             .map(|rows| (PageShape::Rows(key), rows.len()))

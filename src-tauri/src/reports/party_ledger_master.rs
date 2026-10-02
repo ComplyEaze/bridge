@@ -55,6 +55,10 @@ pub(crate) struct PartyLedgerMasterSource {
     /// Base-currency ledgers left out of `rows` because a balance of theirs
     /// is a currency composite (bridge#551). Empty on a book with one master.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted a book whose mark is past its catalogue
+    /// was checked against the company's own ledger count (#938); `None` when
+    /// no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
 }
 
 impl PartyLedgerMasterSource {

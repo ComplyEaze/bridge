@@ -40,7 +40,7 @@
 | **Minimized reads** | Vouchers lack narration, party GSTIN/address, bill allocations, inventory/GST lines — useless for recon, scrutiny, or any review UI. |
 | **Zero live evidence** | Compatibility matrix: every cell `unknown`, evidence `missing`. No `Unsupported` signing key even exists. The "evidence product" has no evidence. |
 | **Only CoreAccounting wired** | IndiaTax / Bills-Outstandings / Inventory packs are feature-gated parsers with no runtime. |
-| **No cloud path for Tally data** | AXAL sync exists only for DSC/documents; Tally data needs a versioned destination contract (fine for now — local-first is the positioning). |
+| **No cloud path for Tally data** | Bridge has no upload feature (the document-sync code was removed); Tally data would need a versioned destination contract (fine for now — local-first is the positioning). |
 | **Velocity sink** | ~30 PRs of pre-dispatch safety ritual produced zero rows of evidence. Safety engineering has been optimizing ceremony before dispatch instead of verifiability after dispatch. |
 
 ---
@@ -71,7 +71,7 @@ or refresh them.
 > follows is what has actually been sourced or explicitly marked. The remaining
 > claims — and the rule that any statement about a named competitor's security
 > or data handling must be sourced or removed rather than graded — are tracked
-> in **[issue #103](https://github.com/lamemustafa/bridge/issues/103)**.
+> in **[issue #103](https://github.com/ComplyEaze/bridge/issues/103)**.
 > Treat anything in §§0–4 not covered below as **unsourced until checked.**
 
 Covered here:
@@ -632,7 +632,7 @@ The table below covers `bridge-tally-protocol/src/xml_read_profiles.rs`, which h
 | `ledgers_request` | `BRIDGE Ledger Collection V1` | `connector.rs:122` |
 | `groups_request` | `BRIDGE Group Collection V1` | `connector.rs:109` |
 | `voucher_types_request` | `BRIDGE Voucher Type Collection V1` | `connector.rs:136` |
-| `vouchers_request` (and `selected_vouchers_request`) | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
+| `vouchers_request` | `BRIDGE Voucher Collection V1` | `connector.rs:154` |
 | `ledger_period_balances_request` | `BRIDGE Ledger Period Collection V1` | `connector.rs:286` |
 
 **Consequence:** the CoreAccounting snapshot reads groups, ledgers, voucher types, vouchers and ledger period balances. Every one of those five builders carries the defect. The snapshot pipeline — and therefore the canonical model, reconciliation, Proof-of-Sync and the mirror that depend on it — cannot ever have completed against a real Tally. Three of the five object types (Groups, Voucher Types, Ledger Period Balances) were never probed on 2026-07-29 and remain entirely unverified.

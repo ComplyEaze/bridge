@@ -1,19 +1,22 @@
 {
-  "manifest_version": "0.1",
+  "manifest_version": "0.2",
   "name": "bridge-tally",
   "display_name": "ComplyEaze Bridge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Read the TallyPrime books on this computer, and prepare Journal, Payment, Receipt and Contra vouchers as a local file. Posting is off by default; when voucher posting is turned on in the settings below, it can post one Journal, Payment, Receipt or Contra at a time, and every posting needs your approval in a native dialog. What it reads, including amounts, goes to your AI provider; Response redaction below can only mask party names or drop narration.",
   "author": {
     "name": "Bridge contributors"
   },
   "license": "Apache-2.0",
+  "icon": "icon.png",
+  "privacy_policies": ["https://bridge.complyeaze.com/privacy"],
   "server": {
     "type": "binary",
     "entry_point": "bin/bridge_mcp",
     "mcp_config": {
       "command": "${__dirname}/bin/bridge_mcp",
       "env": {
+        "BRIDGE_TERMS_ACCEPTED": "${user_config.accept_terms_2026_10}",
         "BRIDGE_TALLY_HOST": "${user_config.host}",
         "BRIDGE_TALLY_PORT": "${user_config.port}",
         "BRIDGE_AGENT_REDACTION": "${user_config.redaction}",
@@ -23,6 +26,13 @@
     }
   },
   "user_config": {
+    "accept_terms_2026_10": {
+      "type": "boolean",
+      "title": "I accept the ComplyEaze Bridge Terms of Use (version 2026-10)",
+      "description": "Required. Bridge refuses every tool call until you accept. Terms of Use: https://bridge.complyeaze.com/terms. How Bridge handles information: https://bridge.complyeaze.com/privacy.",
+      "required": true,
+      "default": false
+    },
     "host": {
       "type": "string",
       "title": "Tally host",

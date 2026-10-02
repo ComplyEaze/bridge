@@ -61,6 +61,22 @@ use tokio_util::sync::CancellationToken;
 
 const MAX_ENDPOINT_SESSIONS: usize = 32;
 
+#[path = "runtime_masters.rs"]
+mod masters;
+pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
+
+#[cfg(test)]
+#[path = "runtime_masters_tests.rs"]
+mod masters_tests;
+
+#[path = "runtime_stock_summary.rs"]
+mod stock_summary;
+pub(crate) use stock_summary::StockSummaryReadError;
+
+#[cfg(test)]
+#[path = "runtime_stock_summary_tests.rs"]
+mod stock_summary_tests;
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;
@@ -1277,6 +1293,9 @@ pub(crate) struct PartyLedgerMasterListing {
         Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
     /// Base-currency ledgers set aside because a balance is a currency composite.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// Whether the census that counted the book was checked against the
+    /// company's own ledger count (#938); `None` when no census ran.
+    pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
     /// The master request's SVFROMDATE (the admitted BOOKSFROM).
     pub(crate) opening_as_of: TallyDate,
     pub(crate) extent: CompanyBookExtent,
@@ -1605,6 +1624,12 @@ fn all_unallocated_parties(
                 } else {
                     ExposureDirection::Payable
                 },
+                opening_balance: residual.opening_balance.clone(),
+                composition: Some(if residual.bill_wise_on {
+                    UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+                } else {
+                    UnallocatedComposition::NotBillWiseLedger
+                }),
             })
         })
         .collect::<Vec<_>>();
@@ -1678,11 +1703,38 @@ impl OutstandingsAgeingAnchor {
     }
 }
 
+/// What the data Bridge holds can say about an unallocated amount, without
+/// reading vouchers. It is deliberately NOT "on account": on a bill-wise ledger
+/// the amount is the net of on-account entries and of any opening balance not
+/// allocated to a reference, and only voucher rows tell those apart (#945).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnallocatedComposition {
+    /// The ledger's bill-wise flag is off: it keeps no bills, so what it carries
+    /// has no bill reference. (The label follows the flag alone; it does not
+    /// claim the residual is the ledger's whole balance.)
+    NotBillWiseLedger,
+    /// The residual of a bill-wise ledger after its named bills: on-account
+    /// entries, an opening balance not allocated to a reference, notes with no
+    /// reference and anything else are not separated.
+    BillWiseLedgerComponentsNotSeparated,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnallocatedParty {
     pub party: String,
     pub amount: ExactDecimal,
     pub direction: ExposureDirection,
+    /// The ledger's own opening balance as of the start of the books, shown and
+    /// never interpreted. `None` when Tally sent none (an empty element is
+    /// unknown, not zero) or the row was not built from a ledger snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_balance: Option<ExactDecimal>,
+    /// What the ledger's bill-wise flag says about the amount; it also carries
+    /// that flag (`NotBillWiseLedger` is flag off), so the two cannot disagree.
+    /// `None` for a row not built from a ledger snapshot (older saved rows).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<UnallocatedComposition>,
 }
 
 fn partial_result(reason: impl Into<OutstandingsPartialReason>) -> OutstandingsLoadResult {
@@ -2431,43 +2483,6 @@ impl CachedProbeReservation {
         self.finish(true)
     }
 
-    pub fn replace(
-        &mut self,
-        replacement_review_id: String,
-        observed_at_unix_ms: i64,
-        result: TallyProbeResult,
-    ) -> anyhow::Result<bool> {
-        if replacement_review_id.is_empty()
-            || replacement_review_id.len() > 128
-            || replacement_review_id.chars().any(char::is_control)
-        {
-            anyhow::bail!("Tally replacement review ID is invalid");
-        }
-        let mut cache = self
-            .session
-            .cached_probe
-            .write()
-            .map_err(|_| anyhow::anyhow!("Tally capability cache is unavailable"))?;
-        let Some(current) = cache.as_ref() else {
-            self.armed = false;
-            return Ok(false);
-        };
-        if !self.armed || current.review_id != self.review_id || !current.reserved {
-            self.armed = false;
-            return Ok(false);
-        }
-        let freshness_origin_unix_ms = current.freshness_origin_unix_ms;
-        *cache = Some(CachedProbe {
-            review_id: replacement_review_id,
-            observed_at_unix_ms,
-            freshness_origin_unix_ms,
-            result,
-            reserved: false,
-        });
-        self.armed = false;
-        Ok(true)
-    }
-
     fn finish(&mut self, consume: bool) -> anyhow::Result<bool> {
         if !self.armed {
             return Ok(false);
@@ -2988,6 +3003,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::None,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3011,6 +3027,7 @@ impl TallyRuntime {
             None,
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            ReadRetryPolicy::transient_default(),
         )
         .await
         .map(|read| read.listing)
@@ -3033,6 +3050,7 @@ impl TallyRuntime {
                 None,
                 true,
                 LedgerCurrencyGate::SingleInrMaster,
+                ReadRetryPolicy::transient_default(),
             )
             .await?;
         let Some(groups) = read.groups else {
@@ -3062,6 +3080,10 @@ impl TallyRuntime {
             Some(from),
             false,
             LedgerCurrencyGate::SingleInrMaster,
+            // Sent once. A catalogue that outlived its deadline is abandoned, and
+            // sending it again queues more work behind a gateway still building
+            // the response: agent voucher reads take the same rule (#485, #937).
+            ReadRetryPolicy::SINGLE_ATTEMPT,
         )
         .await
         .map(|read| (read.listing.ledgers, read.listing.evidence))
@@ -3074,13 +3096,15 @@ impl TallyRuntime {
         opening_date: Option<TallyDate>,
         read_groups: bool,
         currency_gate: LedgerCurrencyGate,
+        retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
             config,
             ReadOperation::MasterExport,
-            ReadRetryPolicy::transient_default(),
+            // The caller's: a movement sends its catalogue once (#485, #937).
+            retry,
             move |client| {
                 let identity = identity.clone();
                 let opening_date = opening_date.clone();
@@ -3299,6 +3323,7 @@ impl TallyRuntime {
         let groups = source.groups.clone();
         let foreign = source.foreign_currency_ledgers_excluded.clone();
         let mixed = source.mixed_currency_ledgers_excluded.clone();
+        let count_cross_check = source.count_cross_check;
         // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
         let opening_as_of = source.from.clone();
         let records = source
@@ -3319,6 +3344,7 @@ impl TallyRuntime {
             groups,
             foreign_currency_ledgers_excluded: foreign,
             mixed_currency_ledgers_excluded: mixed,
+            count_cross_check,
             opening_as_of,
             extent,
             evidence,
@@ -4160,9 +4186,10 @@ impl TallyRuntime {
     /// live 2026-08-07), which the Collection path does not -- that path
     /// silently substitutes whichever company is loaded.
     ///
-    /// The bills reports alone are **not** complete: unallocated "on account"
-    /// balances carry no bill reference and appear in neither report. The
-    /// ledger snapshot recovers them exactly, as
+    /// The bills reports alone are **not** complete: unallocated amounts (on
+    /// account, or all of a bill-less ledger's balance) carry no bill reference
+    /// and appear in neither report. The ledger snapshot recovers them
+    /// exactly, as
     /// `CLOSINGBALANCE - sum(BILLCL)` per party -- measured to 0.00 to the
     /// paisa on every bill-carrying party of both a bill-dominated book (6 of
     /// 10 parties exact, residual Rs 1,05,000) and an on-account-dominated one

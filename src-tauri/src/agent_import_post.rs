@@ -485,16 +485,33 @@ impl Server {
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
-        let snapshot = self
-            .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
-        if expected_sha256.is_some_and(|expected| snapshot.batch.sha256 != expected) {
-            return Err("import_batch_changed".to_string().into());
-        }
+        let admitted: Result<_, ToolFailure> = (|| {
+            let snapshot = self
+                .latest_import_snapshot(batch_id)?
+                .ok_or_else(|| "import_batch_not_found".to_string())?;
+            if expected_sha256.is_some_and(|expected| snapshot.batch.sha256 != expected) {
+                return Err("import_batch_changed".to_string().into());
+            }
+            if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
+                return Err("import_batch_company_mismatch".to_string().into());
+            }
+            Ok(snapshot)
+        })();
+        let snapshot = match admitted {
+            Ok(snapshot) => snapshot,
+            // A refusal before the checked body withdraws an approval given
+            // for this batch just as one inside it does, so it cannot hold the
+            // slot against other batches for its whole limit (#857). The
+            // desktop's journal-only post holds none.
+            Err(failure) => {
+                if scope == PostScope::Vouchers {
+                    self.post_approvals
+                        .revoke_unredeemed(batch_id, "post_refused_before_intent");
+                }
+                return Err(failure);
+            }
+        };
         let line = snapshot.batch.clone();
-        if !batch_guid_matches(&line.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
-        }
         // A re-entered call keeps what its first pass read (#725 slice 2.0).
         let mut accumulated = carried.unwrap_or_else(|| {
             evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty())
@@ -508,6 +525,8 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
+        // The batch's own transaction ids found already in the book (#901).
+        let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -628,6 +647,16 @@ impl Server {
             if recorded {
                 return Err("import_remote_id_reused".to_string().into());
             }
+            // A row another batch already sent to Tally is refused here too,
+            // before the person is asked to approve it (#876); the check that
+            // binds runs under the exclusive lock as the intent is written.
+            let row_posted = {
+                let _lock = self.lock_import_admission_shared()?;
+                self.import_rows_already_posted_while_admitted(&line)?
+            };
+            if row_posted.is_some() {
+                return Err("import_txn_already_posted".to_string().into());
+            }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
@@ -635,7 +664,10 @@ impl Server {
             // the lease sends before posting (§11c).
             let before = self.verify_import_for_post(args).await?;
             accumulated = combine_evidence(accumulated.clone(), before.evidence);
-            require_absent_verification_result(&before.payload["result"], line.vouchers.len())?;
+            require_absent_verification_result(&before.payload["result"], line.vouchers.len())
+                .inspect_err(|_| {
+                    preexisting_txn_ids = Some(present_txn_ids(&before.payload["result"]));
+                })?;
             let payload = ImportPayload {
                 company_guid: line.company_guid.clone(),
                 vouchers: line.vouchers.clone(),
@@ -895,6 +927,15 @@ impl Server {
                         {
                             return Err(BeforeDispatchError::Refused(
                                 UnderLockRefusal::BatchChanged,
+                            ));
+                        }
+                        if self
+                            .import_rows_already_posted_while_admitted(&line)
+                            .map_err(BeforeDispatchError::Other)?
+                            .is_some()
+                        {
+                            return Err(BeforeDispatchError::Refused(
+                                UnderLockRefusal::TxnAlreadyPosted,
                             ));
                         }
                         // Spent here, once, under this lock and before the
@@ -1190,7 +1231,8 @@ impl Server {
         };
         // A refused redemption withdraws the approval it was to use (#725): a
         // later call asks the person again. One taken by this call has already
-        // lapsed; another call's, or a dialog, is left as it is.
+        // lapsed; a dialog still open or declined, one a call waits on, and another
+        // batch's hold are left as they are.
         if scope == PostScope::Vouchers && operation.is_err() {
             self.post_approvals
                 .revoke_unredeemed(batch_id, "post_refused_before_intent");
@@ -1224,6 +1266,19 @@ impl Server {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
                 }
+                // Name the earlier batch to verify. Both refusal paths land
+                // here; the journal only grows, so a later read finds one unless a later
+                // record of that batch replaced its row set, or the lock or the read failed
+                // (both swallowed here), and then no batch is named.
+                if outcome.payload["result"]["error"]["code"] == "import_txn_already_posted" {
+                    let blocking = snapshot.as_ref().and_then(|current| {
+                        let _lock = self.lock_import_admission_shared().ok()?;
+                        self.import_rows_already_posted_while_admitted(&current.batch)
+                            .ok()
+                            .flatten()
+                    });
+                    name_blocking_batch(&mut outcome.payload, blocking.as_deref());
+                }
                 if let Some(located) = post_location {
                     outcome.payload["result"]["post_location"] = located;
                 }
@@ -1233,6 +1288,13 @@ impl Server {
                 }
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
+                }
+                // Withheld under the remediation budget, as `cause` is. That is
+                // not a guarantee against the oversize answer just above it.
+                if let Some(ids) = preexisting_txn_ids {
+                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                        name_preexisting_rows(&mut outcome.payload, &ids);
+                    }
                 }
                 if let Some(ledgers) = ledgers_changed {
                     name_changed_ledgers(&mut outcome.payload, &ledgers);
@@ -1362,6 +1424,19 @@ const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its 
 /// The same, when whether the post was sent could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
+/// What a caller does when another batch already sent, or was found to have
+/// posted, a row of this one (#876). Tally's counters for a rejected send are
+/// not proof that the row is absent now, so Bridge never lifts the block itself.
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
+
+fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
+    let Some(id) = blocking else { return };
+    payload["result"]["error"]["blocking_batch_id"] = json!(id);
+    payload["result"]["error"]["next_step"] = json!(format!(
+        "{TXN_ALREADY_POSTED_NEXT_STEP} The earlier batch is {id}."
+    ));
+}
+
 fn reconciliation_failure_payload(
     batch_id: &str,
     attempted: Option<bool>,
@@ -1376,6 +1451,10 @@ fn reconciliation_failure_payload(
     // words that do not claim a send, since verify_import is right either way.
     // A recorded non-attempt (`Some(false)`) offers no step: its message says
     // no attempt was recorded.
+    if code == "import_txn_already_posted" {
+        payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
+        payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
     if code == "tally_endpoint_busy" {
         payload["result"]["error"]["retry_after_s"] =
             json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
@@ -1580,6 +1659,40 @@ fn require_absent_verification_result(result: &Value, voucher_count: usize) -> R
         return Err("import_preexisting_identity".into());
     }
     Ok(())
+}
+
+/// The transaction ids of the batch's vouchers the readback did not find absent
+/// (#901): each already matches a voucher in the book that this batch did not
+/// post.
+fn present_txn_ids(result: &Value) -> Vec<String> {
+    result["vouchers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|voucher| voucher["status"] != "not_found")
+        .filter_map(|voucher| voucher["bridge_txn_id"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// What to do when a batch's rows are already in the book, or look like rows
+/// that are (#901). It names no amount, ledger or narration.
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and Bridge checks the book again; if the voucher is there it refuses again, and if no voucher with that fingerprint is there it can go on to approval. If it is refused again and you still cannot find the voucher, ask the user, and never change a row (its date, ledger, type or amount) to get it past this check. Only for a genuinely different transaction (the statement has more rows with this date, ledgers and amount than Tally holds vouchers) that shares the fingerprint of a voucher you have opened and confirmed, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+
+/// Name the rows of the batch that are already in the book, with the way on.
+fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
+    if txn_ids.is_empty() {
+        return;
+    }
+    let error = &mut payload["result"]["error"];
+    error["preexisting_txn_ids"] = json!(txn_ids);
+    error["next_step"] = json!(PREEXISTING_ROWS_NEXT_STEP);
+    // Set only at the check before the dialog, where nothing was sent, so the
+    // generic "never rebuild it to retry" of an unobserved attempt would
+    // contradict the step.
+    error["message"] = json!(
+        "Nothing was sent: rows of this batch already match vouchers in the book. \
+         See error.next_step."
+    );
 }
 
 /// The aim check on the snapshot the queue read last before the POST (#574).
@@ -2039,7 +2152,7 @@ fn admit_fresh_saved_voucher(
 /// is held in memory), is never made. Exactly the 100-character line cap.
 pub(super) fn agent_post_timing_lines() -> [String; 1] {
     [format!(
-        "Bridge posts this now or when asked again within {} minutes, unless cancelled, refused or restarted.",
+        "ComplyEaze Bridge posts now or if asked again within {} min, unless cancelled, refused or restarted.",
         approval::APPROVAL_TTL.as_secs() / 60
     )]
 }
@@ -2120,7 +2233,7 @@ fn review_preview_with(
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}\nReference: {}\nNarration: {}\n\n{}\n\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\n\nLedgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from,
         voucher.date, voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         optional(&voucher.reference), optional(&voucher.narration), entries, debit.as_str(), credit.as_str(), line.batch_id);
@@ -2271,11 +2384,11 @@ fn batch_review_text(
     text.push(format!("Batch: {}", line.batch_id));
     text.push(String::new());
     text.push(
-        "Ledgers checked by identity against the build; Bridge adds its batch reference.".into(),
+        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.".into(),
     );
     text.push("Do not post a file already imported manually.".into());
     text.push(
-        "Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes."
+        "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes."
             .into(),
     );
     text.push("After a timeout, reconcile this batch; do not rebuild or resend it.".into());

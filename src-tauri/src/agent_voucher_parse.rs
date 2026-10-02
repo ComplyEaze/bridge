@@ -440,11 +440,34 @@ fn parse_voucher_rows(
                                 })?;
                                 json!({"kind": "named", "name": name})
                             };
-                            allocations.push(json!({
+                            let mut parsed_allocation = json!({
                                 "reference": reference,
                                 "bill_type": bill_type,
                                 "amount": amount,
-                            }));
+                            });
+                            // The bill's own date and credit period, which the wildcard
+                            // fetch already returns on New Ref and Agst Ref allocations
+                            // (live captures). An empty or absent element is not observed
+                            // and the key is omitted, never invented as "" or a zero
+                            // period. A present BILLDATE must be a date, as DATE must:
+                            // a malformed one refuses the read.
+                            if let Some(bill_date) = allocation_row
+                                .get("BILLDATE")
+                                .map(|value| value.trim())
+                                .filter(|value| !value.is_empty())
+                            {
+                                bridge_tally_core::TallyDate::parse(bill_date.to_string())
+                                    .map_err(|_| "bill_allocation_date_invalid".to_string())?;
+                                parsed_allocation["bill_date"] = json!(bill_date);
+                            }
+                            if let Some(period) = allocation_row
+                                .get("BILLCREDITPERIOD")
+                                .map(|value| value.trim())
+                                .filter(|value| !value.is_empty())
+                            {
+                                parsed_allocation["credit_period"] = credit_period_json(period);
+                            }
+                            allocations.push(parsed_allocation);
                         } else if !bridge_tally_protocol::outstandings_shared::bill_allocation_without_type_is_placeholder(
                             allocation_row.get("NAME").map(String::as_str),
                         ) {
@@ -541,8 +564,12 @@ fn parse_voucher_rows(
                             "voucher_master_id_invalid",
                         )?;
                         identities.admit(row.get("GUID").map(String::as_str), master_id)?;
+                        // Emitted as the parsed number's text, never Tally's
+                        // padded form (" 1"), so it equals the same id read
+                        // elsewhere, as import verification already emits it (#989).
+                        let master_id = master_id.map(|id| id.to_string());
                         let amounts = std::mem::take(&mut entries);
-                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": row.get("MASTERID"), "amounts": amounts});
+                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": master_id, "amounts": amounts});
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
                         if let Some(resolved) = resolve_row_voucher_type(&row, company_guid)? {
@@ -678,6 +705,37 @@ fn parse_voucher_rows(
 
 pub(super) fn append_agent_text(row: &mut BTreeMap<String, String>, tag: &str, value: String) {
     row.entry(tag.to_string()).or_default().push_str(&value);
+}
+
+/// The most characters of an unrecognised credit-period text that are carried
+/// out. The text comes from the book, so it is not passed on unbounded.
+const UNRECOGNISED_CREDIT_PERIOD_TEXT_CHARS: usize = 40;
+
+/// A bill allocation's credit period as typed JSON: `{"value": 30, "unit":
+/// "days"}` (units days, weeks, months). The credit period is an annotation on
+/// the allocation, so a text that is not `<n> Days|Weeks|Months` does not refuse
+/// the window (that would lose every other voucher in it over a label, a read
+/// that succeeded before this field was carried): it is carried as
+/// `{"unit": "unrecognised", "text": ...}` and never read as a number of days.
+/// A text over the cap is cut to it and marked `"truncated": true`.
+fn credit_period_json(text: &str) -> Value {
+    use bridge_tally_protocol::outstandings_shared::{parse_credit_period, CreditPeriod};
+    match parse_credit_period(text) {
+        Ok(CreditPeriod::Days(value)) => json!({"value": value, "unit": "days"}),
+        Ok(CreditPeriod::Weeks(value)) => json!({"value": value, "unit": "weeks"}),
+        Ok(CreditPeriod::Months(value)) => json!({"value": value, "unit": "months"}),
+        Err(_) => {
+            let carried = text
+                .chars()
+                .take(UNRECOGNISED_CREDIT_PERIOD_TEXT_CHARS)
+                .collect::<String>();
+            let mut period = json!({"unit": "unrecognised", "text": carried});
+            if text.chars().count() > UNRECOGNISED_CREDIT_PERIOD_TEXT_CHARS {
+                period["truncated"] = Value::Bool(true);
+            }
+            period
+        }
+    }
 }
 
 fn claim_voucher_scalar(

@@ -928,17 +928,15 @@ fn gate_rejects_a_required_path_that_is_not_a_directory() {
 #[test]
 fn real_tree_has_complete_migration_and_report_surface_coverage() {
     let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let surface = CompatibilitySurfaceManifest::from_json(
+    let pins = SurfacePins::from_json(
         &fs::read(repository_root.join("docs/tally/compatibility/compatibility-surface.json"))
             .unwrap(),
     )
     .unwrap();
-    surface.validate_files(&repository_root).unwrap();
-    // `<=` lets pinned files consume the deliberate reserve without raising
-    // the cap: `validate_shape` protects the upper bound by rejecting a
-    // surface above `MAX_SURFACE_FILES`, while this assertion protects the
-    // policy bound by rejecting an inflated cap with excess headroom.
-    assert!(MAX_SURFACE_FILES - surface.files.len() <= RESERVED_SURFACE_FILES);
+    // Resolving reads every pinned file and enforces the required files and directories.
+    // The cap is a fixed parse bound, not a count: the pin list may grow or shrink without
+    // touching it, so nothing here compares it with the number of pins.
+    pins.resolve(&repository_root).unwrap();
 }
 
 #[test]
@@ -957,6 +955,25 @@ fn surface_file_cap_refuses_one_entry_above_the_cap() {
         oversized.validate().unwrap_err(),
         invalid("surface_file_count_invalid")
     );
+}
+
+#[test]
+fn pin_list_longer_than_the_parse_bound_is_refused_and_one_at_the_bound_is_not() {
+    let list = |count: usize| SurfacePins {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files: (0..count)
+            .map(|index| SurfacePin {
+                path: format!("pinned-{index:04}"),
+                reason: None,
+            })
+            .collect(),
+    };
+
+    assert_eq!(
+        list(MAX_SURFACE_FILES + 1).validate().unwrap_err(),
+        invalid("surface_file_count_invalid")
+    );
+    assert!(list(MAX_SURFACE_FILES).validate().is_ok());
 }
 
 #[test]
@@ -1034,85 +1051,175 @@ fn create_required_surface_directories(repository_root: &Path) {
     }
 }
 
-#[test]
-fn rehash_of_an_unchanged_surface_reports_zero_changes() {
-    let temp = tempfile::tempdir().unwrap();
-    fs::write(temp.path().join("surface.txt"), b"unchanged").unwrap();
-    let surface = sealed_surface(temp.path(), &["surface.txt"]);
-
-    let (rehashed, changed) = surface.rehash_files(temp.path()).unwrap();
-
-    assert_eq!(changed, 0);
-    assert_eq!(rehashed, surface);
+fn pins_for(paths: &[&str]) -> SurfacePins {
+    let mut files = paths
+        .iter()
+        .copied()
+        .chain(REQUIRED_SURFACE_FILES)
+        .map(|path| SurfacePin {
+            path: path.to_string(),
+            reason: None,
+        })
+        .collect::<Vec<_>>();
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+    SurfacePins {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files,
+    }
 }
 
 #[test]
-fn rehash_detects_a_modified_pinned_file_without_sealing_it() {
+fn resolving_reads_the_live_bytes_and_the_digest_follows_them() {
     let temp = tempfile::tempdir().unwrap();
+    create_required_surface_directories(temp.path());
     fs::write(temp.path().join("surface.txt"), b"before").unwrap();
-    let surface = sealed_surface(temp.path(), &["surface.txt"]);
+    let pins = pins_for(&["surface.txt"]);
+
+    let before = pins.resolve(temp.path()).unwrap();
+    assert_eq!(before, sealed_surface(temp.path(), &["surface.txt"]));
+    assert_eq!(
+        pins.resolve(temp.path()).unwrap().digest().unwrap(),
+        before.digest().unwrap()
+    );
+
     fs::write(temp.path().join("surface.txt"), b"after").unwrap();
-
-    let (rehashed, changed) = surface.rehash_files(temp.path()).unwrap();
-
-    assert_eq!(changed, 1);
-    let rehashed_surface = rehashed
-        .files
-        .iter()
-        .find(|file| file.path == "surface.txt")
-        .unwrap();
-    let original_surface = surface
-        .files
-        .iter()
-        .find(|file| file.path == "surface.txt")
-        .unwrap();
-    assert_ne!(rehashed_surface.sha256, original_surface.sha256);
-    // With no stored checksum, the rehash is the whole reseal: the result is
-    // valid as it stands, and its digest follows the new bytes.
-    rehashed.validate().unwrap();
-    assert_ne!(rehashed.digest().unwrap(), surface.digest().unwrap());
+    let after = pins.resolve(temp.path()).unwrap();
+    assert_ne!(after.digest().unwrap(), before.digest().unwrap());
 }
 
 #[test]
-fn rehash_fails_closed_when_a_pinned_file_is_missing() {
+fn the_resolved_digest_equals_an_independent_reference_value() {
+    // The reference was computed by a separate implementation (Python: SHA-256 over the domain
+    // `bridge.tally.compatibility-surface/1\0` and the compact JSON of the schema-1 view, files
+    // sorted by path with the SHA-256 of each file's bytes, and an empty `manifest_sha256`) for
+    // exactly this tree. A change to the digest view, its domain or the way bytes are read moves
+    // it and invalidates every receipt and attestation bound to an earlier digest.
     let temp = tempfile::tempdir().unwrap();
+    create_required_surface_directories(temp.path());
+    fs::write(temp.path().join("surface.txt"), b"reference bytes").unwrap();
+    let digest = pins_for(&["surface.txt"])
+        .resolve(temp.path())
+        .unwrap()
+        .digest()
+        .unwrap();
+    assert_eq!(
+        digest,
+        "41b71caf29c8b7ead77e186dbdb4da348270d2abb51167b322447510b27e0a0b"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_pinned_path_that_is_or_sits_under_a_symlink_is_refused() {
+    let temp = tempfile::tempdir().unwrap();
+    create_required_surface_directories(temp.path());
+    fs::write(temp.path().join("target.txt"), b"unpinned target").unwrap();
+    std::os::unix::fs::symlink("target.txt", temp.path().join("link.txt")).unwrap();
+    fs::create_dir(temp.path().join("real")).unwrap();
+    fs::write(temp.path().join("real/inner.txt"), b"inner").unwrap();
+    std::os::unix::fs::symlink("real", temp.path().join("alias")).unwrap();
+
+    assert_eq!(
+        pins_for(&["link.txt"]).resolve(temp.path()).unwrap_err(),
+        invalid("surface_file_symlink")
+    );
+    assert_eq!(
+        pins_for(&["alias/inner.txt"])
+            .resolve(temp.path())
+            .unwrap_err(),
+        invalid("surface_file_symlink")
+    );
+    assert!(pins_for(&["real/inner.txt"]).resolve(temp.path()).is_ok());
+}
+
+#[test]
+fn a_pin_reason_does_not_move_the_digest() {
+    let temp = tempfile::tempdir().unwrap();
+    create_required_surface_directories(temp.path());
+    fs::write(temp.path().join("surface.txt"), b"bytes").unwrap();
+    let plain = pins_for(&["surface.txt"]);
+    let mut reasoned = plain.clone();
+    for pin in &mut reasoned.files {
+        pin.reason = Some("decides what Bridge posts".to_string());
+    }
+    assert_eq!(
+        plain.resolve(temp.path()).unwrap().digest().unwrap(),
+        reasoned.resolve(temp.path()).unwrap().digest().unwrap()
+    );
+}
+
+#[test]
+fn resolving_fails_closed_when_a_pinned_file_is_missing_or_a_required_path_is_unpinned() {
+    let temp = tempfile::tempdir().unwrap();
+    create_required_surface_directories(temp.path());
     let path = temp.path().join("surface.txt");
     fs::write(&path, b"present").unwrap();
-    let surface = sealed_surface(temp.path(), &["surface.txt"]);
+    let pins = pins_for(&["surface.txt"]);
     fs::remove_file(path).unwrap();
-
     assert_eq!(
-        surface.rehash_files(temp.path()).unwrap_err(),
+        pins.resolve(temp.path()).unwrap_err(),
         invalid("surface_file_unavailable")
+    );
+
+    fs::write(temp.path().join("surface.txt"), b"present").unwrap();
+    let mut unpinned = pins_for(&["surface.txt"]);
+    unpinned
+        .files
+        .retain(|pin| pin.path != REQUIRED_SURFACE_FILES[0]);
+    assert_eq!(
+        unpinned.resolve(temp.path()).unwrap_err(),
+        invalid("surface_required_directory_file_unpinned")
     );
 }
 
 #[test]
-fn rehash_preserves_surface_entry_count_and_order() {
-    let temp = tempfile::tempdir().unwrap();
-    fs::write(temp.path().join("alpha.txt"), b"alpha").unwrap();
-    fs::write(temp.path().join("beta.txt"), b"beta").unwrap();
-    let surface = sealed_surface(temp.path(), &["alpha.txt", "beta.txt"]);
-    let paths = surface
-        .files
-        .iter()
-        .map(|file| file.path.clone())
-        .collect::<Vec<_>>();
-    fs::write(temp.path().join("alpha.txt"), b"updated alpha").unwrap();
-    fs::write(temp.path().join("beta.txt"), b"updated beta").unwrap();
+fn a_pin_list_must_be_sorted_unique_relative_bounded_and_reasons_short() {
+    let mut pins = pins_for(&["a.txt"]);
+    pins.validate().unwrap();
 
-    let (rehashed, changed) = surface.rehash_files(temp.path()).unwrap();
-
-    assert_eq!(changed, 2);
-    assert_eq!(rehashed.files.len(), surface.files.len());
+    let mut unsorted = pins.clone();
+    unsorted.files.swap(0, 1);
     assert_eq!(
-        rehashed
-            .files
-            .iter()
-            .map(|file| file.path.clone())
-            .collect::<Vec<_>>(),
-        paths
+        unsorted.validate().unwrap_err(),
+        invalid("surface_files_not_unique_sorted")
     );
+    let mut duplicate = pins.clone();
+    duplicate.files.push(duplicate.files[0].clone());
+    assert!(duplicate.validate().is_err());
+    let mut absolute = pins.clone();
+    absolute.files[0].path = "/etc/passwd".to_string();
+    assert!(absolute.validate().is_err());
+    let mut empty = pins.clone();
+    empty.files.clear();
+    assert_eq!(
+        empty.validate().unwrap_err(),
+        invalid("surface_file_count_invalid")
+    );
+    for bad_reason in [
+        "",
+        "   ",
+        &"x".repeat(MAX_PIN_REASON_CHARS + 1),
+        "line\nbreak",
+    ] {
+        pins.files[0].reason = Some(bad_reason.to_string());
+        assert_eq!(
+            pins.validate().unwrap_err(),
+            invalid("surface_pin_reason_invalid"),
+            "{bad_reason:?}"
+        );
+    }
+    pins.files[0].reason = Some("x".repeat(MAX_PIN_REASON_CHARS));
+    pins.validate().unwrap();
+}
+
+#[test]
+fn a_surface_file_round_trips_without_stored_hashes() {
+    let pins = pins_for(&["a.txt"]);
+    let bytes = pins.to_pretty_json().unwrap();
+    let text = String::from_utf8(bytes.clone()).unwrap();
+    assert!(!text.contains("sha256"));
+    assert!(!text.contains("reason"));
+    assert_eq!(SurfacePins::from_json(&bytes).unwrap(), pins);
 }
 
 #[test]
@@ -1205,20 +1312,31 @@ fn the_computed_digest_is_the_checksum_schema_1_stored() {
 }
 
 #[test]
-fn a_schema_1_surface_or_matrix_is_refused() {
+fn a_schema_1_or_2_surface_or_a_schema_1_matrix_is_refused() {
+    // A file that still stores hashes is refused with a code that names the migration, before
+    // any shape check (serde would otherwise report generic bad JSON).
     assert_eq!(
-        CompatibilitySurfaceManifest::from_json(SURFACE_SCHEMA_1.as_bytes()).unwrap_err(),
+        SurfacePins::from_json(SURFACE_SCHEMA_1.as_bytes()).unwrap_err(),
+        invalid("surface_schema_needs_migration")
+    );
+    let schema_2 = br#"{"schema_version":2,"files":[{"path":"a.txt","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}"#;
+    assert_eq!(
+        SurfacePins::from_json(schema_2).unwrap_err(),
+        invalid("surface_schema_needs_migration")
+    );
+    let schema_3_with_a_hash = br#"{"schema_version":3,"files":[{"path":"a.txt","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}"#;
+    assert_eq!(
+        SurfacePins::from_json(schema_3_with_a_hash).unwrap_err(),
         invalid("artifact_json_invalid")
     );
-    let mut without_checksum: serde_json::Value = serde_json::from_str(SURFACE_SCHEMA_1).unwrap();
-    without_checksum
-        .as_object_mut()
-        .unwrap()
-        .remove("manifest_sha256");
     assert_eq!(
-        CompatibilitySurfaceManifest::from_json(&serde_json::to_vec(&without_checksum).unwrap())
-            .unwrap_err(),
+        SurfacePins::from_json(br#"{"schema_version":4,"files":[]}"#).unwrap_err(),
         invalid("surface_schema_unsupported")
+    );
+    // A hand-edit typo is bad JSON, not an unsupported schema.
+    assert_eq!(
+        SurfacePins::from_json(br#"{"schema_version":3,"files":[],}"#).unwrap_err(),
+        invalid("artifact_json_invalid")
     );
     assert_eq!(
         SupportClaimsManifest::from_json(MATRIX_SCHEMA_1.as_bytes()).unwrap_err(),
@@ -1235,4 +1353,42 @@ fn a_schema_1_surface_or_matrix_is_refused() {
             .unwrap_err(),
         invalid("support_manifest_invalid")
     );
+}
+
+#[test]
+fn an_attestation_review_url_may_use_either_repository_owner_but_no_other() {
+    let surface = CompatibilitySurfaceManifest {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files: vec![SurfaceFile {
+            path: "surface.txt".to_string(),
+            sha256: SHA.to_string(),
+        }],
+    };
+    let receipt = receipt_for(
+        &surface.digest().unwrap(),
+        ProductFamily::TallyPrimeEditLog,
+        TallyMode::Education,
+    );
+    let signing = SigningKey::from_bytes(&[7_u8; 32]);
+    let mut value = attestation(&receipt, &surface, &signing);
+    for accepted in [
+        "https://github.com/lamemustafa/bridge/pull/1",
+        "https://github.com/ComplyEaze/bridge/pull/1",
+    ] {
+        value.review_url = accepted.to_string();
+        assert!(value.validate_shape().is_ok(), "{accepted}");
+    }
+    for refused in [
+        "https://github.com/someone-else/bridge/pull/1",
+        "https://github.com/ComplyEaze/bridge-other/pull/1",
+        "https://github.com/complyeaze/bridge/pull/1",
+        "http://github.com/ComplyEaze/bridge/pull/1",
+    ] {
+        value.review_url = refused.to_string();
+        assert_eq!(
+            value.validate_shape().unwrap_err(),
+            invalid("review_url_invalid"),
+            "{refused}"
+        );
+    }
 }

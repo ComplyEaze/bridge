@@ -12,23 +12,23 @@ disagree in one place that matters.
 **Most large files here are pinned in the compatibility surface, and splitting a
 pinned file silently removes the extracted code from it.**
 
-The parent's hash changes, `scripts/reseal.sh` succeeds, `reseal.sh --verify`
-passes, and CI is green. The seal shrank by exactly what you moved.
+The parent's bytes change, the acknowledgement you add for it is accepted, and CI
+is green. The pinned surface shrank by exactly what you moved.
 
 There is one net, and it is worth stating precisely because it is narrow:
 `validate_required_directory_coverage` fails closed for two directories
 (`src-tauri/src/db/migrations`, `src-tauri/src/reports`) and for four named
 `REQUIRED_SURFACE_FILES` — `agent_catalog.rs`, `agent_desktop_journal.rs`,
 `agent_ledgers.rs`, `source_draft/lifecycle.rs`. Outside those six rules nothing is
-examined at all: `validate_files` and `rehash_files` iterate the manifest's own
+examined at all: `validate_files` and the digest computation iterate the manifest's own
 list, so a file that ought to be pinned and is not is not a check that fails — it
 is a check nobody asked.
 
 So:
 
 > **Splitting a pinned file means pinning every part that decides what Bridge
-> posts or lets leave the machine** -- each with its own named reason beside
-> `MAX_SURFACE_FILES`.
+> posts or lets leave the machine** -- each with its own `reason` in the pin
+> list.
 
 And the companion rule, because the same hazard arrives without anyone splitting
 anything:
@@ -42,7 +42,7 @@ Before bridge#416 nothing recorded either, and the boundary showed it.
 Contra's cash/bank side) and `agent_import_persistence.rs` were not -- so the
 module that *renders* the qualified write shape was sealed and the modules that
 *decide* it were not. #434 pinned those, together with the other admission and
-egress files found the same way, and recorded beside `MAX_SURFACE_FILES` both
+egress files found the same way, and recorded in the comment beside `MAX_SURFACE_FILES` both
 the reason for each pin and which kinds of file were left out on purpose. That
 paragraph is the exemption record; add to it rather than leaving a collaborator
 silently unpinned.
@@ -55,23 +55,21 @@ the pinned `agent_import.rs` re-checks those bounds (see #416);
 selection cap and the refusal-to-message mapping, delegating review, post and
 reconcile to the pinned `agent_desktop_journal.rs`.
 
-**The gate will not tell you when a split leaves code unsealed.** A moved
-module's parent changes hash, the reseal succeeds, and the extracted file is
-outside the seal with every check green. `scripts/reseal.sh` prints a report
-that catches the common case -- a new module declared directly by a pinned one
+**The gate will not tell you when a split leaves code unpinned.** A moved
+module's parent changes, its acknowledgement is accepted, and the extracted file is
+outside the pinned surface with every check green. `scripts/surface_coverage_report.py`
+prints a report that catches the common case -- a new module declared directly by a pinned one
 -- but not a new module under an unpinned parent or deeper descendants, so check
 the new files against the rule above yourself.
 
-**Capacity is not free, and that is deliberate.** `MAX_SURFACE_FILES` is set to
-the exact pin count, so any branch adding a pin raises
-it in the same PR. Setting the cap to the exact count has been the convention
-since #260, and recording a named reason beside the constant for each raise
-since #278; neither is how the reserve was first designed. `RESERVED_SURFACE_FILES`
-(15) was introduced in #223 with the cap at exactly count + 15, and in that
-slack period #246 added eight pins without touching the cap. With no slack, a
-new pin cannot land without an edit to the constant, which is where its reason
-now goes. Then reseal with `scripts/reseal.sh`, which since bridge#760 handles a
-changed pin *list* the same way as changed hashes.
+**A pin is a decision, and that is deliberate.** `MAX_SURFACE_FILES` is a fixed parse
+bound against a runaway list, not a count: adding a pin does not touch it. (It used to
+be kept equal to the exact pin count, so each new pin was also an edit to a pinned
+constant; that was dropped once the acknowledgement check became enforcing, because
+the pin's own `reason` and the enforced acknowledgement carry the decision.) A new pin
+lands with its `reason` in the pin list, and with the acknowledgement
+(`docs/tally/compatibility/acks/pr-<N>.txt`) that lists the new pins and the changed
+pinned files; see the release process.
 
 Budget for that when planning. Splitting a 6,000-line module four ways is four
 surface decisions, not one refactor.
@@ -238,24 +236,22 @@ were `pub(crate) mod tests` and referenced from another file's tests; extracting
 them as a private `mod tests` compiles until the other file does not.
 
 Test files are mostly unpinned by existing norm — 59 of 63 — so extracting tests
-from a pinned file usually does not shrink the seal in practice. Usually is not a
+from a pinned file usually does not shrink the pinned surface in practice. Usually is not a
 rule; check.
 
-## The order that keeps the seal honest
+## The order that keeps the acknowledgement honest
 
-Regenerate, verify, **then** stage. Every time.
+Nothing is regenerated any more, so there is no order of regeneration to get wrong.
+Do the work, then write the acknowledgement last, from the final diff:
 
 ```sh
-./scripts/reseal.sh            # also when the file list changed
-./scripts/reseal.sh --verify   # read the exit status directly, never through a pipe
-git add docs/tally/compatibility/*.json
-git status --porcelain         # must be empty after committing
+git diff --name-status origin/master...HEAD   # list every pinned path, old and new names
+jq -r '.files[].path' docs/tally/compatibility/compatibility-surface.json | sort > /tmp/pins.txt
 ```
 
-Staging the pair and then resealing leaves the regenerated bytes out of the index.
-`validate_files` reads the **working tree**, so every local check passes while the
-commit is wrong; CI reads the commit and refuses with `surface_file_changed`. This
-has cost a CI round at least once.
+The acknowledgement names every pinned path the diff changes and every pin it adds.
+If you edit a pinned file after writing it, update it: CI compares the file with the
+diff and fails on a missing or extra path, and `scripts/merge-gate.sh` blocks on one.
 
 ## Proving a decomposition changed nothing
 
@@ -276,7 +272,7 @@ A pure move should be provably pure:
 2. If pinned and there is no cap headroom, stop and resolve #416 first.
 3. Extract the largest cohesive group to one new module; leave the parent a façade.
 4. Prove purity (test count, both workspaces, fmt, clippy).
-5. Reseal in the order above; pin the new files if the parent was pinned.
+5. Write the acknowledgement from the final diff; pin the new files if the parent was pinned.
 6. Repeat for the next group. One group per PR — a 6,000-line file split four ways
    in one diff is not reviewable, which is the problem you set out to fix.
 

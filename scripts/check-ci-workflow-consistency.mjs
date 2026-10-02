@@ -17,13 +17,14 @@ const workflow = readFileSync(workflowPath, "utf8");
 const failures = [];
 const metadataByWorkspace = new Map();
 
-// These suites may skip in the frontend job, which intentionally has no Rust.
-// Bind their real execution to an existing required job with the pinned toolchain.
+// The surface acknowledgement check runs in this job: it runs on every event, has the full
+// history, and is required through `Required checks`. The step enforces: a pinned-file change
+// without its acknowledgement file fails the job. It must stay, keep its exact shape (no
+// `continue-on-error`, no step-level `if`, no `--report-only` flag), and any change to it is a
+// pinned ci.yml change with its own acknowledgement.
 const workflowConsistency = jobBlock(workflow, "workflow-consistency");
 const toolchain = readFileSync(resolve(repositoryRoot, "rust-toolchain.toml"), "utf8").match(/^channel *= *"([^"]+)"/m)?.[1];
 if (!toolchain) throw new Error("could not read [toolchain].channel from rust-toolchain.toml");
-const pinnedRustPreflight = `rustup which --toolchain ${toolchain} rustc`;
-const resealRegressions = "node --test scripts/reseal.test.mjs scripts/reseal-merge-driver.test.mjs";
 const pinnedRustSetup = new RegExp(
   `^      - uses: dtolnay/rust-toolchain@[^\\n]+\\n        with:\\n          toolchain: ${escapeRegex(toolchain)}$`,
   "m",
@@ -31,12 +32,29 @@ const pinnedRustSetup = new RegExp(
 if (!pinnedRustSetup.test(workflowConsistency)) {
   failures.push("workflow-consistency must install the repository's pinned Rust toolchain");
 }
-const preflightOffset = exactRunStepOffset(workflowConsistency, "Require pinned Rust for reseal regressions", pinnedRustPreflight);
-const regressionOffset = exactRunStepOffset(workflowConsistency, "Test reseal and merge-driver regressions", resealRegressions);
-if (preflightOffset === -1) failures.push("workflow-consistency must fail when pinned Rust is unavailable");
-if (regressionOffset === -1) failures.push("workflow-consistency must run the reseal regression suites");
-if (preflightOffset !== -1 && regressionOffset !== -1 && preflightOffset > regressionOffset) {
-  failures.push("workflow-consistency must require pinned Rust before running reseal regressions");
+const surfaceAckStep = [
+  "      - name: Check the surface acknowledgement",
+  "        env:",
+  "          PR_NUMBER: ${{ github.event.pull_request.number }}",
+  "          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
+  "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || 'push' }}",
+  '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE"',
+].join("\n");
+// The step block runs from its `- name:` line up to the next step (or the job end), so a line
+// appended after `run:` (`continue-on-error`, `if`, ...) is a difference, not a pass. Blank and
+// full-line comment lines at step indentation just before the next step belong to that step.
+const surfaceAckLines = workflowConsistency.split("\n");
+const surfaceAckStart = surfaceAckLines.indexOf("      - name: Check the surface acknowledgement");
+let surfaceAckBlock = null;
+if (surfaceAckStart !== -1) {
+  let end = surfaceAckStart + 1;
+  while (end < surfaceAckLines.length && !surfaceAckLines[end].startsWith("      - ")) end += 1;
+  while (end > surfaceAckStart + 1 && /^(?: {6}#.*)?$/.test(surfaceAckLines[end - 1])) end -= 1;
+  surfaceAckBlock = surfaceAckLines.slice(surfaceAckStart, end).join("\n");
+}
+if (surfaceAckBlock !== surfaceAckStep) {
+  failures.push("workflow-consistency must run the surface acknowledgement check with its exact shape");
 }
 
 // bridge#583: the release positive control is what makes a clean seam scan of the shipped
@@ -53,7 +71,7 @@ const expectedSeamControl = [
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
   "    # platforms as bundle-smoke, whose runs it guards.",
-  "    if: github.event_name != 'pull_request' || needs.changes.outputs.bundle == 'true'",
+  "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",
   "    permissions:",
@@ -127,7 +145,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "85fdd243e10222a6e10dabffa5e5ef0a765a3d8ca00469bdfc382c91dd9928d4"],
+  ], "6cedc97ecc77461e65b82a65a02791bbc57bd3e7a467f1431c716174e5ca1bca"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -138,8 +156,8 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "1b60d4c3772bff9479bb4bf7925e91e039db62f2e76b1d4de78a0fa2a39e816a"],
-  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "02ffb0e75b37aad5c1238ce91ce19f82aa713deb1941978cb3687ad2757c8122"],
+  ], "a328a5925bcd988ab70f3fc3d671bcadff3cae47700740afa103ccf6f03ac29a"],
+  [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
@@ -157,8 +175,8 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "a8652d2207debc644fc71c5a32a32e48f09bf7c39da4a559c7c5519508ba0da9"],
-  ["release-mcpb-preview.yml", releaseWorkflow, "cf1da8bf810c3134d781b2b95e08803b9c1e58b48d20992931ec17660bd73c42"],
+  ["ci.yml", workflow, "d97e58832b09663100294b170e1a3f43958fbd3e31db2ee6a089d92ff8f2db75"],
+  ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
   const jobs = lines.findIndex((line) => line.replace(/\r$/, "") === "jobs:");
@@ -170,10 +188,10 @@ for (const path of trackedFiles().filter((file) => file.startsWith(".github/acti
   localActions.update(`${path}\0`).update(readFileSync(resolve(repositoryRoot, path))).update("\0");
 }
 const localActionsDigest = localActions.digest("hex");
-if (localActionsDigest !== "5635b365035c4d709a17c29be7dcd2a6f3890ad23d7376162ca18d6b1b047543") {
+if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
-if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name != 'pull_request' || needs.changes.outputs.native == 'true'") {
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
@@ -245,6 +263,7 @@ const expectedChanges = [
   "          EVENT_NAME: ${{ github.event_name }}",
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+  "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
   "        run: |",
   "          set -euo pipefail",
   "",
@@ -257,6 +276,8 @@ const expectedChanges = [
   "",
   "          if [[ \"$EVENT_NAME\" == \"pull_request\" ]]; then",
   "            base=\"$PR_BASE_SHA\"",
+  "          elif [[ \"$EVENT_NAME\" == \"merge_group\" ]]; then",
+  "            base=\"$MERGE_GROUP_BASE_SHA\"",
   "          else",
   "            base=\"$BEFORE_SHA\"",
   "          fi",
@@ -272,7 +293,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs)'; then",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-)'; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",

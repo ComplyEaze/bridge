@@ -1,3 +1,7 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test doubles: local sockets, servers and processes"
+)]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
 use crate::tally::TallyProduct;
@@ -5,6 +9,7 @@ use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
     compute_native_outstandings, parse_native_ledger_snapshot,
+    parse_native_ledger_snapshot_for_company,
 };
 use std::collections::BTreeMap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -76,6 +81,7 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         groups: Vec::new(),
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        count_cross_check: None,
     };
     let currency = RuntimeReadEvidence::paired("<currency/>", sha256_hex(b"currency-response"), 19);
     let baseline = TallyRuntime::party_ledger_master_source_evidence(
@@ -846,7 +852,6 @@ fn synthetic_probe_result() -> TallyProbeResult {
             features: BTreeMap::new(),
             packs: BTreeMap::new(),
         },
-        selected_read_scope: None,
         passport_snapshot_id: None,
     }
 }
@@ -1471,39 +1476,6 @@ fn reviewed_probe_cache_rejects_future_expired_and_invalid_freshness() {
 }
 
 #[test]
-fn replacing_a_qualified_review_does_not_renew_its_freshness_origin() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9003,
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let freshness_origin_unix_ms = chrono::Utc::now().timestamp_millis() - 299_000;
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-original".to_string(),
-        observed_at_unix_ms: freshness_origin_unix_ms,
-        freshness_origin_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    let mut reservation = runtime
-        .reserve_cached_probe_fresh(&config, "review-original", 300_000)
-        .expect("reserve original")
-        .expect("original remains barely fresh");
-    assert!(reservation
-        .replace(
-            "review-qualified".to_string(),
-            chrono::Utc::now().timestamp_millis(),
-            synthetic_probe_result(),
-        )
-        .expect("replace reservation"));
-    assert!(runtime
-        .reserve_cached_probe_fresh(&config, "review-qualified", 298_000)
-        .expect("check inherited freshness")
-        .is_none());
-}
-
-#[test]
 fn ordinary_read_admission_and_review_reservation_are_mutually_exclusive() {
     let runtime = TallyRuntime::default();
     let config = TallyConfig {
@@ -1643,48 +1615,6 @@ fn stale_guard_cannot_release_or_consume_a_newer_reserved_review() {
 }
 
 #[test]
-fn stale_guard_cannot_replace_a_newer_reserved_review() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9008,
-    };
-    let session = runtime.session(config.clone()).expect("runtime session");
-    let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-old".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: false,
-    });
-    let mut stale = runtime
-        .reserve_cached_probe_fresh(&config, "review-old", 300_000)
-        .expect("reserve old")
-        .expect("old review");
-    *session.cached_probe.write().expect("capability cache") = Some(CachedProbe {
-        review_id: "review-new".to_string(),
-        observed_at_unix_ms,
-        freshness_origin_unix_ms: observed_at_unix_ms,
-        result: synthetic_probe_result(),
-        reserved: true,
-    });
-
-    assert!(!stale
-        .replace(
-            "review-illegal-replacement".to_string(),
-            observed_at_unix_ms,
-            synthetic_probe_result(),
-        )
-        .expect("stale replace is inert"));
-    drop(stale);
-    let cache = session.cached_probe.read().expect("capability cache");
-    let current = cache.as_ref().expect("new review remains");
-    assert_eq!(current.review_id, "review-new");
-    assert!(current.reserved);
-}
-
-#[test]
 fn held_review_reservation_prevents_endpoint_session_eviction() {
     let runtime = TallyRuntime::default();
     let reserved_config = TallyConfig {
@@ -1801,4 +1731,131 @@ fn telemetry_preview_is_privacy_reduced_and_checksummed() {
         "fixed_dimensions_bucketed_values_v1"
     );
     assert_eq!(preview_value["authenticity_claim"], "none");
+}
+
+/// What each unallocated row says about its own composition, on captures of a
+/// book seeded to hold each case (#945; the hand-worked expectations are in
+/// `bridge-tally-protocol/tests/native_outstandings_lab_live.rs`).
+#[test]
+fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is_never_on_account()
+{
+    fn decoded(bytes: &[u8]) -> String {
+        bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+            bytes,
+            "text/xml; charset=utf-16",
+            bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+            bytes.len(),
+        )
+        .expect("capture decodes")
+        .text
+    }
+    const GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
+    let books_from = TallyDate::parse("20250401").unwrap();
+    let as_of = TallyDate::parse("20260630").unwrap();
+    let receivable = parse_native_bill_rows(
+        &decoded(include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-lab-bills-receivable.utf16le.xml")),
+        &books_from,
+        &as_of,
+    )
+    .unwrap();
+    let payable = parse_native_bill_rows(
+        &decoded(include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-lab-bills-payable.utf16le.xml")),
+        &books_from,
+        &as_of,
+    )
+    .unwrap();
+    let groups = parse_native_group_snapshot(
+        &decoded(include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-lab-groups.utf16le.xml")),
+        GUID,
+    )
+    .unwrap();
+    let ledgers = parse_native_ledger_snapshot_for_company(
+        &decoded(include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-lab-ledgers.utf16le.xml")),
+        GUID,
+    )
+    .unwrap();
+    let computed = compute_native_outstandings(
+        "BRIDGE OUTSTANDINGS LAB",
+        &receivable,
+        &payable,
+        NativeMasterSnapshot {
+            ledgers: &ledgers,
+            groups: NativeGroupSnapshot::Complete(&groups),
+        },
+        NativeAgeingAnchor::DueDate,
+        &as_of,
+        0,
+    )
+    .unwrap();
+    let rows = all_unallocated_parties(&computed.residuals);
+    // Largest first: P08 20,000, P03 7,500, P02 3,000, P05 1,500, P06 800.
+    let summary = rows
+        .iter()
+        .map(|row| {
+            (
+                &row.party[3..6],
+                row.amount.as_str(),
+                row.direction,
+                row.opening_balance.as_ref().map(|opening| opening.as_str()),
+                row.composition,
+            )
+        })
+        .collect::<Vec<_>>();
+    use UnallocatedComposition::{
+        BillWiseLedgerComponentsNotSeparated as Mixed, NotBillWiseLedger as Off,
+    };
+    assert_eq!(
+        summary,
+        vec![
+            (
+                "P08",
+                "20000",
+                ExposureDirection::Receivable,
+                Some("-20000.00"),
+                Some(Mixed)
+            ),
+            (
+                "P03",
+                "7500",
+                ExposureDirection::Receivable,
+                Some("0.00"),
+                Some(Off)
+            ),
+            (
+                "P02",
+                "3000",
+                ExposureDirection::Payable,
+                Some("0.00"),
+                Some(Mixed)
+            ),
+            (
+                "P05",
+                "1500",
+                ExposureDirection::Payable,
+                Some("0.00"),
+                Some(Mixed)
+            ),
+            (
+                "P06",
+                "800",
+                ExposureDirection::Receivable,
+                Some("0.00"),
+                Some(Mixed)
+            ),
+        ]
+    );
+    // The serialized row names the composition in words, and nothing in it says
+    // on-account.
+    let json = serde_json::to_string(&rows).unwrap();
+    assert!(json.contains("\"composition\":\"bill_wise_ledger_components_not_separated\""));
+    assert!(json.contains("\"composition\":\"not_bill_wise_ledger\""));
+    // Everything but the party name (a ledger may be NAMED "On Account Debtor"):
+    // the fields Bridge itself writes must not call any amount on-account.
+    let mut without_names = serde_json::to_value(&rows).unwrap();
+    for row in without_names.as_array_mut().unwrap() {
+        row.as_object_mut().unwrap().remove("party");
+    }
+    let text = without_names.to_string().to_ascii_lowercase();
+    assert!(!text.contains("on_account"));
+    assert!(!text.contains("on account"));
 }

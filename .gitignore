@@ -38,3 +38,5 @@ __pycache__/
 # Written by the install-page deploy job; never committed.
 site/releases.json
 site/changelog.html
+site/privacy.html
+site/terms.html

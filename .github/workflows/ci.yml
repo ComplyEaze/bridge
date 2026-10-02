@@ -592,7 +592,10 @@ jobs:
     needs: changes
     # Bundle output is validated for packaging-relevant pull requests and for every
     # manual or scheduled run, and on a master push unless the merge queue already ran it
-    # on that commit. Rust/Tauri PRs retain the native platform matrix above.
+    # on that commit. Rust/Tauri PRs retain the native platform matrix above. A pull request
+    # runs Windows only: the macOS bundle and seam jobs run in the merge queue and on a master
+    # push, so a macOS-only packaging failure is found at the queue (it ejects that entry)
+    # rather than costing every pull request about 12 macOS runner minutes.
     if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -601,7 +604,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.cache/bridge-package-sccache
       SCCACHE_CACHE_SIZE: 64M
@@ -817,7 +820,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["windows-latest", "macos-latest"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

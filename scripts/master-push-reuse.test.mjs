@@ -288,7 +288,11 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
   const expand = (job) => {
     const text = block(job);
     const label = /^    name: (.+) \(\$\{\{ matrix\.os \}\}\)$/m.exec(text)?.[1];
-    const systems = /^        os: \[(.+)\]$/m.exec(text)?.[1].split(",").map((entry) => entry.trim());
+    // The queue and a push run every system; a pull request may run fewer (the macOS bundle and seam jobs
+    // skip it), so the list that matters here is the one for events other than a pull request.
+    const osLine = /^        os: (.+)$/m.exec(text)?.[1] ?? "";
+    const lists = osLine.startsWith("[") ? [osLine.slice(1, -1)] : [...osLine.matchAll(/'\[([^\]]+)\]'/g)].map((match) => match[1]);
+    const systems = lists.at(-1)?.split(",").map((entry) => entry.trim().replaceAll('"', ""));
     assert.ok(label && systems?.length, `${job} has a matrix name and an os list`);
     return systems.map((system) => `${label} (${system})`);
   };
@@ -405,4 +409,25 @@ test("a commit SHA must be a full-length hex SHA", async () => {
     const outcome = await decide({ env: { ...env, GITHUB_SHA }, fetcher: github().fetcher, changedFiles: ordinaryChange, isAncestor: () => true, sleep: async () => {} });
     assert.equal(outcome.code, "bad_sha", GITHUB_SHA);
   }
+});
+
+// The macOS bundle and seam jobs run in the queue and on a push, not on a pull request. The expression
+// that does this is pinned as text elsewhere; this reads it and proves what it selects for each event.
+test("a pull request runs Windows only for the bundle and seam jobs, and every other event runs both", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const evaluate = (job, event) => {
+    const start = workflow.indexOf(`\n  ${job}:\n`);
+    const line = /^        os: (.+)$/m.exec(workflow.slice(start))[1];
+    const match = /^\$\{\{ fromJSON\(github\.event_name == '([a-z_]+)' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(line);
+    assert.ok(match, `${job} uses the event-dependent matrix expression`);
+    return JSON.parse(event === match[1] ? match[2] : match[3]);
+  };
+  for (const job of ["bundle-smoke", "seam-control"]) {
+    assert.deepEqual(evaluate(job, "pull_request"), ["windows-latest"], job);
+    for (const event of ["merge_group", "push", "workflow_dispatch", "schedule"]) {
+      assert.deepEqual(evaluate(job, event), ["windows-latest", "macos-latest"], `${job} on ${event}`);
+    }
+  }
+  assert.deepEqual(FAMILIES.bundle.filter((name) => name.includes("macos")), ["Bundle smoke (macos-latest)", "Seam positive control (macos-latest)"],
+    "the lookup still judges the macOS bundle and seam jobs, which the queue and a push still run");
 });

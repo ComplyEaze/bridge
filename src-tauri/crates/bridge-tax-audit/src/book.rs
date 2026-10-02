@@ -1432,8 +1432,8 @@ mod tests {
             ),
             (
                 "the later entry of one date wins",
-                vec![(Some("20250401"), "Ga"), (Some("20250401"), "Gb")],
-                "Gb",
+                vec![(Some("20250401"), "Gz"), (Some("20250401"), "Ga")],
+                "Ga",
             ),
             (
                 "an undated entry is the oldest",

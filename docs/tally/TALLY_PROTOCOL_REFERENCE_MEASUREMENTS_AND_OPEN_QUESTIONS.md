@@ -416,6 +416,24 @@ Further observations from the same runs:
   changed the currency master's `ORIGINALNAME` and the company's `CURRENCYNAME` with it, both ways.
   A non-INR company given a ₹ symbol was not measured.
 
+**A window read whole and admitted against its census (#985) — PARTIAL, 2026-10-02.** One run of
+each, on a licensed TallyPrime 7.1 Silver lab, through the product's own `vouchers` and
+`voucher_presence` tools, each call reading one day that held one voucher. Two synthetic lab books:
+one whose voucher mark is above the window planner's whole-book bound, so a census is read (rule
+2 of §11c.3), and one below it, so none is.
+
+| Call | Book | Window label | Verdicts | Requests |
+| --- | --- | --- | --- | --- |
+| `vouchers` | census read | `complete`, total 1 | — | 22 |
+| `vouchers` | no census | `partial`, `nonempty_window_unqualified`, total 1 | — | 16 |
+| `voucher_presence`, 2 proposals | census read | `complete` | the book's voucher `present`; one nothing in the book resembles `absent` | 34 |
+| `voucher_presence`, 2 proposals | no census | `partial`, `nonempty_window_unqualified` | the book's voucher `present`; one sharing its party `possibly_present`, `resembles_book_voucher` | 28 |
+| `voucher_presence`, 1 proposal, a bound party not the book voucher's | no census | `partial`, `nonempty_window_unqualified` | `possibly_present`, `window_not_proven_complete`, 0 candidates | 28 |
+
+The caller declared the voucher types' numbering as manual; their real numbering was not
+established. Not measured: a multi-day window, a census mismatch (none arose, so the refusal was not
+seen live), and the read-back after a post. No book other than these two synthetic lab books.
+
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
 On a TallyPrime 7.1 instance in Education mode, `ledgers_v1`'s custom report raised a modal

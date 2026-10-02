@@ -979,6 +979,29 @@ class GitRepo(unittest.TestCase):
             self.assertIn("Shard results not read (1)", report, text)
             self.assertNotIn("Shards that refused to run", report, text)
 
+    def test_a_shard_file_that_is_json_but_not_records_is_not_read_and_does_not_stop_the_merge(self):
+        # Valid JSON that is not an object of records (#1041): each is "not read", the run fails
+        # naming every id, and the good shard's records still merge. Read after the good shard, so
+        # a shape that merged would overwrite its records rather than hide behind them.
+        parent = self.root.parent
+        good = parent / "shard-1.json"
+        records = {m["id"]: record(m, ["tests/registry.rs::registry_ok"]) for m in self.muts}
+        good.write_text(json.dumps(records))
+        self.prove("B1", "R1")
+        for text in ("null", "5", '""', "[]", "[1, 2]", json.dumps({"B1": "text"})):
+            with self.subTest(shard=text):
+                bad = parent / "shard-2.json"
+                bad.write_text(text)
+                for written in (parent / "all.json", parent / "r.md"):  # never read a previous shape's
+                    written.unlink(missing_ok=True)
+                rc, out = self.main("--merge", str(good), str(bad), "--results", str(parent / "all.json"),
+                                    "--report", str(parent / "r.md"))
+                self.assertEqual(rc, 1, out)
+                report = (parent / "r.md").read_text()
+                self.assertIn("Shard results not read (1)", report)
+                self.assertEqual(mu.failing_ids(issue(report)), ["B1", "R1"])
+                self.assertEqual(json.loads((parent / "all.json").read_text()), records)
+
     def test_merge_reads_a_refusal_apart_from_results_and_never_writes_it_into_them(self):
         parent = self.root.parent
         refused = parent / "shard-1.json"

@@ -207,8 +207,9 @@ behaviour, the comment cites the reference section rather than restating it.
 - Any credential path changes require a security-focused reviewer comment.
 - Any platform-sensitive change must be validated on affected Windows and macOS hosts,
   or the missing platform evidence must be called out explicitly in the PR.
-  A pull request run builds the bundle and seam jobs on Windows only; macOS evidence for
-  those two first appears in the merge queue run, so cite that run, not the pull request run.
+  A pull request run covers the bundle and seam jobs on Windows only; macOS evidence for
+  those two comes from the merge queue run (when the change selects them), so say so in the
+  PR and cite that run once it exists.
 - Never merge a PR that introduces destructive DB migrations without rollback notes.
 - Never relicense or add third-party code or assets without documented authority
   and preservation of applicable copyright, license, and attribution notices.

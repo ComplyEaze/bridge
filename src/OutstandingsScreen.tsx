@@ -104,7 +104,7 @@ const DISPLAY_OPEN_BILL_ROW_LIMIT = 2_000;
 const DISPLAY_UNALLOCATED_PARTY_LIMIT = 10;
 const UNSUPPORTED_CURRENCY_WITHHELD = {
   title: "Totals withheld",
-  message: "Bridge received an unsupported currency assertion. Unit A displays totals only for an explicit INR assertion.",
+  message: "ComplyEaze Bridge received an unsupported currency assertion. Unit A displays totals only for an explicit INR assertion.",
 } as const;
 
 type LoadResult =
@@ -1120,7 +1120,7 @@ function reportToCsv(
   const row = (...values: Array<CsvCell>) => csvRow(...values);
 
   const lines = [
-    row(text("Bridge — aged outstandings")),
+    row(text("ComplyEaze Bridge — aged outstandings")),
     row(text("Company"), text(report.company_name)),
     row(text("As of"), text(formatDate(report.as_of_yyyymmdd))),
     row(text("Currency"), text("INR")),
@@ -1195,11 +1195,11 @@ function comparePartiesBy(sort: PartySort) {
 
 function amountOf(value: string) {
   if (!/^-?\d+(?:\.\d+)?$/.test(value)) {
-    throw new Error("Bridge could not read an outstandings amount.");
+    throw new Error("ComplyEaze Bridge could not read an outstandings amount.");
   }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    throw new Error("Bridge could not read an outstandings amount.");
+    throw new Error("ComplyEaze Bridge could not read an outstandings amount.");
   }
   return parsed;
 }

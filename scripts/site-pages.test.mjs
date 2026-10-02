@@ -284,14 +284,19 @@ test("the jobs table gives one of four answers per row, links each row to its an
   assert.match(asks, /book with stock items is expected to be refused/);
 });
 
-test("the page says which release and day it was checked against, and the structured copy carries the same day", () => {
+test("the page says which release and day it was checked against, and the structured copy is dated no earlier", () => {
   const html = read("faq.html");
   const stamp = html.match(/Checked against release ([0-9.]+) on <time datetime="([0-9-]+)">/);
   assert.ok(stamp, "no check stamp");
   // a version bump fails here until someone has read the answers again and moved the stamp
   const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
   assert.equal(stamp[1], version, `site/faq.html is stamped for release ${stamp[1]} but the manifest says ${version}: reread every answer on the Questions page against the new release (the README, the security page, the Terms and the release notes), then move the stamp in the hero and the dateModified in the structured data`);
-  assert.equal(JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]).dateModified, stamp[2]);
+  // the page can change after its last full check (one answer edited), so the structured copy may be dated later than
+  // the stamp, never earlier; the stamp moves only when every answer has been read again
+  const modified = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]).dateModified;
+  assert.match(stamp[2], /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
+  assert.match(modified, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
+  assert.ok(modified >= stamp[2], `the structured copy says the page last changed on ${modified}, before it was checked on ${stamp[2]}`);
 });
 
 test("the list above the questions tells a person asked to try it out the four things to do first", () => {

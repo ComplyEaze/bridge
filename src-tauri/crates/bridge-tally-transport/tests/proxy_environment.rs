@@ -2,6 +2,7 @@
 //!
 //! This is the only test in its binary: it changes the process environment,
 //! which other tests in the same process could otherwise read while it runs.
+//! Add no other test to this file.
 
 mod proxy_support;
 
@@ -20,6 +21,9 @@ async fn a_proxy_in_the_environment_does_not_carry_a_tally_request() {
     })
     .await;
     assert_eq!(observed.proxy_received, 0, "the request went to the proxy");
-    assert_eq!(observed.tally_received, 1, "the request did not reach Tally");
+    assert_eq!(
+        observed.tally_received, 1,
+        "the request did not reach Tally"
+    );
     assert!(observed.text.contains("<STATUS>1</STATUS>"));
 }

@@ -22,10 +22,8 @@ pub async fn send_with_a_proxy_listening(
 ) -> Observed {
     const MAX_HOST_ABORT_ATTEMPTS: usize = 3;
     for attempt in 1..=MAX_HOST_ABORT_ATTEMPTS {
-        let tally = SequenceSimulator::spawn(vec![
-            ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le),
-        ])
-        .expect("spawn the loopback Tally stand-in");
+        // The proxy binds first so its URL is known, and `before_send` (which
+        // may change the environment) runs before the Tally stand-in starts.
         let proxy = SequenceSimulator::spawn(vec![ScenarioPlan::new(Fixture::SyntheticXml(
             "<ENVELOPE>proxy</ENVELOPE>".to_owned(),
         ))
@@ -33,6 +31,10 @@ pub async fn send_with_a_proxy_listening(
         .expect("spawn the loopback proxy stand-in");
         let proxy_url = format!("http://{}", proxy.address());
         before_send(&proxy_url);
+        let tally = SequenceSimulator::spawn(vec![
+            ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le)
+        ])
+        .expect("spawn the loopback Tally stand-in");
         let endpoint = TallyEndpointConfig {
             host: tally.address().ip().to_string(),
             port: tally.address().port(),

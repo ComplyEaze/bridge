@@ -1301,27 +1301,26 @@ impl Server {
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
                 // An untagged native post that is not bound: what its content
                 // cannot find is never absent. When the post's own answer said
-                // Tally created none of its vouchers (each an exception) and
-                // none is found, say so (bridge#1108); otherwise an edit in
-                // Tally is as likely.
-                let counters = dispatch_response
-                    .as_ref()
-                    .and_then(|response| response.outcome.as_ref())
-                    .map(|outcome| outcome.counters());
+                // Tally created none of its one voucher and it is not found,
+                // say so (bridge#1108); otherwise an edit in Tally is as
+                // likely. Only the post's own readback reads that answer: by
+                // a later verification someone may have entered the voucher
+                // by hand and edited it.
+                let counters = current_dispatch
+                    .then(|| {
+                        dispatch_response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                            .map(|outcome| outcome.counters())
+                    })
+                    .flatten();
                 match verification::unmatched_cause(
                     counters,
                     line.vouchers.len(),
                     verification::unmatched_count(&result),
                 ) {
                     verification::UnmatchedCause::ReportedNotCreated => {
-                        verification::mark_reported_not_created(
-                            &mut result,
-                            if current_dispatch {
-                                verification::ReadWhen::PostsOwnReadback
-                            } else {
-                                verification::ReadWhen::Later
-                            },
-                        )
+                        verification::mark_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)

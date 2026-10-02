@@ -535,39 +535,16 @@ pub(super) fn unmatched_cause(
     }
 }
 
-/// How many of a verification's vouchers its content found nowhere.
+/// How many of a verification's vouchers its content found nowhere. Read only
+/// where nothing is bound, so no voucher is `bound_not_in_window`.
 pub(super) fn unmatched_count(result: &Value) -> u64 {
     result["counts"]["not_found"].as_u64().unwrap_or(0)
 }
 
-/// When a `tally_reported_not_created` voucher is read: in the post's own
-/// readback, or in a later verification, after which someone may already have
-/// entered it by hand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ReadWhen {
-    PostsOwnReadback,
-    Later,
-}
-
-/// The plain line for a voucher Tally reported not created.
-pub(super) fn reported_not_created_next_step(when: ReadWhen) -> &'static str {
-    match when {
-        ReadWhen::PostsOwnReadback => "Tally reported this voucher as not created. Check that it is not in Tally, then enter this one voucher in Tally's voucher entry screen; do not import the batch file again. ComplyEaze Bridge will not send this saved voucher again.",
-        ReadWhen::Later => "When this voucher was posted, Tally reported it as not created, and ComplyEaze Bridge still cannot find it. Check Tally first: if no one has entered it since, enter this one voucher in Tally's voucher entry screen; do not import the batch file again.",
-    }
-}
-
-/// Rewrites a verification of a native post whose own answer from Tally
-/// reported its unmatched vouchers as not created (`UnmatchedCause::ReportedNotCreated`).
-pub(super) fn mark_reported_not_created(result: &mut Value, when: ReadWhen) {
+/// Rewrites the post's own readback when Tally's answer to that post
+/// reported its voucher as not created (`UnmatchedCause::ReportedNotCreated`).
+pub(super) fn mark_reported_not_created(result: &mut Value) {
     mark_not_found_as(result, "tally_reported_not_created");
-    if let Some(vouchers) = result["vouchers"].as_array_mut() {
-        for voucher in vouchers {
-            if voucher["status"] == "tally_reported_not_created" {
-                voucher["next_step"] = json!(reported_not_created_next_step(when));
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -580,6 +557,7 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
         "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
         "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
         "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
+        "tally_reported_not_created" => Some("Tally reported this voucher as not created. Check that it is not in Tally, then enter this one voucher in Tally's voucher entry screen; do not import it again through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again."),
         _ => None,
     }
 }

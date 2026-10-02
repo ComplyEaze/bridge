@@ -4180,7 +4180,7 @@ async fn post_single_rejected(answer: String) -> Value {
     posted
 }
 
-fn assert_reported_not_created(posted: &Value, when: super::super::verification::ReadWhen) {
+fn assert_reported_not_created(posted: &Value) {
     let result = &posted["structuredContent"]["result"];
     assert_eq!(posted["isError"], json!(true), "{posted}");
     assert_eq!(
@@ -4200,34 +4200,24 @@ fn assert_reported_not_created(posted: &Value, when: super::super::verification:
         result["counts"]["tally_reported_not_created"], 1,
         "{posted}"
     );
-    // A post lists its vouchers; verify_import lists those not verified.
-    let voucher = match when {
-        super::super::verification::ReadWhen::PostsOwnReadback => &result["vouchers"][0],
-        super::super::verification::ReadWhen::Later => &result["unverified_vouchers"][0],
-    };
+    // Tally created nothing, so the post is not bound to its span.
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    let voucher = &result["vouchers"][0];
     assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
     let next_step = voucher["next_step"].as_str().expect("a next step");
     assert_eq!(
-        next_step,
-        super::super::verification::reported_not_created_next_step(when),
+        Some(next_step),
+        super::super::verification::plain_next_step("tally_reported_not_created"),
         "{posted}"
     );
     // Safety phrases, pinned before any shortening.
-    let phrases: &[&str] = match when {
-        super::super::verification::ReadWhen::PostsOwnReadback => &[
-            "Tally reported this voucher as not created",
-            "Check that it is not in Tally",
-            "do not import the batch file again",
-            "will not send this saved voucher again",
-        ],
-        super::super::verification::ReadWhen::Later => &[
-            "When this voucher was posted, Tally reported it as not created",
-            "Check Tally first",
-            "if no one has entered it since",
-            "do not import the batch file again",
-        ],
-    };
-    for phrase in phrases {
+    for phrase in [
+        "Tally reported this voucher as not created",
+        "Check that it is not in Tally",
+        "enter this one voucher",
+        "do not import it again through Tally's Import menu",
+        "will not send this saved voucher again",
+    ] {
         assert!(next_step.contains(phrase), "{phrase}: {next_step}");
     }
 }
@@ -4235,36 +4225,31 @@ fn assert_reported_not_created(posted: &Value, when: super::super::verification:
 /// A single voucher Tally rejected (Education answer) reads as not created by
 /// Tally, with the next step that says so.
 #[tokio::test]
-async fn a_rejected_single_voucher_reads_as_not_created_by_tally_education() {
+async fn a_rejected_single_voucher_reads_as_not_created_on_the_education_answer_shape() {
     let posted = post_single_rejected(rejected_one_education()).await;
     assert_eq!(
         posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
         0
     );
-    assert_reported_not_created(
-        &posted,
-        super::super::verification::ReadWhen::PostsOwnReadback,
-    );
+    assert_reported_not_created(&posted);
 }
 
 /// The same on licensed 7.1 Silver's own answer.
 #[tokio::test]
-async fn a_rejected_single_voucher_reads_as_not_created_by_tally_silver() {
+async fn a_rejected_single_voucher_reads_as_not_created_on_the_silver_answer() {
     let posted = post_single_rejected(rejected_one_silver()).await;
     assert_eq!(
         posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
         0
     );
-    assert_reported_not_created(
-        &posted,
-        super::super::verification::ReadWhen::PostsOwnReadback,
-    );
+    assert_reported_not_created(&posted);
 }
 
-/// A later `verify_import` of the same rejected voucher keeps its status, but
-/// its next step no longer assumes nobody has entered it since.
+/// A later `verify_import` never reads the post's answer: by then someone may
+/// have entered the voucher by hand and edited it, so a voucher it cannot find
+/// is `sent_not_attributed`, with the line that says to check in Tally.
 #[tokio::test]
-async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step() {
+async fn a_rejected_single_voucher_verified_later_is_not_labelled_from_the_old_answer() {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(rejected_one_silver())));
     plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
@@ -4281,10 +4266,7 @@ async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step
         )
         .await;
     assert_eq!(sent(simulator).len(), post_requests, "{posted}");
-    assert_reported_not_created(
-        &posted,
-        super::super::verification::ReadWhen::PostsOwnReadback,
-    );
+    assert_reported_not_created(&posted);
     // The later check runs against its own simulator; a dispatched batch
     // verifies only on the origin it recorded, so the journal moves with it.
     let later_plans = span_readback(empty_collection(), 10);
@@ -4302,5 +4284,19 @@ async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step
     .unwrap();
     let later = later_server.call_tool("verify_import", args).await;
     assert_eq!(sent(simulator).len(), expected_requests, "{later}");
-    assert_reported_not_created(&later, super::super::verification::ReadWhen::Later);
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(later["isError"], json!(true), "{later}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{later}"
+    );
+    let voucher = &result["unverified_vouchers"][0];
+    assert_eq!(voucher["status"], "sent_not_attributed", "{later}");
+    assert_eq!(
+        voucher["next_step"].as_str(),
+        super::super::verification::plain_next_step("sent_not_attributed"),
+        "{later}"
+    );
 }

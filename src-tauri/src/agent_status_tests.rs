@@ -559,7 +559,7 @@ fn the_status_description_says_what_today_is_the_date_of() {
         .expect("tally_status tool definition")["description"]
         .as_str()
         .expect("tool description");
-    assert!(description.contains("`today` is the Bridge host's calendar date (YYYYMMDD)"));
+    assert!(description.contains("`today` is this computer's calendar date (YYYYMMDD)"));
     assert!(description.contains(
         "`outstandings` uses when `as_of` is left out, and `ledger_masters` with `fields=compliance` for `party_gstin`"
     ));

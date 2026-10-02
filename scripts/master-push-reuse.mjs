@@ -11,15 +11,17 @@
 // present exactly once in the queue's run and concluded `success`. A skipped job is not that: the
 // push then runs the family itself, as it always did.
 //
-// It FAILS OPEN. Any error, timeout, missing field, ambiguity or surprise prints `false` for both
-// families, which is today's behaviour (every job runs).
+// It FAILS SAFE, in the sense that matters here: any error, timeout, missing field, ambiguity or
+// surprise prints `false` for both families and the push runs everything, as it always did. Once
+// the run and its job listing are read and sound, each family is judged on its own jobs.
 //
 // Conditions for any `true`, all required:
 //   1. the push is an ordinary fast-forward: `before` is an ancestor of the commit, so
 //      `before..commit` really is what the push changed;
-//   2. that push changes none of Cargo.lock, a Cargo.toml, the toolchain file, a cargo config,
-//      tauri.conf.json (its macOS deployment target is in the cache key), this script or anything
-//      under .github/, so caches stay warm and a workflow or lookup change is always exercised in full;
+//   2. that push changes none of Cargo.lock, a Cargo.toml, the toolchain file, a `.cargo/` directory
+//      at any depth, tauri.conf.json (its macOS deployment target is in the cache key), this script
+//      or anything under .github/, so caches stay warm and a workflow or lookup change is always
+//      exercised in full;
 //   3. exactly one `merge_group` run of ci.yml has this head SHA, it is completed with conclusion
 //      `success`, and the API's total_count matches what it returned (no unseen second page);
 //   4. that run's job listing is complete, and each job of the family is present once, `success`.
@@ -27,7 +29,7 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const SHA = /^[0-9a-f]{40,64}$/;
-const FORCE_FULL = /^(?:\.github\/|\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
+const FORCE_FULL = /^(?:\.github\/|(?:.*\/)?\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
 const WORKFLOW_FILE = "ci.yml";
 // The job names a queue run reports when the job ran: ci.yml's `name:` with the matrix expanded.
 // scripts/master-push-reuse.test.mjs derives them from ci.yml and fails if these lists drift.

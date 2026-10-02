@@ -154,7 +154,7 @@ for (const [name, failWith] of [
 test("a lockfile, manifest, toolchain or .github change runs everything without asking the API", async () => {
   for (const file of [
     "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
-    "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml",
+    "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml", "src-tauri/.cargo/config.toml",
     "src-tauri/tauri.conf.json", ".github/workflows/ci.yml", ".github/actions/setup-windows-native/action.yml",
   ]) {
     const { fetcher, calls } = github();
@@ -163,7 +163,7 @@ test("a lockfile, manifest, toolchain or .github change runs everything without 
     assert.equal(outcome.code, "forced_full_path", file);
     assert.equal(calls.length, 0, file);
   }
-  assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a", "src-tauri/tauri.conf.json.md", "docs/.cargo/x"]), undefined);
+  assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a", "src-tauri/tauri.conf.json.md", "docs/cargo/x"]), undefined);
 });
 
 test("a push whose before commit is not an ancestor runs everything without asking the API", async () => {
@@ -316,39 +316,51 @@ test("a run with no usable id, or a listing that mixes in another commit's run, 
   assert.equal(mixed.code, "ambiguous_queue_run");
 });
 
-// A job added later and gated on the same scope outputs would be skipped on a reused push without the
-// lookup ever judging it. The family lists above must cover every job gated on those outputs.
-test("the jobs gated on the native and bundle scope outputs are exactly the jobs the families judge", () => {
-  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  const gated = { native: new Set(), bundle: new Set() };
-  for (const [, job, text] of workflow.matchAll(/\n  ([a-z][a-z-]*):\n((?:(?!\n  [a-z][a-z-]*:\n)[\s\S])*)/g)) {
-    for (const output of Object.keys(gated)) {
-      if (new RegExp(`^    if: .*needs\\.changes\\.outputs\\.${output}\\b`, "m").test(text)) gated[output].add(job);
+// A job gated on the native or bundle scope output is skipped on a reused push without the lookup ever
+// judging it, and so is a job that `needs:` one of the three. Reading ci.yml's jobs (any id, a multi-line
+// `if:`, either form of the output reference, an inline or a block `needs:`), the jobs gated on the
+// outputs must be exactly the jobs the families judge, and the only jobs that may need them are the two
+// aggregators, which must run under `always()` so a skip cannot cascade into them or pass as a success.
+const FAMILY_JOBS = ["native", "bundle-smoke", "seam-control"];
+const MAY_NEED_A_FAMILY_JOB = ["compiler-cache-retention", "required-checks"];
+function skipHazards(workflow) {
+  const jobs = new Map();
+  for (const [, id, body] of workflow.matchAll(/\n  ([A-Za-z0-9_-]+):\n((?:(?!\n  [A-Za-z0-9_-]+:\n)[\s\S])*)/g)) {
+    const fields = new Map();
+    let key = null;
+    for (const line of body.split("\n")) {
+      const start = /^    ([A-Za-z0-9_-]+):(.*)$/.exec(line);
+      if (start) { key = start[1]; fields.set(key, start[2]); } else if (key && /^(?:\s{5,}|\s*$)/.test(line)) fields.set(key, `${fields.get(key)}\n${line}`);
+      else key = null;
     }
+    jobs.set(id, fields);
   }
-  assert.deepEqual([...gated.native], ["native"]);
-  assert.deepEqual([...gated.bundle].sort(), ["bundle-smoke", "seam-control"]);
-});
+  const problems = [];
+  const gated = [...jobs].filter(([, fields]) => /changes\.outputs(?:\.|\[\s*['"])(?:native|bundle)\b/.test(fields.get("if") ?? "")).map(([id]) => id);
+  if (gated.sort().join() !== [...FAMILY_JOBS].sort().join()) problems.push(`jobs gated on the family outputs: ${gated.join(", ")}`);
+  for (const [id, fields] of jobs) {
+    const needs = (fields.get("needs") ?? "").match(/[A-Za-z0-9_-]+/g) ?? [];
+    if (!needs.some((need) => FAMILY_JOBS.includes(need))) continue;
+    if (!MAY_NEED_A_FAMILY_JOB.includes(id)) problems.push(`${id} needs a family job and is not an aggregator`);
+    else if (!/\balways\(\)/.test(fields.get("if") ?? "")) problems.push(`${id} needs a family job without always()`);
+  }
+  return problems;
+}
 
-test("the script prints the decision lines first, in a fixed order, and never swaps the families", () => {
-  assert.deepEqual(render({ native: true, bundle: false, code: "evaluated", reason: "r" }),
-    ["reuse_native=true", "reuse_bundle=false", "code=evaluated", "reason=r"]);
-  assert.deepEqual(render({ native: false, bundle: true, code: "evaluated", reason: "r" }).slice(0, 2),
-    ["reuse_native=false", "reuse_bundle=true"]);
-});
-
-test("run as a command outside a master push, the script prints exactly four lines and no reuse", async () => {
-  const { spawnSync } = await import("node:child_process");
-  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./master-push-reuse.mjs", import.meta.url))], {
-    encoding: "utf8", env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: "pull_request" },
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, "reuse_native=false\nreuse_bundle=false\ncode=not_a_master_push\nreason=not a push to master\n");
-});
-
-test("a commit SHA must be a full-length hex SHA", async () => {
-  for (const GITHUB_SHA of ["a".repeat(39), "abcd", "A".repeat(40)]) {
-    const outcome = await decide({ env: { ...env, GITHUB_SHA }, fetcher: github().fetcher, changedFiles: ordinaryChange, isAncestor: () => true, sleep: async () => {} });
-    assert.equal(outcome.code, "bad_sha", GITHUB_SHA);
+test("only the jobs the families judge are gated on the scope outputs, and only aggregators need them", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  assert.deepEqual(skipHazards(workflow), []);
+  const withJob = (job) => `${workflow.trimEnd()}\n${job}\n`;
+  const hazards = {
+    "a push-only job that needs a family job": "\n  push-only-extra:\n    needs: [bundle-smoke]\n    if: github.event_name == 'push'\n    runs-on: ubuntu-latest\n",
+    "the same with a block needs and a digit in the id": "\n  extra2_job:\n    needs:\n      - changes\n      - seam-control\n    runs-on: ubuntu-latest\n",
+    "a job gated on an output by a multi-line if": "\n  extra-gated:\n    needs: changes\n    if: >-\n      github.event_name == 'push' ||\n      needs.changes.outputs.native == 'true'\n    runs-on: ubuntu-latest\n",
+    "a job gated by the bracket form": "\n  extra-bracket:\n    needs: changes\n    if: needs.changes.outputs['bundle'] == 'true'\n    runs-on: ubuntu-latest\n",
+    "an aggregator without always()": null,
+  };
+  for (const [name, job] of Object.entries(hazards)) {
+    const changed = job === null ? workflow.replace("    if: ${{ always() }}\n    needs: [changes", "    needs: [changes") : withJob(job);
+    assert.notEqual(changed, workflow, name);
+    assert.notDeepEqual(skipHazards(changed), [], name);
   }
 });

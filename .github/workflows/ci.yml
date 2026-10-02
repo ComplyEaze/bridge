@@ -57,7 +57,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
         run: |
           set -euo pipefail
 
@@ -76,13 +76,16 @@ jobs:
           # A push to master runs a family of heavy jobs unless the merge queue already RAN that family
           # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
           # the family by scope is no evidence, so it is run here as it always was. Any error or doubt
-          # in the lookup runs both: a non-zero exit discards whatever was printed, and only an exact
+          # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job
+          # summary), and only an exact
           # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.
           # To turn the reuse off, delete this block: every push is then a full run again.
           if [[ "$EVENT_NAME" == "push" ]]; then
-            decision="$(node scripts/master-push-reuse.mjs)" || decision=''
+            lookup_status=0
+            decision="$(node scripts/master-push-reuse.mjs)" || lookup_status=$?
+            if [[ "$lookup_status" -ne 0 ]]; then decision=''; fi
             printf '%s\n' "$decision"
-            { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; echo "Lookup exit status: $lookup_status"; } >> "$GITHUB_STEP_SUMMARY"
             for family in native bundle; do
               if printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_${family}=true"; then
                 echo "${family}=false" >> "$GITHUB_OUTPUT"
@@ -370,7 +373,8 @@ jobs:
     name: Native checks (${{ matrix.os }})
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
-    # check is deliberately skipped only for frontend- and documentation-only PRs.
+    # check is deliberately skipped only for frontend- and documentation-only PRs, and on a master
+    # push whose commit the merge queue already ran this job on (scripts/master-push-reuse.mjs).
     if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and

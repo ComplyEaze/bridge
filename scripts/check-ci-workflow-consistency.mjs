@@ -145,7 +145,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "c53f41ad6c65a9f3a963ae3aefb3896736d3bdce1e623502ddd24531ac8766ce"],
+  ], "c4e222f36a280af5e6c583b0733249241598228345fce561349d930130f0e46b"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -194,7 +194,7 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "4617fbfac65b29895617661e2fa13c0cf17784cc3eec7b6c81da7520b755e518") {
+if (reuseScriptDigest !== "fa0f478edf3c1810f8b162419bec956ec86e8fe1c4f94c4c4be7e44254456648") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
@@ -272,7 +272,7 @@ const expectedChanges = [
   "          BEFORE_SHA: ${{ github.event.before }}",
   "          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
   "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
-  "          GH_TOKEN: ${{ github.token }}",
+  "          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}",
   "        run: |",
   "          set -euo pipefail",
   "",
@@ -291,13 +291,16 @@ const expectedChanges = [
   "          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family",
   "          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped",
   "          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt",
-  "          # in the lookup runs both: a non-zero exit discards whatever was printed, and only an exact",
+  "          # in the lookup runs both: a non-zero exit discards whatever was printed (its status goes to the job",
+  "          # summary), and only an exact",
   "          # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.",
   "          # To turn the reuse off, delete this block: every push is then a full run again.",
   "          if [[ \"$EVENT_NAME\" == \"push\" ]]; then",
-  "            decision=\"$(node scripts/master-push-reuse.mjs)\" || decision=''",
+  "            lookup_status=0",
+  "            decision=\"$(node scripts/master-push-reuse.mjs)\" || lookup_status=$?",
+  "            if [[ \"$lookup_status\" -ne 0 ]]; then decision=''; fi",
   "            printf '%s\\n' \"$decision\"",
-  "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; } >> \"$GITHUB_STEP_SUMMARY\"",
+  "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; echo \"Lookup exit status: $lookup_status\"; } >> \"$GITHUB_STEP_SUMMARY\"",
   "            for family in native bundle; do",
   "              if printf '%s\\n' \"$decision\" | head -n 2 | grep -qx \"reuse_${family}=true\"; then",
   "                echo \"${family}=false\" >> \"$GITHUB_OUTPUT\"",

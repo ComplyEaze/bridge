@@ -91,8 +91,19 @@ test("a push runs everything when the script says no, says nothing, crashes, or 
 
 test("a push records the decision in the step summary, in a fenced block, and runs the lookup script", () => {
   const { summary, args } = runScope("push", { script: "both" });
-  assert.equal(summary, "### Master push reuse\n```\nreuse_native=true\nreuse_bundle=true\nreason=stub\n```\n");
+  assert.equal(summary, "### Master push reuse\n```\nreuse_native=true\nreuse_bundle=true\nreason=stub\n```\nLookup exit status: 0\n");
   assert.equal(args, "scripts/master-push-reuse.mjs");
+});
+
+test("a crashed lookup is recorded in the summary with its exit status, and prints no decision", () => {
+  const { summary, outputs } = runScope("push", { script: "crashedAfterTrue" });
+  assert.equal(summary, "### Master push reuse\n```\n\n```\nLookup exit status: 3\n");
+  assert.deepEqual(heavy(outputs), ALL);
+});
+
+test("the token reaches the scope step only on a push", () => {
+  const step = workflow.join("\n");
+  assert.match(step, /^ {10}GH_TOKEN: \$\{\{ github\.event_name == 'push' && github\.token \|\| '' \}\}$/m);
 });
 
 test("a scheduled or manual run is a full run and never asks the script", () => {

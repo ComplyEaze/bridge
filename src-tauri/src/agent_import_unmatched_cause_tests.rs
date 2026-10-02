@@ -1,7 +1,9 @@
 //! bridge#1108: what a native post's own answer from Tally says about the
-//! vouchers its readback cannot find. Every answer below is a captured live
-//! response, except the two marked synthetic, which exist only to hold the
-//! guards that no capture reaches.
+//! vouchers its readback cannot find. The Silver answer and the batch of 50
+//! are live responses committed byte for byte; the Education answers are
+//! derived from live captures (counter shape only, see
+//! EDUCATION_IMPORT_COUNTERS_PROVENANCE.md). Tests marked synthetic exist only
+//! to hold the guards that no capture reaches.
 use super::{unmatched_cause, UnmatchedCause};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportResult};
 
@@ -22,7 +24,8 @@ fn counters(xml: &str) -> TallyImportResult {
         .clone()
 }
 
-/// A rejected single voucher, Education mode (CREATED 0, EXCEPTIONS 1).
+/// A rejected single voucher, Education mode (CREATED 0, EXCEPTIONS 1;
+/// derived from a live capture, its LINEERROR text redacted).
 fn rejected_one_education() -> TallyImportResult {
     counters(include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/live_education_w7_baddate_sanitized.xml"
@@ -86,7 +89,7 @@ fn a_rejected_single_voucher_is_reported_not_created() {
 #[test]
 fn a_partial_commit_is_never_read_as_not_created() {
     // A count does not say which voucher Tally rejected: an edited voucher it
-    // did create could otherwise carry the label (bridge#1108 review).
+    // did create could otherwise carry the label.
     for unmatched in [1, 2] {
         assert_eq!(
             unmatched_cause(Some(&committed_49_of_50()), 50, unmatched),
@@ -173,6 +176,52 @@ fn no_exception_establishes_nothing() {
     };
     assert_eq!(
         unmatched_cause(Some(&silent), 1, 1),
+        UnmatchedCause::NotEstablished
+    );
+}
+
+#[test]
+fn a_batch_is_never_read_as_not_created() {
+    // Synthetic: no batch Tally rejected whole has been captured. Two sent,
+    // none created, an exception for each, or one exception and one voucher
+    // found since: neither is labelled.
+    let both_rejected = TallyImportResult {
+        exceptions: 2,
+        ..rejected_one_silver()
+    };
+    assert_eq!(
+        unmatched_cause(Some(&both_rejected), 2, 2),
+        UnmatchedCause::NotEstablished
+    );
+    assert_eq!(
+        unmatched_cause(Some(&rejected_one_silver()), 2, 1),
+        UnmatchedCause::NotEstablished
+    );
+}
+
+#[test]
+fn more_exceptions_than_vouchers_establishes_nothing() {
+    // Synthetic: two exceptions for one voucher is not the captured shape.
+    let doubled = TallyImportResult {
+        exceptions: 2,
+        ..rejected_one_silver()
+    };
+    assert_eq!(
+        unmatched_cause(Some(&doubled), 1, 1),
+        UnmatchedCause::NotEstablished
+    );
+}
+
+#[test]
+fn an_empty_post_establishes_nothing() {
+    // Synthetic: nothing sent, nothing to label.
+    let empty = TallyImportResult {
+        exceptions: 0,
+        line_error_count: 0,
+        ..rejected_one_silver()
+    };
+    assert_eq!(
+        unmatched_cause(Some(&empty), 0, 0),
         UnmatchedCause::NotEstablished
     );
 }

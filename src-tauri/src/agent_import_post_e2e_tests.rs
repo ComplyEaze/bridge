@@ -4137,9 +4137,9 @@ async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() 
 // created none of the one sent and raised an exception, so the voucher is
 // reported as not created by Tally, never as possibly edited in Tally.
 
-/// The captured Education-mode answer to a rejected single voucher (CREATED 0,
-/// EXCEPTIONS 1; its LINEERROR text redacted, see
-/// EDUCATION_IMPORT_COUNTERS_PROVENANCE.md).
+/// The Education-mode answer to a rejected single voucher (CREATED 0,
+/// EXCEPTIONS 1), derived from a live capture with its LINEERROR text redacted:
+/// counter shape only, see EDUCATION_IMPORT_COUNTERS_PROVENANCE.md.
 fn rejected_one_education() -> String {
     include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/live_education_w7_baddate_sanitized.xml"
@@ -4147,9 +4147,10 @@ fn rejected_one_education() -> String {
     .to_string()
 }
 
-/// The captured licensed 7.1 Silver answer to a rejected single voucher
-/// (`single-import-missing-ledger`, 2026-10-02): CREATED 0, EXCEPTIONS 1, one
-/// LINEERROR naming a ledger the book did not hold.
+/// The licensed 7.1 Silver answer to a rejected single voucher, committed byte
+/// for byte (`single-import-missing-ledger`, 2026-10-02): CREATED 0,
+/// EXCEPTIONS 1, one LINEERROR naming a ledger the book did not hold. Only the
+/// answer is borrowed; the voucher posted here is this suite's own.
 fn rejected_one_silver() -> String {
     captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
@@ -4182,6 +4183,10 @@ async fn post_single_rejected(answer: String) -> Value {
 fn assert_reported_not_created(posted: &Value, when: super::super::verification::ReadWhen) {
     let result = &posted["structuredContent"]["result"];
     assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{posted}"
+    );
     assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
     // Only the status a voucher moved to is counted: none moved to
@@ -4227,7 +4232,7 @@ fn assert_reported_not_created(posted: &Value, when: super::super::verification:
     }
 }
 
-/// A single voucher Tally rejected (Education capture) reads as not created by
+/// A single voucher Tally rejected (Education answer) reads as not created by
 /// Tally, with the next step that says so.
 #[tokio::test]
 async fn a_rejected_single_voucher_reads_as_not_created_by_tally_education() {
@@ -4264,6 +4269,7 @@ async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step
     plans.extend(after_approval(xml(rejected_one_silver())));
     plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
     plans.extend(span_readback(empty_collection(), 10));
+    let post_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -4274,7 +4280,7 @@ async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step
             server.call_tool("post_import", args.clone()),
         )
         .await;
-    let _ = sent(simulator);
+    assert_eq!(sent(simulator).len(), post_requests, "{posted}");
     assert_reported_not_created(
         &posted,
         super::super::verification::ReadWhen::PostsOwnReadback,

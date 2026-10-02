@@ -492,13 +492,12 @@ pub(super) fn mark_sent_not_attributed(result: &mut Value) {
 /// found, as far as the post's own answer from Tally can say (bridge#1108).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum UnmatchedCause {
-    /// Tally's answer to the post said it created **none** of the vouchers
-    /// sent, with one exception for each, every counter reported and every
-    /// other counter zero, and none of them is found: no voucher of this post
-    /// exists from this post, so each was not created by it. Only this
-    /// measured shape is read so (protocol reference §9.2: a rejected voucher
-    /// answers `CREATED 0, EXCEPTIONS 1`). A partial commit is never read so,
-    /// because a count does not say which voucher Tally rejected.
+    /// The post sent one voucher, Tally's answer reported every counter, with
+    /// `CREATED 0`, `EXCEPTIONS 1` and every other counter zero, and the
+    /// voucher is not found. Only this captured shape is read so (protocol
+    /// reference §9.2). A batch is never read so: a partial commit's count
+    /// does not say which voucher Tally rejected, and no batch that Tally
+    /// rejected whole has been captured.
     ReportedNotCreated,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
@@ -519,7 +518,8 @@ pub(super) fn unmatched_cause(
     let Ok(sent) = u64::try_from(sent) else {
         return UnmatchedCause::NotEstablished;
     };
-    if counters.counter_presence.all_reported()
+    if sent == 1
+        && counters.counter_presence.all_reported()
         && counters.created == 0
         && counters.altered == 0
         && counters.deleted == 0

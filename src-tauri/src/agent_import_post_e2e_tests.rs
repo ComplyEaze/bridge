@@ -4140,8 +4140,12 @@ async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() 
 // path refuses a missing ledger at build, so the batch here names ledgers the
 // catalogue holds; the rejection stands for one Tally makes after approval (a
 // ledger removed in Tally's screens meanwhile). The LINEERROR names the
-// captured run's ledger, which this batch does not carry: its text is never
-// used for attribution (protocol reference §9.2).
+// captured run's ledger, which this batch does not carry: §9.2 says its text
+// is not a reliable cause, and no verdict reads it. The capture was three
+// Payments in another synthetic lab company; this batch is three Journals in
+// the harness's captured company, and the window reuses the capture's
+// MasterIDs (LASTVCHID 1746). The counter check refuses the binding before
+// anything that depends on the voucher type or the company.
 
 /// The captured live answer to an import that created two of three vouchers.
 fn created_two_of_three() -> String {
@@ -4193,8 +4197,10 @@ fn saved_partial_batch(server: &Server) -> Value {
 /// The window after the partial post: the captured posted Journal, untagged,
 /// twice, as the first and third vouchers. Each copy's named changes: the
 /// amount (both entries), ALTERID (11 and 12, inside the span (10, 12] the
-/// marks give), and MASTERID with the GUID, REMOTEID and VCHKEY suffixes to
-/// match (1745 and 1746, the captured response's LASTVCHID being 1746).
+/// marks give), and MASTERID with the GUID and REMOTEID suffixes to match
+/// (1745 and 1746, the captured response's LASTVCHID being 1746). Each copy's
+/// VCHKEY suffix is set to its MasterID only to keep the two keys distinct: it
+/// is a synthetic value, not derived from the capture.
 fn partial_window() -> String {
     let body = untagged_posted_journal();
     let start = body.find("<VOUCHER ").expect("the capture holds a voucher");
@@ -4244,7 +4250,11 @@ fn the_partial_post_answer_parses_as_two_created_and_one_exception() {
     assert_eq!(outcome.counters().created, 2);
     assert_eq!(outcome.counters().errors, 0);
     assert_eq!(outcome.counters().exceptions, 1);
+    assert_eq!(outcome.counters().line_error_count, 1);
+    assert_eq!(outcome.last_vch_id(), Some(1746));
     assert!(!import_outcome_is_clean(Some(&outcome), 3));
+    // Not clean even against the number it did create: the exception decides.
+    assert!(!import_outcome_is_clean(Some(&outcome), 2));
 }
 
 /// A batch that lands partly is loud and never verified: the binding is
@@ -4256,6 +4266,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     plans.extend(after_approval(xml(created_two_of_three())));
     plans.push(xml(company_marks(12, 50, "WR2 Unicode Lab")));
     plans.extend(span_readback(partial_window(), 12));
+    let expected_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = batch_server_at(simulator.address(), directory.path());
@@ -4266,14 +4277,25 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
             server.call_tool("post_import", args),
         )
         .await;
-    let _ = sent(simulator);
+    // Every scripted answer was asked for, and nothing more.
+    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    assert_eq!(posted["isError"], json!(true), "{posted}");
     let result = &posted["structuredContent"]["result"];
     assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
     assert_eq!(
         result["post_span_binding"]["code"], "span_counters_not_clean",
         "{posted}"
     );
-    assert_ne!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{posted}"
+    );
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["dispatch"]["counters"]["created"], 2, "{posted}");
+    assert_eq!(result["dispatch"]["counters"]["exceptions"], 1, "{posted}");
     assert_eq!(
         result["error"]["code"], "import_reconciliation_required",
         "{posted}"
@@ -4282,6 +4304,32 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     assert_eq!(result["counts"]["matching_content_observed"], 2, "{posted}");
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{posted}");
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
+    // Which rows landed, by transaction id: each matched by the content it
+    // carries (its amount), never by position.
+    let voucher = |id: &str| {
+        result["vouchers"]
+            .as_array()
+            .expect("the result lists its vouchers")
+            .iter()
+            .find(|voucher| voucher["bridge_txn_id"] == id)
+            .unwrap_or_else(|| panic!("{id} is listed: {posted}"))
+            .clone()
+    };
+    for (id, alter_id, master_id) in [("partial-1", 11, "1745"), ("partial-3", 12, "1746")] {
+        let landed = voucher(id);
+        assert_eq!(
+            landed["status"], "matching_content_observed",
+            "{id}: {landed}"
+        );
+        assert_eq!(landed["alter_id"], alter_id, "{id}: {landed}");
+        assert_eq!(landed["master_id"], master_id, "{id}: {landed}");
+        assert_eq!(landed["diffs"], json!([]), "{id}: {landed}");
+    }
+    assert_eq!(
+        voucher("partial-2")["status"],
+        "sent_not_attributed",
+        "{posted}"
+    );
     let verdicts = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()

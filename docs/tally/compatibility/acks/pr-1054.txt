@@ -6,6 +6,7 @@ src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
 src-tauri/src/agent_import.rs
 src-tauri/src/agent_import_ack.rs
+src-tauri/src/agent_import_amend.rs
 src-tauri/src/agent_import_ledger.rs
 src-tauri/src/agent_import_post.rs
 src-tauri/src/agent_import_post_location.rs

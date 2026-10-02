@@ -61,7 +61,7 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
         "REF-1",
         "Synthetic test only",
         "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
-        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.",
+        "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
         &line.batch_id,
     ] {
         assert!(preview.contains(field), "missing {field}");

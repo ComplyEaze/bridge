@@ -141,3 +141,19 @@ fn an_answer_claiming_more_than_was_sent_establishes_nothing() {
         UnmatchedCause::NotEstablished
     );
 }
+
+#[test]
+fn a_shortfall_without_an_exception_establishes_nothing() {
+    // Synthetic: a shortfall Tally answered with no exception (and no error).
+    // Only the measured shape, a rejection reported as an exception, is read
+    // as "not created"; a silent shortfall is not.
+    let silent = TallyImportResult {
+        exceptions: 0,
+        line_error_count: 0,
+        ..rejected_one_silver()
+    };
+    assert_eq!(
+        unmatched_cause(Some(&silent), 1, 1),
+        UnmatchedCause::NotEstablished
+    );
+}

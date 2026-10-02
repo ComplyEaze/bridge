@@ -89,7 +89,7 @@
 <h2>One security note</h2>
 <p>In releases 0.3.0 and 0.4.0 the bank-statement tool could be given a Windows network path (a file on another computer). Windows then connects to that computer and may send the signed-in user&#x27;s network sign-in response to it. No Tally data is sent. It needs the assistant to be talked into using such a path, either your approval of that call or an &quot;always allow&quot; setting, and outbound file-sharing traffic to that computer. Release 0.4.1 refuses these paths. A drive letter mapped to a network share, a link, and on a Mac a mounted network volume can still pass, so keep statements and password files on the computer&#x27;s own disk. If you have 0.3.0 or 0.4.0, update. The advisory is linked from our security policy.</p>
 <h2>Before you use it on a client&#x27;s books</h2>
-<p>Take a backup and try a test company first. Have your client&#x27;s authority. Read your AI provider&#x27;s terms and the Terms of Use, including section 14 on liability; we do not promise support or updates. Check what you get in Tally before you rely on it. The README lists what has been run against a real TallyPrime and what has not, for example posting with the published package against a live TallyPrime, and each way of declining in the Windows approval window (one was tried). Not every read has its own recorded run, and reads on very large books can fail or take longer than the assistant waits. ComplyEaze Bridge is not yet code-signed, so your computer may warn you before opening it.</p>
+<p>Take a backup and try a test company first. Have your client&#x27;s authority. Read your AI provider&#x27;s terms and the Terms of Use, including section 14 on liability; we do not promise support or updates. Check what you get in Tally before you rely on it. The README lists what has been run against a real TallyPrime and what has not, for example posting with the published package against a live TallyPrime, and the approval window on Windows has not been run in a controlled test (one decline and one approval were tried on a 0.4.0 candidate). Not every read has its own recorded run, and reads on very large books can fail or take longer than the assistant waits. ComplyEaze Bridge is not yet code-signed, so your computer may warn you before opening it.</p>
 <div lang="hi">
 <h2>हिंदी में सार (अनुवाद; अंग्रेज़ी पाठ ही लागू होता है)</h2>
 <ul>
@@ -98,7 +98,7 @@
 <li>क्लाइंट की बुक्स पर इस्तेमाल से पहले आपके पास क्लाइंट का अधिकार (authority) होना चाहिए, और आपके पेशेवर गोपनीयता दायित्व लागू रहते हैं।</li>
 <li>नई इंस्टॉलेशन में posting बंद रहती है; पुराने संस्करण से अपग्रेड किया हो तो सेटिंग जाँचें। चालू करने पर हर voucher आपकी मंज़ूरी का इंतज़ार करता है। अगर उसी समय कोई कंपनी या ledger का नाम बदला जाए, वह बदला जाए या Tally में लोड हो, तो voucher गलत जगह जा सकता है। post किया हुआ voucher यह टूल वापस नहीं ले सकता; Tally में खुद सुधारें।</li>
 <li>0.3.0 और 0.4.0 में बैंक-स्टेटमेंट टूल की एक खामी थी; 0.4.1 में उसका ज़्यादातर रास्ता बंद है। पुराना संस्करण हो तो अपडेट करें, और स्टेटमेंट अपने कंप्यूटर की डिस्क पर रखें।</li>
-<li>आपके कंप्यूटर पर रखी फ़ाइलों में रकम और नाम बिना छिपाए रहते हैं, और अपने-आप नहीं मिटते।</li>
+<li>आपके कंप्यूटर पर रखी import की journal, import फ़ाइलों और बैंक-स्टेटमेंट प्रस्तावों में रकम और नाम बिना छिपाए रहते हैं, और अपने-आप नहीं मिटते।</li>
 <li>पहले बैकअप लें और टेस्ट कंपनी पर आज़माएँ। Tally में नतीजा खुद जाँचें। यह अभी code-signed नहीं है। यह अकाउंटिंग, टैक्स, ऑडिट या कानूनी सलाह नहीं है।</li>
 </ul>
 </div>

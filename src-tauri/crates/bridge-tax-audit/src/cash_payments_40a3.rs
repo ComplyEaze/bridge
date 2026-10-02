@@ -1134,6 +1134,8 @@ mod tests {
             chain: chain.iter().map(|g| (*g).to_string()).collect(),
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("invented-{name}"),
             masterid: None,
         };

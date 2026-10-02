@@ -196,6 +196,8 @@ mod tests {
             chain: vec!["Indirect Expenses".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: guid.to_string(),
             masterid: None,
         }

@@ -1,0 +1,642 @@
+{
+ "comment": "entity_269st_gap: cash received on one day by two ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger, reported only where the aggregate reaches the s.269ST(a) limit and no single ledger does. Reaches: a gap row where the names share a word and one where they share none; a PAN whose one ledger already reaches the limit (left to the per-ledger test); an aggregate under the limit; a PAN derived from a GSTIN (an opt-in, into a gap only) and a TAN-shaped GSTIN that gives none; a PAN filled by the engagement's override and one a master already holds (the master wins); a ledger with no PAN left unbound; an entity with one ledger; an excluded ledger and a Duties & Taxes ledger and a round-off ledger that are never parties; a ledger made a party by name outside the party groups; a walk-in sale with only tax and round-off lines (unbound); a Contra and an optional voucher left out.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null,
+  "Other Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-001"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-002",
+   "pan": "ABCDE1234F",
+   "gstin": "27ABCDE1234F1Z5"
+  },
+  {
+   "name": "Alpha Trading Co",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-003",
+   "pan": "ABCDE1234F"
+  },
+  {
+   "name": "Zed Stores",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-004",
+   "pan": "ZZZZZ9999Z"
+  },
+  {
+   "name": "Quick Mart",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-005",
+   "pan": "ZZZZZ9999Z"
+  },
+  {
+   "name": "Big Buyer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-006",
+   "pan": "BIGBY1111B"
+  },
+  {
+   "name": "Big Buyer Branch",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-007",
+   "pan": "BIGBY1111B"
+  },
+  {
+   "name": "Small One",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-008",
+   "pan": "SMALL2222S"
+  },
+  {
+   "name": "Small Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-009",
+   "pan": "SMALL2222S"
+  },
+  {
+   "name": "Derived Co",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-010",
+   "gstin": "29DERIV3333D1Z7"
+  },
+  {
+   "name": "Derived Co North",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-011",
+   "pan": "DERIV3333D"
+  },
+  {
+   "name": "Tan Registrant",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-012",
+   "gstin": "27ABCD12345F1Z5"
+  },
+  {
+   "name": "Override Fill",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-013"
+  },
+  {
+   "name": "Override Fill Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-014",
+   "pan": "OVRDE4444O"
+  },
+  {
+   "name": "Masters Win",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-015",
+   "pan": "MASTR5555M"
+  },
+  {
+   "name": "Masters Win Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-016",
+   "pan": "MASTR5555M"
+  },
+  {
+   "name": "No Pan Customer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-017"
+  },
+  {
+   "name": "Sole Ledger",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-018",
+   "pan": "SOLEL6666S"
+  },
+  {
+   "name": "Excluded Bank",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-019",
+   "pan": "ABCDE1234F"
+  },
+  {
+   "name": "Other Asset Party",
+   "chain": [
+    "Other Assets"
+   ],
+   "guid": "edge-ep_gap-020",
+   "pan": "EXTRA7777E"
+  },
+  {
+   "name": "Other Asset Party Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-021",
+   "pan": "EXTRA7777E"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-ep_gap-022"
+  },
+  {
+   "name": "Output CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ep_gap-023",
+   "pan": "ABCDE1234F"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ep_gap-024",
+   "pan": "ABCDE1234F"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "e01",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Traders",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Trading Co",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e03",
+   "date": "2025-06-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     11000000
+    ],
+    [
+     "Zed Stores",
+     -11000000
+    ]
+   ]
+  },
+  {
+   "guid": "e04",
+   "date": "2025-06-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Quick Mart",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "e05",
+   "date": "2025-06-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     22000000
+    ],
+    [
+     "Big Buyer",
+     -22000000
+    ]
+   ]
+  },
+  {
+   "guid": "e06",
+   "date": "2025-06-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     5000000
+    ],
+    [
+     "Big Buyer Branch",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "e07",
+   "date": "2025-06-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     9000000
+    ],
+    [
+     "Small One",
+     -9000000
+    ]
+   ]
+  },
+  {
+   "guid": "e08",
+   "date": "2025-06-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     9000000
+    ],
+    [
+     "Small Two",
+     -9000000
+    ]
+   ]
+  },
+  {
+   "guid": "e09",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Derived Co",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e10",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Derived Co North",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e11",
+   "date": "2025-06-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Override Fill",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e12",
+   "date": "2025-06-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Override Fill Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e13",
+   "date": "2025-06-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Masters Win",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e14",
+   "date": "2025-06-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Masters Win Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e15",
+   "date": "2025-06-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "No Pan Customer",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "e16",
+   "date": "2025-06-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     25000000
+    ],
+    [
+     "Tan Registrant",
+     -25000000
+    ]
+   ]
+  },
+  {
+   "guid": "e17",
+   "date": "2025-06-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     22000000
+    ],
+    [
+     "Sole Ledger",
+     -22000000
+    ]
+   ]
+  },
+  {
+   "guid": "e18",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Excluded Bank",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e19",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Traders",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e20",
+   "date": "2025-06-11",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Other Asset Party",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e21",
+   "date": "2025-06-11",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Other Asset Party Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "w01",
+   "date": "2025-06-12",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     23600000
+    ],
+    [
+     "Sales",
+     -19999950
+    ],
+    [
+     "Output CGST",
+     -3600000
+    ],
+    [
+     "Round Off",
+     -50
+    ]
+   ]
+  },
+  {
+   "guid": "c01",
+   "date": "2025-06-13",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "Edge Bank",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "e22",
+   "date": "2025-06-14",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Traders",
+     -12000000
+    ]
+   ],
+   "status": "optional"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "entity_269st_gap"
+ ],
+ "round_off_ledgers": [
+  "Round Off"
+ ],
+ "party_identity": {
+  "derive_pan_from_gstin": true,
+  "additional_party_ledgers": [
+   "Other Asset Party"
+  ],
+  "excluded_ledgers": [
+   "Excluded Bank"
+  ],
+  "overrides": {
+   "Override Fill": {
+    "name": "Override Fill Proprietor",
+    "pan": "OVRDE4444O",
+    "gstin": "",
+    "address": "1 Invented Lane"
+   },
+   "Masters Win": {
+    "pan": "OTHER0000X"
+   }
+  }
+ }
+}

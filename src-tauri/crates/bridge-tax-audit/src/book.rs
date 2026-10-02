@@ -75,6 +75,12 @@ pub struct Ledger {
     pub guid: String,
     /// The Tally MASTERID, when the digits parse as a positive integer.
     pub masterid: Option<i64>,
+    /// The master's own `INCOMETAXNUMBER`, empty when the read carried none. Never derived from
+    /// the GSTIN here (`party_identity` decides whether a PAN may be).
+    pub pan: String,
+    /// The master's flat `PARTYGSTIN`, else the registration in force on the period's last day
+    /// from its dated `LEDGSTREGDETAILS.LIST`; empty when neither gives one.
+    pub gstin: String,
 }
 
 impl Ledger {
@@ -210,6 +216,9 @@ pub struct Book {
     /// ([`crate::stock_read::stock_inputs`]), so a bad one refuses that test alone. `None` on a
     /// book not built from a read.
     pub stock: Option<StockReadParts>,
+    /// Whether the read carries the books' currency settings. No read does yet, so this is
+    /// `false` for a book built from one (`read_scope` says so).
+    pub currency_read: bool,
 }
 
 impl Book {
@@ -594,6 +603,7 @@ fn load_ledgers(
     root: &Element,
     groups: &BTreeMap<String, Option<String>>,
     part: &str,
+    _as_of: &TallyDate,
 ) -> Result<BTreeMap<String, Ledger>> {
     refuse_foreign(
         part,
@@ -620,6 +630,8 @@ fn load_ledgers(
                 master_opening_paise,
                 guid: l.child_text("GUID").to_string(),
                 masterid: parse_masterid(l.child_text("MASTERID")),
+                pan: String::new(),
+                gstin: String::new(),
             },
         );
     }
@@ -872,7 +884,12 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
     let groups = load_groups(&gp_root);
     let group_masters = load_group_masters(&gp_root);
     let lp = required(read, "ledgers")?;
-    let ledgers = load_ledgers(&xml::read(&lp.content, &lp.id)?, &groups, &lp.id)?;
+    let ledgers = load_ledgers(
+        &xml::read(&lp.content, &lp.id)?,
+        &groups,
+        &lp.id,
+        &read.period.to,
+    )?;
     crate::ledger_ids::check_no_duplicate_ledger_guids(&ledgers)?;
     let tp = required(read, "trial_balance")?;
     let tb = load_tb(&xml::read(&tp.content, &tp.id)?, &tp.id)?;
@@ -995,6 +1012,7 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         ledgers,
         vouchers,
         tb,
+        currency_read: false,
         stock: Some(StockReadParts {
             items: read.one("stock_items").cloned(),
             summaries: read.of_kind("stock_summary").cloned().collect(),
@@ -1339,7 +1357,124 @@ mod tests {
     }
 
     fn fx_ledgers(text: &str) -> Result<BTreeMap<String, Ledger>> {
-        load_ledgers(&xml::parse(text, "probe")?, &BTreeMap::new(), "probe")
+        load_ledgers(
+            &xml::parse(text, "probe")?,
+            &BTreeMap::new(),
+            "probe",
+            &TallyDate::parse("20260331").unwrap(),
+        )
+    }
+
+    /// A ledger master's PAN, and its GSTIN: the flat `PARTYGSTIN`, else the registration in force
+    /// on the period's last day from the dated list. The expected values are what the reference's
+    /// `_gstin_as_of` and `INCOMETAXNUMBER` read give for the same XML.
+    #[test]
+    fn a_ledger_carries_its_pan_and_the_gstin_in_force_on_the_last_day() {
+        let reg = |from: Option<&str>, gstin: &str| {
+            let from = from.map_or(String::new(), |f| {
+                format!("<APPLICABLEFROM>{f}</APPLICABLEFROM>")
+            });
+            format!("<LEDGSTREGDETAILS.LIST>{from}<GSTIN>{gstin}</GSTIN></LEDGSTREGDETAILS.LIST>")
+        };
+        let gstin_of = |body: &str, as_of: &str| -> String {
+            let text = format!(
+                "<ENVELOPE><LEDGER NAME=\"x\"><PARENT>Sundry Debtors</PARENT>{body}</LEDGER></ENVELOPE>"
+            );
+            let l = load_ledgers(
+                &xml::parse(&text, "probe").unwrap(),
+                &BTreeMap::new(),
+                "probe",
+                &TallyDate::parse(as_of).unwrap(),
+            )
+            .unwrap();
+            l["x"].gstin.clone()
+        };
+        let at = "20260331";
+        let dated = |entries: &[(Option<&str>, &str)]| {
+            entries.iter().map(|(f, g)| reg(*f, g)).collect::<String>()
+        };
+        for (what, entries, want) in [
+            (
+                "one after the day is not in force",
+                vec![
+                    (Some("20240401"), "G1"),
+                    (Some("20250401"), "G2"),
+                    (Some("20260401"), "G3"),
+                ],
+                "G2",
+            ),
+            (
+                "document order is not date order",
+                vec![(Some("20250401"), "G2"), (Some("20240401"), "G1")],
+                "G2",
+            ),
+            (
+                "the later entry of one date wins",
+                vec![(Some("20250401"), "Ga"), (Some("20250401"), "Gb")],
+                "Gb",
+            ),
+            (
+                "an undated entry is the oldest",
+                vec![(None, "Gz"), (Some("20250401"), "G2")],
+                "G2",
+            ),
+            (
+                "an undated entry alone is in force",
+                vec![(None, "Gz")],
+                "Gz",
+            ),
+            (
+                "an entry with no GSTIN is dropped",
+                vec![(Some("20250401"), ""), (Some("20240401"), "G1")],
+                "G1",
+            ),
+            (
+                "every entry after the day gives none",
+                vec![(Some("20260401"), "G3")],
+                "",
+            ),
+            (
+                "an entry on the day itself is in force",
+                vec![(Some("20260331"), "Gd")],
+                "Gd",
+            ),
+            (
+                "the GSTIN is stripped",
+                vec![(Some("20250401"), "  Gp  ")],
+                "Gp",
+            ),
+        ] {
+            assert_eq!(gstin_of(&dated(&entries), at), want, "{what}");
+        }
+        // The flat GSTIN wins over any dated entry; the as-of day moves with the period.
+        let flat = format!(
+            "<PARTYGSTIN> Gf </PARTYGSTIN>{}",
+            dated(&[(Some("20250401"), "G2")])
+        );
+        assert_eq!(gstin_of(&flat, at), "Gf");
+        assert_eq!(
+            gstin_of(&dated(&[(Some("20250401"), "G2")]), "20250331"),
+            ""
+        );
+        // The PAN is the master's own, stripped, and empty when absent.
+        let pan_of = |body: &str| -> String {
+            let text = format!(
+                "<ENVELOPE><LEDGER NAME=\"x\"><PARENT>Sundry Debtors</PARENT>{body}</LEDGER></ENVELOPE>"
+            );
+            let l = load_ledgers(
+                &xml::parse(&text, "probe").unwrap(),
+                &BTreeMap::new(),
+                "probe",
+                &TallyDate::parse(at).unwrap(),
+            )
+            .unwrap();
+            l["x"].pan.clone()
+        };
+        assert_eq!(
+            pan_of("<INCOMETAXNUMBER> ABCDE1234F </INCOMETAXNUMBER>"),
+            "ABCDE1234F"
+        );
+        assert_eq!(pan_of(""), "");
     }
 
     fn fx_tb(text: &str) -> Result<BTreeMap<String, TbRow>> {

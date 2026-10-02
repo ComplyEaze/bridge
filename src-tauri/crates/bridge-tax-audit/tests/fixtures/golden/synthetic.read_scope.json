@@ -1,0 +1,83 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "read_scope",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "7516f60b94596323",
+  "population_note_text": "The read of the books itself: no voucher is examined.",
+  "figures": [
+    {
+      "id": "read_scope.currency_read",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "c43f20a93cd50fa2",
+      "definition_text": "Whether this read of the books includes their currency settings.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "read_scope/currency_not_read",
+      "clauses": [],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "currency_read",
+          "figure_id": "read_scope.currency_read"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "925ff10eec981711",
+      "title_text": "The books' currency was not read: every amount is taken as Indian rupees",
+      "limits_sha256_16": "90f67ae902e32b1e",
+      "limits_text": [
+        "This read of the books does not include their currency settings. Every ledger is taken to be kept in Indian rupees. A book kept in another currency, or a ledger kept in a foreign currency whose amounts carry no foreign-currency value, would not be detected.",
+        "Amounts that do carry a foreign-currency value are refused, so no figure mixes currencies from them."
+      ],
+      "ask_client_sha256_16": "f14b8a12d9d88d22",
+      "ask_client_text": [
+        "Confirm that the books are kept in Indian rupees and that no ledger is kept in a foreign currency."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "MAP-1",
+      "subject": "Unmapped Holding",
+      "detail": "chain incomplete: Legacy Holding"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Electricity",
+      "detail": "vouchers 365050 vs TB movement 365550 paise"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000c",
+      "detail": "Journal J/1 2025-09-28 lines sum 200"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 700 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

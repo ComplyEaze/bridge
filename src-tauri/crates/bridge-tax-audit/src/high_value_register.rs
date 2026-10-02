@@ -1248,6 +1248,7 @@ mod tests {
             group_masters: BTreeMap::new(),
             ledgers: BTreeMap::new(),
             stock: None,
+            currency_read: false,
             vouchers: Vec::new(),
             tb: BTreeMap::new(),
         };
@@ -1307,6 +1308,7 @@ mod tests {
             group_masters: BTreeMap::new(),
             ledgers: BTreeMap::new(),
             stock: None,
+            currency_read: false,
             vouchers: vec![
                 voucher(
                     "g1",

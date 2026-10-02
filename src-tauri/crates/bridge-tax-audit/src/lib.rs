@@ -40,6 +40,7 @@ pub mod compare;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
 pub mod documents;
+pub mod entity_269st_gap;
 pub mod error;
 pub mod financial_statements;
 pub mod findings;
@@ -49,8 +50,10 @@ pub mod ledger_ids;
 pub mod ledger_scrutiny;
 pub mod loans_interest;
 pub mod partners_40b_194t;
+pub mod party_identity;
 pub mod party_monthly;
 pub mod read;
+pub mod read_scope;
 pub mod registry;
 pub mod rules;
 pub mod stale_balances_41_1;
@@ -120,6 +123,9 @@ pub struct Engagement {
     /// `high_value_register`-only: the optional `[roles].s194n_withdrawal_narration_terms`, kept as
     /// written and validated when that test runs ([`high_value_register::s194n_terms`]).
     pub s194n_withdrawal_narration_terms: Option<toml::Value>,
+    /// `entity_269st_gap`-only: the optional `[party_identity]` table, kept as written and
+    /// validated when that test runs ([`party_identity::PartyConfig::from_toml`]).
+    pub party_identity: Option<toml::Value>,
     /// `depreciation`-only: `None` when the client config carries no `[depreciation]` table at
     /// all (an engagement that never runs that test); `Some` once the table is present, at which
     /// point `block_by_ledger`, `opening_wdv_paise` and `dep_expense_ledgers` are REQUIRED within
@@ -856,6 +862,7 @@ not YYYY-MM-DD"
             s194n_withdrawal_narration_terms: roles
                 .get("s194n_withdrawal_narration_terms")
                 .cloned(),
+            party_identity: cfg.get("party_identity").cloned(),
             loan_ledgers_configured: cfg
                 .get("loans")
                 .and_then(toml::Value::as_table)
@@ -1377,6 +1384,33 @@ pub fn high_value_register_on(
         bank_statement_refused: statement_refused,
     };
     let result = high_value_register::run(book, rules, &inputs)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `entity_269st_gap` on a book and return its canonical parity dump. The party index is built
+/// from the engagement's optional `[party_identity]` table; a ledger whose group chain is
+/// incomplete and does not already settle whether it is a party refuses the test, as the
+/// reference's `IncompleteLedgerChain` ends it.
+pub fn entity_269st_gap_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let config = party_identity::PartyConfig::from_toml(bound.party_identity.as_ref())?;
+    let index = party_identity::build_party_index(book, &config)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let round_off_ledgers: BTreeSet<String> = bound.round_off_ledgers.iter().cloned().collect();
+    let result = entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)?;
+    let module_check = entity_269st_gap::check_invariants(&result);
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `read_scope` on a book and return its canonical parity dump. The reference module has no
+/// `check_invariants`, so the dump's module invariants are empty on both sides.
+pub fn read_scope_on(book: &book::Book, rules: &Rules) -> Result<serde_json::Value> {
+    let result = read_scope::run(book, rules)?;
     canonical::canonical_test_result(book, &result, None)
 }
 

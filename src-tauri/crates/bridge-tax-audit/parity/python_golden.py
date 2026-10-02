@@ -81,6 +81,24 @@ def _cash_payments_40a3(c):
         round_off_ledgers=frozenset(round_off_ledgers))
 
 
+def _entity_269st_gap(c):
+    """As tae/pack.py calls it: the party index is built from the engagement's [party_identity] table, and the
+    round-off ledgers are the [roles] ones."""
+    from tae.audit_tests import entity_269st_gap
+    from tae.config import role_ledger_set
+    from tae.party_identity import build_party_index
+    round_off_ledgers = (role_ledger_set(c.cfg, "round_off_ledgers")
+                         if "round_off_ledgers" in c.cfg.get("roles", {}) else set())
+    return entity_269st_gap, entity_269st_gap.run(
+        c.eng, c.rules, c.cash, c.bank, build_party_index(c.eng.book, c.cfg),
+        round_off_ledgers=frozenset(round_off_ledgers))
+
+
+def _read_scope(c):
+    from tae.audit_tests import read_scope
+    return read_scope, read_scope.run(c.eng, c.rules)
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
@@ -402,12 +420,14 @@ RUNNERS = {
     "cash_payments_40a3": _cash_payments_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,
+    "entity_269st_gap": _entity_269st_gap,
     "financial_statements": _financial_statements,
     "high_value_register": _high_value_register,
     "ledger_scrutiny": _ledger_scrutiny,
     "loans_interest": _loans_interest,
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
+    "read_scope": _read_scope,
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,

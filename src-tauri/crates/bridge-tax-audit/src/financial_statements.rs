@@ -751,6 +751,8 @@ mod tests {
             chain: chain.iter().map(|s| (*s).to_string()).collect(),
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("guid-{name}"),
             masterid: None,
         }

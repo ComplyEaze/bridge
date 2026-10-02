@@ -61,7 +61,8 @@ meaning none supplied), `ais` as above, `s194n_terms` and `round_off_ledgers` (d
 `bank_statement_refused` (the reader's plain-words reason a supplied statement was refused; default none) and `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
-for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); and
+for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
+[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); and
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
@@ -88,7 +89,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, cash_payments_40a3,
-                                 creditor_ageing_43bh, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
+                                 creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules
@@ -114,7 +115,9 @@ def main() -> int:
                                  chain=tuple(l["chain"]),
                                  chain_complete=typed(l, "chain_complete", lambda x: isinstance(x, bool),
                                                       "true or false", absent=True, nullable=False),
-                                 guid=l.get("guid", ""))
+                                 guid=l.get("guid", ""),
+                                 pan=typed(l, "pan", lambda x: isinstance(x, str), "text", absent="", nullable=False),
+                                 gstin=typed(l, "gstin", lambda x: isinstance(x, str), "text", absent="", nullable=False))
                for l in spec["ledgers"]}
 
     def integer(x):
@@ -145,7 +148,9 @@ def main() -> int:
                              credit_paise=t["credit"], closing_paise=t["closing"]) for t in spec["tb"]}
     book = Book(company_name="Invented edge book",
                 period=Period(date.fromisoformat(start), date.fromisoformat(end)), groups=groups,
-                ledgers=ledgers, vouchers=vouchers, tb=tb, company_guid="invented-edge-company")
+                ledgers=ledgers, vouchers=vouchers, tb=tb, company_guid="invented-edge-company",
+                currency_read=typed(spec, "currency_read", lambda x: isinstance(x, bool), "true or false",
+                                    absent=False, nullable=False))
     entity_type = spec.get("entity_type", "individual")
     eng = Engagement(entity_type, "2026-27", book)
     rules = load_rules("2026-27", entity_type)
@@ -284,6 +289,7 @@ def main() -> int:
             client_state=tc.client_state(cfg), turnover_is_placeholder=tc.turnover_is_placeholder(cfg),
             deductor_activity=tc.deductor_activity(cfg), goods_carriage_ledgers=tc.tds_goods_carriage_ledgers(cfg))
 
+    from tae.party_identity import build_party_index
     runners = {
         "bank_reconciliation": bank_reconciliation_run,
         "book_keeping_quality": lambda: (book_keeping_quality, book_keeping_quality.run(
@@ -300,6 +306,11 @@ def main() -> int:
             eng, rules, set(spec.get("creditors", [])), acceptance_lag_days=ca.get("acceptance_lag_days", 0),
             supplier_classification=ca.get("supplier_classification", {}), post_year_payments=post_year,
             mse_interest_ledgers=frozenset(ca.get("mse_interest_ledgers", [])))),
+        # As tae/pack.py: the party index is built from the engagement's [party_identity] table, and
+        # the round-off ledgers are passed as given.
+        "entity_269st_gap": lambda: (entity_269st_gap, entity_269st_gap.run(
+            eng, rules, cash, bank, build_party_index(book, {"party_identity": spec.get("party_identity", {})}),
+            round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
         "high_value_register": high_value_register_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),
         "loans_interest": loans_interest_run,
@@ -310,6 +321,7 @@ def main() -> int:
             eng, rules, cash, bank,
             top_n=typed(spec, "top_n", lambda x: integer(x) and x >= 0, "a non-negative integer",
                         absent=party_monthly.PARTY_TOP_N, nullable=False))),
+        "read_scope": lambda: (read_scope, read_scope.run(eng, rules)),
         "stale_balances_41_1": lambda: (stale_balances_41_1, stale_balances_41_1.run(eng, rules)),
         "statutory_dues_43b": lambda: (statutory_dues_43b, statutory_dues_43b.run(
             eng, rules, dict(sd.get("nature_by_ledger", {})), frozenset(sd.get("salary_expense_ledgers", [])))),

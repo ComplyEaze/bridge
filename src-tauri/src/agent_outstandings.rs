@@ -80,6 +80,10 @@ impl Server {
                     .collect::<Vec<_>>();
                 let totals = outstanding_totals_from_open_bills(&all_bills)?;
                 let ageing_buckets = ageing_buckets_from_open_bills(&all_bills)?;
+                // Every open bill in the requested direction, which the totals
+                // and the ageing cover; the page below may show fewer. The page
+                // count is restated if the response size cuts it further.
+                let open_bills_total = all_bills.len();
                 let (bills, bills_truncated, next_bill_offset) =
                     paginate_open_bills(all_bills, bill_offset, bill_limit);
                 let bills = bills
@@ -97,7 +101,7 @@ impl Server {
                     })
                     .collect::<Vec<_>>();
                 Ok((
-                    json!({"totals":totals, "ageing_basis": if matches!(ageing_anchor, OutstandingsAgeingAnchor::BillDate) {"bill_date"} else {"due_date"}, "ageing_buckets": ageing_buckets, "top_parties": parties, "top_parties_ranked_by":"gross_exposure", "open_bills": bills, "offset": bill_offset, "limit": bill_limit, "next_offset": next_bill_offset, "unallocated":{"count": unallocated_count, "totals": unallocated_totals, "parties": unallocated, "truncated": unallocated_truncated, "next_offset": next_unallocated_offset}}),
+                    json!({"totals":totals, "ageing_basis": if matches!(ageing_anchor, OutstandingsAgeingAnchor::BillDate) {"bill_date"} else {"due_date"}, "ageing_buckets": ageing_buckets, "top_parties": parties, "top_parties_ranked_by":"gross_exposure", "open_bills_total": open_bills_total, "open_bills_shown": bills.len(), "open_bills": bills, "offset": bill_offset, "limit": bill_limit, "next_offset": next_bill_offset, "unallocated":{"count": unallocated_count, "totals": unallocated_totals, "parties": unallocated, "truncated": unallocated_truncated, "next_offset": next_unallocated_offset}}),
                     bills_truncated || unallocated_truncated,
                 ))
             };

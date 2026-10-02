@@ -21,7 +21,10 @@ requests it comes from, except where it names an issue.
 
 **What you can do now**
 
-- No new tool. The changes are listed below.
+- No new tool. On a company large enough to be counted first,
+  `voucher_presence` can now answer `absent` for a voucher it finds nowhere in
+  a date range that holds vouchers and was checked against that count. An empty
+  range is still not called absent (#985, #1020).
 
 **Safer or fixed**
 
@@ -29,62 +32,65 @@ requests it comes from, except where it names an issue.
   when its text names a local disk (#1024).
 - A statement or password file path that starts with two slashes or two
   backslashes, such as the Windows long-path form (starting with `\\?\`) or a
-  network share (`\\computer\folder`), is now refused. Use the ordinary drive
-  path instead (#1024).
+  network share (`\\computer\folder`), is now refused. Copy the file to this
+  computer and give its path there (#1024).
 - `vouchers` and `voucher_presence` now call a date range with vouchers in it
   complete by one rule: only when every voucher read was checked against a
   separate count of that range. Before, `vouchers` called any such range
-  complete, and `voucher_presence` called none complete. On a small or new
-  company (voucher change counter 42 or lower), which ComplyEaze Bridge does
-  not count first, both now say `partial`. On a larger company,
-  `voucher_presence` can now answer `absent` for a voucher it finds nowhere in
-  a counted range (#985, #1020).
+  complete (unless it withheld a voucher), and `voucher_presence` called none
+  complete. On a small or new company, which ComplyEaze Bridge does not count
+  first, both now say `partial` (#985, #1020).
 - A voucher changed in Tally between the count and the read now refuses the
   read (`voucher_window_part_not_admitted`, cause `part_census_mismatch`),
   also when the range is read in one request, where it used to return without
   that check. Call again once while the book is quiet; if it repeats, read the
-  range in Tally. `ledger_movement`, verifying an import and the party detail
-  of `outstandings` can give the same refusal. After a post was sent, this
-  refusal on the read-back means the voucher may already be in Tally: use
-  `verify_import` on the same batch and never post it again. Verifying an
-  import for one day that Tally cannot serve in one request is now read in
-  parts instead of refused, which sends more requests to Tally (#985, #1020).
-- When `post_import` refuses a batch before you are asked to approve it,
-  because some of its rows are already in the book
-  (`import_preexisting_identity`), the answer now names those rows by their
-  transaction ids and says what to check in Tally next, instead of returning a
-  bare code. The same batches are refused as before (#901, #908).
+  range in Tally. `ledger_movement`, `purchase_register`, `build_import_xml`,
+  verifying an import and the party detail of `outstandings` can give the same
+  refusal. After a post was sent, this refusal on the read-back means the
+  voucher may already be in Tally: use `verify_import` on the same batch and
+  never post it again. In some cases, verifying an import for one day that
+  Tally cannot serve in one request is now read in parts instead of refused,
+  which sends more requests to Tally (#985, #1020).
+- When `post_import` refuses a batch before it is sent because some of its
+  rows may already be in the book (`import_preexisting_identity`), the answer
+  now names those rows by their transaction ids and says what to check in Tally
+  next, instead of returning a bare code. The same batches are refused as
+  before (#901, #908).
 - `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
   the plain number (`"1"`), not as Tally sends it with a leading space
   (`" 1"`), so it matches the same id returned by `verify_import` (#989, #1021).
-- If voucher posting is turned on, you approve a batch in the posting window,
+- If voucher posting is turned on, you approve a batch in its approval dialog,
   and the post is then refused before it is sent (for example because the
-  import journal is busy, the batch is not found, or it belongs to another
-  company), your approval is withdrawn and you are asked again. Before, in
-  these cases the approval stayed held for up to 15 minutes, and posting any
-  other batch was refused until it lapsed (#857, #904).
+  import journal is busy, the batch is not found, or the call names a
+  different company from the batch's), your approval is withdrawn and you are
+  asked again. Before, in these cases the approval stayed held for up to 15
+  minutes, and posting any other batch was refused until it lapsed (#857,
+  #904).
 
 **Known limits**
 
 - A date range is called complete when the vouchers read match a separate
   count of the range. If Tally's own date selection leaves a voucher out, the
-  count and the read both miss it, and the range is still called complete.
-  A multi-day range read in one request was not tried against TallyPrime, nor
-  how often the new refusal appears on a busy book with several users. A small
-  or new company cannot get `absent`; adding a count for it is deferred (#985,
-  ADR 0017).
-- `import_preexisting_identity` raised after you approve a batch still returns
-  no rows and no next step. The rows it names before approval can be more than
-  the vouchers the book holds, when several rows look the same; count the
-  vouchers in Tally before leaving any row out. A same-day, same-amount twin is
-  still refused (#865, #901).
-- Tried against TallyPrime 7.1 Silver in a lab on 2 October 2026: #1020, on
-  one-day ranges of two synthetic books and the read-back of one posted
-  Journal. The other changes have not been run against TallyPrime; each is
-  covered by automated tests. No one on our side installed the Windows package
-  of this build in Claude Desktop on a Windows PC. The release check starts
-  each package, lists its tools and reads a sample bank statement, and does not
-  run against TallyPrime.
+  count and the read both miss it, and the range is still called complete. A
+  small or new company is not counted, so it cannot get `absent`; adding a
+  count for it is deferred (#985).
+- `parse_bank_statement` checks the text of the path. A mapped drive letter
+  still passes, and so, on a Mac, does a path under a mounted network volume
+  (#1024).
+- A batch refused just before it is sent can still return no rows and no next
+  step. The rows named before that can be more than the vouchers the book
+  holds, when several rows look the same; count the vouchers in Tally before
+  leaving any row out. A same-day, same-amount twin is still refused (#865,
+  #901).
+- Tried against TallyPrime 7.1 Silver in a lab on 2 October 2026, before
+  #1020 merged: one-day ranges on two synthetic books, and the read-back of one
+  posted Journal. Not tried: a range of several days read in one request, the
+  new refusal itself (seen only in tests), how often it appears on a busy book
+  with several users, and other Tally editions. The other changes have not been
+  run against TallyPrime; each is covered by automated tests. No one on our
+  side installed the Windows package of this build in Claude Desktop on a
+  Windows PC. The release check starts each package, lists its tools and reads
+  a sample bank statement, and does not run against TallyPrime.
 
 ## [0.4.0] - 2026-10-02
 

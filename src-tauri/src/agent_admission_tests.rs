@@ -121,17 +121,17 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     );
     // The exact sentence each description ends with, written out here so an edit
     // to the catalogue's constants cannot pass by agreeing with itself.
-    const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to Bridge's local log on this computer; it writes nothing to Tally.";
+    const READ_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to ComplyEaze Bridge's local log on this computer; it writes nothing to Tally.";
     // Local writers: (name, destructive, the exact sentence).
     const LOCAL_WRITERS: &[(&str, bool, &str)] = &[
         // Fresh batch id and file each call: additive.
-        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to Bridge's local folder on this computer; writes nothing to Tally."),
+        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
         // A new file each call: additive.
-        ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in Bridge's local folder on this computer; never contacts Tally."),
+        ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // A newer verification replaces the saved proof.
-        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
+        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
         // It verifies the batch twice, so it replaces the proof as well.
-        ("acknowledge_post_review", true, "Writes one acknowledgement record to Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
+        ("acknowledge_post_review", true, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions

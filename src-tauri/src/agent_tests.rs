@@ -403,7 +403,10 @@ async fn invalid_scope_arguments_are_rejected_before_any_tally_probe() {
             error.get("remediation").is_none(),
             "{tool} refusal gained unearned remediation: {error}"
         );
-        assert_eq!(error["message"], "Bridge refused this operation.", "{tool}");
+        assert_eq!(
+            error["message"], "ComplyEaze Bridge refused this operation.",
+            "{tool}"
+        );
     }
 }
 
@@ -427,7 +430,10 @@ fn an_empty_book_refusal_carries_its_remediation_through_the_real_payload() {
     );
     let error = &response.value["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error["remediation"]
             .as_str()
@@ -460,7 +466,10 @@ fn a_small_response_budget_keeps_the_refusal_code_and_drops_only_the_guidance() 
     // The code is what the caller cannot do without, so it must survive a budget
     // too small to carry the guidance as well.
     assert_eq!(error["code"], "empty_book_first_import");
-    assert_eq!(error["message"], "Bridge refused this operation.");
+    assert_eq!(
+        error["message"],
+        "ComplyEaze Bridge refused this operation."
+    );
     assert!(
         error.get("remediation").is_none(),
         "guidance displaced the refusal budget: {error}"

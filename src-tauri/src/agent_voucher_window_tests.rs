@@ -3165,6 +3165,38 @@ async fn a_census_mismatch_reaches_the_caller_with_its_counts() {
     assert_eq!(error["counts"], json!({"returned": 0, "counted": per_read}));
 }
 
+/// #985: a window is `counted()` only against a census that names each
+/// voucher's GUID. A count of `(day, AlterID)` alone admits the same rows on
+/// AlterIDs only, so the read is not called counted.
+#[tokio::test]
+async fn only_a_census_with_guids_makes_a_window_counted() {
+    let window = ("20260801", "20260801");
+    let with_guids = WindowCensus::from_census_rows(
+        parse_voucher_census(&three_vouchers(), window, None).unwrap(),
+    )
+    .unwrap();
+    let ids_only = WindowCensus::from_rows((1..=3).map(|id| (day("20260801"), id)));
+    for (census, counted) in [(with_guids, true), (ids_only, false)] {
+        let (outcome, _) = read_window(
+            paired(&xml_plan(three_vouchers())),
+            window,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::replay_of(
+                vec![part("20260801", "20260801", None)],
+                Some(WindowWitness {
+                    marks: marks_of(3),
+                    census: Some(census),
+                }),
+            ),
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+        )
+        .await;
+        let outcome = outcome.unwrap();
+        assert_eq!(outcome.rows.len(), 3);
+        assert_eq!(outcome.counted(), counted);
+    }
+}
+
 /// The `vouchers` plans of a book whose mark needs a census (#985): `census`
 /// counts the window, which then fits one read, and `data` is that read.
 fn counted_vouchers_plans(census: String, data: String) -> Vec<ScenarioPlan> {

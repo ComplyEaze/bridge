@@ -438,6 +438,16 @@ impl WindowCensus {
         self.days.values().map(|ids| ids.len() as u64).sum()
     }
 
+    /// Whether every voucher counted carries its GUID, so admission matches
+    /// rows by AlterID **and** GUID. A count built from `(day, AlterID)` alone
+    /// is admitted on AlterIDs only, which a substituted voucher can pass.
+    fn names_every_guid(&self) -> bool {
+        self.days
+            .values()
+            .flatten()
+            .all(|alter_id| self.guids.contains_key(alter_id))
+    }
+
     fn max_alter_id(&self) -> u64 {
         self.days
             .values()
@@ -841,11 +851,13 @@ pub(super) struct WindowReadOutcome<T> {
 impl<T> WindowReadOutcome<T> {
     /// Whether every row was admitted against a census of the window: a
     /// second request, counted apart from the data, that the rows matched
-    /// voucher for voucher. See [`window_read`].
+    /// voucher for voucher, by AlterID and GUID. A count without GUIDs does
+    /// not qualify, because it admits on AlterIDs alone. See [`window_read`].
     pub(super) fn counted(&self) -> bool {
         self.witness
             .as_ref()
-            .is_some_and(|witness| witness.census.is_some())
+            .and_then(|witness| witness.census.as_ref())
+            .is_some_and(WindowCensus::names_every_guid)
     }
 }
 

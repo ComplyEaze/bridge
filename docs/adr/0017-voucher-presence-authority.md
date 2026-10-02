@@ -605,9 +605,19 @@ human-approved batch — this ADR does not move.
   of a few dozen vouchers) sends no census and stays `Partial`, with reason
   `nonempty_window_unqualified`. What remains open: the census and the data
   read share one date filter, so a voucher that filter drops is missed by
-  both alike and the two agree. Not measured: multi-day windows, Education
-  and tiers other than Silver 7.1, and how often a voucher changed between
-  the count and the read refuses an ordinary read.
+  both alike and the two agree.
+
+  What the measurement covers, and what it does not. The census was measured
+  equal to the full read on whole-day windows. Multi-day windows were measured
+  only when read in parts: a whole year and a month of `vouchers`, and a
+  quarter and a month of `ledger_movement`, each part admitted against the
+  census, all complete (§11c.5). A multi-day window read in **one** request
+  and admitted against its census is the case this change creates, and it
+  has not been run against a real Tally; until it has, the ruling is applied
+  past what was measured for that case, and `voucher_presence` is mostly
+  asked about such windows. Also not measured: Education and tiers other
+  than Silver 7.1, and how often a voucher changed between the count and the
+  read refuses an ordinary read.
 
 - **A widened re-read was built, measured and rejected**, and the reasoning is
   recorded here so the next attempt starts past it rather than at it. The idea

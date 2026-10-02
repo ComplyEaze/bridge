@@ -1066,8 +1066,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              different vouchers from the ones it counted (`counts` gives returned against \
              counted), so it released nothing. A voucher created, altered, re-dated or deleted \
              between the count and the read causes it: call the same tool again with the same \
-             arguments, once, while the book is quiet. A repeat on a quiet book means Tally did \
-             not honour the read's filter; read this window in Tally itself.",
+             arguments, once, while the book is quiet. A repeat on a quiet book may mean Tally \
+             did not honour the read's filter, or a fault in Bridge; read this window in Tally \
+             itself.",
         ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the

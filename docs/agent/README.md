@@ -739,15 +739,20 @@ rate or return section, and matches nothing against any portal.
   voucher windows of the first two invoices are committed, and the parsed
   windows have exactly those entries (a test); the requests are the ones the
   code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
-  by the build at commit 8c674d5e (whose tool text and `coverage` note were
-  worded before the latest edits), with the book's own ledger masters, groups and company
-  listings, and is replayed end to end from that recorded call (a test). The
-  untaxed invoice's day was read once by an earlier build; those bytes are not
-  committed, and a test with a Sales voucher whose tax entries are removed
-  stands in for its list. The Credit Note day, and a Debit Note day through
+  by the build at commit 8c674d5e, with the book's own ledger masters, groups and
+  company listings, and is replayed end to end from that recorded call (a test;
+  the answer file carries that build's `coverage` wording). The untaxed
+  invoice's day was read once by an earlier build; only its voucher window is
+  committed, not its masters or the tool's answer, and a test with a Sales
+  voucher whose tax entries are removed stands in for its list. The Credit Note day, and a Debit Note day through
   `purchase_register`, are also replayed end to end from their recorded calls
   (tests). One Sales accounting voucher (not an invoice) is also classified, in
   tests, against the ledger masters of the purchase register's lab book.
+- **What `complete` rests on.** On a row and on the response, `complete` means
+  the company's marks and the ledger masters read the same before and after the
+  window. It does not mean the window was admitted against a separate voucher
+  count: on the small book measured, the call sent no voucher census, and a
+  small window that `vouchers` calls `partial` can be `complete` here.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of

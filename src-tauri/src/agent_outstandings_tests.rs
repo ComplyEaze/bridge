@@ -1247,9 +1247,44 @@ fn the_outstandings_description_says_how_to_read_a_shortened_bill_list() {
         "`open_bills_shown` counts the bills on this page",
         "`limit` is not lowered when the response size shortens the page",
         "\"showing 500 of 1,240 open bills; the totals and the ageing cover all 1,240\"",
-        "(on a later page, the bills from offset + 1)",
+        "(on a later page, the bills from offset + 1;",
+        "on a partial read, both counts and the sentence cover the base-currency ledgers only, so say so in it)",
         "`offset` set to `next_offset`",
     ] {
         assert!(description.contains(needle), "{needle}");
     }
+}
+
+/// On a partial read the counts sit under `base_currency_ledgers` and page
+/// as the complete read's do: an offset past the end shows no bill and keeps
+/// the base-currency total.
+#[tokio::test]
+async fn a_partial_read_past_the_end_shows_no_bill_and_keeps_the_total() {
+    let response = forex_outstandings(
+        None,
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::MaskParties,
+        json!({"offset": 14, "limit": 5}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    let base = &result["base_currency_ledgers"];
+    assert_eq!(base["open_bills_total"], 14);
+    assert_eq!(base["open_bills_shown"], 0);
+    assert!(base["open_bills"].as_array().unwrap().is_empty(), "{base}");
+    assert!(base["next_offset"].is_null(), "{base}");
 }

@@ -360,17 +360,16 @@ const legalPins = {
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "15", "Indemnity"],
   ],
   contact: [
-    ["contact@complyeaze.com (SPMS Comply Eaze Solutions LLP; its postal address is in section 1.1", "terms", "19", "contact@complyeaze.com, SPMS Comply Eaze Solutions LLP, at the address in section 1.1"],
-    ["its postal address is in section 1.1", "terms", "1.1", "Our registered office is at"],
-    ["and these routes are in section 19", "terms", "19", "General questions and notices: contact@complyeaze.com"],
-    ["Before starting any proceedings over a dispute, write to contact@complyeaze.com or to the postal address in section 1.1; both sides then try in good faith to resolve it within 30 days", "terms", "18.2", "Before starting any proceedings, the party raising a dispute will notify the other in writing, at the contact address in section 19. Both will then try in good faith to resolve it within 30 days."],
-    ["or to the postal address in section 1.1", "terms", "1.1", "Our registered office is at"],
-    ["or to the postal address in section 1.1", "terms", "19", "at the address in section 1.1"],
+    ["contact@complyeaze.com (SPMS Comply Eaze Solutions LLP; its registered office address is in section 1 of the Privacy Policy", "privacy", "1", "Our registered office is at"],
+    ["these routes are in section 19 of the Terms of Use", "terms", "19", "General questions and notices: contact@complyeaze.com, SPMS Comply Eaze Solutions LLP"],
+    ["Before starting any proceedings over a dispute, write to contact@complyeaze.com or to our registered office; both sides then try in good faith to resolve it within 30 days", "terms", "18.2", "Before starting any proceedings, the party raising a dispute will notify the other in writing, at the contact address in section 19. Both will then try in good faith to resolve it within 30 days."],
+    ["or to our registered office", "terms", "19", "at the address in section 1.1"],
+    ["or to our registered office", "terms", "1.1", "Our registered office is at"],
     ["though either side can still seek urgent interim relief (section 18.2)", "terms", "18.2", "This does not stop either party from seeking urgent interim relief."],
     ["Do not put real client data, passwords or other confidential information in issues, bug reports, logs or screenshots you share with us or post publicly (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information in issues, bug reports, logs or screenshots that you share with us or post publicly"],
     ["“Grievance” in the subject", "privacy", "16", "with \"Grievance\" in the subject"],
     ["or write by post to that address", "privacy", "16", "or by post to the address in section 1"],
-    ["we acknowledge within 7 days of receiving it and answer within 30 days (section 16 of the Privacy Policy)", "privacy", "16", "We will acknowledge a grievance within 7 days of receiving it and give you our response within 30 days"],
+    ["we acknowledge within 7 days of receiving it and answer within one month (section 16 of the Privacy Policy)", "privacy", "16", "We will acknowledge a grievance within 7 days of receiving it and give you our response within one month"],
     ["write to security@complyeaze.com or use GitHub private vulnerability reporting for the ComplyEaze Bridge repository", "terms", "19", "security@complyeaze.com, or GitHub private vulnerability reporting for the Bridge repository"],
     ["not a public issue; we aim to acknowledge within 7 days", "terms", "19", "We aim to acknowledge a report within seven days. Please do not report a vulnerability in a public issue."],
     ["Section 4.4 of the Terms of Use says we are not obliged to provide support", "terms", "4.4", "We are not obliged to provide support"],
@@ -378,7 +377,7 @@ const legalPins = {
 };
 // "section 14.1", "Section 5", "sections 8, 9 and 15", "sections 4 to 6", "section 16 of the Privacy Policy"
 const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)/gi;
-const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\b/gi;
+const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|lakh|lakhs|crore|crores)\b/gi;
 const withoutCitations = (text) => text.replace(citation, " ");
 // Each citation as "document number", read fail-closed: a citation followed by " of " must name exactly the Terms of
 // Use or the Privacy Policy, and a bare one is the Terms' only if its clause names neither the Privacy Policy nor the
@@ -427,4 +426,15 @@ test("the liability and contact answers say no more and no less than the clauses
       assert.ok(pinned, `#${id} gives the figure "${word}" without a pin to the clause`);
     }
   }
+});
+
+test("every page names the publisher with the registration number and registered office the Privacy Policy gives", () => {
+  // LLP Act 2008 s.21: publications carry the name, registered office, registration number and a statement of
+  // limited liability. The footer repeats section 1 of the Privacy Policy, so the two cannot drift apart.
+  const section1 = flat(legalText("privacy").match(/^## 1\. [\s\S]*?(?=^## )/m)[0]);
+  const llpin = section1.match(/LLP identification number ([A-Z]{3}-[0-9]{4})/);
+  const office = section1.match(/Our registered office is at ([^.]+(?:\.[^.]+)*?, India)\./);
+  assert.ok(llpin && office, "section 1 of the Privacy Policy no longer gives the LLP identification number and registered office");
+  const line = `Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered in India, LLP identification number ${llpin[1]}. Registered office: ${office[1]}.`;
+  for (const page of pages) assert.ok(faqText(read(page)).includes(line), `${page}: the footer does not carry: ${line}`);
 });

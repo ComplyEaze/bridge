@@ -1300,8 +1300,32 @@ impl Server {
                 verification::mark_book_rolled_back(&mut result);
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
                 // An untagged native post that is not bound: what its content
-                // cannot find may have been edited, so it is never absent.
-                verification::mark_sent_not_attributed(&mut result);
+                // cannot find is never absent. When the post's own answer said
+                // Tally created none of its one voucher and it is not found,
+                // say so (bridge#1108); otherwise an edit in Tally is as
+                // likely. Only the post's own readback reads that answer: by
+                // a later verification someone may have entered the voucher
+                // by hand and edited it.
+                let counters = current_dispatch
+                    .then(|| {
+                        dispatch_response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                            .map(|outcome| outcome.counters())
+                    })
+                    .flatten();
+                match verification::unmatched_cause(
+                    counters,
+                    line.vouchers.len(),
+                    verification::unmatched_count(&result),
+                ) {
+                    verification::UnmatchedCause::ReportedNotCreated => {
+                        verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::NotEstablished => {
+                        verification::mark_sent_not_attributed(&mut result)
+                    }
+                }
             }
             let mut closing_mode_evidence = None;
             if result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {

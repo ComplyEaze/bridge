@@ -242,7 +242,13 @@ Contra vouchers, and 5 Journals).
   `book_rolled_back`, nothing bound, nothing read as absent.
 - **Never absence:** a voucher of an untagged native post that was not bound,
   and that its content no longer finds, is `sent_not_attributed`, never
-  `not_found`. A refusal is final, so an edit made in Tally to one voucher
+  `not_found`. The one exception is `tally_reported_not_created`
+  (bridge#1108), in the post's own readback only: a post of one voucher
+  whose own answer reported every counter, `CREATED 0`, `EXCEPTIONS 1` and
+  nothing else, and whose voucher its content does not find. It reads
+  Tally's answer together with that absence and, like
+  `sent_not_attributed`, sits outside the absence qualification gate. A
+  refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
 - **Known limits:** identical twins are bound by position alone, since they
   are identical in content and their own order cannot be observed (the request

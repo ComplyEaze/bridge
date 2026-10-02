@@ -380,11 +380,10 @@ above is not understated by a non-account-payee cheque or draft booked as bank."
     // s.44AB(b), a question only: a profession's audit turns on its gross receipts, which the books' sales figure is
     // not, and whether the client carries on a profession is configuration. Asked where the client is recorded as a
     // profession or both, or where the activity is unrecorded and s.44AB(a) does not already require the audit.
-    if false
-        && (matches!(
-            deductor_activity,
-            Some(DeductorActivity::Profession | DeductorActivity::Both)
-        ) || (deductor_activity.is_none() && audit_required != "yes"))
+    if matches!(
+        deductor_activity,
+        Some(DeductorActivity::Profession | DeductorActivity::Both)
+    ) || (deductor_activity.is_none() && audit_required != "yes")
     {
         let limit_text = match rules.profession_gross_receipts_paise {
             Some(paise) => format!("₹{} lakh", lakh_g(paise)?),
@@ -792,5 +791,78 @@ mod tests {
             Value::Text("not supplied".to_string())
         );
         assert_eq!(r.findings[1].confidence, Confidence::JudgementRequired);
+    }
+
+    fn profession_limits(r: &TestResult) -> Option<&str> {
+        r.findings
+            .iter()
+            .find(|f| f.id == "applicability_44ab/profession_44ab_b")
+            .map(|f| f.limits[0].as_str())
+    }
+
+    #[test]
+    fn the_profession_question_names_the_limit_the_table_holds() {
+        let r = run(
+            &rules(),
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .unwrap();
+        let text = profession_limits(&r).expect("asked for a profession");
+        assert!(
+            text.contains("exceed ₹50 lakh in the previous year"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn the_profession_question_says_so_when_the_table_holds_no_limit() {
+        let mut rules = rules();
+        rules.profession_gross_receipts_paise = None;
+        let r = run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Both),
+        )
+        .unwrap();
+        let text = profession_limits(&r).expect("asked for both");
+        assert!(
+            text.contains(
+                "exceed the limit, which this rules table does not hold in the previous year"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_limit_that_is_not_a_whole_number_of_lakh_is_refused_not_printed_differently() {
+        let mut rules = rules();
+        rules.profession_gross_receipts_paise = Some(500_000_001);
+        let err = run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .unwrap_err();
+        assert!(matches!(err, AuditError::Config(_)), "{err:?}");
+        // A client not asked the question is not refused for it.
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .is_ok());
     }
 }

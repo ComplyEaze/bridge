@@ -6742,5 +6742,117 @@
   "file": "src/findings.rs",
   "from": "            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });",
   "to": "            self.figures.push(Figure {\n                id: id.clone(),\n                value,\n                unit,\n                definition: definition.to_string(),\n                evidence,\n            });\n            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });"
+ },
+ {
+  "id": "AP-01",
+  "by": "author",
+  "what": "the profession question is not asked for a client recorded as both",
+  "file": "src/applicability_44ab.rs",
+  "from": "        Some(DeductorActivity::Profession | DeductorActivity::Both)\n    ) || (deductor_activity.is_none() && audit_required != \"yes\")",
+  "to": "        Some(DeductorActivity::Profession)\n    ) || (deductor_activity.is_none() && audit_required != \"yes\")"
+ },
+ {
+  "id": "AP-02",
+  "by": "author",
+  "what": "the profession question is asked of an unrecorded client even when s.44AB(a) is yes",
+  "file": "src/applicability_44ab.rs",
+  "from": "(deductor_activity.is_none() && audit_required != \"yes\")",
+  "to": "(deductor_activity.is_none())"
+ },
+ {
+  "id": "AP-03",
+  "by": "author",
+  "what": "the profession question is asked of an unrecorded client only when s.44AB(a) is not no",
+  "file": "src/applicability_44ab.rs",
+  "from": "(deductor_activity.is_none() && audit_required != \"yes\")",
+  "to": "(deductor_activity.is_none() && audit_required != \"no\")"
+ },
+ {
+  "id": "AP-04",
+  "by": "author",
+  "what": "the profession question is asked of a business-only client too",
+  "file": "src/applicability_44ab.rs",
+  "from": "(deductor_activity.is_none() && audit_required != \"yes\")",
+  "to": "(deductor_activity != Some(DeductorActivity::Business) || audit_required != \"yes\")"
+ },
+ {
+  "id": "AP-05",
+  "by": "author",
+  "what": "the limit text prints rupees as lakh of paise",
+  "file": "src/applicability_44ab.rs",
+  "from": "Some(paise) => format!(\"₹{} lakh\", lakh_g(paise)?),",
+  "to": "Some(paise) => format!(\"₹{} lakh\", paise),"
+ },
+ {
+  "id": "AP-06",
+  "by": "author",
+  "what": "a rules table with no limit says it holds a limit",
+  "file": "src/applicability_44ab.rs",
+  "from": "None => \"the limit, which this rules table does not hold\".to_string(),",
+  "to": "None => \"the limit\".to_string(),"
+ },
+ {
+  "id": "AP-07",
+  "by": "author",
+  "what": "the profession wording is used for both",
+  "file": "src/applicability_44ab.rs",
+  "from": "            Some(DeductorActivity::Profession) => format!(",
+  "to": "            Some(DeductorActivity::Profession | DeductorActivity::Both) => format!("
+ },
+ {
+  "id": "AP-08",
+  "by": "author",
+  "what": "the not-recorded wording is used for a client recorded as both",
+  "file": "src/applicability_44ab.rs",
+  "from": "            Some(DeductorActivity::Both) => format!(",
+  "to": "            Some(DeductorActivity::Business) => format!("
+ },
+ {
+  "id": "AP-09",
+  "by": "author",
+  "what": "the profession finding is tagged to another clause",
+  "file": "src/applicability_44ab.rs",
+  "from": "clauses: vec![\"s.44AB(b)\".to_string(), \"3CD-8\".to_string()],",
+  "to": "clauses: vec![\"s.44AB(b)\".to_string(), \"3CD-9\".to_string()],"
+ },
+ {
+  "id": "AP-10",
+  "by": "author",
+  "what": "the profession finding is a computed one",
+  "file": "src/applicability_44ab.rs",
+  "from": "            confidence: Confidence::JudgementRequired,\n            limits: vec![format!(\"{why} The CA determines.\")],",
+  "to": "            confidence: Confidence::NeedsDocument,\n            limits: vec![format!(\"{why} The CA determines.\")],"
+ },
+ {
+  "id": "AP-11",
+  "by": "author",
+  "what": "the profession finding cites no audit-required figure",
+  "file": "src/applicability_44ab.rs",
+  "from": "facts: vec![(\"audit_required_44ab_a\".to_string(), f_req_id.clone())],",
+  "to": "facts: Vec::new(),"
+ },
+ {
+  "id": "AP-12",
+  "by": "author",
+  "what": "a limit that is not a whole number of lakh is accepted",
+  "file": "src/applicability_44ab.rs",
+  "from": "    if paise % LAKH_PAISE == 0 {",
+  "to": "    if paise % LAKH_PAISE != 0 || paise == 0 {"
+ },
+ {
+  "id": "AP-13",
+  "by": "author",
+  "what": "the finding does not say the CA determines",
+  "file": "src/applicability_44ab.rs",
+  "from": "limits: vec![format!(\"{why} The CA determines.\")],",
+  "to": "limits: vec![why],"
+ },
+ {
+  "id": "AP-13",
+  "by": "author",
+  "what": "a profession limit the table holds is read as absent",
+  "file": "src/rules.rs",
+  "from": "                Some(_) => Some(int_in(s44ab, \"s44ab\", \"profession_gross_receipts_paise\")?),",
+  "to": "                Some(_) => None,"
  }
 ]

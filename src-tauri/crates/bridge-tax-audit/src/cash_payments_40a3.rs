@@ -226,6 +226,23 @@ fn compute_40a3_rows<'a>(
     Ok((in_scope, excluded))
 }
 
+/// A voucher whose cash leg names no party, pooled by the day with every other such voucher,
+/// whatever name each prints: the row shows every usable printed name and asserts no person.
+fn pool_unidentified<'a>(
+    rows: &mut RowMap<'a>,
+    v: &'a Voucher,
+    total: i64,
+    cash: &BTreeSet<String>,
+    bank: &BTreeSet<String>,
+) -> Result<()> {
+    let row = rows
+        .entry((v.date.clone(), UNIDENTIFIED_PARTY.to_string()))
+        .or_insert_with(RowAgg::new);
+    row.add(total, v)?;
+    row.names.note(v, [cash, bank]);
+    Ok(())
+}
+
 /// party_rows: (date, party ledger name) -> aggregate, for cash RECEIVED from a party.
 fn compute_269st_rows<'a>(
     pop: &[&'a Voucher],
@@ -277,12 +294,7 @@ fn compute_269st_rows<'a>(
                     .add(amt, v)?;
             }
         } else if fallback_total > 0 {
-            // Pooled by the day, whatever name each voucher prints; the row shows every usable
-            // printed name and asserts no person.
-            let key = (v.date.clone(), UNIDENTIFIED_PARTY.to_string());
-            let row = party_rows.entry(key).or_insert_with(RowAgg::new);
-            row.add(fallback_total, v)?;
-            row.names.note(v, [cash, bank]);
+            pool_unidentified(&mut party_rows, v, fallback_total, cash, bank)?;
         }
     }
     Ok(party_rows)
@@ -339,12 +351,7 @@ fn compute_269st_payment_rows<'a>(
                     .add(amt, v)?;
             }
         } else if fallback_total > 0 {
-            // Pooled by the day, whatever name each voucher prints; the row shows every usable
-            // printed name and asserts no person.
-            let key = (v.date.clone(), UNIDENTIFIED_PARTY.to_string());
-            let row = party_rows.entry(key).or_insert_with(RowAgg::new);
-            row.add(fallback_total, v)?;
-            row.names.note(v, [cash, bank]);
+            pool_unidentified(&mut party_rows, v, fallback_total, cash, bank)?;
         }
     }
     Ok(party_rows)

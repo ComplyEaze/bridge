@@ -3604,15 +3604,15 @@
   "by": "author",
   "what": "the no-party row ref loses its label",
   "file": "src/cash_payments_40a3.rs",
-  "from": "EvidenceRef::with_label(\"row\", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY)",
-  "to": "EvidenceRef::new(\"row\", UNIDENTIFIED_PARTY_ROW)"
+  "from": "            &row.names.label(UNIDENTIFIED_PARTY),",
+  "to": "            UNIDENTIFIED_PARTY,"
  },
  {
   "id": "Y03",
   "by": "author",
   "what": "the s.269ST receipt leg cites a ledger again",
   "file": "src/cash_payments_40a3.rs",
-  "from": "        evidence.push(party_ref(ledger_name));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st/{rid}\"),",
+  "from": "        evidence.push(party_ref(ledger_name, data));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st/{rid}\"),",
   "to": "        evidence.push(EvidenceRef::new(\"ledger\", ledger_name));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st/{rid}\"),"
  },
  {
@@ -3620,7 +3620,7 @@
   "by": "author",
   "what": "the s.269ST payment leg cites a ledger again",
   "file": "src/cash_payments_40a3.rs",
-  "from": "        evidence.push(party_ref(ledger_name));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st_payment/{rid}\"),",
+  "from": "        evidence.push(party_ref(ledger_name, data));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st_payment/{rid}\"),",
   "to": "        evidence.push(EvidenceRef::new(\"ledger\", ledger_name));\n        r.findings.push(Finding {\n            id: format!(\"{TEST_ID}/s269st_payment/{rid}\"),"
  },
  {
@@ -6974,5 +6974,349 @@
   "file": "src/registry.rs",
   "from": "c.bank_statement_refused.as_deref(),",
   "to": "None,"
+ },
+ {
+  "id": "CP-01",
+  "by": "author",
+  "what": "a pooled s.269ST row shows no printed names",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "    row.add(total, v)?;\n    row.names.note(v, [cash, bank]);",
+  "to": "    row.add(total, v)?;"
+ },
+ {
+  "id": "CP-02",
+  "by": "author",
+  "what": "a pooled s.269ST row treats a bank ledger name as usable",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "    row.names.note(v, [cash, bank]);\n    Ok(())",
+  "to": "    row.names.note(v, [cash, cash]);\n    Ok(())"
+ },
+ {
+  "id": "CP-03",
+  "by": "author",
+  "what": "an s.40A(3) row shows no printed names",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            row.add(l.amount_paise, v)?;\n            row.names.note(v, [cash, bank]);",
+  "to": "            row.add(l.amount_paise, v)?;"
+ },
+ {
+  "id": "CP-04",
+  "by": "author",
+  "what": "an s.40A(3) row treats a bank ledger name as usable",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            row.add(l.amount_paise, v)?;\n            row.names.note(v, [cash, bank]);",
+  "to": "            row.add(l.amount_paise, v)?;\n            row.names.note(v, [cash, cash]);"
+ },
+ {
+  "id": "CP-05",
+  "by": "author",
+  "what": "no s.40A(3) row is a pooling row",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let pooling = ledger.is_some_and(|lg| POOLING_LEDGER_GROUPS.iter().any(|g| lg.under(g)));",
+  "to": "let pooling = false && ledger.is_some_and(|lg| POOLING_LEDGER_GROUPS.iter().any(|g| lg.under(g)));"
+ },
+ {
+  "id": "CP-06",
+  "by": "author",
+  "what": "a Purchase Accounts ledger is not a pooling ledger",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "[\"Purchase Accounts\", \"Direct Expenses\", \"Indirect Expenses\"]",
+  "to": "[\"Direct Expenses\", \"Direct Expenses\", \"Indirect Expenses\"]"
+ },
+ {
+  "id": "CP-07",
+  "by": "author",
+  "what": "a Direct Expenses ledger is not a pooling ledger",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "[\"Purchase Accounts\", \"Direct Expenses\", \"Indirect Expenses\"]",
+  "to": "[\"Purchase Accounts\", \"Purchase Accounts\", \"Indirect Expenses\"]"
+ },
+ {
+  "id": "CP-08",
+  "by": "author",
+  "what": "an Indirect Expenses ledger is not a pooling ledger",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "[\"Purchase Accounts\", \"Direct Expenses\", \"Indirect Expenses\"]",
+  "to": "[\"Purchase Accounts\", \"Direct Expenses\", \"Direct Expenses\"]"
+ },
+ {
+  "id": "CP-09",
+  "by": "author",
+  "what": "a pooling purchase ledger is called an expense ledger",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let what = if ledger.is_some_and(|lg| lg.under(PURCHASE_ACCOUNTS_GROUP)) {",
+  "to": "let what = if false && ledger.is_some_and(|lg| lg.under(PURCHASE_ACCOUNTS_GROUP)) {"
+ },
+ {
+  "id": "CP-10",
+  "by": "author",
+  "what": "a pooling expense ledger is called a purchase ledger",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let what = if ledger.is_some_and(|lg| lg.under(PURCHASE_ACCOUNTS_GROUP)) {",
+  "to": "let what = if true || ledger.is_some_and(|lg| lg.under(PURCHASE_ACCOUNTS_GROUP)) {"
+ },
+ {
+  "id": "CP-11",
+  "by": "author",
+  "what": "a pooling row keeps the cash-paid amount definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let amount_definition = if pooling {",
+  "to": "let amount_definition = if false {"
+ },
+ {
+  "id": "CP-12",
+  "by": "author",
+  "what": "a pooling row has no pooling limit",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        if pooling {\n            // Keyed by the debited ledger",
+  "to": "        if false {\n            // Keyed by the debited ledger"
+ },
+ {
+  "id": "CP-13",
+  "by": "author",
+  "what": "a pooling row with no usable printed name still lists names",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            let names = if printed.is_empty() {",
+  "to": "            let names = if false {"
+ },
+ {
+  "id": "CP-14",
+  "by": "author",
+  "what": "a pooling row never says some vouchers print no usable name",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            } else if data.names.any_unprinted() {",
+  "to": "            } else if false {"
+ },
+ {
+  "id": "CP-15",
+  "by": "author",
+  "what": "a pooling row keeps the one-payee title",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            title: if pooling {",
+  "to": "            title: if false {"
+ },
+ {
+  "id": "CP-16",
+  "by": "author",
+  "what": "the s.269ST receipt row is never unnamed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),",
+  "to": "        let unnamed = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),"
+ },
+ {
+  "id": "CP-17",
+  "by": "author",
+  "what": "the s.269ST payment row is never unnamed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),",
+  "to": "        let unnamed = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),"
+ },
+ {
+  "id": "CP-18",
+  "by": "author",
+  "what": "an unnamed s.269ST receipt row keeps the one-party definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            &if unnamed {\n                format!(\n                    \"Received on {}",
+  "to": "            &if false {\n                format!(\n                    \"Received on {}"
+ },
+ {
+  "id": "CP-19",
+  "by": "author",
+  "what": "an unnamed s.269ST receipt row keeps the one-party title",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            title: if unnamed {\n                format!(\n                    \"Cash received on {}",
+  "to": "            title: if false {\n                format!(\n                    \"Cash received on {}"
+ },
+ {
+  "id": "CP-20",
+  "by": "author",
+  "what": "an unnamed s.269ST receipt row keeps the one-party ask",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                if unnamed {\n                    \"Who paid on each",
+  "to": "                if false {\n                    \"Who paid on each"
+ },
+ {
+  "id": "CP-21",
+  "by": "author",
+  "what": "an unnamed s.269ST payment row keeps the one-party definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            &if unnamed {\n                format!(\n                    \"Paid on {}",
+  "to": "            &if false {\n                format!(\n                    \"Paid on {}"
+ },
+ {
+  "id": "CP-22",
+  "by": "author",
+  "what": "an unnamed s.269ST payment row keeps the one-party title",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            title: if unnamed {\n                format!(\n                    \"Cash paid on {}",
+  "to": "            title: if false {\n                format!(\n                    \"Cash paid on {}"
+ },
+ {
+  "id": "CP-23",
+  "by": "author",
+  "what": "an unnamed s.269ST payment row keeps the one-party ask",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "            ask_client: if unnamed {\n                vec![\n                    \"Who was paid",
+  "to": "            ask_client: if false {\n                vec![\n                    \"Who was paid"
+ },
+ {
+  "id": "CP-24",
+  "by": "author",
+  "what": "a GUID shared by two vouchers is not noticed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "guid_count[v.guid.as_str()] == 1",
+  "to": "guid_count[v.guid.as_str()] >= 1"
+ },
+ {
+  "id": "CP-25",
+  "by": "author",
+  "what": "a blank GUID names the voucher by the blank",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "if !v.guid.is_empty() && guid_count[v.guid.as_str()] == 1 {",
+  "to": "if guid_count[v.guid.as_str()] == 1 {"
+ },
+ {
+  "id": "CP-26",
+  "by": "author",
+  "what": "a voucher's place is counted from one",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "format!(\"{}#{index}\", v.guid)",
+  "to": "format!(\"{}#{}\", v.guid, index + 1)"
+ },
+ {
+  "id": "CP-27",
+  "by": "author",
+  "what": "a voucher whose cash nets to nothing is a candidate",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "if !has_cash_line || cash_net == 0 {",
+  "to": "if !has_cash_line {"
+ },
+ {
+  "id": "CP-28",
+  "by": "author",
+  "what": "a zero loan line is a side",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "if !is_loan || l.amount_paise == 0 {",
+  "to": "if !is_loan {"
+ },
+ {
+  "id": "CP-29",
+  "by": "author",
+  "what": "a credit to the loan is a repayment",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let side = if l.amount_paise < 0 { \"cr\" } else { \"dr\" };",
+  "to": "let side = if l.amount_paise > 0 { \"cr\" } else { \"dr\" };"
+ },
+ {
+  "id": "CP-30",
+  "by": "author",
+  "what": "a side exactly at the limit is not a candidate",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                if amount < limit_ss_t {\n                    continue;",
+  "to": "                if amount <= limit_ss_t {\n                    continue;"
+ },
+ {
+  "id": "CP-31",
+  "by": "author",
+  "what": "the opposite side is the same side",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let other = if *side == \"cr\" { \"dr\" } else { \"cr\" };",
+  "to": "let other = *side;"
+ },
+ {
+  "id": "CP-32",
+  "by": "author",
+  "what": "a credit side with both sides is not suffixed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "(true, \"cr\") => \"_cr\",",
+  "to": "(true, \"cr\") => \"\","
+ },
+ {
+  "id": "CP-33",
+  "by": "author",
+  "what": "a debit side with both sides is not suffixed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "(true, _) => \"_dr\",",
+  "to": "(true, _) => \"\","
+ },
+ {
+  "id": "CP-34",
+  "by": "author",
+  "what": "the cash direction is reversed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let cash_direction = if cash_net > 0 { \"accepted\" } else { \"repaid\" };",
+  "to": "let cash_direction = if cash_net < 0 { \"accepted\" } else { \"repaid\" };"
+ },
+ {
+  "id": "CP-35",
+  "by": "author",
+  "what": "cash is always said to have moved with the loan",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let with_cash = c.cash_direction == c.direction;",
+  "to": "let with_cash = true;"
+ },
+ {
+  "id": "CP-36",
+  "by": "author",
+  "what": "a blank GUID is named by its GUID",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let vref = if v.guid.is_empty() {",
+  "to": "        let vref = if false {"
+ },
+ {
+  "id": "CP-37",
+  "by": "author",
+  "what": "a voucher with no number is named by an empty number",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                if v.number.is_empty() {\n                    \"(none)\"",
+  "to": "                if false {\n                    \"(none)\""
+ },
+ {
+  "id": "CP-38",
+  "by": "author",
+  "what": "a summed side is described as one line",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let amount_definition = if c.lines == 1 {",
+  "to": "        let amount_definition = if true {"
+ },
+ {
+  "id": "CP-39",
+  "by": "author",
+  "what": "a one-line side is described as summed",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let amount_definition = if c.lines == 1 {",
+  "to": "        let amount_definition = if false {"
+ },
+ {
+  "id": "CP-40",
+  "by": "author",
+  "what": "opposite entries are not shown",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "        let opposite = if c.opposite.is_empty() {",
+  "to": "        let opposite = if true {"
+ },
+ {
+  "id": "CP-41",
+  "by": "author",
+  "what": "opposite ledgers are joined without a space",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "names.join(\", \")\n            )",
+  "to": "names.join(\",\")\n            )"
+ },
+ {
+  "id": "CP-42",
+  "by": "author",
+  "what": "a covered ledger with both sides has no both-sides limit",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "                if !c.suffix.is_empty() {",
+  "to": "                if false {"
+ },
+ {
+  "id": "CP-43",
+  "by": "author",
+  "what": "two vouchers sharing a GUID get one row id",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "hash12_sha256(&c.key), c.suffix)",
+  "to": "hash12_sha256(&v.guid), c.suffix)"
  }
 ]

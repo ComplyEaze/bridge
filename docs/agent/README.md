@@ -857,7 +857,10 @@ covers only the identity and marks reads it sent.
   the rows' JSON text, a proxy for memory (the ledger listings have another
   64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
-  held windows. The desktop screen holds nothing.
+  held windows. The desktop screen holds nothing. A later page is served only
+  for the same question: it must repeat the dates, the voucher-type selector and
+  the `ledger` argument exactly as on the first page; a differently spelled
+  `ledger` is a different question and reads the whole window again.
 - **What a page cannot see.** A change that moves neither mark. The screen
   actions measured so far each moved a mark (§11c.5, one run each: a voucher
   delete moved `ALTVCHID` by 2, a cancel and a save with no change by 1, a

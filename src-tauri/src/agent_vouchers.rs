@@ -190,7 +190,12 @@ enum PageServe {
 }
 
 /// The rows of one page, redacted and party-marked as `vouchers` always did.
-fn page_items(server: &Server, rows: &[Value], offset: usize, limit: usize) -> Vec<Value> {
+pub(super) fn page_items(
+    server: &Server,
+    rows: &[Value],
+    offset: usize,
+    limit: usize,
+) -> Vec<Value> {
     rows.iter()
         .skip(offset)
         .take(limit)

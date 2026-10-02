@@ -870,6 +870,14 @@ fn company() -> String {
 }
 
 fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
+    server_with(address, directory, Redaction::None)
+}
+
+fn server_with(
+    address: std::net::SocketAddr,
+    directory: &std::path::Path,
+    redaction: Redaction,
+) -> Server {
     Server::new(Settings {
         endpoint: TallyEndpointConfig {
             host: address.ip().to_string(),
@@ -878,7 +886,7 @@ fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Serv
         data_dir: directory.to_path_buf(),
         max_rows: 500,
         max_bytes: 200_000,
-        redaction: Redaction::None,
+        redaction,
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
@@ -4365,9 +4373,13 @@ struct OneServer {
 
 impl OneServer {
     fn spawn(plans: Vec<ScenarioPlan>) -> Self {
+        Self::spawn_with(plans, Redaction::None)
+    }
+
+    fn spawn_with(plans: Vec<ScenarioPlan>, redaction: Redaction) -> Self {
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let server = server_at(simulator.address(), directory.path());
+        let server = server_with(simulator.address(), directory.path(), redaction);
         Self {
             simulator,
             server,
@@ -4462,6 +4474,11 @@ async fn a_later_page_is_served_from_the_first_pages_read() {
     let result = &second["structuredContent"]["result"];
     assert_eq!(result["state"], "complete");
     assert_eq!(result["total"], 3);
+    // A served page that is not the last says so: a caller must not read it as
+    // the whole window. It also says where it starts.
+    assert_eq!(second["structuredContent"]["truncated"], true, "{second}");
+    assert_eq!(result["offset"], 1);
+    assert_eq!(first["structuredContent"]["truncated"], true);
 }
 
 fn counted_marks_vouchers() -> u64 {
@@ -4713,4 +4730,159 @@ fn only_a_whole_window_with_nothing_withheld_is_held() {
     assert!(!holdable(WindowRead::Complete, 1));
     assert!(!holdable(WindowRead::Partial, 0));
     assert!(!holdable(WindowRead::Partial, 1));
+}
+
+/// The party names a page of the counted window carries when nothing is masked.
+async fn counted_window_party_names() -> Vec<String> {
+    let mut names = Vec::new();
+    for row in whole_counted_window().await {
+        if let Some(name) = row["party"].as_str() {
+            if !name.is_empty() && !names.iter().any(|seen| seen == name) {
+                names.push(name.to_string());
+            }
+        }
+    }
+    names
+}
+
+#[tokio::test]
+async fn party_names_are_masked_on_a_first_page_and_on_a_served_page() {
+    // What the unmasked tool returns for these rows: the names the masked pages
+    // must not carry. Without them the assertions below would prove nothing.
+    let names = counted_window_party_names().await;
+    assert!(
+        names.len() >= 2,
+        "the fixture must carry party names: {names:?}"
+    );
+    let plain_first = {
+        let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+        one.call(json!({"limit": 3})).await
+    };
+    let plain_text = plain_first["structuredContent"].to_string();
+    assert!(
+        names.iter().any(|name| plain_text.contains(name.as_str())),
+        "the unmasked page must carry a party name (the control)"
+    );
+
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let one = OneServer::spawn_with(plans, Redaction::MaskParties);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
+        .await;
+    // The second page really came from the held rows, not from a fresh read.
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    for (label, response) in [("first page", &first), ("served page", &second)] {
+        assert_ne!(response["isError"], true, "{response}");
+        let text = response["structuredContent"].to_string();
+        for name in &names {
+            assert!(
+                !text.contains(name.as_str()),
+                "the {label} carries the party name {name:?} under mask_parties: {text}"
+            );
+        }
+    }
+}
+
+/// The captured window of a renamed purchase type, its company's GUID replaced by this
+/// module's, so that its rows belong to the company the plans answer for.
+fn classed_window() -> String {
+    let captured = captured_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-vouchers-renamed-purchase-class.utf16le.xml"
+    ));
+    let theirs = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+    assert!(captured.contains(theirs));
+    captured.replace(theirs, GUID)
+}
+
+/// Identity, the pre-flight marks, the census and the window, for a call that selects by type
+/// (which reads the class-resolving shape).
+fn counted_class_plans(window: String) -> (Vec<ScenarioPlan>, ScenarioPlan) {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::ClassEntryWildcard);
+    let marks = mark(limits.census_capacity());
+    let mut plans = identity_plans();
+    plans.extend(paired(&marks));
+    plans.extend(paired(&xml_plan(window.clone())));
+    plans.extend(paired(&xml_plan(window)));
+    (plans, marks)
+}
+
+#[tokio::test]
+async fn a_served_page_of_a_type_filtered_window_keeps_its_type_summary_and_says_when_it_is_last() {
+    let (mut plans, marks) = counted_class_plans(classed_window());
+    plans.extend(marks_page_plans(marks));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    // The captured window is July 2025.
+    let window = json!({"from": "20250701", "to": "20250731"});
+    let mut filter = json!({"voucher_type": "purchase a/c", "limit": 1});
+    filter["from"] = window["from"].clone();
+    filter["to"] = window["to"].clone();
+    let first = one.call(filter).await;
+    assert_ne!(first["isError"], true, "{first}");
+    let first_result = &first["structuredContent"]["result"];
+    assert_eq!(first_result["total"], 2, "{first}");
+    assert_eq!(first["structuredContent"]["truncated"], true);
+    let first_types = first_result["voucher_types"].clone();
+    assert!(
+        first_types.is_object(),
+        "the first page names the types: {first}"
+    );
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(
+            json!({"from": "20250701", "to": "20250731", "voucher_type": "purchase a/c",
+                     "offset": 1, "limit": 1, "snapshot_id": id}),
+        )
+        .await;
+    assert_ne!(second["isError"], true, "{second}");
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    let second_result = &second["structuredContent"]["result"];
+    // The served page is the other one of the two selected rows, the type
+    // summary of the whole selection is carried to it, and as the last page it
+    // says nothing more follows.
+    assert_eq!(second_result["total"], 2);
+    assert_eq!(second_result["voucher_types"], first_types, "{second}");
+    assert_eq!(second["structuredContent"]["truncated"], false);
+    assert_eq!(second_result["offset"], 1);
+    assert_eq!(page_items_of(&second).len(), 1);
+    assert_ne!(page_items_of(&first), page_items_of(&second));
+    // The second page sent the identity read and one marks read, and nothing of the window.
+    assert_eq!(one.requests(), total);
+}
+
+/// A page is cut from rows that are held unredacted, so `page_items` itself must mask and
+/// mark every row it hands out, whatever a later layer also does with the result.
+#[test]
+fn page_items_masks_the_party_names_of_every_row_it_cuts() {
+    let rows: Vec<Value> = (0..3)
+        .map(|n| {
+            json!({
+                "voucher_number": n.to_string(),
+                "party": format!("Lab Party {n}"),
+                "party_ledger_name": "Lab Party Pvt",
+                "amounts": [{"ledger": "Lab Party Pvt", "amount": "10.00"}],
+            })
+        })
+        .collect();
+    let directory = tempfile::tempdir().unwrap();
+    let address: std::net::SocketAddr = "127.0.0.1:9".parse().unwrap();
+    let masked = server_with(address, directory.path(), Redaction::MaskParties);
+    let page = super::super::vouchers::page_items(&masked, &rows, 1, 1);
+    assert_eq!(page.len(), 1);
+    let text = serde_json::to_string(&page).unwrap();
+    assert!(
+        !text.contains("Lab Party"),
+        "a cut page carries a party name: {text}"
+    );
+    // The control: with nothing masked the same page carries the names as plain text.
+    let plain = server_with(address, directory.path(), Redaction::None);
+    let text =
+        serde_json::to_string(&super::super::vouchers::page_items(&plain, &rows, 1, 1)).unwrap();
+    assert!(
+        text.contains("Lab Party 1") && text.contains("Lab Party Pvt"),
+        "{text}"
+    );
 }

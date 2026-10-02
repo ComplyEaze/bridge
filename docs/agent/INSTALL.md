@@ -7,8 +7,8 @@ books.
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
-seen in our tests on 1 and 2 October 2026. On 2 October the Mac had Claude Desktop version 2.19675.0 (read from the
-app's files); we did not record the version on the Windows PC. The TallyPrime keys (F1, Settings, Connectivity,
+seen in our tests on 1 and 2 October 2026. The Mac had Claude Desktop version 2.19675.0 (read from the app's files),
+and the owner reports that the Windows PC had the same version. The TallyPrime keys (F1, Settings, Connectivity,
 Ctrl+A, Alt+K, Alt+Y) and the Mac keys are written from general knowledge of those programs; we did not walk them
 ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
 other companies' programs and they change, so a screen of yours may differ a little.
@@ -220,8 +220,8 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   to archive or remove them.
 - **Update:** it does not update by itself. Install the newer file as in Step 3. Claude Desktop showed an **Update**
   button: click it and follow the prompts. In our one test of this, on a Mac, going from 0.4.0 to the package CI
-  built for 0.4.1, the settings and the Terms switch carried over, Claude Desktop started ComplyEaze Bridge by
-  itself, and no quit was needed. That test covered Claude Desktop only: if another program also uses ComplyEaze
+  built for 0.4.1, the settings and the Terms switch carried over, ComplyEaze Bridge started again on its
+  own, and no quit was needed. That test covered Claude Desktop only: if another program also uses ComplyEaze
   Bridge, stop it first, as the paragraph on upgrading under "The limits of posting" says. Then look at the settings in Step 4. If you had an earlier version, check
   **Allow voucher posting**: an earlier default may still be saved as on.
 

@@ -4132,3 +4132,87 @@ async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() 
         "{result}"
     );
 }
+
+// bridge#1108: a single voucher Tally rejects. Its post's own answer says Tally
+// created none of the one sent and raised an exception, so the voucher is
+// reported as not created by Tally, never as possibly edited in Tally.
+
+/// The captured Education-mode answer to a rejected single voucher (CREATED 0,
+/// EXCEPTIONS 1; its LINEERROR text redacted, see
+/// EDUCATION_IMPORT_COUNTERS_PROVENANCE.md).
+fn rejected_one_education() -> String {
+    include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/live_education_w7_baddate_sanitized.xml"
+    )
+    .to_string()
+}
+
+/// The captured licensed 7.1 Silver answer to a rejected single voucher
+/// (`single-import-missing-ledger`, 2026-10-02): CREATED 0, EXCEPTIONS 1, one
+/// LINEERROR naming a ledger the book did not hold.
+fn rejected_one_silver() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
+    ))
+}
+
+/// Posts the captured single-voucher batch with `answer` as Tally's answer to
+/// the POST, the marks after it unmoved and an empty window: Tally created
+/// nothing.
+async fn post_single_rejected(answer: String) -> Value {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(answer)));
+    plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(empty_collection(), 10));
+    let expected_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    posted
+}
+
+fn assert_reported_not_created(posted: &Value) {
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(result["dispatch"]["counters"]["created"], 0, "{posted}");
+    assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
+    assert_eq!(result["counts"]["not_found"], 0, "{posted}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 0, "{posted}");
+    assert_eq!(
+        result["counts"]["tally_reported_not_created"], 1,
+        "{posted}"
+    );
+    let voucher = &result["vouchers"][0];
+    assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
+    assert_eq!(
+        voucher["next_step"],
+        json!(
+            super::super::verification::plain_next_step("tally_reported_not_created")
+                .expect("a plain line for tally_reported_not_created")
+        ),
+        "{posted}"
+    );
+}
+
+/// A single voucher Tally rejected (Education capture) reads as not created by
+/// Tally, with the next step that says so.
+#[tokio::test]
+async fn a_rejected_single_voucher_reads_as_not_created_by_tally_education() {
+    let posted = post_single_rejected(rejected_one_education()).await;
+    assert_reported_not_created(&posted);
+}
+
+/// The same on licensed 7.1 Silver's own answer.
+#[tokio::test]
+async fn a_rejected_single_voucher_reads_as_not_created_by_tally_silver() {
+    let posted = post_single_rejected(rejected_one_silver()).await;
+    assert_reported_not_created(&posted);
+}

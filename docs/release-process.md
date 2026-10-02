@@ -782,23 +782,32 @@ disagree.
   an older package is a stale claim.
 - The official MCP registry listing is `io.github.ComplyEaze/bridge-tally`, published
   from `registry/server.json` by the **Publish to the MCP registry** workflow
-  (`.github/workflows/publish-mcp-registry.yml`, dispatched by hand, never by a tag; create
-  its `mcp-registry-publish` environment first, limited to the default branch with a
-  required reviewer; with one reviewer who may approve their own run, it is a confirmation
-  click, not a second person's approval). For each release, after it is published, update `registry/server.json` in the
-  post-release pull request: the version, the two asset addresses (they carry the
-  version) and both `fileSha256` values, copied from the release's `.sha256` files.
-  Merge that pull request, and dispatch the workflow from the default branch with the
-  release tag, before any later version pull request changes the manifest. It refuses to publish unless the
-  file's version equals `packaging/mcpb/manifest.json`'s, the tag is `mcp-v<version>`,
-  the release is final, and each hash equals both the digest GitHub records for the asset
-  and its `.sha256` file. A published registry version
-  cannot be edited or moved, so a wrong one is superseded by the next release's, not
-  repaired; the publish permission can also deprecate or delete a version through the
-  registry's status endpoint, which hides it without removing its metadata. The test `scripts/check-registry-server-json.test.mjs` (run by `pnpm test` in every
-  pull request) checks the file's form and that its version never runs ahead of the manifest; it cannot
-  require equality on a pull request, because the version pull request bumps the
-  manifest before the release (and so the hashes) exists.
+  (`.github/workflows/publish-mcp-registry.yml`), dispatched by hand and never by a tag.
+  Create its `mcp-registry-publish` environment first. As set up on 2 October 2026 it
+  allows the default branch only and names one required reviewer, the owner, with
+  prevention of self-review off and administrator bypass off: a run waits for the
+  owner's own confirmation click, and there is no second person. For each release, after
+  it is published, update `registry/server.json` in the post-release pull request: the
+  version, the two asset addresses (they carry the version) and both `fileSha256`
+  values, copied from the release's `.sha256` files. Merge that pull request, and
+  dispatch the workflow from the default branch with the release tag, before any later
+  version pull request changes the manifest. The first job refuses to let the publishing
+  job run unless the file's version equals `packaging/mcpb/manifest.json`'s, the tag is
+  `mcp-v<version>`, the release is final, and each hash equals both the digest GitHub
+  records for the asset and its `.sha256` file. The registry accepts a token from any
+  job of any ComplyEaze repository that holds `id-token: write` and checks nothing else,
+  so the namespace is not protected by this workflow alone.
+
+  A published registry version's configuration cannot be edited or moved. A wrong
+  version can be withdrawn: the publish permission also lets a token mark a version
+  deprecated or deleted through the registry's status endpoint (`mcp-publisher status`),
+  which hides it without removing its metadata, and the next release's publication
+  supersedes it. Withdrawal needs its own `id-token` run, so it is an owner-only step
+  and is deliberately not part of the workflow. The test `scripts/check-registry-server-
+  json.test.mjs` (run by `pnpm test` in every pull request) checks the file's form and
+  that its version never runs ahead of the manifest; it cannot require equality in a
+  pull request, because the version pull request bumps the manifest before the release
+  (and so the hashes) exists.
 
 ## Rollback
 

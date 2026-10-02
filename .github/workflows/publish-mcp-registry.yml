@@ -9,20 +9,25 @@ name: Publish to the MCP registry
 # grant the ComplyEaze organisation namespace (modelcontextprotocol/registry issues 1649, 1537,
 # 1527 and 1551). Signing in with the workflow's own OIDC token grants io.github.<repository
 # owner>/* (internal/api/handlers/v0/auth/github_oidc.go, buildPermissions), here ComplyEaze.
-# A registry version cannot be edited or moved once published, so this job refuses to run unless
-# registry/server.json agrees with the manifest and with the published release (it is final, and
-# its recorded asset digests and .sha256 files equal the file's hashes).
+# A registry version's configuration cannot be edited once published, so the first job refuses to
+# let the second run unless registry/server.json agrees with the manifest and with the published
+# release (it is final, and its recorded asset digests and .sha256 files equal the file's hashes).
 #
-# What guards the namespace: the registry accepts any valid GitHub Actions token from a repository
-# owned by ComplyEaze and checks nothing else (not the workflow, branch or environment). A person
-# with write access can push a branch with a workflow that asks for id-token: write, and the
-# repository already has two (release-mcpb-preview.yml, deploy-install-page.yml). The 'if' and the
-# environment below only gate runs of this unmodified file from the default branch. The real
-# control is who may change .github/workflows (a repository ruleset), which is a repository setting.
+# What guards the namespace: the registry accepts a valid GitHub Actions token from any job of any
+# repository owned by ComplyEaze that holds id-token: write, and checks nothing else (not the
+# workflow, branch or environment). Restricting this workflow, or this repository's workflow
+# files, is therefore not the whole control. The 'if' and the environment below gate runs of this
+# file from the default branch. As set up on 2 October 2026 the environment names one required
+# reviewer, the owner, with prevention of self-review off (the owner is the only reviewer) and
+# administrator bypass off: a run waits for the owner's own confirmation click, and there is no
+# second person. Create the environment BEFORE the first run (a run creates it with no rules if it
+# is missing).
 #
 # The same publish permission also lets a token deprecate or delete a published version through
 # the registry's status endpoint (it needs "publish or edit" permission); it does not allow editing
 # a version's configuration, which needs the edit permission the OIDC sign-in does not grant.
+# Withdrawing a version is a separate, owner-only step that needs its own id-token run; it is
+# deliberately not part of this workflow (docs/release-process.md, "When a listing exists").
 on:
   workflow_dispatch:
     inputs:
@@ -39,14 +44,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Check registry/server.json
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # no id-token here: this job runs before anyone approves the publication
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+      - name: Check registry/server.json against the manifest and the published release
+        shell: bash
+        run: node scripts/check-registry-server-json.mjs --published "$RELEASE_TAG"
+
   publish:
     name: Publish registry/server.json
+    needs: check
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    # Create the GitHub environment of this name BEFORE the first run (a run creates it with no rules
-    # if it is missing). As set up on 2 October 2026 it limits runs to the default branch and names
-    # one required reviewer, the owner, with self-review not prevented and administrators able to
-    # bypass it: it is the owner's own click, not a second person. Add a second reviewer and
-    # prevent self-review to make it one.
     environment: mcp-registry-publish
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -54,7 +76,6 @@ jobs:
       id-token: write # lets the job ask GitHub for the OIDC token the registry accepts
       contents: read
     env:
-      RELEASE_TAG: ${{ inputs.release_tag }}
       # mcp-publisher v1.8.1, linux amd64: the digest GitHub shows for the asset and the line in
       # the release's registry_1.8.1_checksums.txt (both read on 2 October 2026).
       PUBLISHER_VERSION: v1.8.1
@@ -63,14 +84,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-        with:
-          node-version-file: .node-version
-      - name: Check registry/server.json against the manifest and the published release
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/check-registry-server-json.mjs --published "$RELEASE_TAG"
       - name: Download mcp-publisher and check it against the pinned digest
         shell: bash
         run: |

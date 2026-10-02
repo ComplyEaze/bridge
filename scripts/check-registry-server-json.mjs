@@ -129,12 +129,12 @@ async function fetchOk(url) {
   return response.text();
 }
 
-async function main() {
-  const root = resolve(import.meta.dirname, "..");
-  const args = process.argv.slice(2);
+// args are the command-line arguments after the script name. Resolves to the line to print; rejects
+// with a RegistryFileError for a usage mistake or a refused file.
+export async function run(args, { root = resolve(import.meta.dirname, ".."), fetchText = fetchOk } = {}) {
   const published = args.indexOf("--published");
   const tag = published >= 0 ? args[published + 1] : undefined;
-  if (published >= 0 && !tag) throw new RegistryFileError("usage", "--published needs a tag");
+  if (published >= 0 && (!tag || tag.startsWith("--"))) throw new RegistryFileError("usage", "--published needs a tag");
   const known = new Set(["--match-manifest", "--published", tag]);
   for (const arg of args) if (!known.has(arg)) throw new RegistryFileError("usage", `unknown argument ${arg}`);
   const server = parseServerJson(await readFile(resolve(root, "registry", "server.json"), "utf8"));
@@ -142,13 +142,13 @@ async function main() {
   const checked = checkServerJson(server);
   if (published >= 0 || args.includes("--match-manifest")) checkMatchesManifest(checked.version, manifest.version);
   else checkNotAhead(checked.version, manifest.version);
-  if (published >= 0) await checkPublished(checked, tag, fetchOk);
-  console.log(`registry/server.json ok (version ${checked.version}${published >= 0 ? `, hashes equal the ${tag} release` : ""})`);
+  if (published >= 0) await checkPublished(checked, tag, fetchText);
+  return `registry/server.json ok (version ${checked.version}${published >= 0 ? `, hashes equal the ${tag} release` : ""})`;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    await main();
+    console.log(await run(process.argv.slice(2)));
   } catch (error) {
     console.error(error instanceof RegistryFileError ? `registry/server.json refused: ${error.message}` : error);
     process.exit(1);

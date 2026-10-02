@@ -6,7 +6,8 @@ published release (version 0.4.1). It was written from a reading of the source
 code of release 0.4.0, at the tag `mcp-v0.4.0`, on 2 October 2026, and updated
 for 0.4.1 only where the changes between the two tags change an answer on this
 page: the sections on network destinations (3) and on what it reads and
-installs (7). The other answers were not read again against the 0.4.1 tag. It
+installs (7). The sentences in those sections that name release 0.4.0 and the
+other answers were not read again against the 0.4.1 tag. It
 was not tested on a running system (see the README's list of what has been
 run). Unless a line says otherwise, each answer rests on reading that source.
 Anything not measured on a running system is marked **Not measured**.
@@ -47,6 +48,9 @@ settings (section 4).
 - **Between ComplyEaze Bridge and Tally:** only to a loopback address on this
   computer. If you forward that port to a virtual machine or another machine,
   the traffic follows your forward.
+- **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
+  bank statement tool could be given a path that names another computer, and
+  Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
   Bridge hands each tool result, including company names, party names and
   amounts, to Claude Desktop. Claude Desktop is the host, and it sends tool
@@ -130,15 +134,18 @@ settings (section 4).
   opening a path that names another computer makes Windows itself connect to
   that computer, and may send the signed-in user's network sign-in response to
   it. That is the operating system opening a file, not a network client in
-  ComplyEaze Bridge's own code, so the checks above do not see it. It needs the
-  assistant to be steered into giving such a path, your approval of the call or
-  an always-allow setting, and outbound file-sharing traffic to that computer.
-  No Tally data is sent. In 0.4.1 both paths are checked as text before
+  ComplyEaze Bridge's own code, so the checks above do not see it. The
+  advisory names a network share and its WebDAV form. It needs the assistant to
+  be steered into giving such a path (for example by text it has read), your
+  approval of the call in the assistant or an always-allow setting, and
+  outbound file-sharing (or WebDAV) traffic to that computer. No Tally data is
+  sent. On macOS the advisory rates it low. In 0.4.1 both paths are checked as text before
   anything is opened; a path that begins with two slashes or backslashes, in any
-  mix, is refused, and on Windows only a path that starts with a drive letter is
-  accepted. A drive letter mapped to a network share, a link or junction partway
+  mix, is refused, and on Windows only a path that starts with a drive letter, a
+  colon and a slash or backslash is accepted. A drive letter mapped to a network share, a link or junction partway
   along a path, and on a Mac a mounted network volume still pass. Keep
-  statements and password files on a local disk. See the
+  statements and password files on a local disk. On Windows the tool does not
+  check who can read the password file, so restrict its access yourself. See the
   [advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
@@ -231,8 +238,9 @@ found no service, driver, scheduled task, registry key, launch agent or
 listening port. It writes files only in its data folder and in the lock
 folder described in section 4. It also reads files named in a tool call (often
 by the assistant), such as a bank statement and its password file. From 0.4.1 it
-accepts such a path only when its text names a local disk (section 3); on macOS
-it refuses a password file that other users can read. Its one extra process is a
+accepts such a path only when its text starts with a drive letter, a colon and a
+separator (Windows) or a single slash (a Mac) (section 3); on macOS it refuses a
+password file that other users can read. Its one extra process is a
 second copy of itself that shows the approval window.
 
 The approval window is a system dialog. On macOS it is titled "ComplyEaze

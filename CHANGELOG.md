@@ -18,9 +18,10 @@ These changes are in source and not yet in a published build.
 
 **Safer or fixed**
 
-- `outstandings` no longer refuses a book whose Bills Receivable report prints one
-  bill's due date with a four-digit year (a bill with a credit period of about 83
-  years, `1-Dec-2108`): that one date made the whole read fail with no reason. A
+- `outstandings` no longer refuses because one bill's due date in the Bills
+  Receivable report is printed with a four-digit year (a bill with a credit period
+  of about 83 years, `1-Dec-2108`): that one date made the whole read fail with no
+  reason. Not measured: that the rest of the read then completes on such a book. A
   due date is now read as written when Tally prints its year in full and the year
   is 2100 or later. A bill row whose dates ComplyEaze Bridge cannot read still
   refuses the read; the refusal now carries a typed `cause`, the report and the

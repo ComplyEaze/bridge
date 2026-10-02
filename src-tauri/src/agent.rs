@@ -1226,9 +1226,11 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
         cause if cause.starts_with("native_date_") => Some(
             "A date in one row of Tally's Bills Receivable or Payable report is not one \
              ComplyEaze Bridge can read, so no figures were returned: leaving that bill out would \
-             change the totals. `bill_row` names the report and the row in the order Tally sent \
-             them, which may not be the order on screen: look in that report for a bill with a \
-             very long credit period or an unusual date and tell the user what Tally shows. The \
+             change the totals. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen: look in that \
+             report for a bill with a very long credit period or an unusual date and tell the \
+             user what Tally shows. A refusal about the book's date window has no `bill_row`: tell \
+             the user what the cause says. The \
              book did not change during the read, so retrying gives the same refusal. Do not retry.",
         ),
         cause if cause.starts_with("bills_") => Some(

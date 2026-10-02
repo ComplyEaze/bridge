@@ -1147,7 +1147,10 @@ a bound voucher names another voucher, which reads `posted_divergent`, or a fals
 `posted_verified` when its content is the same (bridge#1050). Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
-`state`: `bound`, `refused` with its `code`, `unsettled` with its `code`,
+`state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
+example `binding_effective_date_not_observed`, when the read left out a
+Payment, Receipt or Contra's effective date: never refused for it, and decided
+again by the next verification),
 `not_bound`, `book_rolled_back` or `not_applicable`.
 
 A native post that sent no tag is never attributed by one: a row carrying its
@@ -1173,7 +1176,8 @@ of a doubt beside vouchers that read back verified (closing such a batch inside
 Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
 `absent` there. Check a natively posted batch with `verify_import`, which finds
-its vouchers by their GUIDs, before posting any of them again.
+its vouchers by the GUIDs its post created once its binding is made (and
+otherwise reports them as never absent), before posting any of them again.
 
 If the last read before the POST does not yield the company's voucher mark, the
 post is refused as `post_mark_unrecorded` before its dispatch intent is recorded
@@ -1181,8 +1185,9 @@ and before anything is sent,
 and the approval is withdrawn, so the next call asks again. Known limits:
 identical vouchers in one batch are told apart by request order alone, measured
 once; the local journal is the trust root for the bindings (a lost journal
-leaves the batch unknown, `import_batch_not_found`, and bindings in an edited
-journal are not checked against Tally); and whether a write from another Gold
+leaves the batch unknown, `import_batch_not_found`; in an edited journal, a
+bound voucher's GUID, MasterID and content are still read against the book,
+but not whether this post created it); and whether a write from another Gold
 user's process can share or skip the mark Bridge reads is unmeasured. Open
 follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
 the rows of a rolled-back batch needs the person's approval (bridge#1038);

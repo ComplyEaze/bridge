@@ -3802,6 +3802,15 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
         })
         .collect();
     assert_eq!(summaries.len(), states.len(), "{summaries:?}");
+    let unobserved = with_post_span_summary(
+        json!({ "state": "unsettled", "code": "binding_effective_date_not_observed" }),
+    );
+    let unobserved = unobserved["summary"].as_str().unwrap_or_default();
+    assert!(
+        unobserved.contains("Check the vouchers in Tally"),
+        "{unobserved}"
+    );
+    assert!(!summaries.contains(unobserved), "{unobserved}");
     let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }));
     assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
 }

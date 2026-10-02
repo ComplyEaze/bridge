@@ -55,7 +55,7 @@ its own POST's AlterID span, with no narration tag.
 - Journals in this untagged shape: see `post-span-journal-*` below.
 - A concurrent writer, or another Gold client process.
 - Whether a GUID survives a later edit.
-- Batches other than 10.
+- Payment, Receipt and Contra batches other than 10.
 - A `$GUID` filter without a date clause.
 - Any other release or licence tier.
 
@@ -96,7 +96,7 @@ it and the read of its own AlterID span. It extends the binding fixture above to
 - **The mark:** `ALTVCHID` went from 1805 to 1810, a step of exactly 5; `ALTMSTID` stayed at 234; the other three
   companies' marks did not move.
 - **The span:** exactly the five Journals, ALTERIDs 1806 to 1810 and MASTERIDs 1734 to 1738 in request order (the
-  identical pair at 1807 and 1808), the last MASTERID equal to `LASTVCHID`; narration and signed entries as sent,
+  identical pair at 1807 and 1808, whose order this read cannot show, since the two are identical and no sent REMOTEID comes back), the last MASTERID equal to `LASTVCHID`; narration and signed entries as sent,
   the three-leg split included. Tally filled `EFFECTIVEDATE`, which was not sent, with the date.
 
 ## What it does not establish

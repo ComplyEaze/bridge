@@ -625,7 +625,7 @@ One `Import Data` request carried 10 Payment, Receipt and Contra vouchers in Bri
 
 The span and order for Journals were already in a capture of Bridge's own post path, tagged: 50 Journals at ALTERIDs 1,420–1,469 in batch order, mark 1,419 → 1,469 (`D3_BATCH_CAPTURE_PROVENANCE.md`). One import of 50, 200 and 500 Journals each stepped the mark by exactly its count over the raw gateway, and 50 and 200 did so through Bridge's own post path with contiguous AlterIDs ([§11c.5](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21), one run each).
 
-**Untagged Journals (VERIFIED, one run, 2026-10-02, raw gateway).** One import of 5 untagged Journals in Bridge's own Journal render (no `EFFECTIVEDATE`, no party, the caller's entry order), including an identical pair and a three-leg Journal, gave `CREATED=5` and a mark step of exactly 5 (1805 → 1810). The span held exactly those 5 at ALTERIDs 1806–1810 in request order, MasterIDs 1734–1738 ending on `LASTVCHID`, with narration and entries as sent; Tally filled `EFFECTIVEDATE` with the date (`POST_SPAN_CAPTURE_PROVENANCE.md`, `post-span-journal-*`).
+**Untagged Journals (VERIFIED, one run, 2026-10-02, raw gateway).** One import of 5 untagged Journals in Bridge's own Journal render (no `EFFECTIVEDATE`, no party, the caller's entry order), including an identical pair and a three-leg Journal, gave `CREATED=5` and a mark step of exactly 5 (1805 → 1810). The span held exactly those 5 at ALTERIDs 1806–1810 in request order (the identical pair cannot be told apart in this read, so its order is assigned by position), MasterIDs 1734–1738 ending on `LASTVCHID`, with narration and entries as sent; Tally filled `EFFECTIVEDATE` with the date (`POST_SPAN_CAPTURE_PROVENANCE.md`, `post-span-journal-*`).
 
 **What Bridge builds on it.** A native post no longer writes the narration tag. It is attributed by its position inside its own POST's span (`agent_import_span_identity.rs`). The dispatch intent records the target's voucher mark from the last read before the POST. Binding requires all of these:
 - a clean response with `CREATED=N` and `LASTVCHID`;
@@ -643,7 +643,7 @@ The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only r
 - another Gold client process writing during the post;
 - whether a voucher keeps its GUID and MasterID through a screen edit or an upsert;
 - a concurrent save tripping the step;
-- batches other than 10;
+- Payment, Receipt and Contra batches other than 10;
 - a `$GUID` filter without a date clause;
 - any other release or licence tier;
 - whether a restore or a data rewrite reuses AlterIDs or MasterIDs.

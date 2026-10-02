@@ -297,14 +297,15 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
 
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
 /// binding is decided again by the next read, never refused for good. A real
-/// difference elsewhere in the span still refuses: the absence never hides it.
+/// difference later in the span still refuses: the absence, met first, never
+/// hides it.
 #[test]
 fn an_absent_effective_date_leaves_the_binding_unsettled_not_refused() {
     let span = span();
     let mut read = span_read();
     read.rows
         .iter_mut()
-        .find(|row| row.alter_id == Some(1804))
+        .find(|row| row.alter_id == Some(1796))
         .unwrap()
         .effective_date = None;
     assert_eq!(
@@ -317,9 +318,9 @@ fn an_absent_effective_date_leaves_the_binding_unsettled_not_refused() {
     changed
         .rows
         .iter_mut()
-        .find(|row| row.alter_id == Some(1796))
+        .find(|row| row.alter_id == Some(1800))
         .unwrap()
-        .narration = Some("Electricity bill".into());
+        .narration = Some("NEFT from Test Party".into());
     assert_eq!(
         refusal(bind(
             &span,
@@ -329,7 +330,7 @@ fn an_absent_effective_date_leaves_the_binding_unsettled_not_refused() {
             &BTreeSet::new()
         )),
         SpanRefusal::Content {
-            position: 0,
+            position: 4,
             fields: vec!["narration"]
         }
     );

@@ -54,16 +54,17 @@ impl CompanyName {
 /// has the whole name.
 const MAX_COMPANY_NAME_CHARS: usize = 200;
 
-/// Characters that draw nothing but can change how the text around them reads.
+/// Characters that draw nothing but can change how the text around them reads:
+/// Unicode General_Category Cf and Default_Ignorable_Code_Point (the same rule
+/// the native approval screen applies to the names it shows), so U+061C, the
+/// tag characters and every future format character are covered without a list.
 fn is_invisible_format(character: char) -> bool {
-    matches!(
-        character,
-        '\u{200b}'..='\u{200f}'
-            | '\u{202a}'..='\u{202e}'
-            | '\u{2060}'..='\u{2064}'
-            | '\u{2066}'..='\u{2069}'
-            | '\u{feff}'
-    )
+    use icu_properties::{
+        props::{DefaultIgnorableCodePoint, GeneralCategory},
+        CodePointMapData, CodePointSetData,
+    };
+    CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(character)
+        || CodePointMapData::<GeneralCategory>::new().get(character) == GeneralCategory::Format
 }
 
 /// A date as a person reads it: `1 Apr 2026`, never `01/04/2026`.
@@ -82,10 +83,29 @@ pub(super) enum Gap {
 }
 
 impl Gap {
-    fn sentence(&self) -> String {
+    /// What is partial, in a few words, and what it costs the reader.
+    fn short(&self) -> String {
         match self {
+            Self::BaseCurrencyLedgersOnly {
+                foreign: 0,
+                mixed: 0,
+            } => "base-currency ledgers only, and no ledger was left out".to_string(),
+            Self::BaseCurrencyLedgersOnly { .. } => {
+                "base-currency ledgers only, so debit and credit totals are not expected to match"
+                    .to_string()
+            }
+        }
+    }
+
+    /// The counts behind it.
+    fn detail(&self) -> String {
+        match self {
+            Self::BaseCurrencyLedgersOnly { foreign: 0, mixed: 0 } => {
+                "The book has several currency masters, so only its base-currency ledgers were read."
+                    .to_string()
+            }
             Self::BaseCurrencyLedgersOnly { foreign, mixed } => format!(
-                "base-currency ledgers only: {foreign} {} kept in another currency and {mixed} base-currency {} with a value Tally shows in another currency are left out (the result names up to {} of each kind), so debit and credit totals are not expected to match",
+                "{foreign} {} kept in another currency and {mixed} base-currency {} with a value Tally shows in another currency are left out (the result names up to {} of each kind).",
                 ledgers(*foreign),
                 ledgers(*mixed),
                 super::trial_balance::EXCLUDED_TRIAL_BALANCE_LEDGERS_NAMED,
@@ -102,22 +122,23 @@ fn ledgers(count: usize) -> &'static str {
     }
 }
 
-/// Whether a read covers everything it was asked for. `Whole` is the only
-/// state without a gap; [`Completeness::from_gaps`] is the only way to build
-/// either, so an empty `Partial` cannot exist.
+/// Whether a read covers everything it was asked for: the gaps it has, and
+/// nothing else. The only way to build one is [`Completeness::from_gaps`] and
+/// the field is private, so a read beside a gap cannot be written as whole and
+/// a whole read has no gap to name; "whole" is the empty list and is decided
+/// here, by [`Completeness::is_whole`], never by a caller.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum Completeness {
-    Whole,
-    Partial(Vec<Gap>),
+pub(super) struct Completeness {
+    gaps: Vec<Gap>,
 }
 
 impl Completeness {
     pub(super) fn from_gaps(gaps: Vec<Gap>) -> Self {
-        if gaps.is_empty() {
-            Self::Whole
-        } else {
-            Self::Partial(gaps)
-        }
+        Self { gaps }
+    }
+
+    pub(super) fn is_whole(&self) -> bool {
+        self.gaps.is_empty()
     }
 }
 
@@ -234,15 +255,15 @@ impl TrialBalanceBasis {
             plain_date(&self.from),
             plain_date(&self.to)
         );
-        let lead = match &self.completeness {
-            Completeness::Whole => format!("{}: read for every ledger.", capitalised(&subject)),
-            Completeness::Partial(gaps) => format!(
-                "Partial {subject}: {}.",
-                gaps.iter()
-                    .map(Gap::sentence)
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            ),
+        let lead = if self.completeness.is_whole() {
+            format!("{}: read for every ledger.", capitalised(&subject))
+        } else {
+            // The first sentence says it is partial and what that costs; the
+            // counts follow it.
+            let gaps = &self.completeness.gaps;
+            let short = gaps.iter().map(Gap::short).collect::<Vec<_>>().join("; ");
+            let detail = gaps.iter().map(Gap::detail).collect::<Vec<_>>().join(" ");
+            format!("Partial {subject}: {short}. {detail}")
         };
         Headline {
             lead,

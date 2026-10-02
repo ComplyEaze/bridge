@@ -408,6 +408,10 @@
       "path": "src-tauri/src/agent_egress.rs"
     },
     {
+      "path": "src-tauri/src/agent_headline.rs",
+      "reason": "Decides the sentence a CA reads about whether a read is whole or partial, and states the company and the period."
+    },
+    {
       "path": "src-tauri/src/agent_import.rs"
     },
     {

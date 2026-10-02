@@ -31,22 +31,42 @@ fn a_read_with_no_gap_is_whole_and_says_the_company_and_the_exact_period() {
     assert!(!headline.lead.contains("Partial"));
 }
 
-/// The state is in the lead, in words, and names how many ledgers were left
-/// out each way: a partial read never reads as whole.
+/// The state is in the lead, in words: the first sentence says it is partial
+/// and what that costs, and the counts of what was left out follow it.
 #[test]
 fn a_gap_makes_the_read_partial_and_the_lead_says_so_and_counts_it() {
     for (foreign, mixed, counts) in [
         (3, 1, "3 ledgers kept in another currency and 1 base-currency ledger with a value Tally shows in another currency are left out"),
-        (0, 0, "0 ledgers kept in another currency and 0 base-currency ledgers with a value Tally shows in another currency are left out"),
         (1, 0, "1 ledger kept in another currency and 0 base-currency ledgers with a value Tally shows in another currency are left out"),
     ] {
         let headline = basis(vec![Gap::BaseCurrencyLedgersOnly { foreign, mixed }])
             .headline(&company(), page(0, 5, 5));
-        assert!(headline.lead.starts_with("Partial trial balance for "), "{}", headline.lead);
-        assert!(headline.lead.contains("base-currency ledgers only"), "{}", headline.lead);
-        assert!(headline.lead.contains(counts), "{}", headline.lead);
-        assert!(headline.lead.contains("not expected to match"), "{}", headline.lead);
+        let (first, rest) = headline.lead.split_once(". ").unwrap();
+        assert!(first.starts_with("Partial trial balance for "), "{first}");
+        assert!(
+            first.ends_with("base-currency ledgers only, so debit and credit totals are not expected to match"),
+            "{first}"
+        );
+        assert!(rest.contains(counts), "{rest}");
+        assert!(first.split_whitespace().count() < 30, "a short first sentence: {first}");
     }
+}
+
+/// A several-currency book with nothing set aside is still read for its
+/// base-currency ledgers only, and says so without claiming ledgers were left
+/// out or that the totals will differ.
+#[test]
+fn a_several_currency_book_with_nothing_set_aside_says_so() {
+    let headline = basis(vec![Gap::BaseCurrencyLedgersOnly {
+        foreign: 0,
+        mixed: 0,
+    }])
+    .headline(&company(), page(0, 5, 5));
+    assert_eq!(
+        headline.lead,
+        "Partial trial balance for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: base-currency ledgers only, and no ledger was left out. The book has several currency masters, so only its base-currency ledgers were read."
+    );
+    assert!(!headline.lead.contains("0 ledgers"), "{}", headline.lead);
 }
 
 /// Every gap is named, however many there are: none is dropped for another.
@@ -82,11 +102,12 @@ fn every_gap_is_named_in_the_lead() {
 
 #[test]
 fn only_an_empty_list_of_gaps_is_whole() {
-    assert_eq!(Completeness::from_gaps(Vec::new()), Completeness::Whole);
-    assert!(matches!(
-        Completeness::from_gaps(vec![Gap::BaseCurrencyLedgersOnly { foreign: 0, mixed: 0 }]),
-        Completeness::Partial(gaps) if gaps.len() == 1
-    ));
+    assert!(Completeness::from_gaps(Vec::new()).is_whole());
+    assert!(!Completeness::from_gaps(vec![Gap::BaseCurrencyLedgersOnly {
+        foreign: 0,
+        mixed: 0
+    }])
+    .is_whole());
 }
 
 #[test]
@@ -162,6 +183,10 @@ fn the_company_name_is_quoted_cleaned_and_bounded() {
     assert_eq!(sentence.quoted().matches('\u{201c}').count(), 1);
     let spoof = CompanyName::new("A\u{202e}B\u{200b}C\u{2066}D\u{feff}E");
     assert_eq!(spoof.quoted(), "\u{201c}ABCDE\u{201d}");
+    // By category, not by list: the Arabic letter mark, the tag characters and
+    // a soft hyphen are format characters too.
+    let more = CompanyName::new("A\u{61c}B\u{e0041}C\u{ad}D");
+    assert_eq!(more.quoted(), "\u{201c}ABCD\u{201d}");
     let long = CompanyName::new(&"n".repeat(5_000));
     assert_eq!(long.0.chars().count(), MAX_COMPANY_NAME_CHARS);
 }

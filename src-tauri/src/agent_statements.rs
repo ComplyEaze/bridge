@@ -44,10 +44,9 @@ impl Server {
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));
         let derived = read.derived;
-        let (lines, established, figures) = match kind {
+        let (lines, figures) = match kind {
             NativeStatementKind::ProfitAndLoss => (
                 &derived.profit_and_loss,
-                &derived.net_result,
                 json!({
                     "gross_result": established_json(&derived.gross_result),
                     "net_result": established_json(&derived.net_result),
@@ -55,7 +54,6 @@ impl Server {
             ),
             NativeStatementKind::BalanceSheet => (
                 &derived.balance_sheet,
-                &derived.balance_sheet_profit_and_loss,
                 json!({
                     "profit_and_loss": {
                         "ledger": derived.profit_and_loss_ledger.as_ref().map(|ledger| json!({
@@ -70,7 +68,6 @@ impl Server {
         // The derived lines are the statement only once its result is
         // established; until then they are withheld, and the gates show how
         // each of Tally's own lines compared.
-        let lines_withheld = !matches!(established, Established::Established { .. });
         // The headline's facts, from the same derived results the state is
         // built from, before anything of `derived` is moved.
         let (statement_kind, parts) = match kind {
@@ -102,7 +99,8 @@ impl Server {
             parts,
             derived.profit_and_loss_tie.is_some(),
         );
-        let lines = (!lines_withheld).then_some(lines);
+        // One decision: the lines are withheld exactly when the headline says so.
+        let lines = (!statement_basis.lines_withheld()).then_some(lines);
         let outcome = match kind {
             NativeStatementKind::ProfitAndLoss => {
                 weakest(&[&derived.net_result, &derived.gross_result])

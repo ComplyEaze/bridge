@@ -1257,8 +1257,10 @@ when every result of the statement is established, the lead says so and what the
 the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
 as well); when any result is not established, the lead starts "Not established" and names each result
 with its own state, the reason in words (the reasons are a closed list, so a new one is a compile error
-until it has words) and, for a difference, how many lines did not tie (a Tally line that differs, or a
-derived line Tally has no counterpart for), and says when the derived lines are withheld. So far `trial_balance`,
+until it has words) and, for a difference, how many lines did not tie (a Tally line that differs, a Tally line carrying an
+amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
+profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
+derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
 `profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
 
 ## Protocol and migration notes

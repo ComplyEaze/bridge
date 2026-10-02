@@ -309,8 +309,11 @@ pub(super) enum PartOutcome {
     Established,
     NotEstablished {
         reason: NotEstablishedReason,
-        /// How many lines did not tie: a Tally line that differs, or a derived
-        /// line Tally has no counterpart for (a count; no names).
+        /// How many lines did not tie: a Tally line that differs, a Tally line
+        /// carrying an amount that nothing derived was compared with, or a
+        /// derived line Tally has no counterpart for; for a profit and loss,
+        /// also the Cost of Sales heading when it is off the derived cost of
+        /// sales (a count; no names).
         differing_lines: usize,
     },
 }
@@ -344,6 +347,27 @@ fn reason_words(reason: NotEstablishedReason) -> &'static str {
         }
         NotEstablishedReason::TallyProfitAndLossDiffers => {
             "Tally's own Profit and Loss differs from the derived lines"
+        }
+    }
+}
+
+/// What to do about it, for each reason, by an exhaustive match.
+fn reason_next_step(reason: NotEstablishedReason) -> &'static str {
+    match reason {
+        NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount => {
+            "Ask the user to look at the ledgers the result lists as unclassified."
+        }
+        NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance => {
+            "Tell the user to read Tally's own Profit and Loss and Balance Sheet for this period."
+        }
+        NotEstablishedReason::ProfitAndLossLedgerNotReturned => {
+            "Tell the user Tally did not return the ledger the carried line needs, and ask them to check the book in Tally."
+        }
+        NotEstablishedReason::TallyBalanceSheetDiffers => {
+            "See balance_sheet_gate in the result for the lines that differ, and tell the user."
+        }
+        NotEstablishedReason::TallyProfitAndLossDiffers => {
+            "See tie_out in the result for the lines that differ, and tell the user."
         }
     }
 }
@@ -387,7 +411,7 @@ impl StatementBasis {
     /// Whether the derived lines are withheld from the result: the tool shows
     /// them only once the net result (or the balance sheet's carried line) is
     /// established.
-    fn lines_withheld(&self) -> bool {
+    pub(super) fn lines_withheld(&self) -> bool {
         self.parts.iter().any(|(part, outcome)| {
             matches!(
                 part,
@@ -423,22 +447,25 @@ impl StatementBasis {
             } else {
                 "Tally's own Balance Sheet"
             };
+            let verb = if self.parts.len() == 1 { "is" } else { "are" };
             format!(
-                "{}: {established} established, after the derived lines passed the comparison with {against}.",
+                "{}: {established} {verb} established, after the derived lines passed the comparison with {against}.",
                 capitalised(&subject)
             )
         } else {
-            let phrases = self
+            let sentences = self
                 .parts
                 .iter()
                 .map(|(part, outcome)| match outcome {
-                    PartOutcome::Established => format!("{} is established", part.words()),
+                    PartOutcome::Established => {
+                        format!("{} is established.", capitalised(part.words()))
+                    }
                     PartOutcome::NotEstablished {
                         reason,
                         differing_lines,
                     } => format!(
-                        "{} is not established: {}{}",
-                        part.words(),
+                        "{} is not established because {}{}.",
+                        capitalised(part.words()),
                         reason_words(*reason),
                         match differing_lines {
                             0 => String::new(),
@@ -448,13 +475,27 @@ impl StatementBasis {
                     ),
                 })
                 .collect::<Vec<_>>()
-                .join("; ");
+                .join(" ");
             let withheld = if self.lines_withheld() {
-                " The derived lines are withheld; the result shows how each of Tally's own lines compared."
+                " The derived lines are withheld."
             } else {
                 ""
             };
-            format!("Not established: {subject}: {phrases}.{withheld}")
+            // One next step for each distinct reason, in the order they appear.
+            let mut reasons = Vec::new();
+            for (_, outcome) in &self.parts {
+                if let PartOutcome::NotEstablished { reason, .. } = outcome {
+                    if !reasons.contains(reason) {
+                        reasons.push(*reason);
+                    }
+                }
+            }
+            let next = reasons
+                .iter()
+                .map(|reason| reason_next_step(*reason))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("Not established: the {subject}. {sentences}{withheld} {next}")
         };
         Headline {
             lead,

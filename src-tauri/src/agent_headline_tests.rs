@@ -273,7 +273,7 @@ fn a_statement_part_that_is_not_established_is_always_in_the_lead() {
             assert!(
                 headline
                     .lead
-                    .starts_with("Not established: profit and loss for "),
+                    .starts_with("Not established: the profit and loss for "),
                 "{}",
                 headline.lead
             );
@@ -306,7 +306,7 @@ fn each_part_is_named_with_its_own_state() {
         ],
         true,
     );
-    assert!(headline.lead.contains("the gross result is established; the net result is not established: Tally's own Profit and Loss differs from the derived lines (on 3 lines)"), "{}", headline.lead);
+    assert!(headline.lead.contains("The gross result is established. The net result is not established because Tally's own Profit and Loss differs from the derived lines (on 3 lines)"), "{}", headline.lead);
     // The lines are withheld whenever the net result is not established.
     assert!(
         headline.lead.contains("The derived lines are withheld"),
@@ -327,7 +327,7 @@ fn an_established_statement_says_what_it_ties_to_and_no_more() {
     );
     assert_eq!(
         both.lead,
-        "Profit and loss for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: the gross result and the net result established, after the derived lines passed the comparison with Tally's own Balance Sheet and Profit and Loss."
+        "Profit and loss for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: the gross result and the net result are established, after the derived lines passed the comparison with Tally's own Balance Sheet and Profit and Loss."
     );
     let sheet = statement(
         StatementKind::BalanceSheet,
@@ -463,4 +463,64 @@ fn the_withheld_note_follows_the_parts() {
         "{}",
         net.lead
     );
+}
+
+/// A lead that is not established reads as sentences with one colon, says
+/// what is withheld, and gives a next step for each reason, once each.
+#[test]
+fn a_not_established_lead_is_plain_and_has_a_next_step_for_each_reason() {
+    for reason in EVERY_REASON {
+        let headline = statement(
+            StatementKind::ProfitAndLoss,
+            vec![
+                (StatementPart::GrossResult, not_established(reason, 0)),
+                (StatementPart::NetResult, not_established(reason, 0)),
+            ],
+            true,
+        );
+        assert_eq!(headline.lead.matches(':').count(), 1, "{}", headline.lead);
+        assert_eq!(
+            headline.lead.matches(reason_next_step(reason)).count(),
+            1,
+            "once, not once per part: {}",
+            headline.lead
+        );
+    }
+    let two = statement(
+        StatementKind::ProfitAndLoss,
+        vec![
+            (
+                StatementPart::GrossResult,
+                not_established(NotEstablishedReason::TallyBalanceSheetDiffers, 1),
+            ),
+            (
+                StatementPart::NetResult,
+                not_established(NotEstablishedReason::TallyProfitAndLossDiffers, 2),
+            ),
+        ],
+        true,
+    );
+    assert!(
+        two.lead.contains("See balance_sheet_gate in the result"),
+        "{}",
+        two.lead
+    );
+    assert!(
+        two.lead.contains("See tie_out in the result"),
+        "{}",
+        two.lead
+    );
+}
+
+/// Each reason's next step is its own.
+#[test]
+fn each_reason_has_its_own_next_step() {
+    let steps = EVERY_REASON.map(reason_next_step);
+    for (index, step) in steps.iter().enumerate() {
+        assert!(!step.is_empty());
+        assert!(
+            steps.iter().skip(index + 1).all(|other| other != step),
+            "{step}"
+        );
+    }
 }

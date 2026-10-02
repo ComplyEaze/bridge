@@ -183,7 +183,7 @@ async fn profit_and_loss_reads_both_statements_and_reports_gated_results() {
     let lead = lead(&response);
     assert!(lead.starts_with("Profit and loss for \u{201c}"), "{lead}");
     assert!(
-        lead.contains("the gross result and the net result established"),
+        lead.contains("the gross result and the net result are established"),
         "{lead}"
     );
     assert!(
@@ -228,11 +228,11 @@ async fn a_balance_sheet_that_does_not_tie_names_the_line_and_establishes_nothin
     // The headline leads with it, for both results, with the count of lines.
     let lead = lead(&response);
     assert!(
-        lead.starts_with("Not established: profit and loss for \u{201c}"),
+        lead.starts_with("Not established: the profit and loss for \u{201c}"),
         "{lead}"
     );
-    assert!(lead.contains("the gross result is not established: Tally's own Balance Sheet differs from the derived lines (on 1 line)"), "{lead}");
-    assert!(lead.contains("the net result is not established"), "{lead}");
+    assert!(lead.contains("The gross result is not established because Tally's own Balance Sheet differs from the derived lines (on 1 line)"), "{lead}");
+    assert!(lead.contains("The net result is not established"), "{lead}");
     assert!(lead.contains("The derived lines are withheld"), "{lead}");
     assert!(!lead.contains("established;"), "{lead}");
     assert_eq!(
@@ -255,11 +255,11 @@ async fn a_balance_sheet_that_does_not_tie_withholds_its_lines() {
     assert!(result["lines"].is_null(), "{result}");
     let lead = lead(&response);
     assert!(
-        lead.starts_with("Not established: balance sheet for \u{201c}"),
+        lead.starts_with("Not established: the balance sheet for \u{201c}"),
         "{lead}"
     );
     assert!(
-        lead.contains("the profit and loss line of the balance sheet is not established"),
+        lead.contains("The profit and loss line of the balance sheet is not established"),
         "{lead}"
     );
 }

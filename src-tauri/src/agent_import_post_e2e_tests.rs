@@ -4198,7 +4198,13 @@ fn saved_partial_batch(server: &Server) -> Value {
 fn partial_window() -> String {
     let body = untagged_posted_journal();
     let start = body.find("<VOUCHER ").expect("the capture holds a voucher");
-    let end = body.find("</VOUCHER>").expect("the voucher closes") + "</VOUCHER>".len();
+    // Searched from the voucher on: CMPINFO's `<VOUCHER>12</VOUCHER>` count
+    // closes first.
+    let end = start
+        + body[start..]
+            .find("</VOUCHER>")
+            .expect("the voucher closes")
+        + "</VOUCHER>".len();
     let voucher = &body[start..end];
     let copy = |amount: &str, alter_id: u64, master_id: u64| {
         let copy = replaced_once(voucher, ">-12.61<", &format!(">-{amount}<"));

@@ -4374,9 +4374,11 @@ impl TallyRuntime {
                             confirm_read_boundary(&client, boundary_profile).await?;
                         read_evidence = read_evidence.clone().combine(closing_evidence);
                         let receivable_rows =
-                            parse_native_bill_rows(&receivable_body, &books_from, &as_of)?;
+                            parse_native_bill_rows(&receivable_body, &books_from, &as_of)
+                                .map_err(|error| error.in_report("receivable"))?;
                         let payable_rows =
-                            parse_native_bill_rows(&payable_body, &books_from, &as_of)?;
+                            parse_native_bill_rows(&payable_body, &books_from, &as_of)
+                                .map_err(|error| error.in_report("payable"))?;
                         let snapshot = match classify_against {
                             LedgerClassification::Against(base) => {
                                 parse_native_ledger_snapshot_classified(&ledger_body, &base)

@@ -299,3 +299,12 @@ test("the list above the questions tells a person asked to try it out the four t
   const list = faqText(html.match(/<section class="page-section faq-before">[\s\S]*?<\/section>/)[0]);
   for (const needle of ["test company", "backup", "firewall", "Keep posting off"]) assert.ok(list.includes(needle), needle);
 });
+
+// An IndexNow key file is a root text file named for its key (8 to 128 letters, digits and dashes) and
+// holding exactly that key. llms.txt and robots.txt are shorter than any key, so they are not mistaken for one.
+const indexNowKey = /^[A-Za-z0-9-]{8,128}\.txt$/;
+test("the site has one IndexNow key file, and it holds exactly the key it is named for", () => {
+  const keyFiles = readdirSync(site).filter((file) => indexNowKey.test(file));
+  assert.equal(keyFiles.length, 1, `expected one IndexNow key file, found ${keyFiles.length}`);
+  assert.equal(read(keyFiles[0]), keyFiles[0].replace(/\.txt$/, ""), `${keyFiles[0]} does not hold its own key`);
+});

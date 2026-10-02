@@ -706,7 +706,8 @@ disagree.
 - Each release gets an "In plain words" section above the detailed entries,
   written from the merged pull requests since the last build. It opens with a
   short "Should I upgrade?" block: who should, in one line why (name a published
-  advisory if the build fixes one), how to upgrade, and what to check afterwards.
+  advisory if the build fixes one), how to upgrade, and what to check afterwards
+  (the version the extension shows, and the posting setting).
   It adds no claim the detailed entries or the published advisory do not support.
 - While the changes are unreleased, head the first part "What the next build
   adds", so nothing unpublished reads as available. Rename it "What you can do

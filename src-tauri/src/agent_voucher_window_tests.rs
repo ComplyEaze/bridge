@@ -4595,14 +4595,14 @@ async fn the_desktop_adapter_never_holds_a_window() {
         &one.server,
         &json!({"company_guid": GUID, "from": "20260801", "to": "20260831", "limit": 1}),
         VoucherOperationScope {
-            held_pages: false,
-            guid: GUID.to_string(),
-            from: "20260801".to_string(),
-            to: "20260831".to_string(),
-            company,
-            identity,
             initial_evidence: Some(evidence),
-            composites: VoucherComposites::Refuse,
+            ..VoucherOperationScope::desktop(
+                GUID.to_string(),
+                "20260801".to_string(),
+                "20260831".to_string(),
+                company,
+                identity,
+            )
         },
     )
     .await

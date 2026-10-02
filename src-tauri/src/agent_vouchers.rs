@@ -252,6 +252,31 @@ pub(crate) struct VoucherOperationScope {
     pub(crate) composites: VoucherComposites,
 }
 
+impl VoucherOperationScope {
+    /// The desktop screen's scope: the company is already admitted, a window
+    /// that cannot show a withheld voucher is refused (#674), and nothing is
+    /// held for later pages (#485): its result is shown whole and carries no
+    /// `snapshot`.
+    pub(crate) fn desktop(
+        guid: String,
+        from: String,
+        to: String,
+        company: TallyCompany,
+        identity: VerifiedCompanyIdentity,
+    ) -> Self {
+        Self {
+            held_pages: false,
+            guid,
+            from,
+            to,
+            company,
+            identity,
+            initial_evidence: None,
+            composites: VoucherComposites::Refuse,
+        }
+    }
+}
+
 pub(crate) async fn selected_voucher_operation_for_verified(
     server: &Server,
     args: &Value,

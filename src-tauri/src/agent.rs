@@ -1910,18 +1910,13 @@ pub(crate) async fn desktop_selected_vouchers(
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            held_pages: false,
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;

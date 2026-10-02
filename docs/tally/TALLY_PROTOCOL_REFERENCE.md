@@ -189,6 +189,9 @@ base revision.
 <a id="94e-when-fold-equal-ledgers-coexist-an-import-binds-the-exact-name"></a>
 
 [9.4e When fold-equal ledgers coexist, an import binds the exact name](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94e-when-fold-equal-ledgers-coexist-an-import-binds-the-exact-name)
+<a id="94f-a-ledger-create-on-an-existing-name-replaces-its-parent-bill-wise-flag-and-opening-balance"></a>
+
+[9.4f A ledger `Create` on an existing name replaces its parent, bill-wise flag and opening balance](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94f-a-ledger-create-on-an-existing-name-replaces-its-parent-bill-wise-flag-and-opening-balance)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)

@@ -326,6 +326,9 @@ The observed counters distinguish an alteration of an existing master from creat
 of a new one. This experiment did not establish protection against a concurrent
 foreign writer or recovery of an unobserved prior master.
 
+A `Create` whose fields differ from the existing ledger's replaces its parent, bill-wise flag and
+opening balance (§9.4f).
+
 The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)
 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a. This section records the gateway observation;
@@ -772,6 +775,62 @@ Gold, one client book, 2026-09-28).**
 - **Confidence.** VERIFIED for the 6 vouchers, because `ledger_movement` read back exactly those 6.
   The `Alter` clause is PARTIAL (reported, not read back). It is one session on one client book, so
   **Confidence: PARTIAL** beyond it.
+
+### 9.4f A ledger `Create` on an existing name replaces its parent, bill-wise flag and opening balance
+
+**Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
+`BRIDGE AMEND LAB`, one run. **Confidence: PARTIAL.**
+
+§9.4 measured an identical re-send. This measures a `Create` whose fields differ from the existing
+ledger's. Each request below was a gateway import (`Import Data`, `REPORTNAME` `All Masters`) sent
+with no import option in `STATICVARIABLES`, so Tally applied its default handling.
+
+1. **The setup.** A new ledger `Create Probe 02` was created: `PARENT` `Sundry Creditors`,
+   `ISBILLWISEON` `Yes`, `OPENINGBALANCE` `-1000.00`, and no bill allocations.
+   - Tally answered `CREATED 1`, every other counter 0, no `LINEERROR`, and showed no dialog.
+   - The company's master mark (`ALTMSTID`) stepped by 1.
+2. **The `Create` on that name.** It sent `PARENT` `Indirect Expenses`, `ISBILLWISEON` `No` and
+   `OPENINGBALANCE` `-2500.00`.
+   - Tally answered `CREATED 0, ALTERED 1`, every other counter 0, and no `LINEERROR`.
+   - `ALTMSTID` stepped by 1. The ledger kept its GUID and `MASTERID`; its `ALTERID` advanced.
+
+**After the `Create`, all three fields held the supplied values:**
+
+| Field | Before | Sent | After |
+| --- | --- | --- | --- |
+| `PARENT` | `Sundry Creditors` | `Indirect Expenses` | `Indirect Expenses` |
+| `ISBILLWISEON` | `Yes` | `No` | `No` |
+| Opening balance | `-1000.00` | `-2500.00` | `-2500.00` |
+
+**Two independent reads show the replaced opening:**
+- the trial balance read for April 2025, the company's first month: opening `-1000.00` before and
+  `-2500.00` after;
+- a `Ledger` collection read with `SVFROMDATE` and `SVTODATE` both set to the company's books-from date.
+
+**Read the opening at a stated date.** The same `Ledger` collection read **without** date variables
+returned `OPENINGBALANCE` `0.00` for this ledger after it moved under `Indirect Expenses`. That is the
+opening at the start of the currently loaded period (§5.5, IMPLEMENTATION_GUIDE I11), not the master
+opening. Before the move, under `Sundry Creditors`, the same date-less read showed `-1000.00`. A read
+that leaves out the dates can therefore show a replaced opening as gone, or as unchanged.
+
+**What this means.** A `Create` sent for a name that already exists does not fail, and it does not
+leave the ledger alone:
+- it regroups the ledger;
+- it turns bill-wise tracking off when the request says `No`;
+- it replaces the ledger's opening balance with the supplied one.
+
+The counters report all of this only as `ALTERED 1`. IMPLEMENTATION_GUIDE §3.6 and
+`PROMPT_PLAYBOOK.md` Phase 4 step 3a hold the workflow that must prevent it.
+
+**Object export.** A `TYPE=Object`, `SUBTYPE=Ledger` export with `FETCHLIST` `*` showed `PARENT` and
+`ISBILLWISEON`. It did not include `OPENINGBALANCE`, `ALTERID` or `GUID`, so it cannot witness these
+changes on its own.
+
+**Not measured:**
+- a `Create` that omits `OPENINGBALANCE`, against a ledger that has one;
+- a `Create` that changes the opening alone (here the parent and bill-wise flag changed too);
+- the same behaviour on Gold or Education;
+- any import option that makes Tally ignore an existing master.
 
 
 #

@@ -79,14 +79,30 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 {"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
-The ordinary default tools are `tally_status`, `list_companies`,
-`voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
-`stock_summary`,
-`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` were
-added in release 0.4.0.) `local_data_report` (also
+The ordinary default tools, in name order:
+
+- `balance_sheet`
+- `egress_log`
+- `ledger_masters`
+- `ledger_movement`
+- `list_companies`
+- `local_data_report`
+- `masters`
+- `outstandings`
+- `profit_and_loss`
+- `purchase_register`
+- `read_evidence`
+- `stock_summary`
+- `tally_status`
+- `trial_balance`
+- `validate_masters`
+- `verify_import`
+- `voucher_presence`
+- `voucher_schema`
+- `vouchers`
+
+`masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
+`local_data_report` were added in release 0.4.0. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -975,7 +991,24 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    (it may be under a new name) with `validate_masters` before building again.
    A batch built before this record existed is refused with
    `import_batch_predates_ledger_binding`, before any Tally request; build it
-   again. Any other read inside the queue that fails before the post is refused
+   again. The post reads the book before anything is sent and refuses a batch with
+   `import_preexisting_identity` when any of its vouchers already matches a
+   voucher in the book that it did not post (an earlier batch's twin, or one
+   entered by hand). `error.preexisting_txn_ids` names those rows; nothing is
+   sent and no attempt is recorded. Rows with the same date, type, ledgers, amounts and sides
+   match the same voucher, so count the vouchers in Tally rather than reading
+   every listed row as booked. Open the matching voucher and confirm it is a
+   regular one (an optional or post-dated one is the user's call) and the same
+   bank row, and leave the row out. If the voucher cannot be found, build the
+   batch again so Bridge checks the book again (it refuses again if the voucher
+   is there): the row is not entered by hand on a failed search, and if it is refused again the user decides; a row is never changed to get it past the check. Only a
+   genuinely different transaction that shares the fingerprint of a voucher
+   that was opened and confirmed is entered in Tally by hand. Build the other
+   rows again so they post; a rebuilt batch can be refused again, naming rows
+   the first answer did not list. Cut inline batches on whole days so same-day
+   rows of one amount are not split across batches. The list and step are
+   withheld on a very small response budget, and the same refusal inside the
+   queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known; nothing is sent, and
    the post can be re-run. Checked under the admission lock as the attempt is
    about to be recorded, a batch no longer in the journal, already attempted,
@@ -1437,8 +1470,14 @@ canonical UUIDs. Failed receipt appends restore the previous file length.
 An incomplete log or failed rollback stops the session; a persisted build still
 returns its recovery batch ID before termination. Reads withheld by the result
 byte cap retain partial source commitments in the in-process evidence store.
-Voucher selectors are applied after source-emptiness corroboration; a nonempty
-source with no matching ledger can return a complete empty selection. Amounts
+`vouchers` and `voucher_presence` label a window by one rule (#985): `complete`
+only when its rows were admitted voucher for voucher against the census that
+sized the read (protocol reference §11c.3), or it was empty and corroborated;
+otherwise `partial` with reason `nonempty_window_unqualified`. A book whose
+voucher high-water mark alone proves it small (a few dozen vouchers) sends no
+census, so its nonempty windows are `partial`. Voucher selectors are applied
+after the window is labelled, so a nonempty counted source with no matching
+ledger returns a complete empty selection, and an uncounted one a partial one. Amounts
 must parse as exact decimals, polarity flags must be `Yes` or `No`, and dates
 must be valid calendar dates before ordinary voucher rows are released. Ledger
 selectors require matching catalogues before and after the voucher read, unique

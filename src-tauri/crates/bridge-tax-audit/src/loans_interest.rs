@@ -708,24 +708,6 @@ fn reversal_pairs(
     pairs
 }
 
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
-}
-
 fn paise(n: i128) -> Result<Value> {
     Ok(Value::Int(to_i64(n)?))
 }
@@ -763,8 +745,7 @@ fn refund_or_loan_record(
     let (direction, v) = (row.direction, row.voucher);
     let vh = hash8(&v.guid);
     let rid = format!("{direction}_{h}_{vh}");
-    let f_amt = fig(
-        r,
+    let f_amt = r.fig(
         &format!("not_computed_entry_amount_{rid}"),
         paise(row.amount)?,
         Unit::Paise,
@@ -774,8 +755,7 @@ amount. Its reportability is not computed, so it is in no reportable total."
         ),
         vec![voucher_ref(v)],
     )?;
-    let f_mode = fig(
-        r,
+    let f_mode = r.fig(
         &format!("not_computed_entry_mode_{rid}"),
         text(row.mode),
         Unit::Text,
@@ -883,8 +863,7 @@ fn two_sided_record(
     let vid = format!("{h}_{vh}");
     let mut facts = listed.facts.clone();
     for (&(role, side), &amount) in roles {
-        let id = fig(
-            r,
+        let id = r.fig(
             &format!("two_sided_{role}_{side}_{vid}"),
             paise(amount)?,
             Unit::Paise,
@@ -905,8 +884,7 @@ as {} (from the ledger's group or the client's configuration), summed.",
     let set_off = (listed.credit - other_debits).max(0);
     let balanced = listed.imbalance == 0;
     if set_off != 0 && balanced {
-        let id = fig(
-            r,
+        let id = r.fig(
             &format!("two_sided_forced_set_off_{vid}"),
             paise(set_off)?,
             Unit::Paise,
@@ -1022,8 +1000,7 @@ fn depends_record(
     let (direction, v, h) = (row.direction, row.voucher, c.h);
     let vh = hash8(&v.guid);
     let rid = format!("{direction}_{h}_{vh}");
-    let f_amt = fig(
-        r,
+    let f_amt = r.fig(
         &format!("depends_entry_amount_{rid}"),
         paise(row.amount)?,
         Unit::Paise,
@@ -1033,8 +1010,7 @@ amount. Its reportability is not computed, so it is in no reportable total."
         ),
         vec![voucher_ref(v)],
     )?;
-    let f_mode = fig(
-        r,
+    let f_mode = r.fig(
         &format!("depends_entry_mode_{rid}"),
         text(row.mode),
         Unit::Text,
@@ -1214,8 +1190,7 @@ and debits the loan ledger, which is listed as the books hold it, not divided in
         inputs.deductor_activity,
         inputs.turnover_is_placeholder,
     )?;
-    let f_status = fig(
-        &mut r,
+    let f_status = r.fig(
         "deductor_status",
         text(status),
         Unit::Text,
@@ -1264,8 +1239,7 @@ a business or a profession."
         .filter(|l| !not_tds.contains(l.as_str()))
         .cloned()
         .collect();
-    fig(
-        &mut r,
+    r.fig(
         "tds_payable_ledgers",
         text(&tds_here.iter().map(String::as_str).collect::<Vec<_>>().join("\n")),
         Unit::Text,
@@ -1338,8 +1312,7 @@ read them back.",
         let taken_total: i128 = rows.taken.iter().map(|x| x.amount).sum::<i128>() + listed_credits;
         let repaid_total: i128 = rows.repaid.iter().map(|x| x.amount).sum::<i128>() + listed_debits;
 
-        let f_lender_type = fig(
-            &mut r,
+        let f_lender_type = r.fig(
             &format!("lender_type_{h}"),
             text(lender_type),
             Unit::Text,
@@ -1350,8 +1323,7 @@ classified by the loan ledger this interest pairs with -- never by a word in the
             Vec::new(),
         )?;
         let ev_interest = voucher_refs(rows.interest.iter().map(|&(at, _)| pop[at]));
-        let f_int = fig(
-            &mut r,
+        let f_int = r.fig(
             &format!("interest_total_{h}"),
             paise(interest_total)?,
             Unit::Paise,
@@ -1380,8 +1352,7 @@ classified as TDS payable, counted before that TDS."
             .collect();
         let tds_on_loan: i128 = tds_by_voucher.iter().map(|&(_, x)| x).sum();
         let ev_tds = voucher_refs(tds_by_voucher.iter().map(|&(at, _)| pop[at]));
-        let f_tds = fig(
-            &mut r,
+        let f_tds = r.fig(
             &format!("tds_on_loan_{h}"),
             paise(tds_on_loan)?,
             Unit::Paise,
@@ -1415,8 +1386,7 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
         let f_listed_interest = if listed_194a.is_empty() {
             None
         } else {
-            Some(fig(
-                &mut r,
+            Some(r.fig(
                 &format!("interest_on_listed_vouchers_{h}"),
                 paise(interest_listed)?,
                 Unit::Paise,
@@ -1441,8 +1411,7 @@ never added to it."
                     .and_then(|x| x.checked_add(5000))
                     .ok_or_else(|| overflow(TEST_ID))?
                     .div_euclid(10_000);
-                fig(
-                    &mut r,
+                r.fig(
                     &format!("s194a_tds_expected_{h}"),
                     paise(expected)?,
                     Unit::Paise,
@@ -1495,8 +1464,7 @@ interest."
                 }
                 let covering = usable.div_euclid(10_000);
                 covering_read = covering;
-                fig(
-                    &mut r,
+                r.fig(
                     &format!("s194a_tds_covering_{h}"),
                     paise(covering)?,
                     Unit::Paise,
@@ -1526,8 +1494,7 @@ interest."
                 }
             }
         };
-        fig(
-            &mut r,
+        r.fig(
             &format!("s194a_tds_coverage_{h}"),
             text(coverage),
             Unit::Text,
@@ -1549,8 +1516,7 @@ higher rate is not applied, and the books do not show a PAN."
             .map(|l| l.ledger.as_str())
             .collect();
         if !tds_seen_ledgers.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("interest_tds_ledgers_{h}"),
                 text(&tds_seen_ledgers.into_iter().collect::<Vec<_>>().join("\n")),
                 Unit::Text,
@@ -1562,8 +1528,7 @@ back to tie the interest to the loan's lines."
                 Vec::new(),
             )?;
         }
-        fig(
-            &mut r,
+        r.fig(
             &format!("interest_ledger_{h}"),
             text(
                 &ils.iter()
@@ -1596,8 +1561,7 @@ debiting the loan."
                 )
             }
         };
-        fig(
-            &mut r,
+        r.fig(
             &format!("clause31_taken_total_{h}"),
             paise(taken_total)?,
             Unit::Paise,
@@ -1608,8 +1572,7 @@ taken/accepted in the year, before any Clause 31/s.269SS lender-exemption or mod
             ),
             Vec::new(),
         )?;
-        fig(
-            &mut r,
+        r.fig(
             &format!("clause31_repaid_total_{h}"),
             paise(repaid_total)?,
             Unit::Paise,
@@ -1624,8 +1587,7 @@ in the year, before any Clause 31/s.269T lender-exemption or mode filter.{}",
         for (v, &(credit, debit)) in listed.iter().copied().zip(&sides) {
             let vh = hash8(&v.guid);
             let vid = format!("{h}_{vh}");
-            let gross_credit = fig(
-                &mut r,
+            let gross_credit = r.fig(
                 &format!("two_sided_gross_credit_{vid}"),
                 paise(credit)?,
                 Unit::Paise,
@@ -1635,8 +1597,7 @@ the voucher also debits the loan."
                 ),
                 vec![voucher_ref(v)],
             )?;
-            let gross_debit = fig(
-                &mut r,
+            let gross_debit = r.fig(
                 &format!("two_sided_gross_debit_{vid}"),
                 paise(debit)?,
                 Unit::Paise,
@@ -1652,8 +1613,7 @@ the voucher also credits the loan."
             ];
             let imbalance: i128 = v.lines.iter().map(|l| i128::from(l.amount_paise)).sum();
             if imbalance != 0 {
-                let id = fig(
-                    &mut r,
+                let id = r.fig(
                     &format!("two_sided_imbalance_{vid}"),
                     paise(imbalance)?,
                     Unit::Paise,
@@ -1675,8 +1635,7 @@ positive."
         }
         let ev_listed = voucher_refs(listed.iter().copied());
         if !listed.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("clause31_not_computed_credits_{h}"),
                 paise(listed_credits)?,
                 Unit::Paise,
@@ -1686,8 +1645,7 @@ ledger (tag {h}), summed: in the loan's credits before any filter, in no reporta
                 ),
                 ev_listed.clone(),
             )?;
-            fig(
-                &mut r,
+            r.fig(
                 &format!("clause31_not_computed_debits_{h}"),
                 paise(listed_debits)?,
                 Unit::Paise,
@@ -1726,8 +1684,7 @@ ledger (tag {h}), summed: in the loan's debits before any filter, in no reportab
                 .filter(|x| charge_shaped(x.voucher))
                 .count();
         if charge_entries > 0 {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("clause31_expense_entry_count_{h}"),
                 count(TEST_ID, charge_entries)?,
                 Unit::Count,
@@ -1751,8 +1708,7 @@ computed instead, without that question."
             partner.insert(rows.taken[*ci].at, (rows.repaid[*di].at, shared.clone()));
         }
         if !pairs.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("clause31_reversal_pair_count_{h}"),
                 count(TEST_ID, pairs.len())?,
                 Unit::Count,
@@ -1796,8 +1752,7 @@ computed where that is not decided); nothing is netted."
             }
         }
         if !repeats.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("clause31_repeated_narration_count_{h}"),
                 count(TEST_ID, repeats.len())?,
                 Unit::Count,
@@ -1817,8 +1772,7 @@ lists it; nothing is netted."
         let f_charges = if charge_taken.is_empty() {
             None
         } else {
-            Some(fig(
-                &mut r,
+            Some(r.fig(
                 &format!("expense_credits_{h}"),
                 paise(charge_taken.iter().map(|x| x.amount).sum())?,
                 Unit::Paise,
@@ -1836,8 +1790,7 @@ ledger is not netted against them."
             // R2: an entry against only another loan's interest ledger, or a shared one, may be
             // interest booked to the wrong ledger, or principal: the books do not say.
             let ev_mis = voucher_refs(rows.misposted.iter().map(|&(at, _)| pop[at]));
-            let f_mis = fig(
-                &mut r,
+            let f_mis = r.fig(
                 &format!("possible_misposted_interest_{h}"),
                 paise(-rows.misposted.iter().map(|&(_, a)| a).sum::<i128>())?,
                 Unit::Paise,
@@ -1925,8 +1878,7 @@ or repaid."
             .map(|row| row.after_outstanding_w2)
             .fold(opening_outstanding.max(0), i128::max);
         if listed.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("max_outstanding_paise_{h}"),
                 paise(max_outstanding)?,
                 Unit::Paise,
@@ -1959,8 +1911,7 @@ zero as a fresh loan, the maximum is {}; the books do not show which reading hol
                 Vec::new(),
             )?;
         } else {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("max_outstanding_not_computed_{h}"),
                 text(
                     "not computed: a voucher both credits and debits this loan ledger, and this \
@@ -2475,16 +2426,14 @@ fn clause31_row(r: &mut TestResult, c: &RowContext, row: &WalkedRow, n: &mut Cou
     let h = c.h;
     let vh = hash8(&v.guid);
     let rid = format!("{direction}_{h}_{vh}");
-    let f_amt = fig(
-        r,
+    let f_amt = r.fig(
         &format!("clause31_row_amount_{rid}"),
         paise(amt)?,
         Unit::Paise,
         &format!("Loan {direction} on voucher (tag {vh}) against loan ledger (tag {h})."),
         vec![voucher_ref(v)],
     )?;
-    let f_mode = fig(
-        r,
+    let f_mode = r.fig(
         &format!("clause31_row_mode_{rid}"),
         text(m),
         Unit::Text,
@@ -2496,8 +2445,7 @@ Journal, else other."
         Vec::new(),
     )?;
     let code = mode_code(m, direction);
-    fig(
-        r,
+    r.fig(
         &format!("clause31_row_mode_code_{rid}"),
         text(code),
         Unit::Text,
@@ -2508,8 +2456,7 @@ direction, not read off a specimen utility export -- confirm."
         Vec::new(),
     )?;
     if !after_listed {
-        fig(
-            r,
+        r.fig(
             &format!("clause31_row_outstanding_after_{rid}"),
             paise(after)?,
             Unit::Paise,
@@ -2745,8 +2692,7 @@ fn totals(r: &mut TestResult, n: &Counts, limit_269: i128) -> Result<()> {
     } else {
         ""
     };
-    fig(
-        r,
+    r.fig(
         "clause31_taken_reportable_total",
         paise(n.taken_reportable_total)?,
         Unit::Paise,
@@ -2766,8 +2712,7 @@ s.269SS/269T limit, or whose own amount does.{}{}",
         ),
         Vec::new(),
     )?;
-    fig(
-        r,
+    r.fig(
         "clause31_repaid_reportable_total",
         paise(n.repaid_reportable_total)?,
         Unit::Paise,
@@ -2789,8 +2734,7 @@ interest credited and not yet paid, or the repayment itself reaches the s.269SS/
     )?;
     let listed = n.listed_taken + n.listed_repaid;
     if listed > 0 {
-        fig(
-            r,
+        r.fig(
             "clause31_not_computed_row_count",
             count(TEST_ID, listed)?,
             Unit::Count,
@@ -2802,8 +2746,7 @@ in no reportable total and not in the flag count.",
         )?;
     }
     if n.two_sided_count > 0 {
-        fig(
-            r,
+        r.fig(
             "clause31_two_sided_listed_count",
             count(TEST_ID, n.two_sided_count)?,
             Unit::Count,
@@ -2814,8 +2757,7 @@ and not in the flag count (#779).",
         )?;
     }
     if n.possible_count > 0 {
-        fig(
-            r,
+        r.fig(
             "s269ss_269t_possible_not_computed_count",
             count(TEST_ID, n.possible_count)?,
             Unit::Count,
@@ -2827,8 +2769,7 @@ noted on the row, never in the flag count.",
             Vec::new(),
         )?;
     }
-    fig(
-        r,
+    r.fig(
         "s269ss_269t_flag_count",
         count(TEST_ID, n.flag_count)?,
         Unit::Count,
@@ -2856,8 +2797,7 @@ are not counted.",
         ),
         Vec::new(),
     )?;
-    fig(
-        r,
+    r.fig(
         "s194a_tds_over_threshold_lender_count",
         count(TEST_ID, n.tds_over_threshold_count)?,
         Unit::Count,
@@ -3065,8 +3005,7 @@ fn shared_interest(
             .into_iter()
             .map(|(id, label)| EvidenceRef::with_label("voucher", &id, &label))
             .collect();
-        let f_debits = fig(
-            r,
+        let f_debits = r.fig(
             &format!("shared_interest_unpaired_debits_{lh}"),
             paise(unpaired_debits)?,
             Unit::Paise,
@@ -3076,8 +3015,7 @@ excluded) that no paired loan's interest total counts."
             ),
             ev_debits.clone(),
         )?;
-        let f_reversed = fig(
-            r,
+        let f_reversed = r.fig(
             &format!("shared_interest_reversed_credits_{lh}"),
             paise(reversed_total)?,
             Unit::Paise,
@@ -3095,8 +3033,7 @@ since no credit reduces the figure."
             },
             pair_ev.clone(),
         )?;
-        let f_unmatched = fig(
-            r,
+        let f_unmatched = r.fig(
             &format!("shared_interest_unmatched_credits_{lh}"),
             paise(unmatched_total)?,
             Unit::Paise,
@@ -3122,8 +3059,7 @@ never netted."
             .into_iter()
             .map(|(id, label)| EvidenceRef::with_label("voucher", &id, &label))
             .collect();
-        let f_un = fig(
-            r,
+        let f_un = r.fig(
             &format!("shared_interest_unattributed_{lh}"),
             paise(unattributed)?,
             Unit::Paise,
@@ -3140,8 +3076,7 @@ counts{}{}",
             ),
             un_evidence.clone(),
         )?;
-        fig(
-            r,
+        r.fig(
             &format!("shared_interest_debits_{lh}"),
             paise(debit_on_vouchers)?,
             Unit::Paise,
@@ -3226,8 +3161,7 @@ fn unlisted_loan_notices(
                 lines.iter().copied().filter(|&(_, a)| a < 0).collect();
             let debits: Vec<(&Voucher, i64)> =
                 lines.iter().copied().filter(|&(_, a)| a > 0).collect();
-            let f_cr = fig(
-                r,
+            let f_cr = r.fig(
                 &format!("loan_not_listed_credits_{h}"),
                 paise(-credits.iter().map(|&(_, a)| i128::from(a)).sum::<i128>())?,
                 Unit::Paise,
@@ -3237,8 +3171,7 @@ the client's list of loans (Contra vouchers excluded, as throughout this test)."
                 ),
                 ev(&credits),
             )?;
-            let f_dr = fig(
-                r,
+            let f_dr = r.fig(
                 &format!("loan_not_listed_debits_{h}"),
                 paise(debits.iter().map(|&(_, a)| i128::from(a)).sum())?,
                 Unit::Paise,
@@ -3303,8 +3236,7 @@ type (such as a bank, an NBFC or a person) and the loan statement."
             continue;
         }
         pattern_notices += 1;
-        let f_n = fig(
-            r,
+        let f_n = r.fig(
             &format!("loan_pattern_debits_{h}"),
             count(TEST_ID, hits.len())?,
             Unit::Count,
@@ -3339,8 +3271,7 @@ ledger is not."
                 .to_string()],
         });
     }
-    fig(
-        r,
+    r.fig(
         "loan_not_listed_count",
         count(TEST_ID, notices)?,
         Unit::Count,
@@ -3348,8 +3279,7 @@ ledger is not."
 and are not in the client's list of loans (each has a notice).",
         Vec::new(),
     )?;
-    fig(
-        r,
+    r.fig(
         "loan_notice_chain_incomplete_count",
         count(TEST_ID, chain_incomplete)?,
         Unit::Count,
@@ -3358,8 +3288,7 @@ cash ledgers, whose Tally group chain is incomplete: whether each is under Loans
 be told, so neither notice is raised for it.",
         Vec::new(),
     )?;
-    fig(
-        r,
+    r.fig(
         "loan_pattern_not_listed_count",
         count(TEST_ID, pattern_notices)?,
         Unit::Count,
@@ -4222,7 +4151,7 @@ mod tests {
         let dup = book(vec![taken("g1", "20250601"), taken("g1", "20250602")]);
         let err = run_on(&dup, &rules).unwrap_err();
         assert!(
-            matches!(&err, AuditError::Config(m) if m.contains("would repeat")),
+            matches!(&err, AuditError::DuplicateFigureId(id) if id.contains(".clause31_row_amount_")),
             "{err}"
         );
         // The control: distinct GUIDs give two rows.

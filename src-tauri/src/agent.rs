@@ -1057,6 +1057,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
         ),
+        // A cause, reached through `voucher_window_part_not_admitted`. Since
+        // #985 a window read whole is admitted against the census that sized
+        // it, so this is reachable on an ordinary day's read, not only on a
+        // divided one.
+        "part_census_mismatch" => Some(
+            "Bridge counted this window's vouchers before reading them, and the read returned \
+             different vouchers from the ones it counted (`counts` gives returned against \
+             counted), so it released nothing. A voucher created, altered, re-dated or deleted \
+             between the count and the read causes it: call the same tool again with the same \
+             arguments, once, while the book is quiet. A repeat on a quiet book may mean Tally \
+             did not honour the read's filter, or a fault in Bridge; read this window in Tally \
+             itself.",
+        ),
         // A product limit of the bounded window read (protocol reference §11c):
         // the census walks the book's AlterIDs whatever the window, so the
         // obvious retry — a shorter window — cannot succeed, and saying so is
@@ -1680,15 +1693,16 @@ impl Server {
         }
         validate_tool_arguments(name, args)?;
         match name {
-            "tally_status" => {
-                let (result, evidence) = self.status().await?;
-                Ok(ToolOutcome {
-                    payload: json!({"result": result}),
-                    evidence,
-                    company_guid: None,
-                    truncated: false,
-                })
+            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "balance_sheet" => self.balance_sheet(args).await,
+            "build_import_xml" => {
+                self.import_enabled()?;
+                self.build_import_xml(args).await
             }
+            "changed_since" => self.changed_since(args).await,
+            "egress_log" => self.egress_log(args).map_err(Into::into),
+            "ledger_masters" => self.ledger_masters(args).await,
+            "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {
                 let (companies, evidence) = self.companies().await?;
                 let flagged = companies
@@ -1702,34 +1716,33 @@ impl Server {
                     truncated: false,
                 })
             }
-            "voucher_schema" => self.voucher_schema().map_err(Into::into),
-            "validate_masters" => self.validate_masters(args).await,
-            "post_import" => self.post_import(args).await,
-            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
-            "build_import_xml" => {
-                self.import_enabled()?;
-                self.build_import_xml(args).await
-            }
-            "verify_import" => self.verify_import(args).await,
+            "local_data_report" => self.local_data_report().map_err(Into::into),
+            "masters" => self.masters(args).await,
+            "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
                 self.parse_bank_statement(args).await
             }
-            "ledger_masters" => self.ledger_masters(args).await,
-            "vouchers" => self.vouchers(args).await,
-            "voucher_presence" => self.voucher_presence(args).await,
-            "changed_since" => self.changed_since(args).await,
-            "outstandings" => self.outstandings(args).await,
-            "ledger_movement" => self.ledger_movement(args).await,
-            "purchase_register" => self.purchase_register(args).await,
-            "trial_balance" => self.trial_balance(args).await,
-            "masters" => self.masters(args).await,
-            "stock_summary" => self.stock_summary(args).await,
+            "post_import" => self.post_import(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
-            "balance_sheet" => self.balance_sheet(args).await,
+            "purchase_register" => self.purchase_register(args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
-            "egress_log" => self.egress_log(args).map_err(Into::into),
-            "local_data_report" => self.local_data_report().map_err(Into::into),
+            "stock_summary" => self.stock_summary(args).await,
+            "tally_status" => {
+                let (result, evidence) = self.status().await?;
+                Ok(ToolOutcome {
+                    payload: json!({"result": result}),
+                    evidence,
+                    company_guid: None,
+                    truncated: false,
+                })
+            }
+            "trial_balance" => self.trial_balance(args).await,
+            "validate_masters" => self.validate_masters(args).await,
+            "verify_import" => self.verify_import(args).await,
+            "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_schema" => self.voucher_schema().map_err(Into::into),
+            "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
             "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
             #[cfg(feature = "lab-writes")]

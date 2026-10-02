@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "bridge-tally",
   "display_name": "ComplyEaze Bridge",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Ask about the TallyPrime books on this computer, and prepare Journal, Payment, Receipt and Contra vouchers as a local file. Posting is off until you turn it on below; then it posts one voucher at a time, each after you approve it in a native dialog. What it reads, amounts included, goes to your AI provider; Response redaction can only mask party names or drop narration.",
   "author": {
     "name": "Bridge contributors"

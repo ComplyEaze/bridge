@@ -315,6 +315,9 @@ base revision.
 <a id="11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial"></a>
 
 [11e. Ledger master read sizes and part reads on two books — **PARTIAL**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11e-ledger-master-read-sizes-and-part-reads-on-two-books--partial)
+<a id="11f-how-long-claude-desktop-waits-on-one-tool-call--partial"></a>
+
+[11f. How long Claude Desktop waits on one tool call — **PARTIAL**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11f-how-long-claude-desktop-waits-on-one-tool-call--partial)
 <a id="11a-scale-measurements--11287-voucher-corpus"></a>
 
 [11a. Scale measurements — 11,287-voucher corpus](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11a-scale-measurements--11287-voucher-corpus)

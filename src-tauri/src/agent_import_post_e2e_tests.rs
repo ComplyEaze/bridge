@@ -2145,6 +2145,55 @@ async fn native_post_reads_back_as_posted_verified(
     assert_journaled_clean_create(directory.path());
 }
 
+/// #985: the readback after a sent post is admitted against the census that
+/// sized it, so a book that changed between the count and the read refuses the
+/// readback. The post was sent and stays sent: the refusal names its cause and
+/// sends the caller to verify_import with this batch, never to post again, and
+/// carries none of the read-only "call the same tool again" remediation.
+#[tokio::test]
+async fn a_readback_refused_by_its_census_after_a_post_sends_the_caller_to_verify_import() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    // The readback on a book whose voucher mark needs a census: the census
+    // counts the posted voucher, and the read that follows returns none.
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(
+        marks().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+    ));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(paired(empty_collection()));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "voucher_window_part_not_admitted",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["cause"], "part_census_mismatch",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(
+        result["error"]["message"],
+        "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry."
+    );
+    assert!(result["error"].get("remediation").is_none(), "{response}");
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
+    assert_journaled_clean_create(directory.path());
+}
+
 // bridge#551: a post goes only into a book with exactly one Currency master,
 // checked before approval and again inside the queue.
 
@@ -3531,4 +3580,102 @@ async fn a_failed_readback_reports_changed_masters_with_the_ledger_marked() {
             "{response}"
         );
     }
+}
+
+/// A voucher the book already holds that matches the saved batch's row by
+/// accounting fingerprint (date, type, ledgers, amounts, sides) but was posted by
+/// no batch of this journal: entered by hand, before the batch's pre-import mark.
+fn a_hand_entered_twin_of_the_saved_row() -> String {
+    format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <VOUCHER REMOTEID=\"{GUID}-00000005\"><DATE>20260901</DATE><VOUCHERNUMBER>5</VOUCHERNUMBER>\
+         <VOUCHERTYPENAME>Journal</VOUCHERTYPENAME><GUID>{GUID}-00000005</GUID><MASTERID>5</MASTERID>\
+         <ALTERID>5</ALTERID><NARRATION>Entered by hand</NARRATION>\
+         <ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>Cash</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+    )
+}
+
+/// The reads up to the absence check, on a book that already holds the twin.
+fn before_approval_on_a_book_holding_a_twin() -> Vec<ScenarioPlan> {
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(a_hand_entered_twin_of_the_saved_row()));
+    plans.extend(paired(a_hand_entered_twin_of_the_saved_row()));
+    plans.extend(probe());
+    plans
+}
+
+/// A batch one of whose rows the book already holds is refused before the dialog
+/// and names that row, with the way on (#901). Before, the answer was a bare
+/// code an agent could not act on.
+#[tokio::test]
+async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_a_book_holding_a_twin()))
+            .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    let refused = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert_eq!(
+        error["preexisting_txn_ids"],
+        json!(["journal-583"]),
+        "{refused}"
+    );
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.contains("preexisting_txn_ids"), "{step}");
+    assert!(step.contains("on whole days"), "{step}");
+    assert!(step.contains("do not enter the row by hand"), "{step}");
+    assert!(
+        step.contains("build the batch again and Bridge checks the book again"),
+        "{step}"
+    );
+    assert!(step.contains("never change a row"), "{step}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["attempt_recorded"], false,
+        "{refused}"
+    );
+    assert!(String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .all(|record| !record.contains("dispatch_intent")));
+}
+
+/// On a response budget too small for remediation the rows and the next step are
+/// withheld, as `cause` is, and the refusal keeps its code (#901): the added
+/// fields cannot turn it into the oversize answer.
+#[tokio::test]
+async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_a_book_holding_a_twin()))
+            .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET - 1,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    });
+    let (_line, args) = saved_batch(&server);
+    let refused = server.call_tool("post_import", args).await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert!(error.get("preexisting_txn_ids").is_none(), "{refused}");
+    assert!(error.get("next_step").is_none(), "{refused}");
 }

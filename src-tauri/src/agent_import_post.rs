@@ -261,6 +261,8 @@ impl Server {
     ) -> anyhow::Result<String> {
         #[cfg(test)]
         let _ = CALL_STARTS.try_with(|starts| starts.lock().unwrap().push(call_started));
+        #[cfg(test)]
+        let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(None));
         let first = crate::tally::runtime::with_operation_wire_budget(
             self.runtime
                 .read_company_marks_once(self.tally_config(), request.clone()),
@@ -277,6 +279,8 @@ impl Server {
         else {
             return first;
         };
+        #[cfg(test)]
+        let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(Some(budget)));
         crate::tally::runtime::with_operation_wire_budget_of(
             budget,
             self.runtime
@@ -525,6 +529,8 @@ impl Server {
         let mut masters_verdict: Option<Value> = None;
         // The ledgers whose GUID changed since the build (#239).
         let mut ledgers_changed: Option<Vec<String>> = None;
+        // The batch's own transaction ids found already in the book (#901).
+        let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -662,7 +668,10 @@ impl Server {
             // the lease sends before posting (§11c).
             let before = self.verify_import_for_post(args).await?;
             accumulated = combine_evidence(accumulated.clone(), before.evidence);
-            require_absent_verification_result(&before.payload["result"], line.vouchers.len())?;
+            require_absent_verification_result(&before.payload["result"], line.vouchers.len())
+                .inspect_err(|_| {
+                    preexisting_txn_ids = Some(present_txn_ids(&before.payload["result"]));
+                })?;
             let payload = ImportPayload {
                 company_guid: line.company_guid.clone(),
                 vouchers: line.vouchers.clone(),
@@ -1284,6 +1293,13 @@ impl Server {
                 if let Some(currencies) = currencies_seen {
                     name_refused_currencies(&mut outcome.payload, &currencies);
                 }
+                // Withheld under the remediation budget, as `cause` is. That is
+                // not a guarantee against the oversize answer just above it.
+                if let Some(ids) = preexisting_txn_ids {
+                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                        name_preexisting_rows(&mut outcome.payload, &ids);
+                    }
+                }
                 if let Some(ledgers) = ledgers_changed {
                     name_changed_ledgers(&mut outcome.payload, &ledgers);
                 } else {
@@ -1649,6 +1665,40 @@ fn require_absent_verification_result(result: &Value, voucher_count: usize) -> R
     Ok(())
 }
 
+/// The transaction ids of the batch's vouchers the readback did not find absent
+/// (#901): each already matches a voucher in the book that this batch did not
+/// post.
+fn present_txn_ids(result: &Value) -> Vec<String> {
+    result["vouchers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|voucher| voucher["status"] != "not_found")
+        .filter_map(|voucher| voucher["bridge_txn_id"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// What to do when a batch's rows are already in the book, or look like rows
+/// that are (#901). It names no amount, ledger or narration.
+const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and Bridge checks the book again; if the voucher is there it refuses again, and if no voucher with that fingerprint is there it can go on to approval. If it is refused again and you still cannot find the voucher, ask the user, and never change a row (its date, ledger, type or amount) to get it past this check. Only for a genuinely different transaction (the statement has more rows with this date, ledgers and amount than Tally holds vouchers) that shares the fingerprint of a voucher you have opened and confirmed, leave it out of this batch and enter it in Tally by hand. Then build the other rows again without them so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";
+
+/// Name the rows of the batch that are already in the book, with the way on.
+fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
+    if txn_ids.is_empty() {
+        return;
+    }
+    let error = &mut payload["result"]["error"];
+    error["preexisting_txn_ids"] = json!(txn_ids);
+    error["next_step"] = json!(PREEXISTING_ROWS_NEXT_STEP);
+    // Set only at the check before the dialog, where nothing was sent, so the
+    // generic "never rebuild it to retry" of an unobserved attempt would
+    // contradict the step.
+    error["message"] = json!(
+        "Nothing was sent: rows of this batch already match vouchers in the book. \
+         See error.next_step."
+    );
+}
+
 /// The aim check on the snapshot the queue read last before the POST (#574).
 /// The aim check (#574), then the master mark (#239): the target's ALTMSTID in
 /// the aim snapshot must equal the one read as the queue's binding reads began.
@@ -1900,6 +1950,10 @@ tokio::task_local! {
     pub(super) static BETWEEN_PASSES: std::sync::Arc<dyn Fn() + Send + Sync>;
     /// Test-only: the start each pass of a post call took its budgets from.
     pub(super) static CALL_STARTS: std::sync::Arc<std::sync::Mutex<Vec<std::time::Instant>>>;
+    /// Test-only: one entry per marks readback attempt after a post (#998): `None`
+    /// for the first read, on the operation's own budget, and the retry's budget.
+    pub(super) static MARKS_READS:
+        std::sync::Arc<std::sync::Mutex<Vec<Option<std::time::Duration>>>>;
 }
 
 /// A fresh random REMOTEID for one native post.

@@ -620,6 +620,25 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
             == Some(WireRefusal::Busy)
     };
 
+    // How many reads a call made is counted, not timed (#998): an upper bound on
+    // elapsed time fails on a loaded runner although the code is right. The
+    // lower bounds stay, because a wait can only add to elapsed time.
+    async fn reads_of(
+        server: &Server,
+        request: crate::tally::agent_read_request::AgentReadRequest,
+        call_started: Instant,
+    ) -> (anyhow::Result<String>, Vec<Option<Duration>>) {
+        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let result = MARKS_READS
+            .scope(
+                std::sync::Arc::clone(&reads),
+                server.read_marks_after_post(request, call_started),
+            )
+            .await;
+        let reads = reads.lock().unwrap().clone();
+        (result, reads)
+    }
+
     // Freed after the first budget, inside the second: the retry gets through.
     let held = hold();
     let release = tokio::spawn(async move {
@@ -627,31 +646,29 @@ async fn a_busy_marks_readback_after_a_post_is_retried_once_within_the_call() {
         drop(held);
     });
     let started = Instant::now();
-    let result = server
-        .read_marks_after_post(request(), Instant::now())
-        .await;
+    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
     assert!(started.elapsed() >= budget);
     assert!(!busy(&result), "the retry must reach the wire: {result:?}");
+    assert_eq!(reads, [None, Some(budget)]);
     release.await.unwrap();
 
-    // Held throughout: refused once, after both budgets, never a third.
+    // Held throughout: refused once, after both budgets, never a third read.
     let _held = hold();
     let started = Instant::now();
-    let result = server
-        .read_marks_after_post(request(), Instant::now())
-        .await;
+    let (result, reads) = reads_of(&server, request(), Instant::now()).await;
     assert!(busy(&result));
     assert!(started.elapsed() >= budget * 2);
-    assert!(started.elapsed() < budget * 3);
+    assert_eq!(reads, [None, Some(budget)], "exactly one retry");
 
-    // A call with no time left waits its first budget and nothing more.
+    // A call with no time left waits its first budget and retries nothing.
     let spent = Instant::now()
         .checked_sub(Duration::from_secs(44))
         .unwrap_or_else(Instant::now);
     let started = Instant::now();
-    let result = server.read_marks_after_post(request(), spent).await;
+    let (result, reads) = reads_of(&server, request(), spent).await;
     assert!(busy(&result));
-    assert!(started.elapsed() >= budget && started.elapsed() < budget * 2);
+    assert!(started.elapsed() >= budget);
+    assert_eq!(reads, [None], "no retry");
 }
 
 /// A marks readback that failed after a sent post is named in the recorded
@@ -2679,4 +2696,42 @@ fn an_unreadable_batch_record_keeps_the_step_pending_and_blocks_the_baseline() {
     server.record_batch_step_verdict("batch-c", &json!({"matches_created":true}));
     server.record_masters_verdict_for("batch-c", json!({"state":"unchanged"}), true);
     assert!(super::super::read_verified_baseline_for(&imports, "batch-c", 2).is_some());
+}
+
+/// Only the rows the readback did not find absent are named, by their ids alone.
+#[test]
+fn only_present_rows_are_named_and_a_clean_result_names_none() {
+    let result = json!({"vouchers":[
+        {"bridge_txn_id":"t1","status":"not_found"},
+        {"bridge_txn_id":"t2","status":"not_attributable","marker":"accounting_fingerprint"},
+        {"bridge_txn_id":"t3","status":"duplicate_fingerprint","matches":2},
+        {"bridge_txn_id":"t4","status":"matching_content_observed","marker":"accounting_fingerprint"},
+        {"status":"posted_verified"},
+    ]});
+    assert_eq!(present_txn_ids(&result), ["t2", "t3", "t4"]);
+    assert!(
+        present_txn_ids(&json!({"vouchers":[{"bridge_txn_id":"t1","status":"not_found"}]}))
+            .is_empty()
+    );
+    assert!(present_txn_ids(&json!({})).is_empty());
+
+    let mut payload = json!({"result":{"error":{"code":"import_preexisting_identity"}}});
+    name_preexisting_rows(&mut payload, &[]);
+    assert!(payload["result"]["error"].get("next_step").is_none());
+    // An unobserved attempt's generic message would say never to rebuild it.
+    payload["result"]["error"]["message"] =
+        json!("The saved batch requires reconciliation. never rebuild it to retry.");
+    name_preexisting_rows(&mut payload, &["t2".into(), "t3".into()]);
+    assert!(payload["result"]["error"]["message"]
+        .as_str()
+        .unwrap()
+        .starts_with("Nothing was sent"));
+    assert_eq!(
+        payload["result"]["error"]["preexisting_txn_ids"],
+        json!(["t2", "t3"])
+    );
+    assert!(payload["result"]["error"]["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("error.preexisting_txn_ids"));
 }

@@ -1175,6 +1175,9 @@ async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
     .await;
     let outcome = outcome.unwrap();
     assert_eq!(outcome.reads, [part("20260801", "20260801", None)]);
+    // The census that proved it small is kept and the read admitted against
+    // it, not dropped (#985).
+    assert!(outcome.counted());
     assert_eq!(observed.len(), 12);
     assert_requests(
         &observed,
@@ -1369,6 +1372,7 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
         plans.extend(paired(body));
     }
     plans.extend(paired(&marks_plan(3, 7)));
+    let call_started = std::time::Instant::now();
     let (outcome, observed) = read_window(
         plans,
         ("20260801", "20260802"),
@@ -1379,6 +1383,7 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
         three_a_read(),
     )
     .await;
+    let call_ms = call_started.elapsed().as_millis();
     assert_eq!(observed.len(), 30);
     let timings = outcome.unwrap().timings;
     // The marks were known: only the closing bracket read them.
@@ -1429,6 +1434,12 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
     // Dropping a part's timing, or charging the delay to another part, leaves the
     // second part below the bound.
     assert!(timings.parts[1].ms >= 400, "{timings:?}");
+    // Each part is timed on its own (#998). The parts are read one after another,
+    // so their own times are disjoint pieces of the call and add up to no more
+    // than the call took, however slow the runner. A timing that included the
+    // parts before it would count the 400 ms delay again in the third part.
+    let parts_ms = timings.parts.iter().map(|part| part.ms).sum::<u128>();
+    assert!(parts_ms <= call_ms, "{parts_ms} > {call_ms}: {timings:?}");
     assert_eq!(timings.failed, None);
 }
 
@@ -3160,6 +3171,114 @@ async fn a_census_mismatch_reaches_the_caller_with_its_counts() {
     assert_eq!(error["code"], PART_NOT_ADMITTED, "{response}");
     assert_eq!(error["cause"], PART_CENSUS_MISMATCH);
     assert_eq!(error["counts"], json!({"returned": 0, "counted": per_read}));
+}
+
+/// #985: a window is `counted()` only against a census that names each
+/// voucher's GUID. A count of `(day, AlterID)` alone admits the same rows on
+/// AlterIDs only, so the read is not called counted.
+#[tokio::test]
+async fn only_a_census_with_guids_makes_a_window_counted() {
+    let window = ("20260801", "20260801");
+    let with_guids = WindowCensus::from_census_rows(
+        parse_voucher_census(&three_vouchers(), window, None).unwrap(),
+    )
+    .unwrap();
+    let ids_only = WindowCensus::from_rows((1..=3).map(|id| (day("20260801"), id)));
+    for (census, counted) in [(with_guids, true), (ids_only, false)] {
+        let (outcome, _) = read_window(
+            paired(&xml_plan(three_vouchers())),
+            window,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::replay_of(
+                vec![part("20260801", "20260801", None)],
+                Some(WindowWitness {
+                    marks: marks_of(3),
+                    census: Some(census),
+                }),
+            ),
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+        )
+        .await;
+        let outcome = outcome.unwrap();
+        assert_eq!(outcome.rows.len(), 3);
+        assert_eq!(outcome.counted(), counted);
+    }
+}
+
+/// The `vouchers` plans of a book whose mark needs a census (#985): `census`
+/// counts the window, which then fits one read, and `data` is that read.
+fn counted_vouchers_plans(census: String, data: String) -> Vec<ScenarioPlan> {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(limits.census_capacity())));
+    plans.extend(paired(&xml_plan(census)));
+    plans.extend(paired(&xml_plan(data)));
+    plans
+}
+
+async fn call_vouchers_over(plans: Vec<ScenarioPlan>) -> Value {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
+        )
+        .await;
+    simulator.finish().unwrap();
+    response
+}
+
+/// #985: one rule labels the window. A window the census counted is
+/// `complete`; one the marks alone proved small was counted by nothing, so it
+/// is `partial` and says why.
+#[tokio::test]
+async fn vouchers_labels_a_window_complete_only_when_a_census_counted_it() {
+    let counted =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    assert_eq!(counted["isError"], false, "{counted}");
+    let result = &counted["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["reason"], Value::Null);
+    assert_eq!(result["total"], 3);
+    assert_eq!(
+        counted["structuredContent"]["evidence"]["state"],
+        "complete"
+    );
+
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(3)));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let uncounted = call_vouchers_over(plans).await;
+    assert_eq!(uncounted["isError"], false, "{uncounted}");
+    let result = &uncounted["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], NONEMPTY_WINDOW_UNQUALIFIED);
+    assert_eq!(result["total"], 3);
+    assert_eq!(
+        uncounted["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+}
+
+/// #985: a window read whole after a census is admitted against it, so a read
+/// that returns fewer vouchers than were counted is refused, not returned
+/// short, and the refusal names the next call.
+#[tokio::test]
+async fn a_window_counted_whole_refuses_a_read_short_of_its_census() {
+    let response =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), vouchers_kept(2))).await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], PART_NOT_ADMITTED, "{response}");
+    assert_eq!(error["cause"], PART_CENSUS_MISMATCH);
+    assert_eq!(error["counts"], json!({"returned": 2, "counted": 3}));
+    assert!(
+        error["remediation"]
+            .as_str()
+            .is_some_and(|text| text.contains("call the same tool again")),
+        "{error}"
+    );
 }
 
 /// A licence that drops to Education while a read is in flight: the opening

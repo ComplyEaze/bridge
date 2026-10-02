@@ -1080,7 +1080,7 @@ client's statutory dues classified as TDS payable, net, on every voucher that ca
 the payee or credits it."
         ),
         voucher_refs(seen.iter().map(|(g, v)| (*g, *v))),
-    );
+    )?;
     if seen.is_empty() {
         return Ok(
             "No TDS line (a ledger the client's statutory dues classify as TDS payable) is \
@@ -1267,7 +1267,7 @@ its date.",
                 x.h, x.nature, x.cat_note
             ),
             vec![voucher_ref(g, row.vouchers[g])],
-        );
+        )?;
         facts.push((format!("payment_a:{:03}", n + 1), id));
     }
     if listed.is_empty() {
@@ -1284,7 +1284,7 @@ summed. Each is its own item in clause 21(b); this total is not.",
                 x.h
             ),
             Vec::new(),
-        );
+        )?;
         facts.push(("inadmissible_payments_total".to_string(), id));
     }
 
@@ -1364,7 +1364,7 @@ challans recorded show nothing deposited by the s.139(1) due date, are listed in
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     let mut q_facts = vec![("tds_seen".to_string(), tds_seen_id)];
     for (n, g) in off_a.iter().enumerate() {
         let v = row.vouchers[g];
@@ -1381,7 +1381,7 @@ determines. The voucher cited gives its date.",
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         q_facts.push((format!("deducted_payment:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_21b_deducted_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1389,7 +1389,7 @@ determines. The voucher cited gives its date.",
             Unit::Paise,
             &format!("The TDS on that payment's own voucher (tag {}).", x.h),
             ev1,
-        );
+        )?;
         q_facts.push((format!("deducted_tds:{:03}", n + 1), id));
     }
     if !off_a.is_empty() {
@@ -1403,7 +1403,7 @@ their own vouchers (not in clause 21(b)(ii)(A) or (ii)(B) in this draft), summed
                 x.h
             ),
             Vec::new(),
-        );
+        )?;
         q_facts.push(("deducted_payments_total".to_string(), id));
     }
     let mut guard = if reversal && !candidates.is_empty() {
@@ -1491,7 +1491,7 @@ not tested, because {why}.",
                     x.h, x.nature, x.cat_note
                 ),
                 untested.iter().map(|g| voucher_ref(g, row.vouchers[g])).collect(),
-            );
+            )?;
             limits.push(format!(
                 "{} bill(s) carrying TDS are not tested against the section's rate: {why}.",
                 untested.len()
@@ -1528,7 +1528,7 @@ deposited by the s.139(1) due date; its full amount. The voucher cited gives its
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("payment_b:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_21b_b_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1540,7 +1540,7 @@ date: nothing.",
                 x.h
             ),
             ev1,
-        );
+        )?;
         facts.push((format!("tax_deducted_b:{:03}", n + 1), id));
     }
     let id = r.fig(
@@ -1553,7 +1553,7 @@ Each is its own item in clause 21(b); this total is not.",
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     facts.push(("inadmissible_payments_total".to_string(), id));
     r.findings.push(Finding {
         id: format!("{TEST_ID}/not_deposited/{}", x.rid),
@@ -1655,7 +1655,7 @@ the section's rate; its full amount. The voucher cited gives its date.",
                 x.h, x.nature, x.cat_note
             ),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("short_payment:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_short_tds_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1663,7 +1663,7 @@ the section's rate; its full amount. The voucher cited gives its date.",
             Unit::Paise,
             &format!("The TDS on that payment's own voucher (tag {}).", x.h),
             ev1.clone(),
-        );
+        )?;
         facts.push((format!("short_tds:{:03}", n + 1), id));
         let id = r.fig(
             &format!("{}_row_short_base_{}_{:03}", x.prefix, x.rid, n + 1),
@@ -1676,7 +1676,7 @@ expense, the payee and its TDS).",
                 x.h
             ),
             ev1,
-        );
+        )?;
         facts.push((format!("short_base:{:03}", n + 1), id));
     }
     let id = r.fig(
@@ -1689,7 +1689,7 @@ rate, summed.",
             x.h
         ),
         Vec::new(),
-    );
+    )?;
     facts.push(("short_deducted_payments_total".to_string(), id));
     let mut limits = Vec::new();
     if !short.is_empty() {
@@ -1900,7 +1900,7 @@ firm/LLP/company always; individual/HUF only if previous-year business turnover 
 rules' turnover limit for an individual or HUF -- never assumed from the current year's books \
 alone.",
         Vec::new(),
-    );
+    )?;
     if status == "unknown" {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deductor_status"),
@@ -1940,7 +1940,7 @@ figure only; existence or absence of such a ledger is not itself a conclusion ab
             .iter()
             .map(|n| EvidenceRef::with_label("ledger", n, n))
             .collect(),
-    );
+    )?;
 
     // ---------------------------------------------------------------- payee rows
     let rows = compute_payee_rows(&pop, book, cfg)?;
@@ -2141,7 +2141,7 @@ Accounts line{cat_note}: inside a goods invoice, not a separate contract with th
 from the per-payee tests."
             ),
             Vec::new(),
-        );
+        )?;
 
         let payee_entities: BTreeMap<&str, &Summary> = summaries
             .iter()
@@ -2159,7 +2159,7 @@ once; 'payee not named' counted as one entity, 'within supplier goods invoices' 
 expense ledger line{cat_note}."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             &format!("{prefix}_credited_total"),
             Value::Int(credited_total),
@@ -2169,7 +2169,7 @@ expense ledger line{cat_note}."
 expense ledger line{cat_note} (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test."
             ),
             Vec::new(),
-        );
+        )?;
 
         let is_unmapped_194j = nature == "194J" && subcat == CATEGORY_UNMAPPED;
         let s194h_limit = limits_paise.s194h.unwrap_or(i64::MAX);
@@ -2320,7 +2320,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 'unmapped', which is never threshold-tested)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let mut ordered: Vec<(&str, &Summary)> = over.into_iter().collect();
         ordered.sort_by_key(|(e, _)| hash8(e));
@@ -2328,14 +2328,8 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
             let h = hash8(&format!("{prefix}:{}", stable_ledger_tag(book, entity)?));
             let rid = format!("{prefix}_{h}");
             let evidence = voucher_refs(s.vouchers.iter().map(|(g, v)| (*g, *v)));
-            // Two over-limit entities with one tag would repeat a figure id: the reference raises
-            // there, so this refuses rather than letting `TestResult::fig` panic.
-            let row_figure = format!("{TEST_ID}.{prefix}_row_credited_{rid}");
-            if r.figures.iter().any(|f| f.id == row_figure) {
-                return Err(AuditError::Config(format!(
-                    "{TEST_ID}: two payee entities share the figure id {row_figure}"
-                )));
-            }
+            // Two over-limit entities with one tag repeat this figure id: the reference raises
+            // there, and `fig` refuses.
             let f_credited = r.fig(
                 &format!("{prefix}_row_credited_{rid}"),
                 Value::Int(s.credited),
@@ -2345,7 +2339,7 @@ whose {nature}{cat_note} test trips (single sum/aggregate for \
 across every population voucher touching a mapped expense ledger."
                 ),
                 evidence.clone(),
-            );
+            )?;
             let f_max_single = r.fig(
                 &format!("{prefix}_row_max_single_{rid}"),
                 Value::Int(s.max_single),
@@ -2355,7 +2349,7 @@ across every population voucher touching a mapped expense ledger."
 under {nature}{cat_note}."
                 ),
                 Vec::new(),
-            );
+            )?;
             // An unmapped-category or "possibly over" amount is never a computed TDS default: its
             // fact key keeps it out of the clause amount sums while the finding still counts.
             let credited_key = if is_unmapped_194j {
@@ -2380,7 +2374,7 @@ under {nature}{cat_note}."
 under 194-I."
                     ),
                     Vec::new(),
-                );
+                )?;
                 facts.push(("max_month".to_string(), f_month));
             }
 
@@ -2765,7 +2759,7 @@ mod tests {
         let inputs = Inputs::default();
         let err = run(&book, &rules, "firm", &cfg, &inputs).unwrap_err();
         assert!(
-            matches!(&err, AuditError::Config(m) if m.contains("two payee entities share the figure id")),
+            matches!(&err, AuditError::DuplicateFigureId(id) if id.contains("_row_credited_")),
             "{err}"
         );
         // The control: without the colliding alias both payees are reported.

@@ -320,8 +320,9 @@ function clause(doc, number) {
 // [what the page says, document, clause, what the clause says]
 const legalPins = {
   liability: [
-    ["section 14 of the Terms of Use is what applies", "terms", "14", "Limitation of liability"],
-    ["own disclaimer and limit of liability also apply (section 5.2)", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
+    ["sections 13 and 14 of the Terms of Use are what apply", "terms", "13", "No warranty"],
+    ["sections 13 and 14 of the Terms of Use are what apply", "terms", "14", "Limitation of liability"],
+    ["own disclaimer and limit of liability (section 5.2)", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
     ["To the extent the law allows, we, our partners, employees and agents, and the contributors to ComplyEaze Bridge are not liable at all", "terms", "14.1", "To the maximum extent permitted by applicable law, none of ComplyEaze, its partners, employees and agents, or the contributors to Bridge, will be liable"],
     ["however it is caused, including through negligence (section 14.1)", "terms", "14.1", "however it is caused. It applies whether the claim is in contract, tort (including negligence)"],
     ["indirect, consequential or similar loss", "terms", "14.1", "any indirect, incidental, special, consequential, exemplary or punitive loss or damage"],
@@ -330,7 +331,8 @@ const legalPins = {
     ["any tax, interest, penalty, fee or late fee imposed on you or your clients, or the cost of correcting a return or books", "terms", "14.1", "any tax, interest, penalty, fee or late fee imposed on you or your Clients, or the cost of correcting a return, filing or set of books"],
     ["any claim your clients or anyone else makes against you", "terms", "14.1", "any claim by your Clients or any other third party against you"],
     ["loss caused by your AI assistant, your AI provider, Tally or other third-party software", "terms", "14.1", "any loss caused by your AI Assistant, your AI Provider, Tally or other third-party software"],
-    ["To the extent the law allows, our total liability to you for all claims connected with ComplyEaze Bridge, our website or our services", "terms", "14.2", "To the maximum extent permitted by applicable law, our total liability to you for all claims arising out of or in connection with Bridge, the Services or these Terms"],
+    ["To the extent the law allows, our total liability to you for all claims connected with ComplyEaze Bridge, its website, any service we provide for it or the Terms", "terms", "14.2", "To the maximum extent permitted by applicable law, our total liability to you for all claims arising out of or in connection with Bridge, the Services or these Terms"],
+    ["its website, any service we provide for it", "terms", "2", "The Bridge website, and any support or other service we choose to provide for Bridge"],
     ["the total amount you paid us for ComplyEaze Bridge in the twelve months before the event giving rise to the claim (section 14.2)", "terms", "14.2", "the total amount you paid us for Bridge in the twelve months before the event giving rise to the claim"],
     ["If a court or other authority decides that limit cannot apply", "terms", "14.3", "If a court or other authority decides that the limit in section 14.2 cannot apply"],
     ["our total liability for all claims together is limited to INR 1,000, to the extent the law allows (section 14.3)", "terms", "14.3", "our total liability for all claims together is limited to INR 1,000, to the maximum extent permitted by applicable law"],
@@ -339,8 +341,8 @@ const legalPins = {
   "client-claims": [
     ["To the extent the law allows, and except as section 14.4 provides", "terms", "14.4", "Nothing in these Terms excludes or limits liability"],
     ["we are not liable for a claim your client or anyone else makes against you (Terms of Use, section 14.1)", "terms", "14.1", "any claim by your Clients or any other third party against you"],
-    ["makes a claim or demand against us, our partners, employees or agents, you cover it", "terms", "15", "you will indemnify ComplyEaze and its partners, employees and agents against third-party claims"],
-    ["you cover it and any resulting loss, cost or expense, including reasonable legal fees", "terms", "15", "any claim, demand, loss, cost or expense (including reasonable legal fees) brought by a third party, including your Clients"],
+    ["makes a claim against us, our partners, employees or agents, you cover", "terms", "15", "you will indemnify ComplyEaze and its partners, employees and agents against third-party claims"],
+    ["you cover any claim, demand, loss, cost or expense, including reasonable legal fees, that a third party brings", "terms", "15", "any claim, demand, loss, cost or expense (including reasonable legal fees) brought by a third party, including your Clients"],
     ["to the extent the law allows and to the extent it arises from your breach of the Terms or the law", "terms", "15", "To the extent permitted by applicable law"],
     ["or of Tally’s or your AI provider’s terms", "terms", "15", "or of Tally's or your AI Provider's terms"],
     ["from a voucher you approved, or data you accessed or shared, without the authority section 8 requires", "terms", "15", "a voucher you approved, or data you accessed or shared, without the authority required by section 8"],
@@ -348,7 +350,8 @@ const legalPins = {
     ["your breach of a duty you owe your clients", "terms", "15", "your breach of any duty you owe your Clients"],
     ["You do not cover a claim to the extent it results from our breach of the Terms, our negligence or our wilful misconduct.", "terms", "15", "It does not apply to the extent a claim results from our breach of these Terms or our negligence or wilful misconduct."],
     ["Nor do you cover any penalty imposed on us for our own breach of the law (section 15)", "terms", "15", "It does not cover any penalty imposed on us for our own breach of the law."],
-    ["your decision to approve a voucher or a batch and its accounting consequences, whoever proposed it", "terms", "9.3", "You are responsible for that decision and its accounting consequences, whoever proposed the voucher"],
+    ["your decision to approve a voucher (or, in a build that allows it, a batch) and its accounting consequences, whoever proposed it", "terms", "9.3", "You are responsible for that decision and its accounting consequences, whoever proposed the voucher"],
+    ["(or, in a build that allows it, a batch)", "terms", "9.3", "for a batch (where a Build allows batches), a summary"],
     ["that responsibility does not extend to any difference between what the approval window showed and what ComplyEaze Bridge actually posted (section 9.3)", "terms", "9.3", "This does not apply to any difference between what the window showed and what Bridge actually posted"],
     ["Section 14 still limits any liability we have for such a difference", "terms", "14.2", "our total liability to you for all claims arising out of or in connection with Bridge"],
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "8", "Your responsibilities"],
@@ -360,6 +363,8 @@ const legalPins = {
   contact: [
     ["contact@complyeaze.com (SPMS Comply Eaze Solutions LLP; its postal address is in section 1.1", "terms", "19", "contact@complyeaze.com, SPMS Comply Eaze Solutions LLP, at the address in section 1.1"],
     ["its postal address is in section 1.1", "terms", "1.1", "Our registered office is at"],
+    ["and these routes are in section 19", "terms", "19", "General questions and notices: contact@complyeaze.com"],
+    ["Before starting any proceedings over a dispute, write to contact@complyeaze.com; both sides then try in good faith to resolve it within 30 days (section 18.2)", "terms", "18.2", "Before starting any proceedings, the party raising a dispute will notify the other in writing, at the contact address in section 19. Both will then try in good faith to resolve it within 30 days."],
     ["Do not put real client data, passwords or other confidential information in issues, bug reports, logs or screenshots you share with us or post publicly (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information in issues, bug reports, logs or screenshots that you share with us or post publicly"],
     ["“Grievance” in the subject", "privacy", "16", "with \"Grievance\" in the subject"],
     ["or write by post to that address", "privacy", "16", "or by post to the address in section 1"],

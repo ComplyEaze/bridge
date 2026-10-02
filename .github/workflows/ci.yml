@@ -18,9 +18,10 @@ on:
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
-  # A daily full run on master: push runs skip the heavy jobs when the merge queue already ran
-  # them on the same commit, so this run is what keeps the Rust caches warm (they are saved
-  # only by push, manual and scheduled runs) and catches drift that no change triggers.
+  # A daily full run on master. A push skips a family of heavy jobs when the merge queue already
+  # ran that family on the same commit (scripts/master-push-reuse.mjs), so this run keeps the
+  # Rust caches warm (saved only by push, manual and scheduled runs) and exercises the tip even
+  # when no change triggers a run.
   schedule:
     - cron: '17 3 * * *'
 
@@ -41,7 +42,6 @@ jobs:
       # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).
       actions: read
     outputs:
-      full: ${{ steps.scope.outputs.full }}
       bundle: ${{ steps.scope.outputs.bundle }}
       native: ${{ steps.scope.outputs.native }}
       tax_audit: ${{ steps.scope.outputs.tax_audit }}
@@ -61,9 +61,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # `full` is the unscoped run: every heavy job runs, whatever changed.
+          # The unscoped run: every heavy job runs, whatever changed.
           full_run() {
-            echo 'full=true' >> "$GITHUB_OUTPUT"
             echo 'bundle=true' >> "$GITHUB_OUTPUT"
             echo 'native=true' >> "$GITHUB_OUTPUT"
             echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
@@ -74,20 +73,24 @@ jobs:
             full_run
           fi
 
-          # A push to master is a full run unless the merge queue already ran this exact commit green
-          # (scripts/master-push-reuse.mjs). Any error or doubt in that lookup is a full run: the
-          # `|| true` and the exact-line match mean only a printed `reuse=true` skips anything.
+          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family
+          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped
+          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt
+          # in the lookup runs both: a non-zero exit discards whatever was printed, and only an exact
+          # `reuse_<family>=true` line skips anything. tax_audit is cheap and always runs on a push.
           # To turn the reuse off, delete this block: every push is then a full run again.
           if [[ "$EVENT_NAME" == "push" ]]; then
-            decision="$(node scripts/master-push-reuse.mjs || true)"
+            decision="$(node scripts/master-push-reuse.mjs)" || decision=''
             printf '%s\n' "$decision"
-            if ! printf '%s\n' "$decision" | grep -qx 'reuse=true'; then
-              full_run
-            fi
-            echo 'full=false' >> "$GITHUB_OUTPUT"
-            echo 'bundle=false' >> "$GITHUB_OUTPUT"
-            echo 'native=false' >> "$GITHUB_OUTPUT"
-            echo 'tax_audit=false' >> "$GITHUB_OUTPUT"
+            { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            for family in native bundle; do
+              if printf '%s\n' "$decision" | grep -qx "reuse_${family}=true"; then
+                echo "${family}=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "${family}=true" >> "$GITHUB_OUTPUT"
+              fi
+            done
+            echo 'tax_audit=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -101,8 +104,6 @@ jobs:
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
             full_run
           fi
-
-          echo 'full=false' >> "$GITHUB_OUTPUT"
 
           # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.
           # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.
@@ -236,7 +237,7 @@ jobs:
       - run: node scripts/check-unbounded-reads.mjs
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
-      - run: node --test scripts/master-push-reuse.test.mjs
+      - run: node --test scripts/master-push-reuse.test.mjs scripts/master-push-scope.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
       - run: python3 scripts/bank_statement_import.test.py
@@ -370,7 +371,7 @@ jobs:
     needs: changes
     # Rust/Tauri changes always receive Windows and macOS coverage on PRs. The
     # check is deliberately skipped only for frontend- and documentation-only PRs.
-    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.native == 'true'
+    if: needs.changes.outputs.native == 'true'
     runs-on: ${{ matrix.os }}
     # CI does not debug native test executables. Keep local line tables and
     # release profiles unchanged; assertions and overflow checks stay enabled.
@@ -585,9 +586,10 @@ jobs:
   bundle-smoke:
     name: Bundle smoke (${{ matrix.os }})
     needs: changes
-    # Bundle output is validated for packaging-relevant pull requests and every
-    # master/manual run. Rust/Tauri PRs retain the native platform matrix above.
-    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'
+    # Bundle output is validated for packaging-relevant pull requests and for every
+    # manual or scheduled run, and on a master push unless the merge queue already ran it
+    # on that commit. Rust/Tauri PRs retain the native platform matrix above.
+    if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
@@ -803,7 +805,7 @@ jobs:
     # release and requires the marker there, so a clean scan of the shipped
     # executables means the scan could have seen the seam. Same scope and
     # platforms as bundle-smoke, whose runs it guards.
-    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'
+    if: needs.changes.outputs.bundle == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -889,7 +891,7 @@ jobs:
     # master left inconsistent by a merge that bypassed it then reds crate PRs and
     # the nightly run, not every unrelated PR.
     needs: [changes]
-    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.tax_audit == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.tax_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

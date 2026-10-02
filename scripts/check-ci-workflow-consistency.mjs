@@ -71,7 +71,7 @@ const expectedSeamControl = [
   "    # release and requires the marker there, so a clean scan of the shipped",
   "    # executables means the scan could have seen the seam. Same scope and",
   "    # platforms as bundle-smoke, whose runs it guards.",
-  "    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.bundle == 'true'",
+  "    if: needs.changes.outputs.bundle == 'true'",
   "    runs-on: ${{ matrix.os }}",
   "    timeout-minutes: 45",
   "    permissions:",
@@ -145,7 +145,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "8fadc5cfe0d18740dbd9e1e580874f6586c89e0b50f2169bd25063ea0300a9b3"],
+  ], "c53f41ad6c65a9f3a963ae3aefb3896736d3bdce1e623502ddd24531ac8766ce"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",
@@ -156,7 +156,7 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "46040bb19d8d7c64eb6c04e3e4fc02f0d8531638112f9deabede5da7db53aecf"],
+  ], "76a3c2dd51c3eed7a41bf4734a2a1cbe8754545fce8aec3d364893eb3d53dcae"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
@@ -175,7 +175,7 @@ for (const [source, job, expected, digest] of [
 // And native, bundle-smoke and package run a local composite action before their scans; a local
 // action can call another, so every tracked file under .github/actions/ is pinned by its bytes.
 for (const [name, source, digest] of [
-  ["ci.yml", workflow, "f4d56791d30393f5e76ff16cf6dd72dea67ae75853ca21e03af3035420775f8c"],
+  ["ci.yml", workflow, "25526dcdd7691fef35c27e07c0bb0291543cbf3ba55e7ac4ee40bd59f802b1e9"],
   ["release-mcpb-preview.yml", releaseWorkflow, "c4a747416c492779cfd43305cfd619728d2c9821a17f3efb73da08f67dc56144"],
 ]) {
   const lines = source.split("\n");
@@ -191,7 +191,7 @@ const localActionsDigest = localActions.digest("hex");
 if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
-if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.full == 'true' || needs.changes.outputs.native == 'true'") {
+if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
@@ -251,7 +251,6 @@ const expectedChanges = [
   "      # Only to read this workflow's own merge-queue runs and their jobs (scripts/master-push-reuse.mjs).",
   "      actions: read",
   "    outputs:",
-  "      full: ${{ steps.scope.outputs.full }}",
   "      bundle: ${{ steps.scope.outputs.bundle }}",
   "      native: ${{ steps.scope.outputs.native }}",
   "      tax_audit: ${{ steps.scope.outputs.tax_audit }}",
@@ -271,9 +270,8 @@ const expectedChanges = [
   "        run: |",
   "          set -euo pipefail",
   "",
-  "          # `full` is the unscoped run: every heavy job runs, whatever changed.",
+  "          # The unscoped run: every heavy job runs, whatever changed.",
   "          full_run() {",
-  "            echo 'full=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
@@ -284,20 +282,24 @@ const expectedChanges = [
   "            full_run",
   "          fi",
   "",
-  "          # A push to master is a full run unless the merge queue already ran this exact commit green",
-  "          # (scripts/master-push-reuse.mjs). Any error or doubt in that lookup is a full run: the",
-  "          # `|| true` and the exact-line match mean only a printed `reuse=true` skips anything.",
+  "          # A push to master runs a family of heavy jobs unless the merge queue already RAN that family",
+  "          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped",
+  "          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt",
+  "          # in the lookup runs both: a non-zero exit discards whatever was printed, and only an exact",
+  "          # `reuse_<family>=true` line skips anything. tax_audit is cheap and always runs on a push.",
   "          # To turn the reuse off, delete this block: every push is then a full run again.",
   "          if [[ \"$EVENT_NAME\" == \"push\" ]]; then",
-  "            decision=\"$(node scripts/master-push-reuse.mjs || true)\"",
+  "            decision=\"$(node scripts/master-push-reuse.mjs)\" || decision=''",
   "            printf '%s\\n' \"$decision\"",
-  "            if ! printf '%s\\n' \"$decision\" | grep -qx 'reuse=true'; then",
-  "              full_run",
-  "            fi",
-  "            echo 'full=false' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
-  "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
+  "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; } >> \"$GITHUB_STEP_SUMMARY\"",
+  "            for family in native bundle; do",
+  "              if printf '%s\\n' \"$decision\" | grep -qx \"reuse_${family}=true\"; then",
+  "                echo \"${family}=false\" >> \"$GITHUB_OUTPUT\"",
+  "              else",
+  "                echo \"${family}=true\" >> \"$GITHUB_OUTPUT\"",
+  "              fi",
+  "            done",
+  "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
   "            exit 0",
   "          fi",
   "",
@@ -311,8 +313,6 @@ const expectedChanges = [
   "          if [[ -z \"$base\" || \"$base\" =~ ^0+$ ]]; then",
   "            full_run",
   "          fi",
-  "",
-  "          echo 'full=false' >> \"$GITHUB_OUTPUT\"",
   "",
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",

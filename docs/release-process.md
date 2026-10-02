@@ -714,7 +714,11 @@ disagree.
 **`CHANGELOG.md`**
 
 - Each release gets an "In plain words" section above the detailed entries,
-  written from the merged pull requests since the last build.
+  written from the merged pull requests since the last build. It opens with a
+  short "Should I upgrade?" block: who should, in one line why (name a published
+  advisory if the build fixes one), how to upgrade, and what to check afterwards
+  (the version the extension shows, and the posting setting).
+  It adds no claim the detailed entries or the published advisory do not support.
 - While the changes are unreleased, head the first part "What the next build
   adds", so nothing unpublished reads as available. Rename it "What you can do
   now" when the section becomes the release.
@@ -745,6 +749,11 @@ disagree.
   is empty too, only the standard text and GitHub's list. Headings must read
   `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
   closed, or another level-two heading, is reported as a warning in the run.
+  In the same pull request, reread every answer on the Questions page (`site/faq.html`)
+  against the new release and move its check stamp (the release and the day, in the
+  hero and in the structured data). `scripts/site-pages.test.mjs` fails until the stamp
+  names the version in `packaging/mcpb/manifest.json`, so a version bump cannot merge
+  with answers nobody has reread.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer

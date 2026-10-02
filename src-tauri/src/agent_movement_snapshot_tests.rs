@@ -685,6 +685,115 @@ async fn a_movement_names_an_unknown_ledger_before_reading_any_voucher() {
     simulator.cancel();
 }
 
+/// `ledger_movement` for a ledger spelt without its accents: the refusal keeps
+/// its code and lists the catalogue's own spelling for the user to confirm,
+/// from the catalogue already read (no request after it), and says what to do.
+async fn movement_for_ledger(
+    requested: &str,
+    redaction: Redaction,
+    max_bytes: usize,
+) -> (Value, String) {
+    let mut plans = first_ledger_read();
+    let total = plans.len();
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (mut server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy::default(),
+    );
+    server.settings.redaction = redaction;
+    server.settings.max_bytes = max_bytes;
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger": requested
+            }),
+        )
+        .await;
+    assert_eq!(
+        simulator.received(),
+        total,
+        "no request after the catalogue"
+    );
+    simulator.cancel();
+    let text = response.to_string();
+    (response, text)
+}
+
+#[tokio::test]
+async fn a_misspelt_ledger_lists_the_catalogues_spelling_and_asks_the_user() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 200_000).await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "listed", "{error}");
+    assert_eq!(error["candidates_total"], 1, "{error}");
+    assert_eq!(error["candidates_total_is_lower_bound"], false, "{error}");
+    let names = error["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|candidate| candidate["name"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["Café Naïve Traders"], "{error}");
+    assert!(
+        error.get("requested").is_none(),
+        "the request is not echoed"
+    );
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("ask which one they meant"));
+}
+
+/// Under `mask_parties` neither the catalogue's spelling nor the request is in
+/// the response, in the structured result or its text copy.
+#[tokio::test]
+async fn masking_keeps_the_ledger_names_out_of_a_ledger_refusal() {
+    let (response, text) =
+        movement_for_ledger("Cafe Naive Traders", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "names_masked", "{error}");
+    // Not even a count: it would answer "does a ledger start with this?".
+    for key in ["candidates", "candidates_total", "candidates_reason"] {
+        assert!(error.get(key).is_none(), "{key} under masking: {error}");
+    }
+    for name in ["Café Naïve Traders", "Cafe Naive Traders", "Naïve", "Naive"] {
+        assert!(!text.contains(name), "{name} in {text}");
+    }
+}
+
+/// A masked spelling is refused as such, through the tool, and never looked up.
+#[tokio::test]
+async fn a_masked_ledger_spelling_is_refused_before_it_can_resolve_to_another_ledger() {
+    let (response, _) = movement_for_ledger("Ca…fe", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_name_masked", "{error}");
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("type the full ledger name"));
+}
+
+/// Below the budget that carries guidance, the refusal is the bare code: no
+/// candidates and no listing word, so an absent listing is "no search was
+/// made", which the remediation says, and never a claim about the book.
+#[tokio::test]
+async fn under_the_guidance_budget_the_ledger_refusal_is_the_bare_code() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 4_095).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{response}");
+    for key in ["candidates", "candidates_listing", "remediation"] {
+        assert!(
+            error.get(key).is_none(),
+            "{key} at the small budget: {error}"
+        );
+    }
+}
+
 /// A catalogue export the transport refuses for its size names that too. A
 /// timeout is named already (a request no response answered); an oversized one
 /// was answered, so it needs its own naming. The export is the captured one

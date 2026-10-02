@@ -86,7 +86,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   on 28 September 2026, on a development build and one client book (the import
   request was captured for nine of them); their approval step was not recorded
   ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
-- The published 0.3.0 package on Windows x64, in Claude Desktop (on a free plan;
+- The published 0.3.0 package on Windows x64, in Claude Desktop (with no paid plan;
   we make no claim about other plans): reads only, against licensed TallyPrime
   Gold 7.1 with one client book, on 28 September 2026, in a session separate
   from the development-build posting above (reported by the owner; no logs were
@@ -108,11 +108,11 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
 - A build of 0.4.1 on a Mac, on 2 October 2026. What was run: the package CI built
   for the version pull request, not the published file. The maintainer installed
   it in Claude Desktop over an installed 0.4.0, as an upgrade; the Terms setting
-  and the other settings carried over, and the app itself started the
-  extension's server process (observed, with the start time read from the
+  and the other settings carried over, and the extension's server process
+  started again on its own after the upgrade (its start time was read from the
   process list). `tally_status` and `list_companies` then answered against
   licensed TallyPrime Silver 7.1 holding the lab's own synthetic companies.
-  The record is the maintainer's dated notes, kept privately. What was not run:
+  The record is our dated notes, kept privately. What was not run:
   the published file is built again on another runner, and its program file
   differs from the one tested. We ran both builds without Tally: each reports
   version 0.4.1, lists 21 tools and gives the same answer to `tally_status`. We
@@ -227,6 +227,31 @@ company names, party names and amounts. That is a property of using a hosted
 assistant, not of Bridge. Bridge can mask party names or drop narration first
 (`BRIDGE_AGENT_REDACTION`), but **neither setting removes amounts** — figures
 always go with the answer. Decide this deliberately for client data.
+
+## What it costs
+
+ComplyEaze has not set a price for ComplyEaze Bridge and does not sell licences
+to it; there is no account with us, subscription or licence key. The code of a
+release you download stays under the licence it was published with (Apache-2.0
+for current releases). We have not decided whether to charge for anything in future.
+
+What you pay or provide today:
+
+- **TallyPrime:** your own licence.
+- **Claude Desktop:** Anthropic's plans. On 1 October 2026 we ran a candidate
+  build of 0.4.0 (not the published file) on Windows with a Claude account that
+  had no paid plan, on one synthetic company; we make no claim about other
+  plans or larger books.
+- **Your clients' data:** what Claude reads goes to Anthropic, under
+  Anthropic's terms for your plan; through ComplyEaze Bridge, ComplyEaze does
+  not receive it
+  ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).
+- **Your checking:** check results in Tally before you rely on them.
+
+Support and updates are not guaranteed
+([Terms of Use](https://bridge.complyeaze.com/terms), section 4.4). Our
+liability is limited as section 14 sets out, including its fallback and
+exceptions; read it before client work.
 
 ## Installing it
 

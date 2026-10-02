@@ -253,8 +253,10 @@ Bridge — approve one voucher" with the buttons Cancel and Post voucher. On
 Windows it is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and
 Cancel, and No is the default. Only the positive button approves. The window
 closes by itself after two minutes without an answer, and an approval that is
-not used within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 an approval you
-have given is also withdrawn when the post is then refused before it is sent (for example when the batch is not found).
+not used within fifteen minutes, or before the program restarts, is dropped.
+From 0.4.1 a clicked approval is also withdrawn when the post is refused
+before its checks begin (for example when the batch is not found or the
+journal is busy); a refusal inside the checks already withdrew it.
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,
 and a check of a machine before and after installing and running it.

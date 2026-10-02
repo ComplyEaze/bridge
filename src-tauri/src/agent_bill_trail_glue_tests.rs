@@ -519,6 +519,10 @@ async fn an_unknown_party_is_refused_before_any_voucher_request() {
     let mut call = Call::new(DetailKind::Unadjusted);
     call.party = "No Such Synthetic Party";
     let (result, served) = run(detail_plans(captured_window()), call).await;
-    assert_eq!(result.unwrap_err().code, "ledger_not_found");
+    let refusal = result.unwrap_err();
+    assert_eq!(refusal.code, "ledger_not_found");
+    // The same candidates a `vouchers` or `ledger_movement` refusal carries.
+    let miss = refusal.candidates.and_then(|candidates| candidates.miss);
+    assert_eq!(miss.map(|miss| miss.listing.as_str()), Some("none"));
     assert_eq!(served, 10, "only the company and the catalogue were read");
 }

@@ -12,9 +12,28 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since `mcp-v0.4.1` (2 Oct 2026)
+### In plain words: the next build, since `mcp-v0.4.1`
 
 These changes are in source and not yet in a published build.
+
+**What the next build adds**
+
+- Read a register of the tax in the books for sales: the Sales and Credit Note
+  vouchers of a date window that touch a Duties & Taxes ledger, with each
+  entry's tax taken only from the GST duty head on that ledger's master, never
+  from a name or an amount. It reads as the purchase register does. It was run
+  against a live Tally for one taxed Sales item invoice, one untaxed one (read
+  once by an earlier build; only its voucher window is committed) and one Credit
+  Note, on two synthetic companies. A Credit Note keeps Tally's signs
+  (nothing is netted or flipped, so add signed amounts), and the state-side tax
+  head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
+  side. An inter-state line, a cancelled or optional sale, an unrecognised or
+  missing duty head, more than one voucher in a window and paging were not
+  shown. A sale of a kind a row can show as unmeasured is marked
+  `not_measured_live`; the tool's text says what cannot be marked. The response
+  `state` is `complete` when the company marks and the ledger masters read the
+  same before and after the window, not when the window was counted as
+  `vouchers` now requires (#1009).
 
 **Safer or fixed**
 
@@ -30,6 +49,28 @@ These changes are in source and not yet in a published build.
 
 These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
 requests it comes from, except where it names an issue.
+
+**Should I upgrade?**
+
+- **If you use 0.3.0 or 0.4.0 on Windows: yes.** 0.4.1 closes the network-path
+  forms (a share, its WebDAV form, and the long-path prefixes) of a
+  medium-severity security issue in how the bank-statement tool opens file
+  paths, published as
+  [advisory GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
+  Some paths still pass; the advisory lists which. If you cannot upgrade yet,
+  follow the advisory's steps.
+- **On a Mac: recommended, though not urgent.** The advisory rates the issue
+  low there, and the other changes below apply there too.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
+  Desktop, install the newer file from Settings, Extensions; (3) keep
+  ComplyEaze Bridge's data folder, which holds its record of what it has sent
+  to Tally; (4) check that the extension shows 0.4.1 and that "Allow voucher
+  posting" is as you want it, since an earlier default may still be saved as
+  on; (5) quit Claude Desktop completely and reopen it.
+- **What was tried** is under "Known limits" below. No one on our side
+  installed the Windows package of this build in Claude Desktop on a Windows PC.
 
 **What you can do now**
 

@@ -675,7 +675,8 @@ withdrawn as binding authority rather than erased from the probe history.
 
 **What remains measured in this scope.** The listed forward slash-to-space case, the recorded
 hyphen and whitespace cases, and the rejected en dash, underscore, abbreviation, suffix, and
-NFD cases are observations of this one operation. They do not generalize across product, tier,
+NFD cases are observations of this one operation (the NFD case is now unsupported; see the
+2026-10-02 note under Fixtures). They do not generalize across product, tier,
 object class, direction, or caller.
 
 > **RULE: use only the recorded directional alternatives; do not fold separators into a canonical
@@ -692,6 +693,10 @@ the gateway accepts.
 elsewhere in this document: an NFD spelling of an NFC ledger does not resolve. A fold that
 normalises before comparing merges masters this gateway keeps apart.
 
+> **2026-10-02:** on licensed 7.1 this sentence rests on the NFD row, which is now unsupported (see
+> the note under Fixtures). The exact-codepoint evidence that remains is §9.4b's 2026-08-19
+> observation, on an unclassified Education instance.
+
 **Scope.** One instance, one build, one licence tier, **ledgers only**, one company, and the
 measurement is of *import-time* name resolution — not collection filters, not stock items, groups
 or voucher types, and not voucher numbers. §9.4b's Educational scope stands as its own row; this
@@ -706,7 +711,8 @@ recorded in `TEST_CORPUS.md` §9.2.
 > read of `BRIDGE CORPUS OPENING` on licensed 7.1 Silver returned that ledger's name, in both its
 > `NAME` attribute and its `NAME.LIST`, as `MB CAF` + U+00C3 + U+0089 + ` PROBE`: the UTF-8 bytes of
 > É stored as two Latin-1 characters (mojibake). It cannot serve as an NFC master. Which ledger the
-> NFD row above was sent against is not recorded; if it was this one, that row compared NFD with a
+> NFD row above was sent against is not recorded, but this is the section's only accented fixture;
+> if it was this one, that row compared NFD with a
 > mojibake name, and "rejected" carries no evidence about canonical equivalence: an NFD spelling of
 > É fails against `Ã` + U+0089 whatever Tally does with NFC and NFD. Qualifying 9.4d needed this ledger,
 > so treat the licensed-7.1 NFD row as **unsupported**. What remains is the 2026-08-19 observation in
@@ -813,8 +819,9 @@ and not a failed request.
 > licence to ASCII case beyond what §9.4b and §9.4d already scope (bridge#1076).
 
 **Not measured:**
-- the upper-case-stored direction: the only candidate ledger in the lab is stored as mojibake (see the 9.4d
-  correction), and sending its control character inside a TDL formula was not attempted;
+- the upper-case-stored direction: the only candidate found (the twelve ledgers under one parent in one company
+  were read) is stored as mojibake (see the 9.4d correction), and sending its control character inside a TDL
+  formula was not attempted;
 - import-time resolution of an accented capital;
 - an Object export looked up by a name the book does not hold: its failure mode is unknown, so the variants were
   sent as filters, which fail in band;

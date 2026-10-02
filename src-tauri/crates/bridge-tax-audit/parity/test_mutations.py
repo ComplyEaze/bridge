@@ -523,13 +523,13 @@ class Report(unittest.TestCase):
     def test_the_ids_of_a_shard_that_refused_are_listed_apart_from_ids_nobody_ran(self):
         both = [m["id"] for m in mu.shard(self.muts, 1, 2)], [m["id"] for m in mu.shard(self.muts, 2, 2)]
         refused = {"2/2": {"shard": "2/2", "problems": ["w0: compile_error"],
-                           "output": ["error[E0463]: can't find crate for `core`"]}}
+                           "output": ["error[E0463]: can't find crate for core"]}}
         merged = {i: self.killed[i] for i in both[0]}
         text, failed = mu.report(self.muts, merged, self.committed, refused=refused)
         self.assertTrue(failed)
         self.assertIn("Shards that refused to run (1)", text)
         self.assertIn("`2/2`: w0: compile_error", text)
-        self.assertIn("error[E0463]: can't find crate for `core`", text)
+        self.assertIn("error[E0463]: can't find crate for core", text)
         self.assertIn(f"Not run, their shard refused ({len(both[1])})", text)
         self.assertNotIn("## Not run (", text, "nothing is missing beyond the refused shard's ids")
         # The ids still go on the failing line, so a crate change must re-prove them.
@@ -850,12 +850,12 @@ class GitRepo(unittest.TestCase):
         with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
             rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(work), "--results", str(results))
         self.assertEqual(rc, 2, out)
-        self.assertIn("error[E0463]: can't find crate for `core`", out)
+        self.assertIn("error[E0463]: can't find crate for core", out)
         doc = json.loads(results.read_text())
         self.assertEqual(list(doc), ["refused"])
         self.assertEqual(doc["refused"]["shard"], "1/1")
         self.assertEqual(doc["refused"]["problems"][0].split(": ", 1)[1], "compile_error")
-        self.assertIn("error[E0463]: can't find crate for `core`", doc["refused"]["output"])
+        self.assertIn("error[E0463]: can't find crate for core", doc["refused"]["output"])
         # Not a shard run: no results file, as before.
         with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
             rc, out = self.main("B1", "--workdir", str(work), "--results", str(outside / "plain.json"))
@@ -966,7 +966,7 @@ class GitRepo(unittest.TestCase):
 FAKE_CARGO = """#!/bin/sh
 # A stand-in for cargo: builds instantly; the suite fails when the copy holds B1's mutation.
 case " $* " in *" --no-run "*)
-  if [ -n "$FAKE_BUILD_FAIL" ]; then echo "error[E0463]: can't find crate for \`core\`"; exit 101; fi
+  if [ -n "$FAKE_BUILD_FAIL" ]; then echo "error[E0463]: can't find crate for core"; exit 101; fi
   echo "    Finished"; exit 0;; esac
 echo "     Running tests/registry.rs (/x)"
 if [ -n "$FAKE_FAIL" ] || grep -q koob src/book.rs; then echo "test registry_ok ... FAILED"; exit 101; fi

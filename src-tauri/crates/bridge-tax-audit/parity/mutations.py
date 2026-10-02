@@ -53,6 +53,16 @@ SIGINT or SIGTERM stops the cargo runs in flight (their own process groups) and 
 already written stay. A run killed outright (SIGKILL) can leave its cargo running and a mutation
 in its worker copy; the next run's copy refresh undoes the mutation.
 
+## A shard that cannot start
+
+Before any mutation the unmutated copy must build and pass. When it does not, the run exits 2 and
+prints the compiler's first lines. With `--shard` it also writes, in place of results, one document
+`{"refused": {"shard": "K/N", "problems": [...], "output": [...]}}` to `--results`, so `--merge`
+reports "Shards that refused to run" with the reason, and lists the ids that shard would have run
+apart from ids no shard ran. Both kinds of id still go on the nightly issue's failing line: a change
+must re-prove what no shard proved. Exit 1 is a mutation not killed; the nightly shard job fails on
+any other non-zero exit and leaves the judging of exit 1 to the merge.
+
 ## The results file
 
 `parity/mutation-results.json` is committed. It holds one record per mutation, one line each:
@@ -164,6 +174,11 @@ FAILING_MARK = "mutation-nightly-failing:"
 # The header ci.yml writes before each open issue's body in the --nightly-issues file.
 ISSUE_MARK = "mutation-nightly-issue"
 REPORT_ROWS = 100  # rows per report section; GitHub caps an issue body at 65,536 characters
+# A shard that could not start writes this instead of results: a typed reason and the first lines of
+# the compiler's output, so the merge can tell "refused to run" from "ran and found nothing".
+REFUSED_KEY = "refused"
+REFUSAL_LINES = 40  # compiler lines kept in a refusal
+REFUSAL_LINE_CHARS = 300  # characters kept of each
 
 
 class Stopped(Exception):
@@ -406,16 +421,24 @@ def shard(mutations: list[dict], k: int, n: int) -> list[dict]:
 
 
 def report(mutations: list[dict], merged: dict, committed: dict, unreadable: list[str] = (),
-           accepted: dict | None = None) -> tuple[str, bool]:
+           accepted: dict | None = None, refused: dict | None = None) -> tuple[str, bool]:
     """(Markdown, failed?) for a whole-list run. It fails when any mutation was not run or not
     killed, when a shard's results could not be read, or when the committed results file is stale
     (a record for a mutation not in the list, or none, or one made for a different definition).
     A failed report's first lines name every failing id, for the nightly issue; when a shard could
     not be read, every id in the list, since what it held is unknown. Each section lists at most
-    REPORT_ROWS rows, so the report fits an issue body."""
+    REPORT_ROWS rows, so the report fits an issue body. A shard that refused to run (`refused`, by
+    "k/n") fails the run and is named with its reason and compiler lines; the ids it would have run
+    are listed apart from ids no shard ran, and go on the failing line like every id not run."""
     order = [m["id"] for m in mutations]
     by_id = {m["id"]: m for m in mutations}
-    missing = [i for i in order if i not in merged]
+    refused = refused or {}
+    blocked: set[str] = set()
+    for key in refused:
+        k, n = (int(x) for x in key.split("/"))
+        blocked |= {m["id"] for m in shard(mutations, k, n)}
+    missing = [i for i in order if i not in merged and i not in blocked]
+    missing_refused = [i for i in order if i not in merged and i in blocked]
     bad = [(i, merged[i]["verdict"]) for i in order if i in merged and not passes(by_id[i], merged[i], accepted)]
     survivors = [i for i in order if i in merged and not proven(merged[i]) and passes(by_id[i], merged[i], accepted)]
     now_killed = [i for i in order if proven(merged.get(i)) and accepted_survivor(by_id[i], accepted)]
@@ -427,14 +450,19 @@ def report(mutations: list[dict], merged: dict, committed: dict, unreadable: lis
     timeouts = [i for i in order if merged.get(i, {}).get("verdict") == TIMEOUT]
     thin = [(i, merged[i]["killers"]) for i in order
             if i in merged and merged[i]["verdict"] == KILLED and len(merged[i]["killers"]) < 2]
-    failed = bool(missing or bad or stale or unreadable or stale_survivors)
+    failed = bool(missing or missing_refused or refused or bad or stale or unreadable or stale_survivors)
     out = [f"# Tax-audit mutations: {'FAILED' if failed else 'all killed'}", ""]
     if failed:
-        ids = order if unreadable else sorted(set(missing) | {i for i, _ in bad} | set(stale_ids), key=order.index)
+        ids = order if unreadable else sorted(set(missing) | set(missing_refused) | {i for i, _ in bad}
+                                              | set(stale_ids), key=order.index)
         out += [f"<!-- {FAILING_MARK} {' '.join(ids)} -->", ""]
     out += [f"{len(order)} in the list; {len(merged)} run; {sum(1 for i in order if proven(merged.get(i)))} killed.", ""]
+    refusals = [f"`{k}`: {'; '.join(r.get('problems', [])) or 'no reason recorded'}"
+                + (f" ({r['output'][0]})" if r.get("output") else "") for k, r in sorted(refused.items())]
     for title, rows in (("Shard results not read", [f"`{u}`" for u in unreadable]),
+                        ("Shards that refused to run", refusals),
                         ("Not killed", [f"`{i}` ({by_id[i]['file']}): {v}" for i, v in bad]),
+                        ("Not run, their shard refused", [f"`{i}`" for i in missing_refused]),
                         ("Not run", [f"`{i}`" for i in missing]),
                         ("Stale committed records", stale),
                         ("Stale accepted-survivor entries", stale_survivors),
@@ -719,15 +747,29 @@ def run_one(worker: Worker, m: dict, record: dict | None, full: bool, timeout: i
         path.write_bytes(original)
 
 
-def baseline(workers: list[Worker], timeout: int, build_timeout: int) -> list[str]:
+def compiler_lines(out: str) -> list[str]:
+    """The compiler's own lines from cargo's output, from the first `error` on: at most
+    REFUSAL_LINES of them, each cut to REFUSAL_LINE_CHARS, so a refusal says why without holding a log."""
+    lines = out.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.startswith("error")), None)
+    if start is None:
+        return []
+    return [line[:REFUSAL_LINE_CHARS] for line in lines[start:start + REFUSAL_LINES]]
+
+
+def baseline(workers: list[Worker], timeout: int, build_timeout: int, details: list[str] | None = None
+             ) -> list[str]:
     """Problems with the unmutated copies: a build that fails or hangs, a test that does not pass,
     or a `timeout` under MARGIN times the unmutated suite's measured test time (a slow run would
-    then be counted as a hang). Every worker builds; the full suite runs once, on the first."""
+    then be counted as a hang). Every worker builds; the full suite runs once, on the first.
+    When `details` is given, the compiler's first lines of the first failed build go into it."""
     problems = []
     for w in workers:
         rc, out = w.run(["--no-run"], build_timeout)
         if rc is None or rc != 0 or parse_test_output(out)[1]:
             problems.append(f"{w.dir.name}: {BUILD_TIMEOUT if rc is None else COMPILE_ERROR}")
+            if details is not None and not details:
+                details.extend(compiler_lines(out))
     if problems:
         return problems
     w = workers[0]
@@ -739,6 +781,8 @@ def baseline(workers: list[Worker], timeout: int, build_timeout: int) -> list[st
         problems.append(f"{w.dir.name}: the unmutated suite exceeded --timeout {timeout}s")
     elif compile_error:
         problems.append(f"{w.dir.name}: {COMPILE_ERROR}")
+        if details is not None:
+            details.extend(compiler_lines(out))
     elif failed or rc != 0:
         problems.append(f"{w.dir.name}: fails unmutated: {', '.join(failed) or f'exit {rc}'}")
     elif timeout < MARGIN * took:
@@ -812,12 +856,19 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         merged: dict = {}
         unreadable = []
+        refused: dict[str, dict] = {}
         for path in args.merge:
             try:
-                merged.update(json.loads(path.read_text(encoding="utf-8")))
+                doc = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as e:
                 unreadable.append(f"{path}: {type(e).__name__}")
-        text, failed = report(mutations, merged, load_results(RESULTS), unreadable, accepted)
+                continue
+            if REFUSED_KEY in doc:  # a shard that could not start: a reason, never results
+                refusal = doc[REFUSED_KEY]
+                refused[refusal["shard"]] = refusal
+            else:
+                merged.update(doc)
+        text, failed = report(mutations, merged, load_results(RESULTS), unreadable, accepted, refused)
         write_atomic(args.results, render_results(merged, order))
         if args.report:
             write_atomic(args.report, text + "\n")
@@ -884,16 +935,22 @@ def main(argv: list[str] | None = None) -> int:
     workers = [Worker(i, args.workdir) for i in range(jobs)]
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
+    details: list[str] = []
     try:
         for w in workers:
             w.sync(files)
-        problems = baseline(workers, args.timeout, args.build_timeout)
+        problems = baseline(workers, args.timeout, args.build_timeout, details)
     except (Stopped, KeyboardInterrupt):
         print("stopped before any mutation", file=sys.stderr)
         return 130
     if problems:
         print("refusing: the unmutated copy does not pass; fix that first:\n  " + "\n  ".join(problems),
               file=sys.stderr)
+        if details:
+            print("the compiler said:\n  " + "\n  ".join(details), file=sys.stderr)
+        if args.shard:  # the merge reads this as a refusal, not as results: nothing was run
+            write_atomic(results_path, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": problems,
+                                                                 "output": details}}, indent=1) + "\n")
         return 2
     free = list(workers)
     pool_lock = threading.Lock()

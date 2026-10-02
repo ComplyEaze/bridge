@@ -47,14 +47,23 @@ jobs:
         with:
           toolchain: 1.96.0
       # The whole list, the full suite each time: a survivor verdict must never come
-      # from a subset of the tests. This step does not judge (its exit status is
-      # tee's): the report job judges every shard's results file together.
+      # from a subset of the tests. Exit 1 is a mutation not killed: this step leaves it
+      # to the report job, which judges every shard's results file together. Any other
+      # non-zero exit is the runner refusing to start (the unmutated copy does not build or
+      # pass; it has written a typed refusal in place of results): this job fails, so a
+      # shard that ran nothing is never green.
       - name: Run this shard's mutations
         run: |
+          set +e
           python3 src-tauri/crates/bridge-tax-audit/parity/mutations.py \
             --full --jobs 2 --shard "${{ matrix.shard }}/8" \
             --workdir "$RUNNER_TEMP/mutants" \
-            --results "$RUNNER_TEMP/shard-${{ matrix.shard }}.json" | tee "$RUNNER_TEMP/shard-${{ matrix.shard }}.log"
+            --results "$RUNNER_TEMP/shard-${{ matrix.shard }}.json" 2>&1 | tee "$RUNNER_TEMP/shard-${{ matrix.shard }}.log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::shard ${{ matrix.shard }} of 8 ran nothing: the runner exited $rc (see its log above and the refusal in its results file)"
+            exit "$rc"
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -83,9 +92,10 @@ jobs:
           pattern: mutation-shard-*
           path: shards
           merge-multiple: true
-      # A shard that crashed before writing its file is not a clean shard: its
-      # mutations are absent from the merge, and the report lists them as "not run",
-      # which fails the run. With no shard file at all, the merge reads one missing
+      # A shard that refused to run wrote a typed refusal: the report names it with its
+      # reason and lists its ids apart. A shard that crashed before writing any file is not
+      # a clean shard either: its mutations are absent from the merge, and the report lists
+      # them as "not run", which fails the run. With no shard file at all, the merge reads one missing
       # file, so every id goes on the issue's failing-ids line.
       - name: Merge the shards and judge the whole list
         id: judge

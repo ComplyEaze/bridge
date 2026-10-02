@@ -93,6 +93,48 @@ fn the_other_keys_are_refused_as_the_directory_engagement_refuses_them() {
 }
 
 #[test]
+fn the_directory_engagement_keeps_refusing_a_wrong_format_mixed_keys_and_a_missing_path() {
+    let text = synthetic_text();
+    let code = |text: &str| match Engagement::from_toml(text, &common::fixtures()).unwrap_err() {
+        AuditError::Refused { code, .. } => code,
+        other => panic!("not a refusal: {other:?}"),
+    };
+    let wrong_format = text.replacen("format = \"tally-read-v1\"", "format = \"csv\"", 1);
+    assert!(
+        wrong_format.contains("\"csv\""),
+        "the [snapshot] anchor moved"
+    );
+    assert_eq!(code(&wrong_format), "C1-format");
+    let mixed = text.replacen(
+        "path = \"synthetic-read\"",
+        "path = \"synthetic-read\"\ncompany = \"company.xml\"",
+        1,
+    );
+    assert!(mixed.contains("company = "), "the [snapshot] anchor moved");
+    assert_eq!(code(&mixed), "CFG-mixed");
+    let no_path = text.replacen("path = \"synthetic-read\"\n", "", 1);
+    assert!(
+        !no_path.contains("synthetic-read\"\n"),
+        "the [snapshot] anchor moved"
+    );
+    assert_eq!(code(&no_path), "CFG-path");
+    // The held-book engagement refuses the same text for its own reason: it must carry no [snapshot].
+    for held in [&wrong_format, &mixed, &no_path] {
+        let err = Engagement::from_toml_for_read(held).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                AuditError::Refused {
+                    code: "CFG-snapshot-for-read",
+                    ..
+                }
+            ),
+            "{err:?}"
+        );
+    }
+}
+
+#[test]
 fn a_held_book_gives_the_same_dumps_as_the_directory_engagement() {
     let dir = common::engagement(&common::fixtures().join("synthetic-read"), false);
     let held = Engagement::from_toml_for_read(&without_snapshot(&synthetic_text())).unwrap();

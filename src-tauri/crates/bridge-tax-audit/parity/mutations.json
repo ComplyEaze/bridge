@@ -6790,5 +6790,13 @@
   "file": "src/lib.rs",
   "from": "        if !in_memory\n            && snapshot.get(\"format\")",
   "to": "        if in_memory\n            && snapshot.get(\"format\")"
+ },
+ {
+  "id": "S1-07",
+  "by": "author",
+  "what": "a held book still looks for a [snapshot] table",
+  "file": "src/lib.rs",
+  "from": "        let snapshot = if in_memory {\n            &empty\n        } else {",
+  "to": "        let snapshot = if false {\n            &empty\n        } else {"
  }
 ]

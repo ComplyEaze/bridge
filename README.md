@@ -366,6 +366,9 @@ compromised:
 
 - Tally connections are loopback-only (`localhost`, `127.0.0.0/8`, or `::1`).
   Remote plaintext Tally hosts are intentionally rejected.
+- Showing an export in the file manager accepts only a file ComplyEaze Bridge
+  exported since it started; any other path the renderer sends is refused
+  before anything is launched.
 
 ## Privacy and safe diagnostics
 

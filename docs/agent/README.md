@@ -1369,7 +1369,17 @@ requests. Incoming frames are limited to 5 MB. All responses obey the configured
 byte cap, including control replies, the JSON-RPC wrapper, and newline. A tool
 catalogue that cannot fit returns `agent_response_too_large`; the session remains
 usable. Text content contains the same
-serialized, redacted JSON as `structuredContent` for older clients.
+serialized, redacted JSON as `structuredContent` for older clients. The `initialize` result also
+carries `instructions`, a short text for the client to show its model: start with `list_companies`,
+use the one open company only when the user named no client (or exactly one open company matches the
+name they gave), otherwise ask which and offer the list, state the company, dates and ledger used in
+the first line, anything partial, withheld, not established or not checked ahead of the figures, that
+what is read goes to the AI provider, what to do with a refusal (relay it, take only a different read,
+narrower dates or one repeat of the same read that it names, otherwise ask the user), and to ask before
+preparing or posting anything and never choose a ledger for a voucher. It is left out when
+`max_bytes` is below 4,096 or the request id is over 256 bytes, so that a client asking for tiny
+responses still gets its handshake. The company rule is also in `list_companies`' own description, so
+a client that does not pass the instructions on keeps it; the other sentences are not repeated there.
 
 `tally_status.education_mode` is a boolean: `true` for observed Education mode,
 `false` for observed Licensed mode, and `null` when mode is unobserved. Product

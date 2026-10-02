@@ -7,11 +7,11 @@ books.
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
-seen in our tests on 1 and 2 October 2026, on a Mac with Claude Desktop's bundle version 2.19675.0 (the version used
-on the Windows PC was not recorded). The TallyPrime keys (F1, Settings, Connectivity, Ctrl+A, Alt+K, Alt+Y) and
-the Mac keys are written from general knowledge of those programs; we did not walk them ourselves. On a Mac, the
-question in Step 6 has not been run by us as written. These are other companies' programs and they change, so a screen of
-yours may differ a little.
+seen in our tests on 1 and 2 October 2026. On 2 October the Mac had Claude Desktop version 2.19675.0 (read from the
+app's files); we did not record the version on the Windows PC. The TallyPrime keys (F1, Settings, Connectivity,
+Ctrl+A, Alt+K, Alt+Y) and the Mac keys are written from general knowledge of those programs; we did not walk them
+ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
+other companies' programs and they change, so a screen of yours may differ a little.
 
 ## Before you start
 
@@ -65,9 +65,9 @@ key; **Ctrl** is the **Control** key.
      > from outside. Two tests: (1) `http://localhost:9000/status` opens in Safari on the Mac; (2) from another
      > computer on the same network, `http://<this Mac's network address>:9000/status` must NOT open.
 
-In Claude Desktop on a Mac, a candidate build of 0.4.0 has been installed and its tools have loaded in a chat. A
-build of 0.4.1 was later installed over it, and two tools, `tally_status` and `list_companies`, answered once from
-Tally in a chat on 2 October 2026. The question in Step 6 has not been run there as written. The
+In Claude Desktop on a Mac, a candidate build of 0.4.0 has been installed and its tools have loaded in a chat. The
+package CI built for 0.4.1 was later installed over it, and two tools, `tally_status` and `list_companies`, answered
+once from Tally in a chat on 2 October 2026. The question in Step 6 has not been run there. The
 [README](../../README.md#what-has-been-run-against-a-real-tallyprime) lists what has been run and what has not.
 
 ## Step 1. Let Tally answer on your computer
@@ -158,8 +158,9 @@ keeps running in the background.
 - **Mac:** click **Claude** in the menu bar at the top of the screen and choose **Quit Claude**. Then open Claude
   Desktop again.
 
-Do this on both. In our one test of each, a Mac needed it and Windows did not. That was a first install: when we
-installed a newer file over an installed one on a Mac (see "Remove or update it"), no quit was needed.
+Do this on both. In our one test of each, a Mac needed it and Windows did not. That was a first install. When we
+installed a newer file over an installed one on a Mac, with the Terms switch already on, no quit was needed (one
+test; see "Remove or update it").
 
 ## Step 6. Ask your first question
 
@@ -217,10 +218,11 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   does not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
   masked, stay on the computer. Section 7 of the [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how
   to archive or remove them.
-- **Update:** it does not update by itself. Install the newer file as in Step 3. Claude Desktop shows an **Update**
-  button because an earlier version is installed: click it, then **Install**. In our one test of this, on a Mac,
-  going from 0.4.0 to 0.4.1, the settings and the Terms switch carried over, Claude Desktop restarted ComplyEaze
-  Bridge by itself, and no quit was needed. Then look at the settings in Step 4. If you had an earlier version, check
+- **Update:** it does not update by itself. Install the newer file as in Step 3. Claude Desktop showed an **Update**
+  button: click it and follow the prompts. In our one test of this, on a Mac, going from 0.4.0 to the package CI
+  built for 0.4.1, the settings and the Terms switch carried over, Claude Desktop started ComplyEaze Bridge by
+  itself, and no quit was needed. That test covered Claude Desktop only: if another program also uses ComplyEaze
+  Bridge, stop it first, as the paragraph on upgrading under "The limits of posting" says. Then look at the settings in Step 4. If you had an earlier version, check
   **Allow voucher posting**: an earlier default may still be saved as on.
 
 ## Help

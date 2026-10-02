@@ -1215,6 +1215,66 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
     }
 }
 
+/// A refused argument whose fix is to send it again in the right form, not to
+/// make a different read. Seen in use: "last month" sent as `from`, and a
+/// company's name sent as `company_guid`; both were refused with a bare code.
+/// One type gives both the guidance and the typed `expected` field, so the two
+/// cannot disagree. Only a refusal made before any read gets it:
+/// `company_guid_invalid` is also returned after a read when Tally itself lists
+/// a company whose GUID is malformed, and there the caller's GUID was right.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArgumentRepair {
+    /// `from`, `to` or `as_of` was not shaped like a date (the published
+    /// pattern accepts YYYYMMDD or YYYY-MM-DD).
+    CalendarDate(&'static str),
+    /// `company_guid` was not the hyphenated GUID `list_companies` returns.
+    CompanyGuid,
+}
+
+impl ArgumentRepair {
+    fn of(code: &str) -> Option<Self> {
+        match code {
+            "argument_invalid:from" => Some(Self::CalendarDate("from")),
+            "argument_invalid:to" => Some(Self::CalendarDate("to")),
+            "argument_invalid:as_of" => Some(Self::CalendarDate("as_of")),
+            "company_guid_invalid" => Some(Self::CompanyGuid),
+            _ => None,
+        }
+    }
+
+    fn remediation(self) -> &'static str {
+        match self {
+            Self::CalendarDate(_) => {
+                "Send the date as text, YYYYMMDD (for example 20260930) or YYYY-MM-DD. If the \
+                 user said \"last month\" or \"this financial year\" (1 April to 31 March), work \
+                 out the exact dates yourself and tell the user which dates you used. Nothing was \
+                 read from Tally."
+            }
+            Self::CompanyGuid => {
+                "company_guid must be the 36-character ID that list_companies gives for the \
+                 company, not its name. Call list_companies and use the company the user named; if \
+                 more than one fits, ask which. Nothing was read from Tally."
+            }
+        }
+    }
+
+    /// What the argument should have been, as a typed field beside the code.
+    fn expected(self) -> Value {
+        match self {
+            Self::CalendarDate(argument) => json!({
+                "argument": argument,
+                "kind": "calendar_date",
+                "formats": ["YYYYMMDD", "YYYY-MM-DD"],
+            }),
+            Self::CompanyGuid => json!({
+                "argument": "company_guid",
+                "kind": "company_guid",
+                "from_tool": "list_companies",
+            }),
+        }
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -1562,6 +1622,11 @@ impl Server {
                 candidates,
                 read_detail,
             }) => {
+                // Nothing was read when the failure carries no evidence of a read.
+                let repair = evidence
+                    .is_none()
+                    .then(|| ArgumentRepair::of(&code))
+                    .flatten();
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
                     response_sha256: sha256_hex(code.as_bytes()),
@@ -1596,9 +1661,18 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) = remediation_for(&code, cause) {
+                if let Some(remediation) = refusal_remediation(&code)
+                    .or_else(|| repair.map(ArgumentRepair::remediation))
+                    .or_else(|| remediation_for(&code, cause))
+                {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
+                    }
+                }
+                // Same budget rule: what a refused argument should have been.
+                if let Some(repair) = repair {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["expected"] = repair.expected();
                     }
                 }
                 // A typed validation cause wins; otherwise a request that no

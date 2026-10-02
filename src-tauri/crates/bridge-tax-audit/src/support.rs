@@ -752,6 +752,11 @@ impl PrintedNames {
         quoted.join(" or ")
     }
 
+    /// Whether some vouchers print no usable name.
+    pub(crate) fn any_unprinted(&self) -> bool {
+        self.unprinted
+    }
+
     /// How the pooled row is cited: `bucket`, then every usable printed name, and whether some
     /// vouchers print none.
     pub(crate) fn label(&self, bucket: &str) -> String {

@@ -1,5 +1,5 @@
 {
- "comment": "cash_payments_40a3, s.269SS/269T candidates per voucher, loan ledger and side: a receipt split over two lines of one ledger (one acceptance, summed), two lines each over the limit, both sides of one ledger on one voucher (never netted, the id and the text say which side, an opposite entry shown), a transfer between loans on a voucher whose cash moved the other way, a voucher with a blank GUID named by its number, two vouchers sharing a GUID told apart by their place after a Contra voucher, a repayment, a zero line, a side under the limit, a voucher whose cash nets to nothing, no cash line, a Contra voucher, and a ledger configured with the client's loans beside others not.",
+ "comment": "cash_payments_40a3, s.269SS/269T candidates per voucher, loan ledger and side: a receipt split over two lines of one ledger (one acceptance, summed), two lines each over the limit, both sides of one ledger on one voucher (never netted, the id and the text say which side, an opposite entry shown), a transfer between loans on a voucher whose cash moved the other way, a voucher with a blank GUID named by its number, two vouchers sharing a GUID on one day, told apart by their place after a Contra voucher, a repayment, a zero line, a side under the limit, a voucher whose cash nets to nothing, no cash line, a Contra voucher, and a ledger configured with the client's loans beside others not.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -198,7 +198,7 @@
   },
   {
    "guid": "dup",
-   "date": "2025-07-09",
+   "date": "2025-07-08",
    "base_type": "Receipt",
    "lines": [
     [

@@ -170,7 +170,7 @@
         {
           "kind": "voucher",
           "id": "dup",
-          "label": "Receipt dup on 2025-07-09"
+          "label": "Receipt dup on 2025-07-08"
         }
       ]
     },
@@ -222,7 +222,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_party_days_any_amount_count",
-      "value": 11,
+      "value": 10,
       "unit": "count",
       "definition_sha256_16": "39560ecf00e50bec",
       "definition_text": "Distinct (date, party ledger) pairs with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts'.",
@@ -244,11 +244,6 @@
           "kind": "voucher",
           "id": "dup",
           "label": "Receipt dup on 2025-07-08"
-        },
-        {
-          "kind": "voucher",
-          "id": "dup",
-          "label": "Receipt dup on 2025-07-09"
         },
         {
           "kind": "voucher",
@@ -699,11 +694,11 @@
         {
           "kind": "voucher",
           "id": "dup",
-          "label": "Receipt dup on 2025-07-09"
+          "label": "Receipt dup on 2025-07-08"
         }
       ],
-      "title_sha256_16": "b5ca4edd7dab5047",
-      "title_text": "Cash accepted against a loan ledger on 2025-07-09, at or over the s.269SS/269T limit",
+      "title_sha256_16": "41dd55776e317fbe",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-08, at or over the s.269SS/269T limit",
       "limits_sha256_16": "f6ce0038d92b1d12",
       "limits_text": [
         "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",

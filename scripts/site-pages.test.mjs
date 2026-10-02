@@ -365,7 +365,7 @@ const legalPins = {
     ["Before starting any proceedings over a dispute, write to contact@complyeaze.com or to our registered office; both sides then try in good faith to resolve it within 30 days", "terms", "18.2", "Before starting any proceedings, the party raising a dispute will notify the other in writing, at the contact address in section 19. Both will then try in good faith to resolve it within 30 days."],
     ["or to our registered office", "terms", "19", "at the address in section 1.1"],
     ["or to our registered office", "terms", "1.1", "Our registered office is at"],
-    ["though either side can still seek urgent interim relief (section 18.2)", "terms", "18.2", "This does not stop either party from seeking urgent interim relief."],
+    ["though either side can still seek urgent interim relief (section 18.2 of the Terms of Use)", "terms", "18.2", "This does not stop either party from seeking urgent interim relief."],
     ["Do not put real client data, passwords or other confidential information in issues, bug reports, logs or screenshots you share with us or post publicly (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information in issues, bug reports, logs or screenshots that you share with us or post publicly"],
     ["“Grievance” in the subject", "privacy", "16", "with \"Grievance\" in the subject"],
     ["or write by post to that address", "privacy", "16", "or by post to the address in section 1"],

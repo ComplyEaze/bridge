@@ -49,7 +49,7 @@ use crate::ledger_ids::stable_ledger_tag;
 use crate::loans_interest::LoanConfig;
 use crate::read::iso;
 use crate::rules::Rules;
-use crate::support::{count, hash8, overflow, py_strip, py_upper, voucher_label};
+use crate::support::{count, hash8, overflow, py_upper, voucher_label, PrintedNames};
 use crate::tds_payees::py_format_g;
 
 pub const TEST_ID: &str = "high_value_register";
@@ -175,44 +175,12 @@ pub struct Row<'a> {
     /// GUID -> (share, line), each added per voucher as it is read, so two vouchers sharing a GUID
     /// add together and one voucher's line is never set against two vouchers' shares.
     pub lines: BTreeMap<String, (i64, i64)>,
-    /// The unidentified-party row only: every usable name its vouchers print (shown, never used
-    /// to key or attribute), and whether some voucher prints none.
-    printed: BTreeSet<String>,
-    unprinted: bool,
-}
-
-const PRINTED_AS: &str = " (printed as ";
-
-/// The party a voucher with no party ledger prints (`party_field`), as the books hold it: `None`
-/// when blank, a cash or bank ledger, or one of the voucher's own ledgers (Tally prints the
-/// debited Purchases or credited Sales ledger there, which names no one).
-fn usable_printed_party(v: &Voucher, money: [&BTreeSet<String>; 2]) -> Option<String> {
-    let printed = py_strip(&v.party_field);
-    let unusable = printed.is_empty()
-        || money.iter().any(|set| set.contains(printed))
-        || v.lines.iter().any(|l| l.ledger == printed);
-    (!unusable).then(|| printed.to_string())
+    /// The unidentified-party row only: the names its vouchers print, shown with it and never used
+    /// to key or attribute.
+    names: PrintedNames,
 }
 
 impl<'a> Row<'a> {
-    /// How the unidentified-party row is cited: every usable printed name, quoted as the books
-    /// hold it (a name may itself contain " or "), and whether some vouchers print none.
-    fn unnamed_label(&self) -> String {
-        if self.printed.is_empty() {
-            return UNIDENTIFIED_PARTY.to_string();
-        }
-        let names: Vec<String> = self.printed.iter().map(|p| format!("'{p}'")).collect();
-        format!(
-            "{UNIDENTIFIED_PARTY}{PRINTED_AS}{}{})",
-            names.join(" or "),
-            if self.unprinted {
-                ", and vouchers printing no usable name"
-            } else {
-                ""
-            }
-        )
-    }
-
     fn add(&mut self, v: &'a Voucher, share: i64, line: i64) -> Result<()> {
         self.paise = add(self.paise, share)?;
         self.vouchers.insert(v.guid.clone(), v);
@@ -369,16 +337,10 @@ pub fn mode_rows<'a, K: Ord>(
             // Pooled by the key alone (the day, or the reference), whatever name each voucher
             // prints: a split per printed name or per voucher lost one person's cash across
             // vouchers. The row keeps every usable printed name, to show with it.
-            let printed = usable_printed_party(v, [mode_set, other_money]);
             let row = rows
                 .entry((key_fn(v), UNIDENTIFIED_PARTY.to_string()))
                 .or_default();
-            match printed {
-                Some(name) => {
-                    row.printed.insert(name);
-                }
-                None => row.unprinted = true,
-            }
+            row.names.note(v, [mode_set, other_money]);
             row.add(v, fallback_total, line)?;
         }
     }
@@ -474,7 +436,11 @@ fn voucher_evidence(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceRef> {
 /// carries the row's printed-name label.
 fn party_ref(ledger: &str, row: &Row<'_>) -> EvidenceRef {
     if ledger == UNIDENTIFIED_PARTY {
-        EvidenceRef::with_label("row", UNIDENTIFIED_PARTY_ROW, &row.unnamed_label())
+        EvidenceRef::with_label(
+            "row",
+            UNIDENTIFIED_PARTY_ROW,
+            &row.names.label(UNIDENTIFIED_PARTY),
+        )
     } else {
         EvidenceRef::new("ledger", ledger)
     }

@@ -3,7 +3,7 @@
 //! evidence label, the tag -> ledger lookup the module invariants resolve figures through, and
 //! checked counts and sums.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::book::{Book, Voucher};
 use crate::error::{AuditError, Result};
@@ -717,5 +717,55 @@ mod hash8_tests {
         // hashlib.sha1(b"").hexdigest()[:8] and hashlib.sha1("é".encode()).hexdigest()[:8]
         assert_eq!(super::hash8(""), "da39a3ee");
         assert_eq!(super::hash8("é"), "bf15be71");
+    }
+}
+
+/// The names the vouchers of a pooled row with no party ledger print (`party_field`), shown with
+/// the row and never used to key or attribute it (the reference's `usable_printed_party` and
+/// `unnamed_row_label`, shared by `high_value_register` and `cash_payments_40a3`).
+#[derive(Debug, Default, Clone)]
+pub(crate) struct PrintedNames {
+    names: BTreeSet<String>,
+    unprinted: bool,
+}
+
+impl PrintedNames {
+    /// Record what one voucher prints. A printed name is usable unless it is blank (after Python's
+    /// `strip`), a cash or bank ledger, or one of the voucher's own ledgers: Tally prints the
+    /// debited Purchases or credited Sales ledger there, which names no one.
+    pub(crate) fn note(&mut self, v: &Voucher, money: [&BTreeSet<String>; 2]) {
+        let printed = py_strip(&v.party_field);
+        let unusable = printed.is_empty()
+            || money.iter().any(|set| set.contains(printed))
+            || v.lines.iter().any(|l| l.ledger == printed);
+        if unusable {
+            self.unprinted = true;
+        } else {
+            self.names.insert(printed.to_string());
+        }
+    }
+
+    /// Every usable name, quoted as the books hold it (a name may itself contain " or ") and
+    /// sorted; empty when none is usable.
+    pub(crate) fn quoted(&self) -> String {
+        let quoted: Vec<String> = self.names.iter().map(|p| format!("'{p}'")).collect();
+        quoted.join(" or ")
+    }
+
+    /// How the pooled row is cited: `bucket`, then every usable printed name, and whether some
+    /// vouchers print none.
+    pub(crate) fn label(&self, bucket: &str) -> String {
+        if self.names.is_empty() {
+            return bucket.to_string();
+        }
+        format!(
+            "{bucket} (printed as {}{})",
+            self.quoted(),
+            if self.unprinted {
+                ", and vouchers printing no usable name"
+            } else {
+                ""
+            }
+        )
     }
 }

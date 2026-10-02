@@ -6747,7 +6747,7 @@
   "id": "HV-01",
   "by": "author",
   "what": "a printed name is not stripped of its surrounding whitespace",
-  "file": "src/high_value_register.rs",
+  "file": "src/support.rs",
   "from": "let printed = py_strip(&v.party_field);",
   "to": "let printed = v.party_field.as_str();"
  },
@@ -6755,71 +6755,71 @@
   "id": "HV-02",
   "by": "author",
   "what": "a blank printed name counts as usable",
-  "file": "src/high_value_register.rs",
-  "from": "    let unusable = printed.is_empty()\n        || money",
-  "to": "    let unusable = false\n        || money"
+  "file": "src/support.rs",
+  "from": "let unusable = printed.is_empty()\n            ||",
+  "to": "let unusable = false\n            ||"
  },
  {
   "id": "HV-03",
   "by": "author",
   "what": "a printed name that is the cash or bank ledger counts as usable",
-  "file": "src/high_value_register.rs",
-  "from": "        || money.iter().any(|set| set.contains(printed))\n",
-  "to": "        || false\n"
+  "file": "src/support.rs",
+  "from": "            || money.iter().any(|set| set.contains(printed))\n",
+  "to": "            || false\n"
  },
  {
   "id": "HV-04",
   "by": "author",
   "what": "a printed name that is one of the voucher's own ledgers counts as usable",
-  "file": "src/high_value_register.rs",
-  "from": "        || v.lines.iter().any(|l| l.ledger == printed);",
-  "to": "        || false;"
+  "file": "src/support.rs",
+  "from": "            || v.lines.iter().any(|l| l.ledger == printed);",
+  "to": "            || false;"
  },
  {
   "id": "HV-05",
   "by": "author",
   "what": "only the mode's money ledgers (not the other mode's) make a printed name unusable",
   "file": "src/high_value_register.rs",
-  "from": "usable_printed_party(v, [mode_set, other_money])",
-  "to": "usable_printed_party(v, [mode_set, mode_set])"
+  "from": "row.names.note(v, [mode_set, other_money]);",
+  "to": "row.names.note(v, [mode_set, mode_set]);"
  },
  {
   "id": "HV-06",
   "by": "author",
   "what": "a usable printed name is not recorded on the row",
-  "file": "src/high_value_register.rs",
-  "from": "                Some(name) => {\n                    row.printed.insert(name);\n                }",
-  "to": "                Some(_name) => {}"
+  "file": "src/support.rs",
+  "from": "            self.names.insert(printed.to_string());",
+  "to": "            let _ = printed;"
  },
  {
   "id": "HV-07",
   "by": "author",
   "what": "a voucher printing no usable name is not recorded as one",
-  "file": "src/high_value_register.rs",
-  "from": "                None => row.unprinted = true,",
-  "to": "                None => {}"
+  "file": "src/support.rs",
+  "from": "        if unusable {\n            self.unprinted = true;",
+  "to": "        if unusable {\n            let _ = 0;"
  },
  {
   "id": "HV-08",
   "by": "author",
   "what": "the label drops the quotes round each name",
-  "file": "src/high_value_register.rs",
-  "from": "self.printed.iter().map(|p| format!(\"'{p}'\")).collect();",
-  "to": "self.printed.iter().map(|p| p.to_string()).collect();"
+  "file": "src/support.rs",
+  "from": "self.names.iter().map(|p| format!(\"'{p}'\")).collect();",
+  "to": "self.names.iter().map(|p| p.to_string()).collect();"
  },
  {
   "id": "HV-09",
   "by": "author",
   "what": "the label joins the names with a comma",
-  "file": "src/high_value_register.rs",
-  "from": "names.join(\" or \"),",
-  "to": "names.join(\", \"),"
+  "file": "src/support.rs",
+  "from": "quoted.join(\" or \")",
+  "to": "quoted.join(\", \")"
  },
  {
   "id": "HV-10",
   "by": "author",
   "what": "the label never says vouchers printed no usable name",
-  "file": "src/high_value_register.rs",
+  "file": "src/support.rs",
   "from": "            if self.unprinted {\n                \", and vouchers printing no usable name\"",
   "to": "            if false {\n                \", and vouchers printing no usable name\""
  },
@@ -6827,9 +6827,9 @@
   "id": "HV-11",
   "by": "author",
   "what": "a row with no usable printed name is labelled as if it had one",
-  "file": "src/high_value_register.rs",
-  "from": "        if self.printed.is_empty() {\n            return UNIDENTIFIED_PARTY.to_string();",
-  "to": "        if false {\n            return UNIDENTIFIED_PARTY.to_string();"
+  "file": "src/support.rs",
+  "from": "        if self.names.is_empty() {\n            return bucket.to_string();",
+  "to": "        if false {\n            return bucket.to_string();"
  },
  {
   "id": "HV-12",

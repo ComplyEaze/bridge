@@ -622,6 +622,28 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
+A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+cannot resolve refuses as `ledger_not_found` (no ledger has that name, ignoring case, spaces and
+punctuation) or `ledger_ambiguous` (several do, and none is spelled as requested). Both can carry
+`candidates`, from the catalogue already read, so no request is added: each is `{name, rule}`, with
+no score, none marked best (the order is by rule and then name, not by likelihood), and none is ever chosen for the caller. `candidates_listing`
+says what the list means: `listed`; `truncated` (more were found than fit, with the full count in
+`candidates_total`, and `candidates_total_is_lower_bound` when that count is a floor; the older
+`candidates_truncated` agrees with it); `withheld` (a whole family of ledgers resembles the name and
+none stands out: counted, not listed); `none` (nothing resembles the name; it does not mean the
+ledger is absent); `unavailable` (the search could not run, with `candidates_reason` and no count: the requested name holds a control character, is blank or is very long, or the book is past the binding rules' bounds) or `names_masked` (`mask_parties` hides the names; nothing is searched and no
+count is given, because a count would answer "does a ledger start with this?" for every prefix a
+caller tries). A candidate found by an embedded number is shown with the rule `shared_identifier`
+and is never used as the answer. The refusal's remediation tells the assistant to ask the user which
+ledger they meant. The candidate fields are attached only when `max_bytes` is at least 16,384 (the
+list is framed twice and an error has no page to trim, so a list that does not fit would cost the
+refusal its code), each list is cut to a sixteenth of the cap, and the remediation, like every other,
+needs 4,096. Under `mask_parties`, a requested ledger name that is not spelled exactly as a ledger in the
+book, and that carries `…` or `...` (the mark of a shortened, masked name) or reads like the shortened
+form of another ledger's name, is refused as `ledger_name_masked` and no ledger is used: the lookup
+ignores everything but letters and digits, so `Ra…rs`, `Ra..rs` or `Ra rs` would otherwise find a
+ledger named `RARS`. A ledger spelled exactly as asked is still reached.
+
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
 require a freshly observed supported product and licence mode before and after

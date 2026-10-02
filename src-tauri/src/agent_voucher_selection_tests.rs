@@ -540,6 +540,17 @@ async fn call_filtered_vouchers_over(
     catalogue: impl Fn(&str) -> String,
     ledger: &str,
 ) -> Value {
+    call_filtered_vouchers_configured(window, catalogue, ledger, 200_000, Redaction::None).await
+}
+
+/// [`call_filtered_vouchers_over`] under a response cap and a redaction setting.
+async fn call_filtered_vouchers_configured(
+    window: String,
+    catalogue: impl Fn(&str) -> String,
+    ledger: &str,
+    max_bytes: usize,
+    redaction: Redaction,
+) -> Value {
     let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength);
@@ -561,7 +572,10 @@ async fn call_filtered_vouchers_over(
     }
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let response = server_for(simulator.address(), directory.path())
+    let mut server = server_for(simulator.address(), directory.path());
+    server.settings.max_bytes = max_bytes;
+    server.settings.redaction = redaction;
+    let response = server
         .call_tool(
             "vouchers",
             json!({"company_guid":CAPTURED_GUID,
@@ -571,6 +585,204 @@ async fn call_filtered_vouchers_over(
     simulator.cancel();
     simulator.finish().unwrap();
     response
+}
+
+/// `vouchers` for a ledger named by its first words refuses with the code it
+/// always had, and lists the ledger it may mean for the user to confirm.
+#[tokio::test]
+async fn a_ledger_filter_for_a_truncated_name_lists_what_it_may_mean() {
+    let response = call_filtered_vouchers(|catalogue| catalogue.to_string(), "wr2 sale").await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "listed", "{error}");
+    assert_eq!(error["candidates"][0]["name"], "WR2 Sales", "{error}");
+    assert_eq!(error["candidates"][0]["rule"], "catalog_prefix", "{error}");
+}
+
+/// A refusal that lists ledgers is framed twice (structured and text copy) and an
+/// error object has no page to trim, so a list that did not fit would cost the
+/// caller the refusal code. Across caps from the smallest that carries guidance
+/// to well above the list floor, the code always survives; the list is
+/// attached only from its floor, cut to a sixteenth of the cap, and a cut list
+/// says `truncated` with the whole count.
+#[tokio::test]
+async fn a_long_candidate_list_never_costs_the_refusal_its_code() {
+    let window = || {
+        let words = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    let long_names = |catalogue: &str| {
+        crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            catalogue,
+            (0..20).map(|index| {
+                (
+                    format!("Sundry Creditor With A Deliberately Long Name \u{0928}\u{092e}\u{0938}\u{094d}\u{0924}\u{0947} {index:02}"),
+                    format!("c{index:07x}"),
+                )
+            }),
+        )
+    };
+    for max_bytes in [
+        4_096, 5_000, 6_000, 8_000, 12_000, 16_383, 16_384, 20_000, 200_000,
+    ] {
+        let response = call_filtered_vouchers_configured(
+            window(),
+            long_names,
+            "Sundry Creditor With A Deliberately Long Name",
+            max_bytes,
+            Redaction::None,
+        )
+        .await;
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "ledger_not_found", "{max_bytes}: {response}");
+        if max_bytes < 16_384 {
+            assert!(
+                error.get("candidates_listing").is_none(),
+                "{max_bytes}: {error}"
+            );
+        } else {
+            let listing = error["candidates_listing"].as_str().unwrap();
+            let listed = error["candidates"].as_array().unwrap().len();
+            assert_eq!(error["candidates_total"], 20, "{max_bytes}: {error}");
+            assert_eq!(error["candidates_reason"], "master_binding_near_miss");
+            // Truncated exactly when the budget cut the list, and the old
+            // field agrees with the word.
+            assert_eq!(listing == "truncated", listed < 20, "{max_bytes}: {error}");
+            assert_eq!(error["candidates_truncated"], listing == "truncated");
+            if max_bytes == 16_384 {
+                assert_eq!(listing, "truncated", "{error}");
+            }
+            if max_bytes == 200_000 {
+                assert_eq!((listing, listed), ("listed", 20), "{error}");
+            }
+        }
+    }
+}
+
+/// Twenty-six ledgers that differ only in punctuation all collide: the refusal
+/// is `ledger_ambiguous`, lists the first twenty-five, and says `truncated`
+/// with the whole count, in the old field as well as the new word.
+#[tokio::test]
+async fn more_colliding_ledgers_than_the_cap_are_truncated_with_the_whole_count() {
+    let window = {
+        let words = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    let response = call_filtered_vouchers_configured(
+        window,
+        |catalogue| {
+            crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+                catalogue,
+                (1..=26).map(|dashes| {
+                    (
+                        format!("Dup{}", "-".repeat(dashes)),
+                        format!("d{dashes:07x}"),
+                    )
+                }),
+            )
+        },
+        "dup",
+        200_000,
+        Redaction::None,
+    )
+    .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_ambiguous", "{error}");
+    assert_eq!(error["candidates_listing"], "truncated", "{error}");
+    assert_eq!(error["candidates_truncated"], true, "{error}");
+    assert_eq!(error["candidates_total"], 26, "{error}");
+    assert_eq!(error["candidates"].as_array().unwrap().len(), 25, "{error}");
+}
+
+/// A requested name the binding rules refuse (a control character) cannot be
+/// searched: the refusal keeps its code and says `unavailable`, with the reason
+/// and without a count (a 0 would read as "no ledgers").
+#[tokio::test]
+async fn an_unsearchable_name_says_unavailable_and_gives_no_count() {
+    let window = {
+        let words = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    let response = call_filtered_vouchers_configured(
+        window,
+        |catalogue| catalogue.to_string(),
+        "wr2\u{7}sale",
+        200_000,
+        Redaction::None,
+    )
+    .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{response}");
+    assert_eq!(error["candidates_listing"], "unavailable", "{error}");
+    assert_eq!(error["candidates_reason"], "master_name_unsafe", "{error}");
+    for key in [
+        "candidates",
+        "candidates_total",
+        "candidates_total_is_lower_bound",
+    ] {
+        assert!(
+            error.get(key).is_none(),
+            "{key} beside unavailable: {error}"
+        );
+    }
+}
+
+/// Through `vouchers`, under `mask_parties`: no name, no count, and the masked
+/// spelling is refused, not resolved to another ledger.
+#[tokio::test]
+async fn masking_hides_the_candidates_and_refuses_a_masked_spelling_through_vouchers() {
+    let window = || {
+        let words = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    let masked = call_filtered_vouchers_configured(
+        window(),
+        |catalogue| catalogue.to_string(),
+        "wr2 sale",
+        200_000,
+        Redaction::MaskParties,
+    )
+    .await;
+    let error = &masked["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "names_masked", "{error}");
+    for key in ["candidates", "candidates_total", "candidates_reason"] {
+        assert!(error.get(key).is_none(), "{key}: {error}");
+    }
+    assert!(!masked.to_string().contains("WR2 Sales"), "{masked}");
+    let spelled = call_filtered_vouchers_configured(
+        window(),
+        |catalogue| catalogue.to_string(),
+        "WR…es",
+        200_000,
+        Redaction::MaskParties,
+    )
+    .await;
+    assert_eq!(
+        spelled["structuredContent"]["result"]["error"]["code"], "ledger_name_masked",
+        "{spelled}"
+    );
 }
 
 /// bridge#634: the catalogue parser refused any book past 1,000 ledgers, as

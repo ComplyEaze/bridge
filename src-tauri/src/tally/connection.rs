@@ -2045,8 +2045,10 @@ impl TallyClient {
         // meant to catch a company closed and reopened with equal marks, which
         // the extent cannot see (by reasoning: no live reproduction), and it
         // also refuses a ledger added during the read (#938), and, by reasoning
-        // only (#965), one altered during it: the alteration moves its AlterID
-        // past the slices already read, while Tally still counts it. Then the extent (company GUID and marks) is
+        // only (#965), one altered during it before its slice was read: its new
+        // AlterID is past every slice, while Tally still counts it. A ledger
+        // altered after its slice was read was counted; the extent read below
+        // refuses that case instead. Then the extent (company GUID and marks) is
         // read again, and a change in either refuses the call.
         let cross_check = self
             .cross_check_census_count(identity, counted.get(), evidence, count_evidence)

@@ -232,6 +232,8 @@ fn build(s: &Value) -> Book {
         ledgers,
         vouchers,
         tb,
+        currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
+            .unwrap_or(false),
         ..Default::default()
     }
 }

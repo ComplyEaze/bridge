@@ -1,5 +1,5 @@
 {
- "comment": "entity_269st_gap: cash received on one day by two ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger, reported only where the aggregate reaches the s.269ST(a) limit and no single ledger does. Reaches: a gap row where the names share a word and one where they share none; a PAN whose one ledger already reaches the limit (left to the per-ledger test); an aggregate under the limit; a PAN derived from a GSTIN (an opt-in, into a gap only) and a TAN-shaped GSTIN that gives none; a PAN filled by the engagement's override and one a master already holds (the master wins); a ledger with no PAN left unbound; an entity with one ledger; an excluded ledger and a Duties & Taxes ledger and a round-off ledger that are never parties; a ledger made a party by name outside the party groups; a walk-in sale with only tax and round-off lines (unbound); a Contra and an optional voucher left out.",
+ "comment": "entity_269st_gap: cash received on one day by two ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger, reported only where the aggregate reaches the s.269ST(a) limit and no single ledger does. Reaches: a gap row where the names share a word and one where they share none; a PAN whose one ledger already reaches the limit (left to the per-ledger test); an aggregate under the limit; a PAN derived from a GSTIN (an opt-in, into a gap only) and a TAN-shaped GSTIN that gives none; a PAN filled by the engagement's override and one a master already holds (the master wins); a ledger with no PAN left unbound; an entity with one ledger; an excluded ledger and a Duties & Taxes ledger and a round-off ledger that are never parties; a ledger made a party by name outside the party groups; names that share only a stopword, only a two-letter word, only a word that differs by case and punctuation, or only an accented spelling; an override name that decides whether names agree; a GSTIN filled by the override and a master GSTIN that wins over a different override GSTIN, each deriving a PAN; a ledger made a party by a configured group; a ledger the table names as a round-off ledger; a ledger whose chain is incomplete but already settled (Duties & Taxes, a party group); a walk-in sale with only tax and round-off lines (unbound); a Contra and an optional voucher left out.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -12,7 +12,8 @@
   "Sales Accounts": null,
   "Purchase Accounts": null,
   "Indirect Expenses": null,
-  "Other Assets": null
+  "Other Assets": null,
+  "Related Parties": null
  },
  "ledgers": [
   {
@@ -232,6 +233,175 @@
    ],
    "guid": "edge-ep_gap-024",
    "pan": "ABCDE1234F"
+  },
+  {
+   "name": "Alpha Pvt Ltd",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-025",
+   "pan": "STOPW1111S"
+  },
+  {
+   "name": "Beta Pvt Ltd",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-026",
+   "pan": "STOPW1111S"
+  },
+  {
+   "name": "AB Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-027",
+   "pan": "SHORT2222T"
+  },
+  {
+   "name": "AB Stores",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-028",
+   "pan": "SHORT2222T"
+  },
+  {
+   "name": "ALPHA-Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-029",
+   "pan": "CASEP3333C"
+  },
+  {
+   "name": "alpha.traders 2",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-030",
+   "pan": "CASEP3333C"
+  },
+  {
+   "name": "Café Alpha",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-031",
+   "pan": "UNICO4444U"
+  },
+  {
+   "name": "Cafe Alpha",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-032",
+   "pan": "UNICO4444U"
+  },
+  {
+   "name": "Gstin Override",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-033"
+  },
+  {
+   "name": "Gstin Override Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-034",
+   "pan": "OVRGS5555G"
+  },
+  {
+   "name": "Masters Gstin",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-035",
+   "gstin": "29MASTG6666G1Z1"
+  },
+  {
+   "name": "Masters Gstin Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-036",
+   "pan": "MASTG6666G"
+  },
+  {
+   "name": "Group Party",
+   "chain": [
+    "Related Parties"
+   ],
+   "guid": "edge-ep_gap-037",
+   "pan": "GROUP8888G"
+  },
+  {
+   "name": "Group Party Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-038",
+   "pan": "GROUP8888G"
+  },
+  {
+   "name": "Party Round",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-039",
+   "pan": "ALPHA9999A"
+  },
+  {
+   "name": "Alpha Solo",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-040",
+   "pan": "ALPHA9999A"
+  },
+  {
+   "name": "Partial Tax",
+   "chain": [
+    "Duties & Taxes"
+   ],
+   "guid": "edge-ep_gap-041",
+   "chain_complete": false,
+   "pan": "ABCDE1234F"
+  },
+  {
+   "name": "Partial Debtor",
+   "chain": [
+    "Sundry Debtors"
+   ],
+   "guid": "edge-ep_gap-042",
+   "chain_complete": false,
+   "pan": "PARTL1010P"
+  },
+  {
+   "name": "Partial Debtor Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-043",
+   "pan": "PARTL1010P"
   }
  ],
  "tb": [],
@@ -604,6 +774,276 @@
     ]
    ],
    "status": "optional"
+  },
+  {
+   "guid": "f125",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Pvt Ltd",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f126",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Beta Pvt Ltd",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f127",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "AB Traders",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f128",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "AB Stores",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f129",
+   "date": "2025-07-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "ALPHA-Traders",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f130",
+   "date": "2025-07-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "alpha.traders 2",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f131",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Café Alpha",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f132",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Cafe Alpha",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f133",
+   "date": "2025-07-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Gstin Override",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f134",
+   "date": "2025-07-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Gstin Override Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f135",
+   "date": "2025-07-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Masters Gstin",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f136",
+   "date": "2025-07-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Masters Gstin Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f137",
+   "date": "2025-07-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Group Party",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f138",
+   "date": "2025-07-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Group Party Two",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f139",
+   "date": "2025-07-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Party Round",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f140",
+   "date": "2025-07-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Solo",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f141",
+   "date": "2025-07-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Partial Debtor",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "f142",
+   "date": "2025-07-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Partial Debtor Two",
+     -12000000
+    ]
+   ]
   }
  ],
  "cash": [
@@ -629,14 +1069,26 @@
   ],
   "overrides": {
    "Override Fill": {
-    "name": "Override Fill Proprietor",
+    "name": "Zeta Holdings",
     "pan": "OVRDE4444O",
     "gstin": "",
     "address": "1 Invented Lane"
    },
    "Masters Win": {
     "pan": "OTHER0000X"
+   },
+   "Gstin Override": {
+    "gstin": "29OVRGS5555G1Z9"
+   },
+   "Masters Gstin": {
+    "gstin": "29OTHER7777O1Z2"
    }
-  }
+  },
+  "party_groups": [
+   "Related Parties"
+  ],
+  "round_off_ledgers": [
+   "Party Round"
+  ]
  }
 }

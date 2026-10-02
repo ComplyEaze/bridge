@@ -121,6 +121,158 @@
       ]
     },
     {
+      "id": "entity_269st_gap.entity_day_total_2025-07-01_STOPW1111S",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "9ba0c2276e9b6022",
+      "definition_text": "Cash received on 2025-07-01 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f125",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f126",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-02_SHORT2222T",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "041870e2ad368fc7",
+      "definition_text": "Cash received on 2025-07-02 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f127",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f128",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-03_CASEP3333C",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "fd71f4886a82d050",
+      "definition_text": "Cash received on 2025-07-03 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f129",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f130",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-04_UNICO4444U",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "09227e723ea899ef",
+      "definition_text": "Cash received on 2025-07-04 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f131",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f132",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-05_OVRGS5555G",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "e211f37b0b3456fe",
+      "definition_text": "Cash received on 2025-07-05 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f133",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f134",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-06_MASTG6666G",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "2f7ef5a185ed6004",
+      "definition_text": "Cash received on 2025-07-06 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f135",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f136",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-07_GROUP8888G",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "05c0e828afa21a95",
+      "definition_text": "Cash received on 2025-07-07 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f137",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f138",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "entity_269st_gap.entity_day_total_2025-07-09_PARTL1010P",
+      "value": 24000000,
+      "unit": "paise",
+      "definition_sha256_16": "c9260cfc6e3a6915",
+      "definition_text": "Cash received on 2025-07-09 across the 2 ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "f141",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f142",
+          "label": ""
+        }
+      ]
+    },
+    {
       "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-01_ABCDE1234F",
       "value": 12000000,
       "unit": "paise",
@@ -166,6 +318,70 @@
       "unit": "paise",
       "definition_sha256_16": "428f0d4a5f8e86ec",
       "definition_text": "Largest single-ledger receipt on 2025-06-11 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-01_STOPW1111S",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "bcfa2a7ef2124337",
+      "definition_text": "Largest single-ledger receipt on 2025-07-01 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-02_SHORT2222T",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "6bd541713a5dfe02",
+      "definition_text": "Largest single-ledger receipt on 2025-07-02 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-03_CASEP3333C",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "362486ee8376bded",
+      "definition_text": "Largest single-ledger receipt on 2025-07-03 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-04_UNICO4444U",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "6ef44df3515f6b66",
+      "definition_text": "Largest single-ledger receipt on 2025-07-04 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-05_OVRGS5555G",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "ccf1992e1beb2ab8",
+      "definition_text": "Largest single-ledger receipt on 2025-07-05 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-06_MASTG6666G",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "b1b6c49fad1aad5b",
+      "definition_text": "Largest single-ledger receipt on 2025-07-06 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-07_GROUP8888G",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "ab0ac0dec1c28506",
+      "definition_text": "Largest single-ledger receipt on 2025-07-07 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-09_PARTL1010P",
+      "value": 12000000,
+      "unit": "paise",
+      "definition_sha256_16": "9e8e93e0d668b822",
+      "definition_text": "Largest single-ledger receipt on 2025-07-09 for this PAN -- below the limit, which is why the per-ledger test reports nothing.",
       "evidence": []
     },
     {
@@ -217,8 +433,72 @@
       "evidence": []
     },
     {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-01_STOPW1111S",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "ef59c6f88d2e7493",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-01.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-02_SHORT2222T",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "7b8389b2ab9799c8",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-02.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-03_CASEP3333C",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "daf496875f3db066",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-03.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-04_UNICO4444U",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "aaff994042486524",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-04.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-05_OVRGS5555G",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "aae1e649c2e9b112",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-05.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-06_MASTG6666G",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "aa1c7f6de77e9c35",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-06.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-07_GROUP8888G",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "f3d704f5695080d6",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-07.",
+      "evidence": []
+    },
+    {
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-09_PARTL1010P",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "3be9e983ef3f7bd7",
+      "definition_text": "Ledgers carrying this PAN that received cash on 2025-07-09.",
+      "evidence": []
+    },
+    {
       "id": "entity_269st_gap.gap_amount_total",
-      "value": 141000000,
+      "value": 333000000,
       "unit": "paise",
       "definition_sha256_16": "a395ab60b99d5973",
       "definition_text": "Sum of those person-day aggregates. Not a contravention total: each rests on the CA confirming the ledgers are one person.",
@@ -226,7 +506,7 @@
     },
     {
       "id": "entity_269st_gap.gap_rows_count",
-      "value": 6,
+      "value": 14,
       "unit": "count",
       "definition_sha256_16": "f69a07213027610c",
       "definition_text": "Person-days where the aggregate reaches the s.269ST(a) limit but no single ledger does, and which the per-ledger test therefore does not report.",
@@ -234,7 +514,7 @@
     },
     {
       "id": "entity_269st_gap.multi_ledger_person_days_count",
-      "value": 8,
+      "value": 16,
       "unit": "count",
       "definition_sha256_16": "44a9ff1655cdc598",
       "definition_text": "Person-days on which MORE THAN ONE ledger carrying the same PAN received cash. This is the population the gap can exist in at all: a zero gap with a zero here means the coincidence never arose, NOT that per-ledger keying is safe.",
@@ -242,7 +522,7 @@
     },
     {
       "id": "entity_269st_gap.unbound_ledger_count",
-      "value": 4,
+      "value": 5,
       "unit": "count",
       "definition_sha256_16": "e1782a046a146327",
       "definition_text": "Ledgers in the cash-receipt population with no PAN to bind on, so they cannot be aggregated with any other ledger here at all.",
@@ -427,9 +707,10 @@
       ],
       "title_sha256_16": "b78a769f674d83b7",
       "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-06-06 only when aggregated -- no single ledger does",
-      "limits_sha256_16": "966d4e8268078a08",
+      "limits_sha256_16": "3e9cfd9fefa63d9c",
       "limits_text": [
-        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names."
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names.",
+        "The ledger names for this PAN share no common word -- confirm before treating them as one person."
       ],
       "ask_client_sha256_16": "b11dd0f96dd80d5b",
       "ask_client_text": [
@@ -527,6 +808,378 @@
       "ask_client_text": [
         "Confirm whether these ledgers are one person for s.269ST."
       ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-01_STOPW1111S",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-01_STOPW1111S"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Alpha Pvt Ltd",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Beta Pvt Ltd",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f125",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f126",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "ea8b4bfefafc982c",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-01 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "3e9cfd9fefa63d9c",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names.",
+        "The ledger names for this PAN share no common word -- confirm before treating them as one person."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-02_SHORT2222T",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-02_SHORT2222T"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "AB Stores",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "AB Traders",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f127",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f128",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "57ea3d2795567a1a",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-02 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "3e9cfd9fefa63d9c",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names.",
+        "The ledger names for this PAN share no common word -- confirm before treating them as one person."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-03_CASEP3333C",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-03_CASEP3333C"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "ALPHA-Traders",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "alpha.traders 2",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f129",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f130",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "75cc0dd2fbea46d1",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-03 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "966d4e8268078a08",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-04_UNICO4444U",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-04_UNICO4444U"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Cafe Alpha",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Café Alpha",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f131",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f132",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "86b4047d1907fb4c",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-04 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "966d4e8268078a08",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-05_OVRGS5555G",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-05_OVRGS5555G"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Gstin Override",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Gstin Override Two",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f133",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f134",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "0d12f2e367414809",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-05 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "76eb1d53f79003d9",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names.",
+        "At least one PAN here is derived from the ledger's GSTIN, not recorded on the ledger master."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-06_MASTG6666G",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-06_MASTG6666G"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Masters Gstin",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Masters Gstin Two",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f135",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f136",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "e736692270824de0",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-06 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "76eb1d53f79003d9",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names.",
+        "At least one PAN here is derived from the ledger's GSTIN, not recorded on the ledger master."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-07_GROUP8888G",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-07_GROUP8888G"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Group Party",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Group Party Two",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f137",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f138",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "cee132ea6744e9b3",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-07 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "966d4e8268078a08",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
+    },
+    {
+      "id": "entity_269st_gap/2025-07-09_PARTL1010P",
+      "clauses": [
+        "s.269ST(a)",
+        "3CD-31(ba)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-09_PARTL1010P"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Partial Debtor",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Partial Debtor Two",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f141",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "f142",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "1eb4ff62056a3d34",
+      "title_text": "Cash received from ledgers sharing one PAN reaches the s.269ST(a) limit on 2025-07-09 only when aggregated -- no single ledger does",
+      "limits_sha256_16": "966d4e8268078a08",
+      "limits_text": [
+        "The books show these ledgers share one PAN; whether they are one person is the CA's determination. A shared PAN with unrelated ledger names is either a mis-entered GSTIN or one proprietor trading under two names."
+      ],
+      "ask_client_sha256_16": "b11dd0f96dd80d5b",
+      "ask_client_text": [
+        "Confirm whether these ledgers are one person for s.269ST."
+      ]
     }
   ],
   "book_invariants_evaluated": [
@@ -541,6 +1194,36 @@
   ],
   "book_invariant_violations": [
     {
+      "invariant": "MAP-1",
+      "subject": "Partial Debtor",
+      "detail": "chain incomplete: Sundry Debtors"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "AB Stores",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "AB Traders",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "ALPHA-Traders",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Alpha Pvt Ltd",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Alpha Solo",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
       "invariant": "POP-1",
       "subject": "Alpha Traders",
       "detail": "vouchers -24000000 vs TB movement 0 paise"
@@ -548,6 +1231,11 @@
     {
       "invariant": "POP-1",
       "subject": "Alpha Trading Co",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Beta Pvt Ltd",
       "detail": "vouchers -12000000 vs TB movement 0 paise"
     },
     {
@@ -562,8 +1250,18 @@
     },
     {
       "invariant": "POP-1",
+      "subject": "Cafe Alpha",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Café Alpha",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
       "subject": "Cash",
-      "detail": "vouchers 340600000 vs TB movement 0 paise"
+      "detail": "vouchers 556600000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
@@ -583,6 +1281,36 @@
     {
       "invariant": "POP-1",
       "subject": "Excluded Bank",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Group Party",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Group Party Two",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Gstin Override",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Gstin Override Two",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Masters Gstin",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Masters Gstin Two",
       "detail": "vouchers -12000000 vs TB movement 0 paise"
     },
     {
@@ -627,6 +1355,21 @@
     },
     {
       "invariant": "POP-1",
+      "subject": "Partial Debtor",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Partial Debtor Two",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Party Round",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
       "subject": "Quick Mart",
       "detail": "vouchers -10000000 vs TB movement 0 paise"
     },
@@ -659,6 +1402,11 @@
       "invariant": "POP-1",
       "subject": "Zed Stores",
       "detail": "vouchers -11000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "alpha.traders 2",
+      "detail": "vouchers -12000000 vs TB movement 0 paise"
     }
   ],
   "result_invariants_evaluated": [

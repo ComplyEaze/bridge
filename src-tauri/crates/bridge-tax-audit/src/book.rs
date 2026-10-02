@@ -603,7 +603,7 @@ fn load_ledgers(
     root: &Element,
     groups: &BTreeMap<String, Option<String>>,
     part: &str,
-    _as_of: &TallyDate,
+    as_of: &TallyDate,
 ) -> Result<BTreeMap<String, Ledger>> {
     refuse_foreign(
         part,
@@ -630,12 +630,34 @@ fn load_ledgers(
                 master_opening_paise,
                 guid: l.child_text("GUID").to_string(),
                 masterid: parse_masterid(l.child_text("MASTERID")),
-                pan: String::new(),
-                gstin: String::new(),
+                pan: l.child_text("INCOMETAXNUMBER").to_string(),
+                gstin: match l.child_text("PARTYGSTIN") {
+                    "" => gstin_as_of(l, as_of),
+                    flat => flat.to_string(),
+                },
             },
         );
     }
     Ok(out)
+}
+
+/// The GST registration in force on `as_of`: of the dated entries (`APPLICABLEFROM`, YYYYMMDD; an
+/// undated one is the oldest) that carry a GSTIN and apply on or before the day, the latest, a later
+/// entry of the same date winning. Never the first or the last in document order.
+fn gstin_as_of(ledger: &Element, as_of: &TallyDate) -> String {
+    ledger
+        .children_named("LEDGSTREGDETAILS.LIST")
+        .enumerate()
+        .map(|(i, d)| {
+            let from = match d.child_text("APPLICABLEFROM") {
+                "" => "00000000",
+                from => from,
+            };
+            (from, i, d.child_text("GSTIN"))
+        })
+        .filter(|(from, _, gstin)| !gstin.is_empty() && *from <= as_of.as_str())
+        .max()
+        .map_or_else(String::new, |(_, _, gstin)| gstin.to_string())
 }
 
 fn load_tb(root: &Element, part: &str) -> Result<BTreeMap<String, TbRow>> {

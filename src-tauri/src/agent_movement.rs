@@ -30,7 +30,11 @@ impl Server {
             // below still has to agree before anything is returned.
             let selected = optional_string(args, "ledger")?
                 .map(|name| {
-                    resolve_ledger_name(ledgers.iter().map(|ledger| ledger.name.as_str()), &name)
+                    resolve_ledger_or_refuse(
+                        ledgers.iter().map(|ledger| ledger.name.as_str()),
+                        &name,
+                        self.settings.redaction,
+                    )
                 })
                 .transpose()?;
             let opening_read = self

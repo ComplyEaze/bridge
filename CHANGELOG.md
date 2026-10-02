@@ -459,5 +459,5 @@ there is no summary for that build.
 - Initial open-source Bridge application with React, Rust, and Tauri support
   for Tally, GST, DSC, document, sync, and local database workflows.
 
-[Unreleased]: https://github.com/lamemustafa/bridge/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/lamemustafa/bridge/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ComplyEaze/bridge/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ComplyEaze/bridge/releases/tag/v0.1.0

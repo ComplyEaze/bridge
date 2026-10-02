@@ -1596,3 +1596,40 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         assert!(group["rows"].as_u64().unwrap() >= 1, "{group}");
     }
 }
+
+#[tokio::test]
+async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), true, Redaction::None);
+    // Every other argument is valid and neither file exists. A path that got
+    // as far as an open would therefore answer statement_file_unreadable; the
+    // refusal asserted here is the one made on the text, before any open.
+    let missing = directory.path().join("absent.pdf");
+    let base = arguments(&missing, &directory.path().join("absent.password"));
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", base.clone()).await),
+        Some("statement_file_unreadable"),
+        "the control: a local path that does not exist is opened and fails there"
+    );
+    for text in [
+        r"\\host\share\statement.pdf",
+        r"\\host@80\share\statement.pdf",
+        r"\\?\UNC\host\share\statement.pdf",
+        r"\\?\C:\statement.pdf",
+        r"\\.\C:\statement.pdf",
+        "//host/share/statement.pdf",
+        r"/\host/share/statement.pdf",
+    ] {
+        for key in ["statement_path", "password_file"] {
+            let mut args = base.clone();
+            args[key] = json!(text);
+            let response = server.call_tool("parse_bank_statement", args).await;
+            let expected = format!("argument_invalid:{key}");
+            assert_eq!(
+                error_code(&response),
+                Some(expected.as_str()),
+                "{key} {text}"
+            );
+        }
+    }
+}

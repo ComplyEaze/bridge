@@ -564,8 +564,12 @@ fn parse_voucher_rows(
                             "voucher_master_id_invalid",
                         )?;
                         identities.admit(row.get("GUID").map(String::as_str), master_id)?;
+                        // Emitted as the parsed number's text, never Tally's
+                        // padded form (" 1"), so it equals the same id read
+                        // elsewhere, as import verification already emits it (#989).
+                        let master_id = master_id.map(|id| id.to_string());
                         let amounts = std::mem::take(&mut entries);
-                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": row.get("MASTERID"), "amounts": amounts});
+                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": master_id, "amounts": amounts});
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
                         if let Some(resolved) = resolve_row_voucher_type(&row, company_guid)? {

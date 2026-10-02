@@ -71,7 +71,7 @@ or refresh them.
 > follows is what has actually been sourced or explicitly marked. The remaining
 > claims — and the rule that any statement about a named competitor's security
 > or data handling must be sourced or removed rather than graded — are tracked
-> in **[issue #103](https://github.com/lamemustafa/bridge/issues/103)**.
+> in **[issue #103](https://github.com/ComplyEaze/bridge/issues/103)**.
 > Treat anything in §§0–4 not covered below as **unsourced until checked.**
 
 Covered here:

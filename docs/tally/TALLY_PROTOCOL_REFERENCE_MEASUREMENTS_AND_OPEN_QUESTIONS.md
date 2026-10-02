@@ -255,7 +255,8 @@ request is predicted over a budget well below the cap.
      `GOLD = No`, so Education still reports Silver and the mode is read from `EDUMODE` alone.
 6. **Every part is admitted, and so is their union.** Each row of a part must lie in the part's dates
    and AlterID span. When the window was counted, a part's vouchers must be **exactly** the ones the
-   census counted for it, by AlterID and GUID — a matching count is not enough, because a substituted
+   census counted for it, by AlterID and GUID; a window counted and then read whole, in one part, is
+   admitted against its census the same way, not only a divided one (#985) — a matching count is not enough, because a substituted
    voucher preserves it. And GUIDs and master IDs must be unique across the union of parts, not only
    within each response: a voucher re-dated between two parts is returned by both, each valid alone.
    Either failure refuses as `voucher_window_part_not_admitted` or

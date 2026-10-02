@@ -788,7 +788,8 @@ default handling.
 
 1. **The setup.** A new ledger `Create Probe 02` was created: `PARENT` `Sundry Creditors`,
    `ISBILLWISEON` `Yes`, `OPENINGBALANCE` `-1000.00`, and no bill allocations.
-   - Tally answered `CREATED 1`, every other counter 0, no `LINEERROR`, and showed no dialog.
+   - Tally answered `CREATED 1`, every other counter 0, and no `LINEERROR`. The operator watching
+     Tally's screen reported no dialog.
    - The company's master mark (`ALTMSTID`) stepped by 1.
 2. **The `Create` on that name, with all three fields changed together.** It sent `PARENT`
    `Indirect Expenses`, `ISBILLWISEON` `No` and `OPENINGBALANCE` `-2500.00`.
@@ -804,11 +805,12 @@ default handling.
 | Opening balance | `-1000.00` | `-2500.00` | `-2500.00` |
 
 The "Before" values were read back after step 1. A date-less `Ledger` collection read showed all
-three fields. The trial balance showed the parent and the opening.
+three fields. A trial balance read showed the parent and the opening.
 
-**Two reads show the new opening.**
-- The trial balance for April 2025, the company's first month, shows `-1000.00` before and
-  `-2500.00` after.
+**The new opening, read two ways.**
+- Two trial balance reads through ComplyEaze Bridge 0.4.1's `trial_balance` tool, for April 2025
+  (the company's first month), taken at 16:04:39Z before the `Create` and 16:06:01Z after it, show
+  the opening as `-1000.00` and then `-2500.00`.
 - A `Ledger` collection read with `SVFROMDATE` and `SVTODATE` both set to the company's books-from
   date shows `-2500.00`. It was taken after the `Create` only.
 
@@ -838,7 +840,8 @@ showed `PARENT` and `ISBILLWISEON`. It never showed:
 - `ALTERID`;
 - `GUID`.
 
-It can witness the parent and bill-wise changes, not the opening (one run).
+So a diff of it could show a change to the parent or the bill-wise flag, but not to the opening
+(inferred from the fields it carried, one run).
 
 **Not measured:**
 - which field change caused which effect: the three fields changed in one request, and the parent

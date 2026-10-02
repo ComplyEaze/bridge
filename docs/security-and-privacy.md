@@ -2,10 +2,14 @@
 
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the latest
-published release (version 0.4.0). It was written from a reading of that
-release's source code, at the tag `mcp-v0.4.0`, on 2 October 2026. It was not
-tested on a running system (see the README's list of what has been run).
-Unless a line says otherwise, each answer rests on reading that source.
+published release (version 0.4.1). It was written from a reading of the source
+code of release 0.4.0, at the tag `mcp-v0.4.0`, on 2 October 2026, and updated
+for 0.4.1 only where the changes between the two tags change an answer on this
+page: the sections on network destinations (3) and on what it reads and
+installs (7). The sentences in those sections that name release 0.4.0 and the
+other answers were not read again against the 0.4.1 tag. It
+was not tested on a running system (see the README's list of what has been
+run). Unless a line says otherwise, each answer rests on reading that source.
 Anything not measured on a running system is marked **Not measured**.
 
 To report a vulnerability, see [SECURITY.md](../SECURITY.md).
@@ -44,6 +48,9 @@ settings (section 4).
 - **Between ComplyEaze Bridge and Tally:** only to a loopback address on this
   computer. If you forward that port to a virtual machine or another machine,
   the traffic follows your forward.
+- **A Windows network path, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
+  bank statement tool could be given a path that names another computer, and
+  Windows then connects to that computer by itself. Section 3 describes it.
 - **To your AI provider: yes, whatever the assistant reads.** ComplyEaze
   Bridge hands each tool result, including company names, party names and
   amounts, to Claude Desktop. Claude Desktop is the host, and it sends tool
@@ -120,6 +127,31 @@ settings (section 4).
 
   The changelog adds that the check does not by itself prove that no data
   leaves the machine.
+
+- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The Windows network
+  path ([advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7)):
+  - *What was wrong.* The `parse_bank_statement` tool opened any absolute path
+    it was given for the statement or the password file, including a Windows
+    network path (a network share or its WebDAV form). That is the operating
+    system opening a file, not a network client in ComplyEaze Bridge's own
+    code, so the checks above do not see it.
+  - *Impact.* On Windows, opening a path that names another computer makes
+    Windows connect to it, and may send the signed-in user's network sign-in
+    response there. It needs the assistant to be steered into giving such a
+    path (for example by text it has read), your approval of the call in the
+    assistant or an always-allow setting, and outbound file-sharing or WebDAV
+    traffic to that computer. No Tally data is sent. The advisory's severity is
+    medium; on macOS it is low.
+  - *What 0.4.1 changes.* Both paths are checked as text before anything is
+    opened. A path that begins with two slashes or backslashes, in any mix, is
+    refused; this includes the Windows long-path form (`\\?\C:\...`), so use the
+    plain drive path. On Windows only a path that starts with a drive letter, a
+    colon and a slash or backslash is accepted.
+  - *What still passes.* A drive letter mapped to a network share, a link or
+    junction partway along a path, and on a Mac a mounted network volume.
+  - *What to do.* Keep statements and password files on a local disk. On
+    Windows the tool does not check who can read the password file, so restrict
+    its access yourself.
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
@@ -210,8 +242,10 @@ The package declares only a command to run and its settings. In its source we
 found no service, driver, scheduled task, registry key, launch agent or
 listening port. It writes files only in its data folder and in the lock
 folder described in section 4. It also reads files named in a tool call (often
-by the assistant), such as a bank statement and its password file; on macOS it
-refuses a password file that other users can read. Its one extra process is a
+by the assistant), such as a bank statement and its password file. From 0.4.1 it
+accepts such a path only when its text starts with a drive letter, a colon and a
+separator (Windows) or a single slash (a Mac) (section 3); on macOS it refuses a
+password file that other users can read. Its one extra process is a
 second copy of itself that shows the approval window.
 
 The approval window is a system dialog. On macOS it is titled "ComplyEaze
@@ -220,6 +254,9 @@ Windows it is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and
 Cancel, and No is the default. Only the positive button approves. The window
 closes by itself after two minutes without an answer, and an approval that is
 not used within fifteen minutes, or before the program restarts, is dropped.
+From 0.4.1 a clicked approval is also withdrawn when the post is refused
+before its checks begin (for example when the batch is not found or the
+journal is busy); a refusal inside the checks already withdrew it.
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,
 and a check of a machine before and after installing and running it.

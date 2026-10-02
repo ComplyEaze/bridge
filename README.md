@@ -231,16 +231,17 @@ always go with the answer. Decide this deliberately for client data.
 ## What it costs
 
 ComplyEaze has not set a price for ComplyEaze Bridge and does not sell licences
-to it; there is no account with us, subscription or licence key. A release you
-download stays under the licence it was published with (Apache-2.0 for current
-releases). We have not decided whether to charge for anything in future.
+to it; there is no account with us, subscription or licence key. The code of a
+release you download stays under the licence it was published with (Apache-2.0
+for current releases). We have not decided whether to charge for anything in future.
 
 What you pay or provide today:
 
 - **TallyPrime:** your own licence.
-- **Claude Desktop:** Anthropic's plans. On 1 October 2026 we ran ComplyEaze
-  Bridge on Windows with a Claude account that had no paid plan, on one
-  synthetic company; we make no claim about other plans or larger books.
+- **Claude Desktop:** Anthropic's plans. On 1 October 2026 we ran a candidate
+  build of 0.4.0 (not the published file) on Windows with a Claude account that
+  had no paid plan, on one synthetic company; we make no claim about other
+  plans or larger books.
 - **Your clients' data:** what Claude reads goes to Anthropic under your
   account; through ComplyEaze Bridge, ComplyEaze does not receive it
   ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).

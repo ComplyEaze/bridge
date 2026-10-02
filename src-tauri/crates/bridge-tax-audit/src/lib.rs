@@ -484,6 +484,11 @@ const LEGACY_SNAPSHOT_KEYS: [&str; 10] = [
 ];
 
 impl Engagement {
+    /// Not built yet: parses as a directory engagement, so every test of this method fails.
+    pub fn from_toml_for_read(text: &str) -> Result<Self> {
+        Self::from_toml(text, Path::new(""))
+    }
+
     /// Parse a client config; `[snapshot].path` is relative to `base_dir`.
     pub fn from_toml(text: &str, base_dir: &Path) -> Result<Self> {
         let cfg: toml::Table = toml::from_str(text)

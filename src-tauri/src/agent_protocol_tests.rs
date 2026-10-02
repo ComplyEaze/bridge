@@ -79,6 +79,85 @@ async fn initialize_carries_the_server_instructions() {
     );
 }
 
+/// Every `description` string under `value`, with the JSON path that holds it.
+fn descriptions<'a>(value: &'a Value, path: &str, out: &mut Vec<(String, &'a str)>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                let child_path = format!("{path}.{key}");
+                match (key.as_str(), child) {
+                    ("description", Value::String(text)) => out.push((child_path, text)),
+                    _ => descriptions(child, &child_path, out),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let name = item["name"]
+                    .as_str()
+                    .map_or(index.to_string(), str::to_string);
+                descriptions(item, &format!("{path}[{name}]"), out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The server instructions and every tool and parameter description pair their
+/// backticks, checked as `initialize` and `tools/list` serve them, with posting
+/// off and on. One lost backtick turns every later code span in that text inside
+/// out, and a test that looks for a phrase still finds it: a merge into #1049
+/// left "whatever the statetop` ranks" in the outstandings description (#1109).
+///
+/// Parity only: an even number of lost or added backticks in one text passes.
+/// Not covered: the texts in tool results (headlines, `limitations`,
+/// `next_step` and refusal lines), which an assistant also reads but which
+/// `tools/list` does not serve.
+#[tokio::test]
+async fn every_served_description_and_instruction_pairs_its_backticks() {
+    let mut tool_counts = Vec::new();
+    for (import_enabled, writes_enabled) in
+        [(false, false), (true, false), (false, true), (true, true)]
+    {
+        let directory = tempfile::tempdir().unwrap();
+        let mut served = server(directory.path());
+        served.settings.max_bytes = 4_000_000;
+        served.settings.import_enabled = import_enabled;
+        served.settings.writes_enabled = writes_enabled;
+        let responses = session(
+            served,
+            &[
+                initialize("2025-06-18"),
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            ],
+        )
+        .await;
+        let mut texts = Vec::new();
+        let instructions = responses[0]["result"]["instructions"]
+            .as_str()
+            .expect("initialize carries instructions");
+        texts.push(("instructions".to_string(), instructions));
+        let tools = &responses[1]["result"]["tools"];
+        let count = tools.as_array().expect("tools/list result").len();
+        for tool in tools.as_array().unwrap() {
+            assert!(tool["description"].is_string(), "{}", tool["name"]);
+        }
+        descriptions(tools, "tools", &mut texts);
+        let unpaired: Vec<&str> = texts
+            .iter()
+            .filter(|(_, text)| text.matches('`').count() % 2 == 1)
+            .map(|(path, _)| path.as_str())
+            .collect();
+        assert!(
+            unpaired.is_empty(),
+            "import_enabled={import_enabled} writes_enabled={writes_enabled}: unpaired backtick in {unpaired:?}"
+        );
+        tool_counts.push(count);
+    }
+    // The flags must change what is served, or the posting-on cases checked nothing new.
+    assert!(tool_counts[3] > tool_counts[0], "{tool_counts:?}");
+}
+
 /// A client that asked for tiny responses still gets its handshake: below the
 /// floor that carries guidance, `initialize` omits the instructions and keeps
 /// everything else.

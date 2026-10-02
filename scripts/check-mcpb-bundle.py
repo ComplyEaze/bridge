@@ -27,6 +27,7 @@ DEFAULT_TOOLS = {
     "profit_and_loss",
     "purchase_register",
     "read_evidence",
+    "sales_register",
     "stock_summary",
     "tally_status",
     "trial_balance",

@@ -1,6 +1,14 @@
 //! Bounded stdio framing and MCP request lifecycle.
 use super::*;
 
+/// What a client may show its model about this server as a whole, sent once in
+/// the `initialize` result. The company rule is the one a user's request most
+/// often leaves unsaid (several companies can be open at once), so it comes
+/// first and names the company in the first line; it is also in
+/// `list_companies`' own description, so a client that drops this text keeps
+/// it. The rest repeats what the tools and refusals already say.
+const SERVER_INSTRUCTIONS: &str = "ComplyEaze Bridge reads the TallyPrime books on this computer. Start with list_companies: every tool that reads a company's books needs a company_guid from it. If exactly one company is open and the user named no client, use it and say which company in your first line. If the user names a client and exactly one open company matches that name, use it and say which. Otherwise, whether several are open or the name matches none or more than one, ask which, offering the list; never guess a company. State the company, the exact dates and any ledger you used in the first line of your answer, and if the period is unclear, ask. Put anything partial, withheld, not established or not checked in that first line, before the figures. Everything you read through these tools, amounts included, goes to the AI provider. If a tool refuses, tell the user plainly what it says. Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user. Never get around a refusal by another route. Ask the user before you prepare or post anything, and never choose a ledger for a voucher on their behalf.";
+
 pub(super) async fn serve_stdio<R, W>(
     server: Server,
     mut reader: R,
@@ -70,7 +78,17 @@ where
                 .and_then(negotiate_protocol)
                 .map(|protocol_version| {
                     initialized = true;
-                    json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}})
+                    let mut result = json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}});
+                    // Guidance is never traded for the handshake: at a cap
+                    // too small to carry it, or beside a request id so long
+                    // that the reply would not fit, initialize still succeeds.
+                    let id_bytes = id.as_ref().map_or(0, |id| id.to_string().len());
+                    if server.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
+                        && id_bytes <= 256
+                    {
+                        result["instructions"] = json!(SERVER_INSTRUCTIONS);
+                    }
+                    result
                 }),
             "notifications/initialized" => {
                 if id.is_none() {
@@ -361,7 +379,7 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
     let counter = |name| counters.get(name).and_then(Value::as_u64);
     let presence = counters.get("counter_presence")?.as_object()?;
     let reported = |name| presence.get(name).and_then(Value::as_bool);
-    Some(json!({
+    let mut compact = json!({
         "application_status":application_status,
         "counters":{
             "created":counter("created")?,
@@ -383,7 +401,14 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
             }
         },
         "exceptions_were_reported":outcome["exceptions_were_reported"].as_bool()?
-    }))
+    });
+    // Kept when reported, as the journaled outcome keeps it; a value that is
+    // not a number makes the outcome unusable rather than silently dropped.
+    match outcome.get("last_vch_id") {
+        None => {}
+        Some(value) => compact["last_vch_id"] = json!(value.as_u64()?),
+    }
+    Some(compact)
 }
 
 fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {

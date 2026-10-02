@@ -455,6 +455,12 @@ pub(crate) enum UnderLockRefusal {
     BatchChanged,
     #[error("import_txn_already_posted")]
     TxnAlreadyPosted,
+    /// The aim snapshot did not yield the target's voucher mark to record with
+    /// the intent. The aim check before it requires exactly one target row, so
+    /// this should not fire; if it does, no dispatch intent is recorded and
+    /// nothing is sent.
+    #[error("post_mark_unrecorded")]
+    MarkUnrecorded,
 }
 
 impl UnderLockRefusal {
@@ -465,6 +471,7 @@ impl UnderLockRefusal {
             Self::RemoteIdReused => "import_remote_id_reused",
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
+            Self::MarkUnrecorded => "post_mark_unrecorded",
         }
     }
 }

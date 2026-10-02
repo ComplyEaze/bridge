@@ -1,0 +1,857 @@
+{
+ "what": "the ordered record of every HTTP request one sales_register call sent, not a wire capture itself",
+ "tool": "sales_register",
+ "arguments": {
+  "company_guid": "1edb9b05-8d35-4c0c-9959-dce655730463",
+  "from": "20250421",
+  "to": "20250421"
+ },
+ "requests_sent": 96,
+ "posts": 54,
+ "status_reads": 42,
+ "posts_by_request_id": {
+  "BridgeCompanyExtent": 18,
+  "BridgeCompanyBookExtentV2": 16,
+  "BridgeCompanyCurrencies": 4,
+  "List of Ledgers": 8,
+  "List of Groups": 4,
+  "Bridge Agent Vouchers": 2,
+  "Bridge Agent Company High Water": 2
+ },
+ "requests": [
+  {
+   "seq": 1,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 2,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 3,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 4,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 5,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 6,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 7,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 8,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 9,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 10,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "339d8214cdbd210fba8d3bf1206f20b64b1489cd7c2287102196903d486f72d2",
+   "response_body_bytes": 3400,
+   "response_body_sha256": "52ae8659722ae041c69cedec495bfcf83eac1c5e326f1c7fddbdf9fd150bd0c5",
+   "fixture": "stock_lab_taxed_day_currencies_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 11,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 12,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "339d8214cdbd210fba8d3bf1206f20b64b1489cd7c2287102196903d486f72d2",
+   "response_body_bytes": 3400,
+   "response_body_sha256": "52ae8659722ae041c69cedec495bfcf83eac1c5e326f1c7fddbdf9fd150bd0c5",
+   "fixture": "stock_lab_taxed_day_currencies_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 13,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 14,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 15,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 16,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 17,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 18,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 19,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 20,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 21,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 22,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 23,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 24,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 25,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 26,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "93cc734025f89f1c4959503fd16ff3fcea515c3340fec2b9fcd226cf1551d282",
+   "response_body_bytes": 18126,
+   "response_body_sha256": "d4dbd6231650b4e81744b13a48ff854edb6eb0c03ad061ee1e8ba28bd479ea66",
+   "fixture": "stock_lab_taxed_day_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 27,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 28,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "93cc734025f89f1c4959503fd16ff3fcea515c3340fec2b9fcd226cf1551d282",
+   "response_body_bytes": 18126,
+   "response_body_sha256": "d4dbd6231650b4e81744b13a48ff854edb6eb0c03ad061ee1e8ba28bd479ea66",
+   "fixture": "stock_lab_taxed_day_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 29,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 30,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "6a3e975a469cafe5acfc664c4fe3c882ca45105f977560e5890a569a63928aec",
+   "response_body_bytes": 12870,
+   "response_body_sha256": "cb9d0b0ef667e89b3dbeba22b61a2938d989563e16888d1ecc262b2a2039624c",
+   "fixture": "stock_lab_taxed_day_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 31,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 32,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "6a3e975a469cafe5acfc664c4fe3c882ca45105f977560e5890a569a63928aec",
+   "response_body_bytes": 12870,
+   "response_body_sha256": "cb9d0b0ef667e89b3dbeba22b61a2938d989563e16888d1ecc262b2a2039624c",
+   "fixture": "stock_lab_taxed_day_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 33,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 34,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "d5d16a41d14e67cabb484083281470b4cfd89fb10c551a3e18ff02a57acb62a3",
+   "response_body_bytes": 54280,
+   "response_body_sha256": "03c3624408d000da234e54aacf61c1339dd0ee5867d119e48246dd153b1dd8e8",
+   "fixture": "stock_lab_taxed_day_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 35,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 36,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "d5d16a41d14e67cabb484083281470b4cfd89fb10c551a3e18ff02a57acb62a3",
+   "response_body_bytes": 54280,
+   "response_body_sha256": "03c3624408d000da234e54aacf61c1339dd0ee5867d119e48246dd153b1dd8e8",
+   "fixture": "stock_lab_taxed_day_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 37,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 38,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 39,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 40,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 41,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 42,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 43,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 44,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 45,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 46,
+   "method": "POST",
+   "request_id": "Bridge Agent Vouchers",
+   "request_sha256": "32bc080b2715f9f570e65189b66e225889877fb4f056f387e9fc0979ac2a2632",
+   "response_body_bytes": 76864,
+   "response_body_sha256": "04d28380632caa5c02aeceda49793690e82ee21418f9a4f7b7a2b6cd6d7a3488",
+   "fixture": "stock_lab_taxed_day_voucher_window_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 47,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 48,
+   "method": "POST",
+   "request_id": "Bridge Agent Vouchers",
+   "request_sha256": "32bc080b2715f9f570e65189b66e225889877fb4f056f387e9fc0979ac2a2632",
+   "response_body_bytes": 76864,
+   "response_body_sha256": "04d28380632caa5c02aeceda49793690e82ee21418f9a4f7b7a2b6cd6d7a3488",
+   "fixture": "stock_lab_taxed_day_voucher_window_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 49,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 50,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 51,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 52,
+   "method": "POST",
+   "request_id": "Bridge Agent Company High Water",
+   "request_sha256": "a98987c65a39652c9a0703af5cb613490473267b7170b0aeb6ca7a36f2c15848",
+   "response_body_bytes": 4326,
+   "response_body_sha256": "512ff1552725e16b1374501f92f57fba2cbef1034d61373573bff8b9851fd09e",
+   "fixture": "stock_lab_taxed_day_company_marks_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 53,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 54,
+   "method": "POST",
+   "request_id": "Bridge Agent Company High Water",
+   "request_sha256": "a98987c65a39652c9a0703af5cb613490473267b7170b0aeb6ca7a36f2c15848",
+   "response_body_bytes": 4326,
+   "response_body_sha256": "512ff1552725e16b1374501f92f57fba2cbef1034d61373573bff8b9851fd09e",
+   "fixture": "stock_lab_taxed_day_company_marks_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 55,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 56,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 57,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 58,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 59,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 60,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 61,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 62,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "339d8214cdbd210fba8d3bf1206f20b64b1489cd7c2287102196903d486f72d2",
+   "response_body_bytes": 3400,
+   "response_body_sha256": "52ae8659722ae041c69cedec495bfcf83eac1c5e326f1c7fddbdf9fd150bd0c5",
+   "fixture": "stock_lab_taxed_day_currencies_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 63,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 64,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "339d8214cdbd210fba8d3bf1206f20b64b1489cd7c2287102196903d486f72d2",
+   "response_body_bytes": 3400,
+   "response_body_sha256": "52ae8659722ae041c69cedec495bfcf83eac1c5e326f1c7fddbdf9fd150bd0c5",
+   "fixture": "stock_lab_taxed_day_currencies_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 65,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 66,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 67,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 68,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 69,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 70,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 71,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 72,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 73,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 74,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 75,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 76,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 77,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 78,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "93cc734025f89f1c4959503fd16ff3fcea515c3340fec2b9fcd226cf1551d282",
+   "response_body_bytes": 18126,
+   "response_body_sha256": "d4dbd6231650b4e81744b13a48ff854edb6eb0c03ad061ee1e8ba28bd479ea66",
+   "fixture": "stock_lab_taxed_day_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 79,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 80,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "93cc734025f89f1c4959503fd16ff3fcea515c3340fec2b9fcd226cf1551d282",
+   "response_body_bytes": 18126,
+   "response_body_sha256": "d4dbd6231650b4e81744b13a48ff854edb6eb0c03ad061ee1e8ba28bd479ea66",
+   "fixture": "stock_lab_taxed_day_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 81,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 82,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "6a3e975a469cafe5acfc664c4fe3c882ca45105f977560e5890a569a63928aec",
+   "response_body_bytes": 12870,
+   "response_body_sha256": "cb9d0b0ef667e89b3dbeba22b61a2938d989563e16888d1ecc262b2a2039624c",
+   "fixture": "stock_lab_taxed_day_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 83,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 84,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "6a3e975a469cafe5acfc664c4fe3c882ca45105f977560e5890a569a63928aec",
+   "response_body_bytes": 12870,
+   "response_body_sha256": "cb9d0b0ef667e89b3dbeba22b61a2938d989563e16888d1ecc262b2a2039624c",
+   "fixture": "stock_lab_taxed_day_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 85,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 86,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "d5d16a41d14e67cabb484083281470b4cfd89fb10c551a3e18ff02a57acb62a3",
+   "response_body_bytes": 54280,
+   "response_body_sha256": "03c3624408d000da234e54aacf61c1339dd0ee5867d119e48246dd153b1dd8e8",
+   "fixture": "stock_lab_taxed_day_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 87,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 88,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "d5d16a41d14e67cabb484083281470b4cfd89fb10c551a3e18ff02a57acb62a3",
+   "response_body_bytes": 54280,
+   "response_body_sha256": "03c3624408d000da234e54aacf61c1339dd0ee5867d119e48246dd153b1dd8e8",
+   "fixture": "stock_lab_taxed_day_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 89,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 90,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 91,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 92,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "bc4bf86cdc654026343bfe819e4de86688b77eac2e2d5677453560601e10f439",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "fbbef30973a9220045033d125bde323613328715d543002215568ae9028358c1",
+   "fixture": "stock_lab_taxed_day_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 93,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 94,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 95,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 96,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "stock_lab_taxed_day_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  }
+ ]
+}

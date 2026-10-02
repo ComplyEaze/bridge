@@ -180,6 +180,13 @@ pub struct TallyImportOutcome {
     /// How many `LINEERROR`s kept no text, so a short list is explicit.
     #[serde(skip_serializing_if = "is_zero")]
     tally_line_errors_omitted: u64,
+    /// `LASTVCHID` as Tally reported it, when it did. On a clean create of 10
+    /// vouchers it equalled the last created voucher's MASTERID on one
+    /// licensed Silver 7.1 run (`tests/fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`);
+    /// it is a cross-check for binding a posted voucher, never an identity alone.
+    /// Absent in records saved before it was kept, which read as not observed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_vch_id: Option<u64>,
 }
 
 /// A saved outcome as read back. Its text is bounded again on the way in, so
@@ -192,6 +199,8 @@ struct StoredTallyImportOutcome {
     exceptions_were_reported: bool,
     #[serde(default, deserialize_with = "stored_line_errors")]
     tally_line_errors: Vec<StoredTallyLineError>,
+    #[serde(default)]
+    last_vch_id: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -232,6 +241,7 @@ impl From<StoredTallyImportOutcome> for TallyImportOutcome {
             exceptions_were_reported: stored.exceptions_were_reported,
             tally_line_errors,
             tally_line_errors_omitted,
+            last_vch_id: stored.last_vch_id,
         }
     }
 }
@@ -259,6 +269,11 @@ impl TallyImportOutcome {
     /// How many `LINEERROR`s kept no text.
     pub fn tally_line_errors_omitted(&self) -> u64 {
         self.tally_line_errors_omitted
+    }
+
+    /// `LASTVCHID`, when the response carried it.
+    pub fn last_vch_id(&self) -> Option<u64> {
+        self.last_vch_id
     }
 
     pub fn into_counters(self) -> TallyImportResult {
@@ -390,6 +405,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
     let mut line_error_count = 0_u64;
     let mut tally_line_errors = Vec::new();
     let mut documented_extra_fields = HashSet::new();
+    let mut last_vch_id = None;
 
     loop {
         match reader.read_event()? {
@@ -515,10 +531,11 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                             anyhow::bail!("Tally import response duplicated a documented field");
                         }
                         if name.as_slice() == b"LASTVCHID" {
-                            // Tally documents LASTVCHID as a numeric import-result field. We do
-                            // not retain it yet, but accepting arbitrary text here would make the
-                            // parser evidence unusable for a future identifier cross-check.
-                            read_counter(&mut reader, element.name(), "LASTVCHID")?;
+                            // Tally documents LASTVCHID as a numeric import-result field; it
+                            // is kept as a cross-check for binding a posted voucher, so
+                            // arbitrary text is refused rather than read as absent.
+                            last_vch_id =
+                                Some(read_counter(&mut reader, element.name(), "LASTVCHID")?);
                         } else {
                             read_optional_text(&mut reader, element.name())?;
                         }
@@ -646,6 +663,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
         exceptions_were_reported,
         tally_line_errors,
         tally_line_errors_omitted,
+        last_vch_id,
     })
 }
 

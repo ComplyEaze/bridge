@@ -21,12 +21,11 @@ A bare `<RESPONSE>` root with **no `ENVELOPE`, no `HEADER`, no `STATUS`**:
 </RESPONSE>
 ```
 
-A `STATUS=1` rule cannot apply to imports — there is no `STATUS` to check.
-
-That is the answer to Bridge's `Import Data` envelope. Tally's documented `Import` envelope was
-answered in a different shape: an `ENVELOPE` whose `HEADER` carried `VERSION 1` and `STATUS 1`,
-then the same ten counter elements, in the same order, in `BODY/DATA/IMPORTRESULT` (PARTIAL, one
-run, §9.4g; not counted in §9.1a's numbering).
+That is the answer to Bridge's `Import Data` envelope, and a `STATUS=1` rule cannot apply to it —
+there is no `STATUS` to check. Tally's documented `Import` envelope was answered in a different
+shape: an `ENVELOPE` whose `HEADER` carried `VERSION 1` and `STATUS 1`, then the same ten counter
+elements, in the same order, in `BODY/DATA/IMPORTRESULT` (PARTIAL, one run, §9.4g; not counted in
+§9.1a's numbering).
 
 ### 9.1a A malformed request returns a counter-less response — **fourth response shape**
 
@@ -350,7 +349,7 @@ foreign writer or recovery of an unobserved prior master.
 A `Create` with the same name and a different parent, bill-wise flag and opening balance replaced
 all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g). The documented `IMPORTDUPS`
 option `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both Bridge's envelope and
-Tally's documented one (one run per envelope, plus a case variant in Bridge's; §9.4g).
+Tally's documented one (PARTIAL: one run per envelope, plus a case variant in Bridge's; §9.4g).
 
 The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)

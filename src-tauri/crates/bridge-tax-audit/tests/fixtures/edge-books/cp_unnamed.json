@@ -1,0 +1,445 @@
+{
+ "comment": "cash_payments_40a3, vouchers with no party ledger: the s.40A(3) rows keyed by a Purchase, Direct Expenses or Indirect Expenses ledger (which name what was bought, not whom it was paid to) cite every usable printed name and say so in their definition, title and limits, with and without vouchers printing none, beside a possible goods-carriage flag, a named payee and an excluded capital payee; and the s.269ST receipt and payment rows pooled by day with no party ledger, in their own terms with the printed names on the row, beside a named party's row.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null,
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Unsecured Loans": "Loans (Liability)"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_unnamed-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_unnamed-001"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_unnamed-002"
+  },
+  {
+   "name": "Supplier C",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cp_unnamed-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-cp_unnamed-004"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-cp_unnamed-005"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-cp_unnamed-006"
+  },
+  {
+   "name": "Office Expense",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-cp_unnamed-007"
+  },
+  {
+   "name": "Capital A",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-cp_unnamed-008"
+  },
+  {
+   "name": "Output CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-cp_unnamed-009"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-cp_unnamed-010"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "a01",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Purchases",
+     600000
+    ]
+   ],
+   "party": "Ram Traders"
+  },
+  {
+   "guid": "a02",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -700000
+    ],
+    [
+     "Purchases",
+     700000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "a03",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -2000000
+    ],
+    [
+     "Freight Inward",
+     2000000
+    ]
+   ],
+   "party": "Fast Freight Co"
+  },
+  {
+   "guid": "a04",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -100000
+    ],
+    [
+     "Freight Inward",
+     100000
+    ]
+   ],
+   "party": "Freight Inward"
+  },
+  {
+   "guid": "a05",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": "Cleaner A"
+  },
+  {
+   "guid": "a06",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": " Cleaner A "
+  },
+  {
+   "guid": "a07",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -1100000
+    ],
+    [
+     "Office Expense",
+     1100000
+    ]
+   ],
+   "party": "Cash"
+  },
+  {
+   "guid": "a08",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -1500000
+    ],
+    [
+     "Supplier C",
+     1500000
+    ]
+   ],
+   "party": "Supplier C"
+  },
+  {
+   "guid": "a09",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -1200000
+    ],
+    [
+     "Capital A",
+     1200000
+    ]
+   ],
+   "party": "Capital A"
+  },
+  {
+   "guid": "a10",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": "Cleaner B"
+  },
+  {
+   "guid": "a11",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "r01",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Sales",
+     -11000000
+    ],
+    [
+     "Output CGST",
+     -1000000
+    ]
+   ],
+   "party": "Walk In One"
+  },
+  {
+   "guid": "r02",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     9000000
+    ],
+    [
+     "Sales",
+     -9000000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "r03",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Sales",
+     -500000
+    ]
+   ],
+   "party": "Sales"
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -11000000
+    ],
+    [
+     "Purchases",
+     11000000
+    ]
+   ],
+   "party": "Seller One"
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Purchases",
+     9000000
+    ],
+    [
+     "Round Off",
+     1000000
+    ]
+   ],
+   "party": "Seller One"
+  },
+  {
+   "guid": "c01",
+   "date": "2025-06-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     21000000
+    ],
+    [
+     "Customer A",
+     -21000000
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -21000000
+    ],
+    [
+     "Supplier C",
+     21000000
+    ]
+   ]
+  },
+  {
+   "guid": "r04",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     21000000
+    ],
+    [
+     "Sales",
+     -21000000
+    ]
+   ],
+   "party": "Solo Walk In"
+  },
+  {
+   "guid": "p03",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -21000000
+    ],
+    [
+     "Purchases",
+     21000000
+    ]
+   ],
+   "party": ""
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "cash_payments_40a3"
+ ],
+ "round_off_ledgers": [
+  "Round Off"
+ ]
+}

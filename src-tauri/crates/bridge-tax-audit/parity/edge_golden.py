@@ -61,6 +61,7 @@ meaning none supplied), `ais` as above, `s194n_terms` and `round_off_ledgers` (d
 `bank_statement_refused` (the reader's plain-words reason a supplied statement was refused; default none) and `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
+for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); and
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
 closing_value?}}, default {}), `stock_opening` and `stock_closing` ({as_of, rows: {name: {qty?, value?,
 rate?}}}), each quantity a number, each value or rate integer paise, absent or null meaning None, and
@@ -86,8 +87,8 @@ def main() -> int:
     from tae.adapters.bank_documents import BankStatementDoc
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
-    from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-                                 high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
+    from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, cash_payments_40a3,
+                                 creditor_ageing_43bh, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules
@@ -291,6 +292,10 @@ def main() -> int:
             set(bkq.get("writeoff_discount_ledgers", [])))),
         "cash_book_integrity": lambda: (cash_book_integrity,
                                         cash_book_integrity.run(eng, rules, cash, bank, terms)),
+        # As tae/pack.py: the loan ledgers the client configured and the round-off ledgers, as given.
+        "cash_payments_40a3": lambda: (cash_payments_40a3, cash_payments_40a3.run(
+            eng, rules, cash=cash, bank=bank, loan_ledgers_configured=set(spec.get("loan_ledgers", [])),
+            round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
         "creditor_ageing_43bh": lambda: (creditor_ageing_43bh, creditor_ageing_43bh.run(
             eng, rules, set(spec.get("creditors", [])), acceptance_lag_days=ca.get("acceptance_lag_days", 0),
             supplier_classification=ca.get("supplier_classification", {}), post_year_payments=post_year,

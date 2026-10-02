@@ -409,7 +409,7 @@ range (one rule for an empty or missing value across its renderers) are outside 
 | Fixture | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.cash_44ab.json` | 5,880 | `94d58bcf9a18413ef024eed4537c18e41aed5eeb7fb6ddc964d193ea6e1abe5a` | `golden/synthetic.cash_44ab.json` |
-| `synthetic.cash_payments_40a3.json` | 72,108 | `f9efbd693830005738b44cd1482ef7cd9e1cfd4b1805c6c01cb81f29dbb5cca2` | `golden/synthetic.cash_payments_40a3.json` |
+| `synthetic.cash_payments_40a3.json` | 74,066 | `accefe8587c297fbf3f0fa0af507f72bbecb7ec166e372c40eb2994e01c03244` | `golden/synthetic.cash_payments_40a3.json` |
 | `synthetic.depreciation.json` | 28,219 | `251b34d0491e392b640ffb3df997027704e747868cbd79b6bd6dd3d2ef4a245d` | `golden/synthetic.depreciation.json` |
 | `synthetic.financial_statements.json` | 16,955 | `90f3f13974b2699f8c19dc172d697cc9ed4c77adddf0d9d59f4305d8081fa5e4` | `golden/synthetic.financial_statements.json` |
 | `synthetic.financial_statements.noreport.json` | 15,888 | `2134a63248e05f06f7755fd7588dba8acaccebc471dfba383f4171806b637a69` | `golden/synthetic.financial_statements.noreport.json` |

@@ -1,0 +1,977 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "cash_payments_40a3",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "0bed994af7c6a274",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout.",
+  "figures": [
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_80210cf3720c_1435718f",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "16831f456c3245ec",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k07, cash repaid in the same voucher (covered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k07",
+          "label": "Payment k07 on 2025-07-10"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_a02169a62cb3_1435718f_cr",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "8e28945321f103ab",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k04, cash accepted in the same voucher (covered by the client's list of loans). This voucher also has an opposite entry on 'Loan X'; it may be a correction; check before counting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k04",
+          "label": "Receipt k04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_a02169a62cb3_1435718f_dr",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "c5ef6c8f86eb3f1f",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k04, on a voucher whose cash moved the other way (covered by the client's list of loans). This voucher also has an opposite entry on 'Loan X'; it may be a correction; check before counting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k04",
+          "label": "Receipt k04 on 2025-07-05"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_be8b70219aff_1435718f",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "80b21ca77cd2b17b",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k01, cash accepted in the same voucher (covered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k01",
+          "label": "Receipt k01 on 2025-07-02"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_dc7882722f14_1435718f",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "a71812dc84ddd517",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k05, on a voucher whose cash moved the other way (covered by the client's list of loans). This voucher also has an opposite entry on 'Loan Z'; it may be a correction; check before counting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_0913f159628a_b1d449b2",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "c4a81c092902d78e",
+      "definition_text": "Loan-ledger line (tag b1d449b2) on voucher dup, cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-08"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_58e08f69ba83_a7683786",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "08625bc483178ac3",
+      "definition_text": "Loan-ledger line (tag a7683786) on voucher k12, cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k12",
+          "label": "Receipt k12 on 2025-07-15"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_6774e97b32d4_a7683786",
+      "value": 2000000,
+      "unit": "paise",
+      "definition_sha256_16": "05a17eeead4f45e5",
+      "definition_text": "Loan-ledger lines (tag a7683786) on voucher k13, 2 of them on one side of the ledger, summed; cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k13",
+          "label": "Receipt k13 on 2025-07-16"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_67b588cc7718_b1d449b2",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "f61a02307dc4ca61",
+      "definition_text": "Loan-ledger lines (tag b1d449b2) on voucher k02, 2 of them on one side of the ledger, summed; cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k02",
+          "label": "Receipt k02 on 2025-07-03"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_745443363406_b1d449b2",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "5ce05f2cd98e716f",
+      "definition_text": "Loan-ledger line (tag b1d449b2) on voucher number LV/6, cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt LV/6 on 2025-07-07"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_75aa400b318d_b1d449b2",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "3222aea672d3c8ee",
+      "definition_text": "Loan-ledger lines (tag b1d449b2) on voucher k03, 2 of them on one side of the ledger, summed; cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k03",
+          "label": "Receipt k03 on 2025-07-04"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_925335a8efe8_b1d449b2",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "c4a81c092902d78e",
+      "definition_text": "Loan-ledger line (tag b1d449b2) on voucher dup, cash accepted in the same voucher (uncovered by the client's list of loans).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-09"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_amount_uncovered_dc7882722f14_a7683786",
+      "value": 3500000,
+      "unit": "paise",
+      "definition_sha256_16": "3b521190da0b7d4e",
+      "definition_text": "Loan-ledger line (tag a7683786) on voucher k05, cash repaid in the same voucher (uncovered by the client's list of loans). This voucher also has an opposite entry on 'Loan X'; it may be a correction; check before counting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_count",
+      "value": 13,
+      "unit": "count",
+      "definition_sha256_16": "c41789d6fac8a23a",
+      "definition_text": "(Voucher, loan ledger, side) candidates on population, non-Contra vouchers with a cash line, where one side of a Loans (Liability)-chain ledger on the voucher -- its credits (a loan accepted) or its debits (a loan repaid), summed -- is at or over the s.269SS/269T limit (₹20,000).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_total",
+      "value": 41500000,
+      "unit": "paise",
+      "definition_sha256_16": "d75ad66d54b6c86b",
+      "definition_text": "Sum of the candidates' amounts: each (voucher, loan ledger, side) candidate's lines summed, taken without their sign, across the s.269SS/269T candidates. A voucher with entries on both sides of its loan ledgers (a correction, or a loan taken and repaid) may be counted in both directions.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269ss269t_candidate_uncovered_by_loans_interest_count",
+      "value": 8,
+      "unit": "count",
+      "definition_sha256_16": "b005998bd3934682",
+      "definition_text": "s.269SS/269T candidates (population, non-Contra vouchers with a cash line, where one side of a Loans (Liability)-chain ledger -- its credits or its debits, summed -- is at or over the limit) on a loan ledger NOT in the client's list of loans -- the only ones this test tags for Clause 31; every other candidate is covered by 'Loans and interest' instead.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_at_or_over_limit_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d1cb2ed8cb702b93",
+      "definition_text": "(date, party) pairs where the day's total is at or over the s.269ST(a) limb (i) limit (₹2,00,000 per person per day).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_party_days_any_amount_count",
+      "value": 11,
+      "unit": "count",
+      "definition_sha256_16": "39560ecf00e50bec",
+      "definition_text": "Distinct (date, party ledger) pairs with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts'.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_party_days_any_amount_total",
+      "value": 33000000,
+      "unit": "paise",
+      "definition_sha256_16": "b6d19da9c6734b41",
+      "definition_text": "Sum of cash received across every (date, party ledger) pair with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts', any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt LV/6 on 2025-07-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "k01",
+          "label": "Receipt k01 on 2025-07-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "k02",
+          "label": "Receipt k02 on 2025-07-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "k03",
+          "label": "Receipt k03 on 2025-07-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "k04",
+          "label": "Receipt k04 on 2025-07-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "k08",
+          "label": "Receipt k08 on 2025-07-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "k09",
+          "label": "Receipt k09 on 2025-07-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "k12",
+          "label": "Receipt k12 on 2025-07-15"
+        },
+        {
+          "kind": "voucher",
+          "id": "k13",
+          "label": "Receipt k13 on 2025-07-16"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_at_or_over_limit_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "8f8629d398594be3",
+      "definition_text": "(date, party) pairs where the day's cash payment total is at or over the s.269ST(a) limb (a) threshold (₹2,00,000 per person per day) -- reportable in clause 31(bc), not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_party_days_any_amount_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "18a18587fa068631",
+      "definition_text": "Distinct (date, party ledger) pairs with a cash payment on a population, non-Contra voucher, party ledger not under 'Purchase Accounts'.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s269st_payment_party_days_any_amount_total",
+      "value": 6500000,
+      "unit": "paise",
+      "definition_sha256_16": "581c2a370cc96236",
+      "definition_text": "Sum of cash paid across every (date, party ledger) pair with a cash payment on a population, non-Contra voucher, party ledger not under 'Purchase Accounts', any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "k07",
+          "label": "Payment k07 on 2025-07-10"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_capital",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c4784496ad31b03b",
+      "definition_text": "Cash paid to ledgers under Tally group 'Capital Account' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_duties_taxes",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5f4349ef51c79fb4",
+      "definition_text": "Cash paid to ledgers under Tally group 'Duties & Taxes' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_fixed_assets",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "08cab049a1fa8c42",
+      "definition_text": "Cash paid to ledgers under Tally group 'Fixed Assets' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_loans_advances_asset",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1fa53a3dd1761668",
+      "definition_text": "Cash paid to ledgers under Tally group 'Loans & Advances (Asset)' (excluded from s.40A(3) scope by the rules); 0 (date, payee) pairs.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_excluded_total_loans_liability",
+      "value": 6500000,
+      "unit": "paise",
+      "definition_sha256_16": "ffe64926200deb5f",
+      "definition_text": "Cash paid to ledgers under Tally group 'Loans (Liability)' (excluded from s.40A(3) scope by the rules); 2 (date, payee) pairs.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        },
+        {
+          "kind": "voucher",
+          "id": "k07",
+          "label": "Payment k07 on 2025-07-10"
+        }
+      ]
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_over_limit_all_kinds_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "23053c3df828c87b",
+      "definition_text": "(date, payee) pairs over the s.40A(3) limit before excluding capital, loans, fixed assets and duties and taxes; the in-scope count is a subset.",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_over_limit_in_scope_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "7686f9a6ffe4f134",
+      "definition_text": "In-scope (date, payee) pairs where the day's total exceeds the s.40A(3) limit (₹10,000 per person per day).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_payee_days_any_amount_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "09d653aa443bd158",
+      "definition_text": "Distinct (date, payee ledger) pairs with a cash payment on a population, non-Contra voucher, payee classified as expenditure (not in a group the rules exclude from s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "cash_payments_40a3.s40a3_payee_days_any_amount_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4a6c107b00b43bb6",
+      "definition_text": "Sum of cash paid across every (date, payee ledger) pair with a cash payment on a population, non-Contra voucher, payee classified as expenditure, any amount.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "cash_payments_40a3/s269ss269t/0913f159628a_b1d449b2",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_0913f159628a_b1d449b2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Y",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-08"
+        }
+      ],
+      "title_sha256_16": "41dd55776e317fbe",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-08, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/58e08f69ba83_a7683786",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_58e08f69ba83_a7683786"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Z",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k12",
+          "label": "Receipt k12 on 2025-07-15"
+        }
+      ],
+      "title_sha256_16": "c9f646dc933b716c",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-15, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/6774e97b32d4_a7683786",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_6774e97b32d4_a7683786"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Z",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k13",
+          "label": "Receipt k13 on 2025-07-16"
+        }
+      ],
+      "title_sha256_16": "e9ff5cbf428a13d2",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-16, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/67b588cc7718_b1d449b2",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_67b588cc7718_b1d449b2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Y",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k02",
+          "label": "Receipt k02 on 2025-07-03"
+        }
+      ],
+      "title_sha256_16": "0052680323adb893",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-03, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/745443363406_b1d449b2",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_745443363406_b1d449b2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Y",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Receipt LV/6 on 2025-07-07"
+        }
+      ],
+      "title_sha256_16": "fcb2b81500769052",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-07, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/75aa400b318d_b1d449b2",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_75aa400b318d_b1d449b2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Y",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k03",
+          "label": "Receipt k03 on 2025-07-04"
+        }
+      ],
+      "title_sha256_16": "e2784b59223b5c98",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-04, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/80210cf3720c_1435718f",
+      "clauses": [
+        "s.269T"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_80210cf3720c_1435718f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k07",
+          "label": "Payment k07 on 2025-07-10"
+        }
+      ],
+      "title_sha256_16": "5bf2470d81c29b26",
+      "title_text": "Cash repaid against a loan ledger on 2025-07-10, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "96623659ecfb7c67",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/925335a8efe8_b1d449b2",
+      "clauses": [
+        "s.269SS",
+        "3CD-31(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_925335a8efe8_b1d449b2"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Y",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "dup",
+          "label": "Receipt dup on 2025-07-09"
+        }
+      ],
+      "title_sha256_16": "b5ca4edd7dab5047",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-09, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/a02169a62cb3_1435718f_cr",
+      "clauses": [
+        "s.269SS"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_a02169a62cb3_1435718f_cr"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k04",
+          "label": "Receipt k04 on 2025-07-05"
+        }
+      ],
+      "title_sha256_16": "8f0ec5e4da245ca9",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-05, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "64b3bb7d3a16b489",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total.",
+        "'Loans and interest' gives no clause 31 row for a voucher that both credits and debits this ledger: it lists it as the books hold it, without dividing it into entries or computing its reportability, where the lender is one clause 31 reports. This voucher has both an acceptance and a repayment on it."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/a02169a62cb3_1435718f_dr",
+      "clauses": [
+        "s.269T"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_a02169a62cb3_1435718f_dr"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k04",
+          "label": "Receipt k04 on 2025-07-05"
+        }
+      ],
+      "title_sha256_16": "c7e7d4766ecf24fa",
+      "title_text": "Loan repaid against a loan ledger on 2025-07-05 on a voucher whose cash moved the other way, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "64b3bb7d3a16b489",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total.",
+        "'Loans and interest' gives no clause 31 row for a voucher that both credits and debits this ledger: it lists it as the books hold it, without dividing it into entries or computing its reportability, where the lender is one clause 31 reports. This voucher has both an acceptance and a repayment on it."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/be8b70219aff_1435718f",
+      "clauses": [
+        "s.269SS"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_be8b70219aff_1435718f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k01",
+          "label": "Receipt k01 on 2025-07-02"
+        }
+      ],
+      "title_sha256_16": "e9aa169ad9308105",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-02, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "96623659ecfb7c67",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/dc7882722f14_1435718f",
+      "clauses": [
+        "s.269SS"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_dc7882722f14_1435718f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        }
+      ],
+      "title_sha256_16": "3d38d2a1423a2b39",
+      "title_text": "Loan accepted against a loan ledger on 2025-07-06 on a voucher whose cash moved the other way, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "96623659ecfb7c67",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/dc7882722f14_a7683786",
+      "clauses": [
+        "s.269T",
+        "3CD-31(c)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_uncovered_dc7882722f14_a7683786"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan Z",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k05",
+          "label": "Payment k05 on 2025-07-06"
+        }
+      ],
+      "title_sha256_16": "869433ada799bb2f",
+      "title_text": "Cash repaid against a loan ledger on 2025-07-06, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "f6ce0038d92b1d12",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Cash",
+      "detail": "vouchers 30500000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Edge Bank",
+      "detail": "vouchers 2000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Loan X",
+      "detail": "vouchers -4000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Loan Y",
+      "detail": "vouchers -27000000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Loan Z",
+      "detail": "vouchers -1500000 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "k08",
+      "detail": "Receipt k08 2025-07-11 lines sum 2000000"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "k09",
+      "detail": "Receipt k09 2025-07-12 lines sum -3000000"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "k13",
+      "detail": "Receipt k13 2025-07-16 lines sum 1000000"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "(blank)",
+      "detail": "1 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup",
+      "detail": "2 in-books vouchers share this GUID"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

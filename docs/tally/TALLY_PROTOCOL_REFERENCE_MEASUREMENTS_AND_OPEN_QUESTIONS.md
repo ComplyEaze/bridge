@@ -457,6 +457,20 @@ trail, not from captured bytes. The read was admitted against it and returned co
 reading the window again with the same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
 nobody changed.
 
+**Where a one-month window read spends its time, and what a later page costs — PARTIAL, 2026-10-02.**
+One run of each, on a synthetic benchmark book (one month, 2,542 vouchers, about 82 a day), the `vouchers`
+tool of a master build through a recording read-only relay, licensed TallyPrime 7.1 Silver.
+
+- A whole-window read took 65.8 s in a release build (75.6 s in a debug build) and sent 232 requests. Tally
+  held 45.5 s of it, Bridge's request spacing about 19.1 s, Bridge's own CPU 2.4 s. The census was about 7% of
+  the time and the data parts about 53%. In 57 relay logs of paired reads, the two sends of a pair never differed.
+- Before the page snapshot change (#1053), every later page of the same window read the whole window again:
+  232 requests each. With it, in one run, a later page that named the first page's `snapshot_id` took 1.2 s and
+  sent 10 requests (0.18 s of it Tally's), against 68.0 s and 232 requests for the first page, on a quiet book.
+- Not measured: a change made at Tally's screen between two live pages (the screen actions that move the marks
+  are in the entries above, one run each), a window larger than the 64 MiB the held windows share, another book,
+  another release, the desktop screen (it holds nothing), and the effect of any change to the request spacing.
+
 This does not establish:
 
 - a window of several days read in one request and admitted against its census, which is the case

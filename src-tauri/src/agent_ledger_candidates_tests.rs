@@ -71,7 +71,11 @@ fn an_embedded_number_is_listed_for_confirmation_and_never_resolves() {
     assert_eq!(code, "ledger_not_found");
     assert_eq!(miss.listing, Listing::Listed);
     assert_eq!(listed_names(&items), ["Ramesh Kumar 9876543210"]);
-    assert_eq!(items[0]["rule"], "shared_identifier");
+    assert_eq!(items[0]["rule"], "identifier_match");
+    // The core skipped its name search here, so the one name is not "every
+    // ledger like this": the count is a floor, and the reason says why.
+    assert!(miss.found_is_lower_bound);
+    assert_eq!(miss.reason, Some("name_search_not_run"));
 }
 
 /// `a_b` and `AB` and `A-B` share one lookup key; the ambiguity lists exactly
@@ -155,8 +159,17 @@ fn a_masked_spelling_is_refused_and_not_resolved_to_another_ledger() {
         resolve_ledger_or_refuse(book.into_iter(), "RARS", Redaction::MaskParties).unwrap(),
         "RARS"
     );
+    // The mark itself is refused whatever the setting: a name copied while
+    // masking was on must not be read as another party after it is turned off.
+    for spelling in ["Ra…rs", "Ra...rs"] {
+        let failure =
+            resolve_ledger_or_refuse(book.into_iter(), spelling, Redaction::None).unwrap_err();
+        assert_eq!(failure.code, "ledger_name_masked", "{spelling}");
+    }
+    // A retyping without the mark is another matter without masking: Bridge
+    // wrote no masked name to retype, so the resolver reads it as it always did.
     assert_eq!(
-        resolve_ledger_or_refuse(book.into_iter(), "Ra…rs", Redaction::None).unwrap(),
+        resolve_ledger_or_refuse(book.into_iter(), "Ra rs", Redaction::None).unwrap(),
         "RARS"
     );
     assert_eq!(
@@ -192,9 +205,10 @@ fn a_masked_spelling_is_refused_and_not_resolved_to_another_ledger() {
     );
     // A request that matches no ledger and carries the mark is refused as
     // masked too, with no search and no names.
-    let failure =
-        resolve_ledger_or_refuse(book.into_iter(), "Zz…qq", Redaction::MaskParties).unwrap_err();
-    assert_eq!(failure.code, "ledger_name_masked");
+    for redaction in [Redaction::MaskParties, Redaction::None] {
+        let failure = resolve_ledger_or_refuse(book.into_iter(), "Zz…qq", redaction).unwrap_err();
+        assert_eq!(failure.code, "ledger_name_masked", "{redaction:?}");
+    }
 }
 
 #[test]
@@ -210,7 +224,7 @@ fn the_remediation_for_each_code_says_to_ask_the_user_and_never_to_pick() {
     let not_found = refusal_remediation("ledger_not_found").unwrap();
     for needle in [
         "even one candidate needs the user's confirmation",
-        "none is marked best: the order is by rule and then name, not by likelihood",
+        "none is marked best: the order is by rule strength and then name, not by likelihood",
         "do not say the ledger does not exist",
         "If `candidates_listing` is absent, no candidates were attached because the response budget is small",
     ] {
@@ -218,7 +232,8 @@ fn the_remediation_for_each_code_says_to_ask_the_user_and_never_to_pick() {
     }
     let masked = refusal_remediation("ledger_name_masked").unwrap();
     assert!(masked.contains("exactly as spelled in Tally"));
-    assert!(masked.contains("refused it"));
+    assert!(masked.starts_with("Refused: ask the user to type the full ledger name"));
+    assert!(masked.contains("did not use it"));
 }
 
 /// A list cut to fit the byte budget says `truncated`, with the full count

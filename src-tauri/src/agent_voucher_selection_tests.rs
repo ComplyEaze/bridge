@@ -743,6 +743,45 @@ async fn an_unsearchable_name_says_unavailable_and_gives_no_count() {
     }
 }
 
+/// A state that carries no list (nothing resembles the name) needs only the
+/// guidance floor, not the list floor: it is there from 4,096 bytes, says
+/// `none`, and does not say the ledger is absent.
+#[tokio::test]
+async fn a_name_that_resembles_nothing_says_none_from_the_guidance_floor() {
+    let window = {
+        let words = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    for (max_bytes, carries) in [(4_095, false), (4_096, true)] {
+        let response = call_filtered_vouchers_configured(
+            window.clone(),
+            |catalogue| catalogue.to_string(),
+            "qzxv",
+            max_bytes,
+            Redaction::None,
+        )
+        .await;
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], "ledger_not_found", "{max_bytes}: {error}");
+        assert_eq!(
+            error.get("candidates_listing").is_some(),
+            carries,
+            "{max_bytes}: {error}"
+        );
+        if carries {
+            assert_eq!(error["candidates_listing"], "none", "{error}");
+            assert_eq!(error["candidates_total"], 0, "{error}");
+            assert_eq!(error["candidates_truncated"], false, "{error}");
+            assert!(error.get("candidates").is_none() || error["candidates"] == json!([]));
+        }
+    }
+}
+
 /// Through `vouchers`, under `mask_parties`: no name, no count, and the masked
 /// spelling is refused, not resolved to another ledger.
 #[tokio::test]

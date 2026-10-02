@@ -1,10 +1,11 @@
 //! Candidates for a ledger name the book does not hold, or holds more than
 //! once, so the assistant can ask the user to choose instead of guessing.
 //!
-//! The resolution itself stays `resolve_ledger_name`'s: this module only
-//! says what to show beside its refusal. Nothing here picks a ledger, scores
-//! one, or turns a candidate into the resolution (ADR 0016: a near-miss is
-//! reported, never resolved). The names come from the catalogue the caller
+//! The resolution itself stays `resolve_ledger_name`'s, unchanged: a lone
+//! ledger whose lookup key equals the request's is still read, as before. This
+//! module only says what to show beside a refusal. Nothing here picks a
+//! ledger, scores one, or turns a candidate into the resolution (ADR 0016: a
+//! near-miss is reported, never resolved). The names come from the catalogue the caller
 //! has already read, so no request is added.
 use super::*;
 use bridge_tally_core::master_binding::{
@@ -27,6 +28,11 @@ pub(super) enum Listing {
 }
 
 impl Listing {
+    /// Whether this state carries a list of names (and so needs room for it).
+    pub(super) fn has_list(self) -> bool {
+        matches!(self, Self::Listed | Self::Truncated)
+    }
+
     pub(super) fn as_str(self) -> &'static str {
         match self {
             Self::None => "none",
@@ -71,15 +77,18 @@ impl LedgerMiss {
     }
 }
 
-/// A masked result writes a party as `Ra…rs`, and the lookup key ignores every
-/// character that is not a letter or a digit, so any retyping of that
-/// (`Ra…rs`, `Ra...rs`, `Ra..rs`, `Ra rs`) finds a ledger named `RARS`. A
-/// request is a masked spelling when it carries the mark, or when its key is
-/// the key of another ledger's masked form.
-fn looks_masked(requested: &str, resolved: &str, names: &[&str]) -> bool {
-    if requested.contains('…') || requested.contains("...") {
-        return true;
-    }
+/// Bridge writes `…` only to shorten a masked party name, and an assistant may
+/// retype it as `...`. The lookup key ignores everything but letters and
+/// digits, so `Ra…rs` finds a ledger named `RARS`: a name carrying either mark
+/// is never looked up by its key, whatever the setting is now (it may have
+/// been copied while masking was on).
+fn carries_the_mask_mark(requested: &str) -> bool {
+    requested.contains('…') || requested.contains("...")
+}
+
+/// Under masking, a retyping without the mark is also a masked spelling when
+/// its key is the key of another ledger's masked form (`Ra..rs`, `Ra rs`).
+fn is_another_ledgers_masked_form(requested: &str, resolved: &str, names: &[&str]) -> bool {
     let key = ledger_lookup_key(requested);
     names
         .iter()
@@ -96,20 +105,22 @@ pub(super) fn resolve_ledger_or_refuse<'a>(
 ) -> Result<String, ToolFailure> {
     let names = ledger_names.collect::<Vec<_>>();
     let resolved = resolve_ledger_name(names.iter().copied(), requested);
-    // Under masking, a request that is not byte-exact and looks like a masked
-    // spelling is refused, never looked up by its key: its key may be another
-    // party's. A ledger spelled exactly as asked is still reached.
-    if redaction == Redaction::MaskParties {
-        match &resolved {
-            Ok(name) if name == requested => return Ok(name.clone()),
-            Ok(name) if looks_masked(requested, name, &names) => {
-                return Err("ledger_name_masked".to_string().into())
-            }
-            Err(_) if requested.contains('…') || requested.contains("...") => {
-                return Err("ledger_name_masked".to_string().into())
-            }
-            _ => {}
+    // A request that is not byte-exact and carries the mask mark is refused,
+    // whatever the setting; under masking, so is one that reads like another
+    // ledger's masked form. A ledger spelled exactly as asked is still reached.
+    match &resolved {
+        Ok(name) if name == requested => return Ok(name.clone()),
+        Ok(name)
+            if carries_the_mask_mark(requested)
+                || (redaction == Redaction::MaskParties
+                    && is_another_ledgers_masked_form(requested, name, &names)) =>
+        {
+            return Err("ledger_name_masked".to_string().into())
         }
+        Err(_) if carries_the_mask_mark(requested) => {
+            return Err("ledger_name_masked".to_string().into())
+        }
+        _ => {}
     }
     let code = match resolved {
         Ok(name) => return Ok(name),
@@ -201,12 +212,17 @@ fn near_misses(names: &[&str], requested: &str) -> (LedgerMiss, Vec<Value>) {
     match &binding.status {
         // An embedded identifier named one ledger. It is shown for the user to
         // confirm and is never the resolution.
+        // The core skips its name search on this path, so what else resembles
+        // the name was never looked for: one ledger is shown, and the count is
+        // a floor.
         BindingStatus::Bound { catalog_name, .. } => (
             LedgerMiss {
                 found: 1,
+                found_is_lower_bound: true,
+                reason: Some("name_search_not_run"),
                 ..LedgerMiss::state(Listing::Listed)
             },
-            vec![item(catalog_name, "shared_identifier")],
+            vec![item(catalog_name, "identifier_match")],
         ),
         BindingStatus::Ambiguous(unresolved) | BindingStatus::Unmatched(unresolved) => {
             let found: &Found = &unresolved.candidates;

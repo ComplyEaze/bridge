@@ -831,36 +831,36 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              `vouchers` still read it separately.",
         ),
         "ledger_not_found" => Some(
-            "No ledger in this company has this name, even ignoring case, spaces and \
-             punctuation, and ComplyEaze Bridge chose none. Show the user the ledgers in \
+            "No ledger in this company has this name, even ignoring case, spaces, symbols and \
+             accent marks, and ComplyEaze Bridge chose none. Show the user the ledgers in \
              `candidates`, if there are any, and ask which one they meant: even one candidate \
-             needs the user's confirmation, and none is marked best: the order is by rule and \
-             then name, not by likelihood. Then call again \
-             with that name exactly as listed. `candidates_listing` says what an empty list \
-             means: `none` (nothing resembles the name: ask the user to check the spelling, \
-             and do not say the ledger does not exist), `withheld` (too many ledgers resemble \
-             it to list: ask for more of the name), `truncated` (more were found than are \
-             listed: ask for more of the name), `names_masked` (the redaction setting hides \
-             the names: ask the user to type the full name) or `unavailable` (the search \
-             could not run: ask the user for the exact name). If `candidates_listing` is \
-             absent, no candidates were attached because the response budget is small: ask \
-             the user for the exact name.",
+             needs the user's confirmation, and none is marked best: the order is by rule \
+             strength and then name, not by likelihood. Then call again with that name exactly \
+             as listed. `candidates_listing` says what an empty list means: `none` (nothing \
+             resembles the name: ask the user to check the spelling, and do not say the ledger \
+             does not exist), `withheld` (too many ledgers resemble it to list: ask for more \
+             of the name), `truncated` (more were found than are listed: ask for more of the \
+             name), `names_masked` (the redaction setting hides the names: ask the user to \
+             type the full name) or `unavailable` (the search could not run: ask the user for \
+             the exact name). If `candidates_total_is_lower_bound` is true, there may be more \
+             ledgers than are counted. If `candidates_listing` is absent, no candidates were \
+             attached because the response budget is small: ask the user for the exact name.",
         ),
         "ledger_ambiguous" => Some(
-            "More than one ledger in this company matches this name once case, spaces and \
-             punctuation are ignored, and none is spelled exactly as requested, so \
-             ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and ask \
-             which one they meant, then call again with that name exactly as listed. If \
+            "More than one ledger in this company matches this name once case, spaces, \
+             symbols and accent marks are ignored, and none is spelled exactly as requested, \
+             so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+             ask which one they meant, then call again with that name exactly as listed. If \
              `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
              it is `names_masked` or absent the names are not shown: ask the user to type the \
              full name of the ledger exactly as spelled in Tally, since the names that clash \
-             may differ only in case or punctuation.",
+             may differ only in case, punctuation or accents.",
         ),
         "ledger_name_masked" => Some(
-            "This ledger name looks like a masked name (party names are shortened with `…` \
+            "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
+             This name looks like a shortened, masked name (party names are shortened with `…` \
              when masking is on), and using it could open a different ledger from the one \
-             meant, so ComplyEaze Bridge refused it. Ask the user to type the full ledger \
-             name exactly as spelled in Tally.",
+             meant, so ComplyEaze Bridge did not use it.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
@@ -1556,60 +1556,72 @@ impl Server {
                         error["endpoint"] = json!(endpoint);
                     }
                 }
-                // The list grows with the window, so it is kept only within a
-                // quarter of the response budget, like `window` below: the
-                // refusal code must survive the byte cap.
+                // A voucher-type list grows with the window, so it is kept only
+                // within a quarter of the response budget, like `window` below:
+                // the refusal code must survive the byte cap. A ledger list
+                // rides in the response twice and grows with the book, so it
+                // has its own larger floor and a sixteenth of the budget; the
+                // states that carry no list only need the guidance floor.
                 if let Some(candidates) = candidates {
                     let max_bytes = self.settings.max_bytes;
                     match &candidates.miss {
-                        // Masked: the state only, no names and no count. A
-                        // count is a yes or no on every prefix a caller tries.
-                        Some(miss) if miss.listing == ledger_candidates::Listing::NamesMasked => {
-                            if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                                error["candidates_listing"] = json!(miss.listing.as_str());
-                            }
-                        }
-                        // A ledger list rides in the response twice (the
-                        // structured result and its text copy) and grows with
-                        // the book, so it has its own larger floor and a
-                        // sixteenth of the budget.
-                        // The search could not run: the state and why, and no
-                        // count (a 0 beside it would read as "no ledgers").
-                        Some(miss)
-                            if miss.listing == ledger_candidates::Listing::Unavailable =>
-                        {
-                            if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                                error["candidates_listing"] = json!(miss.listing.as_str());
-                                if let Some(reason) = miss.reason {
-                                    error["candidates_reason"] = json!(reason);
+                        Some(miss) => {
+                            let floor = if miss.listing.has_list() {
+                                LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET
+                            } else {
+                                REMEDIATION_MIN_RESPONSE_BUDGET
+                            };
+                            if max_bytes >= floor {
+                                use ledger_candidates::Listing;
+                                match miss.listing {
+                                    // Masked: the state only, no names and no
+                                    // count. A count is a yes or no on every
+                                    // prefix a caller tries.
+                                    Listing::NamesMasked => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                    }
+                                    // The search could not run: the state and
+                                    // why, and no count (a 0 would read as
+                                    // "no ledgers").
+                                    Listing::Unavailable => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                    Listing::None
+                                    | Listing::Withheld
+                                    | Listing::Listed
+                                    | Listing::Truncated => {
+                                        let fields =
+                                            candidate_fields(&candidates.items, max_bytes / 16);
+                                        for (key, value) in fields {
+                                            error[key] = value;
+                                        }
+                                        // A list cut to fit is `truncated`;
+                                        // `candidates_truncated` says whether
+                                        // anything was left out, which a
+                                        // withheld family also is.
+                                        let cut = error["candidates_truncated"] == json!(true);
+                                        let word = miss.listing_word(cut);
+                                        error["candidates_listing"] = json!(word);
+                                        error["candidates_truncated"] =
+                                            json!(word == "truncated" || word == "withheld");
+                                        error["candidates_total"] = json!(miss.found);
+                                        error["candidates_total_is_lower_bound"] =
+                                            json!(miss.found_is_lower_bound);
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
                                 }
                             }
                         }
-                        Some(miss) if max_bytes >= LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET => {
-                            let fields = candidate_fields(&candidates.items, max_bytes / 16);
-                            for (key, value) in fields {
-                                error[key] = value;
-                            }
-                            // A list cut to fit is `truncated`, and
-                            // `candidates_truncated` says the same as the word.
-                            let cut = error["candidates_truncated"] == json!(true);
-                            let listing = miss.listing_word(cut);
-                            error["candidates_listing"] = json!(listing);
-                            error["candidates_truncated"] = json!(listing == "truncated");
-                            error["candidates_total"] = json!(miss.found);
-                            error["candidates_total_is_lower_bound"] =
-                                json!(miss.found_is_lower_bound);
-                            if let Some(reason) = miss.reason {
-                                error["candidates_reason"] = json!(reason);
-                            }
-                        }
-                        Some(_) => {}
                         None if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET => {
                             if let Some(requested) = &candidates.requested {
                                 error["requested"] = json!(requested);
                             }
-                            for (key, value) in candidate_fields(&candidates.items, max_bytes / 4)
-                            {
+                            for (key, value) in candidate_fields(&candidates.items, max_bytes / 4) {
                                 error[key] = value;
                             }
                         }

@@ -12,6 +12,23 @@ next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since `mcp-v0.4.0` (2 Oct 2026)
+
+These changes are in source and not yet in a published build.
+
+**Safer or fixed**
+
+- `vouchers` and `voucher_presence` now call a date range complete by one
+  rule: only when every voucher read was checked against a separate count of
+  that range. Before, `vouchers` called any range with vouchers in it complete,
+  and `voucher_presence` called none complete. On a company with only a few
+  dozen vouchers, which ComplyEaze Bridge does not count first, `vouchers` now
+  says `partial`. On a larger company, `voucher_presence` can now answer `absent`
+  for a voucher it finds nowhere in a counted range. A voucher changed in Tally
+  between the count and the read now refuses the read, with
+  `part_census_mismatch`, where it used to return without that check; call
+  again once the book is quiet (#985).
+
 ## [0.4.0] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)

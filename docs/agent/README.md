@@ -1240,6 +1240,21 @@ The unavailable `changed_since` implementation must not be used as
 change-enumeration evidence; its retained internal response states that
 deletion detection is unsupported.
 
+## The plain headline
+
+A result may carry a top-level `headline` beside `result`, in words and built only from the typed
+state the tool already has (never from the result's text): `lead` names the company (in quotes), the
+exact period (`1 Apr 2026 to 2 Sep 2026`, never `01/04/2026`) and the state, and `rows` says which rows
+this response lists. A read with any gap is `Partial` and its lead names every gap, with counts; a
+read with none says it covered every ledger. The type that decides this cannot build a whole read
+beside a gap. The headline sorts ahead of `result` in the serialized form (the keys of a response
+are in alphabetical order), so it is read before the figures. When a byte cap trims the page of rows
+the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
+`shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
+`rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
+read tools and the refusals follow.
+
 ## Protocol and migration notes
 
 The server negotiates MCP `2025-06-18` or `2024-11-05`, returning a supported

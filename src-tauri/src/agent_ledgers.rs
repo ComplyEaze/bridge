@@ -396,6 +396,9 @@ pub(super) struct ListingSnapshot {
     /// What a page reports besides its rows (a trial balance's period,
     /// currency and totals); null for a ledger listing.
     pub(super) frame: Value,
+    /// What a trial balance read covers, for the headline of every page served
+    /// from this snapshot; `None` for a ledger listing.
+    pub(super) trial_balance_basis: Option<headline::TrialBalanceBasis>,
     pub(super) evidence: Evidence,
     read_at: String,
     taken: std::time::Instant,
@@ -424,11 +427,28 @@ impl ListingSnapshot {
             rows: Arc::new(rows),
             groups,
             frame,
+            trial_balance_basis: None,
             evidence,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
             bytes,
         }
+    }
+
+    /// A trial balance read's snapshot: it cannot be built without what the
+    /// read covers, so a page served from it always has a headline to state.
+    pub(super) fn trial_balance(
+        identity: &VerifiedCompanyIdentity,
+        kind: ListingKind,
+        extent: bridge_tally_protocol::outstandings_shared::CompanyBookExtent,
+        rows: Vec<Value>,
+        frame: Value,
+        evidence: Evidence,
+        basis: headline::TrialBalanceBasis,
+    ) -> Self {
+        let mut snapshot = Self::new(identity, kind, extent, rows, None, frame, evidence);
+        snapshot.trial_balance_basis = Some(basis);
+        snapshot
     }
 
     pub(super) fn describe(&self, reused: bool) -> Value {

@@ -47,7 +47,6 @@ These changes are in source and not yet in a published build.
   a book that changed between pages could skip or repeat vouchers while every
   page said `complete`. A window that is only `partial` is read again for each
   page, as before (#485).
-||||||| a99c49393
 
 ## [0.4.1] - 2026-10-02
 

@@ -249,7 +249,7 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     );
     let source = parse_import_vouchers(&xml, CAPTURED_GUID).unwrap();
     assert_eq!(source.rows.len(), 1);
-    let result = verify_batch(&line, &source).unwrap();
+    let result = verify_batch(&line, &source, Attribution::Tag).unwrap();
     assert_eq!(result["counts"]["posted_verified"], 1);
     assert_eq!(result["counts"]["matching_content_observed"], 0);
     assert_eq!(result["duplicates"], json!([]));
@@ -265,9 +265,167 @@ fn captured_namespaced_journal_is_attributed_only_to_its_recorded_batch() {
     // Keep the actual observed source and all expected accounting fields intact.
     // A different batch must not inherit this posting's attribution.
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
-    let other = verify_batch(&line, &source).unwrap();
+    let other = verify_batch(&line, &source, Attribution::Tag).unwrap();
     assert_eq!(other["counts"]["posted_verified"], 0);
     assert_eq!(other["counts"]["matching_content_observed"], 1);
     assert_eq!(other["vouchers"][0]["marker"], "accounting_fingerprint");
     assert_eq!(other["vouchers"][0]["attribution"], "not_established");
+}
+
+/// The captured namespaced Journal and the build record it came from, for the
+/// post-span binding cases below.
+fn captured_journal_and_line() -> (ImportReadSource, ImportLedgerLine) {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-namespaced-journal.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be",
+        "identity_scheme":"batch_v1",
+        "company_guid":CAPTURED_GUID,
+        "company":{"name":"WR2 Unicode Lab", "guid":CAPTURED_GUID,
+            "company_number":"100004", "books_from":"20260401"},
+        "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],
+        "date_from":"20260907", "date_to":"20260907",
+        "sha256":"e39eb3c0bfe53144bdd9c0f4afcb88c3d63a2050214233ee77465d42a54245ef",
+        "built_at":"2026-09-06T21:40:26.641Z", "status":"built",
+        "pre_import_mark":{"kind":"company_high_water", "value":8, "master_value":219},
+        "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1", "date":"20260907",
+            "voucher_type":"Journal", "narration":"Bridge MCP batch namespace qualification",
+            "reference":null, "voucher_number":null,
+            "entries":[{"ledger":"Bridge Nested Debtor WR4", "amount":"12.61", "side":"Dr"},
+                {"ledger":"Cash", "amount":"12.61", "side":"Cr"}]}]
+    }))
+    .unwrap();
+    (parse_import_vouchers(&xml, CAPTURED_GUID).unwrap(), line)
+}
+
+fn binding(guid_suffix: &str, master_id: u64) -> Vec<span_identity::PostedVoucherIdentity> {
+    vec![span_identity::PostedVoucherIdentity {
+        bridge_txn_id: "BRIDGE_MCP_LIVE_20260906_A1".into(),
+        guid: format!("{CAPTURED_GUID}-{guid_suffix}"),
+        master_id,
+    }]
+}
+
+/// A bound voucher is found by its GUID first, ahead of the narration tag the
+/// capture also carries.
+#[test]
+fn a_bound_voucher_is_attributed_by_its_guid_first() {
+    let (source, line) = captured_journal_and_line();
+    let result = verify_batch(
+        &line,
+        &source,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["posted_verified"], 1);
+    assert_eq!(result["vouchers"][0]["marker"], "post_span_binding");
+    assert_eq!(result["duplicates"], json!([]));
+    // A binding whose GUID the window does not hold is `bound_not_in_window`,
+    // even beside a matching tag: the binding ranks first and a tag never
+    // overrides it, so the disagreement stays unverified (loud).
+    let elsewhere = verify_batch(
+        &line,
+        &source,
+        Attribution::Span(Some(&binding("00000099", 153))),
+    )
+    .unwrap();
+    assert_eq!(elsewhere["vouchers"][0]["status"], "bound_not_in_window");
+}
+
+/// The GUID found the row, but its MasterID is not the one bound: refused,
+/// never attributed (the GUID is the company GUID plus the MasterID).
+#[test]
+fn a_bound_guid_on_another_master_id_is_not_attributed() {
+    let (source, line) = captured_journal_and_line();
+    let result = verify_batch(
+        &line,
+        &source,
+        Attribution::Span(Some(&binding("00000005", 6))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["not_attributable"], 1);
+    assert_eq!(result["counts"]["posted_verified"], 0);
+    assert_eq!(result["vouchers"][0]["reason"], "bound_master_id_changed");
+}
+
+/// A bound voucher the window does not hold is never `not_found`; after a
+/// rollback it is `book_rolled_back`, and so is any voucher not found.
+#[test]
+fn a_bound_voucher_absent_from_the_window_is_never_not_found() {
+    let (_, line) = captured_journal_and_line();
+    let empty = ImportReadSource::admit(Vec::new()).unwrap();
+    let mut result = verify_batch(
+        &line,
+        &empty,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(result["counts"]["bound_not_in_window"], 1);
+    assert_eq!(result["counts"]["not_found"], 0);
+    verification::mark_book_rolled_back(&mut result);
+    assert_eq!(result["counts"]["bound_not_in_window"], 0);
+    assert_eq!(result["counts"]["book_rolled_back"], 1);
+    assert_eq!(result["vouchers"][0]["status"], "book_rolled_back");
+    // An unbound voucher not found is rewritten the same way.
+    let mut unbound = verify_batch(&line, &empty, Attribution::Span(None)).unwrap();
+    assert_eq!(unbound["counts"]["not_found"], 1);
+    verification::mark_book_rolled_back(&mut unbound);
+    assert_eq!(unbound["counts"]["not_found"], 0);
+    assert_eq!(unbound["vouchers"][0]["status"], "book_rolled_back");
+}
+
+/// An untagged native post that was not bound: a row carrying the batch's tag
+/// is a hand import of the batch's file, not a voucher this POST created, so
+/// the tag attributes nothing and the row is matched by content only. The same
+/// row on the tag basis reads verified.
+#[test]
+fn a_tag_never_attributes_an_untagged_native_post() {
+    let (source, line) = captured_journal_and_line();
+    let tagged = verify_batch(&line, &source, Attribution::Tag).unwrap();
+    assert_eq!(tagged["counts"]["posted_verified"], 1, "{tagged}");
+    let native = verify_batch(&line, &source, Attribution::Span(None)).unwrap();
+    assert_eq!(native["counts"]["posted_verified"], 0, "{native}");
+    assert_eq!(native["counts"]["matching_content_observed"], 1, "{native}");
+    assert_eq!(native["vouchers"][0]["marker"], "accounting_fingerprint");
+}
+
+/// A hand-imported copy beside a bound voucher: the bound row (untagged, as
+/// the native post wrote it) verifies by its GUID, and the tagged copy is
+/// reported as a duplicate, never ignored and never counted.
+#[test]
+fn a_tagged_copy_beside_a_bound_voucher_is_a_duplicate() {
+    let (source, line) = captured_journal_and_line();
+    let mut native = source.rows[0].clone();
+    native.narration = line.vouchers[0].narration.clone();
+    let mut copy = source.rows[0].clone();
+    copy.guid = Some(format!("{CAPTURED_GUID}-00000099"));
+    copy.master_id = Some("153".into());
+    copy.alter_id = Some(11);
+    copy.remote_id = copy.guid.clone();
+    let both = ImportReadSource::admit(vec![native, copy]).unwrap();
+    let result = verify_batch(
+        &line,
+        &both,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        result["vouchers"][0]["marker"], "post_span_binding",
+        "{result}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
+    assert_eq!(result["counts"]["matching_content_observed"], 0, "{result}");
+    assert_eq!(
+        result["duplicates"].as_array().map(Vec::len),
+        Some(1),
+        "{result}"
+    );
 }

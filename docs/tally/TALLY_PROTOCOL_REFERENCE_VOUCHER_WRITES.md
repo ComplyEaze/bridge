@@ -216,7 +216,9 @@ Four properties of it are not guessable, and each was measured:
    and the marker came back intact while the attribute did not. The rule is field-specific and
    more useful stated that way: **Tally overwrites the attribute it owns, and preserves a marker
    placed in a field it does not.** That is why Bridge attributes readback by the narration tag —
-   a deliberate choice of a durable carrier, not a workaround for a missing one.
+   a deliberate choice of a durable carrier, not a workaround for a missing one. (Since
+   2026-10-02 a native post carries no tag and is attributed by its own AlterID span instead;
+   see §9.15. The hand-import file keeps the tag.)
 
    A verifier that compares the observed attribute against the value it sent therefore refuses
    every legitimate readback. The client value is still *stored*, still matches for a
@@ -605,3 +607,42 @@ TallyPrime 7.1 Gold, one client book, 2026-09-28).**
 - **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because about 300
   vouchers were read back in full. It is still one session on one client book, not repeated on a
   second, so treat it as **Confidence: PARTIAL** beyond that book.
+
+### 9.15 An import fills its own AlterID span in request order
+
+**VERIFIED 2026-10-02, one run (licensed TallyPrime 7.1 Silver, synthetic `BRIDGE AMEND LAB`, raw gateway).**
+One `Import Data` request carried 10 Payment, Receipt and Contra vouchers in Bridge's native shape, with print-ready narrations and no `[BRIDGE:…]` tag. Two of the vouchers were identical in every element but the REMOTEID. The capture and its provenance are `tests/fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`.
+
+| Fact | Observed |
+| --- | --- |
+| Counters | `CREATED=10`, every other counter 0, no `LINEERROR`, all seven present, `LASTVCHID=1733` |
+| Company `ALTVCHID`, read just before and just after the POST | 1795 → 1805, a step of exactly 10; `ALTMSTID` unchanged; the other loaded companies unchanged |
+| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order**, the identical pair at 1797 and 1798; the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
+| MasterIDs | 1724–1733 in request order; the last equals `LASTVCHID` |
+| Content | type, date, `EFFECTIVEDATE`, signed entries and the untagged narration as sent |
+| GUID | the company GUID, `-`, then the MasterID in 8 hex digits (`…-000006bc` = 1724); the `REMOTEID` attribute equals it (§9.3) |
+| `$GUID = "<guid>"` added to the day's formula | one row for a present GUID (it separated the identical pair); an empty collection for an absent one |
+
+The span and order for Journals were already in a capture of Bridge's own post path, tagged: 50 Journals at ALTERIDs 1,420–1,469 in batch order, mark 1,419 → 1,469 (`D3_BATCH_CAPTURE_PROVENANCE.md`). One import of 50, 200 and 500 Journals each stepped the mark by exactly its count over the raw gateway, and 50 and 200 did so through Bridge's own post path with contiguous AlterIDs ([§11c.5](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21), one run each).
+
+**What Bridge builds on it.** A native post no longer writes the narration tag. It is attributed by its position inside its own POST's span (`agent_import_span_identity.rs`). The dispatch intent records the target's voucher mark from the last read before the POST. Binding requires all of these:
+- a clean response with `CREATED=N` and `LASTVCHID`;
+- a step equal to `CREATED` when the mark after the POST was read;
+- exactly N rows in the span, row k at mark + k, with the content sent as voucher k;
+- MasterIDs that end on `LASTVCHID`, and a GUID that is the company GUID plus the MasterID.
+
+The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only refuse. The hand-import file keeps its tag, because Bridge never sees that import.
+
+**A rolled-back book (PARTIAL: derived, not captured).** Every voucher change measured gives the voucher an AlterID above the company's mark (§11c.5), so after a create of N the mark should never again read below the pre-POST mark plus N unless the book was rolled back (a backup restored, or another copy put in its place). No rollback has been captured. Bridge reports such a book as `book_rolled_back`, never as `not_found`, and binds nothing in it; a company holding no voucher omits its mark, which reads as 0 for this check. The check sees a rollback only while the mark reads below that floor: a book keyed past it again after a restore is not seen as rolled back, and if a restore lets new vouchers take the MasterIDs the post's vouchers had (not established), a bound GUID would then name another voucher: `posted_divergent`, or `posted_verified` (a false verified) if the fields verification compares are the same and it is effective.
+
+**Known limit (by design, 2026-10-02).** A binding refusal is final for the batch: one voucher edited in Tally before a deferred bind refuses the binding of all of them, whose vouchers are then matched by content only and stay `reconciliation_required`. The person checks them in Tally; a review inside Bridge is bridge#1039.
+
+**Not established:**
+- another Gold client process writing during the post;
+- whether a voucher keeps its GUID and MasterID through a screen edit or an upsert;
+- a concurrent save tripping the step;
+- batches other than 10;
+- a `$GUID` filter without a date clause;
+- untagged Journals;
+- any other release or licence tier;
+- whether a restore or a data rewrite reuses AlterIDs or MasterIDs.

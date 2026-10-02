@@ -129,7 +129,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // A newer verification replaces the saved proof.
-        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline and a masters-check record, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
+        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
         // It verifies the batch twice, so it replaces the proof as well.
         ("acknowledge_post_review", true, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
     ];

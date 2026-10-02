@@ -548,6 +548,9 @@ impl Server {
                     .await
                     .map(|outcome| Step::Done(Box::new(outcome)));
             }
+            // A batch saved before the build refused its narration: its
+            // untagged post could never be bound, so it is never sent.
+            refuse_rewritten_narration(&line.vouchers)?;
             // The record's own hash only proves the record agrees with itself.
             // The file Bridge built must hold exactly the XML this record
             // renders (bridge#575). The native post below re-renders the same
@@ -876,6 +879,11 @@ impl Server {
             // Before anything can be sent, so a crash, a concurrent reader or a
             // failed later write reads a doubt, never an absent record (#239).
             self.record_post_checks_pending(batch_id, line.vouchers.len() > 1)?;
+            // The target's voucher mark in the aim snapshot, the last read before
+            // the POST. The queued recheck sees that snapshot; the intent records
+            // the mark, so binding the post to its own span never rests on a mark
+            // read after the POST (agent_import_span_identity.rs).
+            let aimed_mark = std::sync::Mutex::new(None::<u64>);
             let posted = self
                 .runtime
                 .post_approved_import(
@@ -899,7 +907,20 @@ impl Server {
                             queued.company_marks,
                             identity.company_guid(),
                             &company.name,
-                        )
+                        )?;
+                        let mark = location::parse_all_company_marks(queued.company_marks)
+                            .ok()
+                            .and_then(|rows| {
+                                location::target_voucher_mark(
+                                    &rows,
+                                    identity.company_guid(),
+                                    &company.name,
+                                )
+                            });
+                        if let Ok(mut aimed) = aimed_mark.lock() {
+                            *aimed = mark;
+                        }
+                        Ok(())
                     },
                     || {
                         // The file lock covers only the admission+synced append. It is not
@@ -942,6 +963,12 @@ impl Server {
                                 UnderLockRefusal::TxnAlreadyPosted,
                             ));
                         }
+                        // Before the approval is spent: a refusal here withdraws it,
+                        // and the next call asks the person again.
+                        let pre_post_voucher_mark =
+                            aimed_mark.lock().ok().and_then(|aimed| *aimed).ok_or(
+                                BeforeDispatchError::Refused(UnderLockRefusal::MarkUnrecorded),
+                            )?;
                         // Spent here, once, under this lock and before the
                         // intent: a revoked approval (the call was cancelled)
                         // or a second redemption writes no intent (#725).
@@ -962,7 +989,11 @@ impl Server {
                         // The append itself keeps the catch-all: it may have
                         // recorded an intent (#711).
                         self.append_import_record_while_admitted(
-                            &ledger::StatusRecord::dispatch_for(&line, &native),
+                            &ledger::StatusRecord::dispatch_for(
+                                &line,
+                                &native,
+                                Some(pre_post_voucher_mark),
+                            ),
                         )
                         .map_err(BeforeDispatchError::Other)
                     },
@@ -1210,7 +1241,13 @@ impl Server {
             );
             masters_verdict = Some(masters_after_post.clone());
             let mut proof = self
-                .verify_import_after_current_dispatch(args, masters_after_post)
+                .verify_import_after_current_dispatch(
+                    args,
+                    masters_after_post,
+                    marks_after.as_deref().and_then(|rows| {
+                        location::target_voucher_mark(rows, identity.company_guid(), &company.name)
+                    }),
+                )
                 .await?;
             accumulated = combine_evidence(accumulated.clone(), proof.evidence.clone());
             proof.evidence = accumulated.clone();
@@ -1737,7 +1774,7 @@ fn recheck_import_admission(
     let corroboration = parse_import_vouchers(second, company_guid).map_err(anyhow::Error::msg)?;
     corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)
         .map_err(anyhow::Error::msg)?;
-    let result = verify_batch(line, &observed).map_err(anyhow::Error::msg)?;
+    let result = verify_batch(line, &observed, Attribution::Tag).map_err(anyhow::Error::msg)?;
     require_absent_verification_result(&result, line.vouchers.len()).map_err(|code| match code
         .as_str()
     {
@@ -2037,7 +2074,6 @@ pub(super) fn native_post_request(
     }
     let xml = render_native_vouchers_xml(
         &company.name,
-        line.identity_batch_id(),
         line.vouchers
             .iter()
             .zip(remote_ids.as_slice().iter().copied()),
@@ -2436,6 +2472,17 @@ pub(super) fn has_unreviewable_format_character(value: &str) -> bool {
 
 #[path = "agent_import_post_location.rs"]
 mod location;
+
+/// The aim snapshot's target voucher mark, for the journal tests: the post
+/// records it with its intent, and refuses (`post_mark_unrecorded`) without one.
+#[cfg(test)]
+pub(super) fn location_target_voucher_mark_for_tests(
+    rows: &[location::LoadedCompanyMarks],
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    location::target_voucher_mark(rows, guid, name)
+}
 
 #[cfg(test)]
 #[path = "agent_import_post_tests.rs"]

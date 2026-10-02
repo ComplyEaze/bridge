@@ -368,3 +368,265 @@ fn a_verification_records_each_vouchers_first_verified_alter_id_once() {
         40
     );
 }
+
+// Post-span verdict records (agent_import_span_identity.rs): one per batch,
+// after its response, never setting the batch's status.
+
+fn record(value: impl serde::Serialize) -> String {
+    format!("{}\n", serde_json::to_string(&value).unwrap())
+}
+
+/// A batch, its native intent and its response, as a journal.
+fn posted_journal(line: &ImportLedgerLine) -> String {
+    let intent = ledger::StatusRecord::dispatch_native(line, "c".repeat(64), Uuid::new_v4());
+    let response = ledger::StatusRecord::response(
+        line,
+        ledger::DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: 1,
+            outcome: None,
+        },
+    );
+    format!("{}{}{}", record(line), record(intent), record(response))
+}
+
+fn bound(line: &ImportLedgerLine) -> ledger::PostSpanVerdict {
+    ledger::PostSpanVerdict::Bound(
+        line.vouchers
+            .iter()
+            .enumerate()
+            .map(|(index, voucher)| span_identity::PostedVoucherIdentity {
+                bridge_txn_id: voucher.bridge_txn_id.clone(),
+                guid: format!("{GUID}-{:08x}", 100 + index),
+                master_id: 100 + index as u64,
+            })
+            .collect(),
+    )
+}
+
+fn verdict_json(line: &ImportLedgerLine, verdict: &ledger::PostSpanVerdict) -> Value {
+    serde_json::to_value(ledger::StatusRecord::post_span_verdict(line, verdict)).unwrap()
+}
+
+#[test]
+fn a_verdict_after_the_response_reads_back_and_sets_no_status() {
+    let line = batch();
+    for verdict in [
+        bound(&line),
+        ledger::PostSpanVerdict::Refused("span_step_not_created".into()),
+    ] {
+        let text = format!(
+            "{}{}",
+            posted_journal(&line),
+            record(verdict_json(&line, &verdict))
+        );
+        let snapshots = ledger::parse_snapshots(&text).unwrap();
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].span_verdict.as_ref(), Some(&verdict));
+        assert_eq!(snapshots[0].batch.status, "response_received");
+        let settled = ledger::settlement(std::io::Cursor::new(text.as_bytes())).unwrap();
+        assert_eq!(settled.unsettled, 1, "a verdict is not a verification");
+    }
+}
+
+#[test]
+fn a_verdict_that_breaks_a_rule_makes_the_journal_invalid() {
+    let line = batch();
+    let posted = posted_journal(&line);
+    let good = verdict_json(&line, &bound(&line));
+    let invalid = |text: String| ledger::parse_snapshots(&text).err();
+    let expect = Some("import_ledger_invalid".to_string());
+    // Before any response.
+    let intent_only = posted
+        .lines()
+        .take(2)
+        .map(|line| format!("{line}\n"))
+        .collect::<String>();
+    assert_eq!(invalid(format!("{intent_only}{}", record(&good))), expect);
+    // A second verdict for the batch.
+    assert_eq!(
+        invalid(format!("{posted}{}{}", record(&good), record(&good))),
+        expect
+    );
+    let changed = |edit: &dyn Fn(&mut Value)| {
+        let mut value = good.clone();
+        edit(&mut value);
+        invalid(format!("{posted}{}", record(value)))
+    };
+    // A transaction id the batch does not hold.
+    assert_eq!(
+        changed(&|value| value["bindings"][0]["bridge_txn_id"] = json!("txn-999")),
+        expect
+    );
+    // Fewer bindings than vouchers.
+    assert_eq!(changed(&|value| value["bindings"] = json!([])), expect);
+    // Both bindings and a refusal, then neither.
+    assert_eq!(
+        changed(&|value| value["binding_refusal"] = json!("span_count_mismatch")),
+        expect
+    );
+    assert_eq!(
+        changed(&|value| {
+            value.as_object_mut().unwrap().remove("bindings");
+        }),
+        expect
+    );
+    // A refusal code outside the code alphabet.
+    let refused = verdict_json(
+        &line,
+        &ledger::PostSpanVerdict::Refused("span_count_mismatch".into()),
+    );
+    let mut shouting = refused.clone();
+    shouting["binding_refusal"] = json!("SPAN COUNT");
+    assert_eq!(invalid(format!("{posted}{}", record(shouting))), expect);
+    // A verdict claiming to set a status.
+    assert_eq!(
+        changed(&|value| value["status"] = json!("posted_verified")),
+        expect
+    );
+    // A GUID that is not lowercase hex.
+    assert_eq!(
+        changed(&|value| value["bindings"][0]["guid"] = json!("NOT-A-GUID")),
+        expect
+    );
+    // The good one, for contrast.
+    assert!(ledger::parse_snapshots(&format!("{posted}{}", record(&good))).is_ok());
+}
+
+#[test]
+fn a_pre_post_mark_belongs_only_to_a_native_intent() {
+    let line = batch();
+    let posted = posted_journal(&line);
+    let mut lines = posted
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    lines[1]["pre_post_voucher_mark"] = json!(1795);
+    let marked_intent = lines.iter().map(record).collect::<String>();
+    assert_eq!(
+        ledger::parse_snapshots(&marked_intent).unwrap()[0].pre_post_voucher_mark,
+        Some(1795)
+    );
+    lines[1]
+        .as_object_mut()
+        .unwrap()
+        .remove("pre_post_voucher_mark");
+    lines[2]["pre_post_voucher_mark"] = json!(1795);
+    let marked_response = lines.iter().map(record).collect::<String>();
+    assert_eq!(
+        ledger::parse_snapshots(&marked_response).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+}
+
+#[test]
+fn the_aim_mark_is_read_only_from_exactly_one_target_row() {
+    use crate::agent::change_parse::LoadedCompanyMarks;
+    let row = |name: &str, guid: &str, vouchers| LoadedCompanyMarks {
+        name: name.into(),
+        guid: guid.into(),
+        vouchers,
+        masters: 1,
+    };
+    let target = row("Synthetic Accounts", GUID, 1795);
+    let other = row("Other", "22222222-2222-4222-8222-222222222222", 50);
+    let mark = |rows: &[LoadedCompanyMarks]| {
+        post::location_target_voucher_mark_for_tests(rows, GUID, "Synthetic Accounts")
+    };
+    assert_eq!(mark(&[target.clone(), other.clone()]), Some(1795));
+    assert_eq!(mark(&[other]), None, "no target row");
+    assert_eq!(mark(&[target.clone(), target]), None, "two target rows");
+}
+
+/// A verification records its verdict only against the journal it read: if
+/// anything was appended since, it records nothing and retries, and a verdict
+/// already recorded is never replaced.
+#[test]
+fn a_verdict_is_recorded_only_against_the_journal_its_verification_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let line = batch();
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    fs::write(&journal, posted_journal(&line)).unwrap();
+    let read_at = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap()
+        .generation;
+    // Something else writes after the verification read the journal.
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::from(&line))
+            .unwrap();
+    }
+    let before = fs::read(&journal).unwrap();
+    assert_eq!(
+        server
+            .record_post_span_verdict(&line, &bound(&line), read_at)
+            .err(),
+        Some("import_verification_conflict_retry".to_string())
+    );
+    assert_eq!(fs::read(&journal).unwrap(), before, "nothing was recorded");
+    // Against the current journal it records, once.
+    let current = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap()
+        .generation;
+    let (recorded, after) = server
+        .record_post_span_verdict(&line, &bound(&line), current)
+        .unwrap();
+    assert_eq!(recorded, bound(&line));
+    assert!(after != current);
+    assert_eq!(
+        server
+            .record_post_span_verdict(
+                &line,
+                &ledger::PostSpanVerdict::Refused("span_count_mismatch".into()),
+                after
+            )
+            .err(),
+        Some("import_verification_conflict_retry".to_string())
+    );
+    let snapshot = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.span_verdict, Some(bound(&line)));
+}
+
+/// A GUID another batch already bound is never bound again: checked under the
+/// lock the verdict is recorded under, it is recorded as a refusal instead.
+#[test]
+fn a_guid_bound_by_another_batch_is_recorded_as_a_refusal() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path());
+    let first = batch();
+    let mut second = batch();
+    second.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    fs::write(
+        &journal,
+        format!(
+            "{}{}{}",
+            posted_journal(&first),
+            record(verdict_json(&first, &bound(&first))),
+            posted_journal(&second)
+        ),
+    )
+    .unwrap();
+    let at = server
+        .latest_import_snapshot(&second.batch_id)
+        .unwrap()
+        .unwrap()
+        .generation;
+    let (recorded, _) = server
+        .record_post_span_verdict(&second, &bound(&second), at)
+        .unwrap();
+    assert_eq!(
+        recorded,
+        ledger::PostSpanVerdict::Refused("span_identity_reused".into())
+    );
+}

@@ -19,6 +19,22 @@ enum StatusKind {
     VerificationStatus,
     DispatchIntent,
     DispatchResponse,
+    /// What binding a native post to its own AlterID span decided: the bound
+    /// vouchers, or why it was refused. At most one per batch, after its
+    /// response; it never changes the batch's status.
+    PostSpanVerdict,
+}
+
+/// The status a post-span verdict record carries. It is not a batch status:
+/// readers keep the batch's own status when they meet it.
+const POST_SPAN_VERDICT_STATUS: &str = "post_span_verdict";
+
+/// What binding a batch's native post decided, as journaled.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum PostSpanVerdict {
+    Bound(Vec<super::span_identity::PostedVoucherIdentity>),
+    /// A definitive refusal, by its code. Permanent: no later bind is tried.
+    Refused(String),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -45,6 +61,18 @@ pub(in crate::agent) struct StatusRecord {
     /// skipping a record of what was sent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     native_remote_ids: Option<Vec<String>>,
+    /// The target company's voucher mark (`ALTVCHID`) in the last read before
+    /// the POST. Written with a native dispatch intent, before the POST, so a
+    /// later binding never rests on a mark read after it. A binary older than
+    /// this field refuses a journal holding one (`deny_unknown_fields`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pre_post_voucher_mark: Option<u64>,
+    /// A post-span verdict's bound vouchers, in batch order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bindings: Option<Vec<super::span_identity::PostedVoucherIdentity>>,
+    /// A post-span verdict's refusal code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    binding_refusal: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -79,6 +107,9 @@ impl StatusRecord {
             native_request_sha256: Some(request_sha256),
             native_remote_id: Some(remote_id.hyphenated().to_string()),
             native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -87,10 +118,11 @@ impl StatusRecord {
     pub(super) fn dispatch_for(
         batch: &ImportLedgerLine,
         request: &super::post::NativePostRequest,
+        pre_post_voucher_mark: Option<u64>,
     ) -> Self {
-        match request.remote_ids.as_slice() {
-            // One voucher keeps the single-id shape, so a journal written by
-            // a one-voucher post stays readable by an older binary.
+        let record = match request.remote_ids.as_slice() {
+            // One voucher keeps the single-id shape. A build that predates
+            // the pre-POST mark refuses this intent whatever its shape.
             [remote_id] => Self::dispatch_native(batch, request.request_sha256.clone(), *remote_id),
             remote_ids => Self {
                 native_remote_id: None,
@@ -102,6 +134,45 @@ impl StatusRecord {
                 ),
                 ..Self::dispatch_native(batch, request.request_sha256.clone(), Uuid::nil())
             },
+        };
+        Self {
+            pre_post_voucher_mark,
+            ..record
+        }
+    }
+
+    /// The post-span verdict of one batch.
+    pub(super) fn post_span_verdict(batch: &ImportLedgerLine, verdict: &PostSpanVerdict) -> Self {
+        let (bindings, binding_refusal) = match verdict {
+            PostSpanVerdict::Bound(bound) => (Some(bound.clone()), None),
+            PostSpanVerdict::Refused(code) => (None, Some(code.clone())),
+        };
+        Self {
+            record_type: StatusKind::PostSpanVerdict,
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.sha256.clone(),
+            status: POST_SPAN_VERDICT_STATUS.into(),
+            response: None,
+            native_request_sha256: None,
+            native_remote_id: None,
+            native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings,
+            binding_refusal,
+        }
+    }
+
+    /// Whether this record sets the batch's status. A post-span verdict does
+    /// not: it is a fact about the post, beside whatever status the batch has.
+    fn sets_status(&self) -> bool {
+        !matches!(self.record_type, StatusKind::PostSpanVerdict)
+    }
+
+    fn span_verdict(&self) -> Option<PostSpanVerdict> {
+        match (&self.bindings, &self.binding_refusal) {
+            (Some(bound), None) => Some(PostSpanVerdict::Bound(bound.clone())),
+            (None, Some(code)) => Some(PostSpanVerdict::Refused(code.clone())),
+            _ => None,
         }
     }
 
@@ -115,6 +186,9 @@ impl StatusRecord {
             native_request_sha256: None,
             native_remote_id: None,
             native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
         }
     }
 }
@@ -130,6 +204,9 @@ impl From<&ImportLedgerLine> for StatusRecord {
             native_request_sha256: None,
             native_remote_id: None,
             native_remote_ids: None,
+            pre_post_voucher_mark: None,
+            bindings: None,
+            binding_refusal: None,
         }
     }
 }
@@ -143,6 +220,10 @@ pub(super) struct BatchSnapshot {
     pub(super) response: Option<DispatchResponse>,
     /// The REMOTEID recorded with the native dispatch intent, if any.
     pub(super) native_remote_id: Option<String>,
+    /// The voucher mark recorded with the native dispatch intent, if any.
+    pub(super) pre_post_voucher_mark: Option<u64>,
+    /// What binding the native post to its own span decided, if journaled.
+    pub(super) span_verdict: Option<PostSpanVerdict>,
     // Last matching physical journal record, including identical status appends.
     pub(super) generation: VerificationGeneration,
 }
@@ -168,6 +249,12 @@ pub(super) fn read_snapshot(
                 native_remote_id: selected
                     .as_ref()
                     .and_then(|snapshot| snapshot.native_remote_id.clone()),
+                pre_post_voucher_mark: selected
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.pre_post_voucher_mark),
+                span_verdict: selected
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.span_verdict.clone()),
                 dispatched: selected
                     .as_ref()
                     .is_some_and(|snapshot| snapshot.dispatched),
@@ -180,14 +267,22 @@ pub(super) fn read_snapshot(
             let snapshot = selected
                 .as_mut()
                 .expect("status refers to an admitted batch");
-            if let Some(response) = update.response {
+            if let Some(response) = update.response.clone() {
                 snapshot.response = Some(response);
             }
             snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
             if update.native_remote_id.is_some() {
                 snapshot.native_remote_id = update.native_remote_id.clone();
             }
-            snapshot.batch.status = update.status;
+            if update.pre_post_voucher_mark.is_some() {
+                snapshot.pre_post_voucher_mark = update.pre_post_voucher_mark;
+            }
+            if let Some(verdict) = update.span_verdict() {
+                snapshot.span_verdict = Some(verdict);
+            }
+            if update.sets_status() {
+                snapshot.batch.status = update.status;
+            }
             snapshot.generation = generation;
         }
         _ => {}
@@ -211,6 +306,8 @@ pub(super) fn read_lineage(
             let snapshot = BatchSnapshot {
                 response: prior.and_then(|snapshot| snapshot.response.clone()),
                 native_remote_id: prior.and_then(|snapshot| snapshot.native_remote_id.clone()),
+                pre_post_voucher_mark: prior.and_then(|snapshot| snapshot.pre_post_voucher_mark),
+                span_verdict: prior.and_then(|snapshot| snapshot.span_verdict.clone()),
                 dispatched: prior.is_some_and(|snapshot| snapshot.dispatched),
                 batch: *batch,
                 generation,
@@ -226,14 +323,22 @@ pub(super) fn read_lineage(
         Record::Status(update) => {
             if let Some(index) = latest.get(&update.batch_id) {
                 let snapshot = &mut builds[*index];
-                if let Some(response) = update.response {
+                if let Some(response) = update.response.clone() {
                     snapshot.response = Some(response);
                 }
                 snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
                 if update.native_remote_id.is_some() {
                     snapshot.native_remote_id = update.native_remote_id.clone();
                 }
-                snapshot.batch.status = update.status;
+                if update.pre_post_voucher_mark.is_some() {
+                    snapshot.pre_post_voucher_mark = update.pre_post_voucher_mark;
+                }
+                if let Some(verdict) = update.span_verdict() {
+                    snapshot.span_verdict = Some(verdict);
+                }
+                if update.sets_status() {
+                    snapshot.batch.status = update.status;
+                }
                 snapshot.generation = generation;
             }
         }
@@ -349,13 +454,16 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             match update.record_type {
                 StatusKind::DispatchIntent => progress.dispatched = true,
                 StatusKind::DispatchResponse => progress.responded = true,
-                StatusKind::VerificationStatus => {}
+                StatusKind::VerificationStatus | StatusKind::PostSpanVerdict => {}
             }
             // The latest status of every kind is the batch's status, as
             // `read_snapshot` takes it: a dispatch intent or a response after a
             // hand-import's `posted_verified` makes the batch unverified again.
-            progress.verified = update.status == "posted_verified";
-            progress.found |= progress.verified;
+            // A post-span verdict sets no status.
+            if update.sets_status() {
+                progress.verified = update.status == "posted_verified";
+                progress.found |= progress.verified;
+            }
         }
     })?;
     let sent_or_found = batches
@@ -486,6 +594,11 @@ fn scan_records(
     // Each batch's latest hash, with its voucher count for its REMOTEIDs.
     let mut latest: BTreeMap<String, (String, usize)> = BTreeMap::new();
     let mut dispatched: BTreeMap<String, Option<String>> = BTreeMap::new();
+    // For post-span verdicts: each batch's transaction ids, the batches with a
+    // recorded response, and those with a verdict.
+    let mut txn_ids: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut responded: BTreeSet<String> = BTreeSet::new();
+    let mut with_verdict: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
     while read_record(&mut reader, &mut line)? {
@@ -544,7 +657,26 @@ fn scan_records(
             {
                 return Err("import_ledger_duplicate_dispatch".into());
             }
+            // A pre-POST mark belongs only to a native dispatch intent.
+            if update.pre_post_voucher_mark.is_some()
+                && !(matches!(update.record_type, StatusKind::DispatchIntent)
+                    && update.native_request_sha256.is_some())
+            {
+                return Err("import_ledger_invalid".into());
+            }
+            if matches!(update.record_type, StatusKind::PostSpanVerdict) {
+                admit_post_span_verdict(
+                    &update,
+                    *voucher_count,
+                    txn_ids.get(&update.batch_id),
+                    responded.contains(&update.batch_id),
+                    &mut with_verdict,
+                )?;
+            } else if update.bindings.is_some() || update.binding_refusal.is_some() {
+                return Err("import_ledger_invalid".into());
+            }
             if matches!(update.record_type, StatusKind::DispatchResponse) {
+                responded.insert(update.batch_id.clone());
                 let request_hash = dispatched
                     .get(&update.batch_id)
                     .ok_or("import_ledger_invalid")?;
@@ -571,6 +703,14 @@ fn scan_records(
                 batch.batch_id.clone(),
                 (batch.sha256.clone(), batch.vouchers.len()),
             );
+            txn_ids.insert(
+                batch.batch_id.clone(),
+                batch
+                    .vouchers
+                    .iter()
+                    .map(|voucher| voucher.bridge_txn_id.clone())
+                    .collect(),
+            );
             Record::Batch(Box::new(batch))
         };
         visit(record, VerificationGeneration(ordinal));
@@ -579,6 +719,91 @@ fn scan_records(
             .ok_or_else(|| "import_ledger_invalid".to_string())?;
     }
     Ok(())
+}
+
+/// Every GUID that a batch other than `own_batch_id` has bound, the whole
+/// journal admitted on the way. A bind refuses to claim one of these again.
+pub(super) fn guids_bound_elsewhere(
+    reader: impl BufRead,
+    own_batch_id: &str,
+) -> Result<BTreeSet<String>, String> {
+    let mut guids = BTreeSet::new();
+    scan_records(reader, |record, _| {
+        if let Record::Status(update) = record {
+            if update.batch_id != own_batch_id {
+                guids.extend(
+                    update
+                        .bindings
+                        .iter()
+                        .flatten()
+                        .map(|bound| bound.guid.clone()),
+                );
+            }
+        }
+    })?;
+    Ok(guids)
+}
+
+/// Admits one post-span verdict, or refuses the journal. It must follow the
+/// batch's recorded response, be the batch's only verdict, carry exactly one
+/// of bindings and a refusal code, and set no status. Bindings name each of the
+/// batch's transaction ids once, with distinct GUIDs and MasterIDs. A GUID that
+/// another batch also bound is not a reason to refuse the whole journal (a split
+/// company keeps its parent's GUID); the bind itself refuses to reuse one.
+fn admit_post_span_verdict(
+    update: &StatusRecord,
+    voucher_count: usize,
+    batch_txn_ids: Option<&BTreeSet<String>>,
+    responded: bool,
+    with_verdict: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let invalid = || "import_ledger_invalid".to_string();
+    if update.status != POST_SPAN_VERDICT_STATUS
+        || !responded
+        || update.native_request_sha256.is_some()
+        || update.native_remote_id.is_some()
+        || update.native_remote_ids.is_some()
+        || !with_verdict.insert(update.batch_id.clone())
+    {
+        return Err(invalid());
+    }
+    match (&update.bindings, &update.binding_refusal) {
+        (Some(bindings), None) => {
+            let batch_txn_ids = batch_txn_ids.ok_or_else(invalid)?;
+            let named = bindings
+                .iter()
+                .map(|bound| bound.bridge_txn_id.as_str())
+                .collect::<BTreeSet<_>>();
+            if bindings.len() != voucher_count
+                || named.len() != bindings.len()
+                || !named.iter().all(|txn_id| batch_txn_ids.contains(*txn_id))
+            {
+                return Err(invalid());
+            }
+            let mut guids = BTreeSet::new();
+            let mut master_ids = BTreeSet::new();
+            for bound in bindings {
+                let canonical = bound.guid.len() <= 128
+                    && !bound.guid.is_empty()
+                    && bound.guid.bytes().all(|byte| {
+                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte) || byte == b'-'
+                    });
+                if !canonical || !guids.insert(&bound.guid) || !master_ids.insert(bound.master_id) {
+                    return Err(invalid());
+                }
+            }
+            Ok(())
+        }
+        (None, Some(code))
+            if (1..=64).contains(&code.len())
+                && code.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                }) =>
+        {
+            Ok(())
+        }
+        _ => Err(invalid()),
+    }
 }
 
 fn read_record(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Result<bool, String> {
@@ -628,14 +853,18 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 .get(&batch.batch_id)
                 .and_then(|index| batches.get(*index))
                 .and_then(|snapshot| snapshot.response.clone());
-            let native_remote_id = latest
+            let prior = latest
                 .get(&batch.batch_id)
-                .and_then(|index| batches.get(*index))
-                .and_then(|snapshot| snapshot.native_remote_id.clone());
+                .and_then(|index| batches.get(*index));
+            let native_remote_id = prior.and_then(|snapshot| snapshot.native_remote_id.clone());
+            let pre_post_voucher_mark = prior.and_then(|snapshot| snapshot.pre_post_voucher_mark);
+            let span_verdict = prior.and_then(|snapshot| snapshot.span_verdict.clone());
             latest.insert(batch.batch_id.clone(), batches.len());
             batches.push(BatchSnapshot {
                 response,
                 native_remote_id,
+                pre_post_voucher_mark,
+                span_verdict,
                 dispatched,
                 batch: *batch,
                 generation,
@@ -643,14 +872,22 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
         }
         Record::Status(update) => {
             let snapshot = &mut batches[latest[&update.batch_id]];
-            if let Some(response) = update.response {
+            if let Some(response) = update.response.clone() {
                 snapshot.response = Some(response);
             }
             snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
             if update.native_remote_id.is_some() {
                 snapshot.native_remote_id = update.native_remote_id.clone();
             }
-            snapshot.batch.status = update.status;
+            if update.pre_post_voucher_mark.is_some() {
+                snapshot.pre_post_voucher_mark = update.pre_post_voucher_mark;
+            }
+            if let Some(verdict) = update.span_verdict() {
+                snapshot.span_verdict = Some(verdict);
+            }
+            if update.sets_status() {
+                snapshot.batch.status = update.status;
+            }
             snapshot.generation = generation;
         }
     })?;

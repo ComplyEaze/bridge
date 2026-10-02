@@ -438,6 +438,9 @@
       "path": "src-tauri/src/agent_import_post_location.rs"
     },
     {
+      "path": "src-tauri/src/agent_import_span_identity.rs"
+    },
+    {
       "path": "src-tauri/src/agent_import_verification.rs"
     },
     {

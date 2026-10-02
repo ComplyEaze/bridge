@@ -21,7 +21,11 @@ A bare `<RESPONSE>` root with **no `ENVELOPE`, no `HEADER`, no `STATUS`**:
 </RESPONSE>
 ```
 
-A `STATUS=1` rule cannot apply to imports — there is no `STATUS` to check.
+That is the answer to Bridge's `Import Data` envelope, and a `STATUS=1` rule cannot apply to it —
+there is no `STATUS` to check. Tally's documented `Import` envelope was answered in a different
+shape: an `ENVELOPE` whose `HEADER` carried `VERSION 1` and `STATUS 1`, then the same ten counter
+elements, in the same order, in `BODY/DATA/IMPORTRESULT` (PARTIAL, one run, §9.4g; not counted in
+§9.1a's numbering).
 
 ### 9.1a A malformed request returns a counter-less response — **fourth response shape**
 
@@ -73,6 +77,22 @@ do not infer missing evidence or resend it to obtain a cleaner receipt.
 
 `LINEERROR` text is **untrustworthy for cause attribution** — an out-of-range date produced
 "Voucher date is missing" when the date was present.
+
+**A batch can be created in part — PARTIAL, one run** (licensed TallyPrime 7.1 Silver, a
+synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in Bridge's
+`Import Data` envelope, of which the second debited a ledger the book did not hold:
+- Tally answered `CREATED 2, ERRORS 0, EXCEPTIONS 1`, every other counter 0, and one `LINEERROR`
+  naming the ledger. `LASTVCHID` was the last created voucher's MasterID; `LASTMID` was 0.
+- Read back within a minute, the other two vouchers had been created, in request order. The
+  company's voucher mark (`ALTVCHID`) stepped by 2. The rejected voucher took no MasterID and no
+  AlterID. This read-back is recorded in the lab notes and is not committed.
+
+In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
+named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is
+preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the same
+`CREATED`/`EXCEPTIONS` split for a batch of 50 (`CREATED 49, EXCEPTIONS 1`). Not measured: more than
+one rejected voucher in a batch (so whether `EXCEPTIONS` counts vouchers or errors), any other cause
+of rejection, Gold and Education.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 
@@ -327,7 +347,9 @@ of a new one. This experiment did not establish protection against a concurrent
 foreign writer or recovery of an unobserved prior master.
 
 A `Create` with the same name and a different parent, bill-wise flag and opening balance replaced
-all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g).
+all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g). The documented `IMPORTDUPS`
+option `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both Bridge's envelope and
+Tally's documented one (PARTIAL: one run per envelope, plus a case variant in Bridge's; §9.4g).
 
 The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)
@@ -833,12 +855,13 @@ and not a failed request.
 ### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
 
 **Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
-`BRIDGE AMEND LAB`, three runs, one run each. **Confidence: PARTIAL.**
+`BRIDGE AMEND LAB`, three runs, one run each: the case below and the two follow-up runs (the
+`IMPORTDUPS` runs near the end are counted separately). **Confidence: PARTIAL.**
 
 §9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
-differ from the existing ledger's. Each request below was a gateway import (`Import Data`,
-`REPORTNAME` `All Masters`) sent with no import option in `STATICVARIABLES`, so Tally applied its
-default handling.
+differ from the existing ledger's. Each request below, except the `IMPORTDUPS` runs near the end,
+was a gateway import (`Import Data`, `REPORTNAME` `All Masters`) sent with no import option in
+`STATICVARIABLES`, so Tally applied its default handling.
 
 1. **The setup.** A new ledger `Create Probe 02` was created: `PARENT` `Sundry Creditors`,
    `ISBILLWISEON` `Yes`, `OPENINGBALANCE` `-1000.00`, and no bill allocations.
@@ -912,6 +935,36 @@ showed `PARENT` and `ISBILLWISEON`. It never showed:
 So a diff of it could show a change to the parent or the bill-wise flag, but not to the opening
 (inferred from the fields it carried, one run).
 
+**`IMPORTDUPS` `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both envelopes —
+PARTIAL, one run per envelope plus a case variant** (2026-10-02 UTC, the same company).
+- **What Tally documents.** Tally's developer reference ("Case Study I", written for Tally.ERP 9
+  Release 6) puts an `IMPORTDUPS` static variable in a master import. For a ledger whose name
+  already exists, it names three system formulae for the treatment of the imported opening
+  balance, and describes `DupIgnoreCombine` as ignoring the ledger if it exists. It does not say
+  whether TallyPrime honours the variable over the HTTP gateway.
+- **What was sent.** Each run re-sent an identical ledger `Create` for a ledger the company already
+  held, with no opening balance, and with `<IMPORTDUPS>@@DupIgnoreCombine</IMPORTDUPS>` in
+  `STATICVARIABLES`.
+- **In Bridge's `Import Data` envelope:** Tally answered `ALTERED 1`, every other counter 0. A
+  second spelling, `@@DUPIGNORECOMBINE`, answered the same. Tally's TDL reference documents
+  formula names as case-insensitive, so this very likely tested one value, not two.
+- **In the documented envelope** (`TALLYREQUEST` `Import`, `TYPE` `Data`, `ID` `All Masters`,
+  `DESC` and `DATA`, no `REPORTNAME`): Tally answered `ALTERED 1`, every other counter 0.
+  - Two synthetic companies were loaded (a loaded-company read listed two, before and after). The
+    request named the ledger's company in `SVCURRENTCOMPANY`; the other company was Tally's
+    current company, per the operator's word, not observed.
+  - The named company's master mark (`ALTMSTID`) stepped by 1, and the other company's did not, so
+    the import landed in the named company.
+  - The answer came as an `ENVELOPE` with a `HEADER` (`VERSION 1`, `STATUS 1`), then
+    `BODY/DATA/IMPORTRESULT`, with the company's `CMPINFO` under `DESC`, not as §9.1's bare
+    `RESPONSE`.
+
+So, on these runs, `@@DupIgnoreCombine` did not stop Tally from counting the `Create` as an
+alteration of the existing ledger, in either envelope. The re-send was identical, so no field could
+tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`). In the
+documented envelope the master mark's step of 1 is consistent with that; what an ignore does to the
+mark was not measured.
+
 **Not measured:**
 - whether the parent and the bill-wise flag each change on their own: in the first run they changed
   together, with the opening, and the parent moved from a balance-sheet group to a nominal group;
@@ -924,7 +977,13 @@ So a diff of it could show a change to the parent or the bill-wise flag, but not
 - a ledger that holds bill allocations or posted vouchers;
 - the cause of the date-less `0.00`;
 - the same behaviour on Gold or Education;
-- any import option that makes Tally ignore an existing master.
+- `IMPORTDUPS` on a `Create` whose fields differ from the existing ledger's (both option runs
+  re-sent an identical ledger);
+- whether `IMPORTDUPS` changes how an opening balance is treated, which is all the reference
+  scopes it to (the re-sent ledger had no opening);
+- any other `IMPORTDUPS` value: neither `DupModify` nor `DupCombine` was sent (the reference
+  describes `DupCombine` as combining opening balances);
+- any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
 
 
 #

@@ -250,13 +250,20 @@ async fn empty_ledger_selection_does_not_replace_source_emptiness() {
                 "window_contradicted"
             );
         } else {
+            // #985: the selection inherits its window's label. This book's
+            // mark of 10 proves it small without a census, so nothing counted
+            // the window and the zero is not a checked one.
             assert_eq!(response["isError"], false);
-            assert_eq!(response["structuredContent"]["result"]["state"], "complete");
+            assert_eq!(response["structuredContent"]["result"]["state"], "partial");
+            assert_eq!(
+                response["structuredContent"]["result"]["reason"],
+                "nonempty_window_unqualified"
+            );
             assert_eq!(response["structuredContent"]["result"]["items"], json!([]));
             assert_eq!(response["structuredContent"]["result"]["total"], 0);
             assert_eq!(
                 response["structuredContent"]["evidence"]["state"],
-                "complete"
+                "partial"
             );
         }
         assert_eq!(simulator.finish().unwrap().len(), 28);
@@ -585,7 +592,8 @@ async fn a_ledger_filter_reads_a_book_of_more_than_a_thousand_ledgers() {
     .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
-    assert_eq!(result["state"], "complete", "{result}");
+    // A mark-10 book: read whole, uncounted (#985).
+    assert_eq!(result["state"], "partial", "{result}");
     assert_eq!(result["total"], 1, "{result}");
     let ledgers = result["items"][0]["amounts"]
         .as_array()
@@ -759,7 +767,9 @@ async fn an_ordinary_window_carries_no_withheld_fields() {
     )
     .await;
     let result = &response["structuredContent"]["result"];
-    assert_eq!(result["state"], "complete", "{result}");
+    // A mark-10 book: read whole, uncounted (#985).
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], "nonempty_window_unqualified");
     for key in ["withheld_total", "withheld_vouchers", "coverage"] {
         assert!(result.get(key).is_none(), "{key}");
     }
@@ -789,7 +799,9 @@ async fn a_withheld_voucher_is_listed_under_a_ledger_filter_it_touches() {
     let result = &other["structuredContent"]["result"];
     assert_eq!(result["total"], 1, "{result}");
     assert!(result.get("withheld_total").is_none(), "{result}");
-    assert_eq!(result["state"], "complete");
+    // Uncounted, so `partial` for the window, not for a withheld voucher.
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["reason"], "nonempty_window_unqualified");
 }
 
 /// A window whose every voucher is withheld is not empty: the empty-window

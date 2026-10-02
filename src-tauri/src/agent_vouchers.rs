@@ -1,5 +1,6 @@
 //! Vouchers for the local MCP adapter.
 use super::*;
+use bridge_tally_core::book_presence::WindowRead;
 use std::collections::BTreeSet;
 
 impl Server {
@@ -120,24 +121,34 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // corroboration below is a read of its own and is not counted here.
         let window = serde_json::to_value(&read.timings).unwrap_or(Value::Null);
         let source_marks = read.witness.as_ref().map(|witness| witness.marks);
+        let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
         let rows = read.rows.into_iter().map(VoucherRow::into_filter_row).collect();
         let mut rows = validate_then_filter_voucher_rows(rows, &from, &to, None)?;
-        let mut result_state = "complete";
-        let mut corroboration_reason = None;
-        if rows.is_empty() {
+        let empty_window = if rows.is_empty() {
             let (read_evidence, partial, reason) = server
                 .corroborate_empty_voucher_read(&identity, &company.name, &from, &to, None, source_marks)
                 .await?;
             accumulate_evidence(&mut accumulated, read_evidence);
-            if partial {
-                result_state = "partial";
-                if let Some(evidence) = accumulated.as_mut() { evidence.state = "partial"; }
+            Some((partial, reason))
+        } else {
+            None
+        };
+        // The window's label, decided before any selector: a selection is a
+        // pure function of the window, so a zero from a counted window is a
+        // checked zero and one from an uncounted window is not (#985).
+        let (window_state, mut corroboration_reason) = window_read(counted, empty_window);
+        let mut result_state = match window_state {
+            WindowRead::Complete => "complete",
+            WindowRead::Partial => "partial",
+        };
+        if let Some(evidence) = accumulated.as_mut() {
+            if window_state == WindowRead::Partial {
+                evidence.state = "partial";
             }
-            if corroboration_reason.is_none() {
-                corroboration_reason = reason;
-                if let Some(evidence) = accumulated.as_mut() { evidence.reason_code = reason.map(str::to_string); }
+            if empty_window.is_some() || corroboration_reason.is_some() {
+                evidence.reason_code = corroboration_reason.map(str::to_string);
             }
         }
         // A nonempty, validated source can legitimately have no selector match.

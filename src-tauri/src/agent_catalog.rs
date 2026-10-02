@@ -553,17 +553,17 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     ),
                     "read_evidence" => (
                         concat!(
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer. ",
                             "Shows ComplyEaze Bridge's own recent reads since it started, kept in memory on this computer: request and response fingerprints, byte counts and state, no figures or book content (bounded: the newest `limit` records). ",
-                            "It does not show what the AI provider received. ",
-                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer."
+                            "It does not show what the AI provider received."
                         ),
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
                     ),
                     "egress_log" => (
                         concat!(
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer. ",
                             "Shows the receipts ComplyEaze Bridge keeps of its own tool calls, read from its local log file on this computer: tool, time, company, counts and fingerprints, no figures or book content (bounded to the most recent receipts). ",
-                            "It does not show what the AI provider received. ",
-                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer."
+                            "It does not show what the AI provider received."
                         ),
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
                     ),

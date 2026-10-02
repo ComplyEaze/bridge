@@ -856,8 +856,8 @@ and not a failed request.
 ### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
 
 **Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
-`BRIDGE AMEND LAB`, three runs, one run each (the follow-up and `IMPORTDUPS` runs below are counted
-separately). **Confidence: PARTIAL.**
+`BRIDGE AMEND LAB`, three runs, one run each: the case below and the two follow-up runs (the
+`IMPORTDUPS` runs near the end are counted separately). **Confidence: PARTIAL.**
 
 §9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
 differ from the existing ledger's. Each request below, except the `IMPORTDUPS` runs near the end,
@@ -962,8 +962,9 @@ PARTIAL, one run per envelope plus a case variant** (2026-10-02 UTC, the same co
 
 So, on these runs, `@@DupIgnoreCombine` did not stop Tally from counting the `Create` as an
 alteration of the existing ledger, in either envelope. The re-send was identical, so no field could
-tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`), plus, in
-the documented envelope, the master mark's step of 1.
+tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`). In the
+documented envelope the master mark's step of 1 is consistent with that; what an ignore does to the
+mark was not measured.
 
 **Not measured:**
 - whether the parent and the bill-wise flag each change on their own: in the first run they changed
@@ -981,9 +982,8 @@ the documented envelope, the master mark's step of 1.
   re-sent an identical ledger);
 - whether `IMPORTDUPS` changes how an opening balance is treated, which is all the reference
   scopes it to (the re-sent ledger had no opening);
-- any other `IMPORTDUPS` value: `DupModify` was not sent, and `DupCombine` was not sent, because
-  after the `ALTERED 1` above it could not change the conclusion and the reference describes it as
-  adding opening balances together, a change to money;
+- any other `IMPORTDUPS` value: neither `DupModify` nor `DupCombine` was sent (the reference
+  describes `DupCombine` as combining opening balances);
 - any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
 
 

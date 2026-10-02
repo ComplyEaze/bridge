@@ -1,0 +1,492 @@
+{
+ "comment": "high_value_register, vouchers with no party ledger pooled by day (and by reference) whatever name they print: the row cites every usable printed name, quoted and sorted (a name stripped of Python whitespace, a name containing ' or ', a non-ASCII name, a printed name that is the voucher's own Sales ledger, the cash or bank ledger or blank left out, vouchers printing no usable name counted in the label); a row proven under the limit on its cash line, one whose line differs without being under, one on each side of a bank statement that was refused, a named row beside an unnamed one, bank mode, payments, and limb (b) rows citing the printed names too.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_unnamed-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_unnamed-001"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-hvr_unnamed-002"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-hvr_unnamed-003"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-hvr_unnamed-004"
+  },
+  {
+   "name": "Output CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-hvr_unnamed-005"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-hvr_unnamed-006"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "u01",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     8000000
+    ],
+    [
+     "Sales",
+     -8000000
+    ]
+   ],
+   "party": " Walk-in Buyer One "
+  },
+  {
+   "guid": "u02",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     7000000
+    ],
+    [
+     "Sales",
+     -7000000
+    ]
+   ],
+   "party": "Ram or Shyam"
+  },
+  {
+   "guid": "u03",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     6000000
+    ],
+    [
+     "Sales",
+     -6000000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "u04",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ],
+   "party": "Sales"
+  },
+  {
+   "guid": "u05",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ],
+   "party": "Cash"
+  },
+  {
+   "guid": "u06",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ],
+   "party": "\u001c\u001c"
+  },
+  {
+   "guid": "u07",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Sales",
+     -500000
+    ]
+   ],
+   "party": "Edge Bank"
+  },
+  {
+   "guid": "u08",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Sales",
+     -500000
+    ]
+   ],
+   "party": "Éclair Stores"
+  },
+  {
+   "guid": "u09",
+   "date": "2025-05-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Sales",
+     -500000
+    ]
+   ],
+   "party": "Zed Traders\u001c"
+  },
+  {
+   "guid": "u10",
+   "date": "2025-05-06",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     21000000
+    ],
+    [
+     "Sales",
+     -21000000
+    ]
+   ],
+   "party": "Solo Buyer"
+  },
+  {
+   "guid": "u11",
+   "date": "2025-05-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Edge Bank",
+     15000000
+    ],
+    [
+     "Sales",
+     -25000000
+    ]
+   ],
+   "party": "Mixed Buyer"
+  },
+  {
+   "guid": "u12",
+   "date": "2025-05-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     25000000
+    ],
+    [
+     "Purchases",
+     5000000
+    ],
+    [
+     "Sales",
+     -30000000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "n01",
+   "date": "2025-05-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     22000000
+    ],
+    [
+     "Customer A",
+     -22000000
+    ]
+   ]
+  },
+  {
+   "guid": "u13",
+   "date": "2025-05-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     22000000
+    ],
+    [
+     "Sales",
+     -22000000
+    ]
+   ],
+   "party": "Walk-in Buyer One"
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -12000000
+    ],
+    [
+     "Purchases",
+     12000000
+    ]
+   ],
+   "party": "Supplier Two"
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -9000000
+    ],
+    [
+     "Purchases",
+     9000000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "p03",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -25000000
+    ],
+    [
+     "Customer A",
+     -5000000
+    ],
+    [
+     "Purchases",
+     30000000
+    ]
+   ],
+   "party": ""
+  },
+  {
+   "guid": "p04",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Edge Bank",
+     -15000000
+    ],
+    [
+     "Purchases",
+     25000000
+    ]
+   ],
+   "party": "Mixed Seller"
+  },
+  {
+   "guid": "b01",
+   "date": "2025-06-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     25000000
+    ],
+    [
+     "Sales",
+     -25000000
+    ]
+   ],
+   "party": "Online Buyer"
+  },
+  {
+   "guid": "r01",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Sales",
+     -12000000
+    ]
+   ],
+   "party": "Order Buyer",
+   "reference": "SO-1"
+  },
+  {
+   "guid": "r02",
+   "date": "2025-07-09",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     9000000
+    ],
+    [
+     "Sales",
+     -9000000
+    ]
+   ],
+   "party": "",
+   "reference": "SO-1"
+  },
+  {
+   "guid": "r03",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -11000000
+    ],
+    [
+     "Purchases",
+     11000000
+    ]
+   ],
+   "party": "Seller A",
+   "reference": "PO-1"
+  },
+  {
+   "guid": "r04",
+   "date": "2025-07-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Purchases",
+     10000000
+    ]
+   ],
+   "party": "Seller A",
+   "reference": "PO-1"
+  },
+  {
+   "guid": "r05",
+   "date": "2025-07-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Sales",
+     -1000000
+    ]
+   ],
+   "party": "Late Buyer"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "high_value_register"
+ ],
+ "bank_statement_refused": "does not add up: the opening balance plus its credits less its debits is not its closing balance",
+ "round_off_ledgers": [
+  "Round Off"
+ ],
+ "s194n_recipient_type": "unknown"
+}

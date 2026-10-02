@@ -713,6 +713,7 @@ fn check(name: &str) {
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
+                    bank_statement_refused: s["bank_statement_refused"].as_str(),
                 };
                 let r = high_value_register::run(&book, &rules, &inputs).unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
@@ -1279,6 +1280,7 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
         s194n_recipient_type: None,
         round_off_ledgers: &none,
         counterparty_type_by_ledger: &no_types,
+        bank_statement_refused: None,
     };
     let result = std::panic::catch_unwind(|| high_value_register::run(&book, &rules, &inputs))
         .expect("refused, not panicked");

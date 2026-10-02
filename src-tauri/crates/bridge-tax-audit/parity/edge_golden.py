@@ -58,7 +58,7 @@ statement in the shape `parity/python_golden.py --emit-bank-statement` writes), 
 and `bank_charge_terms` (default []); the statement's rows also feed the module invariant, as the
 reference's pack sets `eng.bank`; and for `high_value_register`: `bank_statement` (optional here, absent
 meaning none supplied), `ais` as above, `s194n_terms` and `round_off_ledgers` (default []),
-`counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
+`bank_statement_refused` (the reader's plain-words reason a supplied statement was refused; default none) and `counterparty_types` ({ledger: type}, the map pack.py builds from the loan ledgers and
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `stock`: `stock_items` ({name: {base_unit?, guid?, opening_qty?, opening_value?, closing_qty?,
@@ -224,7 +224,8 @@ def main() -> int:
             eng, rules, cash, bank, bank_statement=None if bs is None else bank_statement(bs),
             s194n_narration_terms=frozenset(spec.get("s194n_terms", [])), ais_rows=ais,
             s194n_recipient_type=recipient, round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])),
-            counterparty_type_by_ledger=dict(spec.get("counterparty_types", {})))
+            counterparty_type_by_ledger=dict(spec.get("counterparty_types", {})),
+            bank_statement_refused=spec.get("bank_statement_refused"))
 
     def stock_run():
         # As tae/pack.py: invented masters and both Stock Summaries, typed strictly as

@@ -443,6 +443,9 @@ pub struct Inputs<'c> {
     pub s194n_recipient_type: Option<Recipient>,
     pub round_off_ledgers: &'c BTreeSet<String>,
     pub counterparty_type_by_ledger: &'c BTreeMap<String, String>,
+    /// The reader's plain-words reason when the engagement's statement was supplied but refused;
+    /// then `bank_statement` is `None` and s.194N's coverage says so, never "not supplied".
+    pub bank_statement_refused: Option<&'c str>,
 }
 
 #[allow(clippy::too_many_lines)] // one section per limb, as the reference lays them out
@@ -1304,6 +1307,7 @@ mod tests {
             s194n_recipient_type: None,
             round_off_ledgers: &round_off,
             counterparty_type_by_ledger: &no_types,
+            bank_statement_refused: None,
         };
         let r = run(&book, &Rules::vendored().unwrap(), &inputs).unwrap();
         let figure = |prefix: &str| {
@@ -1366,21 +1370,21 @@ mod tests {
         let n = u.limits.len();
         assert_eq!(
             u.limits[n - 2],
-            "The amount is this party's own side of each voucher, not the voucher's own cash \
+            "The amount is the payees' side of each voucher, not the voucher's own cash \
              line. On one or more of the row's vouchers the two differ, so such a voucher carries \
              other lines as well (such as money moving by bank, a discount or deduction, a \
              round-off, a loan, a counterparty this register leaves out, several parties sharing \
              the line, or money moving the other way). The cash credited on these vouchers is \
-             below the threshold, so the cash paid to this party on them is below it too. The \
+             below the threshold, so the cash paid on them is below it too. The \
              cash credited on these vouchers is shown with this row."
         );
-        assert!(u.limits[n - 1].starts_with("No party ledger is on this voucher"));
+        assert!(u.limits[n - 1].starts_with("No party ledger is on these vouchers"));
         // Proven under the limit on the line: a true title, the tags kept, and counted apart at
         // both grains.
         assert_eq!(
             u.title,
-            "Cash paid to one unidentified party on 2025-06-03: the party's side is at or over \
-             the s.269ST(a) limit, but the cash credited on these vouchers is below it"
+            "Cash paid on 2025-06-03 on vouchers that do not name the payee: the payees' side is \
+             at or over the s.269ST(a) limit, but the cash credited on these vouchers is below it"
         );
         assert_eq!(u.clauses, ["s.269ST(a)", "3CD-31(bc)"]);
         for grain in ["day", "voucher"] {
@@ -1398,13 +1402,14 @@ mod tests {
         // The same for a receipt, in both modes, each against its own threshold.
         assert_eq!(
             finding_on("2025-06-04", "cash_receipt").title,
-            "Cash received from one unidentified party on 2025-06-04: the party's side is at or \
-             over the s.269ST(a) limit, but the cash debited on these vouchers is below it"
+            "Cash received on 2025-06-04 on vouchers that do not name the payer: the payers' side \
+             is at or over the s.269ST(a) limit, but the cash debited on these vouchers is below it"
         );
         assert_eq!(
             finding_on("2025-06-04", "bank_receipt").title,
-            "Bank received from one unidentified party on 2025-06-04: the party's side is at or \
-             over the CA-set vouching threshold, but the bank debited on these vouchers is below it"
+            "Bank received on 2025-06-04 on vouchers that do not name the payer: the payers' side \
+             is at or over the CA-set vouching threshold, but the bank debited on these vouchers is \
+             below it"
         );
         assert_eq!(
             figure("bank_receipt_day_at_or_over_threshold_count"),

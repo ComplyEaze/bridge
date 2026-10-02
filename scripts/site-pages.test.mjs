@@ -251,7 +251,7 @@ test("the questions page keeps the claims that tell a reader what ComplyEaze Bri
     "has not been independently audited",
     "Neither choice hides amounts",
     "No ComplyEaze Bridge tool can approve it for you, but software that controls your screen could click the window",
-    "never alters or deletes a voucher",
+    "A post never alters or deletes a voucher",
     "has no tool to delete or undo a posted voucher",
     "None of these files is encrypted",
     "not yet code-signed",
@@ -275,7 +275,7 @@ test("the jobs table gives one of four answers per row, links each row to its an
   }
   const cannot = faqText(html.match(/id="what-it-cannot-do"[\s\S]*?<\/details>/)[0]);
   for (const { job, word } of rows.filter((row) => row.word === "No" || row.word === "Not yet")) {
-    const key = /GSTR/.test(job) ? "GSTR-2B" : /Tax-audit/.test(job) ? "tax-audit" : /sales/i.test(job) ? "sales, purchase or GST" : null;
+    const key = /GSTR/.test(job) ? "GSTR-2B" : /Tax-audit/.test(job) ? "tax-audit" : /sales/i.test(job) ? "sales or purchase invoices" : null;
     assert.ok(key && cannot.includes(key), `${job} (${word}) is not in "What can it not do yet?"`);
   }
   // a verdict stronger than the answer under it would teach a reader to distrust the page

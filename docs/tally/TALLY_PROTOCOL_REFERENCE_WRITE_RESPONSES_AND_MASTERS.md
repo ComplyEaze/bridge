@@ -24,8 +24,9 @@ A bare `<RESPONSE>` root with **no `ENVELOPE`, no `HEADER`, no `STATUS`**:
 A `STATUS=1` rule cannot apply to imports — there is no `STATUS` to check.
 
 That is the answer to Bridge's `Import Data` envelope. Tally's documented `Import` envelope was
-answered in a different shape, with the same ten counter elements in the same order wrapped in
-`ENVELOPE/BODY/DATA/IMPORTRESULT` (PARTIAL, one run, §9.4g; not counted in §9.1a's numbering).
+answered in a different shape: an `ENVELOPE` whose `HEADER` carried `VERSION 1` and `STATUS 1`,
+then the same ten counter elements, in the same order, in `BODY/DATA/IMPORTRESULT` (PARTIAL, one
+run, §9.4g; not counted in §9.1a's numbering).
 
 ### 9.1a A malformed request returns a counter-less response — **fourth response shape**
 
@@ -83,16 +84,16 @@ synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in
 `Import Data` envelope, of which the second debited a ledger the book did not hold:
 - Tally answered `CREATED 2, ERRORS 0, EXCEPTIONS 1`, every other counter 0, and one `LINEERROR`
   naming the ledger. `LASTVCHID` was the last created voucher's MasterID; `LASTMID` was 0.
-- Read back the same minute, the other two vouchers had been created, in request order. The
+- Read back within a minute, the other two vouchers had been created, in request order. The
   company's voucher mark (`ALTVCHID`) stepped by 2. The rejected voucher took no MasterID and no
   AlterID. This read-back is recorded in the lab notes and is not committed.
 
 In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
 named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is
-preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the same counter shape for
-a batch of 50 (`CREATED 49, EXCEPTIONS 1`). Not measured: more than one rejected voucher in a batch
-(so whether `EXCEPTIONS` counts vouchers or errors), any other cause of rejection, Gold and
-Education.
+preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the same
+`CREATED`/`EXCEPTIONS` split for a batch of 50 (`CREATED 49, EXCEPTIONS 1`). Not measured: more than
+one rejected voucher in a batch (so whether `EXCEPTIONS` counts vouchers or errors), any other cause
+of rejection, Gold and Education.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 
@@ -348,7 +349,7 @@ foreign writer or recovery of an unobserved prior master.
 
 A `Create` with the same name and a different parent, bill-wise flag and opening balance replaced
 all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g). The documented `IMPORTDUPS`
-option `@@DupIgnoreCombine` was counted as an alteration, not ignored, in both Bridge's envelope and
+option `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both Bridge's envelope and
 Tally's documented one (one run per envelope, plus a case variant in Bridge's; §9.4g).
 
 The required implementation workflow is maintained in
@@ -855,7 +856,8 @@ and not a failed request.
 ### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
 
 **Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
-`BRIDGE AMEND LAB`, three runs, one run each. **Confidence: PARTIAL.**
+`BRIDGE AMEND LAB`, three runs, one run each (the follow-up and `IMPORTDUPS` runs below are counted
+separately). **Confidence: PARTIAL.**
 
 §9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
 differ from the existing ledger's. Each request below, except the `IMPORTDUPS` runs near the end,
@@ -935,7 +937,7 @@ So a diff of it could show a change to the parent or the bill-wise flag, but not
 (inferred from the fields it carried, one run).
 
 **`IMPORTDUPS` `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both envelopes —
-PARTIAL, one run each** (2026-10-02 UTC, the same company).
+PARTIAL, one run per envelope plus a case variant** (2026-10-02 UTC, the same company).
 - **What Tally documents.** Tally's developer reference ("Case Study I", written for Tally.ERP 9
   Release 6) puts an `IMPORTDUPS` static variable in a master import. For a ledger whose name
   already exists, it names three system formulae for the treatment of the imported opening
@@ -954,12 +956,14 @@ PARTIAL, one run each** (2026-10-02 UTC, the same company).
     current company, per the operator's word, not observed.
   - The named company's master mark (`ALTMSTID`) stepped by 1, and the other company's did not, so
     the import landed in the named company.
-  - The answer came as `ENVELOPE/BODY/DATA/IMPORTRESULT`, with the company's `CMPINFO` under
-    `DESC`, not as §9.1's bare `RESPONSE`.
+  - The answer came as an `ENVELOPE` with a `HEADER` (`VERSION 1`, `STATUS 1`), then
+    `BODY/DATA/IMPORTRESULT`, with the company's `CMPINFO` under `DESC`, not as §9.1's bare
+    `RESPONSE`.
 
 So, on these runs, `@@DupIgnoreCombine` did not stop Tally from counting the `Create` as an
 alteration of the existing ledger, in either envelope. The re-send was identical, so no field could
-tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`).
+tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`), plus, in
+the documented envelope, the master mark's step of 1.
 
 **Not measured:**
 - whether the parent and the bill-wise flag each change on their own: in the first run they changed
@@ -977,8 +981,9 @@ tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IG
   re-sent an identical ledger);
 - whether `IMPORTDUPS` changes how an opening balance is treated, which is all the reference
   scopes it to (the re-sent ledger had no opening);
-- any other `IMPORTDUPS` value: `DupModify` was not sent, and `DupCombine` was not sent because
-  the reference describes it as adding the openings together;
+- any other `IMPORTDUPS` value: `DupModify` was not sent, and `DupCombine` was not sent, because
+  after the `ALTERED 1` above it could not change the conclusion and the reference describes it as
+  adding opening balances together, a change to money;
 - any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
 
 

@@ -300,6 +300,7 @@ impl Server {
             runtime,
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(crate::agent::ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(crate::agent::VoucherPages::default())),
             post_approvals,
             // The desktop app calls Bridge's operations directly and never dispatches an MCP
             // tool, so there is no MCP client to accept anything.

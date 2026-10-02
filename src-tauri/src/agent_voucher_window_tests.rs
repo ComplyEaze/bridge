@@ -4338,3 +4338,276 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         6
     );
 }
+
+// -- #485: a later page of a complete window is served from its first page's read -----------------
+
+use super::vouchers::{
+    selected_voucher_operation_for_verified, VoucherComposites, VoucherOperationScope,
+    VoucherPageKey,
+};
+
+/// One server over one replayed sequence, so a later call can be served from
+/// what an earlier call held.
+struct OneServer {
+    simulator: SequenceSimulator,
+    server: Server,
+    _directory: tempfile::TempDir,
+}
+
+impl OneServer {
+    fn spawn(plans: Vec<ScenarioPlan>) -> Self {
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        Self {
+            simulator,
+            server,
+            _directory: directory,
+        }
+    }
+
+    async fn call(&self, extra: Value) -> Value {
+        let mut args = json!({"company_guid": GUID, "from": "20260801", "to": "20260831"});
+        for (key, value) in extra.as_object().unwrap() {
+            args[key] = value.clone();
+        }
+        self.server.call_tool("vouchers", args).await
+    }
+
+    /// The requests the simulator saw, every scripted answer having been used.
+    fn requests(self) -> usize {
+        self.simulator
+            .finish()
+            .unwrap()
+            .iter()
+            .filter(|request| !request.method.is_empty())
+            .count()
+    }
+}
+
+fn identity_plans() -> Vec<ScenarioPlan> {
+    vec![company_plan(), status_plan(), company_plan(), status_plan()]
+}
+
+/// The requests of a later page of a book whose marks are `marks`: the
+/// identity read every call starts with, then one paired marks read.
+fn marks_page_plans(marks: ScenarioPlan) -> Vec<ScenarioPlan> {
+    let mut plans = identity_plans();
+    plans.extend(paired(&marks));
+    plans
+}
+
+/// The marks the counted book's first read opened and closed on.
+fn counted_marks() -> ScenarioPlan {
+    mark(WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity())
+}
+
+fn page_items_of(response: &Value) -> Vec<Value> {
+    assert_ne!(response["isError"], true, "{response}");
+    response["structuredContent"]["result"]["items"]
+        .as_array()
+        .unwrap()
+        .clone()
+}
+
+fn page_snapshot(response: &Value) -> &Value {
+    &response["structuredContent"]["result"]["snapshot"]
+}
+
+fn refusal_of(response: &Value) -> &Value {
+    assert_eq!(response["isError"], true, "{response}");
+    &response["structuredContent"]["result"]["error"]
+}
+
+/// The rows of the whole counted window, one page.
+async fn whole_counted_window() -> Vec<Value> {
+    let response =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    page_items_of(&response)
+}
+
+#[tokio::test]
+async fn a_later_page_is_served_from_the_first_pages_read() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    assert_eq!(page_snapshot(&first)["reused"], false);
+    assert_eq!(page_snapshot(&first)["voucher_alter_id"], counted_marks_vouchers());
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true);
+    assert_eq!(page_snapshot(&second)["id"], id);
+    // The second page sent the identity read and one marks read, and nothing
+    // of the window: every scripted answer was used and no more were asked.
+    assert_eq!(one.requests(), total);
+    let whole = whole_counted_window().await;
+    assert_eq!(page_items_of(&first).as_slice(), &whole[..1]);
+    assert_eq!(page_items_of(&second).as_slice(), &whole[1..2]);
+    let result = &second["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 3);
+}
+
+fn counted_marks_vouchers() -> u64 {
+    WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity()
+}
+
+#[tokio::test]
+async fn a_moved_book_refuses_a_page_that_names_its_snapshot() {
+    for moved in [mark(counted_marks_vouchers() + 1), marks_plan(counted_marks_vouchers(), 8)] {
+        let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+        plans.extend(marks_page_plans(moved));
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        let first = one.call(json!({"limit": 1})).await;
+        let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+        let second = one
+            .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
+            .await;
+        let error = refusal_of(&second);
+        assert_eq!(error["code"], "listing_snapshot_changed", "{second}");
+        assert_eq!(error["cause"], "book_changed_since_first_page");
+        assert_eq!(one.requests(), total);
+    }
+}
+
+#[tokio::test]
+async fn a_moved_book_reads_the_window_afresh_for_a_page_that_names_nothing() {
+    let moved = marks_plan(counted_marks_vouchers(), 8);
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(identity_plans());
+    plans.extend(paired(&moved));
+    plans.extend(paired(&moved));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one.call(json!({"offset": 1, "limit": 1})).await;
+    assert_ne!(second["isError"], true, "{second}");
+    assert_eq!(page_snapshot(&second)["reused"], false);
+    assert_ne!(page_snapshot(&second)["id"], id);
+    assert_eq!(page_snapshot(&second)["master_alter_id"], 8);
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn a_partial_window_is_not_held_and_a_named_snapshot_of_it_refuses() {
+    let mut plans = identity_plans();
+    plans.extend(paired(&mark(3)));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    let first_len = plans.len();
+    // The second page of a window nothing is held for: no marks read for
+    // nothing, then the window afresh.
+    plans.extend(identity_plans());
+    plans.extend(paired(&mark(3)));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    // The third, naming a snapshot there is none of: refused after the identity read alone.
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    assert_eq!(first["structuredContent"]["result"]["state"], "partial");
+    assert!(page_snapshot(&first).is_null(), "{first}");
+    let second = one.call(json!({"offset": 1, "limit": 1})).await;
+    assert_eq!(second["structuredContent"]["result"]["state"], "partial");
+    assert!(page_snapshot(&second).is_null());
+    let third = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": "nothing-held"}))
+        .await;
+    assert_eq!(refusal_of(&third)["cause"], "snapshot_not_held");
+    assert_eq!(one.requests(), total);
+    assert!(first_len < total);
+}
+
+#[tokio::test]
+async fn a_write_through_the_server_drops_a_held_window() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    assert_eq!(one.server.voucher_pages.lock().unwrap().held_count(), 1);
+    one.server.drop_listing_snapshots(GUID);
+    assert_eq!(one.server.voucher_pages.lock().unwrap().held_count(), 0);
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(refusal_of(&second)["cause"], "snapshot_not_held");
+    assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn an_expired_or_oversized_window_is_not_held() {
+    for (ttl, max_bytes) in [
+        (std::time::Duration::ZERO, usize::MAX),
+        (std::time::Duration::from_secs(600), 1),
+    ] {
+        let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+        plans.extend(identity_plans());
+        let total = plans.len();
+        let one = OneServer::spawn(plans);
+        one.server
+            .voucher_pages
+            .lock()
+            .unwrap()
+            .limits_for_test(ttl, max_bytes);
+        let first = one.call(json!({"limit": 1})).await;
+        let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+        let second = one
+            .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
+            .await;
+        assert_eq!(refusal_of(&second)["cause"], "snapshot_not_held", "{second}");
+        assert_eq!(one.requests(), total);
+    }
+}
+
+#[test]
+fn a_held_window_answers_one_question_only() {
+    let identity = identity();
+    let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None);
+    assert_eq!(base(), base());
+    assert_ne!(base(), VoucherPageKey::new(&identity, "20260802", "20260831", None, None));
+    assert_ne!(base(), VoucherPageKey::new(&identity, "20260801", "20260830", None, None));
+    assert_ne!(base(), VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None));
+    let sales = VoucherTypeSelector::Name("Sales".to_string());
+    let purchase = VoucherTypeSelector::Name("Purchase".to_string());
+    let keyed = |selector| VoucherPageKey::new(&identity, "20260801", "20260831", None, Some(selector));
+    assert_ne!(base(), keyed(&sales));
+    assert_ne!(keyed(&sales), keyed(&purchase));
+    assert_ne!(
+        keyed(&sales),
+        keyed(&VoucherTypeSelector::Guid("Sales".to_string()))
+    );
+}
+
+#[tokio::test]
+async fn the_desktop_adapter_never_holds_a_window() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let (company, identity, evidence) = one.server.verified_company(GUID).await.unwrap();
+    let outcome = selected_voucher_operation_for_verified(
+        &one.server,
+        &json!({"company_guid": GUID, "from": "20260801", "to": "20260831", "limit": 1}),
+        VoucherOperationScope {
+            held_pages: false,
+            guid: GUID.to_string(),
+            from: "20260801".to_string(),
+            to: "20260831".to_string(),
+            company,
+            identity,
+            initial_evidence: Some(evidence),
+            composites: VoucherComposites::Refuse,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(outcome.payload["result"].get("snapshot").is_none());
+    assert_eq!(one.server.voucher_pages.lock().unwrap().held_count(), 0);
+    let _ = one.requests();
+}

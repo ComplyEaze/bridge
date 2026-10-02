@@ -56,9 +56,16 @@ fn empty_collection() -> String {
 }
 
 fn marks() -> String {
+    marks_at(10)
+}
+
+/// The target's own marks with `vouchers` as its voucher mark: what a
+/// verification reads once after a native post, to tell a book that kept the
+/// post from one rolled back below it.
+fn marks_at(vouchers: u64) -> String {
     format!(
         "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\\
-         <GUID>{GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID>\\
+         <GUID>{GUID}</GUID><ALTVCHID>{vouchers}</ALTVCHID><ALTMSTID>7</ALTMSTID>\\
          </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
     )
 }
@@ -270,6 +277,12 @@ fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
 /// A built, never-dispatched batch for the captured laboratory company, with
 /// its XML file, exactly as `build_import_xml` leaves one.
 fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
+    saved_batch_with_narration(server, "Synthetic test only")
+}
+
+/// The saved Journal of `saved_batch`, as any build may have saved it, with
+/// `narration`.
+fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000583", "identity_scheme":"batch_v1",
@@ -280,7 +293,7 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
         "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built",
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
         "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
-            "narration":"Synthetic test only","entries":[
+            "narration":narration,"entries":[
                 {"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
                 {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
     }))
@@ -2086,33 +2099,28 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
 }
 
 /// The whole native post, end to end: absent before, one clean create, the
-/// location snapshot, then the readback finds the post's own voucher. This is
-/// the only simulator test that reaches `posted_verified`; the others stop at
-/// the POST, so their final result is the readback failing for want of plans.
-/// The verdict is the readback's: a target step of two, which does not match
-/// the one create, is reported and changes nothing.
+/// location snapshot, then the readback binds the untagged voucher the post
+/// created and finds it, `posted_verified`.
 #[tokio::test]
 async fn a_native_post_reads_back_as_posted_verified() {
-    for (mark_after, step, matches_created) in [(11, 1, true), (12, 2, false)] {
-        native_post_reads_back_as_posted_verified(mark_after, step, matches_created).await;
-    }
+    native_post_read_back(11, 1, true).await;
 }
 
-async fn native_post_reads_back_as_posted_verified(
-    mark_after: u64,
-    step: u64,
-    matches_created: bool,
-) {
+/// The same post with the target's mark stepping by two for its one create:
+/// the location reports the step, which refuses the post's binding for good,
+/// so the post is never verified.
+#[tokio::test]
+async fn a_mark_step_other_than_the_create_is_reported_and_never_verified() {
+    native_post_read_back(12, 2, false).await;
+}
+
+async fn native_post_read_back(mark_after: u64, step: u64, matches_created: bool) {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
     plans.push(xml(company_marks(mark_after, 50, "WR2 Unicode Lab")));
     // The readback: the same verification read the pre-post check made, now
-    // serving the captured voucher.
-    plans.extend(probe());
-    plans.extend(verified_company());
-    plans.extend(paired(marks()));
-    plans.extend(paired(captured_posted_journal()));
-    plans.extend(paired(captured_posted_journal()));
+    // serving the voucher the post created, untagged.
+    plans.extend(span_readback(untagged_posted_journal(), mark_after));
     plans.extend(probe());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -2126,9 +2134,23 @@ async fn native_post_reads_back_as_posted_verified(
         .await;
     let _ = sent(simulator);
     let result = &response["structuredContent"]["result"];
-    assert_eq!(response["isError"], json!(false), "{response}");
-    assert_eq!(result["dispatch"]["state"], "posted_verified", "{response}");
-    assert_eq!(result["counts"]["posted_verified"], 1, "{response}");
+    assert_eq!(response["isError"], json!(!matches_created), "{response}");
+    if matches_created {
+        assert_eq!(result["dispatch"]["state"], "posted_verified", "{response}");
+        assert_eq!(result["counts"]["posted_verified"], 1, "{response}");
+        assert_eq!(result["post_span_binding"]["state"], "bound", "{response}");
+        assert!(result.get("error").is_none(), "{response}");
+    } else {
+        assert_eq!(
+            result["error"]["code"], "import_reconciliation_required",
+            "{response}"
+        );
+        assert_eq!(result["counts"]["posted_verified"], 0, "{response}");
+        assert_eq!(
+            result["post_span_binding"]["code"], "span_step_not_created",
+            "{response}"
+        );
+    }
     assert_eq!(
         result["post_location"]["state"], "target_only",
         "{response}"
@@ -2141,7 +2163,6 @@ async fn native_post_reads_back_as_posted_verified(
         result["post_location"]["target_voucher_step"]["matches_created"], matches_created,
         "{response}"
     );
-    assert!(result.get("error").is_none(), "{response}");
     assert_journaled_clean_create(directory.path());
 }
 
@@ -2867,7 +2888,7 @@ async fn a_dispatched_batch_without_identities_still_reconciles() {
         let _lock = server.lock_import_admission().unwrap();
         server
             .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
-                &line, &native,
+                &line, &native, None,
             ))
             .unwrap();
     }
@@ -2880,6 +2901,60 @@ async fn a_dispatched_batch_without_identities_still_reconciles() {
     );
     assert_ne!(result["attempt_recorded"], json!(false), "{response}");
     assert!(observed > 0, "the readback reads Tally: {response}");
+}
+
+/// A batch already sent with a narration the agent readers would rewrite still
+/// reconciles: the refusal below applies only before a POST, never to a batch
+/// that must be reconciled rather than sent again.
+#[tokio::test]
+async fn a_dispatched_batch_with_a_rewritten_narration_still_reconciles() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_with_narration(&server, "Synthetic \u{fffd}#4; test only");
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line, &native, None,
+            ))
+            .unwrap();
+    }
+    let response = server.call_tool("post_import", args).await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_ne!(
+        result["error"]["code"], "voucher_text_invalid",
+        "{response}"
+    );
+    assert!(observed > 0, "the readback reads Tally: {response}");
+}
+
+/// A batch saved before the build refused a narration the agent readers would
+/// rewrite: its untagged post could never be bound, so `post_import` refuses
+/// it before approval and before any request, and records no intent.
+#[tokio::test]
+async fn a_saved_narration_that_would_read_back_rewritten_is_never_sent() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch_with_narration(&server, "Synthetic \u{fffd}#4; test only");
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "voucher_text_invalid",
+        "{response}"
+    );
+    assert_eq!(observed, 0, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
 }
 
 // bridge#239: the company's masters across the post. Only when the target's
@@ -2897,7 +2972,7 @@ async fn post_with_masters_after(
     plans.extend(after_approval(xml(created_one())));
     plans.push(xml(marks_after));
     plans.extend(catalogue);
-    plans.extend(reconcile_readback());
+    plans.extend(posted_readback());
     let scripted = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -2945,7 +3020,9 @@ fn block(path: std::path::PathBuf) {
     fs::create_dir_all(path.join("entry")).unwrap();
 }
 
-/// The readback after a post, and in a later reconcile of the posted batch.
+/// The readback after a post, and in a later reconcile of the posted batch,
+/// for a batch whose dispatch intent records no pre-POST mark (written as an
+/// older build wrote it): the window read twice.
 fn reconcile_readback() -> Vec<ScenarioPlan> {
     let mut plans = probe();
     plans.extend(verified_company());
@@ -2953,6 +3030,13 @@ fn reconcile_readback() -> Vec<ScenarioPlan> {
     plans.extend(paired(captured_posted_journal()));
     plans.extend(paired(captured_posted_journal()));
     plans
+}
+
+/// The same readback for a native post this build made: after the window, the
+/// target's marks, which still show the post (a book below them was rolled
+/// back).
+fn posted_readback() -> Vec<ScenarioPlan> {
+    span_readback(untagged_posted_journal(), 11)
 }
 
 /// The snapshot after the POST with the target's master mark at `masters`
@@ -3025,6 +3109,8 @@ async fn a_ledger_now_on_another_guid_after_the_post_is_flagged_not_verified() {
         "{response}"
     );
     assert_eq!(result["masters_after_post"]["ledgers"], json!(["Cash"]));
+    // Bound: the masters check alone keeps it from posted_verified.
+    assert_eq!(result["post_span_binding"]["state"], "bound", "{response}");
     assert_eq!(result["dispatch"]["state"], "reconciliation_required");
     assert_eq!(result["error"]["code"], "posted_under_changed_masters");
     let message = result["error"]["message"].as_str().unwrap();
@@ -3047,6 +3133,8 @@ async fn moved_masters_that_cannot_be_re_read_are_not_verified() {
         result["masters_after_post"]["state"], "check_unavailable",
         "{response}"
     );
+    // Bound: the masters check alone keeps it from posted_verified.
+    assert_eq!(result["post_span_binding"]["state"], "bound", "{response}");
     assert_eq!(result["dispatch"]["state"], "reconciliation_required");
     assert_eq!(result["error"]["code"], "masters_after_post_unconfirmed");
 }
@@ -3095,7 +3183,7 @@ async fn reconcile_seeded(
         let _lock = server.lock_import_admission().unwrap();
         server
             .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
-                &line, &native,
+                &line, &native, None,
             ))
             .unwrap();
         // A clean response was saved, so only the readback and the check decide.
@@ -3467,7 +3555,7 @@ async fn a_changed_masters_post_names_no_ledger_under_mask_parties() {
         plans.extend(after_approval(xml(created_one())));
         plans.push(xml(masters_moved_to(8)));
         plans.extend(paired(replaced.clone()));
-        plans.extend(reconcile_readback());
+        plans.extend(posted_readback());
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_redacting(simulator.address(), directory.path(), redaction);
@@ -3678,4 +3766,369 @@ async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
     assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
     assert!(error.get("preexisting_txn_ids").is_none(), "{refused}");
     assert!(error.get("next_step").is_none(), "{refused}");
+}
+
+// Binding a native post by its own AlterID span (agent_import_span_identity.rs).
+// The post sends an untagged narration; the readback below is the captured
+// posted Journal (`native-namespaced-journal`) with four changes, each named:
+// its `[BRIDGE:…]` tag removed (the post no longer writes one), ALTERID 10 →
+// 11 (inside the span (10, 11] the scripted marks give), and MASTERID 5 → 295
+// with the GUID suffix to match (`created_one()`'s captured LASTVCHID is 295).
+fn untagged_posted_journal() -> String {
+    let body = captured_posted_journal();
+    let body = replaced_once(&body, " [BRIDGE:9c8d8de4-c06c-847b-8309-60ba702bf663]", "");
+    let body = replaced_once(
+        &body,
+        "<ALTERID TYPE=\"Number\"> 10</ALTERID>",
+        "<ALTERID TYPE=\"Number\"> 11</ALTERID>",
+    );
+    let body = replaced_once(
+        &body,
+        "<MASTERID TYPE=\"Number\"> 5</MASTERID>",
+        "<MASTERID TYPE=\"Number\"> 295</MASTERID>",
+    );
+    body.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"))
+}
+
+/// A verification of the posted batch: the window twice serving `window`,
+/// then the target's marks at `mark`.
+fn span_readback(window: String, mark: u64) -> Vec<ScenarioPlan> {
+    let mut plans = probe();
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(window.clone()));
+    plans.extend(paired(window));
+    plans.extend(paired(marks_at(mark)));
+    plans
+}
+
+/// Posts the captured batch with `marks_after` answering the snapshot after the
+/// POST and `readback` the verification after it, then runs one later
+/// `verify_import` per entry of `later`, each against its own simulator (the
+/// journal's origin moved to it, since a dispatched batch verifies only on the
+/// origin it recorded, and one sequence is capped at 128 requests). Returns the
+/// post's response, each later verification's response, and the journal's
+/// post-span verdict records.
+async fn post_and_verify(
+    marks_after: String,
+    readback: Vec<ScenarioPlan>,
+    later: Vec<Vec<ScenarioPlan>>,
+) -> (Value, Vec<Value>, Vec<Value>) {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(marks_after));
+    plans.extend(readback);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    let _ = sent(simulator);
+    let mut origin =
+        super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let mut verified = Vec::new();
+    for plans in later {
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let later_server = server_at(simulator.address(), directory.path());
+        let later_origin =
+            super::super::super::canonical_loopback_origin(&later_server.settings.endpoint)
+                .unwrap();
+        let text = String::from_utf8(journal(directory.path())).unwrap();
+        fs::write(
+            directory.path().join("agent-import-ledger.jsonl"),
+            text.replace(&origin, &later_origin),
+        )
+        .unwrap();
+        origin = later_origin;
+        verified.push(later_server.call_tool("verify_import", args.clone()).await);
+        let _ = sent(simulator);
+    }
+    let verdicts = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .filter(|record| record["record_type"] == "post_span_verdict")
+        .collect::<Vec<_>>();
+    (posted, verified, verdicts)
+}
+
+fn bound_journal_identity() -> Value {
+    json!([{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","guid":format!("{GUID}-00000127"),"master_id":295}])
+}
+
+/// The untagged post binds to the voucher its own POST created and reads back
+/// `posted_verified` by that binding; the binding is journaled once.
+#[tokio::test]
+async fn an_untagged_native_post_binds_to_its_own_span_and_verifies() {
+    let (posted, _, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        Vec::new(),
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(false), "{posted}");
+    assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    assert_eq!(result["post_span_binding"]["state"], "bound", "{posted}");
+    assert_eq!(
+        result["vouchers"][0]["marker"], "post_span_binding",
+        "{posted}"
+    );
+    assert_eq!(verdicts.len(), 1, "{verdicts:?}");
+    assert_eq!(verdicts[0]["bindings"], bound_journal_identity());
+    assert!(verdicts[0].get("binding_refusal").is_none());
+}
+
+/// A bound voucher a later window does not hold is `bound_not_in_window`,
+/// never `not_found`, and the batch is not verified.
+#[tokio::test]
+async fn a_bound_voucher_missing_from_a_later_window_is_never_read_as_absent() {
+    let (_, verified, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![span_readback(empty_collection(), 11)],
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    assert_eq!(result["counts"]["bound_not_in_window"], 1, "{result}");
+    assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    assert_eq!(
+        result["unverified_vouchers"][0]["status"], "bound_not_in_window",
+        "{result}"
+    );
+    assert_eq!(
+        result["unverified_vouchers"][0]["next_step"],
+        json!(
+            super::super::verification::plain_next_step("bound_not_in_window")
+                .expect("a plain line for bound_not_in_window")
+        ),
+        "{result}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{result}"
+    );
+    assert_eq!(
+        result["error"]["code"], "import_reconciliation_required",
+        "{result}"
+    );
+    assert_eq!(
+        verdicts.len(),
+        1,
+        "the later verify journals no second verdict"
+    );
+}
+
+/// A book that reads below the mark the post left was rolled back (a backup
+/// restored over it): its vouchers are `book_rolled_back`, never `not_found`.
+#[tokio::test]
+async fn a_book_rolled_back_below_the_post_reads_as_rolled_back_never_absent() {
+    let (_, verified, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![span_readback(empty_collection(), 10)],
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        result["post_span_binding"]["state"], "book_rolled_back",
+        "{result}"
+    );
+    assert_eq!(result["post_span_binding"]["current_mark"], 10, "{result}");
+    assert_eq!(
+        result["post_span_binding"]["expected_at_least"], 11,
+        "{result}"
+    );
+    assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    assert_eq!(result["counts"]["book_rolled_back"], 1, "{result}");
+    assert_eq!(
+        result["unverified_vouchers"][0]["status"], "book_rolled_back",
+        "{result}"
+    );
+    assert_eq!(
+        result["unverified_vouchers"][0]["next_step"],
+        json!(
+            super::super::verification::plain_next_step("book_rolled_back")
+                .expect("a plain line for book_rolled_back")
+        ),
+        "{result}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{result}"
+    );
+    assert_eq!(
+        result["error"]["code"], "import_reconciliation_required",
+        "{result}"
+    );
+}
+
+/// When the mark after the POST could not be read, the post is bound on the
+/// span its clean response implies, in the same call: the measurement is
+/// missing, not failed.
+#[tokio::test]
+async fn an_unread_after_mark_binds_on_the_span_the_clean_response_implies() {
+    let unreadable = "<ENVELOPE><BODY><DATA></DATA></BODY></ENVELOPE>".to_string();
+    // An unreadable snapshot proves no master unmoved, so the approved ledgers
+    // are read again before the readback.
+    let mut readback = paired(catalogue());
+    readback.extend(span_readback(untagged_posted_journal(), 11));
+    let (posted, _, verdicts) = post_and_verify(unreadable, readback, Vec::new()).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "bound", "{posted}");
+    assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    assert_eq!(verdicts.len(), 1);
+    assert_eq!(verdicts[0]["bindings"], bound_journal_identity());
+}
+
+/// A mark after the POST that stepped by more than Tally created means
+/// something else changed the book during the post: the binding is refused,
+/// journaled, and never retried by a later verification.
+#[tokio::test]
+async fn a_step_other_than_created_refuses_the_binding_for_good() {
+    let (posted, verified, verdicts) = post_and_verify(
+        company_marks(12, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 12),
+        vec![span_readback(untagged_posted_journal(), 12)],
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["post_span_binding"]["code"], "span_step_not_created",
+        "{posted}"
+    );
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    let later = &verified[0]["structuredContent"]["result"];
+    assert_eq!(later["post_span_binding"]["state"], "refused", "{later}");
+    assert_eq!(
+        later["post_span_binding"]["code"], "span_step_not_created",
+        "{later}"
+    );
+    assert_eq!(verdicts.len(), 1, "{verdicts:?}");
+    assert_eq!(verdicts[0]["binding_refusal"], "span_step_not_created");
+}
+
+/// The tagged capture is not what the untagged post sent: its narration
+/// carries the tag, so the binding refuses on content, for good.
+#[tokio::test]
+async fn a_readback_whose_narration_differs_refuses_the_binding() {
+    let mut tagged_in_span = captured_posted_journal();
+    tagged_in_span = replaced_once(
+        &tagged_in_span,
+        "<ALTERID TYPE=\"Number\"> 10</ALTERID>",
+        "<ALTERID TYPE=\"Number\"> 11</ALTERID>",
+    );
+    tagged_in_span = replaced_once(
+        &tagged_in_span,
+        "<MASTERID TYPE=\"Number\"> 5</MASTERID>",
+        "<MASTERID TYPE=\"Number\"> 295</MASTERID>",
+    );
+    tagged_in_span =
+        tagged_in_span.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"));
+    let (posted, _, verdicts) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(tagged_in_span, 11),
+        Vec::new(),
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["post_span_binding"]["code"], "span_content_mismatch",
+        "{posted}"
+    );
+    assert_eq!(verdicts[0]["binding_refusal"], "span_content_mismatch");
+    // The readback's tag is not this untagged post's: the voucher is matched
+    // by content only and never reads verified through the tag.
+    assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
+    assert_eq!(
+        result["vouchers"][0]["status"], "matching_content_observed",
+        "{posted}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["marker"], "accounting_fingerprint",
+        "{posted}"
+    );
+}
+
+/// A copy that holds no voucher at all (one never used, put in place of the
+/// book) omits its voucher mark: that reads as 0, so the post's vouchers are
+/// `book_rolled_back`, never a failed verification and never `not_found`.
+#[tokio::test]
+async fn a_copy_with_no_vouchers_in_place_of_the_book_reads_as_rolled_back() {
+    let no_voucher_mark = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY>\
+         <GUID>{GUID}</GUID><ALTMSTID>7</ALTMSTID>\
+         </COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    let mut later = probe();
+    later.extend(verified_company());
+    later.extend(paired(marks()));
+    later.extend(paired(empty_collection()));
+    later.extend(paired(empty_collection()));
+    later.extend(paired(no_voucher_mark));
+    let (_, verified, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        vec![later],
+    )
+    .await;
+    let result = &verified[0]["structuredContent"]["result"];
+    assert_eq!(
+        result["post_span_binding"]["state"], "book_rolled_back",
+        "{result}"
+    );
+    assert_eq!(result["post_span_binding"]["current_mark"], 0, "{result}");
+    assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    assert_eq!(
+        result["unverified_vouchers"][0]["status"], "book_rolled_back",
+        "{result}"
+    );
+    assert_eq!(
+        result["unverified_vouchers"][0]["next_step"],
+        json!(
+            super::super::verification::plain_next_step("book_rolled_back")
+                .expect("a plain line for book_rolled_back")
+        ),
+        "{result}"
+    );
+}
+
+/// An untagged post whose binding was refused cannot be found by a tag, so a
+/// later window its content does not match (an edit in Tally) reads it as
+/// `sent_not_attributed`, never `not_found`.
+#[tokio::test]
+async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() {
+    let (_, verified, verdicts) = post_and_verify(
+        company_marks(12, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 12),
+        vec![span_readback(empty_collection(), 12)],
+    )
+    .await;
+    assert_eq!(verdicts[0]["binding_refusal"], "span_step_not_created");
+    let result = &verified[0]["structuredContent"]["result"];
+    assert_eq!(result["counts"]["not_found"], 0, "{result}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 1, "{result}");
+    assert_eq!(
+        result["unverified_vouchers"][0]["status"], "sent_not_attributed",
+        "{result}"
+    );
+    assert_eq!(
+        result["unverified_vouchers"][0]["next_step"],
+        json!(
+            super::super::verification::plain_next_step("sent_not_attributed")
+                .expect("a plain line for sent_not_attributed")
+        ),
+        "{result}"
+    );
+    assert_eq!(
+        result["verification_status"], "verification_incomplete",
+        "{result}"
+    );
 }

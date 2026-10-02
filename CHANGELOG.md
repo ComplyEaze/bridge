@@ -35,6 +35,19 @@ These changes are in source and not yet in a published build.
   same before and after the window, not when the window was counted as
   `vouchers` now requires (#1009).
 
+**Safer or fixed**
+
+- `vouchers` no longer re-reads a whole window for every page. A later page of a
+  `complete` window is served from the first page's read while the company's
+  books have not changed in a way that moves their marks, and a page that names
+  the first page's `snapshot_id` is refused if they did, instead of continuing
+  from a different read. Without the name, a page that reads afresh (the held
+  window moved on, expired or was dropped) has offsets that may not continue the
+  earlier pages, which the result says when it knows (`earlier_snapshot`). Before,
+  a book that changed between pages could skip or repeat vouchers while every
+  page said `complete`. A window that is only `partial` is read again for each
+  page, as before (#485).
+
 ## [0.4.1] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)

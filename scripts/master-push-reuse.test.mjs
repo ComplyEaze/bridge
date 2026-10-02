@@ -151,7 +151,7 @@ for (const [name, failWith] of [
   });
 }
 
-test("a lockfile, manifest, toolchain or .github change runs everything without asking the API", async () => {
+test("a lockfile, manifest, toolchain, CI workflow or CI action change runs everything without asking the API", async () => {
   for (const file of [
     "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
     "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml", "src-tauri/.cargo/config.toml",
@@ -163,6 +163,9 @@ test("a lockfile, manifest, toolchain or .github change runs everything without 
     assert.equal(outcome.code, "forced_full_path", file);
     assert.equal(calls.length, 0, file);
   }
+  // A workflow the heavy jobs do not use, and other .github content, do not: that run was an unrelated change on a push and
+  // only occupied the macOS runners.
+  assert.equal(forcesFullRun([".github/workflows/deploy-install-page.yml", ".github/workflows/publish-mcp-registry.yml", ".github/ISSUE_TEMPLATE/bug.yml", ".github/CODEOWNERS", ".github/workflows/ci.yml.bak", ".github/actions"]), undefined);
   assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a", "src-tauri/tauri.conf.json.md", "docs/cargo/x"]), undefined);
 });
 
@@ -301,7 +304,7 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
 });
 
 test("a file name cannot add lines to what the script prints", async () => {
-  const hostile = ".github/x\nreuse_native=true\nreuse_bundle=true\n::warning::y`";
+  const hostile = ".github/actions/x\nreuse_native=true\nreuse_bundle=true\n::warning::y`";
   const outcome = await run({ fetcher: github().fetcher }, () => [hostile]);
   assert.deepEqual(reused(outcome), NOTHING);
   assert.equal(/[\n`]/.test(outcome.reason), false, "the reason is one line even before it is printed");

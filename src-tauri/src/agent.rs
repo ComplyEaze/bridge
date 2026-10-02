@@ -51,6 +51,7 @@ mod masters;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+use vouchers::VoucherPages;
 #[path = "agent_bill_trail.rs"]
 mod bill_trail;
 #[path = "agent_outstandings.rs"]
@@ -414,6 +415,9 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// `vouchers` windows read once and served page by page (#485). In memory
+    /// only; see `agent_vouchers.rs`.
+    voucher_pages: Arc<Mutex<VoucherPages>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -1082,17 +1086,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
-        // control character); the least discoverable of them is specific to
-        // the voucher number, so it is named here rather than left for a
-        // caller to reverse-engineer.
+        // control character); the least discoverable of them applies to the
+        // voucher number and the narration, so it is named here rather than
+        // left for a caller to reverse-engineer.
         "voucher_text_invalid" => Some(
-            "The voucher number is empty, longer than the schema allows, holds a control \
-             character, or — the one cause that is not visible by inspection — begins a \
-             literal U+FFFD immediately followed by `#`, digits and `;` (for example \
-             U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite exactly that sequence before \
-             parsing, so a voucher number carrying it would read back as different text and \
-             could never be confirmed as posted. Remove that sequence from the voucher number \
-             and resubmit; narration and reference may carry it freely.",
+            "A narration, reference or voucher number is empty, longer than the schema \
+             allows, or holds a control character; or — the one cause that is not visible by \
+             inspection — the voucher number or narration holds a literal U+FFFD immediately \
+             followed by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent \
+             readers rewrite exactly that sequence before parsing, so a voucher number \
+             carrying it could never be confirmed as posted, and a native post of a narration \
+             carrying it could never be bound to the voucher it created, so never confirmed \
+             either. Remove that sequence from the voucher number or narration and build the \
+             batch again with build_import_xml: a saved batch cannot be changed, and \
+             post_import refuses one saved with such a narration. The reference may carry it \
+             freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -1364,6 +1372,7 @@ impl Server {
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
         }
@@ -2012,17 +2021,13 @@ pub(crate) async fn desktop_selected_vouchers(
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;

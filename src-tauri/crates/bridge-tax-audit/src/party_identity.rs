@@ -371,7 +371,8 @@ additional_party_ledgers = [\"A\"]\nexcluded_ledgers = [\"E\"]\nround_off_ledger
             ("N", "P", "S", "D")
         );
         assert!(!config("").unwrap().derive_pan_from_gstin);
-        assert!(config("[party_identity]\n").unwrap().overrides.is_empty());
+        let empty = config("[party_identity]\n").unwrap();
+        assert!(empty.overrides.is_empty() && !empty.derive_pan_from_gstin);
         for bad in [
             "party_identity = 5",
             "[party_identity]\nunknown_key = 1",

@@ -59,6 +59,11 @@ These changes are in source and not yet in a published build.
   a book that changed between pages could skip or repeat vouchers while every
   page said `complete`. A window that is only `partial` is read again for each
   page, as before (#485).
+- In the desktop app, the button on an export notice that shows the file
+  (Show in Finder, Show in Explorer or Open folder) now opens only a file
+  ComplyEaze Bridge exported since it started. Any other path is refused
+  before the file manager opens, so a compromised app window cannot use it to
+  point at other files on the computer. Exports work as before (#915, #1051).
 
 ## [0.4.1] - 2026-10-02
 

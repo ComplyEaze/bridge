@@ -426,7 +426,10 @@ fn numeric_voucher_ids_distinguish_absence_from_invalid_observations() {
     }
     let rows = parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
     assert_eq!(rows[0]["alter_id"], 1);
-    assert_eq!(rows[0]["master_id"], " 1");
+    // The capture carries Tally's padded `<MASTERID TYPE="Number"> 1</MASTERID>`;
+    // the row carries the plain number text (#989).
+    assert!(captured.contains("> 1</MASTERID>"));
+    assert_eq!(rows[0]["master_id"], "1");
     assert_eq!(parse_optional_tally_u64(None, "invalid"), Ok(None));
     assert_eq!(
         parse_optional_tally_u64(Some(" 0001 "), "invalid"),
@@ -768,15 +771,19 @@ fn repeated_captured_voucher_identities_are_refused_before_selection_or_movement
         first_start + captured[first_start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let first = &captured[first_start..first_end];
     let guid = original[0]["guid"].as_str().unwrap();
-    let master = original[0]["master_id"].as_str().unwrap();
+    // The first voucher's master ID as the capture spells it, padded. The row's
+    // `master_id` is the trimmed "1" (#989), which would match nothing here.
+    let master = "> 1</MASTERID>";
+    assert_eq!(original[0]["master_id"], "1");
+    assert!(first.contains(master), "{first}");
     for duplicate in [
         first.to_string(),
         first
             .replace(guid, &guid.to_ascii_uppercase())
-            .replace(&format!(">{master}</MASTERID>"), ">999</MASTERID>"),
+            .replace(master, ">999</MASTERID>"),
         first
             .replace(guid, &format!("{CAPTURED_VOUCHER_COMPANY_GUID}-distinct"))
-            .replace(&format!(">{master}</MASTERID>"), ">0001</MASTERID>"),
+            .replace(master, ">0001</MASTERID>"),
     ] {
         let repeated = captured.replacen("</COLLECTION>", &format!("{duplicate}</COLLECTION>"), 1);
         for require_identity in [false, true] {

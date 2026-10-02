@@ -862,6 +862,71 @@ class GitRepo(unittest.TestCase):
         self.assertEqual(rc, 2, out)
         self.assertFalse((outside / "plain.json").exists())
 
+    def test_a_shard_that_crashes_before_any_mutation_writes_a_typed_refusal_and_exits_2(self):
+        """Python exits 1 on an uncaught exception, which the shard step reads as "a mutation not killed" and
+        leaves green. Any crash is exit 2, and before the first mutation it is a typed refusal like a baseline
+        failure."""
+        outside = Path(self.t.name)
+        results = outside / "shard-1.json"
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(results))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        doc = json.loads(results.read_text())
+        self.assertEqual(list(doc), ["refused"])
+        self.assertEqual(doc["refused"]["shard"], "1/1")
+        self.assertEqual(doc["refused"]["problems"], ["crashed: OSError"])
+        self.assertTrue(doc["refused"]["output"][0].startswith("OSError: disk gone"), doc)
+        self.assertIn("OSError: disk gone", out)
+
+    def test_a_crash_after_a_mutation_has_run_keeps_its_records_and_exits_2(self):
+        outside = Path(self.t.name)
+        results = outside / "shard-1.json"
+        saved, calls = mu.run_one, []
+
+        def second_crashes(*a, **k):
+            calls.append(1)
+            if len(calls) == 2:
+                raise RuntimeError("worker died")
+            return saved(*a, **k)
+
+        mu.run_one = second_crashes
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("B1", "R1", "--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(results))
+        finally:
+            mu.run_one = saved
+        self.assertEqual(rc, 2, out)
+        doc = json.loads(results.read_text())
+        self.assertNotIn("refused", doc, "records already made are never replaced by a refusal")
+        self.assertEqual(sorted(doc), ["B1"])
+
+    def test_a_crash_in_a_run_that_is_not_a_shard_exits_2_and_writes_no_file(self):
+        outside = Path(self.t.name)
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("B1", "--workdir", str(outside / "mutants"), "--results", str(outside / "r.json"))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        self.assertFalse((outside / "r.json").exists())
+
     def test_a_shard_run_without_results_never_overwrites_the_committed_results_file(self):
         outside = Path(self.t.name)
         before = mu.RESULTS.read_bytes() if mu.RESULTS.exists() else None

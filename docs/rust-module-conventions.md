@@ -20,7 +20,7 @@ counterpart.
 ## The constraint general advice does not know about
 
 Most large files here are **pinned** in `docs/tally/compatibility/compatibility-surface.json`. A
-split changes the pin set, raises `MAX_SURFACE_FILES` for each new pin (each with its own `reason`), and needs
+split changes the pin set (each new pin with its own `reason`) and needs
 an acknowledgement file under `docs/tally/compatibility/acks/`. The evidence that attests the old file does not automatically
 attest the new ones. **The cost of splitting a pinned file is not the edit; it is the
 attestation.** Everything below assumes that cost is real.
@@ -98,7 +98,7 @@ non-idiomatic Rust. Treat them as questions only.
      identical and CI caught it.
    - **Also:** `cargo fmt --check`, clippy, and the compatibility acknowledgement when a pinned path changed.
 9. **A pinned split carries its reasons.** Record one `reason` per new pin in the pin
-   list (and raise `MAX_SURFACE_FILES`), and pin every new file that decides what Bridge posts or lets leave the
+   list, and pin every new file that decides what Bridge posts or lets leave the
    machine ([`module-decomposition.md`](./module-decomposition.md)).
 10. **Don't reach for a new crate** unless you need something a module cannot give:
     - a compile or incremental-build boundary worth its dependency management;
@@ -190,7 +190,7 @@ shared items:
 - live reads: companies, ledgers, outstandings, selected ledger entries;
 - client group labels and preferences;
 - exports and party statements;
-- thin delegations to documents, Axal and the desktop journal.
+- thin delegations to the desktop journal.
 
 `commands_trial_balance.rs` already shows the per-feature pattern as `commands::trial_balance`.
 

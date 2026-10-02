@@ -66,16 +66,40 @@ export function parseAck(content) {
   return out;
 }
 
+export const WITHDRAWN_MESSAGE =
+  "pinned by a commit of this pull request but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line";
+
+// The branch history check. The diff against the base cannot see a pin the branch added and then
+// lost (a merge resolved by taking the other side's list): at the head the list equals the base's.
+// So every commit of base..head is read: a path is collected when a commit's pin list holds it and
+// none of that commit's parents' lists does (a merge is compared with ALL its parents). A collected
+// path that is in neither the base list nor the head list was pinned by the branch and withdrawn.
+// commits: [{sha, parents: [sha]}]; pinsOf(sha) -> {blob, paths: Set} and throws when the list at
+// that commit cannot be read. A commit whose list is the same blob as a parent's adds nothing.
+export function withdrawnPins({ commits, pinsOf, basePaths, headPaths }) {
+  const collected = new Set();
+  for (const commit of commits) {
+    const own = pinsOf(commit.sha);
+    const parents = commit.parents.map(pinsOf);
+    if (parents.some((p) => p.blob === own.blob)) continue;
+    for (const path of own.paths) if (!parents.some((p) => p.paths.has(path))) collected.add(path);
+  }
+  return sorted([...collected].filter((p) => !basePaths.has(p) && !headPaths.has(p)));
+}
+
 // basePins/headPins: [{path, reason?}]. changed: [{status, path, oldPath?}] (git name-status).
 // acks: files under ACK_DIR in the diff: {added: [{path, content}], modified: [path], deleted: [path],
 // renamedOut: [path]} (renamedOut: an ack renamed to a name outside ACK_DIR, which is a delete plus
 // an add of a file that is not an ack: refused whether or not a pinned path changed).
 // A path is a touch only because it is in a pin list (base or head). The one exception is a nested
 // `.gitattributes`, which is refused (it can change a pinned file's bytes with no pinned path in the diff).
-export function checkAck({ basePins, headPins, changed, acks, prNumber }) {
+// withdrawn: paths a commit of the branch pinned that are in neither the base list nor the head list
+// (see withdrawnPins); each is a removed pin and needs its own "removed-pin:" line.
+export function checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn = [] }) {
   const reasons = [];
   const baseSet = new Set(basePins.map((p) => p.path));
   const headSet = new Set(headPins.map((p) => p.path));
+  const withdrawnPaths = sorted(withdrawn.filter((p) => !baseSet.has(p) && !headSet.has(p)));
   const pinned = new Set([...baseSet, ...headSet]);
   const changedPins = new Set();
   for (const c of changed) {
@@ -83,7 +107,7 @@ export function checkAck({ basePins, headPins, changed, acks, prNumber }) {
     for (const p of [c.path, c.oldPath]) if (p && pinned.has(p)) changedPins.add(p);
   }
   const addedPins = headPins.filter((p) => !baseSet.has(p.path));
-  const removed = sorted([...baseSet].filter((p) => !headSet.has(p)));
+  const removed = sorted([...[...baseSet].filter((p) => !headSet.has(p)), ...withdrawnPaths]);
   const touched = sorted([...changedPins, ...addedPins.map((p) => p.path), ...removed]);
   const expectedPaths = touched.filter((p) => !removed.includes(p));
   const result = (r) => ({ ok: r.length === 0, reasons: r, touched, removed });
@@ -125,7 +149,12 @@ export function checkAck({ basePins, headPins, changed, acks, prNumber }) {
     if (extra.length) reasons.push(`${ack.path}: lists path(s) that are not changed pinned paths: ${extra.join(", ")}`);
     const undeclared = removed.filter((p) => !parsed.removed.includes(p));
     const invented = parsed.removed.filter((p) => !removed.includes(p));
-    if (undeclared.length) reasons.push(`${ack.path}: removed pin(s) need a "removed-pin:" line: ${undeclared.join(", ")}`);
+    const undeclaredBase = undeclared.filter((p) => !withdrawnPaths.includes(p));
+    const undeclaredWithdrawn = undeclared.filter((p) => withdrawnPaths.includes(p));
+    if (undeclaredBase.length) reasons.push(`${ack.path}: removed pin(s) need a "removed-pin:" line: ${undeclaredBase.join(", ")}`);
+    for (const p of undeclaredWithdrawn) {
+      reasons.push(`${ack.path}: ${p}: ${WITHDRAWN_MESSAGE}`);
+    }
     if (invented.length) reasons.push(`${ack.path}: "removed-pin:" names path(s) that were not removed: ${invented.join(", ")}`);
   }
   for (const p of addedPins) {
@@ -210,6 +239,72 @@ function collectAcks(changed, headRev) {
   return acks;
 }
 
+// The paths in a pin list from an older commit of the branch. Only the paths matter there, so the
+// list needs to be valid JSON with a `files` array of rows that each have a path string: the strict
+// rules (sorted, unique, exact keys, schema) apply to the list at the head and at the base, and a
+// branch must not be left with no way to go green because one old commit had its list out of order.
+// scripts/merge-gate.sh reads the same thing (`.files[].path`), so the two checks agree.
+export function historicPaths(text) {
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    throw new Error("the pin list is not valid JSON");
+  }
+  if (!doc || typeof doc !== "object" || Array.isArray(doc) || !Array.isArray(doc.files)) {
+    throw new Error("the pin list has no files array");
+  }
+  const paths = doc.files.map((row, i) => {
+    if (!row || typeof row !== "object" || Array.isArray(row) || typeof row.path !== "string" || row.path === "") {
+      throw new Error(`pin list row ${i + 1} has no path string`);
+    }
+    return row.path;
+  });
+  return new Set(paths);
+}
+
+// The pin list at one commit, for the history check: {blob, paths}, read for its paths only (see
+// historicPaths, which also covers a schema 2 list from a branch cut before schema 3). It must exist
+// and be readable; anything else throws.
+function pinsAtCommit(sha, cache) {
+  if (!/^[0-9a-f]{40,64}$/.test(sha)) throw new Error(`refusing commit ${JSON.stringify(sha)}`);
+  if (!cache.has(sha)) {
+    let blob;
+    try {
+      blob = git("rev-parse", "--verify", `${sha}:${SURFACE_PATH}`).trim();
+    } catch {
+      throw new Error(`the pin list cannot be read at commit ${sha.slice(0, 12)}; the branch history cannot be checked`);
+    }
+    let paths = cache.get(blob)?.paths;
+    if (!paths) {
+      try {
+        paths = historicPaths(git("cat-file", "blob", blob));
+      } catch (error) {
+        throw new Error(`the pin list at commit ${sha.slice(0, 12)} cannot be parsed (${error.message}); the branch history cannot be checked`);
+      }
+      cache.set(blob, { blob, paths });
+    }
+    cache.set(sha, { blob, paths });
+  }
+  return cache.get(sha);
+}
+
+// Every commit of baseRev..headRev with its parents, from `git rev-list --parents` (never a
+// path-limited log: history simplification would hide the merge side that held the pin). A shallow
+// clone cannot show the history, so it fails closed.
+function branchCommits(baseRev, headRev) {
+  if (git("rev-parse", "--is-shallow-repository").trim() !== "false") {
+    throw new Error("this is a shallow clone, so the branch history cannot be checked (fetch with full history)");
+  }
+  return git("rev-list", "--parents", `${rev(baseRev)}..${rev(headRev)}`, "--")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [sha, ...parents] = line.split(" ");
+      return { sha, parents };
+    });
+}
+
 function evaluate(label, baseRev, headRev, prNumber) {
   try {
     const at = (r) => git("show", `${rev(r)}:${SURFACE_PATH}`);
@@ -217,7 +312,14 @@ function evaluate(label, baseRev, headRev, prNumber) {
     const headPins = parsePins(at(headRev));
     const changed = parseNameStatus(git("diff", "--name-status", "-z", "--find-renames", "--find-copies", rev(baseRev), rev(headRev), "--"));
     const acks = collectAcks(changed, headRev);
-    return { label, ...checkAck({ basePins, headPins, changed, acks, prNumber }) };
+    const cache = new Map();
+    const withdrawn = withdrawnPins({
+      commits: branchCommits(baseRev, headRev),
+      pinsOf: (sha) => pinsAtCommit(sha, cache),
+      basePaths: new Set(basePins.map((p) => p.path)),
+      headPaths: new Set(headPins.map((p) => p.path)),
+    });
+    return { label, ...checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn }) };
   } catch (error) {
     return failure(label, error);
   }

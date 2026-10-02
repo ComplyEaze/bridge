@@ -24,7 +24,7 @@ body:
       description: Select exactly one owning area; maintainers apply the matching label.
       options:
         - area:tally
-        - area:documents
+        - area:tax-audit
         - area:infra
         - area:security
     validations:

@@ -90,6 +90,7 @@ fn the_foreign_balance_refusal_names_its_ledger_under_redaction() {
 /// the native read's four sources given, and FOREX's own extent capture when
 /// `extent` is given (else a generic lab extent): every scripted response is
 /// served.
+#[allow(clippy::too_many_arguments)]
 async fn forex_outstandings(
     extent: Option<&[u8]>,
     receivable: &[u8],
@@ -98,6 +99,7 @@ async fn forex_outstandings(
     ledgers: &[u8],
     as_of: &str,
     redaction: Redaction,
+    extra_arguments: Value,
 ) -> Value {
     use tally_protocol_simulator::{
         Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -182,10 +184,14 @@ async fn forex_outstandings(
         batch_post_enabled: false,
     });
     let response = server
-        .call_tool(
-            "outstandings",
-            json!({"company_guid":"b14e9b2d-8a63-4779-804d-25d59eb787eb","as_of":as_of}),
-        )
+        .call_tool("outstandings", {
+            let mut arguments =
+                json!({"company_guid":"b14e9b2d-8a63-4779-804d-25d59eb787eb","as_of":as_of});
+            for (key, value) in extra_arguments.as_object().into_iter().flatten() {
+                arguments[key] = value.clone();
+            }
+            arguments
+        })
         .await;
     assert_eq!(simulator.finish().unwrap().len(), plan_count);
     response
@@ -214,6 +220,7 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
         ),
         "20250930",
         Redaction::MaskParties,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -305,6 +312,7 @@ async fn a_book_with_only_mixed_ledgers_set_aside_is_still_partial() {
         &rupees_only,
         "20260915",
         Redaction::None,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -385,6 +393,7 @@ async fn mcp_outstandings_set_a_mixed_party_aside_with_its_bills() {
         ),
         "20260915",
         Redaction::None,
+        json!({}),
     )
     .await;
     assert_eq!(response["isError"], false, "{response}");
@@ -541,5 +550,626 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
         "net into one figure",
     ] {
         assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
+/// What an agent must know before it relies on a party detail is in the
+/// description it reads: what `tied` does and does not prove, what an absent
+/// residual row and an empty read mean, and what the detail costs.
+#[test]
+fn the_outstandings_description_carries_the_party_details_caveats() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "`tied` means the two figures are equal, not that the composition is proven",
+        "two changes that compensate, or allocations that net to zero, can still read `tied`",
+        "`no_residual_row_for_party` (with `residual` null)",
+        "`no_named_bill_for_party`",
+        "`window_returned_no_vouchers`",
+        "from the whole company's vouchers",
+        "its cost is that of a `vouchers` read over the same span, which is unmeasured on a large book",
+        "any refusal of that read fails the whole `outstandings` call",
+        "`unadjusted_detail_too_large` (nothing narrows it",
+        "with the read's own `partial_reason`",
+        "Passing `detail` is the request to read the company's vouchers from the start of the books",
+        "neither cancelled nor optional",
+        "`row_amounts: as_allocated`",
+        "never net of what later allocations adjusted against its reference",
+        "Tally's own `native_balance`",
+        "`trail_window_too_large` (name a `reference`",
+        "a window of more than 5,376 of the company's vouchers is always refused",
+        "`named_bill_window_too_large` (a reference was named already",
+        "told apart only by `native_rows`",
+        "`unadjusted_window_too_large` (nothing narrows it",
+        "`reads.needed_at_least` against `reads.allowed`",
+        "The limit counts allocations, not bills",
+        "`agent_response_too_large`",
+        "One foreign-currency composite voucher anywhere in the window fails it",
+        "can tie when named",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
+/// The party detail's conflicting arguments are refused before any read: the
+/// tool names the code before any request is attempted.
+#[tokio::test]
+async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() {
+    // Nothing listens here. A refusal that came after a read would carry a
+    // connection error's code, so the expected refusal code below is also the
+    // proof that no request was attempted.
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 1,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let guid = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+    for (extra, code) in [
+        (json!({"party": "P"}), "party_requires_detail"),
+        (json!({"detail": "bill_trail"}), "detail_requires_party"),
+        // The schema's enum refuses an unknown kind before the handler runs;
+        // `invalid_detail` is the handler's own guard behind it.
+        (
+            json!({"party": "P", "detail": "everything"}),
+            "argument_invalid:detail",
+        ),
+        (
+            json!({"party": "P", "detail": "unadjusted", "reference": "R"}),
+            "reference_requires_bill_trail",
+        ),
+    ] {
+        let mut arguments = json!({"company_guid": guid});
+        for (key, value) in extra.as_object().unwrap() {
+            arguments[key] = value.clone();
+        }
+        let response = server.call_tool("outstandings", arguments).await;
+        assert_eq!(response["isError"], true, "{extra}: {response}");
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{extra}"
+        );
+    }
+}
+
+/// A party detail is tied against the whole book's bills, so a partial read
+/// (here: ledgers kept in another currency) refuses it rather than tying
+/// against a subset.
+#[tokio::test]
+async fn mcp_outstandings_refuse_a_party_detail_on_a_partial_read() {
+    let response = forex_outstandings(
+        None,
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::None,
+        json!({"party": "BRIDGE FX DEBTOR A", "detail": "bill_trail"}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "detail_requires_a_complete_read");
+    // The read's own reason stays in band beside the refusal's code.
+    assert_eq!(
+        error["partial_reason"], "currency_ledgers_excluded",
+        "{error}"
+    );
+    assert_eq!(
+        error["partial_reasons"],
+        json!(["foreign_currency_ledgers_excluded"]),
+        "{error}"
+    );
+}
+
+/// The ageing lab book's captured `outstandings` sequence (currency read, then
+/// the native read), with `ledgers` as the native read's ledger source, called
+/// through the MCP tool with `extra_arguments`. The sequence is the one
+/// `currency_then_native_plans_with_ledgers` scripts for the runtime.
+async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    fn decode(bytes: &[u8]) -> String {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+    let xml = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body)).with_encoding(WireEncoding::Utf16Le)
+    };
+    let status = || ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let pair = |plans: &mut Vec<ScenarioPlan>, source: ScenarioPlan| {
+        plans.extend([source.clone(), status(), source, status()]);
+    };
+    let companies = xml(decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    )));
+    let extent = xml(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    )
+    .to_string());
+    let mut plans = Vec::new();
+    pair(&mut plans, companies.clone());
+    // The one-master currency read.
+    plans.push(companies.clone());
+    pair(&mut plans, extent.clone());
+    pair(
+        &mut plans,
+        xml(decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+        ))),
+    );
+    pair(&mut plans, extent.clone());
+    plans.push(companies.clone());
+    // The native outstandings read.
+    plans.extend([status(), companies.clone(), companies.clone()]);
+    pair(&mut plans, extent.clone());
+    for bytes in [
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
+        )
+        .as_slice(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-groups.utf16le.xml"
+        )
+        .as_slice(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-payable.utf16le.xml"
+        )
+        .as_slice(),
+    ] {
+        pair(&mut plans, xml(decode(bytes)));
+    }
+    pair(&mut plans, xml(ledgers));
+    pair(&mut plans, extent);
+    plans.extend([companies.clone(), status(), companies]);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mut arguments =
+        json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
+    for (key, value) in extra_arguments.as_object().into_iter().flatten() {
+        arguments[key] = value.clone();
+    }
+    let response = server.call_tool("outstandings", arguments).await;
+    simulator.cancel();
+    response
+}
+
+/// The captured ageing ledgers predate `CURRENCYNAME`; this is the labelled
+/// edit `ageing_ledgers_with_currency` makes for the runtime's tests: the
+/// field in its captured position on every row, the book's single master
+/// `I₹` on every row but `Ageing Customer A`, which gets `customer_a`.
+fn ageing_ledgers_with_currency(customer_a: &str) -> String {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-ledgers.utf16le.xml"
+    );
+    let captured = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let mut pieces = captured.split("<LEDGER ");
+    let mut ledgers = pieces.next().unwrap().to_string();
+    let mut rows = 0;
+    for piece in pieces {
+        let tag_end = piece.find('>').unwrap() + 1;
+        let currency = if piece.starts_with("NAME=\"Ageing Customer A\"") {
+            customer_a
+        } else {
+            "I\u{20b9}"
+        };
+        ledgers.push_str("<LEDGER ");
+        ledgers.push_str(&piece[..tag_end]);
+        ledgers.push_str(&format!(
+            "\r\n     <CURRENCYNAME TYPE=\"String\">{currency}</CURRENCYNAME>"
+        ));
+        ledgers.push_str(&piece[tag_end..]);
+        rows += 1;
+    }
+    assert_eq!(rows, 6);
+    ledgers
+}
+
+/// The `Partial` arm: a ledger kept in a currency the book's base does not
+/// match makes the native read an in-band partial, and a party detail asked of
+/// it is refused with the read's own reason beside the refusal's code.
+#[tokio::test]
+async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail() {
+    // Without a detail the same read is the in-band partial the refusal names.
+    let plain = ageing_outstandings(ageing_ledgers_with_currency("$"), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    let result = &plain["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["partial_reason"], "ledger_currency_base_unmatched");
+
+    let response = ageing_outstandings(
+        ageing_ledgers_with_currency("$"),
+        json!({"party": "Ageing Customer A", "detail": "unadjusted"}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let content = &response["structuredContent"];
+    let error = &content["result"]["error"];
+    assert_eq!(error["code"], "detail_requires_a_complete_read", "{error}");
+    assert_eq!(
+        error["partial_reason"], "ledger_currency_base_unmatched",
+        "{error}"
+    );
+    // This arm has no derived list, so none is invented.
+    assert!(error.get("partial_reasons").is_none(), "{error}");
+    assert_eq!(
+        content["evidence"]["reason_code"],
+        "detail_requires_a_complete_read"
+    );
+    // The refusal keeps the evidence of every read before it: the company,
+    // the currency and the outstandings read, the same reads the plain call
+    // made.
+    let plain_evidence = &plain["structuredContent"]["evidence"];
+    assert_eq!(content["evidence"]["bytes"], plain_evidence["bytes"]);
+    assert_eq!(
+        content["evidence"]["request_sha256"],
+        plain_evidence["request_sha256"]
+    );
+    assert_eq!(
+        content["evidence"]["response_sha256"],
+        plain_evidence["response_sha256"]
+    );
+    // The ledger the reason concerns is a party name, and is not carried.
+    assert!(!error.to_string().contains("Ageing Customer A"), "{error}");
+}
+
+/// One recorded `outstandings` call with a party detail, replayed through the
+/// MCP tool on the scripted transport, in the order the live gateway answered
+/// it (#945, review P2.1). What the replay serves, exactly:
+/// - each POST is answered with the bytes of the capture its sequence record
+///   names, as captured (UTF-16LE, no byte-order mark). Three of those
+///   captures, the company list, the book extent and the company marks, are
+///   the live answers trimmed to the one company's row, as their own records
+///   declare, so those three are not byte-identical to what the gateway sent;
+/// - each status read is answered with the recorded status body;
+/// - the HTTP head is the test double's own, not the gateway's.
+///
+/// Returns the tool's response, the requests the simulator observed, and the
+/// record.
+async fn replay_recorded_detail_call(
+    record: &str,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
+    replay_recorded_call(record, |_| true, |arguments| arguments, Redaction::None).await
+}
+
+/// [`replay_recorded_detail_call`] serving only the recorded requests `keep`
+/// admits, with the call's arguments passed through `arguments`, under
+/// `redaction`.
+async fn replay_recorded_call(
+    record: &str,
+    keep: impl Fn(&Value) -> bool,
+    arguments: impl Fn(Value) -> Value,
+    redaction: Redaction,
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, Value) {
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let record: Value = serde_json::from_str(record).unwrap();
+    let directory_of_fixtures = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("crates/bridge-tally-protocol/tests/fixtures/agent");
+    let plans = record["requests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|request| keep(request))
+        .map(|request| match request["method"].as_str().unwrap() {
+            "GET" => {
+                let bytes = std::fs::read(
+                    directory_of_fixtures.join(request["response_fixture"].as_str().unwrap()),
+                )
+                .unwrap();
+                let plan = ScenarioPlan::new(Fixture::SyntheticXml(
+                    String::from_utf8(bytes.clone()).unwrap(),
+                ))
+                .with_encoding(WireEncoding::Utf8)
+                .with_framing(ResponseFraming::ContentLength);
+                assert_eq!(
+                    tally_protocol_simulator::encode(&plan.fixture.body(), plan.encoding),
+                    bytes,
+                    "the status read is served as recorded"
+                );
+                plan
+            }
+            _ => {
+                let bytes = std::fs::read(
+                    directory_of_fixtures.join(request["response_fixture"].as_str().unwrap()),
+                )
+                .unwrap();
+                let body = String::from_utf16(
+                    &bytes
+                        .chunks_exact(2)
+                        .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap();
+                let plan = ScenarioPlan::new(Fixture::SyntheticXml(body))
+                    .with_encoding(WireEncoding::Utf16LeNoBom)
+                    .with_framing(ResponseFraming::ContentLength);
+                assert_eq!(
+                    tally_protocol_simulator::encode(&plan.fixture.body(), plan.encoding),
+                    bytes,
+                    "{} is served byte for byte",
+                    request["response_fixture"]
+                );
+                plan
+            }
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 2_000_000,
+        redaction,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let response = server
+        .call_tool("outstandings", arguments(record["arguments"].clone()))
+        .await;
+    simulator.cancel();
+    let observed = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.cancelled)
+        .collect::<Vec<_>>();
+    (response, observed, record)
+}
+
+/// The replay sent exactly the recorded requests, each POST byte for byte as
+/// the live call sent it, and its `detail` is the live call's.
+fn assert_replay_matches_the_live_call(
+    response: &Value,
+    observed: &[tally_protocol_simulator::ObservedRequest],
+    record: &Value,
+) {
+    assert_eq!(response["isError"], false, "{response}");
+    let requests = record["requests"].as_array().unwrap();
+    assert_eq!(
+        observed.len(),
+        requests.len(),
+        "every recorded request, no more"
+    );
+    for (sent, recorded) in observed.iter().zip(requests) {
+        assert_eq!(sent.method, recorded["method"], "seq {}", recorded["seq"]);
+        if let Some(sha) = recorded["request_sha256"].as_str() {
+            assert_eq!(sent.request_body_sha256, sha, "seq {}", recorded["seq"]);
+        }
+    }
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["detail"], record["answer_detail"]);
+}
+
+/// Review P2.1: the `outstandings` tool with `detail: unadjusted`, replayed
+/// from the live call's captured responses, runs to the live call's own
+/// answer.
+#[tokio::test]
+async fn mcp_outstandings_answer_a_recorded_unadjusted_detail_as_the_live_call_did() {
+    let (response, observed, record) = replay_recorded_detail_call(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-unadjusted.json"
+    ))
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    assert_detail_reads_are_in_the_evidence(&response, &record).await;
+}
+
+/// Review P2.1: `detail: bill_trail` with a `reference`, replayed the same
+/// way: the named bill's window starts at its date, and the trail ties.
+#[tokio::test]
+async fn mcp_outstandings_answer_a_recorded_bill_trail_as_the_live_call_did() {
+    let (response, observed, record) = replay_recorded_detail_call(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-bill-trail.json"
+    ))
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    assert_detail_reads_are_in_the_evidence(&response, &record).await;
+}
+
+/// The call's evidence is the plain call's (the same recorded requests
+/// without the detail's) plus both bodies of each of the detail's own reads:
+/// the ledger catalogue, the company marks and the voucher window.
+async fn assert_detail_reads_are_in_the_evidence(response: &Value, record: &Value) {
+    const DETAIL_READS: [&str; 3] = [
+        "List of Ledgers",
+        "Bridge Agent Company High Water",
+        "Bridge Agent Vouchers",
+    ];
+    let is_detail_read = |request: &Value| {
+        let seq = request["seq"].as_u64().unwrap();
+        (50..=65).contains(&seq)
+    };
+    let text = record.to_string();
+    let (plain, _, _) = replay_recorded_call(
+        &text,
+        |request| !is_detail_read(request),
+        |mut arguments| {
+            let arguments_map = arguments.as_object_mut().unwrap();
+            for key in ["party", "detail", "reference"] {
+                arguments_map.remove(key);
+            }
+            arguments
+        },
+        Redaction::None,
+    )
+    .await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    let directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("crates/bridge-tally-protocol/tests/fixtures/agent");
+    let detail_bytes: u64 = record["requests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|request| {
+            is_detail_read(request)
+                && request["method"] == "POST"
+                && DETAIL_READS.contains(&request["request_id"].as_str().unwrap_or_default())
+        })
+        // Each as the simulator serves it: the capture's own bytes.
+        .map(|request| {
+            std::fs::metadata(directory.join(request["response_fixture"].as_str().unwrap()))
+                .unwrap()
+                .len()
+        })
+        .sum();
+    let bytes = |value: &Value| {
+        value["structuredContent"]["evidence"]["bytes"]
+            .as_u64()
+            .unwrap()
+    };
+    assert_eq!(bytes(response), bytes(&plain) + detail_bytes);
+}
+
+const RECORDED_UNADJUSTED: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-unadjusted.json"
+);
+const RECORDED_BILL_TRAIL: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/native-outstandings-detail-sequence-bill-trail.json"
+);
+
+/// Under `mask_parties` the recorded calls send the same requests, and the
+/// party is masked wherever the detail names it: the detail's own `party`
+/// and every bill's. The name appears nowhere in the tool's response.
+#[tokio::test]
+async fn mcp_outstandings_mask_the_party_throughout_a_recorded_detail() {
+    for record in [RECORDED_UNADJUSTED, RECORDED_BILL_TRAIL] {
+        let (response, observed, record) = replay_recorded_call(
+            record,
+            |_| true,
+            |arguments| arguments,
+            Redaction::MaskParties,
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{response}");
+        assert_eq!(observed.len(), record["requests"].as_array().unwrap().len());
+        let party = record["arguments"]["party"].as_str().unwrap();
+        let detail = &response["structuredContent"]["result"]["detail"];
+        let masked = json!(mask(party));
+        assert_eq!(detail["party"], masked, "{detail}");
+        for bill in detail["bills"].as_array().into_iter().flatten() {
+            assert_eq!(bill["party"], masked, "{bill}");
+        }
+        assert!(!response.to_string().contains(party), "{party} unmasked");
+        // Masking changes names only: the figures are the live call's.
+        let live = &record["answer_detail"];
+        for key in ["state", "window", "rows", "residual", "on_account_sum"] {
+            assert_eq!(detail.get(key), live.get(key), "{key}");
+        }
+    }
+}
+
+/// `direction`, `top`, `offset` and `limit` page and filter the book-wide
+/// figures only: with all four set, the recorded call sends the same requests
+/// and its `detail` is still the live call's whole answer.
+#[tokio::test]
+async fn mcp_outstandings_give_the_whole_detail_whatever_the_paging_arguments() {
+    let (response, observed, record) = replay_recorded_call(
+        RECORDED_UNADJUSTED,
+        |_| true,
+        |mut arguments| {
+            for (key, value) in [
+                ("direction", json!("payable")),
+                ("top", json!(1)),
+                ("offset", json!(1)),
+                ("limit", json!(1)),
+            ] {
+                arguments[key] = value;
+            }
+            arguments
+        },
+        Redaction::None,
+    )
+    .await;
+    assert_replay_matches_the_live_call(&response, &observed, &record);
+    let result = &response["structuredContent"]["result"];
+    // The book-wide figures were paged as asked.
+    assert_eq!(result["offset"], 1);
+    assert_eq!(result["limit"], 1);
+    assert!(
+        result["open_bills"].as_array().unwrap().len() <= 1,
+        "{result}"
+    );
+    assert!(
+        result["top_parties"].as_array().unwrap().len() <= 1,
+        "{result}"
+    );
+}
+
+/// The two sequence records hold the expected answers and request hashes the
+/// replays assert against. The fixture-provenance gate reads a JSON record
+/// carrying `source` as documentation and never hashes the record itself, so
+/// their bytes are pinned here: an edited expected answer fails this test
+/// rather than passing the replay it was edited to match. These are the bytes
+/// committed with the capture in 2d415cd.
+#[test]
+fn the_recorded_sequences_are_the_ones_committed_with_the_capture() {
+    for (record, bytes, sha256) in [
+        (
+            RECORDED_UNADJUSTED,
+            27_538,
+            "9695b8107905bb4483ef8c82ad0ba9927ac52fb3ddc830d1b3897de806a16817",
+        ),
+        (
+            RECORDED_BILL_TRAIL,
+            27_780,
+            "07a1512d5af5ca7457a0d6664906ef2fedf20d1501f764c5912e635f3e91c610",
+        ),
+    ] {
+        assert_eq!(record.len(), bytes);
+        assert_eq!(sha256_hex(record.as_bytes()), sha256);
     }
 }

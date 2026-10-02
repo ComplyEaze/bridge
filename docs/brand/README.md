@@ -54,6 +54,8 @@ In this repository:
   `complyeaze-wordmark-*.svg`, `mark-{cobalt,red,red-ondark,reverse,black}.svg` (icon tiles),
   `glyph-{cobalt,white}.svg` (the tick-y alone), `favicon.svg` and `favicon-red.svg` (drawn on the 16 px grid),
   and `app-icon-macos.svg` (a macOS-style tile with margins, for a future native macOS icon).
+- `site/brand/`: the website's copies. `favicon.svg` and `favicon-red.svg` are the masters unchanged; `lockup.svg` is the
+  lockup's outline as one symbol coloured by the page (paper in the cobalt world, cream in the red world).
 - `src-tauri/app-icon.svg`: the desktop app icon source. Every file in `src-tauri/icons/` is rendered from it,
   except the 16 px entries of `icon.ico` and `icon.icns`, which use `docs/brand/svg/favicon.svg`.
 
@@ -65,4 +67,4 @@ are rendered from these SVGs and added where each surface is wired up.
 The letters are **Outfit** (SIL Open Font License 1.1, © The Outfit Project Authors), converted to
 outlines; the tick-y is drawn geometrically for this mark.
 
-ComplyEaze and ComplyEaze Bridge, and the related logos and visual identity, are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze) uses to identify its products. They are not registered trade marks. The Apache License 2.0 does not grant permission to use them, except to describe where the software came from and to reproduce the NOTICE file (section 6 of the license); see TRADEMARKS.md. The logo and icon files — docs/brand/, src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are not licensed under Apache-2.0: all rights in them are reserved. They are included so that official builds carry the ComplyEaze Bridge identity. A fork or modified build must replace them and use a different name.
+ComplyEaze and ComplyEaze Bridge, and the related logos and visual identity, are the names and marks SPMS Comply Eaze Solutions LLP (ComplyEaze) uses to identify its products. They are not registered trade marks. The Apache License 2.0 does not grant permission to use them, except to describe where the software came from and to reproduce the NOTICE file (section 6 of the license); see TRADEMARKS.md. The logo and icon files — docs/brand/, site/brand/, src-tauri/app-icon.svg, src-tauri/icons/ and packaging/mcpb/icon.png — are not licensed under Apache-2.0: all rights in them are reserved. They are included so that official builds carry the ComplyEaze Bridge identity. A fork or modified build must replace them and use a different name.

@@ -3,9 +3,9 @@
 //! The compatibility gate cannot notice a pin disappearing: it digests the pins
 //! that are listed and never adds paths. `docs/release-process.md` requires the
 //! pin list to be merged rather than resolved by taking one side; a resolution
-//! that takes the base side anyway drops every entry a branch added while
-//! keeping the raised `MAX_SURFACE_FILES`, and the gate passes. So does the cap
-//! assertion, which bounds headroom and would pass with all of them dropped.
+//! that takes the base side anyway drops every entry a branch added, and the
+//! gate passes. So does the parse bound `MAX_SURFACE_FILES`, which only refuses a
+//! runaway list and would pass with all of them dropped.
 //! `book_presence_tests.rs` guards its own contract's pins the same way.
 //!
 //! This file is deliberately not pinned itself: a guard that lived in the
@@ -18,7 +18,7 @@ const SURFACE: &str = include_str!("../../docs/tally/compatibility/compatibility
 /// (bridge#416). The reason for each is recorded beside `MAX_SURFACE_FILES` in
 /// `tools/bridge-tally-compatibility/src/lib.rs`; it is not repeated here, so
 /// the two cannot drift apart.
-const ADMISSION_AND_EGRESS: [&str; 14] = [
+const ADMISSION_AND_EGRESS: [&str; 12] = [
     "src-tauri/crates/bridge-tally-protocol/src/group_ancestry.rs",
     "src-tauri/src/agent_company.rs",
     "src-tauri/src/agent_delivery.rs",
@@ -28,8 +28,6 @@ const ADMISSION_AND_EGRESS: [&str; 14] = [
     "src-tauri/src/agent_import_persistence.rs",
     "src-tauri/src/agent_import_post.rs",
     "src-tauri/src/agent_protocol.rs",
-    "src-tauri/src/axal.rs",
-    "src-tauri/src/documents.rs",
     "src-tauri/src/endpoint_coordination.rs",
     "src-tauri/src/tally/approved_import.rs",
     "src-tauri/src/tally/runtime_control.rs",
@@ -69,10 +67,9 @@ fn assert_still_pinned(required: &[&str]) {
     assert!(
         missing.is_empty(),
         "dropped from the compatibility surface: {missing:?}. A merge that took \
-         the base side of compatibility-surface.json loses added pins while \
-         keeping the raised cap, and the gate cannot see it. Restore the entries \
-         in the pin list, keep MAX_SURFACE_FILES equal to the pin count, and add \
-         the acknowledgement file, as described in docs/release-process.md \
+         the base side of compatibility-surface.json loses added pins, and the \
+         gate cannot see it. Restore the entries in the pin list and add the \
+         acknowledgement file, as described in docs/release-process.md \
          (\"Adding or removing a pin\")."
     );
 }

@@ -18,11 +18,10 @@ const failures = [];
 const metadataByWorkspace = new Map();
 
 // The surface acknowledgement check runs in this job: it runs on every event, has the full
-// history, and is required through `Required checks`. The step is report-only today (it exits 0),
-// so what blocks a pinned-file change without its acknowledgement file is scripts/merge-gate.sh;
-// the step must stay, keep its exact shape (no
-// `continue-on-error`, no step-level `if`) and run the checker with the report-only flag until the
-// rule is enforced (dropping the flag is a pinned ci.yml change with its own acknowledgement).
+// history, and is required through `Required checks`. The step enforces: a pinned-file change
+// without its acknowledgement file fails the job. It must stay, keep its exact shape (no
+// `continue-on-error`, no step-level `if`, no `--report-only` flag), and any change to it is a
+// pinned ci.yml change with its own acknowledgement.
 const workflowConsistency = jobBlock(workflow, "workflow-consistency");
 const toolchain = readFileSync(resolve(repositoryRoot, "rust-toolchain.toml"), "utf8").match(/^channel *= *"([^"]+)"/m)?.[1];
 if (!toolchain) throw new Error("could not read [toolchain].channel from rust-toolchain.toml");
@@ -40,7 +39,7 @@ const surfaceAckStep = [
   "          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}",
   "          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}",
   "          CHECK_MODE: ${{ github.event_name == 'pull_request' && 'pull_request' || github.event_name == 'merge_group' && 'merge_group' || github.event_name == 'push' && 'push' || 'workflow_dispatch' }}",
-  '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE" --report-only',
+  '        run: node scripts/check-surface-ack.mjs --mode "$CHECK_MODE"',
 ].join("\n");
 // The step block runs from its `- name:` line up to the next step (or the job end), so a line
 // appended after `run:` (`continue-on-error`, `if`, ...) is a difference, not a pass. Blank and
@@ -146,7 +145,7 @@ for (const [source, job, expected, digest] of [
     "      - name: Prove the approval-seam scan sees a test build",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs --test-harness",
-  ], "e3b499cd5834b252e2c1e011ce279d2dea3fc276238a84879888aea90f825075"],
+  ], "8fadc5cfe0d18740dbd9e1e580874f6586c89e0b50f2169bd25063ea0300a9b3"],
   [workflow, "bundle-smoke", [
     "      - name: Prove shipped executables lack the test-only approval seam",
     "        shell: bash",

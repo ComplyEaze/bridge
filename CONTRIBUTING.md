@@ -73,7 +73,7 @@ details, PINs, tokens, usernames, and absolute local paths.
 ## Issue and triage requirements
 
 - Use the bug or feature template in `.github/ISSUE_TEMPLATE`.
-- Assign exactly one area label: `area:tally`, `area:documents`,
+- Assign exactly one area label: `area:tally`, `area:tax-audit`,
   `area:infra`, or `area:security`.
 - Assign a severity label for bugs: `severity:p1` through `severity:p4`.
 - Use `type:rectify` for a regression introduced by a merged change and link

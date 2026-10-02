@@ -29,32 +29,34 @@ an acknowledgement. Adding or removing a declared part also changes the pin list
 see "Adding or removing a pin" below.** Nothing in a docs diff suggests a
 compatibility gate is involved.
 
-**Enforcement today.** The GitHub check is report-only: it prints
-`WOULD FAIL: <reason>` and exits 0, so it does not block a merge. The blocking
-leg is `scripts/merge-gate.sh`, a local tool run by whoever merges (the
-orchestrator), not CI. The one exception is a push to master, which is always
-enforced (below). Making the pull request check enforcing is a later change to two
-pinned files: drop `--report-only` from the step in
-`.github/workflows/ci.yml` and change the exact step text that
-`scripts/check-ci-workflow-consistency.mjs` requires, both pinned, with their own
-acknowledgement.
+**Enforcement.** The GitHub check enforces. On a pull request and in the merge
+queue, the `workflow-consistency` job fails with
+`surface ack check FAILED: <reason>` when a pinned path changed without its
+acknowledgement file, or the acknowledgement is wrong, edited or unneeded, and
+that job is part of `Required checks`. A push to master is enforced the same way
+(below). `scripts/merge-gate.sh`, run locally by whoever merges, is a second,
+independent check of the same rule. The step first ran with `--report-only`,
+which printed `WOULD FAIL: <reason>` and exited 0; the script
+still accepts that flag for local use, but the CI step must not carry it, and
+`scripts/check-ci-workflow-consistency.mjs` pins the step's exact text so that
+putting it back is a pinned change with its own acknowledgement.
 
 What this trades away, stated plainly. Under schema 2 the required
 `Tally portable core` job failed a pull request, and again the master push, when a
 pinned file's bytes differed from its stored hash. Nothing stored remains to
-compare, so that job can no longer fail on a changed pinned file. On a pull request,
-while the check is report-only, a change merged without `scripts/merge-gate.sh`
-reaches master with every check green. What restores the after-the-fact tripwire: a
-push to master is checked like a pull request and is never report-only. Every
-first-parent commit the push landed (`before..HEAD`, `before` from the event payload;
-each one a squashed pull request, attributed by the `(#N)` in its subject) must carry
-exactly the acknowledgement its pinned changes need, and the master run goes red if
-any does not. A push whose `before` is missing, new or not an ancestor of HEAD (a
-force-push) cannot be verified and fails. This covers the base race: `merge-gate.sh` reads
-the pin list when it runs but the merge binds only the head, so another pull request
-that pins a file after this one was gated lets an unacknowledged change land; the
-master run then fails instead of nobody noticing. It does not stop the merge, and a
-red master needs an acknowledgement-only follow-up pull request to clear.
+compare, so nothing can fail on a byte difference; the acknowledgement replaces it.
+It is procedural assurance, not authentication: a missing or wrong file fails the
+check, but a hand-written file that names the right paths and a reviewer passes it,
+so the review is what stands behind it. The base race is still real: the pin list
+is read when the check runs but the merge binds only the head, so another pull
+request that pins a file after this one was checked lets an unacknowledged change
+land. A push to master is checked like a pull request and is never report-only.
+Every first-parent commit the push landed (`before..HEAD`, `before` from the event
+payload; each one a squashed pull request, attributed by the `(#N)` in its
+subject) must carry exactly the acknowledgement its pinned changes need, and the
+master run goes red if any does not. A push whose `before` is missing, new or not
+an ancestor of HEAD (a force-push) cannot be verified and fails. That red master
+needs an acknowledgement-only follow-up pull request to clear.
 
 #### What the surface is
 
@@ -116,6 +118,16 @@ reviewer: some-github-login
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
 - The branch name is not the file name, so a lane branch is fine.
+- The number is known only once the pull request is open, so the first run of a
+  pull request that touches a pinned path fails with `found 0` until
+  `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
+  the pull request, then push the file.
+- Dependency-update pull requests (Dependabot's npm, cargo and GitHub Actions
+  updates) change pinned files (`package.json`, `pnpm-lock.yaml`,
+  `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock` and pinned workflows), so each
+  one fails `Required checks` until a person pushes its `pr-<N>.txt`. The local
+  merge gate already asked for the same file; the difference is that CI now
+  reports it too.
 
 The `reviewer:` login is procedural assurance, not authentication: the file is
 written by hand and proves nothing by itself. What it records is that a named
@@ -125,22 +137,22 @@ looked at in the review.
 **What checks it**
 
 - CI runs `scripts/check-surface-ack.mjs` in the `workflow-consistency` job. It
-  reports a missing, wrong, edited or unneeded acknowledgement, but is
-  report-only today (see above). Its modes:
+  fails on a missing, wrong, edited or unneeded acknowledgement (see above).
+  Its modes:
   - `pull_request`: diffs the merge commit against its first parent (`HEAD^1`),
     after asserting that `HEAD^2` equals the pull request's head commit.
-  - `merge_group` (once a merge queue exists): checks each first-parent commit in
+  - `merge_group`: checks each first-parent commit in
     `base_sha..head_sha` against its own acknowledgement, and fails closed when a
     commit cannot be attributed to one pull request.
   - `push` (master): every first-parent commit in `before..HEAD` is checked like a
-    pull request, each attributed by the `(#N)` in its subject, and a failure is never
-    report-only; a missing, all-zero or non-ancestor `before` fails closed. It also
+    pull request, each attributed by the `(#N)` in its subject, and `--report-only`
+    never softens a failure; a missing, all-zero or non-ancestor `before` fails closed. It also
     validates that every file in the acknowledgements directory is well formed.
   - `workflow_dispatch`: only the acknowledgements directory is validated.
   The checker runs from the pull request's own tree, so a pull request could weaken
   it; that is why the script and `ci.yml` are pinned, which makes the change
   visible and acknowledged. A change that makes the checker skip itself shows no
-  `WOULD FAIL` in its own pull request run, so the pin alone does not make it red
+  failure in its own pull request run, so the pin alone does not make it red
   in CI; `scripts/merge-gate.sh`, which is also pinned (with
   `scripts/check-ci-workflow-consistency.mjs`, which enforces the step's shape), is
   what sees it. Run the gate from a checkout of the base branch, not from the pull
@@ -152,6 +164,30 @@ looked at in the review.
   master commit that added a pin is not reported as indeterminate. It also
   requires a review or comment that names the head commit, the acknowledgement
   path and every touched path. The `reviewer:` login must be that review's author.
+- **Branch history, in both checks.** The diff against the base cannot see a pin
+  the branch added and then lost, for example when a merge of master is resolved by
+  taking master's pin list: at the head the list equals the base's. So
+  `scripts/check-surface-ack.mjs` and `scripts/merge-gate.sh` also read the pin list at
+  every commit of the pull request and at each commit's parents (a merge is compared
+  with all of them, never the first only). A path that a commit pins and none of its
+  parents pinned, and that is in neither the base list nor the head list, counts as a
+  removed pin: the acknowledgement must declare it with a `removed-pin:` line, or the
+  pin must be restored. In an older commit only the paths matter, so both read them
+  leniently (valid JSON with a `files` array whose rows each have a path string); the
+  strict rules (sorted, unique, exact keys, schema) stay as they are for the list at
+  the head and at the base, so a branch is never stuck because an old commit had its
+  list out of order. Both fail closed on a shallow clone and on a commit whose list
+  cannot be read at all (the script fails, the gate is indeterminate). The CI step
+  blocks (it no longer runs with `--report-only`, so a finding fails the job), and the
+  merge gate blocks too. A pin that follows a rename inside the branch (one commit pins a new
+  file, a later one renames it and moves the pin) reports the old name as withdrawn:
+  declare it with one `removed-pin:` line for the old name. What these checks cannot
+  see: a pin lost in a rebase, a force-push, an amend or a squash before the push
+  leaves no history to read, and the merge group and the push to master each check one
+  squash commit, which has no branch history, so there the pull-request-time check
+  and the merge gate are the control. Only a review that compares the pin list with
+  the last reviewed head and a stay-pinned guard test (for the pins it names) can see
+  a rewritten history.
 - The `Tally portable core` job still runs the `gate` command, which checks
   required-file coverage and that every pinned file exists, and computes the
   digest from the files. It no longer compares a stored hash, so a changed
@@ -197,27 +233,45 @@ Edit the sorted list by hand.
 1. Insert the entry in sorted path order with a `reason` (required for a pin added
    by a pull request, at most 500 characters): why this file decides what Bridge
    posts or lets leave the machine. Paths are relative, unique and sorted.
-2. Raise `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs` to the
-   new pin count. The convention is to pin exactly the count in use, and
-   `RESERVED_SURFACE_FILES` bounds how far the cap may exceed it. Raising it is an
-   explicit compatibility-surface decision: record the reason in the commit and
-   the pull request. That file is pinned, so this edit is itself covered by the
-   acknowledgement.
+2. Leave `MAX_SURFACE_FILES` in `tools/bridge-tally-compatibility/src/lib.rs`
+   alone. It is a fixed parse bound against a runaway list (1024), not a count to
+   maintain, so adding or removing a pin does not touch it and two pull requests
+   that each add a pin no longer collide on it. Only a list that approaches the
+   bound would justify raising it, which is a deliberate change to a pinned file
+   with its own reason and acknowledgement.
 3. Add the acknowledgement, listing the new pin's path (and a `removed-pin:` line for
-   each removal). Then run the tool's tests: a cap change can invalidate a test that
-   hard-codes the old bound.
+   each removal). Then run the tool's tests.
 
-Removing a pin is done the same way, with a `removed-pin:` line and the cap kept
-in step. A malformed list is refused by the tool and by CI.
+Removing a pin is done the same way, with a `removed-pin:` line. A malformed list
+is refused by the tool and by CI.
 
-**`MAX_SURFACE_FILES` is the line most likely to be silently wrong, and it is
-worse when it does NOT conflict.** If two branches start from the same cap and
-each add one pin, both change it from N to N+1: an **identical edit**, which git
-merges without a conflict. The merged surface then holds N+2 pins against a cap
-of N+1, and the gate fails with `surface_file_count_invalid`. That failure is
-loud, so it is not dangerous; what is misleading is expecting a conflict to
-prompt you. Recompute the cap from the merged pin count whether or not git
-stopped to ask.
+**What decides a pin now.** Until the bound replaced the exact count, adding a pin
+meant editing that constant in a pinned file, so the change could not go unnoticed
+in a diff of `lib.rs`. That no longer holds. A pin is now decided by its own
+`reason` (required on every pin a pull request adds), the sorted-and-unique and
+declared-removal rules the tool and the acknowledgement check enforce, and the
+acknowledgement file, which `workflow-consistency` enforces in CI on pull requests,
+in the merge queue and on the push to master. A pull request that adds or removes a
+pin without its acknowledgement fails, whatever else it edits.
+
+One narrower case remains. A branch adds a pin, and a later merge of master is
+resolved by taking master's pin list, which drops that pin. The branch-history check
+(see "What checks it") catches that, including when the acknowledgement is edited or
+deleted to match: the pin counts as withdrawn, so the acknowledgement must declare it
+with a `removed-pin:` line, or the pin must be restored. It is silent only when
+history is rewritten (a rebase, a force-push, an amend or a squash before the push)
+so that no commit records the pin. Before the bound replaced the exact count, a
+reviewer comparing the constant with the pin count could notice that mismatch too;
+that signal is gone. So a review of a pull request that touches the pin list compares
+the list with the last reviewed head as well as with the base, and names any pin that
+was present at the last reviewed head and is gone. That review comparison and a
+stay-pinned guard test (for the pins it names) are the only things that can see a
+rewritten history.
+
+What remains of the old collision: two pull requests that insert a pin at the same
+sorted position still conflict in the pin list itself. Resolve it by keeping both
+entries (see "When the surface conflicts in a merge"); the cap is no longer part of
+it.
 
 #### What the coverage report shows
 
@@ -294,8 +348,7 @@ trace at all, so reconcile its claims the same way.
 
    If the conflict is already resolved and the stages are gone, use `REBASE_HEAD`
    (rebase) or `MERGE_HEAD` (merge) for the incoming side, never `origin/master`.
-3. **Recompute `MAX_SURFACE_FILES` from the reconciled pin count.** Do not carry a
-   number derived from either side's cap.
+3. Leave `MAX_SURFACE_FILES` alone: it is a fixed bound, not a count.
 4. Run the gate, and check the pin count against the union you computed; the gate
    cannot do this for you. Add or update the acknowledgement so it lists every
    changed pinned path and every added pin.
@@ -323,8 +376,8 @@ every row). Merging master into it conflicts on that file. Once per branch:
 
 3. Re-add the pins the branch itself added. `git diff <merge-base>..HEAD --
    docs/tally/compatibility/compatibility-surface.json` shows them. Insert each as
-   `{ "path": "...", "reason": "..." }` in sorted order, and keep
-   `MAX_SURFACE_FILES` equal to the merged pin count. A branch that only changed the
+   `{ "path": "...", "reason": "..." }` in sorted order; do not touch
+   `MAX_SURFACE_FILES`. A branch that only changed the
    contents of already-pinned files has nothing to re-add.
 4. Add `docs/tally/compatibility/acks/pr-<N>.txt` as above if the branch changes any
    pinned path. Until the branch has merged master, its head still holds a schema 2
@@ -523,7 +576,8 @@ credentials, a timestamped Windows signing certificate, protected release
 environments, and host validation of the complete shipped carriers. Self-signed
 certificates and OS-warning bypass instructions are not acceptable substitutes.
 
-`site/` is a small static installer page. Its workflow runs when a maintainer
+`site/` is the static website (home, Download, Releases and Changelog). Its
+workflow runs when a maintainer
 dispatches it, and again when a maintainer-dispatched preview publication in
 this repository finishes successfully, so the page's release snapshot follows
 the release without a second step. The job requires the publication run's event
@@ -623,6 +677,10 @@ It checks every file first and writes none if one fails. Then:
    `README.md` and `managed:latest-preview` in `SECURITY.md`; search both files
    for `managed:`), and check that the install page and the repository
    description name the same build.
+   Also update the sentences that say a tool is "in source but not in the
+   0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
+   and the `README.md` lines that describe the published package, so no line
+   describes the previous build as the newest.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.

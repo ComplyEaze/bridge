@@ -189,6 +189,7 @@ fi
 
 : >"$errfile"
 metadata_status=0
+metadata_commits_proven=0
 metadata_commits=$(gh api --paginate --slurp "repos/$REPO/pulls/$PR/commits?per_page=100" 2>"$errfile") || metadata_status=$?
 if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -e --argjson expected "$metadata_commit_total" --arg head "$head" '
   type == "array" and (all(.[]; type == "array") or all(.[]; type == "object")) and
@@ -210,6 +211,7 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
   unknown "could not prove complete head-bound PR commit metadata for the privacy scan"
   privacy_metadata=""
 else
+  metadata_commits_proven=1
   # Author and committer emails were structurally validated above and are an
   # explicit identity-only source class. Do not mix them into payload/path/
   # metadata scan input, where an identical address would be customer data.
@@ -430,8 +432,66 @@ is_sorted_unique() {
   [ -z "$text" ] || LC_ALL=C sort -c -u <<<"$text" 2>/dev/null
 }
 
+# The branch history check, as in scripts/check-surface-ack.mjs. The diff against the base cannot
+# see a pin the branch added and then lost (a merge resolved by taking the other side's pin list):
+# at the head the list equals the base's. So every commit of the PR (the complete, head-bound list
+# proved above) is read with its parents: a path is collected when a commit's pin list holds it and
+# none of its parents' lists does (a merge is compared with ALL its parents). A collected path that
+# is in neither the base tip's list nor the head's was pinned by the branch and withdrawn. It is a
+# removed pin: the acknowledgement must declare it with a "removed-pin:" line. Any commit whose
+# list cannot be read and parsed makes the answer indeterminate (fail closed).
+withdrawn_pins=""
+history_cache="$tmpdir/pin-history"
+# The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
+pins_at_commit() {
+  local sha="$1"
+  local file="$history_cache/$sha"
+  pins_at_result=""
+  if ! [ -f "$file" ]; then
+    read_contents_text "$sha" "$SURFACE" || return 1
+    jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
+      <<<"$contents_text_result" >/dev/null 2>&1 || return 1
+    jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
+    mv "$file.tmp" "$file"
+  fi
+  pins_at_result="$file"
+}
+if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
+  if [ "$metadata_commits_proven" -ne 1 ]; then
+    unknown "the PR's complete commit list is unproven, so a pin the branch added and then lost cannot be ruled out"
+  else
+    mkdir -p "$history_cache"
+    commit_records=$(jq -r '(if all(.[]; type == "array") then flatten else . end)[] |
+      if (.parents | type) == "array" and all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-fA-F]{40}$"))) then
+        ([.sha] + [.parents[].sha]) | join(" ")
+      else "NOPARENTS " + .sha end' <<<"$metadata_commits" 2>/dev/null) || commit_records="NOPARENTS unreadable"
+    history_status=0
+    collected=""
+    parents_union="$tmpdir/parents-union"
+    while read -r -a record; do
+      [ "${#record[@]}" -gt 0 ] || continue
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; break; fi
+      pins_at_commit "${record[0]}" || { history_status=1; break; }
+      own_file="$pins_at_result"
+      : >"$parents_union"
+      for parent in "${record[@]:1}"; do
+        pins_at_commit "$parent" || { history_status=1; break 2; }
+        cat "$pins_at_result" >>"$parents_union"
+      done
+      LC_ALL=C sort -u -o "$parents_union" "$parents_union"
+      collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
+    done <<<"$commit_records"
+    if [ "$history_status" -ne 0 ]; then
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out"
+    else
+      withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
+    fi
+  fi
+fi
+
 if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merge_base_pinned" ]; then
   removed_pins=$(LC_ALL=C comm -23 <(path_set "$merge_base_pinned") <(path_set "$pinned"))
+  removed_pins=$(path_set "$(printf '%s\n%s\n' "$removed_pins" "$withdrawn_pins")")
   added_pins=$(LC_ALL=C comm -13 <(path_set "$merge_base_pinned") <(path_set "$pinned"))
   union_pinned=$(path_set "$(printf '%s\n%s\n' "$base_pinned" "$pinned")")
   # Both names of a rename count: the old path is what a pinned rename removes.
@@ -515,9 +575,12 @@ if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merg
         ack_extra=$(LC_ALL=C comm -23 <(path_set "$ack_paths") <(printf '%s\n' "$ack_expected") | sed '/^$/d' | first_lines)
         [ -z "$ack_missing" ] || ack_note "omits touched pinned path(s): $ack_missing"
         [ -z "$ack_extra" ] || ack_note "lists path(s) the PR does not touch: $ack_extra"
-        removed_missing=$(LC_ALL=C comm -13 <(path_set "$ack_removed") <(path_set "$removed_pins") | sed '/^$/d' | first_lines)
+        removed_undeclared=$(LC_ALL=C comm -13 <(path_set "$ack_removed") <(path_set "$removed_pins"))
+        removed_missing=$(LC_ALL=C comm -23 <(path_set "$removed_undeclared") <(path_set "$withdrawn_pins") | sed '/^$/d' | first_lines)
+        withdrawn_missing=$(LC_ALL=C comm -12 <(path_set "$removed_undeclared") <(path_set "$withdrawn_pins") | sed '/^$/d' | first_lines)
         removed_extra=$(LC_ALL=C comm -23 <(path_set "$ack_removed") <(path_set "$removed_pins") | sed '/^$/d' | first_lines)
         [ -z "$removed_missing" ] || ack_note "lacks a removed-pin line for: $removed_missing"
+        [ -z "$withdrawn_missing" ] || ack_note "pin(s) pinned by a commit of this PR but not in the pin list at the head; restore the pin, or declare the withdrawal with a removed-pin line: $withdrawn_missing"
         [ -z "$removed_extra" ] || ack_note "has removed-pin line(s) for pin(s) the PR does not remove: $removed_extra"
         no_reason=$(LC_ALL=C comm -23 <(path_set "$added_pins") <(path_set "$head_reasoned") | sed '/^$/d' | first_lines)
         [ -z "$no_reason" ] || ack_note "pin(s) added without a non-empty reason: $no_reason"

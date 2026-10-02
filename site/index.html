@@ -1,92 +1,290 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Install ComplyEaze Bridge, the TallyPrime MCP server that lets Claude Desktop read the TallyPrime books on your own computer." />
-    <title>ComplyEaze Bridge for Claude Desktop</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2323603f'/%3E%3Cpath d='M6 19c4.5-7 15.5-7 20 0' stroke='%23fff' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 19v5M16 14.2V24M26 19v5' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="page">
-      <header class="masthead">
-        <a class="wordmark" href="./" aria-label="ComplyEaze Bridge installation home">ComplyEaze Bridge</a>
-        <nav class="masthead-links">
-          <a class="quiet-link" href="./changelog.html">What changed</a>
-          <a class="quiet-link" href="https://github.com/lamemustafa/bridge/releases">All releases</a>
-        </nav>
-      </header>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ComplyEaze Bridge: the local TallyPrime MCP server for Claude</title>
+<meta name="description" content="ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve. For Indian CAs, in Claude Desktop." />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="preload" href="fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="home.css" />
+<script>(function(c){c.add("js");try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)c.add("ce-static")}catch(e){}})(document.documentElement.classList)</script>
+</head>
+<body>
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
 
-      <section class="intro" aria-labelledby="page-title">
-        <h1 id="page-title">Ask Claude who owes you, and how old the bills are.</h1>
-        <p class="lede">ComplyEaze Bridge reads the TallyPrime already running on this computer, over Tally's own local gateway: outstanding receivables and payables with ageing, and a trial balance, ledger movement or vouchers for a date range you choose.</p>
-        <p class="support-line">Posting is off by default. When you turn on voucher posting in the extension settings, it posts one voucher at a time, and each posting waits for your approval in a separate dialog. The assistant cannot approve it.</p>
-        <p class="support-line"><strong>Packages for</strong> Windows x64 and Apple Silicon Mac. Intel Mac and other platforms are not yet qualified; read each release's notes for what has been tried.</p>
-      </section>
+<main id="main">
 
-      <section class="release-panel" aria-labelledby="download-title">
-        <div class="section-heading">
-          <div>
-            <h2 id="download-title">Choose your computer</h2>
+  <!-- ====================================================== ONE CONTINUOUS TAKE -->
+  <!-- The file is the only 3D object on the page. It is pinned for all nine
+       chapters; only the left panel and a few paper "props" change. -->
+  <section class="story" id="story" aria-label="The client's file, followed through eight chapters of ComplyEaze Bridge">
+    <div class="story-sticky">
+      <div class="canvas-box" id="canvasBox">
+        <div class="canvas-poster" aria-hidden="true"></div>
+        <canvas id="fileCanvas" aria-hidden="true"></canvas>
+
+        <div class="prop prop-question" id="propQuestion" aria-hidden="true">
+          <p>“Who owes us for more than 90 days?”</p>
+        </div>
+        <div class="prop prop-ageing" id="propAgeing" aria-hidden="true">
+          <p class="bubble-label">Answer</p>
+          <p class="ageing-reply">5 parties, &#8377;7,86,300 in all. Largest: Nevrika Agro Foods, &#8377;2,14,000.</p>
+        </div>
+        <div class="prop prop-row" id="propRow" aria-hidden="true">
+          <p class="wp-title"><span class="wp-ref">W/P C-4</span>Working paper &middot; Tax audit FY 2025-26</p>
+          <table class="row-sheet">
+            <caption class="visually-hidden">Working paper, row 1</caption>
+            <thead>
+              <tr><th>Finding</th><th>Vouchers</th><th>Date</th><th>Amount</th><th>3CD clause &middot; Sec.</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-l="Finding"><span class="cell">Cash to one payee over &#8377;10,000 in a day</span></td>
+                <td data-l="Vouchers"><span class="cell">Pay 1187, 1188</span></td>
+                <td data-l="Date"><span class="cell">14 Nov 2025</span></td>
+                <td data-l="Amount"><span class="cell">&#8377;24,600</span></td>
+                <td data-l="3CD clause &middot; Sec."><span class="cell">21(d)(A) &middot;</span> <span class="wp-sec">40A(3)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prop prop-names" id="propNames" aria-hidden="true">
+          <p class="names-cap">3 names, your decision</p>
+          <ul class="names-list">
+            <li><span class="name-chip"><i class="q">?</i><i class="t">&#10003;</i></span><span class="name-parsed">Kavyarth Stationery</span><span class="name-arrow" aria-hidden="true">&rarr;</span><span class="name-book">Kavyarth Stationers</span></li>
+            <li><span class="name-chip"><i class="q">?</i><i class="t">&#10003;</i></span><span class="name-parsed">Nevrika Agro Food</span><span class="name-arrow" aria-hidden="true">&rarr;</span><span class="name-book">Nevrika Agro Foods</span></li>
+            <li><span class="name-chip"><i class="q">?</i><i class="t">&#10003;</i></span><span class="name-parsed">Sample Bank A/c</span><span class="name-arrow" aria-hidden="true">&rarr;</span><span class="name-book">Sample Bank Ltd</span></li>
+          </ul>
+        </div>
+        <div class="prop prop-scrim" id="propScrim" aria-hidden="true"></div>
+        <div class="prop prop-dialog" id="propDialog" aria-hidden="true">
+          <!-- Replica of the macOS alert the 0.3.0 build raises for one voucher (NSAlert, warning
+               style): title, body text and button order are the build's own (src-tauri/src/tally/
+               approved_import.rs show_review, agent_import_post.rs admit_fresh_saved_voucher). Values
+               are the synthetic demo book's. The first button added is the alert's default. -->
+          <div class="dialog-replica">
+            <div class="dialog-head">
+              <div class="dialog-icon" aria-hidden="true">
+                <span class="dialog-icon__tile">
+                  <svg width="30" height="30" viewBox="0 0 20 20" focusable="false"><path d="M4.5 2.5h8l4 4v11h-12z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /><path d="M12.5 2.5v4h4z" fill="currentColor" opacity="0.45" /></svg>
+                </span>
+                <svg class="dialog-icon__badge" width="26" height="26" viewBox="0 0 26 26" focusable="false"><path d="M13 2.6 24.2 22a1.2 1.2 0 0 1-1 1.8H2.8a1.2 1.2 0 0 1-1-1.8z" fill="#ffc21a" stroke="#c88a00" stroke-width="1" stroke-linejoin="round" /><path d="M13 9.4v6.6" stroke="#4a3200" stroke-width="2.2" stroke-linecap="round" /><circle cx="13" cy="19.4" r="1.35" fill="#4a3200" /></svg>
+              </div>
+              <div class="dialog-text">
+                <p class="dialog-msg">Bridge &mdash; approve one voucher</p>
+                <p class="dialog-info">Create ONE Receipt in "Demo Traders Pvt Ltd (synthetic)"
+Company GUID: 3f9a6c1e-52b7-4d08-a1e4-7b20c9d5e386
+Company number: 200417  Books from: 20250401
+Tally: http://127.0.0.1:9000
+Date: 20260312  Voucher number: Tally assigns it
+Reference: (none)
+Narration: (none)
+
+Dr 124600.00  "Example Bank Ltd"
+Cr 124600.00  "Nevrika Agro Foods"
+
+Total debit: 124600.00  Total credit: 124600.00
+Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+Batch: bridge-8e41d2a7-0c6b-4f93-b5a8-1d7e93c04f26
+
+Ledgers checked by identity against the build; Bridge adds its batch reference.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode unchanged until Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.</p>
+              </div>
+            </div>
+            <div class="dialog-actions">
+              <span class="dbtn dbtn-post">Post voucher</span>
+              <span class="dbtn dbtn-default">Cancel</span>
+            </div>
           </div>
-          <p id="release-status" class="release-status" role="status">Checking releases…</p>
+          <p class="dialog-cap">A replica of the approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; that window was run once, on a candidate build of 0.4.0: one decline and one approved post.</p>
         </div>
-        <noscript><p class="channel-note">The download buttons need JavaScript. Without it, open the <a href="https://github.com/lamemustafa/bridge/releases">releases page</a>, take the newest release whose tag starts with <code>mcp-</code> and that lists a <code>.mcpb</code> for your computer, and compare it with the matching <code>.sha256</code> file.</p></noscript>
-        <p id="channel-note" class="channel-note">Not yet code-signed; your computer may warn you before opening it. Compare the checksum with the .sha256 file on the release.</p>
-        <div class="downloads">
-          <a class="download-option" data-platform="windows-x64" aria-disabled="true">
-            <span>Download for Windows</span>
-            <strong>x64</strong>
-            <small>Download unavailable until a matching release is published.</small>
-          </a>
-          <a class="download-option" data-platform="macos-arm64" aria-disabled="true">
-            <span>Download for Apple Silicon Mac</span>
-            <strong>ARM64</strong>
-            <small>Download unavailable until a matching release is published.</small>
-          </a>
-        </div>
-        <p class="verification-note">Each download has a matching <code>.sha256</code> file on the same release. Compare it before opening the package if your organization requires download verification.</p>
-      </section>
 
-      <section class="setup" aria-labelledby="setup-title">
-        <div class="section-heading">
-          <div>
-            <h2 id="setup-title">Install and connect</h2>
+        <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
+      </div>
+
+      <div class="panels" id="panels">
+        <article class="panel" data-chapter="0">
+          <h1>Ask your client's Tally books in plain English.</h1>
+          <p class="proof">ComplyEaze Bridge is a local MCP server that lets Claude read your TallyPrime books, and post only what you approve; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> lists the limits. For Indian CAs.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
           </div>
-        </div>
-        <p class="channel-note"><strong>First, switch Tally's gateway on.</strong> TallyPrime does not listen for ComplyEaze Bridge by default. In Tally's connectivity / client-server configuration settings, set Tally to act as a server (<strong>"acts as Both"</strong> in Tally's own words) and note its HTTP gateway port. To confirm it is listening, open <code>http://localhost:9000/status</code> in a browser, substituting your port: a running gateway answers with a short Tally XML response. If the browser cannot connect at all, the gateway is usually still off, except when Tally runs in a Windows virtual machine on a Mac or the forwarding in step 3 is not set up yet. Read the two cases below before you change any Tally setting.</p>
-        <details class="aside">
-          <summary>Two cases where a failed check does not mean the gateway is off</summary>
-          <p><strong>On a Mac with Tally in a Windows virtual machine,</strong> run the check inside that VM, or only once the local forwarding in step 3 below is working. A Mac browser that cannot connect may mean that forwarding is missing rather than that the gateway is off.</p>
-          <p><strong>If the page hangs instead of refusing the connection,</strong> Tally may simply be busy behind another request. Wait and retry rather than changing the setting.</p>
-        </details>
-        <ol>
-          <li>In Claude Desktop, choose <strong>Settings → Extensions → Advanced settings → Install Extension…</strong> and pick the downloaded <code>.mcpb</code> file. Opening the file directly may also work on your computer.</li>
-          <li>Keep the Tally host as <strong>localhost</strong>. ComplyEaze Bridge accepts only a local loopback connection; it does not expose Tally to the internet.</li>
-          <li>On a Mac, Tally must already be available on <strong>localhost</strong> through a local Windows VM or organization-approved local forwarding. A separate PC or LAN-only Tally cannot be reached by entering its network address.</li>
-          <li>Set <strong>Your Tally port</strong> to the HTTP gateway port you switched on above, then finish the extension setup.</li>
-          <li>Restart Claude Desktop if the extension is installed but its tools do not appear. Use <strong>Connectors</strong> in a new chat to check that ComplyEaze Bridge is connected.</li>
-        </ol>
+          <p class="fineprint"><span class="fp-line fp-wide">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>, still being developed, and may contain errors: try it on a test company, with backups.</span><span class="fp-line"><a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">What has been run against a real TallyPrime, and what has not</a>.</span></p>
+          <p class="coming-line"><span class="tag">In development, not in the download</span> The coloured tabs: flagging findings by clause.</p>
+        </article>
 
-        <div class="port-guide">
-          <label for="tally-port">Port example (this page does not save settings)</label>
-          <input id="tally-port" name="tally-port" type="number" min="1" max="65535" value="9000" inputmode="numeric" />
-          <p id="port-guidance">Use <strong>9000</strong> unless Tally's local HTTP gateway is configured for another port.</p>
-          <p>Enter this only once you have confirmed the gateway is on. It is Tally's HTTP gateway port, not a Tally licence port. This webpage does not save or change any setting. Enter the value in Claude Desktop's extension setup, then restart Claude Desktop after changing it.</p>
-        </div>
-      </section>
+        <article class="panel" data-chapter="1">
+          <h2>Who owes you, and for how long.</h2>
+          <p class="proof">Five parties over 90 days, &#8377;7,86,300 in all.</p>
+          <p class="proof-sub">Reads the trial balance, ledgers, vouchers and outstandings. Ask as you would ask a colleague.</p>
+        </article>
 
-      <section class="plain-language" aria-labelledby="data-title">
-          <h2 id="data-title">ComplyEaze Bridge is local. Your AI conversation is not necessarily local.</h2>
-        <p>ComplyEaze Bridge runs on this computer and connects only to the configured local Tally endpoint. Journal, Payment, Receipt and Contra vouchers can be prepared as a file for you to import in Tally yourself. Posting a voucher directly is off by default; turning on voucher posting in the extension settings adds it, and every new posting requires your approval in a separate dialog. When you ask Claude to use it, the selected Tally results are sent to the AI provider you chose for that conversation. Choose a redaction setting during installation if you need it, and do not install a package from an untrusted source.</p>
-      </section>
+        <article class="panel" data-chapter="2">
+          <h2><span class="tag">In development, not in the download</span> A finding, tied to its voucher.</h2>
+          <p class="proof">Payment 1187 to Demo Packaging Supplies, flagged 40A(3).</p>
+          <p class="proof-sub">One finding per row, cited to its clause. Its accuracy is not yet proven.</p>
+        </article>
 
-      <section class="aftercare" aria-labelledby="aftercare-title">
-        <h2 id="aftercare-title">Upgrade or remove it</h2>
-        <p>Private MCPB downloads do not update automatically. To upgrade, download a newer compatible release and install it from Claude Desktop's Extensions settings, then confirm its version and settings. To remove ComplyEaze Bridge, use that same Extensions screen and choose uninstall. Removing the extension does not change Tally's gateway setting.</p>
-      </section>
-    </main>
-    <script type="module" src="./app.mjs"></script>
-  </body>
+        <article class="panel" data-chapter="3">
+          <h2>From bank statement to a voucher file.</h2>
+          <p class="proof">142 statement lines, <span class="counter" id="counterBank" aria-hidden="true">139</span><span class="visually-hidden">139</span> matched to your ledgers.</p>
+          <p class="proof-sub">3 near-miss ledger names wait for your decision; a voucher file is built once every name in it is exact. ComplyEaze Bridge creates no ledger. It reads password-protected PDF statements from three banks so far.</p>
+        </article>
+
+        <article class="panel" data-chapter="4">
+          <h2>Nothing posts until you approve it.</h2>
+          <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
+          <p class="proof-sub cap-wide">Here one receipt is prepared as its own one-voucher file and posted. Posting is off by default in a new install. A voucher is posted this way or imported in a file, never both.</p>
+          <p class="proof-sub cap-wide">The published 0.4.0 package itself has not been run by us against a live TallyPrime; a candidate build of the same code posted one approved Journal on Windows&nbsp;11 on 1&nbsp;October&nbsp;2026.</p>
+          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of release 0.3.0's window on a Mac. Windows asks Yes, No or Cancel; that window was run once, on a candidate build of 0.4.0. The published package itself has not been run by us against a live TallyPrime.</p>
+        </article>
+
+        <article class="panel" data-chapter="5">
+          <h2>Every voucher checked back in Tally.</h2>
+          <p class="proof">Import the file of the other 141 in Tally yourself; ComplyEaze Bridge reads every voucher back. Found in Tally <span class="counter" id="counterReadback" aria-hidden="true">142</span><span class="visually-hidden">142</span> of 142.</p>
+        </article>
+
+        <article class="panel" data-chapter="6">
+          <h2>Every call leaves a receipt.</h2>
+          <p class="proof">Every read and every post, including refusals, is logged on your computer.</p>
+          <p class="fineprint">What Claude reads goes to your AI provider. Party names can be partly masked or narrations dropped first; amounts are always sent.</p>
+        </article>
+
+        <article class="panel" data-chapter="7">
+          <h2>Read back, and on record.</h2>
+          <p class="proof">Every voucher read back. Every call on record.</p>
+        </article>
+      </div>
+    </div>
+
+    <p class="visually-hidden">
+      A thick case file is followed through eight short chapters, as a 3D book where the browser can draw one. It arrives with twenty-six sticky
+      index flags down its edge, coloured by the kind of finding (flagging findings is in development and not in the download). Asked who owes money for more than 90 days, the
+      flags fold back into the edge, it opens to an ageing page, and the five overdue parties are ringed in pencil. The page turns
+      to a voucher, two pencil ticks are drawn, and its 40A(3) flag leaves the page and lands as row 1 of a working
+      paper titled &ldquo;Working paper &middot; Tax audit FY 2025-26&rdquo; (flagging is in development and not in the download). The page turns
+      again to a bank statement; a slip lifts off each of five rows and the pile reads 139 matched, and three
+      question-mark flags mark near-miss ledger names that wait for your decision; you decide them one after
+      another, each turns into a tick, and the count of lines matched to your ledgers rises from 139 to 142; ComplyEaze Bridge then prepares one receipt as its own one-voucher file, and the other 141 vouchers as a file for you to import in Tally. A replica of
+      the approval window of release 0.3.0 on a Mac rises from that receipt's row, asks you to post that one voucher, and shrinks back into the row with a
+      red tick: one voucher per approval, and a voucher is posted this way or imported in a file, never both. After you import the file of the other 141 in Tally yourself, each voucher is ticked as ComplyEaze Bridge
+      reads it back, counting up to 142 of 142: 141 imported and one posted. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
+      one tick, and the five install steps and the download follow.
+    </p>
+  </section>
+
+  <!-- ================================================================ CLOSE -->
+  <section class="close-full" id="closeFull">
+    <div class="download-block" id="downloadCta">
+      <h2>Set it up in five steps.</h2>
+      <ol class="install-steps">
+        <li>In TallyPrime, turn on the HTTP gateway (Tally acts as &ldquo;Both&rdquo;).</li>
+        <li>Open the downloaded .mcpb file. If Claude&nbsp;Desktop doesn't pick it up: Settings &rarr; Extensions &rarr; Advanced settings &rarr; Install Extension.</li>
+        <li>Check the Tally port in the extension settings (usually <code>9000</code>).</li>
+        <li>Read the Terms of Use linked in the extension settings, then turn on &ldquo;I accept the ComplyEaze Bridge Terms of Use&rdquo;.</li>
+        <li>Save the settings, then quit Claude&nbsp;Desktop completely and reopen it. Then ask about your books in plain language.</li>
+      </ol>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
+      </div>
+      <p class="fineprint"><span class="fp-line">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>; your computer may warn you.</span></p>
+      <p class="next-line"><span class="tag">In development, not in the download</span><span>Flagging findings by clause.</span></p>
+    </div>
+  </section>
+
+
+
+</main>
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>A loopback address on this computer.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* The story's script (and three.js under it) loads only after the page has loaded and the browser
+   has reported its largest paint, so nothing competes with the first paint; the hero is plain HTML.
+   With reduced motion the story is a plain page and none of it loads. */
+(function(){if(document.documentElement.classList.contains("ce-static"))return;var l=0,p=0,d=0;function add(t,a){var e=document.createElement(t);for(var k in a)e[k]=a[k];return e}
+function go(){if(d||!l||!p)return;d=1;setTimeout(function(){["scene.js","vendor/three/three.bundle.min.js"].forEach(function(u){document.head.appendChild(add("link",{rel:"modulepreload",href:u}))});document.body.appendChild(add("script",{type:"module",src:"app.js",onerror:function(){document.documentElement.classList.add("ce-static")}}))},0)}
+try{new PerformanceObserver(function(x,o){o.disconnect();p=1;go()}).observe({type:"largest-contentful-paint",buffered:true})}catch(e){p=1}
+addEventListener("load",function(){l=1;setTimeout(function(){p=1;go()},600);go()})})()
+</script>
+<script src="chrome.js" defer></script>
+<span class="font-warm" data-i="0" aria-hidden="true">0 &#8377;</span><span class="font-warm" data-i="1" aria-hidden="true">0 &#8377;</span><span class="font-warm" data-i="2" aria-hidden="true">0 &#8377;</span>
+</body>
 </html>

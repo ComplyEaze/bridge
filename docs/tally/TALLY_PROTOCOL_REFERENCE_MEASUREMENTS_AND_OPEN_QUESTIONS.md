@@ -693,7 +693,9 @@ real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane,
 version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the
 company reports is refused (`ledger_count_company_differs`), which is meant to catch a company closed and
 reopened with equal marks while the census ran (by reasoning: that case was not reproduced live) and also
-refuses a ledger added during the read; an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
+refuses a ledger added during the read, and (by reasoning, not reproduced: #965) one altered during it before its
+slice was read, whose new AlterID is past every slice while `NUMLEDGERS` still counts it (one altered after its slice
+was read was counted, and the closing extent read refuses that case instead); an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
 sizes nothing, and the result of a counted read says which it was (`ledger_count_cross_check.status`).
 
 **A company name of 150 characters is stored whole, and a request naming it is handled (bridge#917) — PARTIAL, one company, one release.**

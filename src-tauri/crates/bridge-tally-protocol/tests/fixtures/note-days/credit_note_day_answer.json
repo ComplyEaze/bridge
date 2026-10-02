@@ -1,0 +1,122 @@
+{
+ "company": {
+  "books_from": "20250401",
+  "company_number": "100021",
+  "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+  "identity_state": "verified_tuple",
+  "missing_field": null,
+  "name": "BRIDGE SHAPE LAB"
+ },
+ "evidence": {
+  "bytes": 1060620,
+  "duration_ms": 6756,
+  "read_at": "2026-10-01T17:54:22.503Z",
+  "request_sha256": "1a9d0db8762564199267e88832143d2522aa2ec2126e9377aa48b11559edcb7e",
+  "response_sha256": "aac17e0b627063bbf71a093e03a8cadc649cb9528aaebb1caed9e10e491ce2b4",
+  "state": "complete"
+ },
+ "read_at": "2026-10-01T17:54:15.747Z",
+ "result": {
+  "coverage": "items are the Sales and Credit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Sales and Credit Note vouchers with no entry on a Duties & Taxes ledger are counted in sales_vouchers_without_duties_taxes_entry, not returned as items; measured for sales so far: the voucher window of two imported Sales item invoices (not classified end to end) and one Sales accounting voucher classified against its book's ledger masters; not measured for sales: the classification of a Sales item invoice, a Sales voucher with no entry on a Duties & Taxes ledger, credit notes, an inter-state (IGST) line, a tax Tally computes itself, a sale typed on Tally's screen, accounting-invoice mode, optional, cancelled and post-dated sales, a REFERENCE or a populated PARTYGSTIN on a sale, REFERENCEDATE (not returned) and books with several currencies; a row of such a kind carries `not_measured_live` naming it",
+  "items": [
+   {
+    "alter_id": 11,
+    "cancelled": false,
+    "date": "20250429",
+    "duties_taxes_entries_with_unrecognised_head": [],
+    "duties_taxes_entries_without_gst_head": [],
+    "entries_on_ledgers_with_unresolved_group": [],
+    "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000000b",
+    "has_taxable_entry": true,
+    "is_invoice": false,
+    "not_measured_live": [
+     "credit_note"
+    ],
+    "optional": false,
+    "other_entries": [],
+    "party": "Shape Buyer 1",
+    "party_entries": [
+     {
+      "amount": "1180.00",
+      "bill_allocations": [
+       {
+        "amount": "1180.00",
+        "bill_type": "On Account",
+        "reference": {
+         "kind": "on_account"
+        }
+       }
+      ],
+      "is_deemed_positive": "No",
+      "ledger": "Shape Buyer 1"
+     }
+    ],
+    "party_group": "Sundry Debtors",
+    "post_dated": false,
+    "status": "complete",
+    "tax_in_books": [
+     {
+      "amount": "-90.00",
+      "bill_allocations": [],
+      "head": "cgst",
+      "is_deemed_positive": "Yes",
+      "ledger": "CGST",
+      "raw_head": "CGST"
+     },
+     {
+      "amount": "-90.00",
+      "bill_allocations": [],
+      "head": "state_tax",
+      "is_deemed_positive": "Yes",
+      "ledger": "State Tax",
+      "raw_head": "State Tax"
+     }
+    ],
+    "taxable_entries": [
+     {
+      "amount": "-1000.00",
+      "bill_allocations": [],
+      "is_deemed_positive": "Yes",
+      "ledger": "Sales - Local"
+     }
+    ],
+    "voucher_class": "Credit Note",
+    "voucher_number": "1",
+    "voucher_type": "Credit Note"
+   }
+  ],
+  "ledger_masters_observed": 44,
+  "next_offset": null,
+  "offset": 0,
+  "other_voucher_types_touching_duties_taxes": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "profile": "agent_sales_register_v1",
+  "reason": null,
+  "register_classes": [
+   "Sales",
+   "Credit Note"
+  ],
+  "sales_vouchers_without_duties_taxes_entry": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "state": "complete",
+  "total": 1,
+  "unclassified_voucher_type": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "vouchers_observed": 1,
+  "vouchers_with_unplaced_ledgers": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  }
+ },
+ "truncated": false
+}

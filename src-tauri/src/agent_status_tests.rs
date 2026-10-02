@@ -74,9 +74,17 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             writes_enabled: false,
             batch_post_enabled: false,
         });
+        let before = tally_host_today();
         let response = server.call_tool("tally_status", json!({})).await;
+        let after = tally_host_today();
         assert_eq!(response["isError"], false, "{fault}");
         let result = &response["structuredContent"]["result"];
+        // The date an omitted `as_of` defaults to is stated, as the host's
+        // calendar day: bracketed so a midnight crossing cannot fail the test.
+        assert!(
+            result["today"] == before || result["today"] == after,
+            "{fault}: {result}"
+        );
         assert_eq!(
             result["product"],
             if fault == "unobserved" {
@@ -538,6 +546,23 @@ async fn a_busy_wire_lock_names_itself_and_says_when_to_retry() {
         .unwrap()
         .contains("retry_after_s"));
     drop(held);
+}
+
+/// An assistant reads this description to learn that `today` is stated, and
+/// which defaults it is the date of.
+#[test]
+fn the_status_description_says_what_today_is_the_date_of() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "tally_status"))
+        .expect("tally_status tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains("`today` is this computer's calendar date (YYYYMMDD)"));
+    assert!(description.contains(
+        "`outstandings` uses when `as_of` is left out, and `ledger_masters` with `fields=compliance` for `party_gstin`"
+    ));
 }
 
 /// The company rule is in `list_companies`' own description as well as in the

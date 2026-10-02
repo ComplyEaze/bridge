@@ -1483,7 +1483,7 @@ source evidence are not fabricated; zero retained bytes does not establish that
 no HTTP request was attempted. Local-only tools and refusals without retained
 source observations carry local evidence.
 
-`outstandings` returns the runtime's paired native result. A complete read has
+`outstandings` returns the runtime's paired native result. Its `result.as_of` (YYYYMMDD) is always the date read as of, in every state: the caller's `as_of`, or this computer's date when it was left out. `tally_status.today` is that date. A complete read has
 billed totals explicitly scoped to open bills, four overdue-age buckets, an
 `unaged` bucket for future-due or unobserved ages, top parties,
 open bills, and unallocated counts and directional totals; a refused runtime read instead has `state: "partial"` and its

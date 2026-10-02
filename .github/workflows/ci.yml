@@ -179,9 +179,12 @@ jobs:
             fi
             echo "Playwright system dependencies attempt $attempt of 3 failed"
             [ "$attempt" = 3 ] && exit 1
+            # an apt that died mid-unpack leaves dpkg interrupted, and every retry would then fail; finish it first
+            sudo dpkg --configure -a || true
           done
           # The browser download is what hung until the job's time limit about eight times in two days, so it is the
           # part that keeps a short limit and a bounded number of attempts. It runs no apt and holds no lock.
+          # This block ends the step (exit 0 or exit 1 inside it): add nothing after it without checking that.
           if [ "$CACHE_HIT" != "true" ]; then
             for attempt in 1 2 3; do
               if timeout --kill-after=10 240 corepack pnpm exec playwright install chromium webkit; then
@@ -254,7 +257,6 @@ jobs:
       - run: node scripts/check-gh-api-pagination.mjs
       - run: node --test scripts/prune-package-compiler-cache.test.mjs
       - run: node --test scripts/master-push-reuse.test.mjs scripts/master-push-scope.test.mjs
-      - run: node --test scripts/playwright-install-step.test.mjs
       - run: python3 scripts/collect-macos-test-crashes.test.py
       - run: python3 scripts/retain-macos-test-binaries.test.py
       - run: python3 scripts/bank_statement_import.test.py

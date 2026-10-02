@@ -27,7 +27,7 @@ function stepScript() {
 const stubDir = mkdtempSync(join(tmpdir(), "playwright-stubs-"));
 process.on("exit", () => rmSync(stubDir, { recursive: true, force: true }));
 const stub = (name, body) => { writeFileSync(join(stubDir, name), `#!/bin/bash\n${body}\n`); chmodSync(join(stubDir, name), 0o755); };
-stub("sudo", 'cat > "$STUB_DIR/apt-conf-written"');
+stub("sudo", 'echo "sudo $*" >> "$STUB_DIR/calls"; if [ "$1" = tee ]; then cat > "$STUB_DIR/apt-conf-written"; fi');
 stub("timeout", 'echo "timeout $*" >> "$STUB_DIR/calls"; while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"');
 stub("corepack", `echo "corepack $*" >> "$STUB_DIR/calls"
 case "$*" in
@@ -57,10 +57,11 @@ function runStep({ cacheHit, failDeps = 0, failDownload = 0 }) {
 const deps = (calls) => calls.filter((call) => call.startsWith("corepack") && call.includes("install-deps"));
 const downloads = (calls) => calls.filter((call) => call.startsWith("corepack") && call.includes("install chromium"));
 
-test("on a cache hit only the system dependencies are installed, with apt told to wait for the lock", () => {
+test("on a cache hit only the system dependencies are installed, with apt told to wait for the lock first", () => {
   const { status, calls, aptConf } = runStep({ cacheHit: "true" });
   assert.equal(status, 0);
-  assert.equal(deps(calls).length, 1);
+  assert.deepEqual(deps(calls), ["corepack pnpm exec playwright install-deps chromium webkit"], "both browsers' dependencies, exactly");
+  assert.equal(calls[0], "sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout", "the lock wait is configured before anything installs");
   assert.equal(downloads(calls).length, 0);
   assert.match(aptConf, /DPkg::Lock::Timeout "\d+";/);
 });
@@ -69,7 +70,9 @@ test("on a cache miss the browsers are downloaded as well, under a time limit", 
   const { status, calls } = runStep({ cacheHit: "false" });
   assert.equal(status, 0);
   assert.equal(downloads(calls).length, 1);
-  assert.ok(calls.some((call) => call.startsWith("timeout --kill-after=10 240 corepack pnpm exec playwright install chromium webkit")), "the download keeps its limit");
+  assert.ok(calls.some((call) => call === "timeout --kill-after=10 240 corepack pnpm exec playwright install chromium webkit"), "the download keeps its limit, for both browsers");
+  assert.deepEqual(deps(calls), ["corepack pnpm exec playwright install-deps chromium webkit"], "the dependencies are installed on a miss too");
+  assert.ok(calls.findIndex((call) => call.includes("install-deps")) < calls.findIndex((call) => call.includes("install chromium")), "dependencies before the download");
 });
 
 test("the apt-based install is never run under timeout", () => {
@@ -80,10 +83,11 @@ test("the apt-based install is never run under timeout", () => {
   }
 });
 
-test("a failed system install is retried, at most three times, and then fails the step", () => {
+test("a failed system install is retried, at most three times, finishing an interrupted dpkg between attempts, and then fails the step", () => {
   const twice = runStep({ cacheHit: "true", failDeps: 2 });
   assert.equal(twice.status, 0);
   assert.equal(deps(twice.calls).length, 3);
+  assert.equal(twice.calls.filter((call) => call === "sudo dpkg --configure -a").length, 2, "dpkg is finished before each retry, not after the last failure");
   const always = runStep({ cacheHit: "true", failDeps: 99 });
   assert.equal(always.status, 1);
   assert.equal(deps(always.calls).length, 3);

@@ -210,6 +210,9 @@ base revision.
 <a id="914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate"></a>
 
 [9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate)
+<a id="915-an-import-fills-its-own-alterid-span-in-request-order"></a>
+
+[9.15 An import fills its own AlterID span in request order](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#915-an-import-fills-its-own-alterid-span-in-request-order)
 <a id="12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally"></a>
 
 [1.2 A modal error dialog in Tally's UI blocks the gateway until a human clicks OK — **P0 operationally**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#12-a-modal-error-dialog-in-tallys-ui-blocks-the-gateway-until-a-human-clicks-ok--p0-operationally)

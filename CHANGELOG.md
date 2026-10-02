@@ -73,7 +73,8 @@ requests it comes from, except where it names an issue.
   count of the range. If Tally's own date selection leaves a voucher out, the
   count and the read both miss it, and the range is still called complete. A
   small or new company is not counted, so it cannot get `absent`; adding a
-  count for it is deferred (#985).
+  count for it is tracked in #1029, with the multi-day and after-post cases
+  (#985).
 - `parse_bank_statement` checks the text of the path. A mapped drive letter
   still passes, and so, on a Mac, does a path under a mounted network volume
   (#1024).

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ComplyEaze/bridge-tally",
+  "title": "ComplyEaze Bridge",
+  "description": "Reads TallyPrime for your AI assistant; posts only batches you approve. Windows, Apple Silicon Mac.",
+  "version": "0.4.1",
+  "websiteUrl": "https://bridge.complyeaze.com",
+  "repository": {
+    "url": "https://github.com/ComplyEaze/bridge",
+    "source": "github",
+    "id": "1298346634"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.1/bridge-tally-mcp-v0.4.1-windows-x64.mcpb",
+      "fileSha256": "152010acc3342e4e46618911cad6250e9620e62f52a3c9848f21df00ef30b08a",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.4.1/bridge-tally-mcp-v0.4.1-macos-arm64.mcpb",
+      "fileSha256": "59e68408e59d3a86b85be5abaa4b2e0600dbd275ff15fd575ffd242857d26ba1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -780,6 +780,20 @@ disagree.
 - If the MCP registry or another directory lists the build, update that
   listing's version and SHA-256 in the same release. A listing that points at
   an older package is a stale claim.
+- The official MCP registry listing is `io.github.ComplyEaze/bridge-tally`, published
+  from `registry/server.json` by the **Publish to the MCP registry** workflow
+  (`.github/workflows/publish-mcp-registry.yml`, dispatched by a maintainer, never by a
+  tag). For each release, after it is published, update `registry/server.json` in the
+  post-release pull request: the version, the two asset addresses (they carry the
+  version) and both `fileSha256` values, copied from the release's `.sha256` files.
+  Then dispatch the workflow with the release tag. It refuses to publish unless the
+  file's version equals `packaging/mcpb/manifest.json`'s, the tag is `mcp-v<version>`,
+  and each hash equals the release's `.sha256` file. A published registry version
+  cannot be edited or moved, so a wrong one is superseded by the next release's, not
+  repaired. `node scripts/check-registry-server-json.mjs` checks the file's form on
+  every pull request and that its version never runs ahead of the manifest; it cannot
+  require equality on a pull request, because the version pull request bumps the
+  manifest before the release (and so the hashes) exists.
 
 ## Rollback
 

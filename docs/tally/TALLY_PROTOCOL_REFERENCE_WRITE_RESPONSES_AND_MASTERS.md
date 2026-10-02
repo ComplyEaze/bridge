@@ -833,7 +833,7 @@ and not a failed request.
 ### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
 
 **Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
-`BRIDGE AMEND LAB`, one run. **Confidence: PARTIAL.**
+`BRIDGE AMEND LAB`, three runs, one run each. **Confidence: PARTIAL.**
 
 §9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
 differ from the existing ledger's. Each request below was a gateway import (`Import Data`,
@@ -888,6 +888,21 @@ IMPLEMENTATION_GUIDE §3.6 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a hold the wor
 prevent it. Step 3a already asserted that such an overwrite replaces a ledger's group and opening
 balance; this is a measurement of that case.
 
+**Two follow-up runs, one variable each** (2026-10-02, the same company, one run each, lab). Each
+used a new ledger under `Sundry Creditors`, with bill-wise `Yes` and an opening of `-1000.00`. The
+opening was read at the books-from date, before (right after the ledger was created) and after.
+- **Only the opening changed.** A `Create` with the same name, the same parent and bill-wise flag,
+  and `OPENINGBALANCE` `-2500.00` answered `ALTERED 1`. The opening became `-2500.00`; the parent
+  and bill-wise flag were unchanged.
+- **The opening omitted.** A `Create` with the same name, parent and bill-wise flag and no
+  `OPENINGBALANCE` element answered `ALTERED 1`. The opening stayed at `-1000.00`; the parent and
+  bill-wise flag were unchanged.
+
+So, on these runs, a supplied opening replaced the existing one, and an omitted opening was kept.
+In the first of the two, the date-less read agreed with the dated one (`-2500.00`), on a
+balance-sheet ledger. So the date-less `0.00` did not recur on a balance-sheet ledger (one run). That
+fits the nominal-group candidate above; it does not isolate it.
+
 **Object export.** A `TYPE=Object`, `SUBTYPE=Ledger` export, whose `FETCHLIST` held `FETCH` `*`,
 showed `PARENT` and `ISBILLWISEON`. It never showed:
 - `OPENINGBALANCE`, which was checked while the opening was `-1000.00`;
@@ -898,11 +913,13 @@ So a diff of it could show a change to the parent or the bill-wise flag, but not
 (inferred from the fields it carried, one run).
 
 **Not measured:**
-- which field change caused which effect: the three fields changed in one request, and the parent
-  moved from a balance-sheet group to a nominal group;
+- whether the parent and the bill-wise flag each change on their own: in the first run they changed
+  together, with the opening, and the parent moved from a balance-sheet group to a nominal group;
 - a parent change within balance-sheet groups;
-- a `Create` that changes the opening alone, or that omits `OPENINGBALANCE`, `PARENT` or
-  `ISBILLWISEON`;
+- a `Create` that omits `PARENT` or `ISBILLWISEON`;
+- an `OPENINGBALANCE` of `0` or an empty element (only an omitted element was measured);
+- an opening-only change on a ledger under a nominal group;
+- an omitted opening in a `Create` that also changes the parent or the bill-wise flag;
 - a folded or differently cased spelling of the name (§9.4b, §9.4d, §9.4e);
 - a ledger that holds bill allocations or posted vouchers;
 - the cause of the date-less `0.00`;

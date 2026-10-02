@@ -857,7 +857,11 @@ existing master was **overwritten** with the retry payload.
 A `Create` with the same name and a changed parent, bill-wise flag and opening ended,
 in one run on licensed 7.1 Silver, with all three at the supplied values, the opening
 balance included, still reporting only `ALTERED=1` (protocol reference §9.4g, PARTIAL).
-Read any opening at a stated date (I11): a date-less read showed the new opening as 0.00.
+In two follow-up runs, a supplied opening alone replaced the existing one and an
+omitted opening was kept (§9.4g, one run each).
+Read any opening at a stated date (I11): a date-less read showed the new opening as
+0.00 once, after a move to a nominal group; on a balance-sheet ledger it agreed with
+the dated read.
 Persist `CREATED` and `ALTERED` as distinct outbox outcomes.
 A pre-read alone does not authorize creation: use the complete-catalogue
 and mutation-time prerequisites in `PROMPT_PLAYBOOK.md` Phase 4 step 3a; an unqualified case stays

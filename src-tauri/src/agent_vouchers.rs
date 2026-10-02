@@ -18,7 +18,7 @@ pub(super) struct VoucherPageKey {
     from: String,
     to: String,
     ledger: Option<String>,
-    selector: Option<String>,
+    selector: Option<VoucherTypeSelector>,
 }
 
 impl VoucherPageKey {
@@ -34,11 +34,7 @@ impl VoucherPageKey {
             from: from.to_string(),
             to: to.to_string(),
             ledger: ledger.map(str::to_string),
-            selector: selector.map(|selector| match selector {
-                VoucherTypeSelector::Class(class) => format!("class:{class:?}"),
-                VoucherTypeSelector::Guid(guid) => format!("guid:{guid}"),
-                VoucherTypeSelector::Name(name) => format!("name:{name}"),
-            }),
+            selector: selector.cloned(),
         }
     }
 }
@@ -47,7 +43,8 @@ impl VoucherPageKey {
 /// check and selector, unredacted and unmarked, held in process memory only,
 /// never persisted. Redaction and party marking are applied to each page as it
 /// is served. Valid while the company's two marks equal the ones the read
-/// opened and closed on.
+/// opened on: a change since then moves a mark, so it can only make a later
+/// page read afresh, never serve an older read as current.
 pub(super) struct VoucherPageSnapshot {
     id: String,
     key: VoucherPageKey,
@@ -55,18 +52,22 @@ pub(super) struct VoucherPageSnapshot {
     rows: Arc<Vec<Value>>,
     window: Value,
     voucher_types: Option<Value>,
+    /// Why a complete window is complete when it is more than a counted read (an
+    /// empty book), so a served page says it too.
+    reason: Option<&'static str>,
     read_at: String,
     taken: std::time::Instant,
     bytes: usize,
 }
 
 impl VoucherPageSnapshot {
-    fn new(
+    pub(super) fn new(
         key: VoucherPageKey,
         marks: CompanyMarks,
-        rows: Vec<Value>,
+        rows: Arc<Vec<Value>>,
         window: Value,
         voucher_types: Option<Value>,
+        reason: Option<&'static str>,
     ) -> Self {
         let bytes = rows.iter().map(|row| row.to_string().len()).sum::<usize>()
             + window.to_string().len()
@@ -77,9 +78,10 @@ impl VoucherPageSnapshot {
             id: uuid::Uuid::new_v4().to_string(),
             key,
             marks,
-            rows: Arc::new(rows),
+            rows,
             window,
             voucher_types,
+            reason,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
             bytes,
@@ -123,10 +125,11 @@ impl VoucherPages {
         self.held.retain(|held| held.taken.elapsed() < ttl);
     }
 
-    fn hold(&mut self, snapshot: Arc<VoucherPageSnapshot>) {
+    /// Whether the window was kept: one larger than the byte cap is not.
+    pub(super) fn hold(&mut self, snapshot: Arc<VoucherPageSnapshot>) -> bool {
         self.drop_key(&snapshot.key);
         if snapshot.bytes > self.max_bytes {
-            return;
+            return false;
         }
         while self.held.iter().map(|held| held.bytes).sum::<usize>() + snapshot.bytes
             > self.max_bytes
@@ -141,6 +144,7 @@ impl VoucherPages {
             self.held.remove(oldest);
         }
         self.held.push(snapshot);
+        true
     }
 
     fn drop_key(&mut self, key: &VoucherPageKey) {
@@ -148,12 +152,12 @@ impl VoucherPages {
         self.held.retain(|held| held.key != *key);
     }
 
-    fn current(&mut self, key: &VoucherPageKey) -> Option<Arc<VoucherPageSnapshot>> {
+    pub(super) fn current(&mut self, key: &VoucherPageKey) -> Option<Arc<VoucherPageSnapshot>> {
         self.purge_expired();
         self.held.iter().find(|held| held.key == *key).cloned()
     }
 
-    fn drop_company(&mut self, company_guid: &str) {
+    pub(super) fn drop_company(&mut self, company_guid: &str) {
         self.purge_expired();
         self.held
             .retain(|held| !held.key.company_guid.eq_ignore_ascii_case(company_guid));
@@ -169,6 +173,13 @@ impl VoucherPages {
     pub(super) fn held_count(&self) -> usize {
         self.held.len()
     }
+}
+
+/// What a later page of a held window came to: served from the held read, or to
+/// be read afresh, with the held window it found moved on (when it did).
+enum PageServe {
+    Served(ToolOutcome),
+    Fresh(Option<Value>),
 }
 
 /// The rows of one page, redacted and party-marked as `vouchers` always did.
@@ -329,10 +340,11 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 type_selector.as_ref(),
             )
         });
+        let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
             if offset > 0 {
                 let snapshot_id = optional_string(args, "snapshot_id")?;
-                if let Some(outcome) = server
+                match server
                     .serve_voucher_page(
                         &identity,
                         &company,
@@ -344,7 +356,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     )
                     .await?
                 {
-                    return Ok(outcome);
+                    PageServe::Served(outcome) => return Ok(outcome),
+                    PageServe::Fresh(earlier) => earlier_snapshot = earlier,
                 }
             }
             server.drop_voucher_page(key)?;
@@ -472,18 +485,22 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             }
         }
         let total = rows.len();
+        let rows = Arc::new(rows);
         // #485: a complete window is held, for its later pages. A partial one is
         // not: a later page of it reads afresh, as before.
-        let held = match (&page_key, result_state, source_marks) {
-            (Some(key), "complete", Some(marks)) => Some(server.hold_voucher_page(
-                VoucherPageSnapshot::new(
+        let held = match (&page_key, source_marks) {
+            (Some(key), Some(marks))
+                if window_state == WindowRead::Complete && withheld_total == 0 =>
+            {
+                server.hold_voucher_page(VoucherPageSnapshot::new(
                     key.clone(),
                     marks,
                     rows.clone(),
                     window.clone(),
                     voucher_types.clone(),
-                ),
-            )?),
+                    corroboration_reason,
+                ))?
+            }
             _ => None,
         };
         let items = page_items(server, &rows, offset, limit);
@@ -499,6 +516,9 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         );
         if let Some(held) = &held {
             payload["result"]["snapshot"] = held.describe(false);
+        }
+        if let Some(earlier) = earlier_snapshot {
+            payload["result"]["earlier_snapshot"] = earlier;
         }
         if let Some(voucher_types) = voucher_types {
             payload["result"]["voucher_types"] = voucher_types;
@@ -550,16 +570,19 @@ impl Server {
         Ok(())
     }
 
+    /// The held window, or `None` when the byte cap kept it out: a page then
+    /// advertises no snapshot it could not be served from.
     fn hold_voucher_page(
         &self,
         snapshot: VoucherPageSnapshot,
-    ) -> Result<Arc<VoucherPageSnapshot>, ToolFailure> {
+    ) -> Result<Option<Arc<VoucherPageSnapshot>>, ToolFailure> {
         let snapshot = Arc::new(snapshot);
-        self.voucher_pages
+        let kept = self
+            .voucher_pages
             .lock()
             .map_err(|_| "listing_snapshot_store_unavailable".to_string())?
             .hold(snapshot.clone());
-        Ok(snapshot)
+        Ok(kept.then_some(snapshot))
     }
 
     /// A later page, served from the held window of the same question while the
@@ -579,7 +602,7 @@ impl Server {
         snapshot_id: Option<&str>,
         accumulated: &mut Option<Evidence>,
         guid: &str,
-    ) -> Result<Option<ToolOutcome>, ToolFailure> {
+    ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages
             .lock()
@@ -589,7 +612,7 @@ impl Server {
         let Some(held) = held else {
             return match snapshot_id {
                 Some(_) => Err(super::ledgers::snapshot_refusal("snapshot_not_held")),
-                None => Ok(None),
+                None => Ok(PageServe::Fresh(None)),
             };
         };
         if snapshot_id.is_some_and(|id| held.id != id) {
@@ -604,17 +627,26 @@ impl Server {
                 Some(_) => Err(super::ledgers::snapshot_refusal(
                     "book_changed_since_first_page",
                 )),
-                None => Ok(None),
+                // Read afresh, and say so: this page's offsets do not continue
+                // the earlier pages of a book that has since changed.
+                None => Ok(PageServe::Fresh(Some(json!({
+                    "id": held.id,
+                    "cause": "book_changed_since_first_page",
+                    "offsets_do_not_continue": true,
+                })))),
             };
         }
         let snapshot = held;
         let total = snapshot.rows.len();
         let items = page_items(self, &snapshot.rows, offset, limit);
         let truncated = offset.saturating_add(items.len()) < total;
+        if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
+            evidence.reason_code = Some(reason.to_string());
+        }
         let mut payload = voucher_page_payload(
             company,
             "complete",
-            None,
+            snapshot.reason,
             items,
             offset,
             total,
@@ -624,7 +656,7 @@ impl Server {
             payload["result"]["voucher_types"] = voucher_types.clone();
         }
         payload["result"]["snapshot"] = snapshot.describe(true);
-        Ok(Some(ToolOutcome {
+        Ok(PageServe::Served(ToolOutcome {
             payload,
             evidence: accumulated
                 .clone()

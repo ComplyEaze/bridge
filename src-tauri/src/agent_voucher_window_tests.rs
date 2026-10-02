@@ -4349,8 +4349,10 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
 
 // -- #485: a later page of a complete window is served from its first page's read -----------------
 
+use super::voucher_type_class::ReservedVoucherClass;
 use super::vouchers::{
     selected_voucher_operation_for_verified, VoucherOperationScope, VoucherPageKey,
+    VoucherPageSnapshot, VoucherPages,
 };
 
 /// One server over one replayed sequence, so a later call can be served from
@@ -4506,7 +4508,65 @@ async fn a_moved_book_reads_the_window_afresh_for_a_page_that_names_nothing() {
     assert_eq!(page_snapshot(&second)["reused"], false);
     assert_ne!(page_snapshot(&second)["id"], id);
     assert_eq!(page_snapshot(&second)["master_alter_id"], 8);
+    // The page says its offsets do not continue the earlier ones.
+    let earlier = &second["structuredContent"]["result"]["earlier_snapshot"];
+    assert_eq!(earlier["id"], id);
+    assert_eq!(earlier["cause"], "book_changed_since_first_page");
+    assert_eq!(earlier["offsets_do_not_continue"], true);
     assert_eq!(one.requests(), total);
+}
+
+#[tokio::test]
+async fn an_unnamed_later_page_is_served_while_the_marks_are_unchanged() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let second = one.call(json!({"offset": 1, "limit": 2})).await;
+    assert_eq!(page_snapshot(&second)["reused"], true);
+    assert_eq!(page_snapshot(&second)["id"], page_snapshot(&first)["id"]);
+    assert!(second["structuredContent"]["result"]
+        .get("earlier_snapshot")
+        .is_none());
+    let whole = whole_counted_window().await;
+    assert_eq!(page_items_of(&second).as_slice(), &whole[1..3]);
+    assert_eq!(one.requests(), total);
+}
+
+#[test]
+fn a_held_window_is_found_by_its_own_question_only() {
+    let identity = identity();
+    let key = |ledger: Option<&str>, selector: Option<&VoucherTypeSelector>| {
+        VoucherPageKey::new(&identity, "20260801", "20260831", ledger, selector)
+    };
+    let held = |key: VoucherPageKey| {
+        Arc::new(VoucherPageSnapshot::new(
+            key,
+            marks_of(3),
+            Arc::new(Vec::new()),
+            Value::Null,
+            None,
+            None,
+        ))
+    };
+    let class = VoucherTypeSelector::Class(ReservedVoucherClass::Sales);
+    let mut pages = VoucherPages::default();
+    assert!(pages.hold(held(key(None, Some(&class)))));
+    assert!(pages.current(&key(None, Some(&class))).is_some());
+    assert!(pages.current(&key(None, None)).is_none());
+    assert!(pages.current(&key(Some("Cash"), Some(&class))).is_none());
+    assert!(pages
+        .current(&key(
+            None,
+            Some(&VoucherTypeSelector::Class(ReservedVoucherClass::Purchase))
+        ))
+        .is_none());
+    // Another company's writes leave it held; this company's drop it.
+    pages.drop_company("00000000-0000-4000-8000-000000000002");
+    assert!(pages.current(&key(None, Some(&class))).is_some());
+    pages.drop_company(&identity.company_guid().to_uppercase());
+    assert!(pages.current(&key(None, Some(&class))).is_none());
 }
 
 #[tokio::test]
@@ -4572,7 +4632,14 @@ async fn an_expired_or_oversized_window_is_not_held() {
             .unwrap()
             .limits_for_test(ttl, max_bytes);
         let first = one.call(json!({"limit": 1})).await;
-        let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+        // A window the byte cap kept out advertises no snapshot it cannot serve.
+        let id = match page_snapshot(&first)["id"].as_str() {
+            Some(id) => id.to_string(),
+            None => {
+                assert_eq!(max_bytes, 1, "{first}");
+                "nothing-held".to_string()
+            }
+        };
         let second = one
             .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
             .await;

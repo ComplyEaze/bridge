@@ -718,38 +718,48 @@ while each page said `complete`, and a long window cost its whole read once per
 page. Now a `complete` window is held in memory (its rows after every check and
 selector, unredacted; never written to disk) and a later page (`offset` above 0)
 is served from it with one paired marks read in place of the window, while the
-company's two marks (`ALTVCHID` and `ALTMSTID`) equal the ones the read opened
-and closed on. Redaction and party marking are applied to each page as it is
-served. The result carries `snapshot` (`id`, `master_alter_id`,
-`voucher_alter_id`, `read_at`, `reused`).
+company's two marks (`ALTVCHID` and `ALTMSTID`) equal the ones read when the
+window read began. A change since then moves a mark, so it can only make a later
+page read afresh, never serve an older read as current. Redaction and party
+marking are applied to each page as it is served. The result carries `snapshot`
+(`id`, `master_alter_id`, `voucher_alter_id`, `read_at`, `reused`); a served
+page's `window` timings and `read_at` are the first page's, and its `evidence`
+covers only the identity and marks reads it sent.
 
 - **A named snapshot is loud.** A later page that passes the first page's
   `snapshot_id` is refused as `listing_snapshot_changed` (cause
   `book_changed_since_first_page`, or `snapshot_not_held` when the window has
   expired, was replaced, was evicted by the byte cap, or was dropped by a write
-  through this server). Without the name, a page that cannot be served reads the
-  window again, as before, and rows can shift between pages.
+  through this server). `snapshot_id` is read on later pages only.
+- **An unnamed page says when the book moved.** Without the name, a page that
+  cannot be served reads the window again, as before. If a held window of the
+  same question was found and the book had moved on, the result carries
+  `earlier_snapshot` (`id`, `cause` `book_changed_since_first_page`,
+  `offsets_do_not_continue` true): the page is a correct read of the book as it
+  is, but its offsets do not continue the earlier pages; start again from offset 0.
 - **What is held.** Only a `complete` window; a `partial` one (an uncounted
   small book, a withheld foreign-currency voucher) is read again by each page.
   One window per company and question (dates, ledger, voucher-type selector),
-  for at most ten minutes, within the 64 MiB the ledger listings share. A write
-  through this server drops the company's held windows. The desktop screen holds
-  nothing.
+  for ten minutes after the read finished, within 64 MiB of its own (the ledger
+  listings have another 64 MiB); a window larger than that is not held and its
+  result carries no `snapshot`. A write through this server drops the company's
+  held windows. The desktop screen holds nothing.
 - **What a page cannot see.** A change that moves neither mark. The screen
-  actions measured so far each moved a mark (§11c.5: a voucher delete moved
-  `ALTVCHID` by 2, a cancel and a save with no change by 1, a ledger rename
-  `ALTMSTID` by 1); not measured or not established: the second `ALTVCHID` step
-  seen on marking a voucher optional, a company feature or configuration change
-  that alters export content without a mark move, a restored copy of the company
-  with the same GUID and marks, and whether a Tally Gold remote user's save shows
-  in the local `ALTVCHID` read at once. A write from the desktop app, another MCP
-  process or Tally's screens never reaches this server's store; the marks read
-  is then the only check.
-- **What it costs, measured on a synthetic book** (a month of 2,542 vouchers,
-  one run): the first page read the window in about 66 s on a release build;
-  every later page before this change repeated that. A page served from the held
-  window sends the identity read and one marks read (an estimated couple of
-  seconds, not measured live).
+  actions measured so far each moved a mark (§11c.5, one run each: a voucher
+  delete moved `ALTVCHID` by 2, a cancel and a save with no change by 1, a
+  regroup, an opening change and a ledger create or delete `ALTMSTID` by 1).
+  Not shown or not established: the second `ALTVCHID` step seen on marking a
+  voucher optional, whether a company feature or configuration change that
+  alters export content moves a mark (enabling cost centres moved `ALTMSTID` in
+  one PARTIAL run), a restored copy of the company with the same GUID and marks,
+  and whether a Tally Gold remote user's save shows in the local `ALTVCHID` read
+  at once. A write from the desktop app, another MCP process or Tally's screens
+  never reaches this server's store; the marks read is then the only check.
+- **What it costs.** A page served from a held window sends the identity read
+  and one marks read in place of the whole window. The saving was not measured
+  against Tally: a first read of a window of about two and a half thousand
+  vouchers took about a minute on a synthetic book, and each later page before
+  this change took the same again.
 
 ### Foreign-currency composites in `vouchers`
 

@@ -539,3 +539,44 @@ async fn a_busy_wire_lock_names_itself_and_says_when_to_retry() {
         .contains("retry_after_s"));
     drop(held);
 }
+
+/// The two log tools were once one identical sentence, and a model asked
+/// whether the user's data had been sent anywhere answered, from their names,
+/// that nothing had left the computer. Each now says what it holds and what
+/// it does not, so the descriptions must differ and must both carry the
+/// statement that what the assistant reads goes to the AI provider.
+#[test]
+fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
+    let definitions = tool_definitions(true, false);
+    let description_of = |name: &str| {
+        definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|tool| tool["name"] == name))
+            .unwrap_or_else(|| panic!("{name} tool definition"))["description"]
+            .as_str()
+            .expect("tool description")
+            .to_string()
+    };
+    let evidence = description_of("read_evidence");
+    let egress = description_of("egress_log");
+    let first_sentence = |text: &str| text.split(". ").next().unwrap().to_string();
+    assert_ne!(first_sentence(&evidence), first_sentence(&egress));
+    // Each says what it holds, and not what the other holds.
+    assert!(evidence.contains("kept in memory"), "{evidence}");
+    assert!(!evidence.contains("local log file"), "{evidence}");
+    assert!(egress.contains("its local log file"), "{egress}");
+    assert!(!egress.contains("kept in memory"), "{egress}");
+    for description in [&evidence, &egress] {
+        for needle in [
+            "bounded",
+            "It does not show what the AI provider received.",
+            "amounts included, is sent to the AI provider",
+            "redaction can only mask party names or drop narration",
+            "Never tell the user that no data has left their computer.",
+            "no figures or book content",
+            catalog::READ_RECEIPT_SENTENCE,
+        ] {
+            assert!(description.contains(needle), "missing: {needle}");
+        }
+    }
+}

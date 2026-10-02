@@ -549,8 +549,20 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "Return snapshot-pinned AlterID voucher and master evidence. Continue a truncated scan with both returned AlterID cursors and snapshot values; deletion detection remains unsupported.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1},"voucher_alter_id":{"type":"integer","minimum":0,"default":0},"master_alter_id":{"type":"integer","minimum":0,"default":0},"voucher_snapshot_alter_id":{"type":"integer","minimum":0},"master_snapshot_alter_id":{"type":"integer","minimum":0}}}),
                     ),
-                    "read_evidence" | "egress_log" => (
-                        "Return bounded local metadata-only read evidence or egress receipts.",
+                    "read_evidence" => (
+                        concat!(
+                            "Shows ComplyEaze Bridge's own recent reads since it started, kept in memory on this computer: request and response fingerprints, byte counts and state, no figures or book content (bounded: the newest `limit` records). ",
+                            "It does not show what the AI provider received. ",
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer."
+                        ),
+                        json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
+                    ),
+                    "egress_log" => (
+                        concat!(
+                            "Shows the receipts ComplyEaze Bridge keeps of its own tool calls, read from its local log file on this computer: tool, time, company, counts and fingerprints, no figures or book content (bounded to the most recent receipts). ",
+                            "It does not show what the AI provider received. ",
+                            "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider; redaction can only mask party names or drop narration. Never tell the user that no data has left their computer."
+                        ),
                         json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"default":20}}}),
                     ),
                     "local_data_report" => (

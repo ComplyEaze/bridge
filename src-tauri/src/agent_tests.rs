@@ -1702,6 +1702,16 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
         {"bridge_txn_id":"txn-002","date":"2026-09-02","voucher_type":"Payment","entries":[{"ledger":"Expense","amount":"7.50","side":"Dr"},{"ledger":"Bank","amount":"7.50","side":"Cr"}]}
     ]});
+    // The typed refusal itself: its code, and no evidence, so no read was made.
+    let failure = server
+        .build_import_xml(&mixed)
+        .await
+        .err()
+        .expect("a mixed batch is refused");
+    assert_eq!(failure.code, "voucher_type_shapes_mixed");
+    assert!(failure.cause.is_none());
+    assert!(failure.evidence.is_none());
+    // The same refusal as a caller receives it, with its remediation.
     let response = server.call_tool("build_import_xml", mixed).await;
     let error = &response["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "voucher_type_shapes_mixed", "{response}");
@@ -1722,10 +1732,14 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         .expect("build_import_xml is registered")["description"]
         .as_str()
         .expect("tool description");
-    assert!(description.contains(
-        "A batch holds Journals only, or Payment, Receipt and Contra vouchers only (those three \
-         may share one): a batch mixing the two is refused as voucher_type_shapes_mixed"
-    ));
+    // The rule is one whole sentence of the description, not a fragment of one.
+    assert!(
+        description.split(". ").any(|sentence| sentence
+            == "A batch holds Journals only, or Payment, Receipt and Contra vouchers only \
+                (those three may share one): a batch mixing the two is refused as \
+                voucher_type_shapes_mixed, so build one batch of each"),
+        "build_import_xml does not state the mixed-batch rule as its own sentence"
+    );
 }
 
 #[test]

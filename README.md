@@ -111,15 +111,15 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   as version 0.4.1, list 21 tools and answer the same way). The maintainer
   upgraded an installed 0.4.0 over it in Claude Desktop. The Terms setting and
   the other settings carried over, the app restarted the extension itself, and
-  `tally_status` answered against licensed TallyPrime Silver 7.1 with four lab
-  companies loaded. The record is the maintainer's dated notes, kept privately.
+  `tally_status` and `list_companies` answered against licensed TallyPrime
+  Silver 7.1 holding the lab's own companies. The record is the maintainer's dated notes, kept privately.
   The published 0.4.1 file was checked only without Tally; we have not installed
   it in Claude Desktop.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window
-(one was tried); the tools other than `tally_status` answering through Claude
-Desktop on macOS after the Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold
+(one was tried); the tools other than `tally_status` and `list_companies` answering
+through Claude Desktop on macOS after the Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold
 with its approval step recorded. Each release package is built and launched,
 its tool list checked and a synthetic encrypted bank statement parsed, on
 hosted CI runners for Windows x64 and Apple Silicon Mac.

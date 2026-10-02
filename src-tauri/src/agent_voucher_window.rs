@@ -1906,7 +1906,14 @@ impl Server {
     ) -> Result<(CompanyMarks, Evidence), ToolFailure> {
         let mut evidence = None;
         let mut boundary = None;
-        let marks = read_marks(&AgentReader(self), identity, company, &mut evidence, &mut boundary).await?;
+        let marks = read_marks(
+            &AgentReader(self),
+            identity,
+            company,
+            &mut evidence,
+            &mut boundary,
+        )
+        .await?;
         Ok((marks, evidence.expect("a marks read leaves its evidence")))
     }
 }

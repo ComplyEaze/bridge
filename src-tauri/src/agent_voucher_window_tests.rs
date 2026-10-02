@@ -4342,8 +4342,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
 // -- #485: a later page of a complete window is served from its first page's read -----------------
 
 use super::vouchers::{
-    selected_voucher_operation_for_verified, VoucherComposites, VoucherOperationScope,
-    VoucherPageKey,
+    selected_voucher_operation_for_verified, VoucherOperationScope, VoucherPageKey,
 };
 
 /// One server over one replayed sequence, so a later call can be served from
@@ -4435,7 +4434,10 @@ async fn a_later_page_is_served_from_the_first_pages_read() {
     let first = one.call(json!({"limit": 1})).await;
     let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
     assert_eq!(page_snapshot(&first)["reused"], false);
-    assert_eq!(page_snapshot(&first)["voucher_alter_id"], counted_marks_vouchers());
+    assert_eq!(
+        page_snapshot(&first)["voucher_alter_id"],
+        counted_marks_vouchers()
+    );
     let second = one
         .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
         .await;
@@ -4458,7 +4460,10 @@ fn counted_marks_vouchers() -> u64 {
 
 #[tokio::test]
 async fn a_moved_book_refuses_a_page_that_names_its_snapshot() {
-    for moved in [mark(counted_marks_vouchers() + 1), marks_plan(counted_marks_vouchers(), 8)] {
+    for moved in [
+        mark(counted_marks_vouchers() + 1),
+        marks_plan(counted_marks_vouchers(), 8),
+    ] {
         let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
         plans.extend(marks_page_plans(moved));
         let total = plans.len();
@@ -4563,7 +4568,11 @@ async fn an_expired_or_oversized_window_is_not_held() {
         let second = one
             .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
             .await;
-        assert_eq!(refusal_of(&second)["cause"], "snapshot_not_held", "{second}");
+        assert_eq!(
+            refusal_of(&second)["cause"],
+            "snapshot_not_held",
+            "{second}"
+        );
         assert_eq!(one.requests(), total);
     }
 }
@@ -4573,12 +4582,22 @@ fn a_held_window_answers_one_question_only() {
     let identity = identity();
     let base = || VoucherPageKey::new(&identity, "20260801", "20260831", None, None);
     assert_eq!(base(), base());
-    assert_ne!(base(), VoucherPageKey::new(&identity, "20260802", "20260831", None, None));
-    assert_ne!(base(), VoucherPageKey::new(&identity, "20260801", "20260830", None, None));
-    assert_ne!(base(), VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None));
+    assert_ne!(
+        base(),
+        VoucherPageKey::new(&identity, "20260802", "20260831", None, None)
+    );
+    assert_ne!(
+        base(),
+        VoucherPageKey::new(&identity, "20260801", "20260830", None, None)
+    );
+    assert_ne!(
+        base(),
+        VoucherPageKey::new(&identity, "20260801", "20260831", Some("Cash"), None)
+    );
     let sales = VoucherTypeSelector::Name("Sales".to_string());
     let purchase = VoucherTypeSelector::Name("Purchase".to_string());
-    let keyed = |selector| VoucherPageKey::new(&identity, "20260801", "20260831", None, Some(selector));
+    let keyed =
+        |selector| VoucherPageKey::new(&identity, "20260801", "20260831", None, Some(selector));
     assert_ne!(base(), keyed(&sales));
     assert_ne!(keyed(&sales), keyed(&purchase));
     assert_ne!(

@@ -12,6 +12,20 @@ next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since `mcp-v0.4.1`
+
+These changes are in source and not yet in a published build.
+
+**Safer or fixed**
+
+- `vouchers` no longer re-reads a whole window for every page. A later page of a
+  `complete` window is served from the first page's read while the company's
+  books have not changed, and a page that names the first page's `snapshot_id`
+  is refused if they did, instead of continuing from a different read: before,
+  a book that changed between pages could skip or repeat vouchers while every
+  page said `complete`. A window that is only `partial` is read again for each
+  page, as before (#485).
+
 ## [0.4.1] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)

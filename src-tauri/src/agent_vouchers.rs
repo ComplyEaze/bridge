@@ -70,7 +70,9 @@ impl VoucherPageSnapshot {
     ) -> Self {
         let bytes = rows.iter().map(|row| row.to_string().len()).sum::<usize>()
             + window.to_string().len()
-            + voucher_types.as_ref().map_or(0, |types| types.to_string().len());
+            + voucher_types
+                .as_ref()
+                .map_or(0, |types| types.to_string().len());
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             key,
@@ -174,7 +176,12 @@ fn page_items(server: &Server, rows: &[Value], offset: usize, limit: usize) -> V
     rows.iter()
         .skip(offset)
         .take(limit)
-        .map(|row| redact_value(mark_voucher_party_names(row.clone()), server.settings.redaction))
+        .map(|row| {
+            redact_value(
+                mark_voucher_party_names(row.clone()),
+                server.settings.redaction,
+            )
+        })
         .collect()
 }
 
@@ -588,11 +595,15 @@ impl Server {
         if snapshot_id.is_some_and(|id| held.id != id) {
             return Err(super::ledgers::snapshot_refusal("snapshot_not_held"));
         }
-        let (marks, read) = self.read_company_marks_once(identity, &company.name).await?;
+        let (marks, read) = self
+            .read_company_marks_once(identity, &company.name)
+            .await?;
         accumulate_evidence(accumulated, read);
         if held.marks != marks {
             return match snapshot_id {
-                Some(_) => Err(super::ledgers::snapshot_refusal("book_changed_since_first_page")),
+                Some(_) => Err(super::ledgers::snapshot_refusal(
+                    "book_changed_since_first_page",
+                )),
                 None => Ok(None),
             };
         }

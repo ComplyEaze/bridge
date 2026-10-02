@@ -16,34 +16,34 @@ Apache-2.0 builds from current source stays unambiguous.
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)
 
-These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
-request it comes from.
+These changes are in ComplyEaze Bridge 0.4.1. Each fix names the pull request
+it comes from.
 
 **What you can do now**
 
-- Nothing new. This build fixes three things in 0.4.0; every tool otherwise
-  works as it did.
+- Nothing new. This build fixes the things listed below; every tool otherwise
+  works as it did in 0.4.0.
 
 **Safer or fixed**
 
-- `parse_bank_statement` admits a statement or password file path only when
-  its text names a local disk, and refuses any other path (#1024).
-- `vouchers` returns a voucher's `master_id` as the plain number (`"1"`), not
-  as Tally sends it with a leading space (`" 1"`), so it matches the same id
-  returned by `verify_import` (#1021).
-- When a post is refused before its checks (the import journal is busy, the
-  batch is not found, or it belongs to another company), an approval you had
-  already clicked for that batch is withdrawn and you are asked again. Before,
-  that approval stayed held for up to 15 minutes, and every other batch's post
-  was refused until it lapsed (#904).
+- `parse_bank_statement` accepts a statement file or password file path only
+  when its text names a local disk (#1024).
+- `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
+  the plain number (`"1"`), not as Tally sends it with a leading space
+  (`" 1"`), so it matches the same id returned by `verify_import` (#1021).
+- If voucher posting is turned on and you click Approve for a batch, and the
+  post is then refused before it is sent (for example because the import
+  journal is busy, the batch is not found, or it belongs to another company),
+  your click is withdrawn and you are asked again. Before, the click stayed
+  held for up to 15 minutes, and posting any other batch was refused until it
+  lapsed (#904).
 
 **Known limits**
 
-- None of the three fixes has been run against a live TallyPrime; each is
-  covered by automated tests.
-- Before release, the macOS package was installed and started on one Mac. The
-  Windows package was not installed or run by us; the release check only
-  launches each package and lists its tools.
+- None of these fixes has been run against a live TallyPrime; each is covered
+  by automated tests. The Windows package was not installed or run by us; the
+  release check starts each package, lists its tools and reads a sample bank
+  statement, and does not run against TallyPrime.
 
 ## [0.4.0] - 2026-10-02
 

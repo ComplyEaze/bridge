@@ -132,12 +132,15 @@ fn an_answer_with_a_counter_missing_establishes_nothing() {
     );
 }
 
+/// Sets one counter of an answer.
+type Bump = fn(&mut TallyImportResult);
+
 #[test]
 fn any_other_counter_establishes_nothing() {
     // Synthetic, one counter at a time: only the measured shape is read. A
     // voucher Tally created and also reported as an exception is not read as
     // not created.
-    let cases: [(&str, fn(&mut TallyImportResult)); 6] = [
+    let cases: [(&str, Bump); 6] = [
         ("created", |c| c.created = 1),
         ("altered", |c| c.altered = 1),
         ("deleted", |c| c.deleted = 1),

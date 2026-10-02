@@ -159,6 +159,13 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
         }
     }
     response["truncated"] = json!(true);
+    // A headline that lists rows says only the rows that are left. Only a page
+    // of rows (`Rows`) trims what such a headline describes: the other shapes
+    // trim other lists (a partial trial balance's excluded ledgers), and its
+    // ledgers are then as many as before.
+    if matches!(shape, PageShape::Rows(_)) {
+        headline::restate_rows(response, width);
+    }
     Ok(())
 }
 

@@ -41,6 +41,8 @@ mod company;
 use company::*;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_headline.rs"]
+mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
 use ledger_candidates::resolve_ledger_or_refuse;
@@ -1785,17 +1787,20 @@ impl Server {
         });
         evidence.read_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         evidence.duration_ms = Some((Utc::now() - started).num_milliseconds().max(0) as u128);
-        let response_value = redact_tool_response(
-            name,
-            json!({
-                "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
-                "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
-                "evidence": evidence,
-                "truncated": truncated,
-                "result": payload.get("result").cloned().unwrap_or(payload),
-            }),
-            self.settings.redaction,
-        );
+        // A tool that states its outcome in words carries it as `headline`
+        // beside `result`; it sorts ahead of `result` in the serialized form.
+        let headline = payload.get("headline").cloned();
+        let mut envelope = json!({
+            "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
+            "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "evidence": evidence,
+            "truncated": truncated,
+            "result": payload.get("result").cloned().unwrap_or(payload),
+        });
+        if let Some(headline) = headline {
+            envelope["headline"] = headline;
+        }
+        let response_value = redact_tool_response(name, envelope, self.settings.redaction);
         let (response_value, _bytes_truncated, surviving_rows) =
             match enforce_response_byte_cap(response_value, self.settings.max_bytes) {
                 Ok(value) => value,

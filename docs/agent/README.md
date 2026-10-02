@@ -752,8 +752,8 @@ rate or return section, and matches nothing against any portal.
   ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
   voucher census and base-currency reads are added). The result does not report
   the cost.
-- **The state-side head has two spellings.** It is `state_tax` (raw `State Tax`)
-  on one measured book and `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
+- **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
+  on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
   recognised heads for the same side of the tax, so a caller must not look for
   one of them only.
 - **Not shown by any run, and said so in the tool's text and in each
@@ -763,7 +763,9 @@ rate or return section, and matches nothing against any portal.
   registration; a tax Tally computes itself (rate or HSN on the item); a sale
   typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
   `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
-  returned); books with several currencies.
+  returned); a ledger or voucher kept in a currency other than the book's base
+  (the Credit Note run's book defines a second currency, but all of its ledgers
+  are in the base).
 - **A row of a kind no capture covers says so, where the row itself shows the
   kind.** It is returned, not withheld, with `not_measured_live` listing why:
   `invoice_view_credit_note`, `inter_state_line`, `sales_ledger_not_an_entry`
@@ -774,7 +776,8 @@ rate or return section, and matches nothing against any portal.
   cannot show, so they are never marked and are not vouched for: a sale typed on
   Tally's screen in voucher view, a tax Tally computed itself, a duty head no
   sales capture has (such as cess), an invoice of another shape than the one run
-  (for example several goods lines), and several currencies; an unmarked row is
+  (for example several goods lines), and a ledger or voucher kept in a currency
+  other than the book's base; an unmarked row is
   not a measured one in those respects. A row is marked `inter_state_line` only
   when a tax entry's ledger master carries a recognised IGST head; an IGST
   ledger with no head, or an unrecognised head, is listed under the without-head

@@ -26,7 +26,8 @@ Each line names the pull requests it comes from.
   against a live Tally for one taxed Sales item invoice, one untaxed one and one
   Credit Note, on two synthetic companies. A Credit Note keeps Tally's signs
   (nothing is netted or flipped, so add signed amounts), and the state-side tax
-  head has two spellings, `state_tax` and `sgst_utgst`. An inter-state line, a
+  head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
+  side. An inter-state line, a
   cancelled or optional sale, an unrecognised or missing duty head, more than
   one voucher in a window and paging were not shown. A sale of a kind a row can
   show as unmeasured is marked `not_measured_live`; the tool's text says what

@@ -561,7 +561,7 @@ async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_t
 /// Every request file of `note-days/` is a request one of the three calls sent, and every request
 /// a call sent has its file: the record's fingerprints and the files' own bytes agree.
 #[test]
-fn the_note_day_request_files_are_exactly_the_requests_the_two_calls_sent() {
+fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
     use sha2::{Digest, Sha256};
     use std::collections::BTreeSet;
     let hex = |bytes: &[u8]| {

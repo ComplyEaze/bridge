@@ -103,14 +103,18 @@ fn descriptions<'a>(value: &'a Value, path: &str, out: &mut Vec<(String, &'a str
     }
 }
 
-/// Every text an assistant reads, the server instructions and each tool's and
-/// parameter's description, pairs its backticks. One lost backtick turns every
-/// later code span in that text inside out, and a test that looks for a phrase
-/// still finds it: a merge into #1049 left `whatever the statetop` ranks` in the
-/// outstandings description (#1109). Checked as `tools/list` and `initialize`
-/// serve them, with posting off and on.
+/// The server instructions and every tool and parameter description pair their
+/// backticks, checked as `initialize` and `tools/list` serve them, with posting
+/// off and on. One lost backtick turns every later code span in that text inside
+/// out, and a test that looks for a phrase still finds it: a merge into #1049
+/// left "whatever the statetop` ranks" in the outstandings description (#1109).
+///
+/// Parity only: an even number of lost or added backticks in one text passes.
+/// Not covered: the texts in tool results (headlines, `limitations`,
+/// `next_step` and refusal lines), which an assistant also reads but which
+/// `tools/list` does not serve.
 #[tokio::test]
-async fn every_text_an_assistant_reads_pairs_its_backticks() {
+async fn every_served_description_and_instruction_pairs_its_backticks() {
     let mut tool_counts = Vec::new();
     for (import_enabled, writes_enabled) in
         [(false, false), (true, false), (false, true), (true, true)]

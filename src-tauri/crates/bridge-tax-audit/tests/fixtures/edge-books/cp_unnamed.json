@@ -427,6 +427,70 @@
     ]
    ],
    "party": ""
+  },
+  {
+   "guid": "a12",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": "Edge Bank"
+  },
+  {
+   "guid": "a13",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -600000
+    ],
+    [
+     "Office Expense",
+     600000
+    ]
+   ],
+   "party": "Cleaner C"
+  },
+  {
+   "guid": "r05",
+   "date": "2025-06-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     21000000
+    ],
+    [
+     "Sales",
+     -21000000
+    ]
+   ],
+   "party": "Edge Bank"
+  },
+  {
+   "guid": "p04",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -21000000
+    ],
+    [
+     "Purchases",
+     21000000
+    ]
+   ],
+   "party": "Edge Bank"
   }
  ],
  "cash": [

@@ -154,6 +154,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         }
         // A nonempty, validated source can legitimately have no selector match.
         // Corroborate actual source emptiness before any client-side selector.
+        let mut ledger_match = None;
         if let Some((ledger, catalogue)) = selected_catalogue {
             let (corroboration, catalogue_evidence) =
                 server.read_ledger_catalogue(&identity, &company.name).await?;
@@ -168,7 +169,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             {
                 return Err("ledger_snapshot_drifted".to_string().into());
             }
-            rows = filter_voucher_rows_for_ledger(rows, &ledger);
+            rows = filter_voucher_rows_for_ledger(rows, ledger.name());
+            ledger_match = Some(ledger.to_json(server.settings.redaction));
         }
         let mut voucher_types = None;
         if let Some(selector) = &type_selector {
@@ -233,6 +235,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": result_state, "reason": corroboration_reason, "items": items, "offset": offset, "total": total, "profile": "agent_vouchers_v1_filters", "window": window}});
         if let Some(voucher_types) = voucher_types {
             payload["result"]["voucher_types"] = voucher_types;
+        }
+        // The ledger the rows were filtered to, and how the request reached it.
+        if let Some(ledger_match) = ledger_match {
+            payload["result"]["ledger_match"] = ledger_match;
         }
         if withheld_total > 0 {
             payload["result"]["withheld_total"] = json!(withheld_total);

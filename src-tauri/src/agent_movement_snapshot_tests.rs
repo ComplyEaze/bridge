@@ -186,6 +186,10 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 3
             );
+            // #1076: the answer says which ledger it read and how.
+            let ledger_match = &response["structuredContent"]["result"]["ledger_match"];
+            assert_eq!(ledger_match["ledger"], "WR2 Sales", "{ledger_match}");
+            assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
         }
         let observations = simulator.finish().unwrap();
         assert_eq!(

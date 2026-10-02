@@ -624,11 +624,17 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
-A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
-cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
-accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
-does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
-the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
+from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
+whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). Otherwise it
+refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
+or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
+the ledger read, `matched` (`exact` or `case_or_spacing`) and `similar_ledgers` (at most 25, with `similar_ledgers_total`; both left out under `mask_parties`), the other ledgers that
+differ from an exact match only in case or whitespace. A name that only a looser reading reaches (a
+dropped symbol or accent, words run together) is not read: the ledger it would reach is offered among
+the candidates with the rule `lookup_key_equal`, listed first, and the user is asked. Both refusals can carry
+`candidates`, from the catalogue
 already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
 order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
 `candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
@@ -649,9 +655,9 @@ would cost the refusal its code), each list is cut to a sixteenth of the cap; th
 list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
 ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
 writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
-now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
-`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
-`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+now, because ignoring everything but its letters and digits would offer a ledger named `RARS` for
+`Ra…rs`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too, whether or not it resolves. A ledger spelled exactly as asked is still reached.
 
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings

@@ -2528,7 +2528,7 @@ fn save_report_download_bytes(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
     save_download_into(
         &downloads,
         &app.state::<crate::exported_files::ExportedFiles>(),
@@ -2546,7 +2546,7 @@ fn save_download_into(
     contents: &[u8],
 ) -> Result<String, String> {
     let path = write_unique_download(downloads, file_name, contents)
-        .map_err(|error| format!("Bridge could not write the export: {error}"))?;
+        .map_err(|error| format!("ComplyEaze Bridge could not write the export: {error}"))?;
     Ok(exported.record(path))
 }
 
@@ -2591,10 +2591,14 @@ pub async fn reveal_exported_file(
 ) -> Result<(), String> {
     let file = reveal_target(&exported, &path).map_err(|refusal| match refusal {
         RevealRefusal::NotExported => {
-            "ComplyEaze Bridge shows only files it exported since it started.".to_string()
+            "ComplyEaze Bridge shows only files it exported since it started. Export it again to \
+             show it."
+                .to_string()
         }
         RevealRefusal::Missing => {
-            "ComplyEaze Bridge could not find that export any more.".to_string()
+            "ComplyEaze Bridge could not find that export any more. It may have been moved or \
+             deleted."
+                .to_string()
         }
     })?;
     let target = file.path();
@@ -2964,7 +2968,7 @@ pub async fn export_party_statement(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
     save_statement_into(
         &downloads,
         &app.state::<crate::exported_files::ExportedFiles>(),

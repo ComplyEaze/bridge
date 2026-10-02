@@ -9,15 +9,27 @@
 //! recorded in this process and refuses everything else, including another
 //! spelling of the same file.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+/// How many exports the record keeps. The oldest is dropped first, so a file
+/// exported more than this many exports ago can no longer be revealed: export
+/// it again. One entry is a path's text, so the record stays small.
+pub const MAX_RECORDED_EXPORTS: usize = 1_000;
 
 /// The record, held as Tauri state for the life of the process. Each entry maps
 /// the path text an export returned to the webview to the path it wrote.
 #[derive(Default)]
 pub struct ExportedFiles {
-    written: Mutex<HashMap<String, PathBuf>>,
+    written: Mutex<Recorded>,
+}
+
+/// The entries, and their texts from oldest to newest.
+#[derive(Default)]
+struct Recorded {
+    paths: HashMap<String, PathBuf>,
+    order: VecDeque<String>,
 }
 
 /// A file this process exported. Only [`ExportedFiles::admit`] makes one.
@@ -33,10 +45,20 @@ impl ExportedFiles {
     /// to the webview: the text later accepted by [`Self::admit`].
     pub fn record(&self, written: PathBuf) -> String {
         let text = written.to_string_lossy().into_owned();
-        self.written
+        let mut recorded = self
+            .written
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(text.clone(), written);
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if recorded.paths.insert(text.clone(), written).is_some() {
+            // Recorded again: it is now the newest.
+            recorded.order.retain(|known| known != &text);
+        }
+        recorded.order.push_back(text.clone());
+        while recorded.order.len() > MAX_RECORDED_EXPORTS {
+            if let Some(oldest) = recorded.order.pop_front() {
+                recorded.paths.remove(&oldest);
+            }
+        }
         text
     }
 
@@ -46,6 +68,7 @@ impl ExportedFiles {
         self.written
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .paths
             .get(text)
             .cloned()
             .map(ExportedFile)
@@ -100,5 +123,29 @@ mod tests {
             Err(NotExported)
         );
         assert_eq!(exported.admit(""), Err(NotExported));
+    }
+
+    #[test]
+    fn the_record_keeps_the_newest_exports_and_drops_the_oldest() {
+        let exported = ExportedFiles::default();
+        let directory = tempfile::tempdir().unwrap();
+        let path = |n: usize| directory.path().join(format!("export-{n}.csv"));
+        let first = exported.record(path(0));
+        let second = exported.record(path(1));
+        // Recording the first again makes it the newest, so it outlives the second.
+        assert_eq!(exported.record(path(0)), first);
+        for n in 2..=MAX_RECORDED_EXPORTS {
+            exported.record(path(n));
+        }
+        assert_eq!(exported.admit(&second), Err(NotExported));
+        assert_eq!(exported.admit(&first).unwrap().path(), path(0));
+        let newest = path(MAX_RECORDED_EXPORTS).to_string_lossy().into_owned();
+        assert_eq!(
+            exported.admit(&newest).unwrap().path(),
+            path(MAX_RECORDED_EXPORTS)
+        );
+        let recorded = exported.written.lock().unwrap();
+        assert_eq!(recorded.paths.len(), MAX_RECORDED_EXPORTS);
+        assert_eq!(recorded.order.len(), MAX_RECORDED_EXPORTS);
     }
 }

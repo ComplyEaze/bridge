@@ -7,6 +7,8 @@
 //
 //   node scripts/check-surface-ack.mjs --mode pull_request|merge_group|push|workflow_dispatch
 //        [--report-only] [--pr N] [--base REV]        (run from the repository root)
+//   Locally, `--mode pull_request --pr N --base origin/master` checks what this branch changed since it
+//   left master (the merge-base of REV and HEAD), even when master has moved on; CI uses HEAD^1 instead.
 //
 // Exit 0: pass, or --report-only (prints "WOULD FAIL: ..."). Exit 1: a rule failed, or git could
 // not answer (fail closed). Exit 2: bad command-line usage.
@@ -95,12 +97,14 @@ export function withdrawnPins({ commits, pinsOf, basePaths, headPaths }) {
 // `.gitattributes`, which is refused (it can change a pinned file's bytes with no pinned path in the diff).
 // withdrawn: paths a commit of the branch pinned that are in neither the base list nor the head list
 // (see withdrawnPins); each is a removed pin and needs its own "removed-pin:" line.
-export function checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn = [] }) {
+export function checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn = [], alsoPinned = [] }) {
   const reasons = [];
   const baseSet = new Set(basePins.map((p) => p.path));
   const headSet = new Set(headPins.map((p) => p.path));
   const withdrawnPaths = sorted(withdrawn.filter((p) => !baseSet.has(p) && !headSet.has(p)));
-  const pinned = new Set([...baseSet, ...headSet]);
+  // alsoPinned: paths pinned at a revision the branch is not based on (a local --base ahead of the branch);
+  // a change to one is a pinned change, but the pin list's own additions and removals are read against the merge-base.
+  const pinned = new Set([...baseSet, ...headSet, ...alsoPinned]);
   const changedPins = new Set();
   for (const c of changed) {
     // Both names of a rename or copy; a copy source counts only if it is itself pinned.
@@ -305,11 +309,12 @@ function branchCommits(baseRev, headRev) {
     });
 }
 
-function evaluate(label, baseRev, headRev, prNumber) {
+function evaluate(label, baseRev, headRev, prNumber, alsoPinnedRev) {
   try {
     const at = (r) => git("show", `${rev(r)}:${SURFACE_PATH}`);
     const basePins = parsePins(at(baseRev), { allowSchema2: true });
     const headPins = parsePins(at(headRev));
+    const alsoPinned = alsoPinnedRev ? parsePins(at(alsoPinnedRev), { allowSchema2: true }).map((p) => p.path) : [];
     const changed = parseNameStatus(git("diff", "--name-status", "-z", "--find-renames", "--find-copies", rev(baseRev), rev(headRev), "--"));
     const acks = collectAcks(changed, headRev);
     const cache = new Map();
@@ -319,7 +324,7 @@ function evaluate(label, baseRev, headRev, prNumber) {
       basePaths: new Set(basePins.map((p) => p.path)),
       headPaths: new Set(headPins.map((p) => p.path)),
     });
-    return { label, ...checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn }) };
+    return { label, ...checkAck({ basePins, headPins, changed, acks, prNumber, withdrawn, alsoPinned }) };
   } catch (error) {
     return failure(label, error);
   }
@@ -328,6 +333,12 @@ function evaluate(label, baseRev, headRev, prNumber) {
 function pullRequest(opts, env) {
   try {
     let base = opts.base;
+    const named = base;
+    // A local run names the base it was cut from, which may have moved on since. The changes are those since
+    // the merge-base of that revision and HEAD, so a base that is ahead of the branch cannot make other pull
+    // requests' changes and acknowledgements look like this one's. A file that revision has pinned since the
+    // cut still counts as pinned, as it does in CI, which checks the merge against the base's tip.
+    if (base) base = git("merge-base", rev(base), "HEAD").trim();
     if (!base) {
       // The workflow always sets PR_HEAD_SHA; without it nothing proves HEAD^2 is the pull request
       // head (and so that HEAD^1 is the base), so refuse rather than skip the assertion.
@@ -337,7 +348,7 @@ function pullRequest(opts, env) {
       if (second !== expected) throw new Error(`HEAD^2 (${second}) is not the pull request head ${env.PR_HEAD_SHA}`);
       base = "HEAD^1";
     }
-    return [evaluate("pull_request", base, "HEAD", Number(opts.pr ?? env.PR_NUMBER))];
+    return [evaluate("pull_request", base, "HEAD", Number(opts.pr ?? env.PR_NUMBER), named)];
   } catch (error) {
     return [failure("pull_request", error)];
   }

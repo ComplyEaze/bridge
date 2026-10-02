@@ -820,3 +820,40 @@ test("historicPaths reads paths only: unsorted, duplicated and extra-key rows ar
     assert.throws(() => historicPaths(bad), /pin list/, bad);
   }
 });
+
+test("pull_request mode: a local --base that is ahead of the branch is read as its merge-base", () => {
+  const r = prRepo();
+  branch(r, "stale", () => (r.write("a.txt", "changed\n"), r.ackFile(7, ["a.txt"])));
+  // a second commit on the branch, so that HEAD^ is not the merge-base
+  r.sh("switch", "-q", "stale");
+  r.write("other.txt", "second commit\n");
+  const good = r.commit("second commit");
+  r.sh("switch", "-q", "main");
+  // main moves on: another pull request changes a different pinned file and adds its own acknowledgement.
+  r.write("b.txt", "changed on main\n");
+  r.ackFile(3, ["b.txt"]);
+  r.commit("another pull request lands");
+  r.sh("switch", "-q", "--detach", good);
+  const local = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(local.status, 0, local.stdout + local.stderr);
+  assert.match(local.stdout, /touched pinned files \(1: a\.txt\)/, "only this branch's change is counted, not main's");
+  const wrongNumber = cli(r.dir, ["--mode", "pull_request", "--pr", "8", "--base", "main"]);
+  assert.equal(wrongNumber.status, 1, "the branch's own rules still apply against the merge-base");
+  assert.equal(cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "no-such-revision"]).status, 1, "an unknown base fails closed");
+});
+
+test("pull_request mode: a pin master added after the cut still needs an ack for a local --base run", () => {
+  const r = prRepo();
+  const noAck = branch(r, "touches-later-pin", () => r.write("other.txt", "changed by the branch\n"));
+  const withAck = branch(r, "acknowledges-it", () => (r.write("other.txt", "changed by the branch\n"), r.ackFile(7, ["other.txt"])));
+  // main moves on and pins other.txt, which the branches (cut earlier) do not have pinned.
+  r.surface([{ path: "a.txt" }, { path: "b.txt" }, { path: "other.txt" }]);
+  r.commit("master pins other.txt");
+  r.sh("switch", "-q", "--detach", noAck);
+  const missing = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(missing.status, 1, "CI would fail this merge, so the local run must too");
+  assert.match(missing.stdout, /touched pinned files \(1: other\.txt\)/);
+  r.sh("switch", "-q", "--detach", withAck);
+  const ok = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+});

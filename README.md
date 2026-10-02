@@ -242,8 +242,9 @@ What you pay or provide today:
   build of 0.4.0 (not the published file) on Windows with a Claude account that
   had no paid plan, on one synthetic company; we make no claim about other
   plans or larger books.
-- **Your clients' data:** what Claude reads goes to Anthropic under your
-  account; through ComplyEaze Bridge, ComplyEaze does not receive it
+- **Your clients' data:** what Claude reads goes to Anthropic, under
+  Anthropic's terms for your plan; through ComplyEaze Bridge, ComplyEaze does
+  not receive it
   ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).
 - **Your checking:** check results in Tally before you rely on them.
 

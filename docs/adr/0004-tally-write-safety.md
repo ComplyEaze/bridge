@@ -581,3 +581,20 @@ is accepted, and loud.
   record holds without its own file as no doubt again (`ack_no_observed_doubt`, and
   `operator_review` null). The verdict itself is unchanged.
 - Do not edit the journal or the check records by hand to get around any of these.
+
+## Amendment — 2026-10-02: native posts carry no narration tag
+
+- **Change:** a native post (`post_import`, and the desktop Journal post)
+  writes the narration without `[BRIDGE:…]` (owner decision, 2026-09-28) and
+  is attributed by the post-span basis of ADR 0018 (amended 2026-10-02). The
+  hand-import file keeps the tag.
+- **New journal state:** the dispatch intent records the pre-POST voucher
+  mark, and one post-span verdict record per batch follows the response. An
+  older connector refuses such a journal; the incompatibility starts at the
+  first post made with this build.
+- **Rollback:** do not downgrade after posting with this build. Before the
+  first such post a downgrade is harmless.
+- **New refusal:** `post_mark_unrecorded`, under the admission lock before the
+  intent: nothing recorded or sent, and the approval withdrawn.
+- **New readback statuses:** `bound_not_in_window` and `book_rolled_back`.
+  Neither is ever absence.

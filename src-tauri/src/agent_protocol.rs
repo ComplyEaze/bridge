@@ -379,7 +379,7 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
     let counter = |name| counters.get(name).and_then(Value::as_u64);
     let presence = counters.get("counter_presence")?.as_object()?;
     let reported = |name| presence.get(name).and_then(Value::as_bool);
-    Some(json!({
+    let mut compact = json!({
         "application_status":application_status,
         "counters":{
             "created":counter("created")?,
@@ -401,7 +401,14 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
             }
         },
         "exceptions_were_reported":outcome["exceptions_were_reported"].as_bool()?
-    }))
+    });
+    // Kept when reported, as the journaled outcome keeps it; a value that is
+    // not a number makes the outcome unusable rather than silently dropped.
+    match outcome.get("last_vch_id") {
+        None => {}
+        Some(value) => compact["last_vch_id"] = json!(value.as_u64()?),
+    }
+    Some(compact)
 }
 
 fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {

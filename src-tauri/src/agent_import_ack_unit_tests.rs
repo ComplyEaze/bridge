@@ -301,7 +301,15 @@ fn each_readback_guard_refuses_on_its_own_even_under_posted_verified() {
     let marked = || row_json(2, &format!("Paid [BRIDGE:{tag}]"));
     let admit = |row: Value| {
         let row: ReadVoucher = serde_json::from_value(row).unwrap();
-        admit_review(imports.path(), &line, &payload, &[row], DoubtKind::Masters).map(|_| ())
+        admit_review(
+            imports.path(),
+            &line,
+            &payload,
+            &[row],
+            DoubtKind::Masters,
+            None,
+        )
+        .map(|_| ())
     };
     assert_eq!(admit(marked()), Ok(()), "the control is admitted");
     for (pointer, value) in [
@@ -473,6 +481,7 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
         &verified(3),
         &rows,
         DoubtKind::BatchStep,
+        None,
     )
     .unwrap();
     assert_eq!(shown.doubt_raw, STEP_DOUBT);
@@ -485,7 +494,7 @@ fn a_batch_review_binds_every_voucher_and_refuses_a_partial_read() {
         [("T1", 10), ("T2", 11), ("T3", 12)]
     );
     let refused = |payload: &Value, rows: &[ReadVoucher], kind| {
-        admit_review(imports.path(), &line, payload, rows, kind).err()
+        admit_review(imports.path(), &line, payload, rows, kind, None).err()
     };
     assert_eq!(
         refused(&verified(2), &rows, DoubtKind::BatchStep).as_deref(),
@@ -619,6 +628,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         &verified(2),
         &rows,
         DoubtKind::Masters,
+        None,
     )
     .unwrap();
     let record = BatchAckRecord {
@@ -638,7 +648,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&record).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["masters"]["state"], "current", "{review}");
     assert_eq!(review["batch_step"]["state"], "absent", "{review}");
     // A masters review does not cover the step doubt, even filed under it.
@@ -647,7 +657,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         DoubtKind::BatchStep.ack_path(imports.path(), BATCH),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "stale", "{review}");
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     // Even bound to the step doubt's own bytes, a record that names another
@@ -662,7 +672,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     misnamed.doubt = "batch_step".into();
     fs::write(
@@ -670,7 +680,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "current", "{review}");
     // A record for the same vouchers in another order covers nothing.
     misnamed.vouchers.reverse();
@@ -679,7 +689,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
         serde_json::to_vec(&misnamed).unwrap(),
     )
     .unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     misnamed.vouchers.reverse();
     fs::write(
@@ -690,7 +700,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
     // One voucher altered: the masters review is stale and names it.
     let mut edited = rows.clone();
     edited[1].alter_id = Some(99);
-    let review = operator_review(imports.path(), &line, &edited).unwrap();
+    let review = operator_review(imports.path(), &line, &edited, None).unwrap();
     assert_eq!(review["masters"]["state"], "stale", "{review}");
     assert_eq!(
         review["masters"]["changed_vouchers"],
@@ -699,7 +709,7 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
     );
     // A review whose doubt file has gone is stale, not silently absent.
     fs::remove_file(super::batch_step_doubt_path(imports.path(), BATCH)).unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "stale", "{review}");
     assert_eq!(review["batch_step"]["covers_doubt"], false, "{review}");
     assert_eq!(review["masters"]["state"], "current", "{review}");
@@ -718,7 +728,7 @@ fn a_batch_kind_whose_verdict_is_pending_reads_pending() {
             serde_json::to_vec(&json!({"state":masters,"batch_step":{"state":step}})).unwrap(),
         )
         .unwrap();
-        operator_review(imports.path(), &line, &rows)
+        operator_review(imports.path(), &line, &rows, None)
     };
     let review = check("unchanged", MASTERS_CHECK_PENDING).unwrap();
     assert_eq!(review["batch_step"], json!({"state":"pending"}), "{review}");
@@ -742,7 +752,7 @@ fn a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable() {
             serde_json::to_vec(&json!({"state":masters,"batch_step":{"state":step}})).unwrap(),
         )
         .unwrap();
-        operator_review(imports.path(), line, &batch_rows(line))
+        operator_review(imports.path(), line, &batch_rows(line), None)
     };
     let batch = posted_batch(2);
     let review = check(&batch, "posted_under_changed_masters", "matched").unwrap();
@@ -1010,4 +1020,38 @@ fn a_single_review_fits_at_exactly_1600_characters_and_not_one_more() {
     assert_eq!(fit.chars().count(), 1_600, "{fit}");
     assert!(fit.lines().all(|line| line.chars().count() <= 100), "{fit}");
     assert_eq!(refusal.as_deref(), Some("ack_review_too_large"));
+}
+
+/// A native post carries no tag: its reviewed row is the one with the GUID and
+/// MasterID its post was bound to, and without that binding nothing is found.
+/// A binding never falls back to a tag.
+#[test]
+fn a_bound_voucher_is_reviewed_by_its_guid_not_a_tag() {
+    let line = posted_line();
+    let untagged = row(2, "Paid by cheque");
+    let bound = vec![super::span_identity::PostedVoucherIdentity {
+        bridge_txn_id: "T1".into(),
+        guid: "g-1".into(),
+        master_id: 5,
+    }];
+    assert!(marked_row(&line, std::slice::from_ref(&untagged), None).is_none());
+    assert_eq!(
+        marked_row(&line, std::slice::from_ref(&untagged), Some(&bound)),
+        Some(&untagged)
+    );
+    // Another MasterID on the same GUID is not the bound voucher.
+    let other = vec![super::span_identity::PostedVoucherIdentity {
+        master_id: 6,
+        ..bound[0].clone()
+    }];
+    assert!(marked_row(&line, std::slice::from_ref(&untagged), Some(&other)).is_none());
+    // With a binding, a tagged row of the same batch is not taken instead.
+    let tag = line.attribution_tag(&line.vouchers[0]);
+    let mut tagged = row(2, &format!("Paid [BRIDGE:{tag}]"));
+    tagged.guid = Some("g-2".into());
+    assert!(marked_row(&line, std::slice::from_ref(&tagged), Some(&bound)).is_none());
+    assert_eq!(
+        marked_row(&line, std::slice::from_ref(&tagged), None),
+        Some(&tagged)
+    );
 }

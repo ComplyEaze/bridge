@@ -27,7 +27,7 @@ const everyJob = [...FAMILIES.native, ...FAMILIES.bundle];
 const ranEverything = jobsOf([...ALWAYS, ...everyJob, "Tax-audit mutation records", "Required checks"].map((name) => job(name)));
 const skippedHeavyJobs = jobsOf([
   ...ALWAYS.map((name) => job(name)),
-  ...["Native checks (${{ matrix.os }})", "Bundle smoke (${{ matrix.os }})", "Tax-audit mutation records",
+  ...["Native checks (${{ matrix.os }})", "Legacy feature checks (windows-latest)", "Bundle smoke (${{ matrix.os }})", "Tax-audit mutation records",
     "Seam positive control (${{ matrix.os }})"].map((name) => job(name, "skipped")),
   job("Required checks"),
 ]);
@@ -280,7 +280,7 @@ test("anything but a push to master, or an unusable SHA, runs everything", async
 // The job names above are what a queue run reports for ci.yml's matrix jobs. Derive them from the
 // workflow itself, so a renamed job or a changed matrix fails here instead of silently never matching
 // (the push would then run everything) or, for a new OS, matching without the new job being judged.
-test("the family job names are exactly ci.yml's native, bundle-smoke and seam-control matrix jobs", () => {
+test("the family job names are exactly ci.yml's native, legacy-features, bundle-smoke and seam-control jobs", () => {
   const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
   const block = (job) => {
     const start = workflow.indexOf(`\n  ${job}:\n`);
@@ -299,7 +299,12 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
     assert.ok(label && systems?.length, `${job} has a matrix name and an os list`);
     return systems.map((system) => `${label} (${system})`);
   };
-  assert.deepEqual(FAMILIES.native, expand("native"));
+  // The legacy feature job has the native job's scope rule and is not a matrix: one named job on one system.
+  const legacy = block("legacy-features");
+  const legacyName = /^    name: (.+)$/m.exec(legacy)?.[1];
+  assert.equal(/^    runs-on: windows-latest$/m.test(legacy) && !legacy.includes("matrix"), true, "the legacy feature job is one Windows job, not a matrix");
+  assert.match(legacy, /^    if: needs\.changes\.outputs\.native == 'true'$/m, "the legacy feature job is scoped exactly like the native job");
+  assert.deepEqual(FAMILIES.native, [...expand("native"), legacyName]);
   assert.deepEqual(FAMILIES.bundle, [...expand("bundle-smoke"), ...expand("seam-control")]);
 });
 
@@ -328,7 +333,7 @@ test("a run with no usable id, or a listing that mixes in another commit's run, 
 // `if:`, either form of the output reference, an inline or a block `needs:`), the jobs gated on the
 // outputs must be exactly the jobs the families judge, and the only jobs that may need them are the two
 // aggregators, which must run under `always()` so a skip cannot cascade into them or pass as a success.
-const FAMILY_JOBS = ["native", "bundle-smoke", "seam-control"];
+const FAMILY_JOBS = ["native", "legacy-features", "bundle-smoke", "seam-control"];
 const MAY_NEED_A_FAMILY_JOB = ["compiler-cache-retention", "required-checks"];
 function skipHazards(workflow) {
   const jobs = new Map();

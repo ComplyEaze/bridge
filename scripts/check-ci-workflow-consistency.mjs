@@ -194,7 +194,7 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
+if (reuseScriptDigest !== "93c8d69dc367000747def84e6defd9f594adb1789c421b7bd525c0846d9f2682") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {

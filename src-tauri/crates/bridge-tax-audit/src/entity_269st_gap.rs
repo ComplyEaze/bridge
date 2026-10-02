@@ -87,14 +87,13 @@ pub fn run(
     let multi_ledger_days = by_entity.values().filter(|s| s.ledgers.len() > 1).count();
     let (mut gap_total, mut gap_rows) = (0_i64, 0_usize);
     for ((day, pan), slot) in &by_entity {
-        if slot.ledgers.len() < 2 {
-            continue; // single ledger: the per-ledger test already sees it whole
-        }
         if slot.paise < limit {
             continue; // not at the limit even aggregated
         }
+        // Already reported by cash_payments_40a3, never twice. A single ledger at the limit is
+        // such a row, so this also leaves out an entity of one ledger.
         if slot.ledgers.values().any(|amt| *amt >= limit) {
-            continue; // already reported by cash_payments_40a3: never twice
+            continue;
         }
         let binding = slot.binding;
         gap_total = gap_total.checked_add(slot.paise).ok_or_else(overflow)?;
@@ -224,4 +223,35 @@ counts cash_payments_40a3",
             _ => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::findings::Unit;
+
+    /// GAP-1: a gap row whose largest single-ledger amount reaches the limit double counts
+    /// `cash_payments_40a3`; one under it does not, and a figure that is not such a row is ignored.
+    #[test]
+    fn gap_1_fires_on_a_single_ledger_at_the_limit_and_not_under_it() {
+        let result_with = |figures: &[(&str, i64)]| {
+            let mut r = TestResult::new(TEST_ID, VERSION, "invented");
+            for (id, v) in figures {
+                r.fig(id, Value::Int(*v), Unit::Paise, "invented", Vec::new())
+                    .unwrap();
+            }
+            r
+        };
+        let day = "entity_largest_single_ledger_2025-06-01_ABCDE1234F";
+        assert!(check_invariants(&result_with(&[(day, GAP_1_LIMIT_PAISE - 1)])).is_empty());
+        let fired = check_invariants(&result_with(&[
+            (day, GAP_1_LIMIT_PAISE),
+            (
+                "entity_day_total_2025-06-01_ABCDE1234F",
+                GAP_1_LIMIT_PAISE * 3,
+            ),
+        ]));
+        assert_eq!(fired.len(), 1);
+        assert!(fired[0].starts_with("GAP-1 entity_269st_gap.entity_largest_single_ledger_"));
+    }
 }

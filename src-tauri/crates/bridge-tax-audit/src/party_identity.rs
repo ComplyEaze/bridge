@@ -171,7 +171,8 @@ pub struct EntityBinding {
     pub ledgers: Vec<String>,
     /// Per ledger, aligned with `ledgers`.
     pub pan_sources: Vec<PanSource>,
-    /// Disclosure only, never a binding criterion: whether every ledger name shares a word.
+    /// Disclosure only, never a binding criterion: whether every ledger name shares a word (of a
+    /// single ledger, whether its name has one).
     pub names_agree: bool,
 }
 
@@ -297,7 +298,8 @@ rest of the chain",
     let mut index = PartyIndex::default();
     for (pan, mut members) in by_pan {
         members.sort_by(|a, b| a.0.cmp(&b.0));
-        let names_agree = members.len() <= 1 || {
+        // A single-ledger entity never reaches a gap row, so its disclosure is never read.
+        let names_agree = {
             let mut sets = members.iter().map(|m| name_tokens(&m.1));
             let first = sets.next().unwrap_or_default();
             !sets

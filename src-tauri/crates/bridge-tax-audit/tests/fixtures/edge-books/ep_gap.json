@@ -1,5 +1,5 @@
 {
- "comment": "entity_269st_gap: cash received on one day by two ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger, reported only where the aggregate reaches the s.269ST(a) limit and no single ledger does. Reaches: a gap row where the names share a word and one where they share none; a PAN whose one ledger already reaches the limit (left to the per-ledger test); an aggregate under the limit; a PAN derived from a GSTIN (an opt-in, into a gap only) and a TAN-shaped GSTIN that gives none; a PAN filled by the engagement's override and one a master already holds (the master wins); a ledger with no PAN left unbound; an entity with one ledger; an excluded ledger and a Duties & Taxes ledger and a round-off ledger that are never parties; a ledger made a party by name outside the party groups; names that share only a stopword, only a two-letter word, only a word that differs by case and punctuation, or only an accented spelling; an override name that decides whether names agree; a GSTIN filled by the override and a master GSTIN that wins over a different override GSTIN, each deriving a PAN; a ledger made a party by a configured group; a ledger the table names as a round-off ledger; a ledger whose chain is incomplete but already settled (Duties & Taxes, a party group); a walk-in sale with only tax and round-off lines (unbound); a Contra and an optional voucher left out.",
+ "comment": "entity_269st_gap: cash received on one day by two ledgers that carry one PAN, summed over the same population cash_payments_40a3 tests per ledger, reported only where the aggregate reaches the s.269ST(a) limit and no single ledger does. Reaches: a gap row where the names share a word and one where they share none; a PAN whose one ledger already reaches the limit (left to the per-ledger test); an aggregate under the limit; a PAN derived from a GSTIN (an opt-in, into a gap only) and a TAN-shaped GSTIN that gives none; a PAN filled by the engagement's override and one a master already holds (the master wins); a ledger with no PAN left unbound; an entity with one ledger; an excluded ledger and a Duties & Taxes ledger and a round-off ledger that are never parties; a ledger made a party by name outside the party groups; names that share only a stopword, only a two-letter word, only a word that differs by case and punctuation, or only an accented spelling; an override name that decides whether names agree; a GSTIN filled by the override and a master GSTIN that wins over a different override GSTIN, each deriving a PAN; a ledger made a party by a configured group; a ledger the table names as a round-off ledger; a ledger whose chain is incomplete but already settled (Duties & Taxes, a party group); an aggregate of exactly the limit (a gap) and a single ledger of exactly the limit beside another (already reported); a walk-in sale with only tax and round-off lines (unbound); a Contra and an optional voucher left out.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -402,6 +402,42 @@
    ],
    "guid": "edge-ep_gap-043",
    "pan": "PARTL1010P"
+  },
+  {
+   "name": "Exact One",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-044",
+   "pan": "EXACT1212E"
+  },
+  {
+   "name": "Exact Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-045",
+   "pan": "EXACT1212E"
+  },
+  {
+   "name": "Edge One",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-046",
+   "pan": "EDGEO1313E"
+  },
+  {
+   "name": "Edge Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-047",
+   "pan": "EDGEO1313E"
   }
  ],
  "tb": [],
@@ -1042,6 +1078,66 @@
     [
      "Partial Debtor Two",
      -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "g301",
+   "date": "2025-07-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Exact One",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "g302",
+   "date": "2025-07-10",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Exact Two",
+     -10000000
+    ]
+   ]
+  },
+  {
+   "guid": "g303",
+   "date": "2025-07-11",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     20000000
+    ],
+    [
+     "Edge One",
+     -20000000
+    ]
+   ]
+  },
+  {
+   "guid": "g304",
+   "date": "2025-07-11",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Edge Two",
+     -1000000
     ]
    ]
   }

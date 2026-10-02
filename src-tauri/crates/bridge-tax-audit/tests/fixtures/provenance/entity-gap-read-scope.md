@@ -19,7 +19,7 @@ Every book here is invented, with round figures and plain names and PANs and GST
   engagement's override and a master PAN that wins over a different override; a ledger with no PAN
   (unbound); an entity with one ledger; an excluded ledger, a Duties & Taxes ledger and a round-off
   ledger, none a party; a ledger made a party by name; a walk-in sale with only tax and round-off lines;
-  a Contra and an optional voucher left out; and, in the names, a shared stopword only, a shared two-letter word only, a difference of case and punctuation, an accented spelling, an override name deciding the disclosure, a GSTIN filled by an override and a master GSTIN winning over one, a ledger made a party by a configured group, a ledger the table names as round-off, and an incomplete chain that is already settled. `ep_gap_plain` is the same without a `party_identity`
+  a Contra and an optional voucher left out; and, in the names, a shared stopword only, a shared two-letter word only, a difference of case and punctuation, an accented spelling, an override name deciding the disclosure, a GSTIN filled by an override and a master GSTIN winning over one, a ledger made a party by a configured group, a ledger the table names as round-off, an incomplete chain that is already settled, an aggregate of exactly the limit (a gap row) and a single ledger of exactly the limit beside another (already reported, so left out). `ep_gap_plain` is the same without a `party_identity`
   table.
 - **No synthetic golden for `entity_269st_gap`.** The reference ends on the synthetic read with
   `IncompleteLedgerChain`: the read has a ledger whose group chain is incomplete and does not settle
@@ -49,8 +49,8 @@ The edge books are written by hand in a small generator, as data, then read by b
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.read_scope.json` | 2,532 | `8b191e04fdf6722106c6082a722cb7a2bb5e95308b2138701dc1b32f57ba26b5` | `golden/synthetic.read_scope.json` |
-| `ep_gap.json` | 17,168 | `f6993c869161058201c255f1e318f7cdc6dea107a8c820916ee5aab004954ba1` | `edge-books/ep_gap.json` |
-| `edge.ep_gap.entity_269st_gap.json` | 45,767 | `0b56834db7527801d896daef593e073ffe7194efca781c62c826aaff5d198cb2` | `golden/edge.ep_gap.entity_269st_gap.json` |
+| `ep_gap.json` | 18,612 | `02531f5aeb0524ea4885598a9d5d9c9fad60db1790f7062e41b1dd420b9ab7ee` | `edge-books/ep_gap.json` |
+| `edge.ep_gap.entity_269st_gap.json` | 48,921 | `2234933cce1a0b0fd3fdbc8826436f1dc13e3459388ec6e21fde3a52f77b3fc4` | `golden/edge.ep_gap.entity_269st_gap.json` |
 | `ep_gap_plain.json` | 5,638 | `b632cb6e251672e0bfdf23df7a97f6f70a66c5922f7b789d3bbf641f91efd5dc` | `edge-books/ep_gap_plain.json` |
 | `edge.ep_gap_plain.entity_269st_gap.json` | 5,964 | `8cbda182132b76cabfe531de917cf685cb51d49a7272790866a27806b8b3ffec` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
 | `rs_unread.json` | 811 | `d717dcbaa974133eb7968eb442cf9900a7bdcb1a50f4fd9a7c27082c587ab0c5` | `edge-books/rs_unread.json` |

@@ -694,7 +694,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_day_any_amount_total",
-      "value": 192500000,
+      "value": 193000000,
       "unit": "paise",
       "definition_sha256_16": "ae1efbc4328f136a",
       "definition_text": "Sum of cash receipts across all (party, day) pairs above, any amount.",
@@ -788,6 +788,11 @@
           "kind": "voucher",
           "id": "u13",
           "label": "Receipt u13 on 2025-05-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u14",
+          "label": "Receipt u14 on 2025-05-05"
         }
       ]
     },
@@ -809,7 +814,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-05_0e76c1f2",
-      "value": 25500000,
+      "value": 26000000,
       "unit": "paise",
       "definition_sha256_16": "43715a3b6a6239a2",
       "definition_text": "Cash receipts on 2025-05-05 on vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payers' side of each voucher.",
@@ -858,6 +863,11 @@
           "kind": "voucher",
           "id": "u09",
           "label": "Receipt u09 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u14",
+          "label": "Receipt u14 on 2025-05-05"
         }
       ]
     },
@@ -1072,7 +1082,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_single_transaction_no_reference_vouchers_count",
-      "value": 16,
+      "value": 17,
       "unit": "count",
       "definition_sha256_16": "01416de5dc863104",
       "definition_text": "Cash receipt vouchers with a qualifying money leg whose own REFERENCE field is blank -- not linkable to any other voucher by this books-only signal; limb (b) coverage is partial, stated as this count, never silently assumed complete.",
@@ -1080,7 +1090,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_any_amount_count",
-      "value": 18,
+      "value": 19,
       "unit": "count",
       "definition_sha256_16": "bc440322d15f3f1f",
       "definition_text": "Distinct (party, voucher) pairs with a cash receipt on a population, non-Contra voucher.",
@@ -1088,7 +1098,7 @@
     },
     {
       "id": "high_value_register.cash_receipt_voucher_any_amount_total",
-      "value": 192500000,
+      "value": 193000000,
       "unit": "paise",
       "definition_sha256_16": "e003e0ff061903a6",
       "definition_text": "Sum of cash receipts across all (party, voucher) pairs above, any amount.",
@@ -1182,6 +1192,11 @@
           "kind": "voucher",
           "id": "u13",
           "label": "Receipt u13 on 2025-05-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "u14",
+          "label": "Receipt u14 on 2025-05-05"
         }
       ]
     },
@@ -1704,7 +1719,7 @@
         {
           "kind": "row",
           "id": "high_value_register:unidentified_party",
-          "label": "‹cash leg with no identified party› (printed as 'Ram or Shyam' or 'Walk-in Buyer One' or 'Zed Traders' or 'Éclair Stores', and vouchers printing no usable name)"
+          "label": "‹cash leg with no identified party› (printed as 'Ram or Shyam' or 'Ram's Traders' or 'Walk-in Buyer One' or 'Zed Traders' or 'Éclair Stores', and vouchers printing no usable name)"
         },
         {
           "kind": "voucher",
@@ -1750,6 +1765,11 @@
           "kind": "voucher",
           "id": "u09",
           "label": "Receipt u09 on 2025-05-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "u14",
+          "label": "Receipt u14 on 2025-05-05"
         }
       ],
       "title_sha256_16": "8fa5dff36a1b2021",
@@ -2201,7 +2221,7 @@
     {
       "invariant": "POP-1",
       "subject": "Cash",
-      "detail": "vouchers 70500000 vs TB movement 0 paise"
+      "detail": "vouchers 71000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
@@ -2221,7 +2241,7 @@
     {
       "invariant": "POP-1",
       "subject": "Sales",
-      "detail": "vouchers -170500000 vs TB movement 0 paise"
+      "detail": "vouchers -171000000 vs TB movement 0 paise"
     }
   ],
   "result_invariants_evaluated": [

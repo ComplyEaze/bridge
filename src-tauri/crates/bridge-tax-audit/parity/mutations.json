@@ -7318,5 +7318,21 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "hash12_sha256(&c.key), c.suffix)",
   "to": "hash12_sha256(&v.guid), c.suffix)"
+ },
+ {
+  "id": "CP-44",
+  "by": "author",
+  "what": "a GUID shared with a Contra voucher is not counted as shared",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "    for &v in pop {\n        *guid_count.entry(v.guid.as_str()).or_insert(0) += 1;",
+  "to": "    for &v in pop.iter().filter(|v| v.base_type != \"Contra\") {\n        *guid_count.entry(v.guid.as_str()).or_insert(0) += 1;"
+ },
+ {
+  "id": "CP-45",
+  "by": "author",
+  "what": "a side is suffixed only when both sides of its ledger reach the limit",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "suffix: match (sides.len() == 2, *side) {",
+  "to": "suffix: match (sides.len() == 2 && sides.iter().all(|(_, a)| a.iter().sum::<i64>().abs() >= limit_ss_t), *side) {"
  }
 ]

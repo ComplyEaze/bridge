@@ -48,7 +48,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_party_days_any_amount_total",
-      "value": 84500000,
+      "value": 85000000,
       "unit": "paise",
       "definition_sha256_16": "b6d19da9c6734b41",
       "definition_text": "Sum of cash received across every (date, party ledger) pair with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts', any amount.",
@@ -82,6 +82,11 @@
           "kind": "voucher",
           "id": "r05",
           "label": "Receipt r05 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "r06",
+          "label": "Receipt r06 on 2025-06-01"
         }
       ]
     },
@@ -103,7 +108,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_payment_party_days_any_amount_total",
-      "value": 94800000,
+      "value": 94900000,
       "unit": "paise",
       "definition_sha256_16": "581c2a370cc96236",
       "definition_text": "Sum of cash paid across every (date, party ledger) pair with a cash payment on a population, non-Contra voucher, party ledger not under 'Purchase Accounts', any amount.",
@@ -172,6 +177,11 @@
           "kind": "voucher",
           "id": "a13",
           "label": "Payment a13 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-05-11"
         },
         {
           "kind": "voucher",
@@ -263,7 +273,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_row_amount_2025-06-01_0e76c1f2",
-      "value": 21500000,
+      "value": 22000000,
       "unit": "paise",
       "definition_sha256_16": "d38918e7de03c839",
       "definition_text": "Received on 2025-06-01 on cash-receipt vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payers' side of each voucher, not only its cash.",
@@ -282,6 +292,11 @@
           "kind": "voucher",
           "id": "r03",
           "label": "Receipt r03 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "r06",
+          "label": "Receipt r06 on 2025-06-01"
         }
       ]
     },
@@ -487,7 +502,7 @@
     },
     {
       "id": "cash_payments_40a3.s40a3_payee_days_any_amount_total",
-      "value": 93600000,
+      "value": 93700000,
       "unit": "paise",
       "definition_sha256_16": "4a6c107b00b43bb6",
       "definition_text": "Sum of cash paid across every (date, payee ledger) pair with a cash payment on a population, non-Contra voucher, payee classified as expenditure, any amount.",
@@ -551,6 +566,11 @@
           "kind": "voucher",
           "id": "a13",
           "label": "Payment a13 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-05-11"
         },
         {
           "kind": "voucher",
@@ -666,7 +686,7 @@
     },
     {
       "id": "cash_payments_40a3.s40a3_row_amount_2025-05-11_43f948ed",
-      "value": 1200000,
+      "value": 1300000,
       "unit": "paise",
       "definition_sha256_16": "dc31c24316c5ec29",
       "definition_text": "Debits to one expense ledger (tag 43f948ed) on 2025-05-11, on population vouchers with a cash payment, summed: the debits, not the cash paid.",
@@ -680,6 +700,11 @@
           "kind": "voucher",
           "id": "a11",
           "label": "Payment a11 on 2025-05-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-05-11"
         }
       ]
     },
@@ -781,7 +806,7 @@
         {
           "kind": "row",
           "id": "cash_payments_40a3:unidentified_party",
-          "label": "‹cash leg with no identified party› (printed as 'Walk In One', and vouchers printing no usable name)"
+          "label": "‹cash leg with no identified party› (printed as 'Ram's Traders' or 'Walk In One', and vouchers printing no usable name)"
         },
         {
           "kind": "voucher",
@@ -797,6 +822,11 @@
           "kind": "voucher",
           "id": "r03",
           "label": "Receipt r03 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "r06",
+          "label": "Receipt r06 on 2025-06-01"
         }
       ],
       "title_sha256_16": "a49eba88e873f51f",
@@ -1342,15 +1372,20 @@
           "kind": "voucher",
           "id": "a11",
           "label": "Payment a11 on 2025-05-11"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-05-11"
         }
       ],
       "title_sha256_16": "6307d7f7abd9cd52",
       "title_text": "Debits to one expense ledger on vouchers with a cash payment total over the s.40A(3) daily limit on 2025-05-11: the cash paid, and whether it went to one person, are not shown",
-      "limits_sha256_16": "b87148548e0a62fd",
+      "limits_sha256_16": "fd17ec9a1fe5d313",
       "limits_text": [
         "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to government, payments where banking facilities are not available) are not visible from vouchers; ask the client whether any exception applies to this payment.",
         "A single cash entry on this ledger and day may be a lump/year-end total covering several smaller payments to different people or on different days that the books do not itemise separately; confirm before treating it as one payee-day breach.",
-        "This ledger records expenses and may hold payments to several people on one day; the row does not show whether they went to one person. Names printed on its vouchers: 'Cleaner B', and vouchers printing no usable name. (A printed name is usable when it is not blank, a cash or bank ledger, or one of the voucher's own ledgers.)"
+        "This ledger records expenses and may hold payments to several people on one day; the row does not show whether they went to one person. Names printed on its vouchers: 'Cleaner B' or 'Ram's Traders', and vouchers printing no usable name. (A printed name is usable when it is not blank, a cash or bank ledger, or one of the voucher's own ledgers.)"
       ],
       "ask_client_sha256_16": "764d41d5b385c5e2",
       "ask_client_text": [
@@ -1602,7 +1637,7 @@
     {
       "invariant": "POP-1",
       "subject": "Cash",
-      "detail": "vouchers -10300000 vs TB movement 0 paise"
+      "detail": "vouchers -9900000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
@@ -1617,7 +1652,7 @@
     {
       "invariant": "POP-1",
       "subject": "Office Expense",
-      "detail": "vouchers 4700000 vs TB movement 0 paise"
+      "detail": "vouchers 4800000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
@@ -1637,7 +1672,7 @@
     {
       "invariant": "POP-1",
       "subject": "Sales",
-      "detail": "vouchers -62500000 vs TB movement 0 paise"
+      "detail": "vouchers -63000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",

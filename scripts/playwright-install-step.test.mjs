@@ -40,8 +40,9 @@ exit 0`);
 function runStep({ cacheHit, failDeps = 0, failDownload = 0 }) {
   const dir = mkdtempSync(join(tmpdir(), "playwright-step-"));
   try {
-    writeFileSync(join(dir, "step.sh"), `set -eo pipefail\n${stepScript()}\n`);
-    const result = spawnSync("bash", [join(dir, "step.sh")], {
+    writeFileSync(join(dir, "step.sh"), `${stepScript()}\n`);
+    // GitHub runs a step with no `shell:` key as `bash -e {0}`: errexit, no pipefail. Run it the same way.
+    const result = spawnSync("bash", ["-e", join(dir, "step.sh")], {
       cwd: dir, encoding: "utf8",
       env: { PATH: `${stubDir}:${process.env.PATH}`, HOME: dir, STUB_DIR: dir, CACHE_HIT: cacheHit, FAIL_DEPS: String(failDeps), FAIL_DOWNLOAD: String(failDownload) },
     });

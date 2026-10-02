@@ -1327,8 +1327,6 @@ fn the_purchase_result_keeps_its_profile_and_classes() {
     );
 }
 
-// Waiting for the lab (no test stands in for them): the ledger masters and group collection of the company that holds the two
-// Sales item invoices (`sales-day/`), read by the same build as the voucher windows. With them
-// the first test below classifies both invoices end to end, and the untaxed invoice is the
-// positive case for `sales_vouchers_without_duties_taxes_entry` (a Sales voucher with no entry
-// on a Duties & Taxes ledger). Neither is written by hand; each reads the captures once they exist.
+// The two Sales item invoices of `sales-day/`: their voucher windows were read by the purchase register's
+// build. The taxed invoice is classified end to end in `agent_register_server_tests.rs` against the masters
+// read in the same call (`stock-lab-day/`); the untaxed invoice's masters were not committed.

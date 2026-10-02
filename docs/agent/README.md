@@ -738,10 +738,15 @@ rate or return section, and matches nothing against any portal.
   its CGST and state-tax heads and its sales ledger as the taxable entry. The
   voucher windows of the first two invoices are committed, and the parsed
   windows have exactly those entries (a test); the requests are the request the
-  code sends (a test). The Credit Note day, and a Debit Note day through
-  `purchase_register`, are replayed end to end from their recorded calls (tests). One Sales accounting voucher (not an invoice) is also
-  classified, in tests, against the ledger masters of the purchase register's
-  lab book.
+  code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
+  by this build, with the book's own ledger masters, groups and company
+  listings, and is replayed end to end from that recorded call (a test). The
+  untaxed invoice's day was read once by an earlier build; those bytes are not
+  committed, and a test with a Sales voucher whose tax entries are removed
+  stands in for its list. The Credit Note day, and a Debit Note day through
+  `purchase_register`, are also replayed end to end from their recorded calls
+  (tests). One Sales accounting voucher (not an invoice) is also classified, in
+  tests, against the ledger masters of the purchase register's lab book.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of

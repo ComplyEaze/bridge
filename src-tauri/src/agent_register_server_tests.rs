@@ -416,10 +416,6 @@ fn recorded_json(directory: &str, name: &str) -> Value {
     serde_json::from_slice(&recorded_file(directory, name)).unwrap()
 }
 
-fn note_day_file(name: &str) -> Vec<u8> {
-    recorded_file(NOTE_DAYS, name)
-}
-
 fn note_day_json(name: &str) -> Value {
     recorded_json(NOTE_DAYS, name)
 }

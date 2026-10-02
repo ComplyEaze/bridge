@@ -224,6 +224,7 @@ function assertInstallPageWorkflow(page) {
     "actions/deploy-pages": "368f82528645a54fb793d4d04e342629a3f51346",
     "actions/upload-pages-artifact": "fc324d3547104276b827a68afc52ff2a11cc49c9",
   };
+  assert.equal(build.steps.filter((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@")).length, 1, "the build job has exactly one upload step");
   for (const candidate of [...deploy.steps, upload]) {
     const action = candidate.uses.split("@")[0];
     assert.equal(candidate.uses, `${action}@${reviewedPagesActions[action]}`, `${action} must be the reviewed commit`);
@@ -573,6 +574,7 @@ test("the install page workflow keeps the Pages permission and the identity toke
   refused("a runner label list for the deploy job", (copy) => { copy.jobs.deploy["runs-on"] = ["ubuntu-latest", "self-hosted"]; }, /GitHub-hosted runner/);
   refused("a workflow-level env", (copy) => { copy.env = { NODE_OPTIONS: "--require=x" }; }, /no top-level env/);
   refused("workflow-level defaults", (copy) => { copy.defaults = { run: { shell: "bash" } }; }, /no top-level env/);
+  refused("a second upload step in the build job", (copy) => { copy.jobs.build.steps.push({ uses: "actions/upload-pages-artifact@v5" }); }, /exactly one upload step/);
   refused("trailing text after the upload pin", (copy) => { const upload = copy.jobs.build.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@")); upload.uses += "@x"; }, /must be the reviewed commit/);
   refused("a Pages action pinned to a tag", (copy) => { copy.jobs.deploy.steps[1].uses = "actions/deploy-pages@v5"; }, /reviewed commit/);
   refused("a Pages action pinned to a short SHA", (copy) => { copy.jobs.deploy.steps[0].uses = "actions/configure-pages@45bfe01"; }, /reviewed commit/);

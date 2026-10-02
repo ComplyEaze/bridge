@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { FAMILIES, decide, forcesFullRun, printable, render } from "./master-push-reuse.mjs";
 
@@ -193,8 +194,8 @@ test("the ancestry test is git's own: an ancestor passes, a stranger and a missi
   const dir = mkdtempSync(join(tmpdir(), "reuse-ancestry-"));
   try {
     const git = (...args) => {
-      const result = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args],
-        { cwd: dir, encoding: "utf8" });
+      const result = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.excludesFile=", ...args],
+        { cwd: dir, encoding: "utf8", env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
       assert.equal(result.status, 0, result.stderr);
       return result.stdout.trim();
     };
@@ -213,12 +214,11 @@ test("the ancestry test is git's own: an ancestor passes, a stranger and a missi
     // A commit on another line of history is refused; one the clone does not hold is an error, not a "no".
     assert.equal(await codeFor(stranger, second), "not_a_fast_forward");
     assert.equal(await codeFor("d".repeat(40), second), "lookup_failed");
-    // The real changed-file listing, not an injected one: a lockfile changed beside a non-ASCII path
-    // (git quotes such a path unless asked for NUL-separated names) must still force a full run.
+    // The real changed-file listing, not an injected one: a lockfile under a non-ASCII directory is
+    // quoted by git, with a trailing quote that defeats `Cargo.lock$`, unless asked for NUL-separated names.
     git("checkout", "-q", "main");
-    mkdirSync(join(dir, "src-tauri"));
-    writeFileSync(join(dir, "src-tauri", "Cargo.lock"), "lock");
-    writeFileSync(join(dir, "\u00e9.md"), "x");
+    mkdirSync(join(dir, "src-tauri", "\u00e9"), { recursive: true });
+    writeFileSync(join(dir, "src-tauri", "\u00e9", "Cargo.lock"), "lock");
     git("add", "-A");
     git("commit", "-q", "-m", "lock");
     const realListing = (await decide({
@@ -339,7 +339,7 @@ test("the script prints the decision lines first, in a fixed order, and never sw
 
 test("run as a command outside a master push, the script prints exactly four lines and no reuse", async () => {
   const { spawnSync } = await import("node:child_process");
-  const result = spawnSync(process.execPath, [new URL("./master-push-reuse.mjs", import.meta.url).pathname], {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./master-push-reuse.mjs", import.meta.url))], {
     encoding: "utf8", env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: "pull_request" },
   });
   assert.equal(result.status, 0, result.stderr);

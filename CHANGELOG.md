@@ -24,16 +24,16 @@ requests it comes from, except where it names an issue.
 - No new tool. On a company large enough to be counted first,
   `voucher_presence` can now answer `absent` for a voucher it finds nowhere in
   a date range that holds vouchers and was checked against that count. An empty
-  range is still not called absent (#985, #1020).
+  range is called absent only on a company that has never held a voucher, as
+  before (#985, #1020).
 
 **Safer or fixed**
 
 - `parse_bank_statement` accepts a statement file or password file path only
-  when its text names a local disk (#1024).
-- A statement or password file path that starts with two slashes or two
-  backslashes, such as the Windows long-path form (starting with `\\?\`) or a
-  network share (`\\computer\folder`), is now refused. Copy the file to this
-  computer and give its path there (#1024).
+  when its text names a local disk. A path that starts with two separators
+  (two slashes, two backslashes or one of each), such as the Windows long-path
+  form (starting with `\\?\`) or a network share (`\\computer\folder`), is
+  now refused: copy the file to this computer and give its path there (#1024).
 - `vouchers` and `voucher_presence` now call a date range with vouchers in it
   complete by one rule: only when every voucher read was checked against a
   separate count of that range. Before, `vouchers` called any such range
@@ -54,18 +54,19 @@ requests it comes from, except where it names an issue.
 - When `post_import` refuses a batch before it is sent because some of its
   rows may already be in the book (`import_preexisting_identity`), the answer
   now names those rows by their transaction ids and says what to check in Tally
-  next, instead of returning a bare code. The same batches are refused as
-  before (#901, #908).
+  next, instead of returning a bare code, unless the response size limit
+  leaves no room for the list. The same batches are refused as before (#901,
+  #908).
 - `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
   the plain number (`"1"`), not as Tally sends it with a leading space
   (`" 1"`), so it matches the same id returned by `verify_import` (#989, #1021).
 - If voucher posting is turned on, you approve a batch in its approval dialog,
   and the post is then refused before it is sent (for example because the
   import journal is busy, the batch is not found, or the call names a
-  different company from the batch's), your approval is withdrawn and you are
-  asked again. Before, in these cases the approval stayed held for up to 15
-  minutes, and posting any other batch was refused until it lapsed (#857,
-  #904).
+  different company from the batch's), your approval is withdrawn, and the next
+  post that gets past those checks asks you again. Before, in these cases the
+  approval stayed held for up to 15 minutes, and posting any other batch was
+  refused until it was used or lapsed (#857, #904).
 
 **Known limits**
 
@@ -81,8 +82,9 @@ requests it comes from, except where it names an issue.
 - A batch refused just before it is sent can still return no rows and no next
   step. The rows named before that can be more than the vouchers the book
   holds, when several rows look the same; count the vouchers in Tally before
-  leaving any row out. A same-day, same-amount twin is still refused (#865,
-  #901).
+  leaving any row out. A row is still refused when a voucher that an earlier
+  batch or a hand entry put in the book has the same date, type, ledgers,
+  amounts and sides (#865, #901).
 - Tried against TallyPrime 7.1 Silver in a lab on 2 October 2026, before
   #1020 merged: one-day ranges on two synthetic books, and the read-back of one
   posted Journal. Not tried: a range of several days read in one request, the

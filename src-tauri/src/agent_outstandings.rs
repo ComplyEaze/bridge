@@ -101,7 +101,7 @@ impl Server {
                     bills_truncated || unallocated_truncated,
                 ))
             };
-            let (result, bills_truncated) = match load {
+            let (mut result, bills_truncated) = match load {
                 OutstandingsLoadResult::Complete {
                     report: _,
                     statement_open_bills,
@@ -198,6 +198,10 @@ impl Server {
                     )
                 }
             };
+            // The date read as of is echoed whether the caller named it or it
+            // defaulted to the host's today, in every state, so a stated
+            // figure can be tied to the date it was read at.
+            result["as_of"] = json!(as_of_date);
             Ok(ToolOutcome {
                 payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
                 evidence: result_evidence.clone(),

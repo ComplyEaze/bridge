@@ -228,6 +228,7 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
     assert_eq!(content["evidence"]["state"], "partial");
     let result = &content["result"];
     assert_eq!(result["state"], "partial");
+    assert_eq!(result["as_of"], "20250930");
     // One scalar for any mix; the derived set names only the foreign list,
     // as this capture predates the dollar invoice to a rupee party (#642).
     assert_eq!(result["partial_reason"], "currency_ledgers_excluded");
@@ -548,6 +549,7 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
         "Measured on one synthetic book (TallyPrime Silver 7.1)",
         "Read a bill's `kind` as a direction",
         "net into one figure",
+        "the date used is always returned as `result.as_of`, whatever the state",
     ] {
         assert!(description.contains(needle), "missing: {needle}");
     }
@@ -768,7 +770,12 @@ async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
     let mut arguments =
         json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
     for (key, value) in extra_arguments.as_object().into_iter().flatten() {
-        arguments[key] = value.clone();
+        // A null leaves the argument out, to exercise its default.
+        if value.is_null() {
+            arguments.as_object_mut().unwrap().remove(key);
+        } else {
+            arguments[key] = value.clone();
+        }
     }
     let response = server.call_tool("outstandings", arguments).await;
     simulator.cancel();
@@ -812,6 +819,41 @@ fn ageing_ledgers_with_currency(customer_a: &str) -> String {
     ledgers
 }
 
+/// A call without `as_of` reads as of the host's today, and says so: the date
+/// is echoed in the result, so a figure is never left to be read as of
+/// whatever date the caller assumed. Bracketed so a midnight crossing cannot
+/// fail the test.
+#[tokio::test]
+async fn mcp_outstandings_echo_the_date_they_defaulted_to() {
+    let before = tally_host_today();
+    let response =
+        ageing_outstandings(ageing_ledgers_with_currency("I₹"), json!({"as_of": null})).await;
+    let after = tally_host_today();
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    // The captured book does not accept today's date (its read comes back
+    // partial, `native_outstandings_as_of_refused`): the date is echoed in
+    // that state too, and the state is not what this test is about.
+    assert!(result["state"].is_string(), "{result}");
+    assert!(
+        result["as_of"] == before || result["as_of"] == after,
+        "{result}"
+    );
+}
+
+/// A hyphenated `as_of` is accepted and echoed in the compact form the read
+/// used, so the echo is the date read and not the caller's spelling of it.
+#[tokio::test]
+async fn mcp_outstandings_echo_a_hyphenated_date_in_compact_form() {
+    let response = ageing_outstandings(
+        ageing_ledgers_with_currency("I₹"),
+        json!({"as_of": "2026-08-01"}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(response["structuredContent"]["result"]["as_of"], "20260801");
+}
+
 /// The `Partial` arm: a ledger kept in a currency the book's base does not
 /// match makes the native read an in-band partial, and a party detail asked of
 /// it is refused with the read's own reason beside the refusal's code.
@@ -823,6 +865,8 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
     let result = &plain["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{result}");
     assert_eq!(result["partial_reason"], "ledger_currency_base_unmatched");
+    // The withheld arm states the date it was read at, too.
+    assert_eq!(result["as_of"], "20260801", "{result}");
 
     let response = ageing_outstandings(
         ageing_ledgers_with_currency("$"),
@@ -992,6 +1036,7 @@ fn assert_replay_matches_the_live_call(
     }
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["as_of"], record["arguments"]["as_of"], "{result}");
     assert_eq!(result["detail"], record["answer_detail"]);
 }
 

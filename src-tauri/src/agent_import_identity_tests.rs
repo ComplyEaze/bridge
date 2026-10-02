@@ -382,6 +382,39 @@ fn a_bound_voucher_absent_from_the_window_is_never_not_found() {
     assert_eq!(unbound["vouchers"][0]["status"], "book_rolled_back");
 }
 
+/// A bound voucher edited in Tally after its post (an amount changed) is found
+/// by its GUID and reads `posted_divergent`, never `posted_verified`: the
+/// binding names the object, and the content is still compared.
+#[test]
+fn a_bound_voucher_whose_amount_changed_reads_divergent() {
+    let (source, line) = captured_journal_and_line();
+    let mut rows = source.rows.clone();
+    for entry in &mut rows[0].entries {
+        entry.amount = if entry.amount.starts_with('-') {
+            "-13.61".into()
+        } else {
+            "13.61".into()
+        };
+    }
+    let edited = ImportReadSource::admit(rows).unwrap();
+    let result = verify_batch(
+        &line,
+        &edited,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        result["vouchers"][0]["marker"], "post_span_binding",
+        "{result}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["status"], "posted_divergent",
+        "{result}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 0, "{result}");
+    assert_eq!(result["counts"]["posted_divergent"], 1, "{result}");
+}
+
 /// An untagged native post that was not bound: a row carrying the batch's tag
 /// is a hand import of the batch's file, not a voucher this POST created, so
 /// the tag attributes nothing and the row is matched by content only. The same

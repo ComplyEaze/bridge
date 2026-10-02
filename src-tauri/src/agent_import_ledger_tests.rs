@@ -377,18 +377,51 @@ fn record(value: impl serde::Serialize) -> String {
 }
 
 /// A batch, its native intent and its response, as a journal.
+/// A native post of this build: its intent records the pre-POST mark, and its
+/// response carries an outcome parsed from the committed post-span capture.
+/// Only such a batch can have a post-span verdict.
 fn posted_journal(line: &ImportLedgerLine) -> String {
-    let intent = ledger::StatusRecord::dispatch_native(line, "c".repeat(64), Uuid::new_v4());
+    posted_journal_with(line, Some(1795), Some(captured_outcome()))
+}
+
+fn posted_journal_with(
+    line: &ImportLedgerLine,
+    mark: Option<u64>,
+    outcome: Option<bridge_tally_protocol::TallyImportOutcome>,
+) -> String {
+    let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch_native(
+        line,
+        "c".repeat(64),
+        Uuid::new_v4(),
+    ))
+    .unwrap();
+    if let Some(mark) = mark {
+        intent["pre_post_voucher_mark"] = json!(mark);
+    }
     let response = ledger::StatusRecord::response(
         line,
         ledger::DispatchResponse {
             request_sha256: "c".repeat(64),
             response_sha256: "d".repeat(64),
             bytes: 1,
-            outcome: None,
+            outcome,
         },
     );
     format!("{}{}{}", record(line), record(intent), record(response))
+}
+
+fn captured_outcome() -> bridge_tally_protocol::TallyImportOutcome {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-import-response.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    bridge_tally_protocol::parse_import_outcome(&xml).unwrap()
 }
 
 fn bound(line: &ImportLedgerLine) -> ledger::PostSpanVerdict {
@@ -444,6 +477,18 @@ fn a_verdict_that_breaks_a_rule_makes_the_journal_invalid() {
         .map(|line| format!("{line}\n"))
         .collect::<String>();
     assert_eq!(invalid(format!("{intent_only}{}", record(&good))), expect);
+    // A batch whose intent recorded no pre-POST mark (an older build's post),
+    // and a response with no parsed outcome: the writer binds from neither.
+    for unbindable in [
+        posted_journal_with(&line, None, Some(captured_outcome())),
+        posted_journal_with(&line, Some(1795), None),
+    ] {
+        assert_eq!(invalid(format!("{unbindable}{}", record(&good))), expect);
+        assert!(
+            ledger::parse_snapshots(&unbindable).is_ok(),
+            "the journal itself is valid"
+        );
+    }
     // A second verdict for the batch.
     assert_eq!(
         invalid(format!("{posted}{}{}", record(&good), record(&good))),

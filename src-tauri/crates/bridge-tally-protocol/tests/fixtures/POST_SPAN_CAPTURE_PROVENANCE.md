@@ -52,9 +52,53 @@ its own POST's AlterID span, with no narration tag.
 ## What it does not establish
 
 - Bridge's own post path.
-- Journals in this untagged shape (`d3-batch-*` shows Journal span order with the tag).
+- Journals in this untagged shape: see `post-span-journal-*` below.
 - A concurrent writer, or another Gold client process.
 - Whether a GUID survives a later edit.
 - Batches other than 10.
 - A `$GUID` filter without a date clause.
 - Any other release or licence tier.
+
+# `post-span-journal-*`: provenance
+
+One raw gateway import of 5 untagged Journal vouchers, with the company high-water reads around
+it and the read of its own AlterID span. It extends the binding fixture above to Journals.
+
+## Provenance
+
+- **Host / gateway:** as above; only synthetic companies were loaded (`BRIDGE AMEND LAB`,
+  `BRIDGE CORPUS DENSE`, `BRIDGE SHAPE LAB`, `BRIDGE STOCK LAB`).
+- **Date:** 2026-10-02, 16:45:00 to 16:47:46 IST; the import at 16:46:08.
+- **The import:** `post-span-journal-import.xml`, sent once as BOM-prefixed UTF-16LE, under a recorded grant naming
+  its sha256. Bridge's untagged Journal shape (no `EFFECTIVEDATE`, no `PARTYLEDGERNAME`, the caller's entry order):
+  the test `five_captured_journals_are_bridges_own_request_and_bind_in_request_order` renders the same bytes with
+  `render_native_vouchers_xml`. Five Journals dated 2026-07-11, an empty day before the import: a two-leg accrual,
+  an identical pair (vouchers 2 and 3), a reversal and a three-leg split, between `Test Party`, `Test Expense A` and
+  `Test Expense B`. Not sent through `post_import`.
+- **The reads,** each sent once, in this order: the whole day before the import (0 vouchers); the company list
+  (only the four synthetic companies); the high-water read **before**; the import; the high-water read **after**;
+  the verification read narrowed to `$AlterID > 1805 AND $AlterID <= 1810`; the whole day (its response was
+  **byte-identical** to the span read, sha256 `740767430ad7fd5b28971033eddbb7f758a24cd03d584efdee461f5f93a8d119`, so it is not kept separately); the high-water read again
+  (identical to the read after).
+- **Encoding:** as above.
+
+| file | bytes | sha256 |
+|---|---|---|
+| `agent/post-span-journal-import.xml` | 3422 | `69c8aa0225f67d402072b1b9015f2517a08b6a57bc741c1543737b2517a0ca4b` |
+| `agent/post-span-journal-import-response.utf16le.xml` | 544 | `da3d1e4659fcf6f5ce2473c018b596df188ff6ba0d6176b3b79fc2ac3b3841ba` |
+| `agent/post-span-journal-company-high-water-before.utf16le.xml` | 4812 | `eb4ed4308c42a6c85af837b4fd28d4a1f84a67d116efb4b58cdf5ed25aa395c5` |
+| `agent/post-span-journal-company-high-water-after.utf16le.xml` | 4812 | `b53fcde92bb6c1d74c02fbfcd2e81f3771ba57c5bc4b985cde5c440849205f7d` |
+| `agent/post-span-journal-alterid-span-read.utf16le.xml` | 33936 | `740767430ad7fd5b28971033eddbb7f758a24cd03d584efdee461f5f93a8d119` |
+
+## What it establishes
+
+- **Counters:** `CREATED 5`; every other counter 0; no `LINEERROR`; `LASTVCHID 1738`.
+- **The mark:** `ALTVCHID` went from 1805 to 1810, a step of exactly 5; `ALTMSTID` stayed at 234; the other three
+  companies' marks did not move.
+- **The span:** exactly the five Journals, ALTERIDs 1806 to 1810 and MASTERIDs 1734 to 1738 in request order (the
+  identical pair at 1807 and 1808), the last MASTERID equal to `LASTVCHID`; narration and signed entries as sent,
+  the three-leg split included. Tally filled `EFFECTIVEDATE`, which was not sent, with the date.
+
+## What it does not establish
+
+As above, except that Journals in this untagged shape are now measured, once.

@@ -438,7 +438,8 @@
       "path": "src-tauri/src/agent_import_post_location.rs"
     },
     {
-      "path": "src-tauri/src/agent_import_span_identity.rs"
+      "path": "src-tauri/src/agent_import_span_identity.rs",
+      "reason": "binds a native post's vouchers to the Tally vouchers its own POST created; a change there can attribute a posted voucher to the wrong Tally object, which is a false posted_verified"
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs"

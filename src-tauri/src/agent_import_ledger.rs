@@ -597,7 +597,11 @@ fn scan_records(
     // For post-span verdicts: each batch's transaction ids, the batches with a
     // recorded response, and those with a verdict.
     let mut txn_ids: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    // Batches whose response carries a parsed outcome, and whose intent
+    // recorded a pre-POST mark: only such a batch can have a post-span verdict
+    // (the writer binds only from both).
     let mut responded: BTreeSet<String> = BTreeSet::new();
+    let mut marked: BTreeSet<String> = BTreeSet::new();
     let mut with_verdict: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
@@ -664,23 +668,28 @@ fn scan_records(
             {
                 return Err("import_ledger_invalid".into());
             }
+            if update.pre_post_voucher_mark.is_some() {
+                marked.insert(update.batch_id.clone());
+            }
             if matches!(update.record_type, StatusKind::PostSpanVerdict) {
                 admit_post_span_verdict(
                     &update,
                     *voucher_count,
                     txn_ids.get(&update.batch_id),
-                    responded.contains(&update.batch_id),
+                    responded.contains(&update.batch_id) && marked.contains(&update.batch_id),
                     &mut with_verdict,
                 )?;
             } else if update.bindings.is_some() || update.binding_refusal.is_some() {
                 return Err("import_ledger_invalid".into());
             }
             if matches!(update.record_type, StatusKind::DispatchResponse) {
-                responded.insert(update.batch_id.clone());
                 let request_hash = dispatched
                     .get(&update.batch_id)
                     .ok_or("import_ledger_invalid")?;
                 let response = update.response.as_ref().ok_or("import_ledger_invalid")?;
+                if response.outcome.is_some() {
+                    responded.insert(update.batch_id.clone());
+                }
                 if request_hash
                     .as_ref()
                     .is_some_and(|hash| hash != &response.request_sha256)

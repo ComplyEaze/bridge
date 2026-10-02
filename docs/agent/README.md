@@ -1141,18 +1141,25 @@ company whose voucher mark reads below the mark the post left, every voucher it
 no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
 it. Such a book was rolled back (a backup restored, or another copy put in its
 place). The check sees a rollback only while the mark reads below the post's: a
-book keyed past it again after a restore is not seen as rolled back. Bridge still records those rows as posted, so a rebuilt batch holding
+book keyed past it again after a restore is not seen as rolled back, and if
+Tally then gave new vouchers the MasterIDs the post's vouchers held (unmeasured),
+a bound voucher names another voucher, which reads `posted_divergent`, or a false
+`posted_verified` when its content is the same (bridge#1050). Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code`,
 `not_bound`, `book_rolled_back` or `not_applicable`.
 
 A native post that sent no tag is never attributed by one: a row carrying its
-batch's tag is a hand import of the batch's file, matched by content only. A
-narration that would read back rewritten is refused when the batch is built
-(`voucher_text_invalid`), because the binding compares narration byte for byte;
+batch's tag is a hand import of the batch's file, matched by content only. The
+binding compares narration byte for byte. A narration holding the one sequence
+the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
+and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before
-any request, and it is still admitted for review and reconciliation.
+any request; it is still admitted for review and reconciliation. Other text,
+such as Devanagari or the rupee sign, is admitted, and whether it reads back
+byte for byte is not yet measured: a narration that reads back changed refuses
+that post's binding for good.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
@@ -1163,19 +1170,24 @@ whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
 `acknowledge_post_review` does not apply to it, because it records a review only
 of a doubt beside vouchers that read back verified (closing such a batch inside
-Bridge is bridge#1039). `voucher_presence` cannot see a Bridge marker on a
-native post, so it can report such a voucher only as possibly present, never as
-absent.
+Bridge is bridge#1039). `voucher_presence` cannot identify a native post's
+vouchers, because they carry no marker: one edited or re-dated in Tally can read
+`absent` there. Check a natively posted batch with `verify_import`, which finds
+its vouchers by their GUIDs, before posting any of them again.
 
 If the last read before the POST does not yield the company's voucher mark, the
 post is refused as `post_mark_unrecorded` before its dispatch intent is recorded
 and before anything is sent,
 and the approval is withdrawn, so the next call asks again. Known limits:
 identical vouchers in one batch are told apart by request order alone, measured
-once; the local journal is the record of the bindings, so a journal lost or
-replaced leaves those vouchers at `matching_content_observed`, never at a false
-`posted_verified`; and whether a write from another Gold user's process can
-share or skip the mark Bridge reads is unmeasured.
+once; the local journal is the trust root for the bindings (a lost journal
+leaves the batch unknown, `import_batch_not_found`, and bindings in an edited
+journal are not checked against Tally); and whether a write from another Gold
+user's process can share or skip the mark Bridge reads is unmeasured. Open
+follow-ups: the hand-import file still carries the tag (bridge#1037); re-posting
+the rows of a rolled-back batch needs the person's approval (bridge#1038);
+closing a batch whose binding was refused (bridge#1039); and detecting a restore
+keyed past the post's mark (bridge#1050).
 
 Posting binds the saved batch to its loopback endpoint and full company tuple.
 Legacy batches without that endpoint binding remain readable/verifiable but

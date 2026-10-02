@@ -185,7 +185,7 @@ fn outcome_with(from: &str, to: &str) -> bridge_tally_protocol::TallyImportOutco
 fn span() -> PostSpan {
     PostSpan::after_clean_post(
         PreMark::recorded(target_mark(MARKS_BEFORE)),
-        Some(target_mark(MARKS_AFTER)),
+        target_mark(MARKS_AFTER),
         &outcome(),
         10,
     )
@@ -246,31 +246,21 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     };
     // The mark after stepped by 11, not 10: something else moved it.
     assert_eq!(
-        refused(PostSpan::after_clean_post(
-            before,
-            Some(1806),
-            &outcome(),
-            10
-        )),
+        refused(PostSpan::after_clean_post(before, 1806, &outcome(), 10)),
         SpanRefusal::StepNotCreated {
             step: 11,
             created: 10
         }
     );
     assert_eq!(
-        refused(PostSpan::after_clean_post(
-            before,
-            Some(1794),
-            &outcome(),
-            10
-        )),
+        refused(PostSpan::after_clean_post(before, 1794, &outcome(), 10)),
         SpanRefusal::MarkWentBack
     );
     // CREATED changed from 10 to 9.
     assert_eq!(
         refused(PostSpan::after_clean_post(
             before,
-            Some(1805),
+            1805,
             &outcome_with("<CREATED>10</CREATED>", "<CREATED>9</CREATED>"),
             10
         )),
@@ -283,7 +273,7 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     assert_eq!(
         refused(PostSpan::after_clean_post(
             before,
-            Some(1805),
+            1805,
             &outcome_with("<EXCEPTIONS>0</EXCEPTIONS>", "<EXCEPTIONS>1</EXCEPTIONS>"),
             10
         )),
@@ -293,28 +283,55 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     assert_eq!(
         refused(PostSpan::after_clean_post(
             before,
-            Some(1805),
+            1805,
             &outcome_with("<LASTVCHID>1733</LASTVCHID>", ""),
             10
         )),
         SpanRefusal::LastVchIdAbsent
     );
     assert_eq!(
-        refused(PostSpan::after_clean_post(
-            before,
-            Some(1805),
-            &outcome(),
-            0
-        )),
+        refused(PostSpan::after_clean_post(before, 1805, &outcome(), 0)),
         SpanRefusal::EmptyBatch
     );
 }
 
+/// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
+/// binding is decided again by the next read, never refused for good. A real
+/// difference elsewhere in the span still refuses: the absence never hides it.
 #[test]
-fn an_unread_after_mark_leaves_the_binding_unsettled_not_refused() {
+fn an_absent_effective_date_leaves_the_binding_unsettled_not_refused() {
+    let span = span();
+    let mut read = span_read();
+    read.rows
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1804))
+        .unwrap()
+        .effective_date = None;
     assert_eq!(
-        PostSpan::after_clean_post(PreMark::recorded(1795), None, &outcome(), 10),
-        Err(BindError::Unsettled(BindUnsettled::AfterMarkUnavailable))
+        bind(&span, COMPANY_GUID, &sent(), &read, &BTreeSet::new()),
+        Err(BindError::Unsettled(
+            BindUnsettled::EffectiveDateNotObserved
+        ))
+    );
+    let mut changed = read.clone();
+    changed
+        .rows
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1796))
+        .unwrap()
+        .narration = Some("Electricity bill".into());
+    assert_eq!(
+        refusal(bind(
+            &span,
+            COMPANY_GUID,
+            &sent(),
+            &changed,
+            &BTreeSet::new()
+        )),
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["narration"]
+        }
     );
 }
 
@@ -464,7 +481,7 @@ fn master_ids_and_guids_must_follow_lastvchid() {
     // LASTVCHID changed from 1733 to 1734: the MasterIDs no longer end on it.
     let off_by_one = PostSpan::after_clean_post(
         PreMark::recorded(1795),
-        Some(1805),
+        1805,
         &outcome_with("<LASTVCHID>1733</LASTVCHID>", "<LASTVCHID>1734</LASTVCHID>"),
         10,
     )
@@ -557,4 +574,124 @@ fn a_lastvchid_below_the_count_refuses_rather_than_wrapping() {
         refusal(bind(&span, COMPANY_GUID, &sent(), &read, &BTreeSet::new())),
         SpanRefusal::MasterIdNotInSequence { position: 0 }
     );
+}
+
+// The second capture: 5 untagged Journals (`fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`,
+// `post-span-journal-*`).
+const JOURNAL_IMPORT: &str = include_str!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-import.xml"
+);
+const JOURNAL_RESPONSE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-import-response.utf16le.xml"
+);
+const JOURNAL_MARKS_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-company-high-water-before.utf16le.xml"
+);
+const JOURNAL_MARKS_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-company-high-water-after.utf16le.xml"
+);
+const JOURNAL_SPAN_READ: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-alterid-span-read.utf16le.xml"
+);
+
+/// The five Journals as sent, in request order and in the caller's entry order.
+fn sent_journals() -> Vec<ImportVoucher> {
+    use EntrySide::{Cr, Dr};
+    let v = |n: usize, narration: &str, entries| ImportVoucher {
+        bridge_txn_id: format!("journal-{n:02}"),
+        date: "2026-07-11".into(),
+        voucher_type: VoucherType::Journal,
+        narration: Some(narration.into()),
+        reference: None,
+        voucher_number: None,
+        entries,
+    };
+    vec![
+        v(
+            1,
+            "Accrual for July electricity",
+            vec![
+                entry("Test Expense A", Dr, "500.00"),
+                entry("Test Party", Cr, "500.00"),
+            ],
+        ),
+        v(
+            2,
+            "Reclass of bank charges",
+            vec![
+                entry("Test Expense B", Dr, "75.00"),
+                entry("Test Party", Cr, "75.00"),
+            ],
+        ),
+        v(
+            3,
+            "Reclass of bank charges",
+            vec![
+                entry("Test Expense B", Dr, "75.00"),
+                entry("Test Party", Cr, "75.00"),
+            ],
+        ),
+        v(
+            4,
+            "Reversal of excess accrual",
+            vec![
+                entry("Test Party", Dr, "120.00"),
+                entry("Test Expense A", Cr, "120.00"),
+            ],
+        ),
+        v(
+            5,
+            "Split of a shared cost",
+            vec![
+                entry("Test Expense A", Dr, "300.00"),
+                entry("Test Expense B", Dr, "200.00"),
+                entry("Test Party", Cr, "500.00"),
+            ],
+        ),
+    ]
+}
+
+#[test]
+fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
+    let ids = JOURNAL_IMPORT
+        .split("REMOTEID=\"")
+        .skip(1)
+        .map(|rest| Uuid::parse_str(&rest[..36]).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(ids.len(), 5);
+    let xml = render_native_vouchers_xml(COMPANY, sent_journals().iter().zip(ids));
+    assert_eq!(xml, JOURNAL_IMPORT.trim_end_matches('\n'));
+    assert_eq!(
+        (
+            target_mark(JOURNAL_MARKS_BEFORE),
+            target_mark(JOURNAL_MARKS_AFTER)
+        ),
+        (1805, 1810)
+    );
+    let outcome = bridge_tally_protocol::parse_import_outcome(&captured(JOURNAL_RESPONSE)).unwrap();
+    let span = PostSpan::after_clean_post(PreMark::recorded(1805), 1810, &outcome, 5).unwrap();
+    let read = ImportReadSource::admit(
+        parse_import_voucher_rows(&captured(JOURNAL_SPAN_READ), COMPANY_GUID).unwrap(),
+    )
+    .unwrap();
+    let bound = bind(
+        &span,
+        COMPANY_GUID,
+        &sent_journals(),
+        &read,
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(bound.len(), 5);
+    for (position, identity) in bound.iter().enumerate() {
+        let master_id = 1734 + position as u64;
+        assert_eq!(
+            identity.bridge_txn_id,
+            format!("journal-{:02}", position + 1)
+        );
+        assert_eq!(identity.master_id, master_id);
+        assert_eq!(identity.guid, format!("{COMPANY_GUID}-{master_id:08x}"));
+    }
+    // The identical pair binds by position alone.
+    assert_eq!((bound[1].master_id, bound[2].master_id), (1735, 1736));
 }

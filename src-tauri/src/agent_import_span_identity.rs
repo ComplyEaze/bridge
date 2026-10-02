@@ -118,8 +118,12 @@ impl SpanRefusal {
 /// never recorded as a refusal of what Tally holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum BindUnsettled {
-    /// The mark after the POST was not read: transport, timeout or a crash.
-    AfterMarkUnavailable,
+    /// A Payment, Receipt or Contra row was read without `EFFECTIVEDATE`.
+    /// Verification treats that absence as not observed, never as a
+    /// difference, so it is not a reason to refuse the binding for good: the
+    /// next verification decides again. Every other check still ran, and none
+    /// refused.
+    EffectiveDateNotObserved,
     /// The journal could not be read to check that no other batch bound the
     /// same GUIDs.
     JournalUnreadable,
@@ -128,7 +132,7 @@ pub(super) enum BindUnsettled {
 impl BindUnsettled {
     pub(super) fn code(self) -> &'static str {
         match self {
-            Self::AfterMarkUnavailable => "binding_after_mark_unavailable",
+            Self::EffectiveDateNotObserved => "binding_effective_date_not_observed",
             Self::JournalUnreadable => "binding_journal_unreadable",
         }
     }
@@ -207,14 +211,12 @@ impl PostSpan {
     /// target's voucher mark moved by exactly `CREATED`.
     pub(super) fn after_clean_post(
         before: PreMark,
-        after_mark: Option<u64>,
+        after_mark: u64,
         outcome: &bridge_tally_protocol::TallyImportOutcome,
         count: usize,
     ) -> Result<Self, BindError> {
         let last_vch_id = clean_create(outcome, count)?;
         let created = count as u64;
-        let after_mark =
-            after_mark.ok_or(BindError::Unsettled(BindUnsettled::AfterMarkUnavailable))?;
         let step = after_mark
             .checked_sub(before.0)
             .ok_or(SpanRefusal::MarkWentBack)?;
@@ -272,9 +274,13 @@ pub(super) fn bind(
         .and_then(|next| next.checked_sub(span.count as u64))
         .ok_or(SpanRefusal::MasterIdNotInSequence { position: 0 })?;
     let mut identities = Vec::with_capacity(span.count);
+    let mut effective_date_unobserved = false;
     for (position, (row, voucher)) in rows.iter().zip(sent).enumerate() {
         if row.alter_id != span.before.checked_add(1 + position as u64) {
             return Err(SpanRefusal::Position { position }.into());
+        }
+        if voucher.voucher_type.bank_shape().is_some() && row.effective_date.is_none() {
+            effective_date_unobserved = true;
         }
         let fields = content_differences(voucher, row);
         if !fields.is_empty() {
@@ -303,6 +309,11 @@ pub(super) fn bind(
             master_id,
         });
     }
+    if effective_date_unobserved {
+        return Err(BindError::Unsettled(
+            BindUnsettled::EffectiveDateNotObserved,
+        ));
+    }
     Ok(identities)
 }
 
@@ -315,7 +326,12 @@ fn content_differences(voucher: &ImportVoucher, row: &ReadVoucher) -> Vec<&'stat
         fields.push("date");
     }
     // The bank shapes write EFFECTIVEDATE equal to DATE; a Journal writes none.
-    if voucher.voucher_type.bank_shape().is_some() && row.effective_date != date {
+    // An absent one is not observed, never a difference (`bind` leaves it
+    // unsettled), as in verification.
+    if voucher.voucher_type.bank_shape().is_some()
+        && row.effective_date.is_some()
+        && row.effective_date != date
+    {
         fields.push("effective_date");
     }
     if row.voucher_type.as_deref() != Some(voucher.voucher_type.as_str()) {

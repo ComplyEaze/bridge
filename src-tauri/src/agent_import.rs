@@ -1652,7 +1652,7 @@ impl Server {
         let span = match after_post_mark {
             Some(after) => span_identity::PostSpan::after_clean_post(
                 pre_post_voucher_mark,
-                Some(after),
+                after,
                 outcome,
                 count,
             ),

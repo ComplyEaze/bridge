@@ -206,9 +206,14 @@ pub fn parse_native_bill_rows(
         ));
     }
 
+    // A row that cannot be finalised is named by its 1-based place in Tally's
+    // answer, never by its party or reference (bridge#1091).
     pending
         .into_iter()
-        .map(|row| finalize_bill_row(row, books_from, as_of))
+        .enumerate()
+        .map(|(index, row)| {
+            finalize_bill_row(row, books_from, as_of).map_err(|error| error.in_row(index + 1))
+        })
         .collect()
 }
 

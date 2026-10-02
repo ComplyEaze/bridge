@@ -1,0 +1,17 @@
+{
+  "source": "Live TallyPrime Silver 7.1 read of the synthetic company BRIDGE PROBE B SANDBOX (a book built for testing), read once through a recording read-only relay for bridge#1091",
+  "observed_date": "2026-10-02",
+  "requested_as_of": "20260331",
+  "source_response_bytes": 9528,
+  "source_response_sha256": "47de9b307c5bdff60f52bfa3a6f3c4fae482d81f2abb0a43fd9bd61ddcf5acd7",
+  "source_request_bytes": 770,
+  "source_request_sha256": "eddcc9d6fd148d447042531dec87c09d61c705be0819fca0245b08b803576bdd",
+  "request_rendered_by": "render_native_bills_request(Payable, company, 20250401, 20260331); the renderer was checked byte-equal to the product by the sha256 of both bills requests of a recorded outstandings call",
+  "fixture_bytes": 9528,
+  "fixture_sha256": "47de9b307c5bdff60f52bfa3a6f3c4fae482d81f2abb0a43fd9bd61ddcf5acd7",
+  "encoding": "UTF-16LE without BOM, as received",
+  "transformation": [],
+  "content": "21 open bills at 20260331 (an as-of Bills Payable report from 20250401).",
+  "provenance_limit": "One synthetic book on one build, read once: it shows how Tally printed those rows, not how a client book reads. Sent once under the relay's read-only allowlist; the response is unmodified. Whether Tally prints every due date after 2099 with a four-digit year, and from which year, is not established: one row was observed.",
+  "sensitivity_review": "Synthetic company name and synthetic party and bill names (W1 Debtor NN, PROBE Party BW, CPX/CPY/ME reference prefixes); no party, person, GSTIN, address or credential. The decoded file was scanned against the client-names list: no hit."
+}

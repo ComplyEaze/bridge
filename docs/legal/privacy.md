@@ -1,8 +1,8 @@
 # ComplyEaze Bridge Privacy Policy
 
-**Version:** 2026-10
+**Version:** 2026-10.1
 
-**Effective:** 2 October 2026
+**Effective:** 3 October 2026
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 
@@ -20,7 +20,7 @@
 
 ## 1. Who we are and what this policy covers
 
-ComplyEaze Bridge ("**Bridge**") is published by **SPMS Comply Eaze Solutions LLP**, a limited liability partnership registered in India ("**ComplyEaze**", "**we**", "**us**", "**our**"). Our registered office is at S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Industrial Area, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.
+ComplyEaze Bridge ("**Bridge**") is published by **SPMS Comply Eaze Solutions LLP**, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231 ("**ComplyEaze**", "**we**", "**us**", "**our**"). Our registered office is at S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.
 
 This policy explains what happens to information when you use Bridge. It covers:
 
@@ -175,10 +175,11 @@ We use information that reaches us (section 4) only to:
 
 - answer your questions, support requests and bug or vulnerability reports;
 - keep Bridge, our website and our services secure, and investigate misuse;
+- publish, with your separate written agreement, words you give us about ComplyEaze Bridge, with the description of you and of any connection with us that your agreement states, and keep the record of that agreement;
 - comply with the law and respond to lawful requests from authorities; and
 - establish, exercise or defend legal claims.
 
-We do not sell personal data, and we do not use it for advertising.
+We do not sell personal data. We do not use it for advertising, except as the third purpose above allows.
 
 ## 10. Sharing
 
@@ -186,8 +187,9 @@ We share information we receive only:
 
 - with service providers who host or run our website and email, such as GitHub and Cloudflare for the website and our email provider, under their terms of service;
 - where required by law, a court order or a lawful request from a government authority;
-- to protect the rights, safety or property of our users, the public or ComplyEaze; or
-- as part of a merger, acquisition or transfer of our business, subject to this policy.
+- to protect the rights, safety or property of our users, the public or ComplyEaze;
+- as part of a merger, acquisition or transfer of our business, subject to this policy; or
+- with the public, when we publish words you have agreed in writing that we may publish (section 9).
 
 ## 11. Roles and your responsibilities as a professional
 
@@ -208,7 +210,9 @@ ComplyEaze does not collect, receive, store or have access to the Tally Data tha
 
 For personal data **we hold** (section 4), you may ask us for information about it, or ask us to correct, complete or erase it. You may also raise a grievance with our Grievance Officer (section 16).
 
-Once the relevant parts of the Digital Personal Data Protection Act, 2023 and its Rules are in force, you may also use the other rights they give you, such as nominating someone to act for you. We may need to verify your identity before acting, and we may keep information where the law requires us to.
+Once the relevant parts of the Digital Personal Data Protection Act, 2023 and its Rules are in force, you may also use the other rights they give you, such as nominating someone to act for you. We may need to verify your identity before acting, and we may keep information where the law requires us to, or to establish, exercise or defend legal claims (section 13).
+
+You can withdraw your agreement to publish your words at any time by writing to contact@complyeaze.com. We will then remove them from pages we control and not use them again, but copies already in the website's public source history or in web archives may remain.
 
 For Tally Data on your computer, we hold nothing, so we cannot act on a request about it. You can view, correct or delete it yourself, in Tally and in the Local Files. For data your AI Assistant sent to your AI Provider, contact your AI Provider.
 
@@ -218,6 +222,7 @@ If one of your Clients, or anyone whose details appear in their books, asks abou
 
 - **Tally Data and Local Files:** kept on your computer until you delete them (section 7). We do not hold them.
 - **Emails, support requests and reports you send us:** kept as long as needed to deal with them, and for any longer period the law requires, and then deleted, normally no more than three years after the matter is closed.
+- **Words you agreed we may publish, the description that goes with them, and your written agreement:** kept while the words are published, and for three years after they are removed or you withdraw your agreement, so that we can show we had it.
 - **Website request logs:** kept by GitHub and Cloudflare under their own policies.
 
 ## 14. Security
@@ -250,7 +255,7 @@ Bridge is a professional tool for accountants and businesses. It is not intended
 ## 16. Contact and Grievance Officer
 
 - **Privacy questions and requests:** contact@complyeaze.com
-- **Grievance Officer:** the Designated Partner of SPMS Comply Eaze Solutions LLP acts as our Grievance Officer and the person who answers questions about personal data. Write to contact@complyeaze.com with "Grievance" in the subject, or by post to the address in section 1. We will acknowledge a grievance within 7 days of receiving it and give you our response within 30 days.
+- **Grievance Officer:** a Designated Partner of SPMS Comply Eaze Solutions LLP acts as our Grievance Officer and the person who answers questions about personal data. Write to contact@complyeaze.com with "Grievance" in the subject, or by post to the address in section 1. We will acknowledge a grievance within 7 days of receiving it and give you our response within one month.
 - **Security vulnerabilities:** security@complyeaze.com, or GitHub private vulnerability reporting for the Bridge repository. We aim to acknowledge a report within seven days. Please do not report a vulnerability in a public issue.
 
 If you are not satisfied with our response, you may be able to complain to the Data Protection Board of India once the relevant provisions are in force.

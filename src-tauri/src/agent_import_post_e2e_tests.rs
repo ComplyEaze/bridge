@@ -4132,3 +4132,229 @@ async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() 
         "{result}"
     );
 }
+
+// A batch that lands partly (the batch-conditions lab plan, condition 2c).
+// The POST is answered by the live response to a three-voucher import whose
+// second voucher Tally rejected (`partial-import-missing-ledger`, captured
+// 2026-10-02): CREATED 2, ERRORS 0, EXCEPTIONS 1, one LINEERROR. Bridge's own
+// path refuses a missing ledger at build, so the batch here names ledgers the
+// catalogue holds; the rejection stands for one Tally makes after approval (a
+// ledger removed in Tally's screens meanwhile). The LINEERROR names the
+// captured run's ledger, which this batch does not carry: §9.2 says its text
+// is not a reliable cause, and no verdict reads it. The capture was three
+// Payments in another synthetic lab company; this batch is three Journals in
+// the harness's captured company, and the window reuses the capture's
+// MasterIDs (LASTVCHID 1746). The counter check refuses the binding before
+// anything that depends on the voucher type or the company.
+
+/// The captured live answer to an import that created two of three vouchers.
+fn created_two_of_three() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/partial-import-missing-ledger.utf16le.xml"
+    ))
+}
+
+const PARTIAL_AMOUNTS: [&str; 3] = ["12.61", "13.61", "14.61"];
+
+/// `saved_captured_line`'s Journal three times, each with its own amount, as
+/// one batch: the second (13.61) is the one Tally rejects.
+fn saved_partial_batch(server: &Server) -> (ImportLedgerLine, Value) {
+    let mut line = saved_captured_line(server);
+    let template = line.vouchers[0].clone();
+    line.vouchers = PARTIAL_AMOUNTS
+        .iter()
+        .enumerate()
+        .map(|(index, amount)| {
+            let mut voucher = template.clone();
+            voucher.bridge_txn_id = format!("partial-{}", index + 1);
+            voucher
+                .entries
+                .iter_mut()
+                .for_each(|entry| entry.amount = (*amount).into());
+            voucher
+        })
+        .collect();
+    line.txn_ids = line
+        .vouchers
+        .iter()
+        .map(|voucher| voucher.bridge_txn_id.clone())
+        .collect();
+    let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(rendered.as_bytes());
+    bind_to_captured_catalogue(&mut line);
+    server.append_import_ledger(&line).unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        rendered,
+    )
+    .unwrap();
+    let args = json!({"company_guid":GUID,"batch_id":line.batch_id});
+    (line, args)
+}
+
+/// The window after the partial post: the captured posted Journal, untagged,
+/// twice, as the first and third vouchers. Each copy's named changes: the
+/// amount (both entries), ALTERID (11 and 12, inside the span (10, 12] the
+/// marks give), and MASTERID with the GUID and REMOTEID suffixes to match
+/// (1745 and 1746, the captured response's LASTVCHID being 1746): the window's
+/// MasterIDs are derived by named edits from the Payment capture. Each copy's
+/// VCHKEY suffix is set to its MasterID only to keep the two keys distinct: it
+/// is a synthetic value, not derived from the capture.
+fn partial_window() -> String {
+    let body = untagged_posted_journal();
+    let start = body.find("<VOUCHER ").expect("the capture holds a voucher");
+    // Searched from the voucher on: CMPINFO's `<VOUCHER>12</VOUCHER>` count
+    // closes first.
+    let end = start
+        + body[start..]
+            .find("</VOUCHER>")
+            .expect("the voucher closes")
+        + "</VOUCHER>".len();
+    let voucher = &body[start..end];
+    let copy = |amount: &str, alter_id: u64, master_id: u64| {
+        let copy = replaced_once(voucher, ">-12.61<", &format!(">-{amount}<"));
+        let copy = replaced_once(&copy, ">12.61<", &format!(">{amount}<"));
+        let copy = replaced_once(
+            &copy,
+            "<ALTERID TYPE=\"Number\"> 11</ALTERID>",
+            &format!("<ALTERID TYPE=\"Number\"> {alter_id}</ALTERID>"),
+        );
+        let copy = replaced_once(
+            &copy,
+            "<MASTERID TYPE=\"Number\"> 295</MASTERID>",
+            &format!("<MASTERID TYPE=\"Number\"> {master_id}</MASTERID>"),
+        );
+        let copy = copy.replace(
+            &format!("{GUID}-00000127"),
+            &format!("{GUID}-{master_id:08x}"),
+        );
+        replaced_once(
+            &copy,
+            &format!("{GUID}-0000b4bf:00000008"),
+            &format!("{GUID}-0000b4bf:{master_id:08x}"),
+        )
+    };
+    let both = format!(
+        "{}\n    {}",
+        copy(PARTIAL_AMOUNTS[0], 11, 1745),
+        copy(PARTIAL_AMOUNTS[2], 12, 1746)
+    );
+    format!("{}{}{}", &body[..start], both, &body[end..])
+}
+
+/// The captured answer is what the test says it is.
+#[test]
+fn the_partial_post_answer_parses_as_two_created_and_one_exception() {
+    let outcome = parse_import_outcome(&created_two_of_three()).expect("the answer parses");
+    assert_eq!(outcome.counters().created, 2);
+    assert_eq!(outcome.counters().errors, 0);
+    assert_eq!(outcome.counters().exceptions, 1);
+    assert_eq!(outcome.counters().line_error_count, 1);
+    assert_eq!(outcome.last_vch_id(), Some(1746));
+    assert!(!import_outcome_is_clean(Some(&outcome), 3));
+    // Not clean even against the number it did create: the exception decides.
+    assert!(!import_outcome_is_clean(Some(&outcome), 2));
+}
+
+/// A batch that lands partly is loud and never verified: the binding is
+/// refused on the counters and journaled once; the two vouchers that landed
+/// are matched by content only; the one that did not is never read as absent.
+#[tokio::test]
+async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_two_of_three())));
+    // The POST is the last request of the dispatch (see `after_approval`).
+    let post_at = plans.len() - 1;
+    plans.push(xml(company_marks(12, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(partial_window(), 12));
+    let expected_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (line, args) = saved_partial_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    // Every scripted answer was asked for, and nothing more.
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), expected_requests, "{posted}");
+    // The POST carried exactly the saved batch, rendered with the REMOTEIDs
+    // its dispatch intent journaled before the send.
+    let intent = dispatch_intent(directory.path());
+    let recorded_sha = intent["native_request_sha256"].as_str().unwrap();
+    assert_eq!(observed[post_at].request_body_sha256, recorded_sha);
+    let remote_ids = intent["native_remote_ids"]
+        .as_array()
+        .expect("a batch intent journals one REMOTEID per voucher")
+        .iter()
+        .map(|id| Uuid::parse_str(id.as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(remote_ids.len(), 3);
+    let rendered = native_post_request(&line, RemoteIds::from_ids(remote_ids)).unwrap();
+    assert_eq!(rendered.request_sha256, recorded_sha);
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["post_span_binding"]["code"], "span_counters_not_clean",
+        "{posted}"
+    );
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{posted}"
+    );
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["dispatch"]["counters"]["created"], 2, "{posted}");
+    assert_eq!(result["dispatch"]["counters"]["exceptions"], 1, "{posted}");
+    assert_eq!(
+        result["error"]["code"], "import_reconciliation_required",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
+    assert_eq!(result["counts"]["matching_content_observed"], 2, "{posted}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 1, "{posted}");
+    assert_eq!(result["counts"]["not_found"], 0, "{posted}");
+    // Which rows landed, by transaction id: each matched by the content it
+    // carries (its amount), never by position.
+    let voucher = |id: &str| {
+        result["vouchers"]
+            .as_array()
+            .expect("the result lists its vouchers")
+            .iter()
+            .find(|voucher| voucher["bridge_txn_id"] == id)
+            .unwrap_or_else(|| panic!("{id} is listed: {posted}"))
+            .clone()
+    };
+    for (id, alter_id, master_id) in [("partial-1", 11, "1745"), ("partial-3", 12, "1746")] {
+        let landed = voucher(id);
+        assert_eq!(
+            landed["status"], "matching_content_observed",
+            "{id}: {landed}"
+        );
+        assert_eq!(landed["alter_id"], alter_id, "{id}: {landed}");
+        assert_eq!(landed["master_id"], master_id, "{id}: {landed}");
+        assert_eq!(landed["diffs"], json!([]), "{id}: {landed}");
+    }
+    assert_eq!(
+        voucher("partial-2")["status"],
+        "sent_not_attributed",
+        "{posted}"
+    );
+    let verdicts = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .filter(|record| record["record_type"] == "post_span_verdict")
+        .collect::<Vec<_>>();
+    assert_eq!(verdicts.len(), 1, "{verdicts:?}");
+    assert_eq!(verdicts[0]["binding_refusal"], "span_counters_not_clean");
+}

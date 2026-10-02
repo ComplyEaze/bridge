@@ -228,6 +228,7 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
     assert_eq!(content["evidence"]["state"], "partial");
     let result = &content["result"];
     assert_eq!(result["state"], "partial");
+    assert_eq!(result["as_of"], "20250930");
     // One scalar for any mix; the derived set names only the foreign list,
     // as this capture predates the dollar invoice to a rupee party (#642).
     assert_eq!(result["partial_reason"], "currency_ledgers_excluded");
@@ -552,6 +553,7 @@ fn the_outstandings_description_says_what_decides_receivable_and_payable() {
         "Measured on one synthetic book (TallyPrime Silver 7.1)",
         "Read a bill's `kind` as a direction",
         "net into one figure",
+        "the date used is always returned as `result.as_of`, whatever the state",
     ] {
         assert!(description.contains(needle), "missing: {needle}");
     }
@@ -693,6 +695,15 @@ async fn mcp_outstandings_refuse_a_party_detail_on_a_partial_read() {
 /// through the MCP tool with `extra_arguments`. The sequence is the one
 /// `currency_then_native_plans_with_ledgers` scripts for the runtime.
 async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
+    ageing_outstandings_with(None, ledgers, extra_arguments).await
+}
+
+/// [`ageing_outstandings`] with the Bills Receivable report replaced when `receivable` is given.
+async fn ageing_outstandings_with(
+    receivable: Option<String>,
+    ledgers: String,
+    extra_arguments: Value,
+) -> Value {
     use tally_protocol_simulator::{
         Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
@@ -735,21 +746,21 @@ async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
     // The native outstandings read.
     plans.extend([status(), companies.clone(), companies.clone()]);
     pair(&mut plans, extent.clone());
-    for bytes in [
-        include_bytes!(
+    let receivable = receivable.unwrap_or_else(|| {
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
-        )
-        .as_slice(),
-        include_bytes!(
+        ))
+    });
+    for body in [
+        receivable,
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-groups.utf16le.xml"
-        )
-        .as_slice(),
-        include_bytes!(
+        )),
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-payable.utf16le.xml"
-        )
-        .as_slice(),
+        )),
     ] {
-        pair(&mut plans, xml(decode(bytes)));
+        pair(&mut plans, xml(body));
     }
     pair(&mut plans, xml(ledgers));
     pair(&mut plans, extent);
@@ -772,7 +783,12 @@ async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
     let mut arguments =
         json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
     for (key, value) in extra_arguments.as_object().into_iter().flatten() {
-        arguments[key] = value.clone();
+        // A null leaves the argument out, to exercise its default.
+        if value.is_null() {
+            arguments.as_object_mut().unwrap().remove(key);
+        } else {
+            arguments[key] = value.clone();
+        }
     }
     let response = server.call_tool("outstandings", arguments).await;
     simulator.cancel();
@@ -816,6 +832,41 @@ fn ageing_ledgers_with_currency(customer_a: &str) -> String {
     ledgers
 }
 
+/// A call without `as_of` reads as of the host's today, and says so: the date
+/// is echoed in the result, so a figure is never left to be read as of
+/// whatever date the caller assumed. Bracketed so a midnight crossing cannot
+/// fail the test.
+#[tokio::test]
+async fn mcp_outstandings_echo_the_date_they_defaulted_to() {
+    let before = tally_host_today();
+    let response =
+        ageing_outstandings(ageing_ledgers_with_currency("I₹"), json!({"as_of": null})).await;
+    let after = tally_host_today();
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    // The captured book does not accept today's date (its read comes back
+    // partial, `native_outstandings_as_of_refused`): the date is echoed in
+    // that state too, and the state is not what this test is about.
+    assert!(result["state"].is_string(), "{result}");
+    assert!(
+        result["as_of"] == before || result["as_of"] == after,
+        "{result}"
+    );
+}
+
+/// A hyphenated `as_of` is accepted and echoed in the compact form the read
+/// used, so the echo is the date read and not the caller's spelling of it.
+#[tokio::test]
+async fn mcp_outstandings_echo_a_hyphenated_date_in_compact_form() {
+    let response = ageing_outstandings(
+        ageing_ledgers_with_currency("I₹"),
+        json!({"as_of": "2026-08-01"}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(response["structuredContent"]["result"]["as_of"], "20260801");
+}
+
 /// The `Partial` arm: a ledger kept in a currency the book's base does not
 /// match makes the native read an in-band partial, and a party detail asked of
 /// it is refused with the read's own reason beside the refusal's code.
@@ -827,6 +878,8 @@ async fn mcp_outstandings_keep_the_partial_reason_when_refusing_a_party_detail()
     let result = &plain["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{result}");
     assert_eq!(result["partial_reason"], "ledger_currency_base_unmatched");
+    // The withheld arm states the date it was read at, too.
+    assert_eq!(result["as_of"], "20260801", "{result}");
 
     let response = ageing_outstandings(
         ageing_ledgers_with_currency("$"),
@@ -996,6 +1049,7 @@ fn assert_replay_matches_the_live_call(
     }
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["as_of"], record["arguments"]["as_of"], "{result}");
     assert_eq!(result["detail"], record["answer_detail"]);
 }
 
@@ -1176,6 +1230,101 @@ fn the_recorded_sequences_are_the_ones_committed_with_the_capture() {
         assert_eq!(record.len(), bytes);
         assert_eq!(sha256_hex(record.as_bytes()), sha256);
     }
+}
+
+/// bridge#1091: a Bills report row Bridge cannot read refuses the read with its cause, the report
+/// and the row, and a next step, and never names the bill or its party.
+#[tokio::test]
+async fn an_unreadable_bills_row_refuses_with_its_cause_report_and_row() {
+    fn decode(bytes: &[u8]) -> String {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
+    ));
+    // The fourth bill's due date, written with a four-digit year below the one form Tally was seen to
+    // print in full.
+    let damaged = captured.replacen(
+        "<BILLDUE>2-Jul-26</BILLDUE>",
+        "<BILLDUE>2-Jul-2026</BILLDUE>",
+        1,
+    );
+    assert_ne!(damaged, captured);
+    let response = ageing_outstandings_with(
+        Some(damaged),
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "native_outstandings_read_failed");
+    assert_eq!(error["cause"], "native_date_year_invalid");
+    assert_eq!(error["bill_row"], json!({"report": "receivable", "row": 4}));
+    let remediation = error["remediation"].as_str().expect("a next step");
+    assert!(
+        remediation.contains("Do not retry") && remediation.contains("bill_row"),
+        "{remediation}"
+    );
+    // Nothing of the bill: not its party, its reference or its dates, in the structured result
+    // or in the text copy of it.
+    let text = response.to_string();
+    for secret in [
+        "Ageing Customer A",
+        "MP-A",
+        "CANARY",
+        "CREDIT-30",
+        "BD-DIFF",
+        "2-Jul",
+    ] {
+        assert!(
+            !text.contains(secret),
+            "the refusal carries {secret:?}: {text}"
+        );
+    }
+}
+
+/// The Bills-report next steps belong to the outstandings tool only (bridge#1091): the same cause
+/// codes reach other tools through reads that never open that report.
+#[test]
+fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
+    for cause in [
+        "native_date_year_invalid",
+        "bills_xml_malformed",
+        "native_amount_invalid",
+        "native_arithmetic_overflow",
+        "native_tally_reported_failure",
+    ] {
+        assert!(outstandings_cause_remediation(cause).is_some(), "{cause}");
+        // Neither the cause nor an operation code of another tool picks it up.
+        assert_eq!(refusal_remediation(cause), None, "{cause}");
+    }
+    assert_eq!(refusal_remediation("trial_balance_read_failed"), None);
+    // A cause that cannot come from the Bills report has no Bills advice.
+    assert_eq!(outstandings_cause_remediation("native_status_absent"), None);
+    // The choice is made on the code: the same cause under another tool's code gets none.
+    assert!(remediation_for(
+        "native_outstandings_read_failed",
+        Some("native_date_year_invalid")
+    )
+    .is_some());
+    assert_eq!(
+        remediation_for("trial_balance_read_failed", Some("native_status_absent")),
+        None
+    );
+    assert_eq!(
+        remediation_for(
+            "party_ledger_master_read_failed",
+            Some("native_amount_invalid")
+        ),
+        None
+    );
 }
 
 /// RD1 (2 Oct): no field said how many open bills there were, so a page cut

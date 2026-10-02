@@ -22,6 +22,7 @@ use bridge_tax_audit::book::{
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
 use bridge_tax_audit::documents::{bank_statement_from_json, traces_documents_from_json};
+use bridge_tax_audit::error::AuditError;
 use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::{
@@ -1214,7 +1215,10 @@ fn a_repeated_tis_category_is_refused() {
     ) else {
         panic!("a repeated TIS category is refused");
     };
-    assert!(format!("{err}").contains("would repeat"), "{err}");
+    assert!(
+        matches!(&err, AuditError::DuplicateFigureId(id) if id.starts_with("tds_tcs_26as.")),
+        "{err}"
+    );
 }
 
 /// Two matched books rows sharing a GUID would repeat `match_pair_<hash>`: the reference's `fig`
@@ -1244,7 +1248,10 @@ fn a_repeated_books_guid_is_refused_not_panicked() {
     })
     .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
-    assert!(format!("{err}").contains("match_pair_093394bf"), "{err}");
+    assert!(
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "bank_reconciliation.match_pair_093394bf"),
+        "{err}"
+    );
 }
 
 /// A two-line journal whose lines are both on one party ledger gives two figures one id; the
@@ -1277,7 +1284,9 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
         .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
     assert!(
-        format!("{err}").contains("journal_transfer_amount_0bce8b28_0431f39b"),
+        matches!(&err, AuditError::DuplicateFigureId(id)
+            if id.starts_with("high_value_register.")
+                && id.ends_with("journal_transfer_amount_0bce8b28_0431f39b")),
         "{err}"
     );
 }
@@ -1382,7 +1391,7 @@ fn a_party_tag_equal_to_a_fixed_row_is_refused_not_panicked() {
     .expect("refused, not panicked");
     let err = result.expect_err("a repeated figure id is refused");
     assert!(
-        format!("{err}").contains("party_monthly.sales_jun_a64cfcd9"),
+        matches!(&err, AuditError::DuplicateFigureId(id) if id == "party_monthly.sales_jun_a64cfcd9"),
         "{err}"
     );
 }

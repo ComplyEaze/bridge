@@ -92,24 +92,6 @@ fn distance(a: i64, b: i64) -> Result<i64> {
     sub(a, b)?.checked_abs().ok_or_else(|| overflow(TEST_ID))
 }
 
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
-}
-
 /// The optional `[roles].bank_charge_narration_terms`, as a list of strings; empty when absent.
 ///
 /// Divergence, deliberate, and not parity (as `cash_book_integrity::own_account_terms`): the
@@ -309,16 +291,14 @@ pub fn run(
         iso(end)
     );
     let note = r.population_note.clone();
-    fig(
-        &mut r,
+    r.fig(
         "months_covered",
         Value::Text(format!("{}..{}", iso(start), iso(end))),
         Unit::Text,
         &note,
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "months_not_reconciled_note",
         Value::Text(
             "Any FY month outside the window above has no bank statement in this \
@@ -329,16 +309,14 @@ pub fn run(
         "Scope statement.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "bank_statement_source_sha256",
         Value::Text(statement.source_sha256.clone()),
         Unit::Text,
         "sha256 of the raw bank-statement document bytes.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "bank_statement_account_ref",
         Value::Text(statement.account_ref.clone()),
         Unit::Text,
@@ -353,8 +331,7 @@ pub fn run(
     for b in &book_rows {
         books_closing = add(books_closing, b.amount_paise)?;
     }
-    let f_books_open = fig(
-        &mut r,
+    let f_books_open = r.fig(
         "books_opening_paise",
         Value::Int(books_opening),
         Unit::Paise,
@@ -364,40 +341,35 @@ pub fn run(
         ),
         vec![],
     )?;
-    let f_stmt_open = fig(
-        &mut r,
+    let f_stmt_open = r.fig(
         "statement_opening_paise",
         Value::Int(statement.opening_balance_paise),
         Unit::Paise,
         "The statement's own declared opening balance.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "opening_tie_diff_paise",
         Value::Int(sub(books_opening, statement.opening_balance_paise)?),
         Unit::Paise,
         "books_opening_paise minus statement_opening_paise; reported even when zero.",
         vec![],
     )?;
-    let f_books_close = fig(
-        &mut r,
+    let f_books_close = r.fig(
         "books_closing_paise",
         Value::Int(books_closing),
         Unit::Paise,
         "books_opening_paise plus every books row in the window (below).",
         vec![],
     )?;
-    let f_stmt_close = fig(
-        &mut r,
+    let f_stmt_close = r.fig(
         "statement_closing_paise",
         Value::Int(statement.closing_balance_paise),
         Unit::Paise,
         "The statement's own declared closing balance.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "closing_tie_diff_paise",
         Value::Int(sub(books_closing, statement.closing_balance_paise)?),
         Unit::Paise,
@@ -406,8 +378,7 @@ pub fn run(
     )?;
     if *end == period.to {
         let closing = book.tb.get(bank_ledger).map_or(0, |t| t.closing_paise);
-        fig(
-            &mut r,
+        r.fig(
             "tb_closing_paise",
             Value::Int(closing),
             Unit::Paise,
@@ -449,16 +420,14 @@ pub fn run(
         });
     }
 
-    fig(
-        &mut r,
+    r.fig(
         "books_rows_count",
         count(TEST_ID, book_rows.len())?,
         Unit::Count,
         &note,
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "statement_rows_count",
         count(TEST_ID, stmt.len())?,
         Unit::Count,
@@ -473,8 +442,7 @@ pub fn run(
     for &(bi, si) in &pairs {
         let (b, s) = (&book_rows[bi], &stmt[si]);
         let h = hash8(&b.guid);
-        fig(
-            &mut r,
+        r.fig(
             &format!("match_pair_{h}"),
             Value::Text("matched".to_string()),
             Unit::Text,
@@ -485,8 +453,7 @@ pub fn run(
             ],
         )?;
     }
-    fig(
-        &mut r,
+    r.fig(
         "category_matched_count",
         count(TEST_ID, pairs.len())?,
         Unit::Count,
@@ -591,8 +558,7 @@ pub fn run(
             .iter()
             .map(|&i| EvidenceRef::with_label("voucher", &book_rows[i].guid, &book_rows[i].label))
             .collect();
-        fig(
-            &mut r,
+        r.fig(
             &format!("books_only_reason_{reason}_count"),
             count(TEST_ID, rows_b.len())?,
             Unit::Count,
@@ -603,8 +569,7 @@ pub fn run(
         for &i in rows_b {
             total_b = add(total_b, book_rows[i].amount_paise)?;
         }
-        fig(
-            &mut r,
+        r.fig(
             &format!("books_only_reason_{reason}_paise"),
             Value::Int(total_b),
             Unit::Paise,
@@ -622,8 +587,7 @@ pub fn run(
                 )
             })
             .collect();
-        fig(
-            &mut r,
+        r.fig(
             &format!("statement_only_reason_{reason}_count"),
             count(TEST_ID, rows_s.len())?,
             Unit::Count,
@@ -634,8 +598,7 @@ pub fn run(
         for &i in rows_s {
             total_s = add(total_s, signed(&stmt[i])?)?;
         }
-        fig(
-            &mut r,
+        r.fig(
             &format!("statement_only_reason_{reason}_paise"),
             Value::Int(total_s),
             Unit::Paise,
@@ -646,24 +609,21 @@ pub fn run(
 
     let unclassified =
         books_by_reason[REASON_UNCLASSIFIED].len() + stmt_by_reason[REASON_UNCLASSIFIED].len();
-    fig(
-        &mut r,
+    r.fig(
         "unclassified_count",
         count(TEST_ID, unclassified)?,
         Unit::Count,
         "books_only + statement_only rows with no reason from the closed set (BANK-3: must be 0).",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "category_books_only_count",
         count(TEST_ID, unmatched_books.len())?,
         Unit::Count,
         "Books rows with no statement counterpart.",
         vec![],
     )?;
-    fig(
-        &mut r,
+    r.fig(
         "category_statement_only_count",
         count(TEST_ID, unmatched_stmt.len())?,
         Unit::Count,

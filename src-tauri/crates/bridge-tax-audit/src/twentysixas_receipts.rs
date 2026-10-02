@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::book::{Book, Voucher};
 use crate::documents::Form26asRow;
-use crate::error::{AuditError, Result};
+use crate::error::Result;
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
@@ -29,23 +29,6 @@ use crate::support::{overflow, py_upper};
 
 pub const TEST_ID: &str = "twentysixas_receipts";
 
-/// Add a figure, refusing a repeated id as the reference's `fig` raises on one.
-fn fig(
-    r: &mut TestResult,
-    name: &str,
-    value: Value,
-    unit: Unit,
-    definition: &str,
-    evidence: Vec<EvidenceRef>,
-) -> Result<String> {
-    let id = format!("{TEST_ID}.{name}");
-    if r.figures.iter().any(|f| f.id == id) {
-        return Err(AuditError::Config(format!(
-            "{TEST_ID}: figure id {id} would repeat"
-        )));
-    }
-    Ok(r.fig(name, value, unit, definition, evidence))
-}
 pub const VERSION: &str = "1";
 
 const SUPPLY_SECTIONS: [&str; 8] = [
@@ -198,8 +181,7 @@ to a books ledger; books population (optional, cancelled and post-dated vouchers
                 out.push(led_ref.clone());
                 out
             };
-            let f26 = fig(
-                &mut r,
+            let f26 = r.fig(
                 &format!("{cls}_26as_amount_{h}"),
                 Value::Int(amt26),
                 Unit::Paise,
@@ -207,8 +189,7 @@ to a books ledger; books population (optional, cancelled and post-dated vouchers
                 with_ledger(&ev26),
             )?;
             let vev = voucher_refs(books_ev);
-            let fb = fig(
-                &mut r,
+            let fb = r.fig(
                 &format!("{cls}_books_amount_{h}"),
                 Value::Int(books_amt),
                 Unit::Paise,
@@ -222,8 +203,7 @@ to a books ledger; books population (optional, cancelled and post-dated vouchers
             let diff = amt26
                 .checked_sub(books_amt)
                 .ok_or_else(|| overflow(TEST_ID))?;
-            let fd = fig(
-                &mut r,
+            let fd = r.fig(
                 &format!("{cls}_difference_{h}"),
                 Value::Int(diff),
                 Unit::Paise,
@@ -274,8 +254,7 @@ books."
         }
         let other = &groups[2];
         if !other.is_empty() {
-            fig(
-                &mut r,
+            r.fig(
                 &format!("other_sections_26as_amount_{h}"),
                 Value::Int(sum_paise(other.iter().map(|a| a.amount_paise))?),
                 Unit::Paise,

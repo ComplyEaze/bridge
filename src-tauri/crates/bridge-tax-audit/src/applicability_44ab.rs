@@ -144,7 +144,7 @@ pub fn run(
             percent_g(limit_bp)
         ),
         vec![EvidenceRef::new("rule", "s44ab")],
-    );
+    )?;
     facts.push(("applicable_threshold".to_string(), f_thr));
     let f_def = r.fig(
         "turnover_definition",
@@ -153,7 +153,7 @@ pub fn run(
         "This test's own turnover definition, stated once and cited by every turnover figure \
 of this test.",
         Vec::new(),
-    );
+    )?;
     facts.push(("turnover_definition".to_string(), f_def));
 
     let turnover = turnover_inputs.books_turnover_paise;
@@ -165,14 +165,14 @@ of this test.",
             "Books turnover, per this test's turnover definition, supplied to this test from \
 the sales figure of 'Financial statements' -- never recomputed here.",
             Vec::new(),
-        ),
+        )?,
         None => r.fig(
             "turnover",
             Value::Text("not supplied".to_string()),
             Unit::Text,
             "Books turnover was not supplied to this test.",
             Vec::new(),
-        ),
+        )?,
     };
     facts.push(("turnover".to_string(), f_turnover));
 
@@ -201,7 +201,7 @@ may not use the same population or section coverage as this test's books turnove
 the source test's own report)."
             ),
             Vec::new(),
-        );
+        )?;
         facts.push((format!("{source}_turnover"), f_src));
         if input.coverage != "full" {
             comparison_limits.push(format!(
@@ -220,7 +220,7 @@ the source test's own report)."
                 Unit::Paise,
                 &format!("Books turnover less the turnover per {upper}."),
                 Vec::new(),
-            );
+            )?;
             facts.push((format!("{source}_turnover_diff_from_books"), f_diff));
         }
     }
@@ -267,7 +267,7 @@ it, so this cannot be asserted as a confident 'no'",
 the cash share resolves, 'no' when it certainly does not, else 'undetermined'. This call: {reason}."
         ),
         Vec::new(),
-    );
+    )?;
     facts.push(("audit_required_44ab_a".to_string(), f_req));
 
     let profession = crate::support::py_lower(entity_type).contains("profession");
@@ -279,7 +279,7 @@ the cash share resolves, 'no' when it certainly does not, else 'undetermined'. T
 out of scope of this test for every entity; this figure only flags whether the engagement's \
 entity type text suggests a profession, in which case s.44ADA needs separate CA analysis this test does not provide.",
         Vec::new(),
-    );
+    )?;
     facts.push(("s44ada_professions_in_scope".to_string(), f_44ada));
 
     for (name, value, definition) in [
@@ -307,7 +307,7 @@ s.139(1)).",
             Unit::Text,
             definition,
             Vec::new(),
-        );
+        )?;
         facts.push((name.to_string(), id));
     }
 
@@ -374,7 +374,7 @@ above is not understated by a non-account-payee cheque or draft booked as bank."
                 Unit::Text,
                 "Presumptive-taxation history was not passed to this test.",
                 Vec::new(),
-            );
+            )?;
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/presumptive_history"),
                 clauses,
@@ -412,7 +412,7 @@ require an audit under s.44AB(e) independently of the turnover threshold above."
 (the client's setup, verbatim; this test does not interpret it beyond restating it)."
                 ),
                 Vec::new(),
-            );
+            )?;
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/presumptive_history"),
                 clauses,

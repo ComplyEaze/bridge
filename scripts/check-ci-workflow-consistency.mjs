@@ -326,7 +326,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/tally/compatibility/(compatibility-surface\\.json$|fixtures/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -353,7 +353,8 @@ if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
 // a file the scope does not list is skipped, with the file's change, by the queue, and only a master
 // push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/
 // through include_str!/include_bytes!, and every file listed below that a test or a native-job step
-// reads at run time, must be matched by the native scope's own pattern.
+// reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
+// portable core` runs that workspace on every pull request, whatever the scope selects.
 const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))'; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
 const tracked = trackedFiles();
 const readAtRunTime = [
@@ -366,19 +367,18 @@ const readAtRunTime = [
   ["scripts/retain-macos-test-binaries.py", "the native job's macOS crash steps"],
   ["scripts/check-tally-request-builder-hazards.mjs", "src-tauri/src/tally/tdl_engine.rs"],
   ["scripts/fixtures/", "src-tauri/crates/bridge-bank-statement/tests/common/mod.rs"],
-  ["docs/tally/compatibility/compatibility-surface.json", "tools/bridge-tally-compatibility/src/lib_tests.rs"],
-  ["docs/tally/compatibility/fixtures/", "tools/bridge-tally-live-read/src/lib.rs"],
+  ["docs/tally/compatibility/compatibility-surface.json", "src-tauri/tests/admission_and_egress_files_stay_pinned.rs"],
   ["LICENSE", "tauri.conf.json bundle resources, copied by the build script"],
   ["NOTICE", "tauri.conf.json bundle resources, copied by the build script"],
   ["THIRD_PARTY_LICENSES.txt", "tauri.conf.json bundle resources, copied by the build script"],
   ["THIRD_PARTY_LICENSES_RUST.txt", "tauri.conf.json bundle resources, copied by the build script"],
 ];
 for (const [entry, reader, optional] of readAtRunTime) {
-  // A listed directory stands for a real file in it, so a renamed or emptied directory fails here.
-  const file = entry.endsWith("/") ? tracked.find((path) => path.startsWith(entry)) : tracked.find((path) => path === entry);
-  if (!file && optional) { if (!nativeScope.test(entry)) failures.push(`the native scope omits ${entry}, which ${reader} reads`); }
-  else if (!file) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
-  else if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
+  // A listed directory stands for every tracked file in it, each of which must be selected.
+  const files = entry.endsWith("/") ? tracked.filter((path) => path.startsWith(entry)) : tracked.filter((path) => path === entry);
+  if (files.length === 0 && optional) { if (!nativeScope.test(entry)) failures.push(`the native scope omits ${entry}, which ${reader} reads`); }
+  else if (files.length === 0) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
+  for (const file of files) if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
 }
 for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test(path))) {
   const source = readFileSync(resolve(repositoryRoot, file), "utf8").replace(/^\s*\/\/.*$/gm, "");

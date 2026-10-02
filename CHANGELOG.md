@@ -22,8 +22,8 @@ These changes are in source and not yet in a published build.
   rule: only when every voucher read was checked against a separate count of
   that range. Before, `vouchers` called any range with vouchers in it complete,
   and `voucher_presence` called none complete. On a company with only a few
-  dozen vouchers, which Bridge does not count first, `vouchers` now says
-  `partial`. On a larger company, `voucher_presence` can now answer `absent`
+  dozen vouchers, which ComplyEaze Bridge does not count first, `vouchers` now
+  says `partial`. On a larger company, `voucher_presence` can now answer `absent`
   for a voucher it finds nowhere in a counted range. A voucher changed in Tally
   between the count and the read now refuses the read, with
   `part_census_mismatch`, where it used to return without that check; call

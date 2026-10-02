@@ -144,7 +144,36 @@ jobs:
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run license:check
-      - run: corepack pnpm exec playwright install --with-deps chromium webkit
+      # The browser download hung until the job's time limit about eight times in two days
+      # (bridge#998). The browsers are cached by Playwright version and runner OS. A hit
+      # installs only the system packages; a miss downloads, with a short timeout per
+      # attempt and a bounded number of attempts, so a hung download fails fast and is
+      # tried again instead of burning the job. Only this download is retried, never a test.
+      - name: Read the Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install Playwright browsers and system dependencies
+        env:
+          CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" = "true" ]; then
+            command=(corepack pnpm exec playwright install-deps chromium webkit)
+          else
+            command=(corepack pnpm exec playwright install --with-deps chromium webkit)
+          fi
+          for attempt in 1 2 3; do
+            if timeout --kill-after=10 240 "${command[@]}"; then
+              exit 0
+            fi
+            echo "Playwright install attempt $attempt of 3 failed or timed out after 240 s"
+          done
+          exit 1
       - run: corepack pnpm test
       - run: corepack pnpm run build
 

@@ -1144,7 +1144,7 @@ fn derived_sales_tail() -> String {
         ),
         (
             "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
-            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen or an item invoice may hold the sales ledger in an inventory allocation instead; not measured)",
+            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured)",
         ),
         (
             "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",

@@ -737,7 +737,7 @@ rate or return section, and matches nothing against any portal.
   ledgers, for one Credit Note in voucher view booked on account: one row with
   its CGST and state-tax heads and its sales ledger as the taxable entry. The
   voucher windows of the first two invoices are committed, and the parsed
-  windows have exactly those entries (a test); the requests are the request the
+  windows have exactly those entries (a test); the requests are the ones the
   code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
   by the build at commit 8c674d5e (whose tool text and `coverage` note were
   worded before the latest edits), with the book's own ledger masters, groups and company

@@ -12,10 +12,9 @@ next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: in source since `mcp-v0.4.0`
+### In plain words: the next build, since `mcp-v0.4.0` (2 Oct 2026)
 
-These changes are on the main branch. They are not yet in a published package.
-Each line names the pull requests it comes from.
+These changes are in source and not yet in a published build.
 
 **What the next build adds**
 
@@ -27,11 +26,24 @@ Each line names the pull requests it comes from.
   Credit Note, on two synthetic companies. A Credit Note keeps Tally's signs
   (nothing is netted or flipped, so add signed amounts), and the state-side tax
   head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
-  side. An inter-state line, a
-  cancelled or optional sale, an unrecognised or missing duty head, more than
-  one voucher in a window and paging were not shown. A sale of a kind a row can
+  side. An inter-state line, a cancelled or optional sale, an unrecognised or
+  missing duty head, more than one voucher in a window and paging were not
+  shown. A sale of a kind a row can
   show as unmeasured is marked `not_measured_live`; the tool's text says what
   cannot be marked (#1009).
+
+**Safer or fixed**
+
+- `vouchers` and `voucher_presence` now call a date range complete by one
+  rule: only when every voucher read was checked against a separate count of
+  that range. Before, `vouchers` called any range with vouchers in it complete,
+  and `voucher_presence` called none complete. On a company with only a few
+  dozen vouchers, which ComplyEaze Bridge does not count first, `vouchers` now
+  says `partial`. On a larger company, `voucher_presence` can now answer `absent`
+  for a voucher it finds nowhere in a counted range. A voucher changed in Tally
+  between the count and the read now refuses the read, with
+  `part_census_mismatch`, where it used to return without that check; call
+  again once the book is quiet (#985).
 
 ## [0.4.0] - 2026-10-02
 

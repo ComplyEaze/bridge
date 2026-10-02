@@ -51,6 +51,7 @@ mod masters;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+use vouchers::VoucherPages;
 #[path = "agent_bill_trail.rs"]
 mod bill_trail;
 #[path = "agent_outstandings.rs"]
@@ -414,6 +415,9 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// `vouchers` windows read once and served page by page (#485). In memory
+    /// only; see `agent_vouchers.rs`.
+    voucher_pages: Arc<Mutex<VoucherPages>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -1369,6 +1373,7 @@ impl Server {
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
         }
@@ -2017,17 +2022,13 @@ pub(crate) async fn desktop_selected_vouchers(
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;

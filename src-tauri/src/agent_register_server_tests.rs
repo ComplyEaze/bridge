@@ -168,6 +168,40 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
 }
 
 #[tokio::test]
+async fn the_sales_register_sends_the_same_requests_and_lists_the_purchase_apart() {
+    // The sales register reads exactly as the purchase register does, so the recorded
+    // answers of the purchase register's read serve it: the one voucher of that day is a
+    // Purchase, which the sales register does not list as a row but names.
+    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            "sales_register",
+            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+        )
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["vouchers_observed"], 1);
+    let other = &result["other_voucher_types_touching_duties_taxes"];
+    assert_eq!(other["total"], 1);
+    assert_eq!(other["listed"][0]["voucher_class"], "Purchase");
+    let observed = simulator.finish().unwrap();
+    assert_eq!(observed.len(), RECORDED_ORDER.len());
+    for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
+        assert_eq!(
+            request.request_body_sha256,
+            recorded_request_sha256(Kind::of(letter)),
+            "request {position} ({letter}) is not the recorded one"
+        );
+    }
+}
+
+#[tokio::test]
 async fn the_requests_sent_are_the_recorded_ones_in_the_recorded_order() {
     // The scripted transport answers by position, so this is what pins the order and shape of
     // Bridge's reads: each request body's fingerprint must be the recorded one.
@@ -297,4 +331,398 @@ async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_rea
         assert!(!text.contains(name), "{name} survived masking: {text}");
     }
     let _ = simulator.finish();
+}
+
+#[tokio::test]
+async fn the_servers_redaction_setting_masks_what_the_sales_register_lists() {
+    // Read as a sales register, the recorded day's Purchase is listed apart with the ledger names
+    // it touches; with parties masked none of them may survive, and unmasked they are there.
+    for (redaction, expect_names) in [(Redaction::None, true), (Redaction::MaskParties, false)] {
+        let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_for(&simulator, directory.path(), redaction);
+        let response = server
+            .call_tool(
+                "sales_register",
+                json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            )
+            .await;
+        assert_eq!(response["isError"], false, "{response}");
+        let text = response["structuredContent"]["result"].to_string();
+        for name in ["Input CGST", "Input SGST"] {
+            assert_eq!(text.contains(name), expect_names, "{name}: {text}");
+        }
+        let _ = simulator.finish();
+    }
+}
+
+/// The two captured sales-day window requests are the request the code sends for a one-day
+/// window, with the lab company and the day substituted: hashed like the recorded purchase
+/// window request (UTF-16LE with a byte-order mark), they equal its fingerprint.
+#[test]
+fn the_captured_sales_day_requests_are_the_window_request_the_code_sends() {
+    use sha2::{Digest, Sha256};
+    for (bytes, day) in [
+        (
+            &include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_sales_day_request.utf16le.xml"
+            )[..],
+            "20250420",
+        ),
+        (
+            &include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_taxed_sales_day_request.utf16le.xml"
+            )[..],
+            "20250421",
+        ),
+    ] {
+        assert_eq!(&bytes[..2], &[0xff, 0xfe], "a byte-order mark, as sent");
+        let text = utf16(&bytes[2..]);
+        assert!(text.contains("<SVCURRENTCOMPANY>BRIDGE STOCK LAB</SVCURRENTCOMPANY>"));
+        let substituted = text
+            .replace("BRIDGE STOCK LAB", "BRIDGE GST RECON LAB")
+            .replace(day, "20250903");
+        let mut wire = vec![0xff, 0xfe];
+        for unit in substituted.encode_utf16() {
+            wire.extend(unit.to_le_bytes());
+        }
+        assert_eq!(
+            Sha256::digest(&wire)
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            recorded_request_sha256(Kind::Window),
+            "the {day} request is not the window request the code sends"
+        );
+    }
+}
+
+// A Credit Note day through `sales_register` and a Debit Note day through `purchase_register`,
+// each replayed from a live call on one synthetic company (see `note-days/PROVENANCE.md`). The
+// scripted transport follows the call's own sequence record: it answers each request, in order,
+// with the response bytes the record names, and the fingerprint of every request the code sends
+// must be the recorded one.
+
+const NOTE_DAYS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/crates/bridge-tally-protocol/tests/fixtures/note-days"
+);
+
+fn recorded_file(directory: &str, name: &str) -> Vec<u8> {
+    std::fs::read(format!("{directory}/{name}")).unwrap_or_else(|error| panic!("{name}: {error}"))
+}
+
+fn recorded_json(directory: &str, name: &str) -> Value {
+    serde_json::from_slice(&recorded_file(directory, name)).unwrap()
+}
+
+fn note_day_json(name: &str) -> Value {
+    recorded_json(NOTE_DAYS, name)
+}
+
+async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
+    replay_recorded(NOTE_DAYS, prefix, 118).await
+}
+
+/// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
+/// `directory`) and returns the tool's response, the record and the requests that were not the
+/// recorded ones. `expected_requests` is what the call is known to have sent.
+async fn replay_recorded(
+    directory: &str,
+    prefix: &str,
+    expected_requests: usize,
+) -> (Value, Value, Vec<String>) {
+    let sequence = recorded_json(directory, &format!("{prefix}_sequence.json"));
+    let requests = sequence["requests"].as_array().unwrap();
+    assert_eq!(
+        requests.len(),
+        expected_requests,
+        "the record lists every request of the call"
+    );
+    assert_eq!(sequence["requests_sent"], expected_requests);
+    let plans = requests
+        .iter()
+        .map(|request| {
+            if request["method"] == "GET" {
+                plan(Kind::Status, String::new())
+            } else {
+                let fixture = request["fixture"].as_str().unwrap();
+                plan(Kind::Window, utf16(&recorded_file(directory, fixture)))
+            }
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            sequence["tool"].as_str().unwrap(),
+            sequence["arguments"].clone(),
+        )
+        .await;
+    let observed = simulator.finish().unwrap();
+    assert_eq!(
+        observed.len(),
+        requests.len(),
+        "every recorded request was sent, no more"
+    );
+    let mut wrong = Vec::new();
+    for (position, (sent, recorded)) in observed.iter().zip(requests).enumerate() {
+        let want = recorded["request_sha256"]
+            .as_str()
+            .unwrap_or_else(|| recorded_request_sha256(Kind::Status));
+        if sent.request_body_sha256 != want {
+            wrong.push(format!("request {position} is not the recorded one"));
+        }
+    }
+    (response, sequence, wrong)
+}
+
+#[tokio::test]
+async fn a_credit_note_day_replays_through_the_sales_register_with_the_signs_tally_sent() {
+    let (response, _, wrong) = replay_note_day("credit_note_day").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_observed"], 1);
+    assert_eq!(result["ledger_masters_observed"], 44);
+    for list in [
+        "other_voucher_types_touching_duties_taxes",
+        "unclassified_voucher_type",
+        "vouchers_with_unplaced_ledgers",
+        "sales_vouchers_without_duties_taxes_entry",
+    ] {
+        assert_eq!(result[list]["total"], 0, "{list}");
+    }
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Credit Note");
+    assert_eq!(row["voucher_number"], "1");
+    assert_eq!(row["is_invoice"], false);
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party"], "Shape Buyer 1");
+    assert_eq!(row["party_group"], "Sundry Debtors");
+    // The signs are Tally's: the party is positive and the sales and tax entries negative, the
+    // reverse of a Sales row, and nothing is netted or flipped.
+    assert_eq!(row["party_entries"][0]["amount"], "1180.00");
+    assert_eq!(
+        row["party_entries"][0]["bill_allocations"][0]["bill_type"],
+        "On Account"
+    );
+    assert_eq!(row["has_taxable_entry"], true);
+    assert_eq!(row["taxable_entries"][0]["ledger"], "Sales - Local");
+    assert_eq!(row["taxable_entries"][0]["amount"], "-1000.00");
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (tax[0]["head"].as_str(), tax[0]["amount"].as_str()),
+        (Some("cgst"), Some("-90.00"))
+    );
+    // This book's state-side head is `state_tax`; the other lab book's is `sgst_utgst`.
+    assert_eq!(
+        (tax[1]["head"].as_str(), tax[1]["raw_head"].as_str()),
+        (Some("state_tax"), Some("State Tax"))
+    );
+    assert_eq!(tax[1]["amount"], "-90.00");
+    assert!(row["other_entries"].as_array().unwrap().is_empty());
+    // A Credit Note in voucher view, on account, is a measured kind: no marker.
+    assert!(row.get("not_measured_live").is_none(), "{row}");
+    // What the live call returned, row for row, apart from the marker the first build
+    // put on every credit note and this one no longer puts on this kind.
+    let answer = note_day_json("credit_note_day_answer.json");
+    let mut live_row = answer["result"]["items"][0].clone();
+    assert_eq!(live_row["not_measured_live"], json!(["credit_note"]));
+    live_row
+        .as_object_mut()
+        .unwrap()
+        .remove("not_measured_live");
+    assert_eq!(row, &live_row);
+    assert_eq!(answer["result"]["ledger_masters_observed"], 44);
+}
+
+#[tokio::test]
+async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_tally_sent() {
+    let (response, _, wrong) = replay_note_day("debit_note_day").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_purchase_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Debit Note");
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party_group"], "Sundry Creditors");
+    assert_eq!(row["party_entries"][0]["amount"], "-1180.00");
+    assert_eq!(row["taxable_entries"][0]["amount"], "1000.00");
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (tax[0]["head"].as_str(), tax[0]["amount"].as_str()),
+        (Some("cgst"), Some("90.00"))
+    );
+    assert_eq!(
+        (tax[1]["head"].as_str(), tax[1]["amount"].as_str()),
+        (Some("state_tax"), Some("90.00"))
+    );
+    assert!(row.get("not_measured_live").is_none());
+    // The purchase register returns exactly what the live call did.
+    let answer = note_day_json("debit_note_day_answer.json");
+    assert_eq!(row, &answer["result"]["items"][0]);
+}
+
+/// Every request file of `note-days/` is a request one of the three calls sent, and every request
+/// a call sent has its file: the record's fingerprints and the files' own bytes agree.
+#[test]
+fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
+    request_files_are_exactly_the_requests_sent(
+        NOTE_DAYS,
+        &[
+            "credit_note_day",
+            "debit_note_day",
+            "cancelled_purchase_day",
+        ],
+    );
+}
+
+fn request_files_are_exactly_the_requests_sent(directory: &str, prefixes: &[&str]) {
+    use sha2::{Digest, Sha256};
+    use std::collections::BTreeSet;
+    let hex = |bytes: &[u8]| {
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    let files = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.ends_with("_request.utf16le.xml"))
+        .collect::<Vec<_>>();
+    let mut on_disk = BTreeSet::new();
+    for name in &files {
+        let bytes = recorded_file(directory, name);
+        assert_eq!(
+            &bytes[..2],
+            &[0xff, 0xfe],
+            "{name}: a byte-order mark, as sent"
+        );
+        on_disk.insert(hex(&bytes));
+    }
+    assert_eq!(
+        on_disk.len(),
+        files.len(),
+        "no two request files are the same request"
+    );
+    let mut sent = BTreeSet::new();
+    for prefix in prefixes {
+        let sequence = recorded_json(directory, &format!("{prefix}_sequence.json"));
+        sent.extend(
+            sequence["requests"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|request| request["request_sha256"].as_str().map(str::to_string)),
+        );
+    }
+    assert_eq!(on_disk, sent);
+}
+
+#[tokio::test]
+async fn a_cancelled_purchase_is_never_a_row_and_is_listed_with_its_cancelled_flag() {
+    // A cancelled voucher keeps no entries, so it has no Duties & Taxes entry and lands in the
+    // list of register-class vouchers without one, flagged, rather than among the rows. This
+    // is a Purchase read through the purchase register; a cancelled SALE is not measured.
+    let (response, _, wrong) = replay_note_day("cancelled_purchase_day").await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 0);
+    assert!(result["items"].as_array().unwrap().is_empty());
+    assert_eq!(result["vouchers_observed"], 1);
+    let listed = &result["purchase_vouchers_without_duties_taxes_entry"];
+    assert_eq!(listed["total"], 1);
+    assert_eq!(listed["listed"][0]["voucher_class"], "Purchase");
+    assert_eq!(listed["listed"][0]["cancelled"], true);
+    // What the live call returned, side list for side list.
+    let answer = note_day_json("cancelled_purchase_day_answer.json");
+    assert_eq!(
+        listed,
+        &answer["result"]["purchase_vouchers_without_duties_taxes_entry"]
+    );
+}
+
+// A taxed Sales item invoice through `sales_register`, replayed from a live call on the stock lab
+// book with that book's own ledger masters, groups and company listings (see
+// `stock-lab-day/PROVENANCE.md`). This is the register's end-to-end proof for an item invoice:
+// the masters the invoice's ledgers are classified against were read in the same call.
+
+const STOCK_LAB_DAY: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/crates/bridge-tally-protocol/tests/fixtures/stock-lab-day"
+);
+
+#[tokio::test]
+async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_its_own_masters() {
+    let (response, _, wrong) = replay_recorded(STOCK_LAB_DAY, "stock_lab_taxed_day", 96).await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_observed"], 1);
+    assert_eq!(result["ledger_masters_observed"], 8);
+    for list in [
+        "other_voucher_types_touching_duties_taxes",
+        "unclassified_voucher_type",
+        "vouchers_with_unplaced_ledgers",
+        "sales_vouchers_without_duties_taxes_entry",
+    ] {
+        assert_eq!(result[list]["total"], 0, "{list}");
+    }
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Sales");
+    assert_eq!(row["is_invoice"], true);
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party_group"], "Sundry Debtors");
+    // A sale's party is negative and its sales and tax entries positive, as Tally sends them.
+    assert_eq!(row["party_entries"][0]["amount"], "-118.00");
+    assert_eq!(row["has_taxable_entry"], true);
+    assert_eq!(row["taxable_entries"].as_array().unwrap().len(), 1);
+    assert_eq!(row["taxable_entries"][0]["amount"], "100.00");
+    // Both heads come from the ledger masters: the state side is `sgst_utgst` on this book.
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (
+            tax[0]["head"].as_str(),
+            tax[0]["raw_head"].as_str(),
+            tax[0]["amount"].as_str()
+        ),
+        (Some("cgst"), Some("CGST"), Some("9.00"))
+    );
+    assert_eq!(
+        (
+            tax[1]["head"].as_str(),
+            tax[1]["raw_head"].as_str(),
+            tax[1]["amount"].as_str()
+        ),
+        (Some("sgst_utgst"), Some("SGST/UTGST"), Some("9.00"))
+    );
+    assert!(row["other_entries"].as_array().unwrap().is_empty());
+    // A captured invoice-mode Sale is a measured kind: no marker.
+    assert!(row.get("not_measured_live").is_none(), "{row}");
+    // What the live call returned, row for row.
+    let answer = recorded_json(STOCK_LAB_DAY, "stock_lab_taxed_day_answer.json");
+    assert_eq!(row, &answer["result"]["items"][0]);
+    assert_eq!(answer["result"]["ledger_masters_observed"], 8);
+}
+
+#[test]
+fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
+    request_files_are_exactly_the_requests_sent(STOCK_LAB_DAY, &["stock_lab_taxed_day"]);
 }

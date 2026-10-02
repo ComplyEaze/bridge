@@ -645,6 +645,12 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         ("read_evidence", json!({"records":[]})),
         (
+            "sales_register",
+            super::register::mark_register_row(
+                json!({"party":"Customer One","tax_in_books":[{"ledger":"Customer One"}],"taxable_entries":[{"ledger":"Supplier Two"}],"party_entries":[{"ledger":"Customer One"}],"other_entries":[{"ledger":"Supplier Two"}]}),
+            ),
+        ),
+        (
             "stock_summary",
             json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
         ),

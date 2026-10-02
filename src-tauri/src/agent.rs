@@ -41,6 +41,9 @@ mod company;
 use company::*;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_ledger_candidates.rs"]
+mod ledger_candidates;
+use ledger_candidates::resolve_ledger_or_refuse;
 #[path = "agent_ledgers.rs"]
 mod ledgers;
 #[path = "agent_masters.rs"]
@@ -520,6 +523,10 @@ struct IncompleteRead {
 struct Candidates {
     requested: Option<String>,
     items: Vec<Value>,
+    /// Set for a ledger name that was not found or was ambiguous: what the
+    /// listing means, so an empty or cut list is never read as "no such
+    /// ledger".
+    miss: Option<ledger_candidates::LedgerMiss>,
 }
 
 /// A compliance read refused before any ledger request was sent because its
@@ -757,6 +764,13 @@ const GENERIC_RUNTIME_READ_FAILURE: &str = "agent_runtime_read_failed";
 /// gives it up.
 const REMEDIATION_MIN_RESPONSE_BUDGET: usize = 4_096;
 
+/// The floor for a ledger refusal's candidate list. The whole refusal is
+/// framed twice (as a structured result and as its text copy) and an error
+/// object has no page to trim, so a list that does not fit costs the caller
+/// the refusal code. At a sixteenth of this budget, the list, the guidance
+/// and the framing together stay well inside it.
+const LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET: usize = 16_384;
+
 /// The causes of a movement's ledger catalogue read that outlived its deadline
 /// or the response cap. The catalogue lists every ledger in the book, so it does
 /// not shrink with the voucher window.
@@ -805,16 +819,48 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "register_ledger_currency_excluded" => Some(
             "A voucher in this window touches a ledger that the compliance read of the ledger \
              masters set aside because it is kept in another currency (or its balance is a \
-             currency composite), so purchase_register cannot classify the voucher and refuses \
+             currency composite), so the purchase or sales register cannot classify the voucher and refuses \
              the whole window rather than leave it out. Narrow from and to so the window holds \
              no such voucher, or read it with `vouchers`. Retrying the same window refuses \
              again.",
         ),
         "register_master_mark_unavailable" => Some(
-            "Tally did not report the company's master-alteration mark, which purchase_register \
-             needs to bind the ledger masters to the voucher window. It cannot be answered \
+            "Tally did not report the company's master-alteration mark, which the purchase and sales \
+             registers need to bind the ledger masters to the voucher window. It cannot be answered \
              from this book as Tally reports it; `ledger_masters` with fields=compliance and \
              `vouchers` still read it separately.",
+        ),
+        "ledger_not_found" => Some(
+            "No ledger in this company has this name, even ignoring case, spaces, symbols and \
+             accent marks, and ComplyEaze Bridge chose none. Show the user the ledgers in \
+             `candidates`, if there are any, and ask which one they meant: even one candidate \
+             needs the user's confirmation, and none is marked best: the order is by rule \
+             strength and then name, not by likelihood. Then call again with that name exactly \
+             as listed. `candidates_listing` says what an empty list means: `none` (nothing \
+             resembles the name: ask the user to check the spelling, and do not say the ledger \
+             does not exist), `withheld` (too many ledgers resemble it to list: ask for more \
+             of the name), `truncated` (more were found than are listed: ask for more of the \
+             name), `names_masked` (the redaction setting hides the names: ask the user to \
+             type the full name) or `unavailable` (the search could not run: ask the user for \
+             the exact name). If `candidates_total_is_lower_bound` is true, there may be more \
+             ledgers than are counted. If `candidates_listing` is absent, no candidates were \
+             attached because the response budget is small: ask the user for the exact name.",
+        ),
+        "ledger_ambiguous" => Some(
+            "More than one ledger in this company matches this name once case, spaces, \
+             symbols and accent marks are ignored, and none is spelled exactly as requested, \
+             so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+             ask which one they meant, then call again with that name exactly as listed. If \
+             `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
+             it is `names_masked` or absent the names are not shown: ask the user to type the \
+             full name of the ledger exactly as spelled in Tally, since the names that clash \
+             may differ only in case, punctuation or accents.",
+        ),
+        "ledger_name_masked" => Some(
+            "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
+             This name looks like a shortened, masked name (party names are shortened with `…` \
+             when masking is on), and using it could open a different ledger from the one \
+             meant, so ComplyEaze Bridge did not use it.",
         ),
         "ledger_masters_as_of_requires_compliance" => Some(
             "`as_of` selects the date `party_gstin` is read as of, which only \
@@ -946,10 +992,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              released nothing.",
         ),
         "ledger_count_company_differs" => Some(
-            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count of the \
-             company's ledgers is higher than that census found: the census missed ledgers, either \
-             because a ledger was added during the read or (reasoned, not reproduced) because \
-             the company was closed and reopened while it ran, and a read sized from the low \
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count \
+             of the company's ledgers is higher than that census found: the census missed ledgers, \
+             because a ledger was added during the read or (reasoned, not reproduced) because a \
+             ledger was altered during it before its slice was read, so its new AlterID is past \
+             every slice, or the company was closed and reopened while it ran, and a read sized \
+             from the low \
              count would have been sized too small. No master was requested. Retry once with the company left alone and \
              nobody editing it in Tally. A repeat means the census and Tally's count disagree \
              about this book: call ledger_masters with fields=basic instead."
@@ -1510,19 +1558,76 @@ impl Server {
                         error["endpoint"] = json!(endpoint);
                     }
                 }
-                // The list grows with the window, so it is kept only within a
-                // quarter of the response budget, like `window` below: the
-                // refusal code must survive the byte cap.
+                // A voucher-type list grows with the window, so it is kept only
+                // within a quarter of the response budget, like `window` below:
+                // the refusal code must survive the byte cap. A ledger list
+                // rides in the response twice and grows with the book, so it
+                // has its own larger floor and a sixteenth of the budget; the
+                // states that carry no list only need the guidance floor.
                 if let Some(candidates) = candidates {
-                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
-                        if let Some(requested) = &candidates.requested {
-                            error["requested"] = json!(requested);
+                    let max_bytes = self.settings.max_bytes;
+                    match &candidates.miss {
+                        Some(miss) => {
+                            let floor = if miss.listing.has_list() {
+                                LEDGER_CANDIDATES_MIN_RESPONSE_BUDGET
+                            } else {
+                                REMEDIATION_MIN_RESPONSE_BUDGET
+                            };
+                            if max_bytes >= floor {
+                                use ledger_candidates::Listing;
+                                match miss.listing {
+                                    // Masked: the state only, no names and no
+                                    // count. A count is a yes or no on every
+                                    // prefix a caller tries.
+                                    Listing::NamesMasked => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                    }
+                                    // The search could not run: the state and
+                                    // why, and no count (a 0 would read as
+                                    // "no ledgers").
+                                    Listing::Unavailable => {
+                                        error["candidates_listing"] = json!(miss.listing.as_str());
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                    Listing::None
+                                    | Listing::Withheld
+                                    | Listing::Listed
+                                    | Listing::Truncated => {
+                                        let fields =
+                                            candidate_fields(&candidates.items, max_bytes / 16);
+                                        for (key, value) in fields {
+                                            error[key] = value;
+                                        }
+                                        // A list cut to fit is `truncated`;
+                                        // `candidates_truncated` says whether
+                                        // anything was left out, which a
+                                        // withheld family also is.
+                                        let cut = error["candidates_truncated"] == json!(true);
+                                        let word = miss.listing_word(cut);
+                                        error["candidates_listing"] = json!(word);
+                                        error["candidates_truncated"] =
+                                            json!(word == "truncated" || word == "withheld");
+                                        error["candidates_total"] = json!(miss.found);
+                                        error["candidates_total_is_lower_bound"] =
+                                            json!(miss.found_is_lower_bound);
+                                        if let Some(reason) = miss.reason {
+                                            error["candidates_reason"] = json!(reason);
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        let fields =
-                            candidate_fields(&candidates.items, self.settings.max_bytes / 4);
-                        for (key, value) in fields {
-                            error[key] = value;
+                        None if max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET => {
+                            if let Some(requested) = &candidates.requested {
+                                error["requested"] = json!(requested);
+                            }
+                            for (key, value) in candidate_fields(&candidates.items, max_bytes / 4) {
+                                error[key] = value;
+                            }
                         }
+                        None => {}
                     }
                 }
                 // The partial read's own reason, under the same budget rule:
@@ -1726,8 +1831,9 @@ impl Server {
             }
             "post_import" => self.post_import(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
-            "purchase_register" => self.purchase_register(args).await,
+            "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
+            "sales_register" => self.register(register::RegisterKind::Sales, args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;

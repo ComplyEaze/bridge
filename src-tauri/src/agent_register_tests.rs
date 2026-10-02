@@ -3,6 +3,12 @@ use bridge_tally_protocol::parse_native_party_ledger_master_records_with_evidenc
 
 use super::*;
 
+/// The purchase register's classification, which most tests below read; the sales register's
+/// tests name `RegisterKind::Sales` and call `super::classify_register` directly.
+fn classify_register(index: &MasterIndex, rows: &[Value]) -> Result<RegisterPage, String> {
+    super::classify_register(RegisterKind::Purchase, index, rows)
+}
+
 /// The disposable GST lab book the captures below were read from.
 const COMPANY_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 
@@ -572,7 +578,14 @@ fn result_for(
     index: &MasterIndex,
     redaction: Redaction,
 ) -> Result<RegisterResult, String> {
-    register_result(index, rows, ("20250901", "20250930"), (0, 500), redaction)
+    register_result(
+        RegisterKind::Purchase,
+        index,
+        rows,
+        ("20250901", "20250930"),
+        (0, 500),
+        redaction,
+    )
 }
 
 #[test]
@@ -837,3 +850,487 @@ fn an_unrecognised_head_sits_only_in_the_unrecognised_list() {
     );
     assert_eq!(ledgers(&row["tax_in_books"]), ["Input SGST"]);
 }
+
+// The sales register. It reads and classifies exactly as the purchase register does (the tests
+// above run through `RegisterKind::Purchase`); what differs is the register's classes and the
+// group the taxable ledgers sit under. The lab book of the captures above holds one Sales
+// voucher, so it is the sales register's only capture with the ledger masters beside it.
+
+fn sales_page() -> RegisterPage {
+    super::classify_register(RegisterKind::Sales, &captured_index(), &captured_rows()).unwrap()
+}
+
+#[test]
+fn the_captured_sales_voucher_is_the_sales_register_and_every_purchase_type_is_listed_apart() {
+    let page = sales_page();
+    assert_eq!(page.vouchers_observed, 8);
+    assert_eq!(page.rows.len(), 1);
+    let other: Vec<_> = page
+        .other_voucher_types
+        .iter()
+        .map(|row| row["voucher_class"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        other,
+        [
+            "Purchase",
+            "Purchase",
+            "Purchase",
+            "Purchase",
+            "Debit Note",
+            "Journal",
+            "Payment"
+        ]
+    );
+    assert!(page.register_class_without_duties_taxes_entry.is_empty());
+    assert!(page.unclassified_voucher_type.is_empty());
+    assert!(page.vouchers_with_unplaced_ledgers.is_empty());
+}
+
+#[test]
+fn a_sales_row_takes_tax_from_the_duty_head_and_the_sales_ledger_as_its_taxable_entry() {
+    let page = sales_page();
+    let row = row_on(&page.rows, "20250918");
+    assert_eq!(row["voucher_class"], "Sales");
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party"], "Counter Sales - Unregistered");
+    assert_eq!(row["party_group"], "Sundry Debtors");
+    assert_eq!(
+        ledgers(&row["tax_in_books"]),
+        ["Output CGST", "Output SGST"]
+    );
+    assert_eq!(row["tax_in_books"][0]["head"], "cgst");
+    assert_eq!(row["tax_in_books"][1]["head"], "state_tax");
+    // Amounts are as the books state them: a sale's tax is a credit, which is positive.
+    assert_eq!(row["tax_in_books"][0]["amount"], "900.00");
+    assert_eq!(row["has_taxable_entry"], true);
+    assert_eq!(ledgers(&row["taxable_entries"]), ["Sales - Goods"]);
+    assert_eq!(row["taxable_entries"][0]["amount"], "10000.00");
+    assert_eq!(
+        ledgers(&row["party_entries"]),
+        ["Counter Sales - Unregistered"]
+    );
+    assert_eq!(row["party_entries"][0]["amount"], "-11800.00");
+    // The captured Sales voucher is an accounting voucher, not an invoice: reported as read.
+    assert_eq!(row["is_invoice"], false);
+}
+
+#[test]
+fn a_sales_voucher_with_no_duties_taxes_entry_is_counted_apart_and_is_not_a_row() {
+    // A captured Sales voucher with its two Duties & Taxes entries removed, the way the purchase
+    // test above does it. A change that fixed the register's classes to Purchase at this branch
+    // would put the voucher under "other voucher types" or drop it, and this test would fail.
+    let mut rows = captured_rows();
+    let sale = rows
+        .iter_mut()
+        .find(|row| row["date"] == "20250918")
+        .expect("the captured Sales voucher");
+    sale["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| !entry["ledger"].as_str().unwrap().starts_with("Output "));
+    let result = register_result(
+        RegisterKind::Sales,
+        &captured_index(),
+        rows,
+        ("20250901", "20250930"),
+        (0, 500),
+        Redaction::None,
+    )
+    .unwrap();
+    let body = &result.result;
+    assert_eq!(body["total"], 0);
+    assert_eq!(body["items"], json!([]));
+    assert_eq!(
+        body["sales_vouchers_without_duties_taxes_entry"]["total"],
+        1
+    );
+    let listed = &body["sales_vouchers_without_duties_taxes_entry"]["listed"][0];
+    assert_eq!(listed["date"], "20250918");
+    assert_eq!(listed["voucher_class"], "Sales");
+    assert!(body
+        .get("purchase_vouchers_without_duties_taxes_entry")
+        .is_none());
+}
+
+#[test]
+fn neither_register_lists_the_others_vouchers_as_rows() {
+    let purchases = classify_register(&captured_index(), &captured_rows()).unwrap();
+    assert!(purchases.rows.iter().all(|row| matches!(
+        row["voucher_class"].as_str(),
+        Some("Purchase" | "Debit Note")
+    )));
+    assert!(sales_page()
+        .rows
+        .iter()
+        .all(|row| matches!(row["voucher_class"].as_str(), Some("Sales" | "Credit Note"))));
+}
+
+#[test]
+fn the_register_classes_are_the_registers_own() {
+    assert!(is_register_class(RegisterKind::Sales, "Sales"));
+    assert!(is_register_class(RegisterKind::Sales, "Credit Note"));
+    assert!(!is_register_class(RegisterKind::Sales, "Purchase"));
+    assert!(!is_register_class(RegisterKind::Sales, "Debit Note"));
+    assert!(is_register_class(RegisterKind::Purchase, "Purchase"));
+    assert!(is_register_class(RegisterKind::Purchase, "Debit Note"));
+    assert!(!is_register_class(RegisterKind::Purchase, "Sales"));
+    assert!(!is_register_class(RegisterKind::Purchase, "Credit Note"));
+}
+
+#[test]
+fn the_sales_result_names_its_own_profile_classes_and_list() {
+    let result = register_result(
+        RegisterKind::Sales,
+        &captured_index(),
+        captured_rows(),
+        ("20250901", "20250930"),
+        (0, 500),
+        Redaction::None,
+    )
+    .unwrap();
+    let body = &result.result;
+    assert_eq!(body["profile"], "agent_sales_register_v1");
+    assert_eq!(body["register_classes"], json!(["Sales", "Credit Note"]));
+    assert_eq!(body["total"], 1);
+    assert_eq!(
+        body["sales_vouchers_without_duties_taxes_entry"]["total"],
+        0
+    );
+    assert!(body
+        .get("purchase_vouchers_without_duties_taxes_entry")
+        .is_none());
+    let coverage = body["coverage"].as_str().unwrap();
+    assert!(coverage.starts_with("items are the Sales and Credit Note vouchers"));
+    // What no capture covers is said in the response, not only in the tool text.
+    for named in [
+        "measured for sales so far",
+        "live runs on two synthetic companies",
+        "not shown by any run: an invoice-view Credit Note",
+        "its signs reversed as Tally sends them",
+        "look for neither alone",
+        "only where the row itself shows it",
+        "not vouched for",
+        "a recognised IGST head",
+        "REFERENCEDATE (not returned)",
+        "`not_measured_live`",
+    ] {
+        assert!(coverage.contains(named), "coverage lacks {named}");
+    }
+    // The purchase register's response is unchanged by this note.
+    let purchase = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
+    assert!(!purchase.result["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("not measured"));
+}
+
+#[test]
+fn the_sales_register_masks_every_ledger_and_the_party_like_the_purchase_register() {
+    let result = register_result(
+        RegisterKind::Sales,
+        &captured_index(),
+        captured_rows(),
+        ("20250901", "20250930"),
+        (0, 500),
+        Redaction::MaskParties,
+    )
+    .unwrap();
+    let text = result.result.to_string();
+    for name in [
+        "Counter Sales - Unregistered",
+        "Sales - Goods",
+        "Output CGST",
+    ] {
+        assert!(!text.contains(name), "{name} leaked");
+    }
+}
+
+/// The voucher window Bridge's own builder sent for one day and Tally's answer, from a lab
+/// company whose ledger masters were not read alongside (see the provenance file).
+fn sales_day_rows(name: &str) -> Vec<Value> {
+    let bytes: &[u8] = match name {
+        "sales_day" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_sales_day_live.utf16le.xml"
+        ),
+        _ => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/sales-day/register_window_taxed_sales_day_live.utf16le.xml"
+        ),
+    };
+    parse_agent_rows(&utf16(bytes), "1edb9b05-8d35-4c0c-9959-dce655730463")
+        .expect("the live voucher window parses")
+}
+
+#[test]
+fn a_sales_item_invoice_arrives_with_the_party_the_sales_ledger_and_its_tax_ledgers_as_entries() {
+    let plain = sales_day_rows("sales_day");
+    assert_eq!(plain.len(), 1);
+    assert_eq!(plain[0]["voucher_class"], "Sales");
+    assert_eq!(plain[0]["is_invoice"], true);
+    // The goods line is nested under the sales ledger's entry and is not an entry of its own.
+    assert_eq!(
+        plain[0]["amounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| (
+                entry["ledger"].as_str().unwrap(),
+                entry["amount"].as_str().unwrap()
+            ))
+            .collect::<Vec<_>>(),
+        [("Lab Customer One", "-24.00"), ("Lab Sales", "24.00")]
+    );
+    let taxed = sales_day_rows("taxed_sales_day");
+    assert_eq!(taxed.len(), 1);
+    assert_eq!(
+        taxed[0]["amounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| (
+                entry["ledger"].as_str().unwrap(),
+                entry["amount"].as_str().unwrap()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            ("Lab Customer One", "-118.00"),
+            ("Lab Sales", "100.00"),
+            ("Lab Output CGST", "9.00"),
+            ("Lab Output SGST", "9.00"),
+        ]
+    );
+}
+
+#[test]
+fn a_sales_voucher_naming_ledgers_the_masters_do_not_list_refuses_instead_of_being_guessed() {
+    // The item invoices come from another company than the masters above, and that company's
+    // masters were not captured: the register cannot place their ledgers, and says so.
+    for name in ["sales_day", "taxed_sales_day"] {
+        assert_eq!(
+            super::classify_register(
+                RegisterKind::Sales,
+                &captured_index(),
+                &sales_day_rows(name)
+            )
+            .map(|_| ()),
+            Err("ledger_snapshot_drifted".to_string())
+        );
+    }
+}
+
+/// The sales description after its own opening is the purchase description's shared read with
+/// these swaps. This is the only place the swaps live, so an edit to the purchase text that
+/// the sales text does not follow fails here, not in the server.
+fn derived_sales_tail() -> String {
+    let (_, shared) = PURCHASE_REGISTER_DESCRIPTION
+        .split_once(" It inherits the compliance read")
+        .expect("the purchase description has its shared read");
+    let swaps = [
+        (
+            "whose head Bridge recognises as",
+            "whose head ComplyEaze Bridge recognises as",
+        ),
+        (
+            "Return the Purchase and Debit Note vouchers",
+            "Return the Sales and Credit Note vouchers",
+        ),
+        (
+            "`taxable_entries` are entries on Purchase Accounts ledgers only (a GST purchase booked to a fixed-asset or expense ledger has `has_taxable_entry` false)",
+            "`taxable_entries` are entries on Sales Accounts ledgers only (a sale booked to another ledger, or whose sales ledger sits in an inventory allocation, has `has_taxable_entry` false)",
+        ),
+        (
+            "(Sales, Journal, Payment and so on)",
+            "(Purchase, Journal, Payment and so on)",
+        ),
+        (
+            "a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, or tax booked to a ledger filed elsewhere)",
+            "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry)",
+        ),
+        (
+            "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
+            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured)",
+        ),
+        (
+            "Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
+            "Measured so far: `sales_register` was run against a live Tally on two synthetic companies. On the first, once per day, for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one (read once by an earlier build; its voucher window is committed, its masters and the tool's answer are not) was counted under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44 ledgers, for one Credit Note in voucher view booked on account: one row, with its CGST and state-tax heads and its sales ledger as the taxable entry. One Sales accounting voucher (not an invoice) was also classified, in tests, against the ledger masters of the purchase register's lab book. A Credit Note is returned as a row with its signs reversed as Tally sends them: the tool neither nets nor flips, so a caller that sums tax over a window must add signed amounts. The measured Credit Note of 1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry -1000.00, each tax entry -90.00 and the party entry 1180.00, where a Sales row has the sales and tax entries positive and the party entry negative. The state-side tax head is `state_tax` (raw State Tax) on one measured book and `sgst_utgst` (raw SGST/UTGST) on another; both are recognised heads for the same side of the tax, so a caller must not look for one of them only. The cost of a call varies by book: 96 requests on a book with 8 ledgers and one currency, 118 on one with 44 ledgers and two currencies, which adds a voucher census and base-currency reads; the result does not report the cost. Not shown by any run: an invoice-view Credit Note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; REFERENCEDATE (not returned); and a ledger or voucher kept in a currency other than the book's base. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (invoice_view_credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess), an invoice of another shape than the one run (for example several goods lines), and a ledger or voucher kept in a currency other than the book's base; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
+        ),
+    ];
+    let mut text = shared.to_string();
+    for (from, to) in swaps {
+        assert!(text.contains(from), "the purchase text lost: {from}");
+        text = text.replace(from, to);
+    }
+    format!(" It inherits the compliance read{text}")
+}
+
+#[test]
+fn the_sales_description_is_the_purchase_one_with_the_sales_swaps() {
+    let sales = RegisterKind::Sales.description();
+    assert!(sales.starts_with("Read-only: a register of what the books record, not a GST return."));
+    assert!(
+        sales.ends_with(&derived_sales_tail()),
+        "the sales description no longer follows the purchase description"
+    );
+    assert_eq!(
+        RegisterKind::Purchase.description(),
+        PURCHASE_REGISTER_DESCRIPTION
+    );
+}
+
+#[test]
+fn the_sales_description_says_nothing_only_the_purchase_register_would() {
+    let sales = RegisterKind::Sales.description();
+    for purchase_only in [
+        "Purchase Accounts",
+        "Debit Note vouchers",
+        "purchase_vouchers_without_duties_taxes_entry",
+        "input tax credit eligibility",
+        "GSTR-2B",
+        "exempt or unregistered",
+    ] {
+        assert!(
+            !sales.contains(purchase_only),
+            "sales text says {purchase_only}"
+        );
+    }
+    for stated in [
+        "Return the Sales and Credit Note vouchers of a date window",
+        "`sales_vouchers_without_duties_taxes_entry`",
+        "entries on Sales Accounts ledgers only",
+        "or whose sales ledger sits in an inventory allocation",
+        "may hold the sales ledger in an inventory allocation instead; not measured",
+        "the tool does not say why such a voucher carries no tax entry",
+        "A Debit Note, including one issued to a customer, is not a sales row",
+        "run against a live Tally on two synthetic companies",
+        "Not shown by any run: an invoice-view Credit Note",
+        "its signs reversed as Tally sends them",
+        "must not look for one of them only",
+        "The cost of a call varies by book",
+        "more than one voucher in a window",
+        "REFERENCEDATE (not returned)",
+        "`not_measured_live`",
+        "only where the row itself shows the kind",
+        "Kinds a row cannot show are never marked and are not vouched for",
+        "a recognised IGST head",
+        "its CGST and SGST/UTGST heads",
+    ] {
+        assert!(sales.contains(stated), "sales text lacks: {stated}");
+    }
+}
+
+/// The classifier's own markers for hand-set kinds. The rows are the captured Sales voucher
+/// with one field set, so these test the marker rule, not any capture of such a voucher.
+#[test]
+fn a_sales_row_of_a_kind_no_capture_covers_says_so_and_a_covered_one_does_not() {
+    let captured = row_on(&sales_page().rows, "20250918").clone();
+    assert!(
+        captured.get("not_measured_live").is_none(),
+        "the captured Sales voucher is a measured kind"
+    );
+    let mut rows = captured_rows();
+    let sale = rows
+        .iter_mut()
+        .find(|row| row["voucher_class"] == "Sales")
+        .unwrap();
+    let cases = [
+        ("cancelled", json!(true), "cancelled"),
+        ("optional", json!(true), "optional"),
+        ("post_dated", json!(true), "post_dated"),
+        ("party_gstin", json!("SYNTHETIC"), "party_gstin_present"),
+        ("reference", json!("SYN-REF"), "reference_present"),
+    ];
+    for (key, value, code) in cases {
+        let mut marked = sale.clone();
+        marked[key] = value;
+        let page =
+            super::classify_register(RegisterKind::Sales, &captured_index(), &[marked]).unwrap();
+        assert_eq!(page.rows.len(), 1, "{key}");
+        assert_eq!(
+            page.rows[0]["not_measured_live"],
+            json!([code]),
+            "{key} should mark the row"
+        );
+    }
+    // A Credit Note in voucher view was measured live; one in the invoice view was not.
+    let mut credit = sale.clone();
+    credit["voucher_class"] = json!("Credit Note");
+    let page = super::classify_register(RegisterKind::Sales, &captured_index(), &[credit.clone()])
+        .unwrap();
+    assert!(page.rows[0].get("not_measured_live").is_none());
+    credit["is_invoice"] = json!(true);
+    let page = super::classify_register(RegisterKind::Sales, &captured_index(), &[credit]).unwrap();
+    assert_eq!(
+        page.rows[0]["not_measured_live"],
+        json!(["invoice_view_credit_note"])
+    );
+    // An invoice-view voucher is not marked: one taxed and one untaxed item invoice were run live.
+    let mut invoice = sale.clone();
+    invoice["is_invoice"] = json!(true);
+    let page =
+        super::classify_register(RegisterKind::Sales, &captured_index(), &[invoice]).unwrap();
+    assert!(page.rows[0].get("not_measured_live").is_none());
+    // The purchase register's rows never carry the field.
+    let purchases = classify_register(&captured_index(), &rows).unwrap();
+    assert!(purchases
+        .rows
+        .iter()
+        .all(|row| row.get("not_measured_live").is_none()));
+}
+
+/// An IGST entry and a sale whose sales ledger is not an entry are marked by the entries they
+/// carry. The first row is the captured inter-state purchase read as a sale (its tax is on the
+/// igst head); the second drops the sales ledger entry from the captured Sales voucher.
+#[test]
+fn an_igst_line_and_a_missing_sales_ledger_entry_are_marked() {
+    let mut rows = captured_rows();
+    let purchase = rows
+        .iter()
+        .find(|row| row["date"] == "20250905")
+        .cloned()
+        .unwrap();
+    let mut as_sale = purchase;
+    as_sale["voucher_class"] = json!("Sales");
+    let page =
+        super::classify_register(RegisterKind::Sales, &captured_index(), &[as_sale]).unwrap();
+    let marks = page.rows[0]["not_measured_live"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert!(marks.contains(&json!("inter_state_line")));
+    // Its Purchase Accounts ledger is not the sales group, so there is no taxable entry.
+    assert!(marks.contains(&json!("sales_ledger_not_an_entry")));
+    let sale = rows
+        .iter_mut()
+        .find(|row| row["voucher_class"] == "Sales")
+        .unwrap();
+    sale["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["ledger"] != "Sales - Goods");
+    let page = super::classify_register(
+        RegisterKind::Sales,
+        &captured_index(),
+        std::slice::from_ref(sale),
+    )
+    .unwrap();
+    assert_eq!(page.rows[0]["has_taxable_entry"], false);
+    assert_eq!(
+        page.rows[0]["not_measured_live"],
+        json!(["sales_ledger_not_an_entry"])
+    );
+    assert_eq!(page.rows[0]["status"], "complete");
+}
+
+#[test]
+fn the_purchase_result_keeps_its_profile_and_classes() {
+    let result = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
+    assert_eq!(result.result["profile"], "agent_purchase_register_v1");
+    assert_eq!(
+        result.result["register_classes"],
+        json!(["Purchase", "Debit Note"])
+    );
+}
+
+// The two Sales item invoices of `sales-day/`: their voucher windows were read by the purchase register's
+// build. The taxed invoice is classified end to end in `agent_register_server_tests.rs` against the masters
+// read in the same call (`stock-lab-day/`); the untaxed invoice's masters were not committed.

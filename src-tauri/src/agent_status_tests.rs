@@ -565,6 +565,28 @@ fn the_status_description_says_what_today_is_the_date_of() {
     ));
 }
 
+/// The company rule is in `list_companies`' own description as well as in the
+/// server instructions, so a client that drops the instructions keeps it.
+#[test]
+fn the_company_rule_is_in_the_list_companies_description() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "list_companies"))
+        .expect("list_companies tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "Start here.",
+        "the company_guid every tool that reads a company's books needs",
+        "If exactly one company is open and the user named no client, use it and say which in your first line",
+        "if the user names a client and exactly one open company matches that name, use it and say which",
+        "otherwise ask which, offering the list, and never guess a company.",
+    ] {
+        assert!(description.contains(needle), "missing: {needle}");
+    }
+}
+
 /// The two log tools were once one identical sentence, and a model asked
 /// whether the user's data had been sent anywhere answered, from their names,
 /// that nothing had left the computer. Each now says what it holds and what

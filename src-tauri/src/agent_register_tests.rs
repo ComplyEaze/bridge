@@ -916,6 +916,44 @@ fn a_sales_row_takes_tax_from_the_duty_head_and_the_sales_ledger_as_its_taxable_
 }
 
 #[test]
+fn a_sales_voucher_with_no_duties_taxes_entry_is_counted_apart_and_is_not_a_row() {
+    // A captured Sales voucher with its two Duties & Taxes entries removed, the way the purchase
+    // test above does it. A change that fixed the register's classes to Purchase at this branch
+    // would put the voucher under "other voucher types" or drop it, and this test would fail.
+    let mut rows = captured_rows();
+    let sale = rows
+        .iter_mut()
+        .find(|row| row["date"] == "20250918")
+        .expect("the captured Sales voucher");
+    sale["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| !entry["ledger"].as_str().unwrap().starts_with("Output "));
+    let result = register_result(
+        RegisterKind::Sales,
+        &captured_index(),
+        rows,
+        ("20250901", "20250930"),
+        (0, 500),
+        Redaction::None,
+    )
+    .unwrap();
+    let body = &result.result;
+    assert_eq!(body["total"], 0);
+    assert_eq!(body["items"], json!([]));
+    assert_eq!(
+        body["sales_vouchers_without_duties_taxes_entry"]["total"],
+        1
+    );
+    let listed = &body["sales_vouchers_without_duties_taxes_entry"]["listed"][0];
+    assert_eq!(listed["date"], "20250918");
+    assert_eq!(listed["voucher_class"], "Sales");
+    assert!(body
+        .get("purchase_vouchers_without_duties_taxes_entry")
+        .is_none());
+}
+
+#[test]
 fn neither_register_lists_the_others_vouchers_as_rows() {
     let purchases = classify_register(&captured_index(), &captured_rows()).unwrap();
     assert!(purchases.rows.iter().all(|row| matches!(

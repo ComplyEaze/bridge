@@ -414,7 +414,7 @@ range (one rule for an empty or missing value across its renderers) are outside 
 | `synthetic.financial_statements.json` | 16,955 | `90f3f13974b2699f8c19dc172d697cc9ed4c77adddf0d9d59f4305d8081fa5e4` | `golden/synthetic.financial_statements.json` |
 | `synthetic.financial_statements.noreport.json` | 15,888 | `2134a63248e05f06f7755fd7588dba8acaccebc471dfba383f4171806b637a69` | `golden/synthetic.financial_statements.noreport.json` |
 | `synthetic-report-totals.json` | 134 | `e772509bd6ebc52afc23ef9742b6b1f2a090737533abe3761a7448124411b7e3` | `synthetic-report-totals.json` |
-| `synthetic.applicability_44ab.json` | 10,768 | `fe59182afe17fc8b5ddb0d06cbc565bd851423b02af3bdbf3185b86dfc552b2e` | `golden/synthetic.applicability_44ab.json` |
+| `synthetic.applicability_44ab.json` | 11,960 | `2e67df43f09f8e2c1ba01ef8314773174882238743fd26f79014eb96bef06079` | `golden/synthetic.applicability_44ab.json` |
 | `synthetic.trial_balance.json` | 92,621 | `249306799598823277ac59bb68dcd83c4af9d693b68d648b0d2f79852e3fd69f` | `golden/synthetic.trial_balance.json` |
 | `synthetic.stale_balances_41_1.json` | 10,501 | `8962228b7ab6a9c8cf95f8dcd467bcba91acac09e5b37a622518843775d31e40` | `golden/synthetic.stale_balances_41_1.json` |
 | `synthetic.ledger_scrutiny.json` | 53,038 | `f3f1505aa17b7d4b4bae46b340c439a089a3cc2e91bedad55066a7bd9cd8a628` | `golden/synthetic.ledger_scrutiny.json` |

@@ -69,35 +69,35 @@ pub fn run(book: &Book, rules: &Rules) -> Result<TestResult> {
             Unit::Text,
             "The ledger's Tally group chain, primary group first.",
             ev(),
-        );
+        )?;
         r.fig(
             &format!("tb_opening_{h}"),
             Value::Int(t.opening_paise),
             Unit::Paise,
             "Opening balance per the Trial Balance (Dr positive).",
             ev(),
-        );
+        )?;
         r.fig(
             &format!("tb_debit_{h}"),
             Value::Int(t.debit_paise),
             Unit::Paise,
             "Debits in the period per the Trial Balance.",
             ev(),
-        );
+        )?;
         r.fig(
             &format!("tb_credit_{h}"),
             Value::Int(t.credit_paise),
             Unit::Paise,
             "Credits in the period per the Trial Balance.",
             ev(),
-        );
+        )?;
         r.fig(
             &format!("tb_closing_{h}"),
             Value::Int(t.closing_paise),
             Unit::Paise,
             "Closing balance per the Trial Balance (Dr positive).",
             ev(),
-        );
+        )?;
         opening = opening.checked_add(t.opening_paise).ok_or_else(overflow)?;
         debit = debit.checked_add(t.debit_paise).ok_or_else(overflow)?;
         credit = credit.checked_add(t.credit_paise).ok_or_else(overflow)?;
@@ -109,14 +109,14 @@ pub fn run(book: &Book, rules: &Rules) -> Result<TestResult> {
         Unit::Count,
         "Ledgers with any opening, movement or closing in the period.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "total_opening",
         Value::Int(opening),
         Unit::Paise,
         "Sum of openings (Dr positive); non-zero is Tally's 'Difference in opening balances'.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "total_debit",
         Value::Int(debit),
@@ -124,14 +124,14 @@ pub fn run(book: &Book, rules: &Rules) -> Result<TestResult> {
         "Sum of the debit column as Tally exports it (a Stock-in-Hand ledger's column can carry \
 stock values that do not move its closing, so this need not equal the credit column).",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "total_credit",
         Value::Int(credit),
         Unit::Paise,
         "Sum of the credit column as Tally exports it.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "total_closing",
         Value::Int(closing),
@@ -139,7 +139,7 @@ stock values that do not move its closing, so this need not equal the credit col
         "Sum of closings (Dr positive); equals the opening difference when the period's entries \
 balance.",
         Vec::new(),
-    );
+    )?;
     Ok(r)
 }
 

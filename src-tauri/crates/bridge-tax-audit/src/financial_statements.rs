@@ -309,7 +309,7 @@ pub fn run(
 'Sales Accounts' (Dr+/Cr- convention; credit-balance group, sign-flipped to a positive revenue \
 figure).",
         group_ev(SALES_GROUP),
-    );
+    )?;
     let f_direct_inc = r.fig(
         "direct_incomes",
         Value::Int(d.direct_incomes),
@@ -317,7 +317,7 @@ figure).",
         "Direct Incomes: sum of TB closing balances under the primary group 'Direct Incomes', \
 sign-flipped to a positive figure.",
         group_ev(DIRECT_INCOMES_GROUP),
-    );
+    )?;
     let f_purchases = r.fig(
         "purchases",
         Value::Int(d.purchases),
@@ -325,7 +325,7 @@ sign-flipped to a positive figure.",
         "Purchase Accounts: sum of TB closing balances under the primary group 'Purchase \
 Accounts' (debit-balance group, no sign flip).",
         group_ev(PURCHASE_GROUP),
-    );
+    )?;
     let f_direct_exp = r.fig(
         "direct_expenses",
         Value::Int(d.direct_expenses),
@@ -333,7 +333,7 @@ Accounts' (debit-balance group, no sign flip).",
         "Direct Expenses: sum of TB closing balances under the primary group 'Direct Expenses', \
 no sign flip.",
         group_ev(DIRECT_EXPENSES_GROUP),
-    );
+    )?;
 
     let stock_ev: Vec<EvidenceRef> = d
         .stock_rows
@@ -348,7 +348,7 @@ no sign flip.",
 masters value, read directly; not subject to the quirk in the Trial Balance's own closing field \
 for Stock-in-Hand ledgers).",
         stock_ev.clone(),
-    );
+    )?;
     let f_close_stock = r.fig(
         "closing_stock",
         Value::Int(d.closing_stock),
@@ -357,7 +357,7 @@ for Stock-in-Hand ledgers).",
 movement - the year's TB credit movement (recomputed; the ledger's own TB closing field is NOT \
 used -- it is shown separately, for comparison, with a count of the ledgers where it is stale).",
         stock_ev.clone(),
-    );
+    )?;
     r.fig(
         "closing_stock_tb_field",
         Value::Int(d.closing_stock_tb_field),
@@ -366,7 +366,7 @@ used -- it is shown separately, for comparison, with a count of the ledgers wher
 the recomputed closing stock (opening plus net debit movement) is the figure used everywhere else in \
 this test.",
         stock_ev,
-    );
+    )?;
     let stale: Vec<&StockRow> = d.stock_rows.iter().filter(|row| row.stale).collect();
     r.fig(
         "stock_in_hand_ledgers_with_stale_tb_closing_field_count",
@@ -381,7 +381,7 @@ asserted) wherever this quirk is present.",
             .iter()
             .map(|row| EvidenceRef::new("ledger", &row.ledger))
             .collect(),
-    );
+    )?;
 
     let f_gp = r.fig(
         "gross_profit",
@@ -391,7 +391,7 @@ asserted) wherever this quirk is present.",
 closing stock); one stock basis (Trial Balance / balance sheet, with the recomputed closing stock) \
 used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40.",
         Vec::new(),
-    );
+    )?;
     let f_gp_pct = r.fig(
         "gross_profit_pct_bp",
         pct_bp(d.gross_profit, d.sales).ok_or_else(overflow)?,
@@ -399,14 +399,14 @@ used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40.
         "Gross profit as a share of sales, on the Trial Balance stock basis (recomputed closing \
 stock).",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "stock_to_turnover_pct_bp",
         pct_bp(d.closing_stock, d.sales).ok_or_else(overflow)?,
         Unit::BasisPoints,
         "Closing stock as a share of sales.",
         Vec::new(),
-    );
+    )?;
     let f_indirect_exp = r.fig(
         "indirect_expenses",
         Value::Int(d.indirect_expenses),
@@ -414,7 +414,7 @@ stock).",
         "Indirect Expenses: sum of TB closing balances under the primary group 'Indirect \
 Expenses', no sign flip.",
         group_ev(INDIRECT_EXPENSES_GROUP),
-    );
+    )?;
     let f_other_inc = r.fig(
         "other_income",
         Value::Int(d.other_income),
@@ -422,21 +422,21 @@ Expenses', no sign flip.",
         "Indirect Incomes: sum of TB closing balances under the primary group 'Indirect Incomes', \
 sign-flipped to a positive figure.",
         group_ev(INDIRECT_INCOMES_GROUP),
-    );
+    )?;
     let f_np = r.fig(
         "net_profit",
         Value::Int(d.net_profit),
         Unit::Paise,
         "Gross profit less indirect expenses plus indirect incomes.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "net_profit_pct_bp",
         pct_bp(d.net_profit, d.sales).ok_or_else(overflow)?,
         Unit::BasisPoints,
         "Net profit as a share of sales.",
         Vec::new(),
-    );
+    )?;
 
     let mut facts = vec![
         ("sales".to_string(), f_sales),
@@ -464,7 +464,7 @@ sign-flipped to a positive figure.",
             "Sum of TB closing balances of the client's own partners'-interest ledgers (the client's \
 setup; already included inside indirect expenses).",
             ev.clone(),
-        );
+        )?;
         let f_pbi = r.fig(
             "profit_before_partner_interest",
             Value::Int(pbi),
@@ -472,7 +472,7 @@ setup; already included inside indirect expenses).",
             "Net profit plus the partners' interest (net profit is AFTER partners' interest, since it \
 is charged as an indirect expense).",
             ev,
-        );
+        )?;
         facts.push(("partner_interest".to_string(), f_pi));
         facts.push(("profit_before_partner_interest".to_string(), f_pbi));
     }
@@ -504,7 +504,7 @@ books cannot show whether it was actually verified."
 'performed' and which of the two, when the report's totals were supplied (from the read's report \
 part), else 'not performed' and why.",
         Vec::new(),
-    );
+    )?;
     facts.push(("report_tie_status".to_string(), f_tie_status));
     if let Some(rep) = report_totals {
         let source = rep
@@ -519,7 +519,7 @@ part), else 'not performed' and why.",
                 "Net profit per {source} (Tally's own report; never recomputed by this test)."
             ),
             Vec::new(),
-        );
+        )?;
         let diff_np = sub(d.net_profit, rep.net_profit_paise)?;
         r.fig(
             "report_net_profit_diff",
@@ -527,7 +527,7 @@ part), else 'not performed' and why.",
             Unit::Paise,
             "Net profit less the net profit in Tally's own report.",
             Vec::new(),
-        );
+        )?;
         facts.push(("report_net_profit".to_string(), f_rep_np));
         if let Some(cs) = rep.closing_stock_paise {
             let f_rep_cs = r.fig(
@@ -539,14 +539,14 @@ part), else 'not performed' and why.",
 test)."
                 ),
                 Vec::new(),
-            );
+            )?;
             r.fig(
                 "report_closing_stock_diff",
                 Value::Int(sub(d.closing_stock, cs)?),
                 Unit::Paise,
                 "Closing stock less the closing stock in Tally's own report.",
                 Vec::new(),
-            );
+            )?;
             facts.push(("report_closing_stock".to_string(), f_rep_cs));
         }
         let tie_ok = diff_np.checked_abs().ok_or_else(overflow)? <= TIE_TOLERANCE_PAISE;
@@ -599,7 +599,7 @@ at the period end, to independently tie net profit and closing stock."
         Unit::Count,
         "Every voucher exported, all statuses.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "in_books_voucher_count",
         Value::Int(d.in_books_count),
@@ -607,7 +607,7 @@ at the period end, to independently tie net profit and closing stock."
         "Books population: exported vouchers with status regular (optional, cancelled and \
 post-dated excluded).",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "excluded_voucher_count",
         Value::Int(d.excluded_count),
@@ -615,7 +615,7 @@ post-dated excluded).",
         "Exported vouchers excluded from the books population (vouchers exported less vouchers in \
 the books population).",
         Vec::new(),
-    );
+    )?;
     for ((status, vtype), vouchers) in &excluded {
         let h = hash8(&format!("{status}:{vtype}"));
         r.fig(
@@ -626,7 +626,7 @@ the books population).",
                 "Excluded vouchers with status '{status}' and voucher type '{vtype}' (tag {h})."
             ),
             voucher_evidence(vouchers),
-        );
+        )?;
     }
     Ok(r)
 }

@@ -627,7 +627,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
     for line in [
-        "Quantities are withheld: nothing checks them, so none is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
+        "Quantities are withheld: nothing checks them, so none is returned. A quantity ComplyEaze Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
         "Item names, parents and base units come from one source and are not checked against another",
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
@@ -1109,7 +1109,7 @@ async fn valued_items_against_a_report_with_no_amount_return_no_item_and_do_not_
         assert!(comparison.get("tally_stock_summary_lines_added").is_none());
         let remediation = page["remediation"].as_str().unwrap();
         assert!(remediation.contains(
-            "Bridge cannot tell whether Tally left the report blank or it truly shows no stock"
+            "ComplyEaze Bridge cannot tell whether Tally left the report blank or it truly shows no stock"
         ));
         assert!(!remediation.contains("disagree"), "{remediation}");
         assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
@@ -1289,7 +1289,7 @@ async fn more_rows_than_tallys_item_count_refuses_with_both_numbers_too() {
         assert!(refusal["remediation"]
             .as_str()
             .unwrap()
-            .contains("with more rows the count is not counting the list Bridge read"));
+            .contains("with more rows the count is not counting the list ComplyEaze Bridge read"));
         assert!(refused["structuredContent"]["result"]
             .get("items")
             .is_none());
@@ -1316,7 +1316,7 @@ async fn a_stock_summary_tally_does_not_recognise_refuses_with_its_next_step() {
     let remediation = refusal["remediation"].as_str().unwrap();
     assert!(remediation.contains("do not retry"), "{remediation}");
     assert!(
-        remediation.contains("Bridge cannot tell why"),
+        remediation.contains("ComplyEaze Bridge cannot tell why"),
         "{remediation}"
     );
     assert!(refused["structuredContent"]["result"]

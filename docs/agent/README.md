@@ -79,14 +79,30 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 {"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
-The ordinary default tools are `tally_status`, `list_companies`,
-`voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
-`stock_summary`,
-`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` were
-added in release 0.4.0.) `local_data_report` (also
+The ordinary default tools, in name order:
+
+- `balance_sheet`
+- `egress_log`
+- `ledger_masters`
+- `ledger_movement`
+- `list_companies`
+- `local_data_report`
+- `masters`
+- `outstandings`
+- `profit_and_loss`
+- `purchase_register`
+- `read_evidence`
+- `stock_summary`
+- `tally_status`
+- `trial_balance`
+- `validate_masters`
+- `verify_import`
+- `voucher_presence`
+- `voucher_schema`
+- `vouchers`
+
+`masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
+`local_data_report` were added in release 0.4.0. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank

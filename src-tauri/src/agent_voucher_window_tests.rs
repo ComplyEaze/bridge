@@ -1372,6 +1372,7 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
         plans.extend(paired(body));
     }
     plans.extend(paired(&marks_plan(3, 7)));
+    let call_started = std::time::Instant::now();
     let (outcome, observed) = read_window(
         plans,
         ("20260801", "20260802"),
@@ -1382,6 +1383,7 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
         three_a_read(),
     )
     .await;
+    let call_ms = call_started.elapsed().as_millis();
     assert_eq!(observed.len(), 30);
     let timings = outcome.unwrap().timings;
     // The marks were known: only the closing bracket read them.
@@ -1432,6 +1434,12 @@ async fn a_window_read_times_its_marks_census_and_each_part() {
     // Dropping a part's timing, or charging the delay to another part, leaves the
     // second part below the bound.
     assert!(timings.parts[1].ms >= 400, "{timings:?}");
+    // Each part is timed on its own (#998). The parts are read one after another,
+    // so their own times are disjoint pieces of the call and add up to no more
+    // than the call took, however slow the runner. A timing that included the
+    // parts before it would count the 400 ms delay again in the third part.
+    let parts_ms = timings.parts.iter().map(|part| part.ms).sum::<u128>();
+    assert!(parts_ms <= call_ms, "{parts_ms} > {call_ms}: {timings:?}");
     assert_eq!(timings.failed, None);
 }
 

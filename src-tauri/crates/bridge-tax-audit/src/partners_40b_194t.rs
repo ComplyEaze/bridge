@@ -759,7 +759,7 @@ pub fn run_with(
 s40b_interest_rate_bp and rules.entity(...).s194t for this engagement's entity_type -- never from \
 the entity_type string itself. 'no' when both are absent/zero/false.",
         Vec::new(),
-    );
+    )?;
     if !applicable {
         return Ok(r);
     }
@@ -777,7 +777,8 @@ narration."
 
     // Each partner's figures are tagged `hash8(key)`, as the reference tags them, so two keys whose
     // tags coincide would name one figure twice. The reference raises there (its `fig` refuses a
-    // duplicate id); refuse the same way before any partner figure is built, never panic in `fig`.
+    // duplicate id); refuse before any partner figure is built, naming both keys, rather than
+    // leave `fig` to refuse the first repeated id.
     let mut tags: BTreeMap<String, &str> = BTreeMap::new();
     for key in partners.keys() {
         let tag = hash8(key);
@@ -823,7 +824,7 @@ bound ({s40b_rate} bp), not a confirmed authorised rate."
             ),
         },
         Vec::new(),
-    );
+    )?;
     if rate_not_recorded {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/deed_rate_missing"),
@@ -990,7 +991,7 @@ that says so)."
             Unit::Paise,
             &format!("Opening (1-4) balance of partner (tag {h})'s capital ledger(s), Dr+/Cr-."),
             ev_capital.clone(),
-        );
+        )?;
         let no_remuneration_note = if p.remuneration_ledger.is_none() {
             " No remuneration ledger is configured for this partner: remuneration credits, if any, \
 are read as capital; configure the remuneration ledger."
@@ -1009,7 +1010,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
 {no_remuneration_note}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_360day_{h}"),
             int(allowable_360)?,
@@ -1018,7 +1019,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
                 "Same daily-balance walk for partner (tag {h}), but actual days / 360.{unusable}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_opening_only_{h}"),
             int(allowable_opening_only)?,
@@ -1028,7 +1029,7 @@ date), actual days / 365, a debit (negative) capital day contributing zero.{unus
 opening value for the whole year (no intra-year voucher line applied at all).{unusable}"
             ),
             ev_capital.clone(),
-        );
+        )?;
         r.fig(
             &format!("allowable_interest_sensitivity_no_reduction_{h}"),
             int(allowable_no_reduction)?,
@@ -1039,7 +1040,7 @@ withdrawal or transfer (every debit line on the capital ledger(s) skipped; a cre
 e.g. capital introduced, still applied).{unusable}"
             ),
             ev_capital,
-        );
+        )?;
 
         let ev_interest_v = voucher_refs(&w.interest_vouchers);
         let f_credited = r.fig(
@@ -1051,7 +1052,7 @@ e.g. capital introduced, still applied).{unusable}"
 also carrying a line on their interest_ledger.{unusable}"
             ),
             ev_interest_v.clone(),
-        );
+        )?;
         credited_total += credited;
         let off = &w.off_capital_vouchers;
         // The listed vouchers on a ledger shared by partners, never the shared ledgers alone.
@@ -1324,7 +1325,7 @@ your statutory dues; otherwise, what it is.",
                 Unit::Paise,
                 &format!("interest_credited_{h} minus allowable_interest_{h}, floor 0."),
                 Vec::new(),
-            );
+            )?;
             excess_total += excess;
             if excess > 0 {
                 let mut limits = vec![if rate_not_recorded {
@@ -1391,7 +1392,7 @@ split is counted as interest, not here."
                 }
             ),
             voucher_refs(&w.remuneration_vouchers),
-        );
+        )?;
         remuneration_facts.push((key.clone(), f_rem));
         let mixed_here = &w.mixed_unsplit_vouchers;
         // A voucher is mixed only when it carries a remuneration ledger, so one is configured.
@@ -1477,7 +1478,7 @@ remuneration, commission, bonus and interest to a partner).{}",
                 }
             ),
             Vec::new(),
-        );
+        )?;
         let tds_expected = round_half_up(subject_paise * i128::from(tds_rate_bp), 10_000);
         let f_tds = r.fig(
             &format!("s194t_tds_expected_{h}"),
@@ -1485,7 +1486,7 @@ remuneration, commission, bonus and interest to a partner).{}",
             Unit::Paise,
             &format!("TDS @ {tds_rate_bp} bp on s194t_amount_credited_{h}."),
             Vec::new(),
-        );
+        )?;
         // The remuneration voucher wins a GUID both maps hold, as `{**interest, **remuneration}`.
         let mut touched = w.interest_vouchers.clone();
         touched.extend(w.remuneration_vouchers.clone());
@@ -1597,7 +1598,7 @@ judged\" when none is classified, or when the only such lines are on a ledger sh
 on a voucher whose TDS is not booked against partners' capitals alone)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let over = subject_paise > i128::from(tds_limit_paise);
         if over || base_uncertain {
@@ -1784,7 +1785,7 @@ returned the income, tax paid)."
             Unit::Paise,
             "Sum of s40b_excess_<partner> across all partners.",
             Vec::new(),
-        );
+        )?;
     } else {
         r.fig(
             "s40b_excess_total_not_computed",
@@ -1799,7 +1800,7 @@ out the partners whose excess is not computed (their s40b_not_computed findings)
 configured (see that question). Where a partner's excess is computed, it is that partner's own \
 figure.",
             Vec::new(),
-        );
+        )?;
     }
     r.fig(
         "s194t_interest_credited_total",
@@ -1808,7 +1809,7 @@ figure.",
         "Sum of interest_credited_<partner> across all partners -- cross-check this against a \
 shared interest_ledger's own TB movement when every partner uses the same ledger name.",
         Vec::new(),
-    );
+    )?;
 
     if !remuneration_facts.is_empty() {
         let mut limits = vec![

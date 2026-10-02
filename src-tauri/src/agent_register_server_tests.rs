@@ -581,6 +581,17 @@ async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_t
 /// a call sent has its file: the record's fingerprints and the files' own bytes agree.
 #[test]
 fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
+    request_files_are_exactly_the_requests_sent(
+        NOTE_DAYS,
+        &[
+            "credit_note_day",
+            "debit_note_day",
+            "cancelled_purchase_day",
+        ],
+    );
+}
+
+fn request_files_are_exactly_the_requests_sent(directory: &str, prefixes: &[&str]) {
     use sha2::{Digest, Sha256};
     use std::collections::BTreeSet;
     let hex = |bytes: &[u8]| {
@@ -589,14 +600,14 @@ fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>()
     };
-    let files = std::fs::read_dir(NOTE_DAYS)
+    let files = std::fs::read_dir(directory)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
         .filter(|name| name.ends_with("_request.utf16le.xml"))
         .collect::<Vec<_>>();
     let mut on_disk = BTreeSet::new();
     for name in &files {
-        let bytes = note_day_file(name);
+        let bytes = recorded_file(directory, name);
         assert_eq!(
             &bytes[..2],
             &[0xff, 0xfe],
@@ -610,12 +621,8 @@ fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
         "no two request files are the same request"
     );
     let mut sent = BTreeSet::new();
-    for prefix in [
-        "credit_note_day",
-        "debit_note_day",
-        "cancelled_purchase_day",
-    ] {
-        let sequence = note_day_json(&format!("{prefix}_sequence.json"));
+    for prefix in prefixes {
+        let sequence = recorded_json(directory, &format!("{prefix}_sequence.json"));
         sent.extend(
             sequence["requests"]
                 .as_array()
@@ -650,4 +657,76 @@ async fn a_cancelled_purchase_is_never_a_row_and_is_listed_with_its_cancelled_fl
         listed,
         &answer["result"]["purchase_vouchers_without_duties_taxes_entry"]
     );
+}
+
+// A taxed Sales item invoice through `sales_register`, replayed from a live call on the stock lab
+// book with that book's own ledger masters, groups and company listings (see
+// `stock-lab-day/PROVENANCE.md`). This is the register's end-to-end proof for an item invoice:
+// the masters the invoice's ledgers are classified against were read in the same call.
+
+const STOCK_LAB_DAY: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/crates/bridge-tally-protocol/tests/fixtures/stock-lab-day"
+);
+
+#[tokio::test]
+async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_its_own_masters() {
+    let (response, _, wrong) = replay_recorded(STOCK_LAB_DAY, "stock_lab_taxed_day", 96).await;
+    assert!(wrong.is_empty(), "{wrong:?}");
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["profile"], "agent_sales_register_v1");
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 1);
+    assert_eq!(result["vouchers_observed"], 1);
+    assert_eq!(result["ledger_masters_observed"], 8);
+    for list in [
+        "other_voucher_types_touching_duties_taxes",
+        "unclassified_voucher_type",
+        "vouchers_with_unplaced_ledgers",
+        "sales_vouchers_without_duties_taxes_entry",
+    ] {
+        assert_eq!(result[list]["total"], 0, "{list}");
+    }
+    let row = &result["items"][0];
+    assert_eq!(row["voucher_class"], "Sales");
+    assert_eq!(row["is_invoice"], true);
+    assert_eq!(row["status"], "complete");
+    assert_eq!(row["party_group"], "Sundry Debtors");
+    // A sale's party is negative and its sales and tax entries positive, as Tally sends them.
+    assert_eq!(row["party_entries"][0]["amount"], "-118.00");
+    assert_eq!(row["has_taxable_entry"], true);
+    assert_eq!(row["taxable_entries"].as_array().unwrap().len(), 1);
+    assert_eq!(row["taxable_entries"][0]["amount"], "100.00");
+    // Both heads come from the ledger masters: the state side is `sgst_utgst` on this book.
+    let tax = row["tax_in_books"].as_array().unwrap();
+    assert_eq!(tax.len(), 2);
+    assert_eq!(
+        (
+            tax[0]["head"].as_str(),
+            tax[0]["raw_head"].as_str(),
+            tax[0]["amount"].as_str()
+        ),
+        (Some("cgst"), Some("CGST"), Some("9.00"))
+    );
+    assert_eq!(
+        (
+            tax[1]["head"].as_str(),
+            tax[1]["raw_head"].as_str(),
+            tax[1]["amount"].as_str()
+        ),
+        (Some("sgst_utgst"), Some("SGST/UTGST"), Some("9.00"))
+    );
+    assert!(row["other_entries"].as_array().unwrap().is_empty());
+    // A captured invoice-mode Sale is a measured kind: no marker.
+    assert!(row.get("not_measured_live").is_none(), "{row}");
+    // What the live call returned, row for row.
+    let answer = recorded_json(STOCK_LAB_DAY, "stock_lab_taxed_day_answer.json");
+    assert_eq!(row, &answer["result"]["items"][0]);
+    assert_eq!(answer["result"]["ledger_masters_observed"], 8);
+}
+
+#[test]
+fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
+    request_files_are_exactly_the_requests_sent(STOCK_LAB_DAY, &["stock_lab_taxed_day"]);
 }

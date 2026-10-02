@@ -45,6 +45,64 @@ async fn session(server: Server, requests: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// The server tells the client, once, how to start: which tool first, when to
+/// ask which company, and that the figures go to the AI provider. A host may
+/// drop it, so each statement is pinned here by its phrase and nothing else
+/// depends on it.
+#[tokio::test]
+async fn initialize_carries_the_server_instructions() {
+    let directory = tempfile::tempdir().unwrap();
+    let responses = session(server(directory.path()), &[initialize("2025-06-18")]).await;
+    let instructions = responses[0]["result"]["instructions"]
+        .as_str()
+        .expect("initialize carries instructions");
+    for needle in [
+        "Start with list_companies",
+        "every tool that reads a company's books needs a company_guid from it",
+        "If exactly one company is open and the user named no client, use it and say which company in your first line.",
+        "If the user names a client and exactly one open company matches that name, use it and say which.",
+        "ask which, offering the list; never guess a company.",
+        "State the company, the exact dates and any ledger you used in the first line of your answer",
+        "Everything you read through these tools, amounts included, goes to the AI provider.",
+        "Otherwise, whether several are open or the name matches none or more than one, ask which",
+        "take a next step it names only if it is a different read or narrower dates, and say what you changed; for any other next step, ask the user.",
+        "Never get around a refusal by another route.",
+    ] {
+        assert!(instructions.contains(needle), "missing: {needle}");
+    }
+    assert!(
+        instructions.len() < 1_500,
+        "kept short: {}",
+        instructions.len()
+    );
+}
+
+/// A client that asked for tiny responses still gets its handshake: below the
+/// floor that carries guidance, `initialize` omits the instructions and keeps
+/// everything else.
+#[tokio::test]
+async fn initialize_omits_the_instructions_below_the_guidance_floor() {
+    for (max_bytes, carries) in [(256, false), (4_095, false), (4_096, true)] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut small = server(directory.path());
+        small.settings.max_bytes = max_bytes;
+        let responses = session(small, &[initialize("2025-06-18")]).await;
+        let result = &responses[0]["result"];
+        assert_eq!(result["protocolVersion"], "2025-06-18", "{max_bytes}");
+        assert_eq!(result["instructions"].is_string(), carries, "{max_bytes}");
+    }
+    // A request id near the cap leaves no room for them either: the handshake
+    // still succeeds, without, and a retry is not met with `already_initialized`.
+    let directory = tempfile::tempdir().unwrap();
+    let mut long_id = initialize("2025-06-18");
+    long_id["id"] = json!("i".repeat(3_000));
+    let mut small = server(directory.path());
+    small.settings.max_bytes = 4_096;
+    let responses = session(small, &[long_id]).await;
+    assert_eq!(responses[0]["result"]["protocolVersion"], "2025-06-18");
+    assert!(responses[0]["result"].get("instructions").is_none());
+}
+
 #[tokio::test]
 async fn negotiates_fallback_and_returns_complete_text_to_legacy_clients() {
     for (requested, expected) in [

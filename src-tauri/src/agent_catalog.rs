@@ -490,7 +490,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         json!({"type":"object","additionalProperties":false}),
                     ),
                     "list_companies" => (
-                        "Return observed company tuples and identity ambiguity flags.",
+                        "Start here. Return observed company tuples (the company_guid every tool that reads a company's books needs) and identity ambiguity flags. If exactly one company is open and the user named no client, use it and say which in your first line; if the user names a client and exactly one open company matches that name, use it and say which; otherwise ask which, offering the list, and never guess a company.",
                         json!({"type":"object","additionalProperties":false}),
                     ),
                     "outstandings" => (

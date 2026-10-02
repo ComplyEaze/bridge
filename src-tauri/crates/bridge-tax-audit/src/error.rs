@@ -26,6 +26,10 @@ pub enum AuditError {
     /// derived; ledgers fall back to a name hash instead (`docs/tax-audit/parity-spec-v1.md` §11).
     #[error("{0} has no Tally GUID; refusing to derive a stable id from its name")]
     MissingGuid(String),
+    /// A test named one figure id twice. The reference's `fig` raises there, so the test is
+    /// refused rather than the process ended.
+    #[error("figure id {0} would repeat")]
+    DuplicateFigureId(String),
     #[error("{path}: {source}")]
     Io {
         path: String,

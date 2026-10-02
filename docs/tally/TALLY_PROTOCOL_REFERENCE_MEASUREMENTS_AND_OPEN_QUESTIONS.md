@@ -462,8 +462,9 @@ One run of each, on a synthetic benchmark book (one month, 2,542 vouchers, about
 tool of a master build through a recording read-only relay, licensed TallyPrime 7.1 Silver.
 
 - A whole-window read took 65.8 s in a release build (75.6 s in a debug build) and sent 232 requests. Tally
-  held 45.5 s of it, Bridge's request spacing about 19.1 s, Bridge's own CPU 2.4 s. The census was about 7% of
-  the time and the data parts about 53%. In 57 relay logs of paired reads, the two sends of a pair never differed.
+  held 45.5 s of it, Bridge's request spacing about 19.1 s, Bridge's own CPU 2.4 s. Of the relay's Tally seconds, the
+  data parts took 36.7 s and the census 5.2 s: 55.7% and 7.9% of the 65.84 s the call took (computed from those three figures
+  of the same run). In 57 relay logs of paired reads on quiet synthetic books, the two sends of a pair never differed.
 - Before the page snapshot change (#1053), every later page of the same window read the whole window again:
   232 requests each. With it, in one run, a later page that named the first page's `snapshot_id` took 1.2 s and
   sent 10 requests (0.18 s of it Tally's), against 68.0 s and 232 requests for the first page, on a quiet book.

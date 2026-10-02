@@ -16,6 +16,17 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Safer or fixed**
+
+- `outstandings` no longer refuses a book whose Bills Receivable report prints one
+  bill's due date with a four-digit year (a bill with a credit period of about 83
+  years, `1-Dec-2108`): that one date made the whole read fail with no reason. A
+  due date is now read as written when Tally prints its year in full and the year
+  is 2100 or later. A bill row whose dates ComplyEaze Bridge cannot read still
+  refuses the read; the refusal now carries a typed `cause`, the report and the
+  row number when it is a row that fails, and a next step, never the bill's party
+  or reference. A due date that far out gives no overdue days in the ageing (#1091).
+
 **What the next build adds**
 
 - Read a register of the tax in the books for sales: the Sales and Credit Note

@@ -833,9 +833,13 @@ fn absent_billoverdue_is_not_the_same_as_present_but_empty() {
             &as_of(VALIDATION_LAB_BOOKS_FROM),
             &as_of(VALIDATION_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_fixed_row_missing_billoverdue"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_fixed_row_missing_billoverdue"
+            )),
+        })
     );
 }
 
@@ -1372,9 +1376,13 @@ fn billfixed_missing_billcl_fails_closed() {
     );
     assert_eq!(
         result,
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_fixed_row_missing_billcl"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_fixed_row_missing_billcl"
+            )),
+        })
     );
 }
 

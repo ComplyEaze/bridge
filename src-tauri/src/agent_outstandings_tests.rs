@@ -689,6 +689,15 @@ async fn mcp_outstandings_refuse_a_party_detail_on_a_partial_read() {
 /// through the MCP tool with `extra_arguments`. The sequence is the one
 /// `currency_then_native_plans_with_ledgers` scripts for the runtime.
 async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
+    ageing_outstandings_with(None, ledgers, extra_arguments).await
+}
+
+/// [`ageing_outstandings`] with the Bills Receivable report replaced when `receivable` is given.
+async fn ageing_outstandings_with(
+    receivable: Option<String>,
+    ledgers: String,
+    extra_arguments: Value,
+) -> Value {
     use tally_protocol_simulator::{
         Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
     };
@@ -731,21 +740,21 @@ async fn ageing_outstandings(ledgers: String, extra_arguments: Value) -> Value {
     // The native outstandings read.
     plans.extend([status(), companies.clone(), companies.clone()]);
     pair(&mut plans, extent.clone());
-    for bytes in [
-        include_bytes!(
+    let receivable = receivable.unwrap_or_else(|| {
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
-        )
-        .as_slice(),
-        include_bytes!(
+        ))
+    });
+    for body in [
+        receivable,
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-groups.utf16le.xml"
-        )
-        .as_slice(),
-        include_bytes!(
+        )),
+        decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-payable.utf16le.xml"
-        )
-        .as_slice(),
+        )),
     ] {
-        pair(&mut plans, xml(decode(bytes)));
+        pair(&mut plans, xml(body));
     }
     pair(&mut plans, xml(ledgers));
     pair(&mut plans, extent);
@@ -1172,4 +1181,99 @@ fn the_recorded_sequences_are_the_ones_committed_with_the_capture() {
         assert_eq!(record.len(), bytes);
         assert_eq!(sha256_hex(record.as_bytes()), sha256);
     }
+}
+
+/// bridge#1091: a Bills report row Bridge cannot read refuses the read with its cause, the report
+/// and the row, and a next step, and never names the bill or its party.
+#[tokio::test]
+async fn an_unreadable_bills_row_refuses_with_its_cause_report_and_row() {
+    fn decode(bytes: &[u8]) -> String {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+    let captured = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
+    ));
+    // The fourth bill's due date, written with a four-digit year below the one form Tally was seen to
+    // print in full.
+    let damaged = captured.replacen(
+        "<BILLDUE>2-Jul-26</BILLDUE>",
+        "<BILLDUE>2-Jul-2026</BILLDUE>",
+        1,
+    );
+    assert_ne!(damaged, captured);
+    let response = ageing_outstandings_with(
+        Some(damaged),
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "native_outstandings_read_failed");
+    assert_eq!(error["cause"], "native_date_year_invalid");
+    assert_eq!(error["bill_row"], json!({"report": "receivable", "row": 4}));
+    let remediation = error["remediation"].as_str().expect("a next step");
+    assert!(
+        remediation.contains("Do not retry") && remediation.contains("bill_row"),
+        "{remediation}"
+    );
+    // Nothing of the bill: not its party, its reference or its dates, in the structured result
+    // or in the text copy of it.
+    let text = response.to_string();
+    for secret in [
+        "Ageing Customer A",
+        "MP-A",
+        "CANARY",
+        "CREDIT-30",
+        "BD-DIFF",
+        "2-Jul",
+    ] {
+        assert!(
+            !text.contains(secret),
+            "the refusal carries {secret:?}: {text}"
+        );
+    }
+}
+
+/// The Bills-report next steps belong to the outstandings tool only (bridge#1091): the same cause
+/// codes reach other tools through reads that never open that report.
+#[test]
+fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
+    for cause in [
+        "native_date_year_invalid",
+        "bills_xml_malformed",
+        "native_amount_invalid",
+        "native_arithmetic_overflow",
+        "native_tally_reported_failure",
+    ] {
+        assert!(outstandings_cause_remediation(cause).is_some(), "{cause}");
+        // Neither the cause nor an operation code of another tool picks it up.
+        assert_eq!(refusal_remediation(cause), None, "{cause}");
+    }
+    assert_eq!(refusal_remediation("trial_balance_read_failed"), None);
+    // A cause that cannot come from the Bills report has no Bills advice.
+    assert_eq!(outstandings_cause_remediation("native_status_absent"), None);
+    // The choice is made on the code: the same cause under another tool's code gets none.
+    assert!(remediation_for(
+        "native_outstandings_read_failed",
+        Some("native_date_year_invalid")
+    )
+    .is_some());
+    assert_eq!(
+        remediation_for("trial_balance_read_failed", Some("native_status_absent")),
+        None
+    );
+    assert_eq!(
+        remediation_for(
+            "party_ledger_master_read_failed",
+            Some("native_amount_invalid")
+        ),
+        None
+    );
 }

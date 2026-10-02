@@ -1007,6 +1007,22 @@ toggling the UI to *Ageing by Bill Date* left the exported `BILLOVERDUE` unchang
 due-date value. Recompute ageing from `BILLDATE`/`BILLDUE` against an explicit as-of on
 every path.
 
+**A due date past 2099 prints its year in full, and an as-of report listed no later-dated bill — PARTIAL, 2026-10-02 (bridge#1091).**
+One read each of the Bills Receivable and Bills Payable reports of a synthetic company (BRIDGE PROBE B SANDBOX, licensed
+TallyPrime 7.1 Silver) as of 20260331, from the book's start 20250401: 1,477 open receivable bills and 21 payable ones.
+
+- The bill dated 1-Aug-25 whose credit period was about 83 years (the printed date is exactly 1000 months after it: an inference from
+  the arithmetic, the report does not state the period) printed `BILLDUE` as `1-Dec-2108`, the year in full. Due dates in 2026, 2033, 2035
+  and 2052 in the same report printed two digits. Bridge's parser accepted two digits only, so the whole read refused with no cause. It now
+  reads a four-digit year of 2100 or later in a **due date** exactly as written, inside the same window; a four-digit year in a bill date,
+  or below 2100, still refuses. Observed once: whether every year from 2100 prints so, and on other releases, is not established.
+- Six rows, the ones with a due date after the as-of date, carried an empty `BILLOVERDUE` element.
+- The report's latest bill date was the as-of date. The issue records later probe vouchers dated after the financial year on this book
+  (not re-read here), so on this book the as-of Bills report did not list a later-dated bill. One book; it was inferred before.
+- Fixtures: `native-outstandings-probe-b-bills-receivable` and `native-outstandings-probe-b-bills-payable`, byte-exact, with provenance.
+- Not measured: whether the rest of the call (the ledger and group reads, the party join and the overdue crosscheck) then completes on
+  this book: the capture held only the extent and the two Bills reports.
+
 ### 12a.4 The import path rewrites what you send — extends §9
 
 §9.2 already records that `ERRORS=0` does not mean success. Eight further rewrites, each

@@ -1346,7 +1346,14 @@ source observations carry local evidence.
 billed totals explicitly scoped to open bills, four overdue-age buckets, an
 `unaged` bucket for future-due or unobserved ages, top parties,
 open bills, and unallocated counts and directional totals; a refused runtime read instead has `state: "partial"` and its
-exact `partial_reason`. `ledger_movement` returns literal-window voucher
+exact `partial_reason`. A Bills report row whose dates Bridge cannot read refuses the whole
+read (leaving a bill out would change the totals) with its `cause` (a typed code
+for the rule that failed), a `bill_row` (`report`, `receivable` or `payable`, and
+the 1-based `row` in the order Tally sent them: never the bill's party, reference
+or date) and a next step. A refusal that is not about one row (an amount, the
+shape of the report, the book window) has a `cause` and no `bill_row`. A due date
+printed with a four-digit year of 2100 or later is read as written; no other form
+is added (protocol reference section 12a.3, one observation). `ledger_movement` returns literal-window voucher
 movement with exact decimal `opening`, `debit`, `credit`, `closing`, parent,
 and `vouchers_touching`. `ledger_masters` accepts `fields: "compliance"` to
 return the paired party-master GSTIN/PAN/MSME/bank/IFSC/email/phone/state and

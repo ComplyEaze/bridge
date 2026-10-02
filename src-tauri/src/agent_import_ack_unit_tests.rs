@@ -731,6 +731,7 @@ fn a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale(
         &verified(2),
         &rows,
         DoubtKind::Masters,
+        None,
     )
     .unwrap();
     let current = || BatchAckRecord {
@@ -751,7 +752,7 @@ fn a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale(
             serde_json::to_vec(record).unwrap(),
         )
         .unwrap();
-        operator_review(imports.path(), &line, &rows).unwrap()["masters"].clone()
+        operator_review(imports.path(), &line, &rows, None).unwrap()["masters"].clone()
     };
     // Control: the record as written is current.
     let review = review_of(&current());
@@ -809,7 +810,7 @@ fn a_step_doubt_without_its_step_reads_unreadable() {
     let rows = batch_rows(&line);
     let step_doubt = super::batch_step_doubt_path(imports.path(), BATCH);
     fs::write(&step_doubt, br#"{"state":"unmatched"}"#).unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(
         review["batch_step"],
         json!({"state":"unreadable"}),
@@ -817,7 +818,7 @@ fn a_step_doubt_without_its_step_reads_unreadable() {
     );
     // Control: with its step, the same file is a doubt with no review yet.
     fs::write(&step_doubt, STEP_DOUBT).unwrap();
-    let review = operator_review(imports.path(), &line, &rows).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
     assert_eq!(review["batch_step"]["state"], "absent", "{review}");
 }
 

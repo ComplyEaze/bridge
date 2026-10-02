@@ -4351,7 +4351,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
 
 use super::voucher_type_class::ReservedVoucherClass;
 use super::vouchers::{
-    selected_voucher_operation_for_verified, VoucherOperationScope, VoucherPageKey,
+    holdable, selected_voucher_operation_for_verified, VoucherOperationScope, VoucherPageKey,
     VoucherPageSnapshot, VoucherPages,
 };
 
@@ -4640,6 +4640,7 @@ async fn an_expired_or_oversized_window_is_not_held() {
                 "nothing-held".to_string()
             }
         };
+        assert_eq!(page_snapshot(&first).is_null(), max_bytes == 1);
         let second = one
             .call(json!({"offset": 1, "limit": 1, "snapshot_id": id}))
             .await;
@@ -4704,4 +4705,12 @@ async fn the_desktop_adapter_never_holds_a_window() {
     assert!(outcome.payload["result"].get("snapshot").is_none());
     assert_eq!(one.server.voucher_pages.lock().unwrap().held_count(), 0);
     let _ = one.requests();
+}
+
+#[test]
+fn only_a_whole_window_with_nothing_withheld_is_held() {
+    assert!(holdable(WindowRead::Complete, 0));
+    assert!(!holdable(WindowRead::Complete, 1));
+    assert!(!holdable(WindowRead::Partial, 0));
+    assert!(!holdable(WindowRead::Partial, 1));
 }

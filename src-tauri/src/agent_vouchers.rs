@@ -175,6 +175,12 @@ impl VoucherPages {
     }
 }
 
+/// Whether a read may be held for later pages: its window was counted or
+/// corroborated whole, and nothing was withheld from it.
+pub(super) fn holdable(window_state: WindowRead, withheld_total: usize) -> bool {
+    window_state == WindowRead::Complete && withheld_total == 0
+}
+
 /// What a later page of a held window came to: served from the held read, or to
 /// be read afresh, with the held window it found moved on (when it did).
 enum PageServe {
@@ -489,9 +495,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         // #485: a complete window is held, for its later pages. A partial one is
         // not: a later page of it reads afresh, as before.
         let held = match (&page_key, source_marks) {
-            (Some(key), Some(marks))
-                if window_state == WindowRead::Complete && withheld_total == 0 =>
-            {
+            (Some(key), Some(marks)) if holdable(window_state, withheld_total) => {
                 server.hold_voucher_page(VoucherPageSnapshot::new(
                     key.clone(),
                     marks,

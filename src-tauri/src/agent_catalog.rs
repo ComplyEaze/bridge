@@ -342,17 +342,33 @@ pub(super) enum ToolEffect {
 
 impl ToolEffect {
     pub(super) fn of(name: &str) -> Option<Self> {
+        // One arm per tool, in name order, so two pull requests that add
+        // different tools touch different lines (#995).
         Some(match name {
-            "tally_status" | "list_companies" | "voucher_schema" | "validate_masters"
-            | "outstandings" | "ledger_masters" | "ledger_movement" | "purchase_register"
-            | "trial_balance" | "profit_and_loss" | "balance_sheet" | "vouchers"
-            | "voucher_presence" | "changed_since" | "read_evidence" | "egress_log" | "masters"
-            | "stock_summary" | "local_data_report" => Self::Read,
-            "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
-            "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
-            "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
             "acknowledge_post_review" => Self::LocalRewrite(ACKNOWLEDGE_SENTENCE),
+            "balance_sheet" => Self::Read,
+            "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
+            "changed_since" => Self::Read,
+            "egress_log" => Self::Read,
+            "ledger_masters" => Self::Read,
+            "ledger_movement" => Self::Read,
+            "list_companies" => Self::Read,
+            "local_data_report" => Self::Read,
+            "masters" => Self::Read,
+            "outstandings" => Self::Read,
+            "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
             "post_import" => Self::TallyPost,
+            "profit_and_loss" => Self::Read,
+            "purchase_register" => Self::Read,
+            "read_evidence" => Self::Read,
+            "stock_summary" => Self::Read,
+            "tally_status" => Self::Read,
+            "trial_balance" => Self::Read,
+            "validate_masters" => Self::Read,
+            "verify_import" => Self::LocalRewrite(VERIFY_IMPORT_SENTENCE),
+            "voucher_presence" => Self::Read,
+            "voucher_schema" => Self::Read,
+            "vouchers" => Self::Read,
             _ => return None,
         })
     }

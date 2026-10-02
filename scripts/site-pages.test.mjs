@@ -428,13 +428,15 @@ test("the liability and contact answers say no more and no less than the clauses
   }
 });
 
-test("every page names the publisher with the registration number and registered office the Privacy Policy gives", () => {
-  // LLP Act 2008 s.21: publications carry the name, registered office, registration number and a statement of
-  // limited liability. The footer repeats section 1 of the Privacy Policy, so the two cannot drift apart.
+test("every page names the publisher with the statement of limited liability, registration number and registered office the Privacy Policy gives", () => {
+  // The footer repeats the name, the statement of limited liability, the registration number and the registered
+  // office from section 1 of the Privacy Policy, so the two cannot drift apart.
   const section1 = flat(legalText("privacy").match(/^## 1\. [\s\S]*?(?=^## )/m)[0]);
   const llpin = section1.match(/LLP identification number ([A-Z]{3}-[0-9]{4})/);
   const office = section1.match(/Our registered office is at ([^.]+(?:\.[^.]+)*?, India)\./);
   assert.ok(llpin && office, "section 1 of the Privacy Policy no longer gives the LLP identification number and registered office");
-  const line = `Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered in India, LLP identification number ${llpin[1]}. Registered office: ${office[1]}.`;
+  const registered = "a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008";
+  assert.ok(section1.includes(`SPMS Comply Eaze Solutions LLP, ${registered}, LLP identification number`), "section 1 of the Privacy Policy no longer states that the LLP is registered with limited liability");
+  const line = `Published by SPMS Comply Eaze Solutions LLP, ${registered}, LLP identification number ${llpin[1]}. Registered office: ${office[1]}.`;
   for (const page of pages) assert.ok(faqText(read(page)).includes(line), `${page}: the footer does not carry: ${line}`);
 });

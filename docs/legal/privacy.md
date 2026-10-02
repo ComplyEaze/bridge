@@ -20,7 +20,7 @@
 
 ## 1. Who we are and what this policy covers
 
-ComplyEaze Bridge ("**Bridge**") is published by **SPMS Comply Eaze Solutions LLP**, a limited liability partnership registered in India, LLP identification number ACI-9231 ("**ComplyEaze**", "**we**", "**us**", "**our**"). Our registered office is at S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.
+ComplyEaze Bridge ("**Bridge**") is published by **SPMS Comply Eaze Solutions LLP**, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231 ("**ComplyEaze**", "**we**", "**us**", "**our**"). Our registered office is at S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.
 
 This policy explains what happens to information when you use Bridge. It covers:
 

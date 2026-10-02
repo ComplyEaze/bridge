@@ -591,7 +591,9 @@ fn the_company_rule_is_in_the_list_companies_description() {
 /// whether the user's data had been sent anywhere answered, from their names,
 /// that nothing had left the computer. Each now says what it holds and what
 /// it does not, so the descriptions must differ and must both carry the
-/// statement that what the assistant reads goes to the AI provider.
+/// statement that what the assistant reads goes to the AI provider. That
+/// statement comes first: in a plan-only eval a model that read "no figures
+/// or book content" first echoed it as "no figures or client data sent".
 #[test]
 fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     let definitions = tool_definitions(true, false);
@@ -606,8 +608,25 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     };
     let evidence = description_of("read_evidence");
     let egress = description_of("egress_log");
-    let first_sentence = |text: &str| text.split(". ").next().unwrap().to_string();
-    assert_ne!(first_sentence(&evidence), first_sentence(&egress));
+    let disclosure = "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider;";
+    for description in [&evidence, &egress] {
+        assert!(description.starts_with(disclosure), "{description}");
+        let holds = description.find("no figures or book content").unwrap();
+        assert!(
+            description
+                .find("Never tell the user that no data has left their computer.")
+                .unwrap()
+                < holds,
+            "{description}"
+        );
+    }
+    let holding_sentence = |text: &str| {
+        text.split(". ")
+            .find(|s| s.starts_with("Shows "))
+            .unwrap()
+            .to_string()
+    };
+    assert_ne!(holding_sentence(&evidence), holding_sentence(&egress));
     // Each says what it holds, and not what the other holds.
     assert!(evidence.contains("kept in memory"), "{evidence}");
     assert!(!evidence.contains("local log file"), "{evidence}");

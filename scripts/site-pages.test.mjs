@@ -305,6 +305,15 @@ test("the list above the questions tells a person asked to try it out the four t
   for (const needle of ["test company", "backup", "firewall", "Keep posting off"]) assert.ok(list.includes(needle), needle);
 });
 
+// An IndexNow key file is a root text file named for its key (8 to 128 letters, digits and dashes) and
+// holding exactly that key. llms.txt and robots.txt are shorter than any key, so they are not mistaken for one.
+const indexNowKey = /^[A-Za-z0-9-]{8,128}\.txt$/;
+test("the site has one IndexNow key file, and it holds exactly the key it is named for", () => {
+  const keyFiles = readdirSync(site).filter((file) => indexNowKey.test(file));
+  assert.equal(keyFiles.length, 1, `expected one IndexNow key file, found ${keyFiles.length}`);
+  assert.equal(read(keyFiles[0]), keyFiles[0].replace(/\.txt$/, ""), `${keyFiles[0]} does not hold its own key`);
+});
+
 // The liability and contact answers paraphrase the Terms of Use and the Privacy Policy. Each figure and section
 // number in them, and each qualifier listed below, is pinned to the words of the clause it summarises: a pinned
 // qualifier dropped from the page, a figure or section number with no pin of its own, or a clause reworded under the

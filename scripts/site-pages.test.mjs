@@ -373,6 +373,7 @@ const legalPins = {
 const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)/gi;
 const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|thirty|sixty|ninety|hundred|thousand)\b/gi;
 const withoutCitations = (text) => text.replace(citation, " ");
+const citedIn = (text) => [...text.matchAll(citation)].flatMap((match) => [match[1], ...match[2].split(/, | and | to /).filter(Boolean)]);
 
 test("the liability and contact answers say no more and no less than the clauses they summarise", () => {
   const html = read("faq.html");
@@ -385,11 +386,9 @@ test("the liability and contact answers say no more and no less than the clauses
       assert.ok(clause(doc, number).includes(reads), `${doc} ${number} no longer reads: ${reads} (reread #${id} against it)`);
     }
     // every section the answer cites has a pin to that very clause or section, inside a phrase that cites it
-    for (const match of answer.matchAll(citation)) {
-      for (const cited of [match[1], ...match[2].split(/, | and | to /).filter(Boolean)]) {
-        const own = pins.filter(([says, , number]) => (number === cited || number.startsWith(`${cited}.`)) && new RegExp(`\\b${cited.replace(".", "\\.")}\\b(?!\\.[0-9])`).test(says));
-        assert.ok(own.length > 0, `#${id} cites section ${cited} without a pin to it`);
-      }
+    for (const cited of citedIn(answer)) {
+      const own = pins.filter(([says, , number]) => citedIn(says).includes(cited) && (number === cited || number.startsWith(`${cited}.`)));
+      assert.ok(own.length > 0, `#${id} cites section ${cited} without a pin to it`);
     }
     // every figure, in digits or in words, sits inside a pinned phrase
     for (const [word] of withoutCitations(answer).matchAll(figure)) {

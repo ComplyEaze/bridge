@@ -2928,6 +2928,7 @@ async fn a_dispatched_batch_with_a_rewritten_narration_still_reconciles() {
         result["error"]["code"], "voucher_text_invalid",
         "{response}"
     );
+    assert_ne!(result["attempt_recorded"], json!(false), "{response}");
     assert!(observed > 0, "the readback reads Tally: {response}");
 }
 

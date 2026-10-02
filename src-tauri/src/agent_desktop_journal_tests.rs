@@ -229,6 +229,36 @@ async fn descriptor_company_mismatch_is_refused_before_any_tally_work() {
     );
 }
 
+/// A Journal saved with a narration the readers would rewrite is refused
+/// before approval, with no attempt recorded. Asking for approval again can
+/// never succeed, so the message says to build it again (#1055).
+#[tokio::test]
+async fn a_saved_journal_refused_for_its_text_says_to_build_it_again() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, mut line) = service(directory.path().join("agent"));
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000003".into();
+    line.vouchers[0].narration = Some("Synthetic \u{fffd}#4; test only".into());
+    line.sha256 = sha256_hex(
+        render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
+    );
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    let operation = service
+        .post(&line.batch_id, &line.sha256, &line.company_guid)
+        .await;
+    let result = &operation.result["result"];
+    assert_eq!(result["error"]["code"], "voucher_text_invalid", "{result}");
+    assert_eq!(result["attempt_recorded"], false, "{result}");
+    assert_eq!(
+        result["error"]["message"],
+        "Nothing was sent. This saved batch has a narration, reference or voucher number \
+         that cannot be posted, and a saved batch cannot be changed. Correct the text, build \
+         the batch again, then post the new one."
+    );
+}
+
 #[tokio::test]
 async fn missing_or_unreadable_history_refuses_admission_without_claiming_no_prior_attempt() {
     for unreadable in [false, true] {

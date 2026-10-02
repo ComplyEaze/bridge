@@ -3,8 +3,9 @@
 // Checks registry/server.json, the file published to the MCP registry for a release.
 //   (no flag)         the file is consistent with itself and not ahead of the manifest version;
 //   --match-manifest  its version equals packaging/mcpb/manifest.json's;
-//   --published TAG   as --match-manifest, TAG is mcp-v<version>, and each fileSha256 equals the
-//                     .sha256 file of the release asset it names (read from GitHub).
+//   --published TAG   as --match-manifest, TAG is mcp-v<version>, the release is published and not
+//                     a pre-release, and each fileSha256 equals both the digest GitHub records for
+//                     the asset it names and the asset's .sha256 file (read from GitHub).
 // The version cannot be required equal on every pull request: the version pull request bumps the
 // manifest before the release exists, and the hashes are known only after the release is built.
 // Equality and the hashes are therefore checked when the publish workflow runs.
@@ -21,7 +22,9 @@ export class RegistryFileError extends Error {
 }
 
 const SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json";
-const NAME = /^io\.github\.ComplyEaze\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// A registry name cannot be moved or removed once published, so it is pinned, not pattern-matched.
+// A later product gets its own listing and its own reviewed change here.
+const NAME = "io.github.ComplyEaze/bridge-tally";
 const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const PLATFORMS = ["windows-x64", "macos-arm64"];
@@ -59,7 +62,7 @@ export function checkServerJson(server) {
     throw new RegistryFileError("not_an_object");
   }
   if (server.$schema !== SCHEMA) throw new RegistryFileError("schema_url");
-  if (typeof server.name !== "string" || !NAME.test(server.name)) throw new RegistryFileError("name");
+  if (server.name !== NAME) throw new RegistryFileError("name");
   if (typeof server.description !== "string" || server.description.length === 0 || server.description.length > DESCRIPTION_LIMIT) {
     throw new RegistryFileError("description_length");
   }
@@ -92,7 +95,19 @@ export function checkMatchesManifest(version, manifestVersion) {
 // so that a failed request is never read as an empty or matching answer.
 export async function checkPublished(checked, tag, fetchText) {
   if (tag !== releaseTag(checked.version)) throw new RegistryFileError("tag_mismatch");
+  let release;
+  try {
+    release = JSON.parse(await fetchText(`https://api.github.com/repos/ComplyEaze/bridge/releases/tags/${tag}`));
+  } catch {
+    throw new RegistryFileError("release_unavailable");
+  }
+  if (release === null || typeof release !== "object" || release.draft !== false || release.prerelease !== false) {
+    throw new RegistryFileError("release_not_final");
+  }
   for (const asset of checked.assets) {
+    const name = asset.url.slice(asset.url.lastIndexOf("/") + 1);
+    const recorded = Array.isArray(release.assets) ? release.assets.find((candidate) => candidate?.name === name) : undefined;
+    if (recorded?.digest !== `sha256:${asset.sha256}`) throw new RegistryFileError("digest_mismatch", asset.platform);
     let body;
     try {
       body = await fetchText(`${asset.url}.sha256`);

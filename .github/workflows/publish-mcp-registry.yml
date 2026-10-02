@@ -2,14 +2,23 @@ name: Publish to the MCP registry
 
 # Publishes registry/server.json to the official MCP registry as
 # io.github.ComplyEaze/bridge-tally, for a release that is already published. Run it by hand after
-# registry/server.json has been updated for that release (docs/release-process.md, step 5).
+# registry/server.json has been updated for that release (docs/release-process.md, "When a
+# listing exists").
 #
 # Why it runs here: signing in to the registry from a laptop with a GitHub device login did not
 # grant the ComplyEaze organisation namespace (modelcontextprotocol/registry issues 1649, 1537,
 # 1527 and 1551). Signing in with the workflow's own OIDC token grants io.github.<repository
 # owner>/* (internal/api/handlers/v0/auth/github_oidc.go, buildPermissions), here ComplyEaze.
 # A registry version cannot be edited or moved once published, so this job refuses to run unless
-# registry/server.json agrees with the manifest and with the published release's checksum files.
+# registry/server.json agrees with the manifest and with the published release (it is final, and
+# its recorded asset digests and .sha256 files equal the file's hashes).
+#
+# What guards the namespace: the registry accepts any valid GitHub Actions token from a repository
+# owned by ComplyEaze and checks nothing else (not the workflow, branch or environment). A person
+# with write access can push a branch with a workflow that asks for id-token: write, and the
+# repository already has two (release-mcpb-preview.yml, deploy-install-page.yml). The 'if' and the
+# environment below only gate runs of this unmodified file from the default branch. The real
+# control is who may change .github/workflows (a repository ruleset), which is a repository setting.
 on:
   workflow_dispatch:
     inputs:
@@ -29,8 +38,9 @@ jobs:
   publish:
     name: Publish registry/server.json
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    # Create a GitHub environment of this name and limit it to the default branch, with a required
-    # reviewer, to make a second person approve each publication.
+    # Create the GitHub environment of this name BEFORE the first run (a run creates it with no rules
+    # if it is missing), limit it to the default branch and add a required reviewer, so that a
+    # second person approves each run of this file.
     environment: mcp-registry-publish
     runs-on: ubuntu-latest
     timeout-minutes: 10

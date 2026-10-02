@@ -626,7 +626,7 @@ posted against — the counters alone would not have said. Every created voucher
 | `AND` for `&` | **rejected** | rejected |
 | a **missing** suffix word | **rejected** | rejected |
 | an **added** suffix word | **rejected** | not sent |
-| **NFD** against an NFC master | **rejected** | not sent |
+| **NFD** against an NFC master | **rejected** (but see the 2026-10-02 note under Fixtures) | not sent |
 
 **One row here was mislabelled and is corrected.** The first run of this probe recorded `AND` for
 `&` as rejected, but what it actually sent was a name with `AND CO` **appended** — against a master
@@ -702,6 +702,17 @@ about the same one.
 `Suspense A/c`, carrying no balances, so this is repeatable. They post-date the catalogue digest
 recorded in `TEST_CORPUS.md` §9.2.
 
+> **Scoped correction, 2026-10-02: `MB CAFÉ PROBE` is not stored with an É.** A Ledger collection
+> read of `BRIDGE CORPUS OPENING` on licensed 7.1 Silver returned that ledger's name, in both its
+> `NAME` attribute and its `NAME.LIST`, as `MB CAF` + U+00C3 + U+0089 + ` PROBE`: the UTF-8 bytes of
+> É stored as two Latin-1 characters (mojibake). It cannot serve as an NFC master. Which ledger the
+> NFD row above was sent against is not recorded; if it was this one, that row compared NFD with a
+> mojibake name, and "rejected" carries no evidence about canonical equivalence: an NFD spelling of
+> É fails against `Ã` + U+0089 whatever Tally does with NFC and NFD. Qualifying 9.4d needed this ledger,
+> so treat the licensed-7.1 NFD row as **unsupported**. What remains is the 2026-08-19 observation in
+> §9.4b, scoped there to an unclassified Education instance and to no licensed SKU.
+> **Confidence: PARTIAL** (one read of one ledger).
+
 
 ### 9.4c Real catalogues carry families a partial name cannot separate
 
@@ -772,6 +783,42 @@ Gold, one client book, 2026-09-28).**
 - **Confidence.** VERIFIED for the 6 vouchers, because `ledger_movement` read back exactly those 6.
   The `Alter` clause is PARTIAL (reported, not read back). It is one session on one client book, so
   **Confidence: PARTIAL** beyond it.
+
+### 9.4f A `$Name` filter folds ASCII case, not accented capitals
+
+**Confidence: PARTIAL.** Measured on 2026-10-02, licensed TallyPrime 7.1 Silver (`education_mode=false`), on one
+synthetic company and one ledger, in one direction: the accented letter is stored lower-case and asked for
+upper-case.
+
+§9.4b and §9.4d measure ASCII case on **import**. This measures a Ledger collection filtered by the TDL formula
+`$Name = "<name>"`. The stored name was `Näive Chemicals &amp; Co.`: the `&amp;` is literal text in the name, and
+the `ä` is precomposed (U+00E4). The variants were built from the name as captured earlier from this company,
+which an Object export read back byte-for-byte before any filter was sent. Each request's codepoints were
+asserted, and its UTF-16 encoding was round-tripped, before it was sent. A match was judged by the ledger's GUID.
+
+| asked | matched |
+| --- | --- |
+| the stored name | **yes** |
+| ASCII letters upper-cased, `ä` unchanged (`NäIVE CHEMICALS &AMP; CO.`) | **yes** |
+| fully upper-cased, `Ä` (U+00C4) | **no** |
+| the same, with `Ä` decomposed (`A` + U+0308) | no |
+| accents removed (`Naive …`) | no |
+| a name the book does not hold | no |
+
+All four non-matches returned the same well-formed empty collection, with no `LINEERROR`, so each one is an answer
+and not a failed request.
+
+> **RULE: do not treat two names that differ in the case of a non-ASCII letter as one name.** Tally's `$Name`
+> equality did not, in the one direction measured, and nothing else measured shows Tally doing so. This adds no
+> licence to ASCII case beyond what §9.4b and §9.4d already scope (bridge#1076).
+
+**Not measured:**
+- the upper-case-stored direction: the only candidate ledger in the lab is stored as mojibake (see the 9.4d
+  correction), and sending its control character inside a TDL formula was not attempted;
+- import-time resolution of an accented capital;
+- an Object export looked up by a name the book does not hold: its failure mode is unknown, so the variants were
+  sent as filters, which fail in band;
+- other letters (ß, dotless i) and other builds.
 
 
 #

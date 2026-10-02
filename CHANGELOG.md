@@ -12,6 +12,18 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since `mcp-v0.4.1` (2 Oct 2026)
+
+These changes are in source and not yet in a published build.
+
+**Safer or fixed**
+
+- In the desktop app, the button on an export notice that shows the file
+  (Show in Finder, Show in Explorer or Open folder) now opens only a file
+  ComplyEaze Bridge exported since it started. Any other path is refused
+  before the file manager opens, so a compromised app window cannot use it to
+  point at other files on the computer. Exports work as before (#915, #1051).
+
 ## [0.4.1] - 2026-10-02
 
 ### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)

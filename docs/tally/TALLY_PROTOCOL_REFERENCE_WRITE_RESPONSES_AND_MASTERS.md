@@ -326,6 +326,9 @@ The observed counters distinguish an alteration of an existing master from creat
 of a new one. This experiment did not establish protection against a concurrent
 foreign writer or recovery of an unobserved prior master.
 
+A `Create` with the same name and a different parent, bill-wise flag and opening balance replaced
+all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g).
+
 The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)
 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a. This section records the gateway observation;
@@ -826,6 +829,102 @@ and not a failed request.
 - an Object export looked up by a name the book does not hold: its failure mode is unknown, so the variants were
   sent as filters, which fail in band;
 - other letters (ß, dotless i) and other builds.
+
+### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
+
+**Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
+`BRIDGE AMEND LAB`, three runs, one run each. **Confidence: PARTIAL.**
+
+§9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
+differ from the existing ledger's. Each request below was a gateway import (`Import Data`,
+`REPORTNAME` `All Masters`) sent with no import option in `STATICVARIABLES`, so Tally applied its
+default handling.
+
+1. **The setup.** A new ledger `Create Probe 02` was created: `PARENT` `Sundry Creditors`,
+   `ISBILLWISEON` `Yes`, `OPENINGBALANCE` `-1000.00`, and no bill allocations.
+   - Tally answered `CREATED 1`, every other counter 0, and no `LINEERROR`. The operator watching
+     Tally's screen reported no dialog.
+   - The company's master mark (`ALTMSTID`) stepped by 1.
+2. **The `Create` on that name, with all three fields changed together.** It sent `PARENT`
+   `Indirect Expenses`, `ISBILLWISEON` `No` and `OPENINGBALANCE` `-2500.00`.
+   - Tally answered `CREATED 0, ALTERED 1`, every other counter 0, and no `LINEERROR`.
+   - `ALTMSTID` stepped by 1 again. The ledger kept its GUID and `MASTERID`; its `ALTERID` advanced.
+
+**After the `Create`, all three fields held the supplied values:**
+
+| Field | Before (as created in step 1) | Sent in step 2 | After (read back) |
+| --- | --- | --- | --- |
+| `PARENT` | `Sundry Creditors` | `Indirect Expenses` | `Indirect Expenses` |
+| `ISBILLWISEON` | `Yes` | `No` | `No` |
+| Opening balance | `-1000.00` | `-2500.00` | `-2500.00` |
+
+The "Before" values were read back after step 1. A date-less `Ledger` collection read showed all
+three fields. A trial balance read showed the parent and the opening.
+
+**The new opening, read two ways.**
+- Two trial balance reads through ComplyEaze Bridge 0.4.1's `trial_balance` tool, for April 2025
+  (the company's first month), taken at 16:04:39Z before the `Create` and 16:06:01Z after it, show
+  the opening as `-1000.00` and then `-2500.00`.
+- A `Ledger` collection read with `SVFROMDATE` and `SVTODATE` both set to the company's books-from
+  date shows `-2500.00`. It was taken after the `Create` only.
+
+**Read the opening at a stated date.** The same `Ledger` collection read **without** date variables
+returned `OPENINGBALANCE` `0.00` for this ledger after the `Create`. Before it, under `Sundry
+Creditors`, the same date-less read returned `-1000.00`.
+
+The cause was not isolated. It may be either of these:
+- the date-less read reporting the opening at the start of the loaded period (by analogy with §5.5);
+- the ledger now sitting under a nominal group (§5.5's 2026-09-06 correction).
+
+Either way, a date-less read showed a replaced opening as `0.00` (observed once). Read an opening at
+a stated date (IMPLEMENTATION_GUIDE I11).
+
+**What this means, on this run:**
+- a `Create` with the same name and a changed parent, bill-wise flag and opening did not fail;
+- it ended with all three at the supplied values;
+- the counters reported it only as `ALTERED 1`.
+
+IMPLEMENTATION_GUIDE §3.6 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a hold the workflow that must
+prevent it. Step 3a already asserted that such an overwrite replaces a ledger's group and opening
+balance; this is a measurement of that case.
+
+**Two follow-up runs, one variable each** (2026-10-02, the same company, one run each, lab). Each
+used a new ledger under `Sundry Creditors`, with bill-wise `Yes` and an opening of `-1000.00`. The
+opening was read at the books-from date, before (right after the ledger was created) and after.
+- **Only the opening changed.** A `Create` with the same name, the same parent and bill-wise flag,
+  and `OPENINGBALANCE` `-2500.00` answered `ALTERED 1`. The opening became `-2500.00`; the parent
+  and bill-wise flag were unchanged.
+- **The opening omitted.** A `Create` with the same name, parent and bill-wise flag and no
+  `OPENINGBALANCE` element answered `ALTERED 1`. The opening stayed at `-1000.00`; the parent and
+  bill-wise flag were unchanged.
+
+So, on these runs, a supplied opening replaced the existing one, and an omitted opening was kept.
+In the first of the two, the date-less read agreed with the dated one (`-2500.00`), on a
+balance-sheet ledger. So the date-less `0.00` did not recur on a balance-sheet ledger (one run). That
+fits the nominal-group candidate above; it does not isolate it.
+
+**Object export.** A `TYPE=Object`, `SUBTYPE=Ledger` export, whose `FETCHLIST` held `FETCH` `*`,
+showed `PARENT` and `ISBILLWISEON`. It never showed:
+- `OPENINGBALANCE`, which was checked while the opening was `-1000.00`;
+- `ALTERID`;
+- `GUID`.
+
+So a diff of it could show a change to the parent or the bill-wise flag, but not to the opening
+(inferred from the fields it carried, one run).
+
+**Not measured:**
+- whether the parent and the bill-wise flag each change on their own: in the first run they changed
+  together, with the opening, and the parent moved from a balance-sheet group to a nominal group;
+- a parent change within balance-sheet groups;
+- a `Create` that omits `PARENT` or `ISBILLWISEON`;
+- an `OPENINGBALANCE` of `0` or an empty element (only an omitted element was measured);
+- an opening-only change on a ledger under a nominal group;
+- an omitted opening in a `Create` that also changes the parent or the bill-wise flag;
+- a folded or differently cased spelling of the name (§9.4b, §9.4d, §9.4e);
+- a ledger that holds bill allocations or posted vouchers;
+- the cause of the date-less `0.00`;
+- the same behaviour on Gold or Education;
+- any import option that makes Tally ignore an existing master.
 
 
 #

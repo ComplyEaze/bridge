@@ -19,9 +19,10 @@
 //   1. the push is an ordinary fast-forward: `before` is an ancestor of the commit, so
 //      `before..commit` really is what the push changed;
 //   2. that push changes none of Cargo.lock, a Cargo.toml, the toolchain file, a `.cargo/` directory
-//      at any depth, tauri.conf.json (its macOS deployment target is in the cache key), this script
-//      or anything under .github/, so caches stay warm and a workflow or lookup change is always
-//      exercised in full;
+//      at any depth, tauri.conf.json (its macOS deployment target is in the cache key), this script,
+//      the CI workflow or a composite action it uses (.github/workflows/ci.yml, .github/actions/), so
+//      caches stay warm and a workflow or lookup change is always exercised in full. Other .github
+//      content (another workflow, issue templates) is not used by the heavy jobs and does not force one;
 //   3. exactly one `merge_group` run of ci.yml has this head SHA, it is completed with conclusion
 //      `success`, and the API's total_count matches what it returned (no unseen second page);
 //   4. that run's job listing is complete, and each job of the family is present once, `success`.
@@ -29,7 +30,7 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const SHA = /^[0-9a-f]{40,64}$/;
-const FORCE_FULL = /^(?:\.github\/|(?:.*\/)?\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
+const FORCE_FULL = /^(?:\.github\/workflows\/ci\.yml$|\.github\/actions\/|(?:.*\/)?\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
 const WORKFLOW_FILE = "ci.yml";
 // The job names a queue run reports when the job ran: ci.yml's `name:` with the matrix expanded.
 // scripts/master-push-reuse.test.mjs derives them from ci.yml and fails if these lists drift.

@@ -408,23 +408,42 @@ const NOTE_DAYS: &str = concat!(
     "/crates/bridge-tally-protocol/tests/fixtures/note-days"
 );
 
+fn recorded_file(directory: &str, name: &str) -> Vec<u8> {
+    std::fs::read(format!("{directory}/{name}")).unwrap_or_else(|error| panic!("{name}: {error}"))
+}
+
+fn recorded_json(directory: &str, name: &str) -> Value {
+    serde_json::from_slice(&recorded_file(directory, name)).unwrap()
+}
+
 fn note_day_file(name: &str) -> Vec<u8> {
-    std::fs::read(format!("{NOTE_DAYS}/{name}")).unwrap_or_else(|error| panic!("{name}: {error}"))
+    recorded_file(NOTE_DAYS, name)
 }
 
 fn note_day_json(name: &str) -> Value {
-    serde_json::from_slice(&note_day_file(name)).unwrap()
+    recorded_json(NOTE_DAYS, name)
 }
 
-/// Replays one recorded call and returns the tool's response and its observed requests.
 async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
-    let sequence = note_day_json(&format!("{prefix}_sequence.json"));
+    replay_recorded(NOTE_DAYS, prefix, 118).await
+}
+
+/// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
+/// `directory`) and returns the tool's response, the record and the requests that were not the
+/// recorded ones. `expected_requests` is what the call is known to have sent.
+async fn replay_recorded(
+    directory: &str,
+    prefix: &str,
+    expected_requests: usize,
+) -> (Value, Value, Vec<String>) {
+    let sequence = recorded_json(directory, &format!("{prefix}_sequence.json"));
     let requests = sequence["requests"].as_array().unwrap();
     assert_eq!(
         requests.len(),
-        118,
+        expected_requests,
         "the record lists every request of the call"
     );
+    assert_eq!(sequence["requests_sent"], expected_requests);
     let plans = requests
         .iter()
         .map(|request| {
@@ -432,7 +451,7 @@ async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
                 plan(Kind::Status, String::new())
             } else {
                 let fixture = request["fixture"].as_str().unwrap();
-                plan(Kind::Window, utf16(&note_day_file(fixture)))
+                plan(Kind::Window, utf16(&recorded_file(directory, fixture)))
             }
         })
         .collect::<Vec<_>>();

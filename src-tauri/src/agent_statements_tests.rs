@@ -13,7 +13,7 @@
 //! derivation's figures are proven in `reports::statements`.
 use super::super::*;
 use super::{top_level, weakest};
-use crate::reports::statements::Established;
+use crate::reports::statements::{Established, NotEstablishedReason};
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -110,6 +110,14 @@ fn plans_with(current_assets: &str, profit_and_loss: Option<String>) -> Vec<Scen
     plans
 }
 
+/// The headline's lead, from the structured content of a response.
+fn lead(response: &Value) -> String {
+    response["structuredContent"]["headline"]["lead"]
+        .as_str()
+        .expect("a statement carries a headline")
+        .to_string()
+}
+
 async fn call(tool: &str, plans: Vec<ScenarioPlan>) -> (Value, usize, usize) {
     call_with(tool, plans, Redaction::None).await
 }
@@ -171,6 +179,18 @@ async fn profit_and_loss_reads_both_statements_and_reports_gated_results() {
     );
     assert_eq!(result["tie_out"]["lines"][0]["status"], "matched");
     assert_eq!(result["lines"].as_array().unwrap().len(), 6);
+    // In words, ahead of the figures: established, the period, and what it ties to.
+    let lead = lead(&response);
+    assert!(lead.starts_with("Profit and loss for \u{201c}"), "{lead}");
+    assert!(
+        lead.contains("the gross result and the net result established"),
+        "{lead}"
+    );
+    assert!(
+        lead.contains("passed the comparison with Tally's own Balance Sheet and Profit and Loss"),
+        "{lead}"
+    );
+    assert!(!lead.contains("Not established"), "{lead}");
 }
 
 #[tokio::test]
@@ -182,6 +202,14 @@ async fn balance_sheet_reads_only_the_balance_sheet_and_reports_the_carried_line
     assert!(value(carried).numeric_eq(&bridge_tally_core::ExactDecimal::parse("11027.00").unwrap()));
     assert!(result["tie_out"].is_null());
     assert_eq!(result["lines"].as_array().unwrap().len(), 9);
+    // No Profit and Loss was read, so none is claimed.
+    let lead = lead(&response);
+    assert!(lead.starts_with("Balance sheet for \u{201c}"), "{lead}");
+    assert!(
+        lead.contains("passed the comparison with Tally's own Balance Sheet."),
+        "{lead}"
+    );
+    assert!(!lead.contains("Profit and Loss."), "{lead}");
 }
 
 #[tokio::test]
@@ -197,6 +225,16 @@ async fn a_balance_sheet_that_does_not_tie_names_the_line_and_establishes_nothin
     }
     // The derived lines are withheld, not shown as the statement.
     assert!(result["lines"].is_null(), "{result}");
+    // The headline leads with it, for both results, with the count of lines.
+    let lead = lead(&response);
+    assert!(
+        lead.starts_with("Not established: profit and loss for \u{201c}"),
+        "{lead}"
+    );
+    assert!(lead.contains("the gross result is not established: Tally's own Balance Sheet differs from the derived lines (on 1 line)"), "{lead}");
+    assert!(lead.contains("the net result is not established"), "{lead}");
+    assert!(lead.contains("The derived lines are withheld"), "{lead}");
+    assert!(!lead.contains("established;"), "{lead}");
     assert_eq!(
         result["balance_sheet_gate"]["lines"]
             .as_array()
@@ -215,6 +253,15 @@ async fn a_balance_sheet_that_does_not_tie_withholds_its_lines() {
     assert_eq!(carried["state"], "not_established", "{carried}");
     assert_eq!(carried["reason"], "tally_balance_sheet_differs");
     assert!(result["lines"].is_null(), "{result}");
+    let lead = lead(&response);
+    assert!(
+        lead.starts_with("Not established: balance sheet for \u{201c}"),
+        "{lead}"
+    );
+    assert!(
+        lead.contains("the profit and loss line of the balance sheet is not established"),
+        "{lead}"
+    );
 }
 
 #[tokio::test]
@@ -319,6 +366,11 @@ async fn a_profit_and_loss_that_differs_from_tallys_own_is_not_established_at_th
     );
     assert_eq!(result["result"]["net_result"]["reason"], result["reason"]);
     assert!(result["lines"].is_null(), "{result}");
+    let lead = lead(&response);
+    assert!(
+        lead.contains("Tally's own Profit and Loss differs from the derived lines"),
+        "{lead}"
+    );
 }
 
 /// Every reason the derivation can refuse with, through the same decision the
@@ -333,15 +385,15 @@ fn every_not_established_reason_is_carried_to_the_top() {
         lines: Vec::new(),
     };
     for reason in [
-        "unclassified_ledger_carries_an_amount",
-        "closing_stock_not_derivable_from_trial_balance",
-        "profit_and_loss_ledger_not_returned",
-        "tally_balance_sheet_differs",
-        "tally_profit_and_loss_differs",
+        NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount,
+        NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance,
+        NotEstablishedReason::ProfitAndLossLedgerNotReturned,
+        NotEstablishedReason::TallyBalanceSheetDiffers,
+        NotEstablishedReason::TallyProfitAndLossDiffers,
     ] {
         assert_eq!(
             top_level(&not_established(reason)),
-            ("not_established", Some(reason))
+            ("not_established", Some(reason.as_str()))
         );
     }
     let established = Established::Established {
@@ -357,7 +409,7 @@ fn the_weaker_of_two_results_decides_the_top() {
         value: bridge_tally_core::ExactDecimal::parse("1.00").unwrap(),
     };
     let refused = Established::NotEstablished {
-        reason: "tally_profit_and_loss_differs",
+        reason: NotEstablishedReason::TallyProfitAndLossDiffers,
         lines: Vec::new(),
     };
     assert_eq!(
@@ -372,4 +424,35 @@ fn the_weaker_of_two_results_decides_the_top() {
         top_level(weakest(&[&established, &established])).0,
         "observed"
     );
+}
+
+/// The codes a caller reads are the ones the result has always carried, by
+/// both paths that write them (`as_str` and the derived serde form).
+#[test]
+fn the_not_established_codes_are_unchanged() {
+    for (reason, code) in [
+        (
+            NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount,
+            "unclassified_ledger_carries_an_amount",
+        ),
+        (
+            NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance,
+            "closing_stock_not_derivable_from_trial_balance",
+        ),
+        (
+            NotEstablishedReason::ProfitAndLossLedgerNotReturned,
+            "profit_and_loss_ledger_not_returned",
+        ),
+        (
+            NotEstablishedReason::TallyBalanceSheetDiffers,
+            "tally_balance_sheet_differs",
+        ),
+        (
+            NotEstablishedReason::TallyProfitAndLossDiffers,
+            "tally_profit_and_loss_differs",
+        ),
+    ] {
+        assert_eq!(reason.as_str(), code);
+        assert_eq!(serde_json::to_value(reason).unwrap(), json!(code));
+    }
 }

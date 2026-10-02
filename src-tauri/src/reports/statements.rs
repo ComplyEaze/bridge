@@ -136,6 +136,33 @@ pub struct UnclassifiedLedger {
     pub credit: NativeTrialBalanceAmount,
 }
 
+/// Why a statement's result is not established. Typed, so that nothing words
+/// or reports a reason that this list does not hold; the codes are the same
+/// ones the result has always carried.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotEstablishedReason {
+    UnclassifiedLedgerCarriesAnAmount,
+    ClosingStockNotDerivableFromTrialBalance,
+    ProfitAndLossLedgerNotReturned,
+    TallyBalanceSheetDiffers,
+    TallyProfitAndLossDiffers,
+}
+
+impl NotEstablishedReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UnclassifiedLedgerCarriesAnAmount => "unclassified_ledger_carries_an_amount",
+            Self::ClosingStockNotDerivableFromTrialBalance => {
+                "closing_stock_not_derivable_from_trial_balance"
+            }
+            Self::ProfitAndLossLedgerNotReturned => "profit_and_loss_ledger_not_returned",
+            Self::TallyBalanceSheetDiffers => "tally_balance_sheet_differs",
+            Self::TallyProfitAndLossDiffers => "tally_profit_and_loss_differs",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum Established {
@@ -143,7 +170,7 @@ pub enum Established {
         value: ExactDecimal,
     },
     NotEstablished {
-        reason: &'static str,
+        reason: NotEstablishedReason,
         /// For `tally_balance_sheet_differs`, the lines that did not tie: a
         /// Tally line's name, or a derived line's display name.
         lines: Vec<String>,
@@ -151,7 +178,7 @@ pub enum Established {
 }
 
 impl Established {
-    fn blocked(reason: &'static str) -> Self {
+    fn blocked(reason: NotEstablishedReason) -> Self {
         Self::NotEstablished {
             reason,
             lines: Vec::new(),
@@ -348,12 +375,12 @@ pub fn derive_statements(
     });
     // Stock blocks the carried line too: Tally's carries the change in stock.
     let blocked = if omitted {
-        Some("unclassified_ledger_carries_an_amount")
+        Some(NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount)
     } else if stock_ledger_count > 0 {
-        Some("closing_stock_not_derivable_from_trial_balance")
+        Some(NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance)
     } else if profit_and_loss_ledger.is_none() {
         // Tally's carried line then has nothing to tie to; name the cause.
-        Some("profit_and_loss_ledger_not_returned")
+        Some(NotEstablishedReason::ProfitAndLossLedgerNotReturned)
     } else {
         None
     };
@@ -370,7 +397,7 @@ pub fn derive_statements(
     let gross = sum_of(&|name| TRADING_PRIMARY_GROUPS.contains(&name))?;
     let net = sum_of(&|_| true)?;
     let carried = match &profit_and_loss_ledger {
-        None => Established::blocked("profit_and_loss_ledger_not_returned"),
+        None => Established::blocked(NotEstablishedReason::ProfitAndLossLedgerNotReturned),
         Some(ledger) => {
             let mut total = profit_and_loss_closing;
             total.add(&ledger.closing)?;
@@ -390,7 +417,7 @@ pub fn derive_statements(
     let gated = |value: ExactDecimal| match blocked {
         Some(reason) => Established::blocked(reason),
         None if !failures.is_empty() => Established::NotEstablished {
-            reason: "tally_balance_sheet_differs",
+            reason: NotEstablishedReason::TallyBalanceSheetDiffers,
             lines: failures.clone(),
         },
         None => Established::Established { value },
@@ -406,7 +433,7 @@ pub fn derive_statements(
     let movement_gated = |value: ExactDecimal| match gated(value) {
         Established::Established { .. } if !profit_and_loss_failures.is_empty() => {
             Established::NotEstablished {
-                reason: "tally_profit_and_loss_differs",
+                reason: NotEstablishedReason::TallyProfitAndLossDiffers,
                 lines: profit_and_loss_failures.clone(),
             }
         }
@@ -607,21 +634,22 @@ fn tie_lines(
         .lines
         .iter()
         .map(|line| {
-            let status = if let Some(group) =
-                lines.iter().find(|group| group.display_name == line.name)
-            {
-                named.push(group.display_name.as_str());
-                compare(&line.sub, &line.main, &group.amount.sum)
-            } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
-                match result {
-                    Established::Established { value } => compare(&line.sub, &line.main, value),
-                    Established::NotEstablished { reason, .. } => TieStatus::NotCompared { reason },
-                }
-            } else {
-                TieStatus::NotCompared {
-                    reason: "no_derived_line_of_that_name",
-                }
-            };
+            let status =
+                if let Some(group) = lines.iter().find(|group| group.display_name == line.name) {
+                    named.push(group.display_name.as_str());
+                    compare(&line.sub, &line.main, &group.amount.sum)
+                } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
+                    match result {
+                        Established::Established { value } => compare(&line.sub, &line.main, value),
+                        Established::NotEstablished { reason, .. } => TieStatus::NotCompared {
+                            reason: reason.as_str(),
+                        },
+                    }
+                } else {
+                    TieStatus::NotCompared {
+                        reason: "no_derived_line_of_that_name",
+                    }
+                };
             TieLine {
                 name: line.name.clone(),
                 tally_sub: line.sub.clone(),

@@ -6,9 +6,9 @@
 //! them into a sentence. (A byte cap that trims a page reads back only the
 //! headline's own `page` numbers, to restate its row sentence.) Two rules are held by the types:
 //!
-//! - A read is [`Completeness::Whole`] only when it has no [`Gap`]; a read
-//!   with any gap is [`Completeness::Partial`], and its headline names every
-//!   gap. There is no way to write "whole" over a gap.
+//! - A read is whole only when it has no [`Gap`] ([`Completeness::is_whole`]);
+//!   a read with any gap is partial, and its headline names every gap. There
+//!   is no way to write "whole" over a gap.
 //! - Rows are described by a [`Page`], and a later byte cap that trims a page
 //!   restates the row sentence from the rows that are left
 //!   ([`restate_rows`]), so the headline never claims rows the response no
@@ -19,6 +19,7 @@
 //! headline: the headline types hold counts, dates and enums, and one
 //! [`CompanyName`].
 use super::*;
+use crate::reports::statements::{Established, NotEstablishedReason};
 use serde::Deserialize;
 
 /// The company a headline names, as Tally spells it, made safe to quote.
@@ -78,7 +79,11 @@ pub(super) fn plain_date(date: &bridge_tally_core::TallyDate) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Gap {
     /// A several-currency book read for its plain base-currency ledgers only:
-    /// how many ledgers were set aside, in each of the two ways.
+    /// how many ledgers were set aside, in each of the two ways. Even with
+    /// none set aside this is partial: the tool's own scope
+    /// (`ledgers_scope: base_currency_ledgers_only`) and its first limitation
+    /// say so, and the headline agrees with them and says that nothing was
+    /// left out, rather than calling a different scope whole.
     BaseCurrencyLedgersOnly { foreign: usize, mixed: usize },
 }
 
@@ -269,6 +274,192 @@ impl TrialBalanceBasis {
             lead,
             rows: Some(page.sentence()),
             page: Some(page),
+        }
+    }
+}
+
+/// Which statement a headline is about.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StatementKind {
+    ProfitAndLoss,
+    BalanceSheet,
+}
+
+/// One result a statement carries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StatementPart {
+    GrossResult,
+    NetResult,
+    BalanceSheetProfitAndLoss,
+}
+
+impl StatementPart {
+    fn words(self) -> &'static str {
+        match self {
+            Self::GrossResult => "the gross result",
+            Self::NetResult => "the net result",
+            Self::BalanceSheetProfitAndLoss => "the profit and loss line of the balance sheet",
+        }
+    }
+}
+
+/// Whether one result of a statement is established, and if not why.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PartOutcome {
+    Established,
+    NotEstablished {
+        reason: NotEstablishedReason,
+        /// How many lines did not tie: a Tally line that differs, or a derived
+        /// line Tally has no counterpart for (a count; no names).
+        differing_lines: usize,
+    },
+}
+
+impl PartOutcome {
+    /// The outcome of one derived result, by an exhaustive match.
+    pub(super) fn of(result: &Established) -> Self {
+        match result {
+            Established::Established { .. } => Self::Established,
+            Established::NotEstablished { reason, lines } => Self::NotEstablished {
+                reason: *reason,
+                differing_lines: lines.len(),
+            },
+        }
+    }
+}
+
+fn reason_words(reason: NotEstablishedReason) -> &'static str {
+    match reason {
+        NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount => {
+            "a ledger the derivation cannot classify carries an amount"
+        }
+        NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance => {
+            "the book has a Stock-in-Hand balance and closing stock is not derived"
+        }
+        NotEstablishedReason::ProfitAndLossLedgerNotReturned => {
+            "Tally did not return its Profit & Loss A/c ledger"
+        }
+        NotEstablishedReason::TallyBalanceSheetDiffers => {
+            "Tally's own Balance Sheet differs from the derived lines"
+        }
+        NotEstablishedReason::TallyProfitAndLossDiffers => {
+            "Tally's own Profit and Loss differs from the derived lines"
+        }
+    }
+}
+
+/// What a profit and loss or balance sheet read established, held for its
+/// headline.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct StatementBasis {
+    kind: StatementKind,
+    from: bridge_tally_core::TallyDate,
+    to: bridge_tally_core::TallyDate,
+    parts: Vec<(StatementPart, PartOutcome)>,
+    /// Whether Tally's own Profit and Loss was read as well. It only counts
+    /// for a profit and loss: only its results are gated on it.
+    read_tally_profit_and_loss: bool,
+}
+
+impl StatementBasis {
+    pub(super) fn new(
+        kind: StatementKind,
+        from: bridge_tally_core::TallyDate,
+        to: bridge_tally_core::TallyDate,
+        parts: Vec<(StatementPart, PartOutcome)>,
+        read_tally_profit_and_loss: bool,
+    ) -> Self {
+        Self {
+            kind,
+            from,
+            to,
+            parts,
+            read_tally_profit_and_loss,
+        }
+    }
+
+    /// Whether the result's own comparison included Tally's Profit and Loss:
+    /// only a profit and loss that read it.
+    fn compared_with_tally_profit_and_loss(&self) -> bool {
+        self.kind == StatementKind::ProfitAndLoss && self.read_tally_profit_and_loss
+    }
+
+    /// Whether the derived lines are withheld from the result: the tool shows
+    /// them only once the net result (or the balance sheet's carried line) is
+    /// established.
+    fn lines_withheld(&self) -> bool {
+        self.parts.iter().any(|(part, outcome)| {
+            matches!(
+                part,
+                StatementPart::NetResult | StatementPart::BalanceSheetProfitAndLoss
+            ) && !matches!(outcome, PartOutcome::Established)
+        })
+    }
+
+    pub(super) fn headline(&self, company: &CompanyName) -> Headline {
+        let name = match self.kind {
+            StatementKind::ProfitAndLoss => "profit and loss",
+            StatementKind::BalanceSheet => "balance sheet",
+        };
+        let subject = format!(
+            "{name} for {}, {} to {}",
+            company.quoted(),
+            plain_date(&self.from),
+            plain_date(&self.to)
+        );
+        let every_part_established = self
+            .parts
+            .iter()
+            .all(|(_, outcome)| matches!(outcome, PartOutcome::Established));
+        let lead = if every_part_established {
+            let established = self
+                .parts
+                .iter()
+                .map(|(part, _)| part.words())
+                .collect::<Vec<_>>()
+                .join(" and ");
+            let against = if self.compared_with_tally_profit_and_loss() {
+                "Tally's own Balance Sheet and Profit and Loss"
+            } else {
+                "Tally's own Balance Sheet"
+            };
+            format!(
+                "{}: {established} established, after the derived lines passed the comparison with {against}.",
+                capitalised(&subject)
+            )
+        } else {
+            let phrases = self
+                .parts
+                .iter()
+                .map(|(part, outcome)| match outcome {
+                    PartOutcome::Established => format!("{} is established", part.words()),
+                    PartOutcome::NotEstablished {
+                        reason,
+                        differing_lines,
+                    } => format!(
+                        "{} is not established: {}{}",
+                        part.words(),
+                        reason_words(*reason),
+                        match differing_lines {
+                            0 => String::new(),
+                            1 => " (on 1 line)".to_string(),
+                            count => format!(" (on {count} lines)"),
+                        }
+                    ),
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            let withheld = if self.lines_withheld() {
+                " The derived lines are withheld; the result shows how each of Tally's own lines compared."
+            } else {
+                ""
+            };
+            format!("Not established: {subject}: {phrases}.{withheld}")
+        };
+        Headline {
+            lead,
+            rows: None,
+            page: None,
         }
     }
 }

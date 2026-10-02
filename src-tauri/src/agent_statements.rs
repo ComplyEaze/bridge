@@ -44,7 +44,7 @@ impl Server {
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));
         let derived = read.derived;
-        let (lines, established, headline) = match kind {
+        let (lines, established, figures) = match kind {
             NativeStatementKind::ProfitAndLoss => (
                 &derived.profit_and_loss,
                 &derived.net_result,
@@ -70,7 +70,39 @@ impl Server {
         // The derived lines are the statement only once its result is
         // established; until then they are withheld, and the gates show how
         // each of Tally's own lines compared.
-        let lines = matches!(established, Established::Established { .. }).then_some(lines);
+        let lines_withheld = !matches!(established, Established::Established { .. });
+        // The headline's facts, from the same derived results the state is
+        // built from, before anything of `derived` is moved.
+        let (statement_kind, parts) = match kind {
+            NativeStatementKind::ProfitAndLoss => (
+                headline::StatementKind::ProfitAndLoss,
+                vec![
+                    (
+                        headline::StatementPart::GrossResult,
+                        headline::PartOutcome::of(&derived.gross_result),
+                    ),
+                    (
+                        headline::StatementPart::NetResult,
+                        headline::PartOutcome::of(&derived.net_result),
+                    ),
+                ],
+            ),
+            NativeStatementKind::BalanceSheet => (
+                headline::StatementKind::BalanceSheet,
+                vec![(
+                    headline::StatementPart::BalanceSheetProfitAndLoss,
+                    headline::PartOutcome::of(&derived.balance_sheet_profit_and_loss),
+                )],
+            ),
+        };
+        let statement_basis = headline::StatementBasis::new(
+            statement_kind,
+            trial_balance.from.clone(),
+            trial_balance.to.clone(),
+            parts,
+            derived.profit_and_loss_tie.is_some(),
+        );
+        let lines = (!lines_withheld).then_some(lines);
         let outcome = match kind {
             NativeStatementKind::ProfitAndLoss => {
                 weakest(&[&derived.net_result, &derived.gross_result])
@@ -96,7 +128,7 @@ impl Server {
                     "from": trial_balance.from, "to": trial_balance.to,
                     "currency": trial_balance.currency, "read_at": trial_balance.read_at,
                     "lines": lines,
-                    "result": headline,
+                    "result": figures,
                     "unclassified": unclassified,
                     "unclassified_total": unclassified_total,
                     "stock_ledger_count": derived.stock_ledger_count,
@@ -120,11 +152,14 @@ impl Server {
         if let (Some(reason), Some(result)) = (top_level(outcome).1, result.as_object_mut()) {
             result.insert("reason".to_string(), json!(reason));
         }
+        let mut payload = json!({
+            "company": company_json(&company, std::slice::from_ref(&company)),
+            "result": result,
+        });
+        payload["headline"] =
+            json!(statement_basis.headline(&headline::CompanyName::new(&company.name)));
         Ok(ToolOutcome {
-            payload: json!({
-                "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": result,
-            }),
+            payload,
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: unclassified_total > MAX_UNCLASSIFIED_RETURNED,
@@ -138,7 +173,7 @@ impl Server {
 fn top_level(outcome: &Established) -> (&'static str, Option<&'static str>) {
     match outcome {
         Established::Established { .. } => ("observed", None),
-        Established::NotEstablished { reason, .. } => ("not_established", Some(reason)),
+        Established::NotEstablished { reason, .. } => ("not_established", Some(reason.as_str())),
     }
 }
 
@@ -158,7 +193,7 @@ fn established_json(result: &Established) -> Value {
     match result {
         Established::Established { value } => json!({"state": "established", "value": value}),
         Established::NotEstablished { reason, lines } => json!({
-            "state": "not_established", "reason": reason,
+            "state": "not_established", "reason": reason.as_str(),
             "lines": lines.iter().cloned().map(party_name).collect::<Vec<_>>(),
         }),
     }

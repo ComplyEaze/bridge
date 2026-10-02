@@ -255,6 +255,10 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
     let base = &result["base_currency_ledgers"];
     assert_eq!(base["totals"]["receivable"], "34500");
     assert_eq!(base["open_bills"].as_array().unwrap().len(), 14);
+    // The counts sit with the figures they describe, under the same key.
+    assert_eq!(base["open_bills_total"], 14);
+    assert_eq!(base["open_bills_shown"], 14);
+    assert!(result.get("open_bills_total").is_none(), "{result}");
     let excluded = &result["foreign_currency_ledgers_excluded"];
     assert_eq!(excluded["count"], 3);
     let ledgers = excluded["ledgers"].as_array().unwrap();
@@ -1171,5 +1175,81 @@ fn the_recorded_sequences_are_the_ones_committed_with_the_capture() {
     ] {
         assert_eq!(record.len(), bytes);
         assert_eq!(sha256_hex(record.as_bytes()), sha256);
+    }
+}
+
+/// RD1 (2 Oct): no field said how many open bills there were, so a page cut
+/// at `limit` read like the whole list while its totals covered every bill.
+/// `open_bills_total` counts the bills in the requested direction before any
+/// paging; `open_bills_shown` counts the page actually returned.
+#[tokio::test]
+async fn mcp_outstandings_count_every_open_bill_and_the_bills_shown() {
+    let call = |arguments: Value| async move {
+        let response = ageing_outstandings(ageing_ledgers_with_currency("I₹"), arguments).await;
+        assert_eq!(response["isError"], false, "{response}");
+        let result = response["structuredContent"]["result"].clone();
+        assert_eq!(result["state"], "complete", "{result}");
+        result
+    };
+    let length = |result: &Value| result["open_bills"].as_array().unwrap().len() as u64;
+
+    // Every bill on one page: shown equals total, and nothing follows.
+    let whole = call(json!({})).await;
+    let total = whole["open_bills_total"].as_u64().unwrap();
+    assert_eq!(total, length(&whole));
+    assert_eq!(whole["open_bills_shown"], total);
+    assert!(whole["next_offset"].is_null(), "{whole}");
+    assert!(total > 2, "the captured book must page: {total}");
+
+    // A cut page keeps the total and counts what it shows.
+    let first = call(json!({"limit": 2})).await;
+    assert_eq!(first["open_bills_total"], total);
+    assert_eq!(first["open_bills_shown"], 2);
+    assert_eq!(length(&first), 2);
+    assert_eq!(first["next_offset"], 2);
+
+    // The last page is shorter than `limit`: shown is the page, not `limit`.
+    let last = call(json!({"offset": total - 1, "limit": 2})).await;
+    assert_eq!(last["open_bills_total"], total);
+    assert_eq!(last["open_bills_shown"], 1);
+    assert_eq!(last["limit"], 2);
+
+    // An offset past the end shows nothing and keeps the total.
+    let beyond = call(json!({"offset": total, "limit": 2})).await;
+    assert_eq!(beyond["open_bills_total"], total);
+    assert_eq!(beyond["open_bills_shown"], 0);
+    assert!(beyond["next_offset"].is_null(), "{beyond}");
+
+    // The total is counted after the direction filter, as the totals are.
+    let receivable = call(json!({"direction": "receivable", "limit": 1})).await;
+    let receivable_bills = whole["open_bills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|bill| bill["kind"] == "receivable")
+        .count() as u64;
+    assert!(receivable_bills > 1 && receivable_bills < total, "{whole}");
+    assert_eq!(receivable["open_bills_total"], receivable_bills);
+    assert_eq!(receivable["open_bills_shown"], 1);
+}
+
+#[test]
+fn the_outstandings_description_says_how_to_read_a_shortened_bill_list() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "outstandings"))
+        .expect("outstandings tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    for needle in [
+        "`open_bills_total` counts every open bill in the requested direction",
+        "`open_bills_shown` counts the bills on this page",
+        "`limit` is not lowered when the response size shortens the page",
+        "\"showing 500 of 1,240 open bills; the totals and the ageing cover all 1,240\"",
+        "(on a later page, the bills from offset + 1)",
+        "`offset` set to `next_offset`",
+    ] {
+        assert!(description.contains(needle), "{needle}");
     }
 }

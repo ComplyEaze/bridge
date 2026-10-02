@@ -137,6 +137,9 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
             {
                 rows.truncate(width);
                 figures["next_offset"] = json!(offset + width as u64);
+                if let Some(shown) = figures.get_mut("open_bills_shown") {
+                    *shown = json!(width);
+                }
             }
             if let Some(rows) = figures["unallocated"]["parties"]
                 .as_array_mut()

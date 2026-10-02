@@ -209,3 +209,20 @@
 .rel-body { min-height: 70vh; }
 /* the generated article opens with its own h1; the title band already says the page's name */
 .changelog > h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ------------------------------------------------------- privacy and terms */
+/* Rendered at deploy from docs/legal/*.md into legal.template.html. No title band: the document's
+   own heading opens the page, under a header that is solid from the top. */
+.ce-page--plain .ce-header { background: var(--header-ground); border-bottom-color: var(--cobalt-line); }
+.legal-layout { width: min(100% - 2 * var(--gutter), 760px); margin: 0 auto; padding: calc(var(--header-h) + 48px) 0 72px; }
+.legal { font-size: 16px; line-height: 1.65; color: var(--ink); overflow-wrap: break-word; }
+.legal h1 { font-family: var(--font-head); font-size: clamp(30px, 4vw, 44px); font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 20px; text-wrap: balance; }
+.legal h2 { font-family: var(--font-head); font-size: 22px; font-weight: 650; letter-spacing: -0.01em; margin: 40px 0 12px; }
+.legal p { margin: 0 0 14px; }
+.legal ul { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 8px; }
+.legal hr { border: 0; border-top: 1px solid var(--paper-line); margin: 32px 0; }
+.legal code { font-family: var(--font-mono); font-size: 0.88em; background: var(--paper-line); padding: 1px 5px; border-radius: 4px; }
+.legal table { width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 14px; line-height: 1.5; display: block; overflow-x: auto; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--paper-line); min-width: 9ch; }
+.legal th { font-weight: 650; background: var(--paper-line); }
+.legal-summary { margin: 24px 0; padding: 18px 20px 6px; background: var(--card); border: 1px solid var(--paper-line); border-left: 4px solid var(--cover); border-radius: var(--r-md); }

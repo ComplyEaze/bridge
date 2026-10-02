@@ -1,36 +1,24 @@
 # Changelog
 
-All notable changes to Bridge are documented here. The project follows
+All notable changes to ComplyEaze Bridge are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
 Published builds are MCPB packages that are not yet code-signed (tags
-`mcp-preview-*`): so far
-`mcp-preview-0.2.0` and `mcp-preview-0.3.0`. The number of the next build is
-chosen when it is released.
+`mcp-preview-*` and, from 0.4.0, `mcp-v*`): so far
+`mcp-preview-0.2.0`, `mcp-preview-0.3.0` and `mcp-v0.4.0`. The number of the
+next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: in source since `mcp-preview-0.3.0` (26 Sep 2026)
+### In plain words: in source since `mcp-v0.4.0`
 
 These changes are on the main branch. They are not yet in a published package.
 Each line names the pull requests it comes from.
 
 **What the next build adds**
 
-- Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
-  line for line to Tally's own statement; otherwise it is refused, and the
-  lines that differ are named. A book with stock items is expected to be
-  refused, because no such book has been measured, and the tie-out itself has
-  been measured on two synthetic books only (#774).
-- Read closing stock values per item. An item is returned only when the
-  values add up to Tally's own Stock Summary and Bridge read exactly as many
-  items as Tally's own count; otherwise no item is returned, with the reason and
-  the next step. A company with no stock items is told so. A value keeps
-  Tally's sign, as in the Trial Balance: stock held is a negative number.
-  Quantities are not returned yet, because nothing checks them. Only a
-  31 March and small books are read (#980, #979, #1001).
 - Read a register of the tax in the books for sales: the Sales and Credit Note
   vouchers of a date window that touch a Duties & Taxes ledger, with each
   entry's tax taken only from the GST duty head on that ledger's master, never
@@ -43,6 +31,65 @@ Each line names the pull requests it comes from.
   one voucher in a window and paging were not shown. A sale of a kind a row can
   show as unmeasured is marked `not_measured_live`; the tool's text says what
   cannot be marked (#1009).
+
+## [0.4.0] - 2026-10-02
+
+### In plain words: ComplyEaze Bridge 0.4.0, since `mcp-preview-0.3.0` (26 Sep 2026)
+
+These changes are in ComplyEaze Bridge 0.4.0. Each line names the pull
+requests it comes from, except where it names an issue.
+
+**What you can do now**
+
+- Read a company's masters as a list: voucher types (with their numbering
+  method), godowns, units, stock groups, or ledger groups, in pages. The book is
+  checked before and after the read. For godowns, units and stock groups, a book
+  with very many masters is refused, with the size named, rather than answered
+  in part (#952).
+- See what a party's unallocated amount is made of, from data the tool already
+  reads, and what that data cannot tell apart. Each bill now carries its own
+  date and credit period, and payable and receivable follow the sign of the
+  bill's balance (#945, #946, #957, #959, #961).
+- See what ComplyEaze Bridge keeps on this computer. `local_data_report` (and
+  `bridge_mcp --local-data-report` on the command line) counts files, bytes and
+  the age of the oldest file by kind, and gives the state of the import journal
+  and how many saved batches are not settled. It changes no book and deletes
+  nothing; like every call, it records its own receipt line in the local log. It
+  names no file path unless you ask on the command line (#925).
+- Read the purchase register of tax in the books: the Purchase and Debit Note
+  vouchers of a date window that touch a ledger under Duties & Taxes, with the
+  tax amount each entry records under the ledger's GST duty head. Other voucher
+  types that touch those ledgers (Sales, Journal, Payment) are listed apart with
+  exact counts (at most 100 are listed), and an entry whose ledger has no recognised GST head is listed and
+  never given one. Nothing is posted and nothing is inferred: whether an entry
+  belongs in a return is for you to decide (#971).
+- Ask `outstandings` for one party, with `detail`, to see why a bill is open and
+  what an unallocated amount holds, party by party. A bill trail lists the
+  allocations of each of the party's bills, oldest first, leaving out those in
+  cancelled and optional vouchers, and says whether they
+  add up to Tally's own balance for the bill. The unadjusted view lists the
+  party's on-account, advance and pending credit or debit note allocations and
+  compares the on-account total with its unallocated amount; a note is
+  recognised only when its voucher type is named exactly Credit Note or Debit
+  Note. A bill that does
+  not tie, or whose identity is ambiguous, is shown as such and nothing is
+  merged. The detail reads the company's vouchers from the start of the books,
+  so a large book can be refused, with a next step (#981).
+- Read Profit and Loss and Balance Sheet. A figure is shown only when it ties
+  line for line to Tally's own statement. Otherwise ComplyEaze Bridge's own
+  statement is withheld; Tally's own amount for each line is still returned,
+  with the derived amount on each line that differs, and the lines that differ
+  are named. A book with stock items is expected to be
+  refused, because no such book has been measured, and the tie-out itself has
+  been measured on two synthetic books only (#774).
+- Read closing stock values per item. An item is returned only when the values
+  add up to Tally's own Stock Summary and ComplyEaze Bridge read exactly as many
+  items as Tally's own count; otherwise no item is returned, with the reason and
+  the next step. A company with no stock items is told so. A value keeps
+  Tally's sign, as in the Trial Balance: stock held is a negative number.
+  Quantities are not returned, because nothing checks them, and names, parents
+  and units are returned but not checked. Only a 31 March and small books are
+  read (#980, #979, #1001).
 - Read books that define more than one currency. Outstandings set aside
   foreign-currency ledgers, and a rupee ledger with a foreign-currency
   balance, and name them. Compliance ledgers and the Trial Balance are read
@@ -50,6 +97,14 @@ Each line names the pull requests it comes from.
   whose amount Tally stored in a foreign currency instead of refusing the
   whole date window. The desktop app follows the same read (#642, #647, #649, #715,
   #781, #824, #825).
+- Read a book too large for one read, in parts, including ledgers under parents
+  that cannot be named, and have the ledger count cross-checked against the
+  company's own count. A movement read names an oversized ledger catalogue and
+  refuses an unknown ledger before it reads any voucher (#679, #885, #891, #936,
+  #938, #939, #960).
+- Recognise SGST/UTGST as a GST duty head (#968).
+- The app and the extension carry the ComplyEaze Bridge tick logo as their icon
+  (#950, #978).
 - A ledger read on a several-currency book, or one whose base currency is not
   INR, is refused before any request to Tally, instead of returning bare
   numbers (#751).
@@ -65,6 +120,26 @@ Each line names the pull requests it comes from.
   the tool's result is established; otherwise it is `not_established`, with
   the same `reason` as the nested result. This changes the tool's output; no
   figure, check or withheld line changes (#984).
+- Every tool is refused until the Terms of Use are accepted, and the extension
+  carries a privacy policy (#943).
+- The party-master balance snapshot ends at today's date, not at a stray voucher
+  date (#896).
+- The Markdown proof shows the verification status and any duplicate vouchers in
+  the batch (#811).
+- ComplyEaze Bridge sends one request to Tally at a time, across all its
+  running processes (#883).
+- Each send to Tally is recorded in the local log with its place, kind, size,
+  outcome and time, and no book content (#918, #941).
+- ComplyEaze Bridge refuses to build or post a row that another batch already
+  sent to Tally (#876, #898).
+- A bank statement's result returns no amount except the figures you supplied
+  and an open cash line's amount, and names the saved proposals file by its id
+  alone (#848, #850).
+- The configured redaction also applies to ledger names in posting and
+  verification results (#851).
+- The native posting windows say ComplyEaze Bridge (#970).
+- Each package's build is attested, and the attestation is checked before it is
+  published (#923).
 - If you are slow at the approval window, the agent's call no longer waits
   on it. The agent is told the approval is pending and asks again. A click
   made while no call is waiting is posted by the next call, not one call later
@@ -90,6 +165,31 @@ Each line names the pull requests it comes from.
   as reaching outside this computer. `parse_bank_statement` had been marked
   read-only by mistake (#909, #921).
 
+**Known limits**
+
+- Stock: the closing-value total is checked against Tally's own Stock Summary on
+  one synthetic book, and the item count against the rows on one synthetic
+  company, and the sign of a value was measured on one synthetic company. A
+  book with many stock items is refused: the read is for small books, and
+  typical stock-heavy books refuse today. A book in which no item carries a value
+  returns nothing. A book with
+  stock items is expected to be refused by Profit and Loss and Balance Sheet,
+  because no such book has been measured (#774, #980, #1001).
+- A book with very many masters is refused by `masters` for godowns, units and
+  stock groups, and how common that is across real books has not been measured
+  (#952).
+- `local_data_report` has not been run on a Windows host, and how it reports a
+  Windows junction is unverified. It does not cover the desktop app's other
+  settings, its database or its logs (#925).
+- The purchase register has been read from a disposable synthetic book only. A
+  purchase typed on screen, item invoices whose purchase ledger sits in an
+  inventory allocation, and books with several currencies are not covered, and
+  it does not decide whether a Debit Note is a purchase return or a debit note to
+  a customer (#971).
+- The party detail of `outstandings` has been measured on one synthetic book.
+  Its cost on a large book is not measured, and a window that needs too many
+  requests is refused (#981).
+
 **Also in source**
 
 - The tax-audit engine gained its stock and party-monthly tests. The engine is
@@ -103,9 +203,9 @@ Each line names the pull requests it comes from.
 - The unfinished document-sync feature is gone from the source, and so from
   both the desktop app and the binary the Claude Desktop extension runs: the
   AXAL sign-in, the code that scanned a folder and uploaded the files you chose
-  to ComplyEaze cloud storage, and the two hidden screens for them. No Bridge
+  to ComplyEaze cloud storage, and the two hidden screens for them. No ComplyEaze Bridge
   tool could reach them, and no navigation led to them. After this change the
-  only network client in Bridge's own code connects to Tally on your own
+  only network client in ComplyEaze Bridge's own code connects to Tally on your own
   computer. The CI egress gate fails if a first-party crate other than the Tally
   transport depends on reqwest in its shipped dependencies (the app crate keeps
   it only as a dev-dependency) or if any first-party crate depends on hyper. It

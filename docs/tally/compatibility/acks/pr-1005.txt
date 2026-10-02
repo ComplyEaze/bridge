@@ -1,0 +1,4 @@
+package.json
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+reviewer: lamemustafa

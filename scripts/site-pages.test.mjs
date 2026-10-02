@@ -4,9 +4,9 @@ import test from "node:test";
 
 const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
-// changelog.html is written by the deploy from this template; the template is the tracked page.
-const pages = readdirSync(site).filter((name) => name.endsWith(".html") && name !== "changelog.html").sort();
-const generated = new Set(["changelog.html", "releases.json"]);
+// The deploy writes these from the tracked templates; a template is the page this test reads.
+const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html"]);
+const pages = readdirSync(site).filter((name) => name.endsWith(".html") && !generated.has(name)).sort();
 
 function region(html, open, close) {
   const start = html.indexOf(open);
@@ -24,7 +24,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["changelog.template.html", "download.html", "index.html", "releases.html"]);
+  assert.deepEqual(pages, ["changelog.template.html", "download.html", "index.html", "legal.template.html", "releases.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {

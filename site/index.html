@@ -132,7 +132,7 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
               <span class="dbtn dbtn-default">Cancel</span>
             </div>
           </div>
-          <p class="dialog-cap">A replica of the approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; we have not yet run that window on Windows.</p>
+          <p class="dialog-cap">A replica of the approval window in release 0.3.0 on a Mac. On Windows the same text sits under its own title with Yes, No and Cancel; that window was run once, on a candidate build of 0.4.0: one decline and one approved post.</p>
         </div>
 
         <p class="demo-caption">Demo book: Demo Traders Pvt Ltd (synthetic), <span class="nw">FY 2025-26</span>.</p>
@@ -171,8 +171,8 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
           <h2>Nothing posts until you approve it.</h2>
           <p class="proof">One voucher per approval, one attempt, no automatic retry.</p>
           <p class="proof-sub cap-wide">Here one receipt is prepared as its own one-voucher file and posted. Posting is off by default in a new install. A voucher is posted this way or imported in a file, never both.</p>
-          <p class="proof-sub cap-wide">Posting from the released package has not yet been run by us against a live TallyPrime.</p>
-          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of release 0.3.0's window on a Mac. Windows asks Yes, No or Cancel. That window, and posting from the released package, have not yet been run by us against a live TallyPrime.</p>
+          <p class="proof-sub cap-wide">The published 0.4.0 package itself has not been run by us against a live TallyPrime; a candidate build of the same code posted one approved Journal on Windows&nbsp;11 on 1&nbsp;October&nbsp;2026.</p>
+          <p class="proof-sub cap-phone">One receipt, prepared as its own file, is posted. Shown: a replica of release 0.3.0's window on a Mac. Windows asks Yes, No or Cancel; that window was run once, on a candidate build of 0.4.0. The published package itself has not been run by us against a live TallyPrime.</p>
         </article>
 
         <article class="panel" data-chapter="5">
@@ -205,26 +205,26 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       the approval window of release 0.3.0 on a Mac rises from that receipt's row, asks you to post that one voucher, and shrinks back into the row with a
       red tick: one voucher per approval, and a voucher is posted this way or imported in a file, never both. After you import the file of the other 141 in Tally yourself, each voucher is ticked as ComplyEaze Bridge
       reads it back, counting up to 142 of 142: 141 imported and one posted. A narrow receipt slip slides out for the calls made. Finally the flags retract, the file shuts on
-      one tick, and the four install steps and the download follow.
+      one tick, and the five install steps and the download follow.
     </p>
   </section>
 
   <!-- ================================================================ CLOSE -->
   <section class="close-full" id="closeFull">
     <div class="download-block" id="downloadCta">
-      <h2>Set it up in four steps.</h2>
+      <h2>Set it up in five steps.</h2>
       <ol class="install-steps">
         <li>In TallyPrime, turn on the HTTP gateway (Tally acts as &ldquo;Both&rdquo;).</li>
         <li>Open the downloaded .mcpb file. If Claude&nbsp;Desktop doesn't pick it up: Settings &rarr; Extensions &rarr; Advanced settings &rarr; Install Extension.</li>
         <li>Check the Tally port in the extension settings (usually <code>9000</code>).</li>
-        <li>Save, restart Claude&nbsp;Desktop if the tools don't appear, and ask about your books in plain language.</li>
+        <li>Read the Terms of Use linked in the extension settings, then turn on &ldquo;I accept the ComplyEaze Bridge Terms of Use&rdquo;.</li>
+        <li>Save the settings, then quit Claude&nbsp;Desktop completely and reopen it. Then ask about your books in plain language.</li>
       </ol>
       <div class="cta-row">
         <a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a>
       </div>
       <p class="fineprint"><span class="fp-line">Windows&nbsp;x64 and Apple&nbsp;Silicon Macs &middot; Claude&nbsp;Desktop extension</span><span class="fp-line">Not yet <span class="nw">code-signed</span>; your computer may warn you.</span></p>
       <p class="next-line"><span class="tag">In development, not in the download</span><span>Flagging findings by clause.</span></p>
-      <p class="next-line"><span class="tag">Built, not yet released</span><span>Balance sheet and P&amp;L reads.</span></p>
     </div>
   </section>
 
@@ -262,6 +262,8 @@ After a timeout, reconcile this batch; do not rebuild or resend it.</p>
       <nav class="ce-footer__col" aria-label="Legal">
         <h3>Legal</h3>
         <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
           <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
           <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
         </ul>

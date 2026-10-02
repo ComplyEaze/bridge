@@ -16,6 +16,18 @@ Apache-2.0 builds from current source stays unambiguous.
 
 These changes are in source and not yet in a published build.
 
+**Safer or fixed**
+
+- `outstandings` no longer refuses because one bill's due date in the Bills
+  Receivable report is printed with a four-digit year (a bill with a credit period
+  of about 83 years, `1-Dec-2108`): that one date made the whole read fail with no
+  reason. Not measured: that the rest of the read then completes on such a book. A
+  due date is now read as written when Tally prints its year in full and the year
+  is 2100 or later. A bill row whose dates ComplyEaze Bridge cannot read still
+  refuses the read; the refusal now carries a typed `cause`, the report and the
+  row number when it is a row that fails, and a next step, never the bill's party
+  or reference. A due date that far out gives no overdue days in the ageing (#1091).
+
 **What the next build adds**
 
 - Read a register of the tax in the books for sales: the Sales and Credit Note
@@ -34,6 +46,19 @@ These changes are in source and not yet in a published build.
   `state` is `complete` when the company marks and the ledger masters read the
   same before and after the window, not when the window was counted as
   `vouchers` now requires (#1009).
+
+**Safer or fixed**
+
+- `vouchers` no longer re-reads a whole window for every page. A later page of a
+  `complete` window is served from the first page's read while the company's
+  books have not changed in a way that moves their marks, and a page that names
+  the first page's `snapshot_id` is refused if they did, instead of continuing
+  from a different read. Without the name, a page that reads afresh (the held
+  window moved on, expired or was dropped) has offsets that may not continue the
+  earlier pages, which the result says when it knows (`earlier_snapshot`). Before,
+  a book that changed between pages could skip or repeat vouchers while every
+  page said `complete`. A window that is only `partial` is read again for each
+  page, as before (#485).
 
 ## [0.4.1] - 2026-10-02
 

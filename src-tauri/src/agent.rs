@@ -1229,8 +1229,9 @@ impl ArgumentRepair {
         match self {
             Self::CalendarDate(_) => {
                 "Send the date as text, YYYYMMDD (for example 20260930) or YYYY-MM-DD. If the \
-                 user said \"last month\" or \"this financial year\", work out the exact dates \
-                 yourself and tell the user which dates you used. Nothing was read from Tally."
+                 user said \"last month\" or \"this financial year\" (1 April to 31 March), work \
+                 out the exact dates yourself and tell the user which dates you used. Nothing was \
+                 read from Tally."
             }
             Self::CompanyGuid => {
                 "company_guid must be the 36-character ID that list_companies gives for the \

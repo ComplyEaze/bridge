@@ -165,6 +165,13 @@ async fn a_misformed_date_or_company_guid_says_what_was_expected() {
             remediation.contains("Nothing was read from Tally."),
             "{code}: {remediation}"
         );
+        // An Indian financial year, spelt out: assistants put the wrong months in it.
+        if code != "company_guid_invalid" {
+            assert!(
+                remediation.contains("\"this financial year\" (1 April to 31 March)"),
+                "{code}: {remediation}"
+            );
+        }
         assert_eq!(
             response["structuredContent"]["evidence"]["bytes"], 0,
             "{code}"

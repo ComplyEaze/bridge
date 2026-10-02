@@ -420,6 +420,21 @@ def shard(mutations: list[dict], k: int, n: int) -> list[dict]:
     return [m for m in mutations if owner[m["file"]] == k - 1]
 
 
+def refused_shard(refusal) -> None:
+    """Raise ValueError unless `refusal` is what a refusing shard writes: a "K/N" shard with 1 <= K <= N, a
+    list of problems and a list of compiler lines, all text. A corrupt document is then "not read", with the
+    rest of the merge intact, rather than a crash with no report."""
+    ok = isinstance(refusal, dict)
+    if ok:
+        m = re.fullmatch(r"(\d+)/(\d+)", refusal.get("shard") if isinstance(refusal.get("shard"), str) else "")
+        ok = bool(m) and 1 <= int(m.group(1)) <= int(m.group(2))
+        for key in ("problems", "output"):
+            lines = refusal.get(key)
+            ok = ok and isinstance(lines, list) and all(isinstance(x, str) for x in lines)
+    if not ok:
+        raise ValueError("not a shard refusal")
+
+
 def report(mutations: list[dict], merged: dict, committed: dict, unreadable: list[str] = (),
            accepted: dict | None = None, refused: dict | None = None) -> tuple[str, bool]:
     """(Markdown, failed?) for a whole-list run. It fails when any mutation was not run or not
@@ -860,14 +875,13 @@ def main(argv: list[str] | None = None) -> int:
         for path in args.merge:
             try:
                 doc = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(doc, dict) and REFUSED_KEY in doc:  # a shard that could not start: a reason,
+                    refused_shard(doc[REFUSED_KEY])                # never results
+                    refused[doc[REFUSED_KEY]["shard"]] = doc[REFUSED_KEY]
+                else:
+                    merged.update(doc)
             except (OSError, ValueError) as e:
                 unreadable.append(f"{path}: {type(e).__name__}")
-                continue
-            if REFUSED_KEY in doc:  # a shard that could not start: a reason, never results
-                refusal = doc[REFUSED_KEY]
-                refused[refusal["shard"]] = refusal
-            else:
-                merged.update(doc)
         text, failed = report(mutations, merged, load_results(RESULTS), unreadable, accepted, refused)
         write_atomic(args.results, render_results(merged, order))
         if args.report:
@@ -948,7 +962,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         if details:
             print("the compiler said:\n  " + "\n  ".join(details), file=sys.stderr)
-        if args.shard:  # the merge reads this as a refusal, not as results: nothing was run
+        if args.shard and args.results:  # the merge reads this as a refusal, not as results: nothing was run
             write_atomic(results_path, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": problems,
                                                                  "output": details}}, indent=1) + "\n")
         return 2

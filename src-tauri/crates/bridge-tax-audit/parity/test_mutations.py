@@ -862,6 +862,39 @@ class GitRepo(unittest.TestCase):
         self.assertEqual(rc, 2, out)
         self.assertFalse((outside / "plain.json").exists())
 
+    def test_a_shard_run_without_results_never_overwrites_the_committed_results_file(self):
+        outside = Path(self.t.name)
+        before = mu.RESULTS.read_bytes() if mu.RESULTS.exists() else None
+        with fake_cargo(outside, FAKE_CARGO, FAKE_BUILD_FAIL="1"):
+            rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"))
+        self.assertEqual(rc, 2, out)
+        self.assertEqual(mu.RESULTS.read_bytes() if mu.RESULTS.exists() else None, before)
+
+    def test_a_corrupt_refusal_document_is_not_read_and_does_not_stop_the_merge(self):
+        parent = self.root.parent
+        good = parent / "shard-2.json"
+        good.write_text(json.dumps({m["id"]: record(m, ["tests/registry.rs::registry_ok"]) for m in self.muts}))
+        corrupt = [
+            '"refused"',                                                   # a string, not a document
+            json.dumps({"refused": None}),
+            json.dumps({"refused": "x"}),
+            json.dumps({"refused": {"problems": [], "output": []}}),         # no shard
+            json.dumps({"refused": {"shard": "abc", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "0/0", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "3/2", "problems": [], "output": []}}),
+            json.dumps({"refused": {"shard": "1/2", "problems": "w0", "output": []}}),
+            json.dumps({"refused": {"shard": "1/2", "problems": [], "output": [7]}}),
+        ]
+        for i, text in enumerate(corrupt):
+            bad = parent / f"bad-{i}.json"
+            bad.write_text(text)
+            rc, out = self.main("--merge", str(bad), str(good), "--results", str(parent / "all.json"),
+                                "--report", str(parent / "r.md"))
+            report = (parent / "r.md").read_text()
+            self.assertEqual(rc, 1, f"{text}: {out}")
+            self.assertIn("Shard results not read (1)", report, text)
+            self.assertNotIn("Shards that refused to run", report, text)
+
     def test_merge_reads_a_refusal_apart_from_results_and_never_writes_it_into_them(self):
         parent = self.root.parent
         refused = parent / "shard-1.json"

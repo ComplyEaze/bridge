@@ -61,7 +61,7 @@ jobs:
             --results "$RUNNER_TEMP/shard-${{ matrix.shard }}.json" 2>&1 | tee "$RUNNER_TEMP/shard-${{ matrix.shard }}.log"
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
-            echo "::error::shard ${{ matrix.shard }} of 8 ran nothing: the runner exited $rc (see its log above and the refusal in its results file)"
+            echo "::error::shard ${{ matrix.shard }} of 8 ran nothing: the runner exited $rc (see its log above; a refusal because the unmutated copy failed is also in its results file)"
             exit "$rc"
           fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -25,7 +25,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["changelog.template.html", "download.html", "index.html", "legal.template.html", "releases.html"]);
+  assert.deepEqual(pages, ["changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {
@@ -99,7 +99,7 @@ test("nothing on the site points at the roadmap or the comparison, which ship se
 
 test("page text keeps to the wording rules", () => {
   // scripts and stylesheets draw words too (the 3D pages, the header switch, CSS content)
-  for (const name of [...pages, "download.js", "releases.js", "release-source.mjs", "chrome.js", "app.js", "scene.js", "chrome.css", "home.css", "pages.css"]) {
+  for (const name of [...pages, "download.js", "faq.js", "releases.js", "release-source.mjs", "chrome.js", "app.js", "scene.js", "chrome.css", "home.css", "pages.css"]) {
     const raw = read(name);
     // in a script or stylesheet the words are in the code, not in its comments
     const text = name.endsWith(".html") ? visibleText(raw) : raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -143,7 +143,7 @@ test("no file that ships carries an internal working label", () => {
 });
 
 // What a search engine or an AI assistant reads about the site without running its script.
-const indexed = ["index.html", "download.html", "releases.html"];
+const indexed = ["index.html", "download.html", "faq.html", "releases.html"];
 const metaContent = (html, property) => html.match(new RegExp(`<meta property="${property}" content="([^"]*)" />`))?.[1];
 
 test("each indexed page names its own address, and its social card repeats the page's own title and description", () => {
@@ -210,4 +210,92 @@ test("llms.txt is a plain description that keeps to the wording rules and links 
     const file = link.split("/blob/master/")[1];
     assert.ok(existsSync(new URL(`../${file}`, site)), `${link} names a file the repository does not have`);
   }
+});
+
+// The questions page: what it promises a reader, and that the structured copy of it cannot drift from the words.
+const faqText = (html) => html.replace(/<\/?(?:p|li|ul|ol|div|tr|td|th|table|summary|h[1-6])\b[^>]*>/g, " ").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&rsquo;/g, "\u2019").replace(/&lsquo;/g, "\u2018").replace(/&ldquo;/g, "\u201c").replace(/&rdquo;/g, "\u201d").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+
+test("every question is a native disclosure with its own address, written as a question, with an answer", () => {
+  const html = read("faq.html");
+  const items = [...html.matchAll(/<details class="faq-item" id="([^"]+)"( open)?>\s*<summary>(.*?)<\/summary>\s*<div class="faq-answer">([\s\S]*?)<\/div>\s*<\/details>/g)];
+  assert.ok(items.length >= 15, "the page holds the questions the readers asked");
+  const ids = items.map((item) => item[1]);
+  assert.equal(new Set(ids).size, ids.length, "two questions share an address");
+  assert.ok(items.filter((item) => item[2]).length <= 1, "more than one question opens by default");
+  for (const [, id, , question, answer] of items) {
+    assert.match(id, /^[a-z][a-z0-9-]*$/);
+    assert.match(faqText(question), /\?$/, `${id}: a question ends with a question mark`);
+    assert.ok(faqText(answer).length > 60 && faqText(answer).split(" ").length < 260, `${id}: an answer is short but is one`);
+  }
+  assert.equal([...html.matchAll(/<details\b/g)].length, items.length, "a question is not in the form the check reads");
+  for (const [, href] of html.matchAll(/<a href="#([^"]+)"/g)) assert.ok(html.includes(`id="${href}"`), `#${href} points at nothing`);
+});
+
+test("the structured copy of the questions says exactly what the page says, question for question", () => {
+  const html = read("faq.html");
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  assert.equal(blocks.length, 1);
+  const data = JSON.parse(blocks[0][1]);
+  assert.equal(data["@type"], "FAQPage");
+  const shown = [...html.matchAll(/<summary>(.*?)<\/summary>\s*<div class="faq-answer">([\s\S]*?)<\/div>\s*<\/details>/g)].map((item) => [faqText(item[1]), faqText(item[2])]);
+  const structured = data.mainEntity.map((entity) => [entity.name, entity.acceptedAnswer.text]);
+  assert.deepEqual(structured, shown);
+  const all = JSON.stringify(data);
+  assert.doesNotMatch(all.replace("has not set a price", ""), /price|\bfree\b|[\u20b9$]/i, "a price, or a cost claim beyond the one the owner approved");
+});
+
+test("the questions page keeps the claims that tell a reader what ComplyEaze Bridge cannot do", () => {
+  const text = faqText(read("faq.html"));
+  // each phrase is a limit or a caution the README and the security page state; dropping one makes the page kinder than they are
+  for (const needle of [
+    "has not been independently audited",
+    "Neither choice hides amounts",
+    "No ComplyEaze Bridge tool can approve it for you, but software that controls your screen could click the window",
+    "never alters or deletes a voucher",
+    "has no tool to delete or undo a posted voucher",
+    "None of these files is encrypted",
+    "not yet code-signed",
+    "Not run yet: the package of the latest release against a live TallyPrime",
+    "book with stock items is expected to be refused",
+    "Intel Macs are not supported",
+    "has not set a price for ComplyEaze Bridge and does not sell licences to it",
+    "through ComplyEaze Bridge, ComplyEaze does not receive it (sections 4 to 6 of the Privacy Policy)",
+    "We have not decided whether to charge for anything in future",
+  ]) assert.ok(text.includes(needle), `the page no longer says: ${needle}`);
+});
+
+test("the jobs table gives one of four answers per row, links each row to its answer, and every \"No\" or \"Not yet\" is also in the list of what it cannot do", () => {
+  const html = read("faq.html");
+  const rows = [...html.matchAll(/<tr><th scope="row"><a href="#([^"]+)">(.*?)<\/a>(?:<small>.*?<\/small>)?<\/th><td><span class="faq-verdict faq-verdict--(\w+)">([^<]+)<\/span><\/td><\/tr>/g)].map((row) => ({ link: row[1], job: faqText(row[2]), kind: row[3], word: row[4] }));
+  assert.ok(rows.length >= 9);
+  for (const { link, job, kind, word } of rows) {
+    assert.ok(["Yes", "Partly", "No", "Not yet"].includes(word), `${job}: ${word}`);
+    assert.equal(kind, word.replace(" ", "").toLowerCase(), `${job}: the style does not match the word`);
+    assert.ok(html.includes(`<details class="faq-item" id="${link}"`), `${job}: #${link} is not a question`);
+  }
+  const cannot = faqText(html.match(/id="what-it-cannot-do"[\s\S]*?<\/details>/)[0]);
+  for (const { job, word } of rows.filter((row) => row.word === "No" || row.word === "Not yet")) {
+    const key = /GSTR/.test(job) ? "GSTR-2B" : /Tax-audit/.test(job) ? "tax-audit" : /sales/i.test(job) ? "sales, purchase or GST" : null;
+    assert.ok(key && cannot.includes(key), `${job} (${word}) is not in "What can it not do yet?"`);
+  }
+  // a verdict stronger than the answer under it would teach a reader to distrust the page
+  const asks = faqText(html.match(/id="what-can-i-ask"[\s\S]*?<\/details>/)[0]);
+  for (const { job, word } of rows.filter((row) => /stock items|Profit/.test(row.job))) assert.equal(word, "Partly", `${job}`);
+  assert.match(asks, /book with stock items is expected to be refused/);
+});
+
+test("the page says which release and day it was checked against, and the structured copy carries the same day", () => {
+  const html = read("faq.html");
+  const stamp = html.match(/Checked against release ([0-9.]+) on <time datetime="([0-9-]+)">/);
+  assert.ok(stamp, "no check stamp");
+  // a version bump fails here until someone has read the answers again and moved the stamp
+  const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
+  assert.equal(stamp[1], version, `site/faq.html is stamped for release ${stamp[1]} but the manifest says ${version}: reread every answer on the Questions page against the new release (the README, the security page, the Terms and the release notes), then move the stamp in the hero and the dateModified in the structured data`);
+  assert.equal(JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]).dateModified, stamp[2]);
+});
+
+test("the list above the questions tells a person asked to try it out the four things to do first", () => {
+  const html = read("faq.html");
+  const list = faqText(html.match(/<section class="page-section faq-before">[\s\S]*?<\/section>/)[0]);
+  for (const needle of ["test company", "backup", "firewall", "Keep posting off"]) assert.ok(list.includes(needle), needle);
 });

@@ -61,7 +61,9 @@ prints the compiler's first lines. With `--shard` it also writes, in place of re
 reports "Shards that refused to run" with the reason, and lists the ids that shard would have run
 apart from ids no shard ran. Both kinds of id still go on the nightly issue's failing line: a change
 must re-prove what no shard proved. Exit 1 is a mutation not killed; the nightly shard job fails on
-any other non-zero exit and leaves the judging of exit 1 to the merge.
+any other non-zero exit and leaves the judging of exit 1 to the merge. An uncaught exception is exit 2,
+never 1: before the first mutation of a shard it is written as a refusal ("crashed: <type>", with the
+exception and its innermost frame); after, the records already made stay and the shard still fails.
 
 ## The results file
 
@@ -136,6 +138,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
@@ -179,6 +182,7 @@ REPORT_ROWS = 100  # rows per report section; GitHub caps an issue body at 65,53
 REFUSED_KEY = "refused"
 REFUSAL_LINES = 40  # compiler lines kept in a refusal
 REFUSAL_LINE_CHARS = 300  # characters kept of each
+_MADE_A_VERDICT = threading.Event()  # set once any mutation has a verdict: a crash then keeps the records
 
 
 class Stopped(Exception):
@@ -842,6 +846,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--merge", type=Path, nargs="+", metavar="FILE", help="merge shard results; run nothing")
     ap.add_argument("--report", type=Path, metavar="MD", help="with --merge: write a Markdown report")
     args = ap.parse_args(argv)
+    _MADE_A_VERDICT.clear()
+    try:
+        return run(args)
+    except Exception as e:  # Python exits 1 on an uncaught one, which means "a mutation was not killed"
+        crash = f"crashed: {type(e).__name__}"
+        frame = traceback.extract_tb(e.__traceback__)[-1]
+        detail = [f"{type(e).__name__}: {e}"[:REFUSAL_LINE_CHARS],
+                  f"at {Path(frame.filename).name}:{frame.lineno} in {frame.name}"]
+        print(f"{crash}: {detail[0]}\n  {detail[1]}", file=sys.stderr)
+        if args.shard and args.results and not _MADE_A_VERDICT.is_set():  # nothing was run: a refusal
+            write_atomic(args.results, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": [crash],
+                                                                 "output": detail}}, indent=1) + "\n")
+        return 2
+
+
+def run(args: argparse.Namespace) -> int:
 
     mutations = json.loads(LIST.read_text(encoding="utf-8"))
     order = [m["id"] for m in mutations]
@@ -985,6 +1005,7 @@ def main(argv: list[str] | None = None) -> int:
         rec.update(commit=head, crate_tree=tree)
         with pool_lock:
             done[m["id"]] = rec
+            _MADE_A_VERDICT.set()
             kill = f" by {len(rec['killers'])}: {', '.join(rec['killers'])}" if rec["killers"] else ""
             print(f"{m['id']} {rec['verdict']} ({rec['mode']}){kill}", flush=True)
             results[m["id"]] = rec

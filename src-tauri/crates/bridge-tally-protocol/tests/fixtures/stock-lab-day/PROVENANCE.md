@@ -12,8 +12,8 @@ groups and company listings the call read, and compares the tool's row with the 
    `taxable_entries`; two entries under `tax_in_books`, heads `cgst` (raw `CGST`) and
    `sgst_utgst` (raw `SGST/UTGST`), `9.00` each. `is_invoice` is `true` and the row carries no
    `not_measured_live` field.
-2. **This is the first capture in which the register tool classified an item invoice against its own
-   masters.** The earlier sales-day captures hold only the voucher window, read by the purchase
+2. **This is the first committed capture in which the register tool classified an item invoice
+   against its own masters.** The earlier sales-day captures hold only the voucher window, read by the purchase
    register's build.
 3. **The call cost 96 requests** (54 exports and 42 status reads) on a book with 8 ledgers and one
    currency. The same tool sent 118 on a larger book with two currencies (see `note-days/`).
@@ -39,8 +39,8 @@ groups and company listings the call read, and compares the tool's row with the 
 - **Requests: 96** (54 exports and 42 status reads). Exports by request id:
   `BridgeCompanyExtent` 18, `BridgeCompanyBookExtentV2` 16, `BridgeCompanyCurrencies` 4,
   `List of Ledgers` 8, `List of Groups` 4, `Bridge Agent Vouchers` 2,
-  `Bridge Agent Company High Water` 2. There is no voucher census and no base-currency read: the
-  book is below the read planner's threshold and has one currency.
+  `Bridge Agent Company High Water` 2. The voucher census and base-currency reads sent on the 118-request book
+  (see `note-days/`) were not sent here; why is not established.
 
 ## What each file is
 
@@ -50,8 +50,13 @@ groups and company listings the call read, and compares the tool's row with the 
   part of any file.
 - **One file per distinct request.** Bridge sends most requests more than once in a call (paired
   reads and brackets). Every answer to the same request bytes was byte-identical within the call.
+- **`stock_lab_taxed_day_voucher_window_response.utf16le.xml` is the same voucher read as
+  `sales-day/register_window_taxed_sales_day_live.utf16le.xml`,** from a second read of the same day: the request
+  is byte-identical and the decoded responses differ only in the `CMPINFO` object counters. It is kept here
+  because the replay needs the bytes this call received, beside the masters this call read.
 - **`stock_lab_taxed_day_answer.json` is a tool answer, not a wire capture.** It is the structured
-  content the tool returned, written with one-space indentation. Its `evidence` hashes are the
+  content the tool returned, written with one-space indentation. Its `coverage` sentence is the
+  wording of the build at `8c674d5e`, not of the current tool text; the tests compare the row only. Its `evidence` hashes are the
   tool's own, over everything it read.
 - **`stock_lab_taxed_day_sequence.json` is a record, not a wire capture.** It lists every request
   of the call in order with its method, request id, hashes and the fixture that holds the response.

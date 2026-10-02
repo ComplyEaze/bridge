@@ -739,7 +739,8 @@ rate or return section, and matches nothing against any portal.
   voucher windows of the first two invoices are committed, and the parsed
   windows have exactly those entries (a test); the requests are the request the
   code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
-  by this build, with the book's own ledger masters, groups and company
+  by the build at commit 8c674d5e (whose tool text and `coverage` note were
+  worded before the latest edits), with the book's own ledger masters, groups and company
   listings, and is replayed end to end from that recorded call (a test). The
   untaxed invoice's day was read once by an earlier build; those bytes are not
   committed, and a test with a Sales voucher whose tax entries are removed

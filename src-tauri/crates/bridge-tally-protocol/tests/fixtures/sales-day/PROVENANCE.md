@@ -59,7 +59,7 @@ checked against the request the code sends (`agent_register_server_tests.rs`).
 Tax beyond two plain ledger entries (no registration, GSTIN, place of supply, HSN, rate or
 inter-state line); a tax Tally computed itself; credit notes; optional, cancelled or
 post-dated vouchers; a line listed twice; a sale typed on Tally's screen; a real batch; other releases. Two vouchers, one company. The ledger masters and groups of that
-company were not captured alongside, so nothing here classifies these two vouchers end to end.
+company were not captured alongside, so nothing here classifies these two vouchers end to end. Since 2 Oct 2026 `stock-lab-day/` holds the masters, groups and company listings of that company, read in one `sales_register` call for the taxed day, so the taxed voucher is classified end to end there; the untaxed day's masters are not committed.
 
 ## Files
 

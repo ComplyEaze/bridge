@@ -22,8 +22,9 @@ These changes are in source and not yet in a published build.
   vouchers of a date window that touch a Duties & Taxes ledger, with each
   entry's tax taken only from the GST duty head on that ledger's master, never
   from a name or an amount. It reads as the purchase register does. It was run
-  against a live Tally for one taxed Sales item invoice, one untaxed one and one
-  Credit Note, on two synthetic companies. A Credit Note keeps Tally's signs
+  against a live Tally for one taxed Sales item invoice, one untaxed one (read once
+  by an earlier build; its bytes are not committed) and one Credit Note, on two
+  synthetic companies. A Credit Note keeps Tally's signs
   (nothing is netted or flipped, so add signed amounts), and the state-side tax
   head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
   side. An inter-state line, a cancelled or optional sale, an unrecognised or

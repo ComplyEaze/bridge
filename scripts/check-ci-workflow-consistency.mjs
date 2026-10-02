@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -326,7 +326,7 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-)'; then",
+  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
@@ -348,6 +348,57 @@ const expectedChanges = [
 ].join("\n");
 if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
   failures.push("changes changed shape; review its scope rules and update expectedChanges");
+}
+// The native job runs on a pull request only when the scope above selects it. A test in it that reads
+// a file the scope does not list is skipped, with the file's change, by the queue, and only a master
+// push would find the break. So: every file a Rust test pulls in from outside src-tauri/ and tools/
+// through include_str!/include_bytes!, and every file listed below that a test or a native-job step
+// reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
+// portable core` runs that workspace on every pull request, whatever the scope selects.
+const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))'; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
+const tracked = trackedFiles();
+const readAtRunTime = [
+  [".cargo/config.toml", "src-tauri/tests/approval_seam_gate.rs (read if present; none is tracked today)", true],
+  [".gitattributes", "byte-exact fixture checkout on Windows"],
+  ["package.json", "src-tauri/tests/approval_seam_gate.rs"],
+  ["packaging/pdfium/pdfium.lock.json", "the native job's PDFium step"],
+  ["scripts/fetch-pdfium.py", "the native job's PDFium step"],
+  ["scripts/collect-macos-test-crashes.py", "the native job's macOS crash steps"],
+  ["scripts/retain-macos-test-binaries.py", "the native job's macOS crash steps"],
+  ["scripts/check-tally-request-builder-hazards.mjs", "src-tauri/src/tally/tdl_engine.rs"],
+  ["scripts/fixtures/", "src-tauri/crates/bridge-bank-statement/tests/common/mod.rs"],
+  ["docs/tally/compatibility/compatibility-surface.json", "src-tauri/tests/admission_and_egress_files_stay_pinned.rs"],
+  ["LICENSE", "tauri.conf.json bundle resources, copied by the build script"],
+  ["NOTICE", "tauri.conf.json bundle resources, copied by the build script"],
+  ["THIRD_PARTY_LICENSES.txt", "tauri.conf.json bundle resources, copied by the build script"],
+  ["THIRD_PARTY_LICENSES_RUST.txt", "tauri.conf.json bundle resources, copied by the build script"],
+];
+for (const [entry, reader, optional] of readAtRunTime) {
+  // A listed directory stands for every tracked file in it, each of which must be selected.
+  const files = entry.endsWith("/") ? tracked.filter((path) => path.startsWith(entry)) : tracked.filter((path) => path === entry);
+  if (files.length === 0 && optional) { if (!nativeScope.test(entry)) failures.push(`the native scope omits ${entry}, which ${reader} reads`); }
+  else if (files.length === 0) failures.push(`the run-time read list names ${entry}, which has no tracked file; update the list (${reader})`);
+  for (const file of files) if (!nativeScope.test(file)) failures.push(`the native scope omits ${file}, which ${reader} reads`);
+}
+for (const file of tracked.filter((path) => /^(?:src-tauri|tools)\/.+\.rs$/.test(path))) {
+  const source = readFileSync(resolve(repositoryRoot, file), "utf8").replace(/^\s*\/\/.*$/gm, "");
+  for (const opening of source.matchAll(/include_(?:str|bytes)!\(/g)) {
+    // The argument runs to the matching parenthesis, so a nested concat!(env!(..), "..") is read whole.
+    let depth = 1;
+    let end = opening.index + opening[0].length;
+    while (end < source.length && depth > 0) depth += source[end] === "(" ? 1 : source[end] === ")" ? -1 : 0, end += 1;
+    const argument = source.slice(opening.index + opening[0].length, end - 1);
+    const literal = /^\s*"([^"]+)"\s*,?\s*$/.exec(argument)?.[1];
+    if (literal === undefined) {
+      // A form this scan cannot resolve (concat!, env!) that climbs out of the crate must be listed by hand above.
+      if (argument.includes("..")) failures.push(`${file} includes a path this check cannot resolve (${argument.trim().slice(0, 80)}); list it in readAtRunTime`);
+      continue;
+    }
+    const resolved = posix.normalize(posix.join(posix.dirname(file), literal));
+    if (!/^(?:src-tauri|tools)\//.test(resolved) && !nativeScope.test(resolved)) {
+      failures.push(`the native scope omits ${resolved}, which ${file} includes`);
+    }
+  }
 }
 const expectedRequiredChecks = [
   "  required-checks:",

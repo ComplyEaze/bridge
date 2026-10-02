@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Where does your client&#x27;s data go when Claude reads Tally? | ComplyEaze Bridge</title>
+<meta name="description" content="A plain answer for CAs: what ComplyEaze Bridge keeps on your computer, what goes to your AI provider, what posting can and cannot do, and what has and has not been tried." />
+<link rel="canonical" href="https://bridge.complyeaze.com/blog-where-does-client-data-go.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Where does your client&#x27;s data go when Claude reads Tally? | ComplyEaze Bridge" />
+<meta property="og:description" content="A plain answer for CAs: what ComplyEaze Bridge keeps on your computer, what goes to your AI provider, what posting can and cannot do, and what has and has not been tried." />
+<meta property="og:url" content="https://bridge.complyeaze.com/blog-where-does-client-data-go.html" />
+<link rel="alternate" type="application/atom+xml" title="ComplyEaze Bridge blog" href="feed.xml" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page ce-page--plain">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="legal-layout">
+<article class="legal">
+<h1>Where does your client&#x27;s data go when Claude reads Tally?</h1>
+<p><em>Written on 2 October 2026, about release 0.4.1. The README, the security page and the Terms are the current text; this post is not edited when they change.</em></p>
+<p>If you keep client books in TallyPrime and you are thinking about an AI assistant, the first question is not &quot;how clever is it?&quot; It is &quot;where does my client&#x27;s data go?&quot; Here is a plain answer for ComplyEaze Bridge, including the parts that are uncomfortable.</p>
+<p><strong>The short answer</strong></p>
+<ul>
+<li>From our reading of the code in release 0.4.1, ComplyEaze does not receive your Tally data through ComplyEaze Bridge.</li>
+<li>What Claude reads goes to your AI provider, which for Claude is Anthropic. That can include party names, narrations and amounts. Amounts are never masked.</li>
+<li>In a new installation, posting into Tally is off. When you turn it on, each voucher waits for your approval in a separate window.</li>
+<li>ComplyEaze Bridge is still being developed. It runs on Windows (x64) and Apple Silicon Macs, with TallyPrime on the same computer.</li>
+</ul>
+<h2>What ComplyEaze Bridge is</h2>
+<p>An open-source extension for Claude Desktop. It lets Claude read the TallyPrime open on your own computer: outstanding receivables and payables with ageing, the trial balance, profit and loss, balance sheet, ledger movement, vouchers in a date window, a purchase register and closing stock. It can check ledger names against your book and prepare Journal, Payment, Receipt and Contra vouchers as a file.</p>
+<h2>Step 1: Tally to ComplyEaze Bridge</h2>
+<p>It talks to Tally through Tally&#x27;s own connection, using an address on your own computer only, so it cannot be pointed at a Tally on another machine. It cannot tell whether you have forwarded that connection elsewhere, so do not forward it across the internet.</p>
+<p>In the code we read, we found no analytics, no crash reporting and no automatic update check. That is a reading of the source, not a measurement of the running program, and nobody independent has audited it. Because it does not check for updates, look at the releases page now and then.</p>
+<h2>Step 2: Claude Desktop to your AI provider</h2>
+<p>This is the step that matters for confidentiality. Whatever Claude reads through ComplyEaze Bridge becomes part of your conversation and is sent to your AI provider. Depending on what the assistant asks for, that can include company, ledger and party names; vouchers with dates, amounts, narrations and GSTINs; outstanding bills; the trial balance and other statements; ledger details such as PAN and bank account numbers; the contents of a bank-statement PDF you ask it to read; and file locations that usually include your computer user name.</p>
+<p>Whether your provider keeps this, trains on it, or processes it elsewhere depends on the provider, your plan and your settings. Please ask yours: Is it kept? Is it used for training? Where is it processed?</p>
+<p>ComplyEaze Bridge has one optional setting, &quot;Response redaction&quot;. It can shorten party and ledger names to their first two and last two characters, or it can remove narrations, but not both. Neither makes the data anonymous. Amounts, company names, GSTINs and PAN numbers are never masked. By default nothing is masked.</p>
+<p>Our Terms and Privacy Policy put the next part on you: you need each client&#x27;s authority to access their books with ComplyEaze Bridge and to share their data with your AI provider, and you must give any notice or obtain any consent that the law or your engagement requires. Your professional duties of confidentiality still apply. Nothing here is accounting, tax, audit or legal advice.</p>
+<h2>What stays on your computer</h2>
+<p>ComplyEaze Bridge keeps files on your computer so you can see what it did. The request log records the time, the tool, Tally&#x27;s internal code for the company, and short codes (&quot;fingerprints&quot;) of each request and result; it is designed to hold no amounts or names. The import journal, import files and bank-statement proposals do hold amounts and names, unmasked. None of it is deleted automatically, and removing the extension may leave it behind. Do not simply delete the folder: ComplyEaze Bridge uses it to avoid sending the same batch twice, so the Privacy Policy asks you to check Tally and then archive it in an encrypted archive. On Windows the files take the folder&#x27;s normal permissions, so turn on full-disk encryption (BitLocker on Windows, FileVault on a Mac).</p>
+<h2>What it can do to your books</h2>
+<ul>
+<li><strong>Reading</strong> does not write to your books. A large read can still slow Tally, sometimes until Tally is restarted, and that can affect other people on a shared Tally.</li>
+<li><strong>Posting</strong> is off by default in new installations. If you upgraded from an earlier version, check the setting, because an earlier default may still be saved as on. When it is on, each voucher (Journal, Payment, Receipt or Contra) waits for your approval in a separate window on your computer. An approval is used once and expires. No ComplyEaze Bridge tool lets the assistant approve a post. Software that can control your screen could still click the button, so do not let such software run while a posting is waiting.</li>
+<li><strong>A post can land in the wrong place</strong> if a company or ledger is renamed, replaced or loaded in Tally at that moment. Do not change companies or ledgers in Tally while a post is waiting.</li>
+<li><strong>It cannot undo a posted voucher.</strong> You correct it in Tally. It reads the voucher back after posting; a match does not mean the entry is correct or compliant.</li>
+<li>It does not create masters or post sales, purchase, tax or inventory entries.</li>
+</ul>
+<h2>One security note</h2>
+<p>In releases 0.3.0 and 0.4.0 the bank-statement tool could be given a Windows network path (a file on another computer). Windows then connects to that computer and may send the signed-in user&#x27;s network login details to it. No Tally data is sent. It needs the assistant to be talked into using such a path, and either your approval of that call or an &quot;always allow&quot; setting. Release 0.4.1 refuses these paths. A drive letter mapped to a network share, a link, and on a Mac a mounted network volume can still pass, so keep statements and password files on the computer&#x27;s own disk. If you have 0.3.0 or 0.4.0, update. The advisory is linked from our security policy.</p>
+<h2>Before you use it on a client&#x27;s books</h2>
+<p>Take a backup and try a test company first. Have your client&#x27;s authority. Read your AI provider&#x27;s terms and the Terms of Use, including section 14 on liability; we do not promise support or updates. Check what you get in Tally before you rely on it. The README lists what has been run against a real TallyPrime and what has not, for example posting with the published package against a live TallyPrime. Not every read has its own recorded run, and reads on very large books can fail or take longer than the assistant waits. ComplyEaze Bridge is not yet code-signed, so your computer may warn you before opening it.</p>
+<div lang="hi">
+<h2>हिंदी में सार (अनुवाद; अंग्रेज़ी पाठ ही लागू होता है)</h2>
+<ul>
+<li>0.4.1 के कोड को पढ़कर हमारा आकलन है कि ComplyEaze Bridge के ज़रिए ComplyEaze को आपका Tally डेटा नहीं मिलता।</li>
+<li>Claude जो पढ़ता है, वह आपके AI प्रदाता (Claude के लिए Anthropic) को जाता है: कंपनी और पार्टी के नाम, narration, GSTIN, रकम, और कभी-कभी PAN व बैंक विवरण भी। &quot;Response redaction&quot; सेटिंग केवल पार्टी के नाम छोटे कर सकती है या narration हटा सकती है; रकम पर यह कभी लागू नहीं होती। प्रदाता डेटा रखता है या नहीं, इस पर ट्रेनिंग करता है या नहीं, कहाँ प्रोसेस करता है, यह उसकी शर्तों में देखें।</li>
+<li>क्लाइंट की बुक्स पर इस्तेमाल से पहले आपके पास क्लाइंट का अधिकार (authority) होना चाहिए, और आपके पेशेवर गोपनीयता दायित्व लागू रहते हैं।</li>
+<li>नई इंस्टॉलेशन में posting बंद रहती है; पुराने संस्करण से अपग्रेड किया हो तो सेटिंग जाँचें। चालू करने पर हर voucher आपकी मंज़ूरी का इंतज़ार करता है। अगर उसी समय कोई कंपनी या ledger का नाम बदला या बदला गया हो, तो voucher गलत जगह जा सकता है। post किया हुआ voucher यह टूल वापस नहीं ले सकता; Tally में खुद सुधारें।</li>
+<li>0.3.0 और 0.4.0 में बैंक-स्टेटमेंट टूल की एक खामी थी; 0.4.1 में उसका ज़्यादातर रास्ता बंद है। पुराना संस्करण हो तो अपडेट करें, और स्टेटमेंट अपने कंप्यूटर की डिस्क पर रखें।</li>
+<li>पहले बैकअप लें और टेस्ट कंपनी पर आज़माएँ। Tally में नतीजा खुद जाँचें। यह अभी code-signed नहीं है। यह अकाउंटिंग, टैक्स, ऑडिट या कानूनी सलाह नहीं है।</li>
+</ul>
+</div>
+<hr>
+<p>ComplyEaze Bridge is not a product of, or endorsed by, Tally Solutions, Anthropic or ICAI. Questions: contact@complyeaze.com. Download and release notes: <a href="./download.html">the Download page</a>. The current text is in the <a href="./terms.html">Terms of Use</a>, the <a href="./privacy.html">Privacy Policy</a>, the <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy page</a> and the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime" target="_blank" rel="noopener noreferrer">README list of what has been run</a>. Security policy: <a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p>
+</article>
+  </div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>A loopback address on this computer.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+</body>
+</html>

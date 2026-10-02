@@ -25,7 +25,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["changelog.template.html", "download.html", "index.html", "legal.template.html", "releases.html"]);
+  assert.deepEqual(pages, ["blog-where-does-client-data-go.html", "blog.html", "changelog.template.html", "download.html", "index.html", "legal.template.html", "releases.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {
@@ -210,4 +210,26 @@ test("llms.txt is a plain description that keeps to the wording rules and links 
     const file = link.split("/blob/master/")[1];
     assert.ok(existsSync(new URL(`../${file}`, site)), `${link} names a file the repository does not have`);
   }
+});
+
+test("the Atom feed has one entry for each blog post, pointing at the post's own address", () => {
+  const origin = "https://bridge.complyeaze.com";
+  const rfc3339 = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z";
+  const posts = pages.filter((name) => name.startsWith("blog-"));
+  assert.ok(posts.length >= 1, "the blog has at least one post");
+  const feed = read("feed.xml");
+  const entries = [...feed.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((match) => match[1]);
+  assert.equal(entries.length, posts.length, "the feed has one entry per post page");
+  for (const post of posts) {
+    const address = `${origin}/${post}`;
+    const entry = entries.find((text) => text.includes(`<id>${address}</id>`));
+    assert.ok(entry, `${post} has no feed entry with its address as the id`);
+    for (const tag of ["title", "summary"]) assert.match(entry, new RegExp(`<${tag}>[^<]+</${tag}>`), `${post}: the feed entry has no ${tag}`);
+    for (const tag of ["published", "updated"]) assert.match(entry, new RegExp(`<${tag}>${rfc3339}</${tag}>`), `${post}: the feed entry has no ${tag} time`);
+    assert.ok(entry.includes(`<link rel="alternate" type="text/html" href="${address}" />`), `${post}: the feed entry does not link to the page`);
+  }
+  assert.match(feed.replace(/<entry>[\s\S]*?<\/entry>/g, ""), new RegExp(`<updated>${rfc3339}</updated>`), "the feed itself has no RFC 3339 update time");
+  // the feed carries words too, so it keeps to the same wording rules as a page
+  for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) assert.doesNotMatch(feed, banned, `feed.xml says ${banned}`);
+  assert.doesNotMatch(feed, /(?<!ComplyEaze )\bBridge\b/, "feed.xml names the product as a bare Bridge");
 });

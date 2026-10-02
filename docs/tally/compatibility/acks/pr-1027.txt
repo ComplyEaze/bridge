@@ -1,4 +1,3 @@
-src-tauri/src/agent_catalog.rs
 src-tauri/src/agent_register.rs
 src-tauri/src/agent_register_tests.rs
 reviewer: lamemustafa

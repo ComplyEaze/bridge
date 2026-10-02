@@ -5,6 +5,7 @@ import test from "node:test";
 const site = new URL("../site/", import.meta.url);
 const read = (name) => readFileSync(new URL(name, site), "utf8");
 // The deploy writes these from the tracked templates; a template is the page this test reads.
+const siteOrigin = "https://bridge.complyeaze.com/";
 const generated = new Set(["changelog.html", "privacy.html", "releases.json", "terms.html"]);
 const pages = readdirSync(site).filter((name) => name.endsWith(".html") && !generated.has(name)).sort();
 
@@ -56,6 +57,11 @@ test("every reference on a page is a file the site ships or the deploy writes, o
     const html = read(name).replace(/<!--[\s\S]*?-->/g, " ");
     for (const [tag, attribute, , ref] of html.matchAll(/<[a-z][^>]*?\b(href|src)=(["'])(.*?)\2/g)) {
       if (ref.startsWith("#")) continue;
+      // a page may name its own address as its canonical one, and no other address on this site's origin
+      if (tag.startsWith('<link rel="canonical"')) {
+        assert.equal(ref, siteOrigin + (name === "index.html" ? "" : name), `${name}: its canonical address is not its own`);
+        continue;
+      }
       if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith("//")) {
         // only an <a> may leave the site, and only for this project's GitHub pages: no outside script, style, font or image
         assert.ok(tag.startsWith("<a ") && attribute === "href" && outsideLinks.test(ref), `${name}: ${ref} is an outside reference`);
@@ -124,7 +130,7 @@ test("no file that ships carries an internal working label", () => {
     /\bround[- ]?[0-9]/i, /\bv[0-9]m?\b(?!\.[0-9]|[0-9])/, /\bv[0-9]\//, /\bpages\//, /\bstyle\.css\b/, /\b[0-9]{1,2} (?:Sep|Oct)\b(?! 20)/,
     /privacy policy, section/i, /\bPrivacy and Terms\b/, /\b(?:TBT|perf) pass\b/i, /\bfinal (?:pass|review)\b/i,
   ];
-  const files = readdirSync(site, { recursive: true }).filter((name) => /\.(html|css|js|mjs|svg|md)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
+  const files = readdirSync(site, { recursive: true }).filter((name) => /\.(html|css|js|mjs|svg|md|txt|xml)$/.test(name) && !name.endsWith(".min.js") && !generated.has(name));
   assert.ok(files.includes("scene.js") && files.includes("chrome.js") && files.includes("home.css") && files.includes("brand/lockup.svg"), "the check reads the scripts, stylesheets and artwork");
   for (const name of files) {
     // path data (d="M2.21 7 L4.99 7 …") is drawing commands, not words
@@ -133,5 +139,75 @@ test("no file that ships carries an internal working label", () => {
       const hit = lines.find((line) => label.test(line));
       assert.equal(hit, undefined, `${name} matches ${label}: ${hit}`);
     }
+  }
+});
+
+// What a search engine or an AI assistant reads about the site without running its script.
+const indexed = ["index.html", "download.html", "releases.html"];
+const metaContent = (html, property) => html.match(new RegExp(`<meta property="${property}" content="([^"]*)" />`))?.[1];
+
+test("each indexed page names its own address, and its social card repeats the page's own title and description", () => {
+  for (const name of indexed) {
+    const html = read(name);
+    const url = siteOrigin + (name === "index.html" ? "" : name);
+    assert.equal(html.match(/<link rel="canonical" href="([^"]*)" \/>/g)?.length, 1, `${name}: exactly one canonical link`);
+    assert.match(html, new RegExp(`<link rel="canonical" href="${url.replaceAll(".", "\\.")}" />`), name);
+    assert.equal(metaContent(html, "og:url"), url, name);
+    assert.equal(metaContent(html, "og:title"), html.match(/<title>(.*?)<\/title>/)[1], name);
+    assert.equal(metaContent(html, "og:description"), html.match(/<meta name="description" content="(.*?)" \/>/)[1], name);
+    assert.equal(metaContent(html, "og:site_name"), "ComplyEaze Bridge", name);
+    // no image: a card image has to be a raster file made by a designer, not drawn here
+    assert.doesNotMatch(html, /og:image|twitter:image/i, `${name}: a card image needs a shipped raster file first`);
+  }
+});
+
+test("the structured data on the home page is valid JSON and states no price, no version and no unproven claim", () => {
+  const html = read("index.html");
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  assert.equal(blocks.length, 1);
+  const data = JSON.parse(blocks[0][1]);
+  assert.equal(data["@type"], "SoftwareApplication");
+  assert.equal(data.name, "ComplyEaze Bridge");
+  assert.equal(data.url, siteOrigin);
+  const text = JSON.stringify(data);
+  const keys = (value) => (value && typeof value === "object" ? Object.entries(value).flatMap(([key, inner]) => [key, ...keys(inner)]) : []);
+  for (const key of keys(data)) assert.doesNotMatch(key, /^(?:offers?|price\w*|softwareVersion|downloadUrl|aggregateRating|review|isAccessibleForFree)$/i, `${key} would go stale or imply something unproven`);
+  assert.doesNotMatch(text, /price|\bfree\b|\bpaid\b|[₹$]/i, "a price in the words");
+  for (const banned of [/\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]/]) assert.doesNotMatch(text, banned);
+  assert.equal(text.match(/(?<!ComplyEaze )\bBridge\b/g), null, "a bare Bridge");
+  assert.match(data.description, /not yet code-signed/);
+  assert.match(data.description, /off by default in a new install/);
+});
+
+test("the sitemap lists every page that is meant to be found and nothing the site does not ship or generate", () => {
+  const listed = [...read("sitemap.xml").matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+  assert.equal(new Set(listed).size, listed.length, "a page is listed twice");
+  for (const url of listed) {
+    assert.ok(url.startsWith(siteOrigin), url);
+    const file = url.slice(siteOrigin.length) || "index.html";
+    assert.ok(generated.has(file) || existsSync(new URL(file, site)), `${url} is not a page the site ships or the deploy writes`);
+  }
+  for (const name of indexed) assert.ok(listed.includes(siteOrigin + (name === "index.html" ? "" : name)), `${name} is not in the sitemap`);
+  assert.match(read("robots.txt"), /^Sitemap: https:\/\/bridge\.complyeaze\.com\/sitemap\.xml$/m);
+  assert.doesNotMatch(read("robots.txt"), /^Disallow: \/\s*$/m, "a blanket disallow would hide the site");
+});
+
+test("llms.txt is a plain description that keeps to the wording rules and links only to this project", () => {
+  const text = read("llms.txt");
+  assert.match(text, /^# ComplyEaze Bridge\n\n> /);
+  for (const banned of [/\bfree\b/i, /\boffline\b/i, /nothing leaves/i, /\bpreviews?\b/i, /[™®]|&trade;|&reg;/]) assert.doesNotMatch(text, banned);
+  assert.equal(text.match(/(?<!ComplyEaze )\bBridge\b/g), null, "a bare Bridge");
+  assert.match(text, /not yet code-signed/);
+  assert.match(text, /amounts are always sent/);
+  const links = [...text.matchAll(/\]\((https?:[^)\s]+)\)/g)].map((match) => match[1]);
+  assert.ok(links.length >= 8);
+  for (const link of links) assert.match(link, /^https:\/\/(?:github\.com\/ComplyEaze\/bridge(?:\/|$)|bridge\.complyeaze\.com\/)/, link);
+  for (const link of links.filter((link) => link.startsWith(siteOrigin))) {
+    const file = link.slice(siteOrigin.length);
+    assert.ok(generated.has(file) || existsSync(new URL(file, site)), `${link} is not a page the site ships or the deploy writes`);
+  }
+  for (const link of links.filter((link) => link.includes("/blob/master/"))) {
+    const file = link.split("/blob/master/")[1];
+    assert.ok(existsSync(new URL(`../${file}`, site)), `${link} names a file the repository does not have`);
   }
 });

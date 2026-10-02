@@ -619,7 +619,9 @@ every note for them first, and for maintainers second.
 - Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
   weeks, and only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts.
+  both hosts. A master push may show the native, bundle and seam jobs skipped
+  when the merge queue ran them on that same commit; its job summary names the
+  queue run, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the
@@ -680,7 +682,17 @@ It checks every file first and writes none if one fails. Then:
    Also update the sentences that say a tool is "in source but not in the
    0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
    and the `README.md` lines that describe the published package, so no line
-   describes the previous build as the newest.
+   describes the previous build as the newest. Add the new tag to the
+   "so far" list under `## [Unreleased]` in `CHANGELOG.md`, and the new version
+   to the version line of `docs/security-and-privacy.md` (change its tag line
+   only when the page is read again at the new tag).
+   The publish workflow creates the release as a pre-release and deploys the
+   site as soon as it ends, before `gh release edit` marks the release latest, so
+   the release snapshot deployed with the site still records it as a
+   pre-release. The site workflow has no push trigger: text merged under `site/`
+   and in `CHANGELOG.md` goes live only when a maintainer dispatches it or at
+   the next publication, so dispatch it once after the post-release pull request
+   merges.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
@@ -702,7 +714,11 @@ disagree.
 **`CHANGELOG.md`**
 
 - Each release gets an "In plain words" section above the detailed entries,
-  written from the merged pull requests since the last build.
+  written from the merged pull requests since the last build. It opens with a
+  short "Should I upgrade?" block: who should, in one line why (name a published
+  advisory if the build fixes one), how to upgrade, and what to check afterwards
+  (the version the extension shows, and the posting setting).
+  It adds no claim the detailed entries or the published advisory do not support.
 - While the changes are unreleased, head the first part "What the next build
   adds", so nothing unpublished reads as available. Rename it "What you can do
   now" when the section becomes the release.

@@ -2145,6 +2145,55 @@ async fn native_post_reads_back_as_posted_verified(
     assert_journaled_clean_create(directory.path());
 }
 
+/// #985: the readback after a sent post is admitted against the census that
+/// sized it, so a book that changed between the count and the read refuses the
+/// readback. The post was sent and stays sent: the refusal names its cause and
+/// sends the caller to verify_import with this batch, never to post again, and
+/// carries none of the read-only "call the same tool again" remediation.
+#[tokio::test]
+async fn a_readback_refused_by_its_census_after_a_post_sends_the_caller_to_verify_import() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    // The readback on a book whose voucher mark needs a census: the census
+    // counts the posted voucher, and the read that follows returns none.
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(
+        marks().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+    ));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(paired(empty_collection()));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "voucher_window_part_not_admitted",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["cause"], "part_census_mismatch",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(
+        result["error"]["message"],
+        "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry."
+    );
+    assert!(result["error"].get("remediation").is_none(), "{response}");
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
+    assert_journaled_clean_create(directory.path());
+}
+
 // bridge#551: a post goes only into a book with exactly one Currency master,
 // checked before approval and again inside the queue.
 
@@ -3586,7 +3635,7 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
     assert!(step.contains("on whole days"), "{step}");
     assert!(step.contains("do not enter the row by hand"), "{step}");
     assert!(
-        step.contains("build the batch again and Bridge checks the book again"),
+        step.contains("build the batch again and ComplyEaze Bridge checks the book again"),
         "{step}"
     );
     assert!(step.contains("never change a row"), "{step}");

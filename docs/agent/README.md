@@ -79,14 +79,32 @@ Cursor uses the same server object in `.cursor/mcp.json`, with the same
 {"mcpServers":{"bridge-tally":{"command":"/absolute/path/to/bridge_mcp","env":{"BRIDGE_TERMS_ACCEPTED":"true"}}}}
 ```
 
-The ordinary default tools are `tally_status`, `list_companies`,
-`voucher_schema`, `validate_masters`, `verify_import`, `outstandings`,
-`ledger_masters`, `ledger_movement`, `purchase_register`, `trial_balance`, `masters`,
-`stock_summary`,
-`profit_and_loss`, `balance_sheet`, `vouchers`, `voucher_presence`,
-`read_evidence`, `egress_log`, and `local_data_report`. (`masters`, `stock_summary`,
-`profit_and_loss`, `balance_sheet`, `purchase_register` and `local_data_report` were
-added in release 0.4.0.) `local_data_report` (also
+The ordinary default tools, in name order:
+
+- `balance_sheet`
+- `egress_log`
+- `ledger_masters`
+- `ledger_movement`
+- `list_companies`
+- `local_data_report`
+- `masters`
+- `outstandings`
+- `profit_and_loss`
+- `purchase_register`
+- `read_evidence`
+- `sales_register`
+- `stock_summary`
+- `tally_status`
+- `trial_balance`
+- `validate_masters`
+- `verify_import`
+- `voucher_presence`
+- `voucher_schema`
+- `vouchers`
+
+`masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
+`local_data_report` were added in release 0.4.0; `sales_register` is in source and not
+in a published release. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -712,6 +730,99 @@ or vouchers.
   with several currencies; any GSTIN, `REFERENCEDATE`, or cancelled, optional or
   post-dated voucher in the captures the tests use. The captures are one
   synthetic lab book and one month.
+
+### Sales register (`sales_register`)
+
+The mirror of `purchase_register`: it lists the Sales and Credit Note vouchers
+of a date window that touch a ledger under Duties & Taxes, and says per entry
+what the books record. It is the same code with two things changed: the register's
+voucher classes (Sales and Credit Note instead of Purchase and Debit Note) and
+the group of the taxable ledgers (Sales Accounts instead of Purchase Accounts).
+Everything else is shared: the reads, the company pin, the snapshot binding, the
+states, the refusals, the paging, the masking, and the rule that tax comes only
+from the GST duty head on the ledger master, never from a name or an amount.
+Read the purchase register's section above for each of them. The response's
+`profile` is `agent_sales_register_v1`; vouchers with no Duties & Taxes entry are
+counted in `sales_vouchers_without_duties_taxes_entry`; each row carries
+`party_group` and the tool does not decide whether a Credit Note is a sales
+return or a credit note issued to a supplier. It decides no place of supply, tax
+rate or return section, and matches nothing against any portal.
+
+- **Measured.** `sales_register` was run against a live Tally on two synthetic
+  companies (TallyPrime 7.1 Silver). On the first, once per day, for one taxed
+  Sales item invoice and one untaxed one: the taxed sale came back as one row
+  (voucher type Sales in the invoice view, the party as a debit entry, the sales
+  ledger as its taxable entry, and two credit entries on tax ledgers whose
+  masters carry the heads CGST and SGST/UTGST), and the untaxed one was counted
+  under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44
+  ledgers, for one Credit Note in voucher view booked on account: one row with
+  its CGST and state-tax heads and its sales ledger as the taxable entry. The
+  voucher windows of the first two invoices are committed, and the parsed
+  windows have exactly those entries (a test); the requests are the ones the
+  code sends (a test). The taxed invoice's day was read again on 2 Oct 2026
+  by the build at commit 8c674d5e, with the book's own ledger masters, groups and
+  company listings, and is replayed end to end from that recorded call (a test;
+  the answer file carries that build's `coverage` wording). The untaxed
+  invoice's day was read once by an earlier build; only its voucher window is
+  committed, not its masters or the tool's answer, and a test with a Sales
+  voucher whose tax entries are removed stands in for its list. The Credit Note day, and a Debit Note day through
+  `purchase_register`, are also replayed end to end from their recorded calls
+  (tests). One Sales accounting voucher (not an invoice) is also classified, in
+  tests, against the ledger masters of the purchase register's lab book.
+- **What `complete` rests on.** The response `state` is `complete` when the
+  company's marks and the ledger masters read the same before and after the
+  window (and, for an empty window, its corroboration read confirmed it). It
+  does not mean the window was admitted against a separate voucher count: on the
+  small book measured, the call sent no voucher census, and a small window that
+  `vouchers` calls `partial` can be `complete` here. A row's `status` of
+  `complete` is a different thing: every entry the voucher touches classified.
+- **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
+  reversed as Tally sends them: the tool neither nets nor flips, so a caller that
+  sums tax over a window must add signed amounts. The measured Credit Note of
+  1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
+  `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
+  row has the sales and tax entries positive and the party entry negative.
+- **The cost varies by book.** The same call sent 96 requests on a book with 8
+  ledgers and one currency and 118 on one with 44 ledgers and two currencies (a
+  voucher census and base-currency reads are added). The result does not report
+  the cost.
+- **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
+  on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
+  recognised heads for the same side of the tax, so a caller must not look for
+  one of them only.
+- **Not shown by any run, and said so in the tool's text and in each
+  response's `coverage`:** an invoice-view Credit Note; an inter-state (IGST)
+  line; a cancelled or optional sales voucher; an unrecognised or missing duty
+  head on a sale; more than one voucher in a window; paging; a company with a
+  registration; a tax Tally computes itself (rate or HSN on the item); a sale
+  typed on Tally's screen; accounting-invoice mode; a post-dated sale; a
+  `REFERENCE` or a populated `PARTYGSTIN` on a sale; `REFERENCEDATE` (not
+  returned); a ledger or voucher kept in a currency other than the book's base
+  (the Credit Note run's book defines a second currency, but all of its ledgers
+  are in the base).
+- **A row of a kind no capture covers says so, where the row itself shows the
+  kind.** It is returned, not withheld, with `not_measured_live` listing why:
+  `invoice_view_credit_note`, `inter_state_line`, `sales_ledger_not_an_entry`
+  (tax is present but no entry is on a Sales Accounts ledger: the sales ledger
+  may sit in an inventory allocation), `cancelled`, `optional`, `post_dated`,
+  `party_gstin_present`, `reference_present`. A row the captures cover has no
+  such field, and the purchase register's rows never carry it. Some kinds a row
+  cannot show, so they are never marked and are not vouched for: a sale typed on
+  Tally's screen in voucher view, a tax Tally computed itself, a duty head no
+  sales capture has (such as cess), an invoice of another shape than the one run
+  (for example several goods lines), and a ledger or voucher kept in a currency
+  other than the book's base; an unmarked row is
+  not a measured one in those respects. A row is marked `inter_state_line` only
+  when a tax entry's ledger master carries a recognised IGST head; an IGST
+  ledger with no head, or an unrecognised head, is listed under the without-head
+  or unrecognised list and the status is not complete.
+  `sales_vouchers_without_duties_taxes_entry` lists such vouchers by identity
+  only; the tool does not say why one carries no tax entry. A cancelled sale
+  that Tally returns with no ledger entries is listed there too, with
+  `cancelled` true; no cancelled sale has been read, so whether one keeps its
+  entries is not measured (#1013). A Debit Note, even
+  to a customer, is not a sales row: it is listed apart by identity and ledger
+  names, with no amount.
 
 ### Foreign-currency composites in `vouchers`
 
@@ -1458,8 +1569,14 @@ canonical UUIDs. Failed receipt appends restore the previous file length.
 An incomplete log or failed rollback stops the session; a persisted build still
 returns its recovery batch ID before termination. Reads withheld by the result
 byte cap retain partial source commitments in the in-process evidence store.
-Voucher selectors are applied after source-emptiness corroboration; a nonempty
-source with no matching ledger can return a complete empty selection. Amounts
+`vouchers` and `voucher_presence` label a window by one rule (#985): `complete`
+only when its rows were admitted voucher for voucher against the census that
+sized the read (protocol reference §11c.3), or it was empty and corroborated;
+otherwise `partial` with reason `nonempty_window_unqualified`. A book whose
+voucher high-water mark alone proves it small (a few dozen vouchers) sends no
+census, so its nonempty windows are `partial`. Voucher selectors are applied
+after the window is labelled, so a nonempty counted source with no matching
+ledger returns a complete empty selection, and an uncounted one a partial one. Amounts
 must parse as exact decimals, polarity flags must be `Yes` or `No`, and dates
 must be valid calendar dates before ordinary voucher rows are released. Ledger
 selectors require matching catalogues before and after the voucher read, unique

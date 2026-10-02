@@ -325,7 +325,7 @@ filtered sub-table)."
 summed across every ledger the client's setup maps to nature '{nature}'."
             ),
             ledger_ev.clone(),
-        );
+        )?;
         let f_close = r.fig(
             &format!("closing_liability_{nature}"),
             Value::Int(closing),
@@ -335,7 +335,7 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 summed across every ledger the client's setup maps to nature '{nature}'."
             ),
             ledger_ev.clone(),
-        );
+        )?;
         if !no_tb_row.is_empty() {
             r.fig(
                 &format!("ledgers_without_tb_row_count_{nature}"),
@@ -346,7 +346,7 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 (opening/closing treated as nil)."
                 ),
                 ledger_refs(no_tb_row.iter().copied()),
-            );
+            )?;
         }
 
         let nl = compute_nature_lines(&pop, ledgers)?;
@@ -360,7 +360,7 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 mapped to nature '{nature}'."
             ),
             voucher_ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("paid_{nature}"),
             Value::Int(nl.paid),
@@ -370,7 +370,7 @@ mapped to nature '{nature}'."
 ledgers mapped to nature '{nature}'."
             ),
             voucher_ev,
-        );
+        )?;
 
         if NOT_S43B_NATURES.contains(&nature) {
             continue;
@@ -451,7 +451,7 @@ liability reported separately under clause 26(i)(A)(b), so the same rupee is nev
 both clauses (GN 46.4-46.7)."
             ),
             ledger_ev.to_vec(),
-        );
+        )?;
         let mut limits = vec![
             format!(
                 "Allowability under s.43B turns on payment on or before {due_text}; a challan or \
@@ -528,7 +528,7 @@ return/Form 3CD (not available to this module) -- treating the whole TB opening 
 26(i)(A) risks double-deducting an amount already allowed last year."
         ),
         payment_ev.clone(),
-    );
+    )?;
     let f_unpaid = r.fig(
         &format!("opening_s43b_still_unpaid_{nature}"),
         Value::Int(opening_lot.remaining_paise),
@@ -542,7 +542,7 @@ already allowable in an earlier year, not a settled figure; it carries forward a
 opening balance either way, and is EXCLUDED from clause 26(i)(B) so it is never counted twice."
         ),
         ledger_ev.to_vec(),
-    );
+    )?;
     if opening_lot.paid_paise > 0 {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/opening_paid/{nature}"),
@@ -646,7 +646,7 @@ date (FIFO, oldest lot first; s.36(1)(va)). Excludes any opening (prior-year) li
 payments are reported separately."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_late = r.fig(
         &format!("deposited_late_{nature}"),
         Value::Int(late),
@@ -656,7 +656,7 @@ payments are reported separately."
 (FIFO, oldest lot first). Excludes any opening (prior-year) liability lot."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_not_visible = r.fig(
         &format!("not_visible_after_year_end_{nature}"),
         Value::Int(not_visible),
@@ -667,7 +667,7 @@ voucher population has no postings after this date, so on-time/late cannot be de
 this book at all)."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_visible_unpaid = r.fig(
         &format!("unpaid_due_date_passed_{nature}"),
         Value::Int(visible_unpaid),
@@ -677,7 +677,7 @@ this book at all)."
 had no matching payment recorded in the books by then."
         ),
         lot_ev.clone(),
-    );
+    )?;
     if unmatched_advance != 0 {
         r.fig(
             &format!("unmatched_advance_{nature}"),
@@ -689,7 +689,7 @@ had no matching payment recorded in the books by then."
 a specific month's deduction)."
             ),
             lot_ev.clone(),
-        );
+        )?;
     }
 
     if let Some(opening_lot) = opening_lot {
@@ -708,7 +708,7 @@ s.36(1)(va) due date into the portion paid on time and the portion paid late, no
 as a whole."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_paid_on_time = r.fig(
             &format!("opening_liability_paid_on_time_{nature}"),
             Value::Int(opening_paid_on_time),
@@ -719,7 +719,7 @@ as a whole."
 (s.36(1)(va)) -- allowable in the earlier year it was deducted, not disallowed."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_paid_late = r.fig(
             &format!("opening_liability_paid_late_{nature}"),
             Value::Int(opening_paid_late),
@@ -731,7 +731,7 @@ as a whole."
 Ltd v CIT (2022) SC), not reassessed this year."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_unpaid = r.fig(
             &format!("opening_liability_unpaid_{nature}"),
             Value::Int(opening_lot.remaining_paise),
@@ -743,7 +743,7 @@ pre-dates this PY), so it is permanently disallowed for the earlier year it was 
 (s.36(1)(va), Checkmate), and still an unresolved PF/ESI Act deposit besides."
             ),
             lot_ev.clone(),
-        );
+        )?;
         if opening_paid_late > 0 {
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/opening_paid_late/{nature}"),
@@ -1095,21 +1095,24 @@ mod tests {
         };
         let mut r = TestResult::new(TEST_ID, VERSION, "v");
         let x = || vec![EvidenceRef::new("ledger", "X")];
-        r.fig("opening_liability_a", Value::Int(1), Unit::Paise, "d", x());
+        r.fig("opening_liability_a", Value::Int(1), Unit::Paise, "d", x())
+            .unwrap();
         r.fig(
             "closing_liability_a",
             Value::Int(999),
             Unit::Paise,
             "d",
             x(),
-        );
+        )
+        .unwrap();
         r.fig(
             "closing_liability_b",
             Value::Int(0),
             Unit::Paise,
             "d",
             Vec::new(),
-        );
+        )
+        .unwrap();
         assert_eq!(
             check_invariants(&book, &r).unwrap(),
             vec![

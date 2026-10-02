@@ -7,10 +7,138 @@ All notable changes to ComplyEaze Bridge are documented here. The project follow
 
 Published builds are MCPB packages that are not yet code-signed (tags
 `mcp-preview-*` and, from 0.4.0, `mcp-v*`): so far
-`mcp-preview-0.2.0`, `mcp-preview-0.3.0` and `mcp-v0.4.0`. The number of the
-next build is chosen when it is released.
+`mcp-preview-0.2.0`, `mcp-preview-0.3.0`, `mcp-v0.4.0` and `mcp-v0.4.1`. The
+number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
+
+### In plain words: the next build, since `mcp-v0.4.1`
+
+These changes are in source and not yet in a published build.
+
+**What the next build adds**
+
+- Read a register of the tax in the books for sales: the Sales and Credit Note
+  vouchers of a date window that touch a Duties & Taxes ledger, with each
+  entry's tax taken only from the GST duty head on that ledger's master, never
+  from a name or an amount. It reads as the purchase register does. It was run
+  against a live Tally for one taxed Sales item invoice, one untaxed one (read
+  once by an earlier build; only its voucher window is committed) and one Credit
+  Note, on two synthetic companies. A Credit Note keeps Tally's signs
+  (nothing is netted or flipped, so add signed amounts), and the state-side tax
+  head has two recognised forms, `state_tax` and `sgst_utgst`, for the same
+  side. An inter-state line, a cancelled or optional sale, an unrecognised or
+  missing duty head, more than one voucher in a window and paging were not
+  shown. A sale of a kind a row can show as unmeasured is marked
+  `not_measured_live`; the tool's text says what cannot be marked. The response
+  `state` is `complete` when the company marks and the ledger masters read the
+  same before and after the window, not when the window was counted as
+  `vouchers` now requires (#1009).
+
+## [0.4.1] - 2026-10-02
+
+### In plain words: ComplyEaze Bridge 0.4.1, since 0.4.0 (2 Oct 2026)
+
+These changes are in ComplyEaze Bridge 0.4.1. Each line names the pull
+requests it comes from, except where it names an issue.
+
+**Should I upgrade?**
+
+- **If you use 0.3.0 or 0.4.0 on Windows: yes.** 0.4.1 closes the network-path
+  forms (a share, its WebDAV form, and the long-path prefixes) of a
+  medium-severity security issue in how the bank-statement tool opens file
+  paths, published as
+  [advisory GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
+  Some paths still pass; the advisory lists which. If you cannot upgrade yet,
+  follow the advisory's steps.
+- **On a Mac: recommended, though not urgent.** The advisory rates the issue
+  low there, and the other changes below apply there too.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
+  Desktop, install the newer file from Settings, Extensions; (3) keep
+  ComplyEaze Bridge's data folder, which holds its record of what it has sent
+  to Tally; (4) check that the extension shows 0.4.1 and that "Allow voucher
+  posting" is as you want it, since an earlier default may still be saved as
+  on; (5) quit Claude Desktop completely and reopen it.
+- **What was tried** is under "Known limits" below. No one on our side
+  installed the Windows package of this build in Claude Desktop on a Windows PC.
+
+**What you can do now**
+
+- No new tool. On a company large enough to be counted first,
+  `voucher_presence` can now answer `absent` for a voucher it finds nowhere in
+  a date range that holds vouchers and was checked against that count. An empty
+  range is called absent only on a company that has never held a voucher, as
+  before (#985, #1020).
+
+**Safer or fixed**
+
+- `parse_bank_statement` accepts a statement file or password file path only
+  when its text names a local disk. A path that starts with two separators
+  (two slashes, two backslashes or one of each), such as the Windows long-path
+  form (starting with `\\?\`) or a network share (`\\computer\folder`), is
+  now refused: copy the file to this computer and give its path there (#1024).
+- `vouchers` and `voucher_presence` now call a date range with vouchers in it
+  complete by one rule: only when every voucher read was checked against a
+  separate count of that range. Before, `vouchers` called any such range
+  complete (unless it withheld a voucher), and `voucher_presence` called none
+  complete. On a small or new company, which ComplyEaze Bridge does not count
+  first, both now say `partial` (#985, #1020).
+- A voucher changed in Tally between the count and the read now refuses the
+  read (`voucher_window_part_not_admitted`, cause `part_census_mismatch`),
+  also when the range is read in one request, where it used to return without
+  that check. Call again once while the book is quiet; if it repeats, read the
+  range in Tally. `ledger_movement`, `purchase_register`, `build_import_xml`,
+  verifying an import and the party detail of `outstandings` can give the same
+  refusal. After a post was sent, this refusal on the read-back means the
+  voucher may already be in Tally: use `verify_import` on the same batch and
+  never post it again. In some cases, verifying an import for one day that
+  Tally cannot serve in one request is now read in parts instead of refused,
+  which sends more requests to Tally (#985, #1020).
+- When `post_import` refuses a batch before it is sent because some of its
+  rows may already be in the book (`import_preexisting_identity`), the answer
+  now names those rows by their transaction ids and says what to check in Tally
+  next, instead of returning a bare code, unless the response size limit
+  leaves no room for the list. The same batches are refused as before (#901,
+  #908).
+- `vouchers` returns a voucher's `master_id` (Tally's internal voucher id) as
+  the plain number (`"1"`), not as Tally sends it with a leading space
+  (`" 1"`), so it matches the same id returned by `verify_import` (#989, #1021).
+- If voucher posting is turned on, you approve a batch in its approval dialog,
+  and the post is then refused before it is sent (for example because the
+  import journal is busy, the batch is not found, or the call names a
+  different company from the batch's), your approval is withdrawn, and the next
+  post that gets past those checks asks you again. Before, in these cases the
+  approval stayed held for up to 15 minutes, and posting any other batch was
+  refused until it was used or lapsed (#857, #904).
+
+**Known limits**
+
+- A date range is called complete when the vouchers read match a separate
+  count of the range. If Tally's own date selection leaves a voucher out, the
+  count and the read both miss it, and the range is still called complete. A
+  small or new company is not counted, so it cannot get `absent`; adding a
+  count for it is tracked in #1029, with the multi-day and after-post cases
+  (#985).
+- `parse_bank_statement` checks the text of the path. A mapped drive letter
+  still passes, and so, on a Mac, does a path under a mounted network volume
+  (#1024).
+- A batch refused just before it is sent can still return no rows and no next
+  step. The rows named before that can be more than the vouchers the book
+  holds, when several rows look the same; count the vouchers in Tally before
+  leaving any row out. A row is still refused when a voucher that an earlier
+  batch or a hand entry put in the book has the same date, type, ledgers,
+  amounts and sides (#865, #901).
+- Tried against TallyPrime 7.1 Silver in a lab on 2 October 2026, before
+  #1020 merged: one-day ranges on two synthetic books, and the read-back of one
+  posted Journal. Not tried: a range of several days read in one request, the
+  new refusal itself (seen only in tests), how often it appears on a busy book
+  with several users, and other Tally editions. The other changes have not been
+  run against TallyPrime; each is covered by automated tests. No one on our
+  side installed the Windows package of this build in Claude Desktop on a
+  Windows PC. The release check starts each package, lists its tools and reads
+  a sample bank statement, and does not run against TallyPrime.
 
 ## [0.4.0] - 2026-10-02
 

@@ -94,7 +94,7 @@ impl DesktopJournalService {
                 let message = if no_attempt_recorded {
                     "No posting attempt is recorded for this original Journal."
                 } else {
-                    "Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
+                    "ComplyEaze Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
                 };
                 let mut operation = DesktopJournalOperation::from_failure(failure, message);
                 if no_attempt_recorded {
@@ -237,7 +237,7 @@ impl DesktopJournalOperation {
             "attempt_recorded": result["attempt_recorded"].as_bool(),
             "error": (!error.is_null()).then(|| json!({
                 "code": bounded_action_text(&error["code"], 256).unwrap_or("journal_action_error"),
-                "message": message.as_deref().unwrap_or("Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
+                "message": message.as_deref().unwrap_or("ComplyEaze Bridge could not confirm the Journal. Reconcile the original batch without resending it."),
                 "remediation": bounded_action_text(&error["remediation"], 4096),
             })),
         }});

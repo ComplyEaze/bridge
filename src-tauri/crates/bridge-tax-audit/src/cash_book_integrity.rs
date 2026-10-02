@@ -179,7 +179,7 @@ pub fn run(
 receipt came before every same-day payment."
             ),
             Vec::new(),
-        );
+        )?;
         let f_worst = r.fig(
             &format!("negative_days_worst_case_{h}"),
             count(worst_neg)?,
@@ -188,7 +188,7 @@ receipt came before every same-day payment."
                 "Days on which cash ledger (tag {h}) is below zero if same-day payments came first."
             ),
             Vec::new(),
-        );
+        )?;
         // The first day at the lowest closing, as Python's min() returns the first minimum.
         let lowest = best_neg.iter().fold(None::<&&Day>, |acc, d| match acc {
             Some(a) if a.close <= d.close => Some(a),
@@ -207,14 +207,14 @@ receipt came before every same-day payment."
 below zero."
             ),
             ev(best_vouchers.iter().copied()),
-        );
+        )?;
         let f_low_day = r.fig(
             &format!("lowest_best_case_date_{h}"),
             Value::Text(lowest.map_or(String::new(), |d| iso(&d.date))),
             Unit::Text,
             "Date of that lowest best-case closing (blank when none).",
             Vec::new(),
-        );
+        )?;
         if !best_neg.is_empty() {
             let mut evidence = ev(best_vouchers.iter().copied());
             evidence.push(EvidenceRef::new("ledger", led));
@@ -256,7 +256,7 @@ cash was actually paid."
         "Sum of every ledger's Trial Balance opening balance (Dr positive). Tally shows a non-zero \
 sum as 'Difference in opening balances'.",
         Vec::new(),
-    );
+    )?;
     if diff != 0 {
         let openings: Vec<EvidenceRef> = book
             .tb
@@ -296,7 +296,7 @@ balance sheet settles it."
         "Own-account narration terms set for this client. Zero means the own-account check looked at \
 nothing.",
         Vec::new(),
-    );
+    )?;
     let mut out_v: Vec<(&Voucher, i64)> = Vec::new();
     let mut in_v: Vec<(&Voucher, i64)> = Vec::new();
     if !terms.is_empty() {
@@ -327,7 +327,7 @@ nothing.",
         "Contra entries debiting cash whose bank narration names the assessee's own account \
 (money sent to another account, booked as cash in hand).",
         ev(out_v.iter().map(|(v, _)| *v)),
-    );
+    )?;
     let f_out_n = r.fig(
         "own_account_booked_as_withdrawal_count",
         count(out_v.len())?,
@@ -335,7 +335,7 @@ nothing.",
         "Number of Contra entries debiting cash whose bank narration names the assessee's own account \
 (money sent to another account, booked as cash in hand).",
         Vec::new(),
-    );
+    )?;
     let f_in = r.fig(
         "own_account_booked_as_deposit_total",
         Value::Int(total(&in_v)?),
@@ -343,7 +343,7 @@ nothing.",
         "Contra entries crediting cash whose bank narration names the assessee's own account \
 (money received from another account, booked as cash deposited).",
         ev(in_v.iter().map(|(v, _)| *v)),
-    );
+    )?;
     let f_in_n = r.fig(
         "own_account_booked_as_deposit_count",
         count(in_v.len())?,
@@ -351,7 +351,7 @@ nothing.",
         "Number of Contra entries crediting cash whose bank narration names the assessee's own \
 account (money received from another account, booked as cash deposited).",
         Vec::new(),
-    );
+    )?;
     if !out_v.is_empty() || !in_v.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/own_account_as_cash/all"),
@@ -408,14 +408,14 @@ transfers were used for."
             Unit::Paise,
             &format!("Money received into cash or bank credited to expense ledger (tag {h})."),
             ev(rows.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_n = r.fig(
             &format!("expense_credit_count_{h}"),
             count(rows.len())?,
             Unit::Count,
             &format!("Entries in that total (ledger tag {h})."),
             Vec::new(),
-        );
+        )?;
         let mut evidence = ev(rows.iter().map(|(v, _)| *v));
         evidence.push(EvidenceRef::new("ledger", name));
         r.findings.push(Finding {
@@ -442,7 +442,7 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
         Unit::Paise,
         "Sum of money received credited to any expense ledger.",
         Vec::new(),
-    );
+    )?;
 
     // 5. cash paid through journals, and repeated narrations among them
     let mut jv: BTreeMap<&str, Vec<(&Voucher, i64)>> = BTreeMap::new();
@@ -492,14 +492,14 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
             Unit::Paise,
             &format!("Cash paid through Journal entries to expense ledger (tag {h})."),
             ev(rows.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_n = r.fig(
             &format!("journal_cash_count_{h}"),
             count(rows.len())?,
             Unit::Count,
             &format!("Journal entries paying cash to expense ledger (tag {h})."),
             Vec::new(),
-        );
+        )?;
         let f_rep = r.fig(
             &format!("journal_cash_repeated_narration_total_{h}"),
             Value::Int(total(&repeated)?),
@@ -509,7 +509,7 @@ the expense; any other receipt does not, and an unexplained credit is a s.68 que
 is identical to another such entry's."
             ),
             ev(repeated.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_rep_n = r.fig(
             &format!("journal_cash_repeated_narration_count_{h}"),
             count(repeated.len())?,
@@ -519,7 +519,7 @@ is identical to another such entry's."
 identical to another such entry's."
             ),
             Vec::new(),
-        );
+        )?;
         let f_un = r.fig(
             &format!("journal_cash_unnarrated_total_{h}"),
             Value::Int(total(&unnarrated)?),
@@ -529,7 +529,7 @@ identical to another such entry's."
 narration at all."
             ),
             ev(unnarrated.iter().map(|(v, _)| *v)),
-        );
+        )?;
         let f_un_n = r.fig(
             &format!("journal_cash_unnarrated_count_{h}"),
             count(unnarrated.len())?,
@@ -539,7 +539,7 @@ narration at all."
 all."
             ),
             Vec::new(),
-        );
+        )?;
         let mut evidence = ev(rows.iter().map(|(v, _)| *v));
         evidence.push(EvidenceRef::new("ledger", name));
         r.findings.push(Finding {
@@ -578,7 +578,7 @@ entry."
         Unit::Paise,
         "Cash paid through Journal entries to any expense ledger.",
         Vec::new(),
-    );
+    )?;
     Ok(r)
 }
 

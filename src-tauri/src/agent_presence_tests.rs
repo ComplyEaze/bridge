@@ -728,6 +728,22 @@ fn high_water_xml() -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
 }
 
+/// `presence_plans` on a book whose voucher mark needs a census (#985): the
+/// census counts the window's two vouchers, the window fits one read, and that
+/// read is admitted against the count.
+fn counted_presence_plans() -> Vec<ScenarioPlan> {
+    let catalogue = catalogue_xml();
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(
+        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
+    ));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&window_xml()));
+    steps.extend(paired_read(&catalogue));
+    plans(steps)
+}
+
 /// `presence_plans` with one marker written into JV-1's narration, the way an
 /// earlier Bridge import would have left it.
 fn marker_presence_plans(marker: &str) -> Vec<ScenarioPlan> {
@@ -810,6 +826,54 @@ async fn a_nonempty_window_without_a_control_total_still_answers_but_never_issue
     let observed = simulator.finish().expect("requests");
     // 22 before the pre-flight volume bound, plus its one high-water read.
     assert_eq!(observed.len(), 28);
+}
+
+/// #985, the same window on a book large enough to need a census: the census
+/// is the window's source-side control total (ADR 0017), so the window is
+/// `complete` and a proposal nothing resembles is `absent`.
+#[tokio::test]
+async fn a_nonempty_window_counted_by_its_census_can_issue_absent() {
+    let simulator = SequenceSimulator::spawn(counted_presence_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": CAPTURED_GUID,
+                "from": "20260901",
+                "to": "20260930",
+                "numbering": [{"voucher_type":"Journal","numbering_method":"manual"}],
+                "vouchers": [
+                    proposal("JV-1", "Bridge Nested Debtor WR4", "12.50"),
+                    proposal("JV-2", "Café Naïve Traders", "7.50"),
+                    proposal("JV-9", "नमस्ते ट्रेडर्स", "99.00"),
+                ],
+            }),
+        )
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["window"]["read"], "complete", "{result}");
+    let items = result["items"].as_array().expect("items");
+    assert_eq!(items[0]["presence"], "present", "{items:?}");
+    assert_eq!(items[1]["presence"], "present", "{items:?}");
+    assert_eq!(items[2]["presence"], "absent", "{items:?}");
+    let observed = simulator.finish().expect("requests");
+    // The uncounted control's 28, plus the census's paired read.
+    assert_eq!(observed.len(), 34);
 }
 
 /// The same window carrying a marker Bridge wrote, under `automatic` numbering.

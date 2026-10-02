@@ -119,7 +119,7 @@ scrutiny entry)."
 \"confirm\" -- the rules table has no ledger scrutiny entry yet)."
         },
         Vec::new(),
-    );
+    )?;
     let expense_ledgers = book.ledgers_under_any(&[
         DIRECT_EXPENSES_GROUP.to_string(),
         INDIRECT_EXPENSES_GROUP.to_string(),
@@ -179,7 +179,7 @@ scrutiny entry)."
             "Ledgers under Tally's '{DIRECT_EXPENSES_GROUP}' or '{INDIRECT_EXPENSES_GROUP}' groups."
         ),
         Vec::new(),
-    );
+    )?;
 
     let sum = |e: &Entries| -> Result<i64> {
         e.values()
@@ -205,7 +205,7 @@ scrutiny entry)."
             Unit::Paise,
             &format!("Sum of positive (debit/expense) population entries on one ledger (tag {h})."),
             ledger_ev.clone(),
-        );
+        )?;
         let f_large_count = r.fig(
             &format!("large_entry_count_{h}"),
             count(d.large.len())?,
@@ -215,7 +215,7 @@ scrutiny entry)."
 over the large-entry threshold."
             ),
             evidence(&d.large),
-        );
+        )?;
         let f_large_total = r.fig(
             &format!("large_entry_total_paise_{h}"),
             Value::Int(sum(&d.large)?),
@@ -225,7 +225,7 @@ over the large-entry threshold."
 taken without its sign, is over the large-entry threshold."
             ),
             Vec::new(),
-        );
+        )?;
         let f_round_count = r.fig(
             &format!("round_sum_count_{h}"),
             count(d.round_sum.len())?,
@@ -235,7 +235,7 @@ taken without its sign, is over the large-entry threshold."
 of \u{20b9}1,000."
             ),
             evidence(&d.round_sum),
-        );
+        )?;
         let f_round_total = r.fig(
             &format!("round_sum_total_paise_{h}"),
             Value::Int(sum(&d.round_sum)?),
@@ -245,7 +245,7 @@ of \u{20b9}1,000."
 is an exact, nonzero multiple of \u{20b9}1,000."
             ),
             Vec::new(),
-        );
+        )?;
         let f_last_count = r.fig(
             &format!("last_days_count_{h}"),
             count(d.last_days.len())?,
@@ -257,7 +257,7 @@ days of the period ({} to {}).",
                 iso(&period.to)
             ),
             evidence(&d.last_days),
-        );
+        )?;
         let f_last_total = r.fig(
             &format!("last_days_total_paise_{h}"),
             Value::Int(sum(&d.last_days)?),
@@ -269,7 +269,7 @@ days of the period ({} to {}).",
                 iso(&period.to)
             ),
             Vec::new(),
-        );
+        )?;
         let cash_paid = sum(&d.cash_paid)?;
         let cash_share_bp: Option<i64> = if total_debit != 0 {
             match pct_bp(cash_paid, total_debit) {
@@ -288,7 +288,7 @@ days of the period ({} to {}).",
 carries a nonzero line on a configured cash ledger."
             ),
             evidence(&d.cash_paid),
-        );
+        )?;
         let f_cash_share = r.fig(
             &format!("cash_share_bp_{h}"),
             Value::Int(cash_share_bp.unwrap_or(0)),
@@ -298,7 +298,7 @@ carries a nonzero line on a configured cash ledger."
 ledger has no debit entries at all)."
             ),
             Vec::new(),
-        );
+        )?;
         let journal_only = !d.journal.is_empty() && d.non_journal.is_empty();
         let f_journal_only = r.fig(
             &format!("journal_only_{h}"),
@@ -309,7 +309,7 @@ ledger has no debit entries at all)."
 '{JOURNAL_BASE_TYPE}' (and at least one does)."
             ),
             Vec::new(),
-        );
+        )?;
         let closing = book.tb.get(*name).map_or(0, |t| t.closing_paise);
         let contra_nature = closing < 0;
         let f_closing = r.fig(
@@ -318,7 +318,7 @@ ledger has no debit entries at all)."
             Unit::Paise,
             &format!("TB closing balance of this ledger (tag {h}), Dr+/Cr-."),
             ledger_ev.clone(),
-        );
+        )?;
         let f_contra = r.fig(
             &format!("contra_nature_closing_{h}"),
             Value::Text(if contra_nature { "yes" } else { "no" }.to_string()),
@@ -328,7 +328,7 @@ ledger has no debit entries at all)."
 on an expense ledger)."
             ),
             Vec::new(),
-        );
+        )?;
 
         let mut flags: Vec<String> = Vec::new();
         if !d.large.is_empty() {
@@ -414,7 +414,7 @@ large/round-sum/last-days entries listed."
         "Expense ledgers (under Direct Expenses or Indirect Expenses) with at least one scrutiny \
 indicator triggered.",
         Vec::new(),
-    );
+    )?;
     Ok(r)
 }
 

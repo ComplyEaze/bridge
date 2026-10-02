@@ -428,7 +428,7 @@ pub fn run(
         "Distinct (date, payee ledger) pairs with a cash payment on a population, non-Contra \
 voucher, payee classified as expenditure (not in a group the rules exclude from s.40A(3)).",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s40a3_payee_days_any_amount_total",
         Value::Int(in_scope_total),
@@ -436,7 +436,7 @@ voucher, payee classified as expenditure (not in a group the rules exclude from 
         "Sum of cash paid across every (date, payee ledger) pair with a cash payment on a \
 population, non-Contra voucher, payee classified as expenditure, any amount.",
         in_scope_ev,
-    );
+    )?;
     r.fig(
         "s40a3_over_limit_in_scope_count",
         Value::Int(rows_over_limit.len() as i64),
@@ -447,7 +447,7 @@ population, non-Contra voucher, payee classified as expenditure, any amount.",
             rupees(i128::from(limit_40a3))
         ),
         Vec::new(),
-    );
+    )?;
 
     let mut over_all_kinds = rows_over_limit.len();
     for kind in &excluded_roles {
@@ -463,7 +463,7 @@ population, non-Contra voucher, payee classified as expenditure, any amount.",
         "(date, payee) pairs over the s.40A(3) limit before excluding capital, loans, fixed \
 assets and duties and taxes; the in-scope count is a subset.",
         Vec::new(),
-    );
+    )?;
 
     for kind in &excluded_roles {
         let rows = &excluded_rows[kind];
@@ -482,7 +482,7 @@ scope by the rules); {} (date, payee) pairs.",
                 rows.len()
             ),
             ev,
-        );
+        )?;
     }
 
     // One Finding per in-scope payee-day that is actually over the limit.
@@ -499,7 +499,7 @@ population voucher that day.",
                 iso(d)
             ),
             evidence_for_vouchers(&data.vouchers),
-        );
+        )?;
         let goods_flag = data.paise <= goods_limit && transport_name_match(ledger_name);
         let f_goods = r.fig(
             &format!("s40a3_goods_carriage_candidate_{rid}"),
@@ -508,7 +508,7 @@ population voucher that day.",
             "Heuristic only: ledger name matches a generic transport-name pattern and the \
 day's total is within the \u{20b9}35,000 goods-carriage limit (proviso to s.40A(3)).",
             Vec::new(),
-        );
+        )?;
         let mut limits = vec![
             "Books only: Rule 6DD exceptions (e.g. bank/cooperative-bank closure, payments to \
 government, payments where banking facilities are not available) are not visible from \
@@ -569,7 +569,7 @@ several payments."
         "Distinct (date, party ledger) pairs with a cash receipt on a population, non-Contra \
 voucher, party ledger not under 'Sales Accounts'.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s269st_party_days_any_amount_total",
         Value::Int(party_total),
@@ -577,7 +577,7 @@ voucher, party ledger not under 'Sales Accounts'.",
         "Sum of cash received across every (date, party ledger) pair with a cash receipt on a \
 population, non-Contra voucher, party ledger not under 'Sales Accounts', any amount.",
         party_ev,
-    );
+    )?;
     r.fig(
         "s269st_at_or_over_limit_count",
         Value::Int(rows_269st.len() as i64),
@@ -588,7 +588,7 @@ limit ({} per person per day).",
             rupees(i128::from(limit_269st))
         ),
         Vec::new(),
-    );
+    )?;
 
     for ((d, ledger_name), data) in rows_269st {
         let h = stable_ledger_tag(book, ledger_name)?;
@@ -603,7 +603,7 @@ population voucher that day.",
                 iso(d)
             ),
             evidence_for_vouchers(&data.vouchers),
-        );
+        )?;
         let mut evidence = evidence_for_vouchers(&data.vouchers);
         evidence.push(party_ref(ledger_name));
         r.findings.push(Finding {
@@ -652,7 +652,7 @@ only, never counted a second time in the Clause 31 filing-aid total."
         "Distinct (date, party ledger) pairs with a cash payment on a population, non-Contra \
 voucher, party ledger not under 'Purchase Accounts'.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s269st_payment_party_days_any_amount_total",
         Value::Int(pay_total),
@@ -660,7 +660,7 @@ voucher, party ledger not under 'Purchase Accounts'.",
         "Sum of cash paid across every (date, party ledger) pair with a cash payment on a \
 population, non-Contra voucher, party ledger not under 'Purchase Accounts', any amount.",
         pay_ev,
-    );
+    )?;
     r.fig(
         "s269st_payment_at_or_over_limit_count",
         Value::Int(rows_269st_pay.len() as i64),
@@ -672,7 +672,7 @@ s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reporta
             limit_269st_text = rupees(i128::from(limit_269st))
         ),
         Vec::new(),
-    );
+    )?;
 
     for ((d, ledger_name), data) in rows_269st_pay {
         let h = stable_ledger_tag(book, ledger_name)?;
@@ -687,7 +687,7 @@ voucher that day.",
                 iso(d)
             ),
             evidence_for_vouchers(&data.vouchers),
-        );
+        )?;
         let mut evidence = evidence_for_vouchers(&data.vouchers);
         evidence.push(party_ref(ledger_name));
         r.findings.push(Finding {
@@ -758,7 +758,7 @@ the client's list of loans).",
                 &v.guid,
                 &voucher_label(v),
             )],
-        );
+        )?;
         let common_limit = "Books only: confirm the counterparty is not government, a banking \
 company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no \
 other exception in the Act applies."
@@ -824,7 +824,7 @@ that list to get the full lender-classification/running-balance test instead."
 the only ones this test tags for Clause 31; every other candidate is covered by 'Loans and \
 interest' instead.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s269ss269t_candidate_count",
         Value::Int(candidates.len() as i64),
@@ -835,7 +835,7 @@ line of an amount, taken without its sign, at or over the s.269SS/269T limit ({}
             rupees(i128::from(limit_ss_t))
         ),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "s269ss269t_candidate_total",
         Value::Int(loan_total),
@@ -844,7 +844,7 @@ line of an amount, taken without its sign, at or over the s.269SS/269T limit ({}
 the s.269SS/269T candidates (population, non-Contra vouchers with a cash line and such a line at \
 or over the limit).",
         Vec::new(),
-    );
+    )?;
 
     Ok(r)
 }

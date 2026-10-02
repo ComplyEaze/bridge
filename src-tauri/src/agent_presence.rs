@@ -117,6 +117,7 @@ impl Server {
                 .await?;
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);
+            let counted = read.counted();
             let rows = validate_then_filter_voucher_rows(read.rows, &from, &to, None)?;
 
             // The window is independent evidence about which ledgers exist.
@@ -143,13 +144,13 @@ impl Server {
             }
 
             // A window can only license `Absent` when its cardinality is
-            // independently established. The existing empty-window control
-            // can establish that narrow case. A nonempty response has no
-            // source-side count, so a well-formed bounded response cannot be
-            // promoted to Complete merely because it contains rows.
-            let mut read = WindowRead::Partial;
-            let mut reason = Some("nonempty_window_unqualified");
-            if rows.is_empty() {
+            // independently established: by the empty-window control, or by a
+            // census its rows were admitted against (`window_read`, #985). An
+            // uncounted nonempty window stays `Partial`, which `book_presence`
+            // degrades from `Absent` to `WindowNotProvenComplete` instead of
+            // refusing; `Present` and `PossiblyPresent` need no completeness
+            // proof, so the read continues to the paired-snapshot checks below.
+            let empty_window = if rows.is_empty() {
                 let (read_evidence, partial, corroboration) = self
                     .corroborate_empty_voucher_read(
                         &identity,
@@ -161,26 +162,16 @@ impl Server {
                     )
                     .await?;
                 accumulate(&mut accumulated, read_evidence);
-                reason = corroboration;
-                if partial {
-                    read = WindowRead::Partial;
-                    if let Some(evidence) = accumulated.as_mut() {
-                        evidence.state = "partial";
-                        evidence.reason_code = corroboration.map(str::to_string);
-                    }
-                } else {
-                    read = WindowRead::Complete;
+                Some((partial, corroboration))
+            } else {
+                None
+            };
+            let (read, reason) = window_read(counted, empty_window);
+            if read == WindowRead::Partial {
+                if let Some(evidence) = accumulated.as_mut() {
+                    evidence.state = "partial";
+                    evidence.reason_code = reason.map(str::to_string);
                 }
-            } else if let Some(evidence) = accumulated.as_mut() {
-                evidence.state = "partial";
-                evidence.reason_code = reason.map(str::to_string);
-                // The adapter has no source-side cardinality for nonempty
-                // windows, so `read` stays `Partial` (its default above) and
-                // this window can never license `Absent` (`book_presence`
-                // degrades that to `WindowNotProvenComplete` instead of
-                // refusing it). `Present` and `PossiblyPresent` need no
-                // completeness proof, so the read continues to the
-                // paired-snapshot checks below rather than refusing outright.
             }
 
             // The verdict is built from two independently timed observations,

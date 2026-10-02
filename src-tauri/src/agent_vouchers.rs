@@ -53,6 +53,10 @@ pub(super) struct VoucherPageSnapshot {
     rows: Arc<Vec<Value>>,
     window: Value,
     voucher_types: Option<Value>,
+    /// The ledger the rows were filtered to and how the request reached it,
+    /// already redacted, so a served page names the ledger it read as the first
+    /// page did (#1076).
+    ledger_match: Option<Value>,
     /// Why a complete window is complete when it is more than a counted read (an
     /// empty book), so a served page says it too.
     reason: Option<&'static str>,
@@ -68,13 +72,17 @@ impl VoucherPageSnapshot {
         rows: Arc<Vec<Value>>,
         window: Value,
         voucher_types: Option<Value>,
+        ledger_match: Option<Value>,
         reason: Option<&'static str>,
     ) -> Self {
         let bytes = rows.iter().map(|row| row.to_string().len()).sum::<usize>()
             + window.to_string().len()
             + voucher_types
                 .as_ref()
-                .map_or(0, |types| types.to_string().len());
+                .map_or(0, |types| types.to_string().len())
+            + ledger_match
+                .as_ref()
+                .map_or(0, |ledger| ledger.to_string().len());
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             key,
@@ -82,6 +90,7 @@ impl VoucherPageSnapshot {
             rows,
             window,
             voucher_types,
+            ledger_match,
             reason,
             read_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             taken: std::time::Instant::now(),
@@ -513,6 +522,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     rows.clone(),
                     window.clone(),
                     voucher_types.clone(),
+                    ledger_match.clone(),
                     corroboration_reason,
                 ))?
             }
@@ -673,6 +683,9 @@ impl Server {
         );
         if let Some(voucher_types) = &snapshot.voucher_types {
             payload["result"]["voucher_types"] = voucher_types.clone();
+        }
+        if let Some(ledger_match) = &snapshot.ledger_match {
+            payload["result"]["ledger_match"] = ledger_match.clone();
         }
         payload["result"]["snapshot"] = snapshot.describe(true);
         Ok(PageServe::Served(ToolOutcome {

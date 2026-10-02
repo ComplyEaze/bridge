@@ -1,5 +1,5 @@
 {
- "comment": "high_value_register, vouchers with no party ledger pooled by day (and by reference) whatever name they print: the row cites every usable printed name, quoted and sorted (a name stripped of Python whitespace, a name containing ' or ', a non-ASCII name, a printed name that is the voucher's own Sales ledger, the cash or bank ledger or blank left out, vouchers printing no usable name counted in the label); a row proven under the limit on its cash line, one whose line differs without being under, one on each side of a bank statement that was refused, a named row beside an unnamed one, bank mode, payments, and limb (b) rows citing the printed names too.",
+ "comment": "high_value_register, vouchers with no party ledger pooled by day (and by reference) whatever name they print: the row cites every usable printed name, quoted and sorted (a name stripped of Python whitespace, a name containing ' or ', a non-ASCII name, a printed name that is the voucher's own Sales ledger, the cash or bank ledger or blank left out, vouchers printing no usable name counted in the label); a row proven under the limit on its cash line (an unnamed receipt, payment and bank row, and a named receipt, payment and bank row), one whose line differs without being under, one on each side of a bank statement that was refused, a named row beside an unnamed one, bank mode, payments, and limb (b) rows citing the printed names too.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",
@@ -472,6 +472,44 @@
     ]
    ],
    "party": "Late Buyer"
+  },
+  {
+   "guid": "n02",
+   "date": "2025-08-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     10000000
+    ],
+    [
+     "Edge Bank",
+     15000000
+    ],
+    [
+     "Customer A",
+     -25000000
+    ]
+   ]
+  },
+  {
+   "guid": "n03",
+   "date": "2025-08-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -10000000
+    ],
+    [
+     "Edge Bank",
+     -15000000
+    ],
+    [
+     "Customer A",
+     25000000
+    ]
+   ]
   }
  ],
  "cash": [

@@ -4844,8 +4844,8 @@
   "by": "author",
   "what": "the caller's AIS rows are not passed",
   "file": "src/registry.rs",
-  "from": "&c.traces.ais)",
-  "to": "&[])"
+  "from": "&c.traces.ais,\n            )",
+  "to": "&[],\n            )"
  },
  {
   "id": "E2B2-29",
@@ -6966,5 +6966,13 @@
   "file": "src/high_value_register.rs",
   "from": "format!(\"the bank statement supplied was refused (it {reason})\")",
   "to": "format!(\"the bank statement supplied was refused (it {})\", \"\")"
+ },
+ {
+  "id": "HV-29",
+  "by": "author",
+  "what": "the registry does not pass the caller's refused-statement reason",
+  "file": "src/registry.rs",
+  "from": "c.bank_statement_refused.as_deref(),",
+  "to": "None,"
  }
 ]

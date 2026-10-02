@@ -361,6 +361,7 @@ impl ToolEffect {
             "profit_and_loss" => Self::Read,
             "purchase_register" => Self::Read,
             "read_evidence" => Self::Read,
+            "sales_register" => Self::Read,
             "stock_summary" => Self::Read,
             "tally_status" => Self::Read,
             "trial_balance" => Self::Read,
@@ -411,6 +412,7 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "profit_and_loss",
     "purchase_register",
     "read_evidence",
+    "sales_register",
     "stock_summary",
     "tally_status",
     "trial_balance",
@@ -505,8 +507,8 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                         "Return literal-window ledger opening, exact debit/credit movement, closing, and touched-voucher count with a freshly observed supported product/mode and an operation-valid opening boundary. Reads the full voucher window before filtering or pagination; use narrow dates. Dense windows can fail source limits. Requires one observed INR currency master: a book with several Currency masters, none, or one that is not INR is refused before any ledger read.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"ledger":{"type":"string","minLength":1,"maxLength":agent_import::MAX_MASTER_NAME_CHARS,"pattern":r"\S"},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"default":500}}}),
                     ),
-                    "purchase_register" => (
-                        "Read-only: a register of what the books record, not a GST return. It does not decide input tax credit eligibility or blocked credit, matches nothing against GSTR-2B or any portal, checks no GSTIN (`party_gstin` is returned only when the voucher carries one), does not return REFERENCEDATE yet (`reference` is returned only when the voucher carries one), does not classify an item invoice's purchase as taxable (`has_taxable_entry` is false when no entry sits on a Purchase Accounts ledger), and never sums tax across heads or vouchers. It does not treat reverse-charge journals, imports (IGST paid at customs) or input service distribution specially: a voucher that touches a Duties & Taxes ledger is listed by the rule below and nothing more. A GST duty head does not say whether a ledger is input or output, and a Debit Note can be a purchase return or a debit note issued to a customer: each row carries `party_group` (the voucher party's predefined group, for example Sundry Creditors or Sundry Debtors, when it resolves) and the tool does not guess which it is. It inherits the compliance read's refusals (an INR base currency is required; a book too large to list is refused; see `ledger_masters`) and refuses with `register_master_mark_unavailable` when Tally does not report the master-alteration mark. Each page re-reads the masters and the window, so rows can shift between pages. Return the Purchase and Debit Note vouchers of a date window that touch a ledger under Duties & Taxes, with the tax each entry carries taken only from the GST duty head recorded on that ledger's master -- never from a ledger name and never from an amount. Reads the full voucher window before pagination (use narrow dates) and the ledger masters twice, before and after it. Per row: `tax_in_books` lists each entry on a ledger whose head Bridge recognises as {ledger, head, raw_head, amount}; `duties_taxes_entries_without_gst_head` lists entries on Duties & Taxes ledgers that carry no GST head and never assigns them one: `observation` `not_tax_ledger` is a ledger whose own tax type is not GST (usually TDS or another payable), `absent` is a ledger with no head whose tax type is GST or was not reported, which may be a GST ledger whose head is missing (`tax_type` says which); `duties_taxes_entries_with_unrecognised_head` lists entries whose head is not in the recognised vocabulary or contradicts the ledger's tax type, with the raw spelling and its observation; `entries_on_ledgers_with_unresolved_group` lists entries on ledgers whose group chain could not be resolved; `taxable_entries` are entries on Purchase Accounts ledgers only (a GST purchase booked to a fixed-asset or expense ledger has `has_taxable_entry` false); `party_entries` are the voucher party's own; `other_entries` is everything else (round-off included) with no role inferred. `status` is the first that applies of head_conflict, has_unrecognised_head, has_unresolved_group, has_entries_without_gst_head, has_other_entries, complete. Amounts are as the books state them (negative is a debit), never re-signed and never summed across heads; there is no input-credit or direction field. `reference`, `party_gstin`, `is_invoice`, `post_dated` follow `vouchers`: absent means not observed, and `cancelled`, `optional` and `post_dated` vouchers are returned flagged, not excluded. Every other voucher type that touches Duties & Taxes (Sales, Journal, Payment and so on) is listed apart in `other_voucher_types_touching_duties_taxes`, not in `items`: whether it belongs in a return is the CA's call. A voucher with no resolved class is listed under `unclassified_voucher_type`; a voucher that touches only unplaceable ledgers under `vouchers_with_unplaced_ledgers`; a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, or tax booked to a ledger filed elsewhere). Rows are in `items` (paged by offset and limit like `vouchers`); each has `has_taxable_entry`, false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation). The side lists carry exact counts (`total`) and at most 100 items (`listed`); every ledger name in the response is masked like `vouchers` masks it. A voucher that names a ledger the masters do not list, a master or voucher that changed while the window was read, or a ledger set aside for its currency, refuses (`ledger_snapshot_drifted`, `voucher_window_changed_during_read`, `register_ledger_currency_excluded`) and releases no rows; a row dated outside the window refuses as `window_not_honoured`. A `sgst_utgst` head is a state-side head that a consumer summing state tax must include alongside `state_tax`. Not measured: REFERENCEDATE (not returned), item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
+                    "purchase_register" | "sales_register" => (
+                        "", // the text comes from `RegisterKind::description`
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"offset":{"type":"integer","minimum":0,"default":0},"limit":{"type":"integer","minimum":1,"default":500}}}),
                     ),
                     "trial_balance" => (
@@ -587,12 +589,16 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     ),
                 };
                 let effect = ToolEffect::of(name);
+                let description = match super::register::RegisterKind::of_tool(name) {
+                    Some(kind) => kind.description(),
+                    None => description.to_string(),
+                };
                 let description = match effect {
                     Some(ToolEffect::Read) => format!("{description} {READ_RECEIPT_SENTENCE}"),
                     Some(ToolEffect::LocalWrite(sentence) | ToolEffect::LocalRewrite(sentence)) => {
                         format!("{description} {sentence}")
                     }
-                    Some(ToolEffect::TallyPost) | None => description.to_string(),
+                    Some(ToolEffect::TallyPost) | None => description,
                 };
                 let mut tool = json!({"name": name, "description": description, "inputSchema": input_schema});
                 if let Some(effect) = effect {

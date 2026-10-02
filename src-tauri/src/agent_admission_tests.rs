@@ -98,6 +98,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "profit_and_loss",
         "purchase_register",
         "read_evidence",
+        "sales_register",
         "stock_summary",
         "tally_status",
         "trial_balance",

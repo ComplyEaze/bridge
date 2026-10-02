@@ -911,6 +911,25 @@ class GitRepo(unittest.TestCase):
         self.assertNotIn("refused", doc, "records already made are never replaced by a refusal")
         self.assertEqual(sorted(doc), ["B1"])
 
+    def test_a_crash_whose_refusal_cannot_be_written_still_exits_2(self):
+        outside = Path(self.t.name)
+        unwritable = outside / "shard-1.json"
+        unwritable.mkdir()  # replacing a directory with the refusal file fails
+        saved = mu.committed_files
+
+        def boom(*_a):
+            raise OSError("disk gone")
+
+        mu.committed_files = boom
+        try:
+            with fake_cargo(outside, FAKE_CARGO):
+                rc, out = self.main("--full", "--shard", "1/1", "--workdir", str(outside / "mutants"),
+                                    "--results", str(unwritable))
+        finally:
+            mu.committed_files = saved
+        self.assertEqual(rc, 2, out)
+        self.assertIn("OSError: disk gone", out)
+
     def test_a_crash_in_a_run_that_is_not_a_shard_exits_2_and_writes_no_file(self):
         outside = Path(self.t.name)
         saved = mu.committed_files

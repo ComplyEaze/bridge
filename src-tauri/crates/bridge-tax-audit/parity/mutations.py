@@ -856,8 +856,11 @@ def main(argv: list[str] | None = None) -> int:
                   f"at {Path(frame.filename).name}:{frame.lineno} in {frame.name}"]
         print(f"{crash}: {detail[0]}\n  {detail[1]}", file=sys.stderr)
         if args.shard and args.results and not _MADE_A_VERDICT.is_set():  # nothing was run: a refusal
-            write_atomic(args.results, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": [crash],
-                                                                 "output": detail}}, indent=1) + "\n")
+            try:
+                write_atomic(args.results, json.dumps({REFUSED_KEY: {"shard": args.shard, "problems": [crash],
+                                                                     "output": detail}}, indent=1) + "\n")
+            except OSError as werr:  # the exit stays 2: the merge then lists the shard's ids as not run
+                print(f"the refusal could not be written: {type(werr).__name__}", file=sys.stderr)
         return 2
 
 

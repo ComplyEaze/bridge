@@ -1186,6 +1186,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
         ),
+        // build_import_xml refuses this before any live read (`refuse_mixed_shapes`):
+        // the two shapes come from separate qualifications (protocol reference
+        // §9.8 and §9.13), and no file mixing them has been imported (#1082).
+        "voucher_type_shapes_mixed" => Some(
+            "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
+             (those three may share a batch). Split the vouchers into one batch of each kind \
+             and build them separately; nothing was written or sent.",
+        ),
         _ => None,
     }
 }

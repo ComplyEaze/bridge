@@ -985,7 +985,12 @@ that turns that on.
    `Receipt` and `Contra` **both fields are refused** — neither element's fate
    has been observed on those types, and the bank's own reference belongs in
    the narration, which survives. A payload carrying one is rejected before any
-   live read. A batch that is not an amendment and holds a row another batch of
+   live read. A batch holds either Journals only, or `Payment`, `Receipt` and
+   `Contra` vouchers only (those three may share a batch): a batch that mixes a
+   Journal with any of them is refused as `voucher_type_shapes_mixed`, also before
+   any live read, because the two are rendered in different shapes and no file
+   mixing them has been imported (protocol reference §9.8 and §9.13). Split it
+   into one batch of each kind (#1082). A batch that is not an amendment and holds a row another batch of
    the company already sent to Tally, or that a readback found posted, is
    refused here as `import_txn_already_posted` (described under approved voucher
    posting) and no file is written: a hand import of that file would post the

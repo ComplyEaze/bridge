@@ -1678,6 +1678,56 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
     );
 }
 
+/// A batch that mixes a Journal with a bank voucher is refused before any live
+/// read, and the refusal says how to split it (#1082). The endpoint is a closed
+/// port, so a refusal that came from a read would carry a transport code
+/// instead of this one.
+#[tokio::test]
+async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
+    let directory = tempfile::tempdir().expect("temporary agent directory");
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
+        {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
+        {"bridge_txn_id":"txn-002","date":"2026-09-02","voucher_type":"Payment","entries":[{"ledger":"Expense","amount":"7.50","side":"Dr"},{"ledger":"Bank","amount":"7.50","side":"Cr"}]}
+    ]});
+    let response = server.call_tool("build_import_xml", mixed).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "voucher_type_shapes_mixed", "{response}");
+    assert_eq!(
+        error["remediation"],
+        "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
+         (those three may share a batch). Split the vouchers into one batch of each kind \
+         and build them separately; nothing was written or sent.",
+        "{response}"
+    );
+    assert_eq!(response["isError"], true);
+    assert!(!directory.path().join("imports").exists());
+    // The tool text states the rule before a caller meets the refusal.
+    let definitions = super::catalog::registered_tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "build_import_xml"))
+        .expect("build_import_xml is registered")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains(
+        "A batch holds Journals only, or Payment, Receipt and Contra vouchers only (those three \
+         may share one): a batch mixing the two is refused as voucher_type_shapes_mixed"
+    ));
+}
+
 #[test]
 fn outstandings_receipt_counts_wholly_unallocated_party_rows() {
     let response = json!({

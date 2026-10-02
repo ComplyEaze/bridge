@@ -193,6 +193,10 @@ pub struct Engagement {
     raw_cfg: toml::Table,
     /// The directory `[snapshot].path` and a legacy trade-creditor source are relative to.
     base_dir: PathBuf,
+    /// Built by [`Engagement::from_toml_for_read`]: no `[snapshot]`, no directory. [`load_book`]
+    /// refuses such an engagement, so it cannot reach a directory by any path; its book comes from
+    /// the caller, and the tests run on it through [`registry`].
+    in_memory: bool,
 }
 
 /// `[loans]` from the client config, bound. Empty when the config has no `[loans]` table: the
@@ -484,13 +488,20 @@ const LEGACY_SNAPSHOT_KEYS: [&str; 10] = [
 ];
 
 impl Engagement {
-    /// Not built yet: parses as a directory engagement, so every test of this method fails.
-    pub fn from_toml_for_read(text: &str) -> Result<Self> {
-        Self::from_toml(text, Path::new(""))
-    }
-
     /// Parse a client config; `[snapshot].path` is relative to `base_dir`.
     pub fn from_toml(text: &str, base_dir: &Path) -> Result<Self> {
+        Self::parse(text, Some(base_dir))
+    }
+
+    /// Parse a client config for a book the caller already holds (a read Bridge made itself): no
+    /// `[snapshot]` table is allowed, there is no directory, and the result can never be given to
+    /// [`load_book`]. Everything else is read and refused exactly as [`Engagement::from_toml`] does,
+    /// except a `legacy_json` trade-creditor source, which names a file and so is refused here.
+    pub fn from_toml_for_read(text: &str) -> Result<Self> {
+        Self::parse(text, None)
+    }
+
+    fn parse(text: &str, base_dir: Option<&Path>) -> Result<Self> {
         let cfg: toml::Table = toml::from_str(text)
             .map_err(|e| AuditError::Config(format!("engagement TOML: {e}")))?;
         let table = |name: &str| {
@@ -525,13 +536,36 @@ impl Engagement {
                     AuditError::Config(format!("[period].{key} {s:?} is not YYYY-MM-DD"))
                 })
         };
-        let (client, period, snapshot, roles) = (
-            table("client")?,
-            table("period")?,
-            table("snapshot")?,
-            table("roles")?,
-        );
-        if snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1") {
+        let (client, period, roles) = (table("client")?, table("period")?, table("roles")?);
+        let in_memory = base_dir.is_none();
+        if in_memory && cfg.contains_key("snapshot") {
+            return Err(AuditError::refused(
+                "CFG-snapshot-for-read",
+                "[snapshot] names a directory, and this engagement has none",
+            ));
+        }
+        if in_memory
+            && roles
+                .get("trade_creditors_source")
+                .and_then(toml::Value::as_table)
+                .and_then(|t| t.get("kind"))
+                .and_then(toml::Value::as_str)
+                == Some("legacy_json")
+        {
+            return Err(AuditError::refused(
+                "CFG-legacy-for-read",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        let empty = toml::Table::new();
+        let snapshot = if in_memory {
+            &empty
+        } else {
+            table("snapshot")?
+        };
+        if !in_memory
+            && snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1")
+        {
             return Err(AuditError::refused(
                 "C1-format",
                 "[snapshot].format is not \"tally-read-v1\"",
@@ -547,11 +581,15 @@ impl Engagement {
                 format!("[snapshot] names a read and also legacy keys {mixed:?}"),
             ));
         }
-        let path = snapshot
-            .get("path")
-            .and_then(toml::Value::as_str)
-            .filter(|p| !p.is_empty())
-            .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?;
+        let path = if in_memory {
+            ""
+        } else {
+            snapshot
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .filter(|p| !p.is_empty())
+                .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?
+        };
         let company_pin = client
             .get("tally")
             .map(|t| -> Result<CompanyPin> {
@@ -842,7 +880,7 @@ not YYYY-MM-DD"
                 from: date(period, "start")?,
                 to: date(period, "end")?,
             },
-            read_dir: base_dir.join(path),
+            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),
             allow_unbracketed_read: snapshot
                 .get("allow_unbracketed_read")
                 .and_then(toml::Value::as_bool)
@@ -898,7 +936,8 @@ not YYYY-MM-DD"
             partners: PartnersConfig::default(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
-            base_dir: base_dir.to_path_buf(),
+            base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
+            in_memory,
             raw_cfg: cfg,
         })
     }
@@ -1007,6 +1046,12 @@ pub fn rules_for(engagement: &Engagement) -> Result<Rules> {
 
 /// Read and verify the engagement's read, and build its book (C1-C10).
 pub fn load_book(engagement: &Engagement) -> Result<book::Book> {
+    if engagement.in_memory {
+        return Err(AuditError::refused(
+            "CFG-no-directory",
+            "this engagement was built for a book the caller holds and names no read directory",
+        ));
+    }
     let read = Read::open(&engagement.read_dir)?;
     read.check(
         &engagement.period,

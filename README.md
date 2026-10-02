@@ -86,7 +86,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   on 28 September 2026, on a development build and one client book (the import
   request was captured for nine of them); their approval step was not recorded
   ([protocol reference](./docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md)).
-- The published 0.3.0 package on Windows x64, in Claude Desktop (on a free plan;
+- The published 0.3.0 package on Windows x64, in Claude Desktop (with no paid plan;
   we make no claim about other plans): reads only, against licensed TallyPrime
   Gold 7.1 with one client book, on 28 September 2026, in a session separate
   from the development-build posting above (reported by the owner; no logs were

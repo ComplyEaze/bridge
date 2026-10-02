@@ -1435,6 +1435,10 @@ grant admission.
 
 Top-party ranking uses `gross_exposure`, with billed and unallocated receivable
 and payable fields kept separate. `totals.scope` is `open_bills_only`.
+`open_bills_total` counts every open bill in the requested direction (the bills `totals` and
+`ageing_buckets` cover; on a partial read, the base-currency ledgers' bills only, beside those figures) and `open_bills_shown` counts the bills on the page returned. A page cut by
+the response size keeps `limit` unchanged and restates `open_bills_shown`, so a page shorter than the
+total is read from `open_bills_shown` and `next_offset`, never from `limit`.
 `unallocated.totals` contains `receivable`, `payable`, `gross_unallocated` and
 `by_composition` (the same gross split by composition, below).
 The previous ambiguous `outstanding_total` and `unallocated.amount` fields have

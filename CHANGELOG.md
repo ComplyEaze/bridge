@@ -31,7 +31,9 @@ These changes are in source and not yet in a published build.
   missing duty head, more than one voucher in a window and paging were not
   shown. A sale of a kind a row can
   show as unmeasured is marked `not_measured_live`; the tool's text says what
-  cannot be marked (#1009).
+  cannot be marked. The response `state` is `complete` when the company marks
+  and the ledger masters read the same before and after the window, not when the
+  window was counted as `vouchers` now requires (#1009).
 
 **Safer or fixed**
 

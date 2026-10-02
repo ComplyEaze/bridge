@@ -748,11 +748,13 @@ rate or return section, and matches nothing against any portal.
   `purchase_register`, are also replayed end to end from their recorded calls
   (tests). One Sales accounting voucher (not an invoice) is also classified, in
   tests, against the ledger masters of the purchase register's lab book.
-- **What `complete` rests on.** On a row and on the response, `complete` means
-  the company's marks and the ledger masters read the same before and after the
-  window. It does not mean the window was admitted against a separate voucher
-  count: on the small book measured, the call sent no voucher census, and a
-  small window that `vouchers` calls `partial` can be `complete` here.
+- **What `complete` rests on.** The response `state` is `complete` when the
+  company's marks and the ledger masters read the same before and after the
+  window (and, for an empty window, its corroboration read confirmed it). It
+  does not mean the window was admitted against a separate voucher count: on the
+  small book measured, the call sent no voucher census, and a small window that
+  `vouchers` calls `partial` can be `complete` here. A row's `status` of
+  `complete` is a different thing: every entry the voucher touches classified.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of

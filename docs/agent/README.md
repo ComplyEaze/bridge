@@ -887,8 +887,9 @@ covers only the identity and marks reads it sent.
   64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
   held windows. The desktop screen holds nothing. A later page is served only
-  for the same question: it must repeat the dates, the voucher-type selector and
-  the `ledger` argument exactly as on the first page; a differently spelled
+  for the same question: the same dates (a date is the same question however it
+  is written, `2026-08-01` or `20260801`), the same voucher-type selector and the
+  `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
 - **What a page cannot see.** A change that moves neither mark. The screen
   actions measured so far each moved a mark (§11c.5, one run each: a voucher

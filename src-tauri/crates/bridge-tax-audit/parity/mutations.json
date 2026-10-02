@@ -6836,8 +6836,8 @@
   "by": "author",
   "what": "a limit that is not a whole number of lakh is accepted",
   "file": "src/applicability_44ab.rs",
-  "from": "    if paise % LAKH_PAISE == 0 {",
-  "to": "    if paise % LAKH_PAISE != 0 || paise == 0 {"
+  "from": "    if paise % LAKH_PAISE == 0 && (paise / LAKH_PAISE).abs() < 1_000_000 {",
+  "to": "    if paise % LAKH_PAISE != 0 && (paise / LAKH_PAISE).abs() < 1_000_000 {"
  },
  {
   "id": "AP-13",
@@ -6854,5 +6854,21 @@
   "file": "src/rules.rs",
   "from": "                Some(_) => Some(int_in(s44ab, \"s44ab\", \"profession_gross_receipts_paise\")?),",
   "to": "                Some(_) => None,"
+ },
+ {
+  "id": "AP-15",
+  "by": "author",
+  "what": "the profession question is asked of an unrecorded client only when s.44AB(a) is not no (the undetermined case)",
+  "file": "src/applicability_44ab.rs",
+  "from": "(deductor_activity.is_none() && audit_required != \"yes\")",
+  "to": "(deductor_activity.is_none() && audit_required == \"no\")"
+ },
+ {
+  "id": "AP-16",
+  "by": "author",
+  "what": "a limit of a million lakh or more is printed (Python prints it in exponent form)",
+  "file": "src/applicability_44ab.rs",
+  "from": "    if paise % LAKH_PAISE == 0 && (paise / LAKH_PAISE).abs() < 1_000_000 {",
+  "to": "    if paise % LAKH_PAISE == 0 {"
  }
 ]

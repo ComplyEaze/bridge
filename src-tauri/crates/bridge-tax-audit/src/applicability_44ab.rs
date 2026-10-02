@@ -106,15 +106,16 @@ fn py_repr(v: Option<&toml::Value>) -> Result<String> {
     }
 }
 
-/// `paise / 1_00_000_00` as Python's `:g` prints it, for a whole number of lakh (the only shape the rules
-/// table holds); any other value is refused rather than printed differently from the reference.
+/// `paise / 1_00_000_00` as Python's `:g` prints it, for a whole number of lakh below a million (the only shape
+/// the rules table holds); any other value is refused rather than printed differently from the reference.
 fn lakh_g(paise: i64) -> Result<String> {
     const LAKH_PAISE: i64 = 10_000_000;
-    if paise % LAKH_PAISE == 0 {
+    // Python's `:g` keeps six significant digits, so a million lakh or more prints in exponent form.
+    if paise % LAKH_PAISE == 0 && (paise / LAKH_PAISE).abs() < 1_000_000 {
         Ok((paise / LAKH_PAISE).to_string())
     } else {
         Err(AuditError::Config(format!(
-            "applicability_44ab: [s44ab].profession_gross_receipts_paise {paise} is not a whole number of lakh"
+            "applicability_44ab: [s44ab].profession_gross_receipts_paise {paise} is not a whole number of lakh below a million"
         )))
     }
 }
@@ -854,6 +855,28 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, AuditError::Config(_)), "{err:?}");
+        // A million lakh or more would print in exponent form under Python's `:g`: refused too.
+        rules.profession_gross_receipts_paise = Some(10_000_000 * 1_000_000);
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .is_err());
+        rules.profession_gross_receipts_paise = Some(10_000_000 * 999_999);
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .is_ok());
+        rules.profession_gross_receipts_paise = Some(500_000_001);
         // A client not asked the question is not refused for it.
         assert!(run(
             &rules,

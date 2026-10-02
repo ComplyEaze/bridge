@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { FAMILIES, decide, forcesFullRun } from "./master-push-reuse.mjs";
+import { FAMILIES, decide, forcesFullRun, printable } from "./master-push-reuse.mjs";
 
 const SHA = "a".repeat(40);
 const BEFORE = "b".repeat(40);
@@ -61,7 +61,15 @@ test("a queue run whose native, bundle and seam jobs all passed lets the push re
   const outcome = await run({ fetcher });
   assert.deepEqual(reused(outcome), EVERYTHING, outcome.reason);
   assert.match(calls[0].url, /event=merge_group&head_sha=a{40}&per_page=100/);
-  assert.equal(calls[0].options.redirect, "error");
+  assert.match(calls[1].url, /\/runs\/101\/jobs\?per_page=100$/);
+  assert.equal(calls.length, 2);
+  for (const { url, options } of calls) {
+    assert.match(url, /^https:\/\/api\.github\.com\/repos\/example\/bridge\/actions\//);
+    assert.equal(options.method, "GET");
+    assert.equal(options.redirect, "error");
+    assert.equal(options.headers.Authorization, "Bearer synthetic-test-token");
+    assert.ok(options.signal instanceof AbortSignal, "every request is bounded by a timeout");
+  }
 });
 
 test("a queue run that skipped the heavy jobs is not evidence that they passed", async () => {
@@ -100,19 +108,20 @@ test("one job of a family missing, repeated, unsuccessful or unfinished takes th
 test("a job listing with more jobs than it returned runs everything", async () => {
   const outcome = await run({ fetcher: github({ jobs: { ...ranEverything, total_count: 101 } }).fetcher });
   assert.deepEqual(reused(outcome), NOTHING);
-  assert.match(outcome.reason, /incomplete/);
+  assert.equal(outcome.code, "job_listing_incomplete");
 });
 
 test("no queue run for the commit runs everything", async () => {
   const outcome = await run({ fetcher: github({ runs: listing([]) }).fetcher });
-  assert.deepEqual(outcome, { native: false, bundle: false, reason: "no merge-queue run for this commit" });
+  assert.deepEqual(reused(outcome), NOTHING);
+  assert.equal(outcome.code, "no_queue_run");
 });
 
 test("a failed or cancelled queue run runs everything, whatever its jobs say", async () => {
   for (const conclusion of ["failure", "cancelled", "timed_out", "skipped", null]) {
     const outcome = await run({ fetcher: github({ runs: listing([queueRun({ conclusion })]) }).fetcher });
     assert.deepEqual(reused(outcome), NOTHING, String(conclusion));
-    assert.match(outcome.reason, /concluded/);
+    assert.equal(outcome.code, "queue_run_not_success");
   }
 });
 
@@ -120,7 +129,7 @@ test("a queue run for a different commit runs everything", async () => {
   const other = queueRun({ head_sha: "c".repeat(40) });
   const outcome = await run({ fetcher: github({ runs: listing([other]) }).fetcher });
   assert.deepEqual(reused(outcome), NOTHING);
-  assert.match(outcome.reason, /no merge-queue run/);
+  assert.equal(outcome.code, "no_queue_run");
 });
 
 test("a run that is not a merge_group run is not a queue run", async () => {
@@ -137,22 +146,23 @@ for (const [name, failWith] of [
   test(`${name} runs everything`, async () => {
     const outcome = await run({ fetcher: github({ failWith }).fetcher });
     assert.deepEqual(reused(outcome), NOTHING);
-    assert.match(outcome.reason, /lookup failed/);
+    assert.equal(outcome.code, "lookup_failed");
   });
 }
 
 test("a lockfile, manifest, toolchain or .github change runs everything without asking the API", async () => {
   for (const file of [
     "src-tauri/Cargo.lock", "Cargo.toml", "src-tauri/crates/bridge-tally-core/Cargo.toml", "tools/Cargo.lock",
-    "rust-toolchain.toml", "rust-toolchain", ".github/workflows/ci.yml", ".github/actions/setup-windows-native/action.yml",
+    "rust-toolchain.toml", "rust-toolchain", "scripts/master-push-reuse.mjs", ".cargo/config.toml",
+    "src-tauri/tauri.conf.json", ".github/workflows/ci.yml", ".github/actions/setup-windows-native/action.yml",
   ]) {
     const { fetcher, calls } = github();
     const outcome = await run({ fetcher }, () => ["docs/a.md", file]);
     assert.deepEqual(reused(outcome), NOTHING, file);
-    assert.match(outcome.reason, /always runs everything/, file);
+    assert.equal(outcome.code, "forced_full_path", file);
     assert.equal(calls.length, 0, file);
   }
-  assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a"]), undefined);
+  assert.equal(forcesFullRun(["src/Cargo.toml.md", "docs/Cargo.lockfile", "x.github/a", "src-tauri/tauri.conf.json.md", "docs/.cargo/x"]), undefined);
 });
 
 test("a push whose before commit is not an ancestor runs everything without asking the API", async () => {
@@ -160,7 +170,7 @@ test("a push whose before commit is not an ancestor runs everything without aski
   const asked = [];
   const outcome = await run({ fetcher, isAncestor: (before, sha) => { asked.push([before, sha]); return false; } });
   assert.deepEqual(reused(outcome), NOTHING);
-  assert.match(outcome.reason, /not a fast-forward/);
+  assert.equal(outcome.code, "not_a_fast_forward");
   assert.deepEqual(asked, [[BEFORE, SHA]]);
   assert.equal(calls.length, 0);
 });
@@ -194,15 +204,15 @@ test("the ancestry test is git's own: an ancestor passes, a stranger and a missi
     const second = commit("b");
     git("checkout", "-q", "-b", "other", first);
     const stranger = commit("c");
-    const defaultAncestry = async (before, sha) => (await decide({
+    const codeFor = async (before, sha) => (await decide({
       env: { ...env, BEFORE_SHA: before, GITHUB_SHA: sha }, cwd: dir, changedFiles: ordinaryChange,
-      fetcher: github({ failWith: 500 }).fetcher, sleep: async () => {},
-    })).reason;
-    // An ancestor gets past the ancestry test (and is then stopped by the stubbed API failure).
-    assert.match(await defaultAncestry(first, second), /lookup failed \(500\)/);
-    // A commit on another line of history, and one the clone does not hold, are refused or error out.
-    assert.match(await defaultAncestry(stranger, second), /not a fast-forward/);
-    assert.match(await defaultAncestry("d".repeat(40), second), /lookup failed \(Error\)/);
+      fetcher: github({ runs: listing([]) }).fetcher, sleep: async () => {},
+    })).code;
+    // An ancestor gets past the ancestry test (and is then stopped by the empty queue listing).
+    assert.equal(await codeFor(first, second), "no_queue_run");
+    // A commit on another line of history is refused; one the clone does not hold is an error, not a "no".
+    assert.equal(await codeFor(stranger, second), "not_a_fast_forward");
+    assert.equal(await codeFor("d".repeat(40), second), "lookup_failed");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -211,13 +221,13 @@ test("the ancestry test is git's own: an ancestor passes, a stranger and a missi
 test("two queue runs for one commit is ambiguous and runs everything", async () => {
   const outcome = await run({ fetcher: github({ runs: listing([queueRun(), queueRun({ id: 102 })]) }).fetcher });
   assert.deepEqual(reused(outcome), NOTHING);
-  assert.match(outcome.reason, /more than one/);
+  assert.equal(outcome.code, "ambiguous_queue_run");
 });
 
 test("a listing with more runs than it returned runs everything", async () => {
   const outcome = await run({ fetcher: github({ runs: listing([queueRun()], { total_count: 2 }) }).fetcher });
   assert.deepEqual(reused(outcome), NOTHING);
-  assert.match(outcome.reason, /incomplete/);
+  assert.equal(outcome.code, "run_listing_incomplete");
 });
 
 test("a queue run that has not completed is waited for a bounded time, then ignored", async () => {
@@ -271,4 +281,38 @@ test("the family job names are exactly ci.yml's native, bundle-smoke and seam-co
   };
   assert.deepEqual(FAMILIES.native, expand("native"));
   assert.deepEqual(FAMILIES.bundle, [...expand("bundle-smoke"), ...expand("seam-control")]);
+});
+
+test("a file name cannot add lines to what the script prints", async () => {
+  const hostile = ".github/x\nreuse_native=true\nreuse_bundle=true\n::warning::y`";
+  const outcome = await run({ fetcher: github().fetcher }, () => [hostile]);
+  assert.deepEqual(reused(outcome), NOTHING);
+  assert.equal(/[\n`]/.test(outcome.reason), false, "the reason is one line even before it is printed");
+  assert.equal(/[\x00-\x1f\x7f`]/.test(printable(hostile)), false);
+  assert.equal(printable("a\nb`c\r"), "a b c ");
+});
+
+test("a run with no usable id, or a listing that mixes in another commit's run, runs everything", async () => {
+  for (const id of [0, -1, 1.5, "101", null]) {
+    const outcome = await run({ fetcher: github({ runs: listing([queueRun({ id })]) }).fetcher });
+    assert.deepEqual(reused(outcome), NOTHING, String(id));
+    assert.equal(outcome.code, "queue_run_id", String(id));
+  }
+  const mixed = await run({ fetcher: github({ runs: listing([queueRun(), queueRun({ id: 102, head_sha: "c".repeat(40) })]) }).fetcher });
+  assert.deepEqual(reused(mixed), NOTHING);
+  assert.equal(mixed.code, "ambiguous_queue_run");
+});
+
+// A job added later and gated on the same scope outputs would be skipped on a reused push without the
+// lookup ever judging it. The family lists above must cover every job gated on those outputs.
+test("the jobs gated on the native and bundle scope outputs are exactly the jobs the families judge", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const gated = { native: new Set(), bundle: new Set() };
+  for (const [, job, text] of workflow.matchAll(/\n  ([a-z][a-z-]*):\n((?:(?!\n  [a-z][a-z-]*:\n)[\s\S])*)/g)) {
+    for (const output of Object.keys(gated)) {
+      if (new RegExp(`^    if: .*needs\\.changes\\.outputs\\.${output}\\b`, "m").test(text)) gated[output].add(job);
+    }
+  }
+  assert.deepEqual([...gated.native], ["native"]);
+  assert.deepEqual([...gated.bundle].sort(), ["bundle-smoke", "seam-control"]);
 });

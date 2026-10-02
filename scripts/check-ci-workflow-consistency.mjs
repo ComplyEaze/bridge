@@ -191,6 +191,12 @@ const localActionsDigest = localActions.digest("hex");
 if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a851ab2db5479da") {
   failures.push(`.github/actions/ changed; its digest is now ${localActionsDigest}`);
 }
+// The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
+// to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
+const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
+if (reuseScriptDigest !== "39e3b0dca6ee50e2fd260fae558a4838f2c69799fc31e3ca03ffdb32757e348a") {
+  failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
+}
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
   failures.push("native must run on every pull request that changes native code");
 }
@@ -286,14 +292,14 @@ const expectedChanges = [
   "          # on this exact commit and it passed (scripts/master-push-reuse.mjs). A queue run that skipped",
   "          # the family by scope is no evidence, so it is run here as it always was. Any error or doubt",
   "          # in the lookup runs both: a non-zero exit discards whatever was printed, and only an exact",
-  "          # `reuse_<family>=true` line skips anything. tax_audit is cheap and always runs on a push.",
+  "          # `reuse_<family>=true` line among the first two skips anything. tax_audit is cheap and always runs on a push.",
   "          # To turn the reuse off, delete this block: every push is then a full run again.",
   "          if [[ \"$EVENT_NAME\" == \"push\" ]]; then",
   "            decision=\"$(node scripts/master-push-reuse.mjs)\" || decision=''",
   "            printf '%s\\n' \"$decision\"",
   "            { echo '### Master push reuse'; echo '```'; printf '%s\\n' \"$decision\"; echo '```'; } >> \"$GITHUB_STEP_SUMMARY\"",
   "            for family in native bundle; do",
-  "              if printf '%s\\n' \"$decision\" | grep -qx \"reuse_${family}=true\"; then",
+  "              if printf '%s\\n' \"$decision\" | head -n 2 | grep -qx \"reuse_${family}=true\"; then",
   "                echo \"${family}=false\" >> \"$GITHUB_OUTPUT\"",
   "              else",
   "                echo \"${family}=true\" >> \"$GITHUB_OUTPUT\"",

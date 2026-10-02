@@ -3,7 +3,7 @@
 // Decides, per family of heavy CI jobs, whether a push to master may skip that family because the
 // merge queue already RAN it, and it passed, on this exact commit. The scope job in ci.yml runs it
 // and reads exact lines from stdout: `reuse_native=true|false`, `reuse_bundle=true|false`, then
-// `reason=...`.
+// `code=...` and `reason=...`.
 //
 // The evidence is positive and per job. The queue scopes its run like a pull request does, so a
 // docs-only commit gets a green `Required checks` with every heavy job SKIPPED; that green says
@@ -17,8 +17,9 @@
 // Conditions for any `true`, all required:
 //   1. the push is an ordinary fast-forward: `before` is an ancestor of the commit, so
 //      `before..commit` really is what the push changed;
-//   2. that push changes none of Cargo.lock, a Cargo.toml, the toolchain file or anything under
-//      .github/, so caches stay warm and a workflow change is always exercised in full;
+//   2. that push changes none of Cargo.lock, a Cargo.toml, the toolchain file, a cargo config,
+//      tauri.conf.json (its macOS deployment target is in the cache key), this script or anything
+//      under .github/, so caches stay warm and a workflow or lookup change is always exercised in full;
 //   3. exactly one `merge_group` run of ci.yml has this head SHA, it is completed with conclusion
 //      `success`, and the API's total_count matches what it returned (no unseen second page);
 //   4. that run's job listing is complete, and each job of the family is present once, `success`.
@@ -26,7 +27,7 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const SHA = /^[0-9a-f]{40,64}$/;
-const FORCE_FULL = /^(?:\.github\/|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
+const FORCE_FULL = /^(?:\.github\/|\.cargo\/|src-tauri\/tauri\.conf\.json$|scripts\/master-push-reuse\.mjs$|rust-toolchain(?:\.toml)?$|(?:.*\/)?Cargo\.(?:lock|toml)$)/;
 const WORKFLOW_FILE = "ci.yml";
 // The job names a queue run reports when the job ran: ci.yml's `name:` with the matrix expanded.
 // scripts/master-push-reuse.test.mjs derives them from ci.yml and fails if these lists drift.
@@ -42,8 +43,11 @@ const ATTEMPTS = 4;
 const RETRY_MS = 15_000;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const outcome = (native, bundle, reason) => ({ native, bundle, reason });
-const full = (reason) => outcome(false, false, reason);
+// `code` is the stable, machine-readable reason (tests assert it); `reason` is free text for a human.
+const outcome = (native, bundle, code, reason) => ({ native, bundle, code, reason: printable(reason) });
+const full = (code, reason) => outcome(false, false, code, reason);
+
+export const printable = (text) => String(text).replace(/[\x00-\x1f\x7f`]/g, " ");
 
 export function forcesFullRun(changedFiles) {
   return changedFiles.find((file) => FORCE_FULL.test(file));
@@ -73,30 +77,30 @@ export async function decide({
   try {
     return await decideUnchecked({ env, fetcher, changedFiles, isAncestor, sleep, cwd });
   } catch (error) {
-    return full(`lookup failed (${error?.status ?? error?.name ?? "error"}): running everything`);
+    return full("lookup_failed", `lookup failed (${error?.status ?? error?.name ?? "error"}): running everything`);
   }
 }
 
 async function decideUnchecked({ env, fetcher, changedFiles, isAncestor, sleep, cwd }) {
   if (env.GITHUB_EVENT_NAME !== "push" || env.GITHUB_REF !== "refs/heads/master") {
-    return full("not a push to master");
+    return full("not_a_master_push", "not a push to master");
   }
   const sha = env.GITHUB_SHA ?? "";
   const before = env.BEFORE_SHA ?? "";
   if (!SHA.test(sha) || !SHA.test(before) || /^0+$/.test(before)) {
-    return full("the push has no usable commit or before SHA");
+    return full("bad_sha", "the push has no usable commit or before SHA");
   }
   if (!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY ?? "") || !env.GH_TOKEN) {
-    return full("missing repository or token");
+    return full("missing_credentials", "missing repository or token");
   }
-  if (!isAncestor(before, sha, cwd)) return full("the push is not a fast-forward of its before commit");
+  if (!isAncestor(before, sha, cwd)) return full("not_a_fast_forward", "the push is not a fast-forward of its before commit");
   const forcing = forcesFullRun(changedFiles(before, sha, cwd));
-  if (forcing) return full(`the push changes ${forcing}, which always runs everything`);
+  if (forcing) return full("forced_full_path", `the push changes ${JSON.stringify(forcing)}, which always runs everything`);
 
   const base = `https://api.github.com/repos/${env.GITHUB_REPOSITORY}/actions`;
   async function get(path) {
     const response = await fetcher(`${base}${path}`, {
-      method: "GET", redirect: "error", signal: AbortSignal.timeout(30_000),
+      method: "GET", redirect: "error", signal: AbortSignal.timeout(20_000),
       headers: { Authorization: `Bearer ${env.GH_TOKEN}`, Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw Object.assign(new Error("GitHub API request failed"), { status: response.status });
@@ -108,23 +112,23 @@ async function decideUnchecked({ env, fetcher, changedFiles, isAncestor, sleep, 
     const listing = await get(`/workflows/${WORKFLOW_FILE}/runs?event=merge_group&head_sha=${sha}&per_page=100`);
     const runs = listing?.workflow_runs;
     if (!Array.isArray(runs) || listing.total_count !== runs.length) {
-      return full("the run listing is incomplete or malformed");
+      return full("run_listing_incomplete", "the run listing is incomplete or malformed");
     }
     const matching = runs.filter((candidate) => candidate?.head_sha === sha && candidate?.event === "merge_group");
-    if (matching.length === 0) return full("no merge-queue run for this commit");
-    if (matching.length > 1 || matching.length !== runs.length) return full("more than one merge-queue run for this commit");
+    if (matching.length === 0) return full("no_queue_run", "no merge-queue run for this commit");
+    if (matching.length > 1 || matching.length !== runs.length) return full("ambiguous_queue_run", "more than one merge-queue run for this commit");
     run = matching[0];
     if (run.status === "completed") break;
-    if (attempt === ATTEMPTS) return full("the merge-queue run had not completed");
+    if (attempt === ATTEMPTS) return full("queue_run_not_completed", "the merge-queue run had not completed");
     await sleep(RETRY_MS);
   }
-  if (run.conclusion !== "success") return full(`the merge-queue run concluded ${run.conclusion}`);
-  if (!Number.isSafeInteger(run.id) || run.id <= 0) return full("the merge-queue run has no usable id");
+  if (run.conclusion !== "success") return full("queue_run_not_success", `the merge-queue run concluded ${run.conclusion}`);
+  if (!Number.isSafeInteger(run.id) || run.id <= 0) return full("queue_run_id", "the merge-queue run has no usable id");
 
   const jobsListing = await get(`/runs/${run.id}/jobs?per_page=100`);
   const jobs = jobsListing?.jobs;
   if (!Array.isArray(jobs) || jobsListing.total_count !== jobs.length) {
-    return full("the job listing is incomplete or malformed");
+    return full("job_listing_incomplete", "the job listing is incomplete or malformed");
   }
   const passed = (name) => {
     const named = jobs.filter((job) => job?.name === name);
@@ -132,7 +136,7 @@ async function decideUnchecked({ env, fetcher, changedFiles, isAncestor, sleep, 
   };
   const native = FAMILIES.native.every(passed);
   const bundle = FAMILIES.bundle.every(passed);
-  return outcome(native, bundle, `merge-queue run ${run.id}: native jobs ${native ? "passed" : "did not all run and pass"}, `
+  return outcome(native, bundle, "evaluated", `merge-queue run ${run.id}: native jobs ${native ? "passed" : "did not all run and pass"}, `
     + `bundle and seam jobs ${bundle ? "passed" : "did not all run and pass"}`);
 }
 
@@ -140,5 +144,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const result = await decide();
   console.log(`reuse_native=${result.native}`);
   console.log(`reuse_bundle=${result.bundle}`);
+  // A reason can carry a file name, and a name may hold newlines or backticks. Neither may add a line
+  // the scope step could read as a decision, a workflow command, or a break in the job summary.
+  console.log(`code=${result.code}`);
   console.log(`reason=${result.reason}`);
 }

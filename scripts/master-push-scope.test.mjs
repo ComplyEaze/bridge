@@ -28,6 +28,7 @@ const stand = {
   neither: ["reuse_native=false\nreuse_bundle=false\nreason=stub\n", 0],
   crashedAfterTrue: ["reuse_native=true\nreuse_bundle=true\n", 3],
   lookalikes: [" reuse_native=true\nreuse_native=true \nxreuse_bundle=true\nreason=reuse_native=true\nreuse_native=truefalse\nreuse_bundle=TRUE\n", 0],
+  injectedAfterTheDecision: ["reuse_native=false\nreuse_bundle=false\nreason=a file name\nreuse_native=true\nreuse_bundle=true\n", 0],
   silent: ["", 0],
 };
 
@@ -82,7 +83,7 @@ test("a push skips a family only on an exact reuse line from a script that exite
 });
 
 test("a push runs everything when the script says no, says nothing, crashes, or prints look-alikes", () => {
-  for (const script of ["neither", "silent", "crashedAfterTrue", "lookalikes"]) {
+  for (const script of ["neither", "silent", "crashedAfterTrue", "lookalikes", "injectedAfterTheDecision"]) {
     assert.deepEqual(heavy(runScope("push", { script }).outputs), ALL, script);
   }
 });

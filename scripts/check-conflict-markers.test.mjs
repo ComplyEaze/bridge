@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -51,5 +51,31 @@ test("a directory that is not a repository is exit 2, never 'none found'", () =>
   try {
     const run = spawnSync(process.execPath, [script, "--root", dir], { encoding: "utf8" });
     assert.equal(run.status, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a tracked file that cannot be read is exit 2, not a clean result", { skip: process.getuid?.() === 0 ? "root can read any file" : false }, () => {
+  const dir = repo({ "locked.txt": "<<<<<<< x\n", "fine.txt": "ok\n" });
+  try {
+    chmodSync(join(dir, "locked.txt"), 0o000);
+    const run = spawnSync(process.execPath, [script, "--root", dir], { encoding: "utf8" });
+    assert.equal(run.status, 2, run.stdout + run.stderr);
+  } finally { chmodSync(join(dir, "locked.txt"), 0o644); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a repository in the middle of a conflicted merge reports each marker once", () => {
+  const dir = repo({ "a.txt": "line\n" });
+  const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8" });
+  try {
+    git("commit", "-q", "-m", "base");
+    git("switch", "-q", "-c", "other");
+    writeFileSync(join(dir, "a.txt"), "theirs\n"); git("commit", "-qam", "theirs");
+    git("switch", "-q", "-");
+    writeFileSync(join(dir, "a.txt"), "ours\n"); git("commit", "-qam", "ours");
+    git("merge", "other"); // conflicts: git lists a.txt three times (stages 1, 2, 3)
+    assert.match(git("ls-files", "-u").stdout, /a\.txt/);
+    const found = findMarkers(dir); // three lines, or four when the user config writes diff3 base markers
+    assert.ok(found.length >= 3 && found[0] === "a.txt:1", found.join());
+    assert.deepEqual(found, [...new Set(found)], "each marker is reported once");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

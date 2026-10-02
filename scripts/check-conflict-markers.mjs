@@ -3,8 +3,8 @@
 // Fails when a tracked text file contains a merge-conflict marker at the start of a line: `<<<<<<<`,
 // diff3's `|||||||`, `>>>>>>>` (each alone or followed by a space and a label) or `=======` alone. A
 // resolution that keeps a marker is committed by an ordinary merge, passes every other check, and ships
-// as text (it reached a changelog and the agent README once). Reads the committed files, so run it on a
-// clean checkout. A line of exactly seven `=` that is a heading underline must be reworded.
+// as text (it reached a changelog and the agent README once). Reads the working-tree copy of each tracked
+// file, so run it on a clean checkout (CI does). A line of exactly seven `=` that is a heading underline must be reworded.
 //
 //   node scripts/check-conflict-markers.mjs [--root DIR]
 //
@@ -23,14 +23,21 @@ export function markerLines(text) {
 export function findMarkers(root) {
   const listed = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
   if (listed.error || listed.status !== 0) throw new Error(`git ls-files failed: ${listed.error?.message ?? listed.stderr.trim()}`);
-  const found = [];
+  const found = new Set(); // a repository mid-merge lists an unmerged path once per stage
   for (const file of listed.stdout.split("\0").filter(Boolean)) {
     let data;
-    try { data = readFileSync(resolve(root, file)); } catch { continue; } // a tracked path that is not a readable file (a submodule)
+    try {
+      data = readFileSync(resolve(root, file));
+    } catch (error) {
+      // Only a tracked path that is not a file here (a submodule, a dangling link) is skipped; any other read
+      // failure is an error, never "nothing found".
+      if (error.code === "ENOENT" || error.code === "EISDIR") continue;
+      throw error;
+    }
     if (data.includes(0)) continue; // binary and UTF-16 files are not text a marker could be read in
-    for (const line of markerLines(data.toString("utf8"))) found.push(`${file}:${line}`);
+    for (const line of markerLines(data.toString("utf8"))) found.add(`${file}:${line}`);
   }
-  return found;
+  return [...found];
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

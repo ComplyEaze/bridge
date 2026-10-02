@@ -8,7 +8,10 @@
 //!   bank rows against the CA-set vouching threshold only (s.269ST is cash-only). Findings are at
 //!   (party, day) grain; the voucher grain is a companion count and total.
 //! * A voucher whose money leg has no identifiable party (only Sales/Purchase Accounts, Duties &
-//!   Taxes or round-off lines) is one `UNIDENTIFIED_PARTY` row, cited as a `row`, never a ledger.
+//!   Taxes or round-off lines) is pooled, with every other such voucher of the day (or of the
+//!   reference), into one `UNIDENTIFIED_PARTY` row, cited as a `row`, never a ledger. The row
+//!   asserts no person: it is titled and worded as vouchers that do not name the payer or payee,
+//!   and its label quotes every usable name its vouchers print.
 //! * A cash receipt against Loans (Liability) is left out entirely (a s.269SS transaction), and in
 //!   cash mode so is a counterparty whose configured type is a bank, a co-operative bank or a
 //!   Government company (the form's own parenthetical).
@@ -46,7 +49,7 @@ use crate::ledger_ids::stable_ledger_tag;
 use crate::loans_interest::LoanConfig;
 use crate::read::iso;
 use crate::rules::Rules;
-use crate::support::{count, hash8, overflow, py_upper, voucher_label};
+use crate::support::{count, hash8, overflow, py_strip, py_upper, voucher_label};
 use crate::tds_payees::py_format_g;
 
 pub const TEST_ID: &str = "high_value_register";
@@ -172,9 +175,44 @@ pub struct Row<'a> {
     /// GUID -> (share, line), each added per voucher as it is read, so two vouchers sharing a GUID
     /// add together and one voucher's line is never set against two vouchers' shares.
     pub lines: BTreeMap<String, (i64, i64)>,
+    /// The unidentified-party row only: every usable name its vouchers print (shown, never used
+    /// to key or attribute), and whether some voucher prints none.
+    printed: BTreeSet<String>,
+    unprinted: bool,
+}
+
+const PRINTED_AS: &str = " (printed as ";
+
+/// The party a voucher with no party ledger prints (`party_field`), as the books hold it: `None`
+/// when blank, a cash or bank ledger, or one of the voucher's own ledgers (Tally prints the
+/// debited Purchases or credited Sales ledger there, which names no one).
+fn usable_printed_party(v: &Voucher, money: [&BTreeSet<String>; 2]) -> Option<String> {
+    let printed = py_strip(&v.party_field);
+    let unusable = printed.is_empty()
+        || money.iter().any(|set| set.contains(printed))
+        || v.lines.iter().any(|l| l.ledger == printed);
+    (!unusable).then(|| printed.to_string())
 }
 
 impl<'a> Row<'a> {
+    /// How the unidentified-party row is cited: every usable printed name, quoted as the books
+    /// hold it (a name may itself contain " or "), and whether some vouchers print none.
+    fn unnamed_label(&self) -> String {
+        if self.printed.is_empty() {
+            return UNIDENTIFIED_PARTY.to_string();
+        }
+        let names: Vec<String> = self.printed.iter().map(|p| format!("'{p}'")).collect();
+        format!(
+            "{UNIDENTIFIED_PARTY}{PRINTED_AS}{}{})",
+            names.join(" or "),
+            if self.unprinted {
+                ", and vouchers printing no usable name"
+            } else {
+                ""
+            }
+        )
+    }
+
     fn add(&mut self, v: &'a Voucher, share: i64, line: i64) -> Result<()> {
         self.paise = add(self.paise, share)?;
         self.vouchers.insert(v.guid.clone(), v);
@@ -328,9 +366,19 @@ pub fn mode_rows<'a, K: Ord>(
                 row.add(v, amt, line)?;
             }
         } else if fallback_total > 0 {
+            // Pooled by the key alone (the day, or the reference), whatever name each voucher
+            // prints: a split per printed name or per voucher lost one person's cash across
+            // vouchers. The row keeps every usable printed name, to show with it.
+            let printed = usable_printed_party(v, [mode_set, other_money]);
             let row = rows
                 .entry((key_fn(v), UNIDENTIFIED_PARTY.to_string()))
                 .or_default();
+            match printed {
+                Some(name) => {
+                    row.printed.insert(name);
+                }
+                None => row.unprinted = true,
+            }
             row.add(v, fallback_total, line)?;
         }
     }
@@ -422,10 +470,11 @@ fn voucher_evidence(vouchers: &BTreeMap<String, &Voucher>) -> Vec<EvidenceRef> {
         .collect()
 }
 
-/// The party a finding names: a `ledger` ref, or the `row` ref for the unidentified bucket.
-fn party_ref(ledger: &str) -> EvidenceRef {
+/// The party a finding names: a `ledger` ref, or the `row` ref for the unidentified bucket, which
+/// carries the row's printed-name label.
+fn party_ref(ledger: &str, row: &Row<'_>) -> EvidenceRef {
     if ledger == UNIDENTIFIED_PARTY {
-        EvidenceRef::with_label("row", UNIDENTIFIED_PARTY_ROW, UNIDENTIFIED_PARTY)
+        EvidenceRef::with_label("row", UNIDENTIFIED_PARTY_ROW, &row.unnamed_label())
     } else {
         EvidenceRef::new("ledger", ledger)
     }
@@ -583,16 +632,40 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                     let differs = data.lines.values().any(|(share, line)| share != line);
                     let line_total = data.line_total()?;
                     let other_mode = if is_cash { "bank" } else { "cash" };
-                    let mut amount_definition = format!(
-                        "{} {dir} from/to one party ledger (tag {h}) on {day}, summed across every \
-                         population voucher that day.",
-                        capitalize(mode_name)
-                    );
+                    // A pooled row with no party ledger is stated in its own terms, never as one
+                    // party.
+                    let unnamed = ledger.as_str() == UNIDENTIFIED_PARTY;
+                    let side = if direction == Direction::Receipt {
+                        "the payers' side"
+                    } else {
+                        "the payees' side"
+                    };
+                    let mut amount_definition = if unnamed {
+                        format!(
+                            "{} {dir}s on {day} on vouchers with no party ledger (tag {h}), whatever \
+                             name they print, summed: {side} of each voucher.",
+                            capitalize(mode_name)
+                        )
+                    } else {
+                        format!(
+                            "{} {dir} from/to one party ledger (tag {h}) on {day}, summed across every \
+                             population voucher that day.",
+                            capitalize(mode_name)
+                        )
+                    };
                     if differs {
-                        amount_definition.push_str(&format!(
-                            " This is the party's side of each voucher; on one or more of the row's \
-                             vouchers it differs from the {mode_name} line, which is shown with it."
-                        ));
+                        amount_definition.push_str(&if unnamed {
+                            format!(
+                                " On one or more of the row's vouchers it differs from the {mode_name} \
+                                 line, which is shown with it."
+                            )
+                        } else {
+                            format!(
+                                " This is the party's side of each voucher; on one or more of the \
+                                 row's vouchers it differs from the {mode_name} line, which is shown \
+                                 with it."
+                            )
+                        });
                     }
                     let f_amt = r.fig(
                         &format!("{prefix}_row_amount_{rid}"),
@@ -644,17 +717,30 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                          vec!["Vouch this entry to the bank statement and the underlying document.".to_string()])
                     };
                     if differs {
+                        let own_side = if unnamed {
+                            side
+                        } else {
+                            "this party's own side"
+                        };
                         let mut limit = format!(
-                            "The amount is this party's own side of each voucher, not the voucher's own \
+                            "The amount is {own_side} of each voucher, not the voucher's own \
                              {mode_name} line. On one or more of the row's vouchers the two differ, so such a \
                              voucher carries other lines as well (such as money moving by {other_mode}, a \
                              discount or deduction, a round-off, a loan, a counterparty this register leaves \
                              out, several parties sharing the line, or money moving the other way)."
                         );
                         if line_total < row_threshold {
+                            let who = if unnamed {
+                                match direction {
+                                    Direction::Receipt => "received on them".to_string(),
+                                    Direction::Payment => "paid on them".to_string(),
+                                }
+                            } else {
+                                format!("{moved} this party on them")
+                            };
                             limit.push_str(&format!(
                                 " The {mode_name} {verb} on these vouchers is below the threshold, so the \
-                                 {mode_name} {moved} this party on them is below it too."
+                                 {mode_name} {who} is below it too."
                             ));
                         }
                         limit.push_str(&format!(
@@ -671,15 +757,49 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                             capitalize(mode_name)
                         );
                     }
-                    if ledger.as_str() == UNIDENTIFIED_PARTY {
-                        title = title.replace("one party", "one unidentified party");
-                        limits.push("No party ledger is on this voucher -- the books cannot name the \
-                                     counterparty; this is grouped as one transaction (limb (b) candidate) \
-                                     rather than dropped or scattered across its tax/round-off lines.".to_string());
-                        ask.push(
-                            "Supply the counterparty's name and PAN for this transaction."
-                                .to_string(),
+                    if unnamed {
+                        // Retitled, never split: the row pools every such voucher of the day, so it
+                        // asserts no person -- it may be one person's cash, or several people's.
+                        let (who, act) = match direction {
+                            Direction::Receipt => ("payer", "paid"),
+                            Direction::Payment => ("payee", "was paid"),
+                        };
+                        let did = if direction == Direction::Receipt {
+                            "received"
+                        } else {
+                            "paid"
+                        };
+                        let opening = format!(
+                            "{} {did} on {day} on vouchers that do not name the {who}: ",
+                            capitalize(mode_name)
                         );
+                        // Proven under the limit on the line, the sentence says so and asks nothing
+                        // it disproves.
+                        title = if data.over(row_threshold)? == Over::PartySideOnly {
+                            format!(
+                                "{opening}{side} is at or over the {over_what}, but the {mode_name} \
+                                 {verb} on these vouchers is below it"
+                            )
+                        } else {
+                            format!(
+                                "{opening}the total is at or over the {over_what}; whether any one \
+                                 person {act} that much is not known"
+                            )
+                        };
+                        ask.retain(|a| {
+                            a != "Confirm whether this receipt is genuinely from one party."
+                                && a != "Confirm whether this payment is genuinely to one party."
+                        });
+                        limits.push("No party ledger is on these vouchers -- the books cannot name the \
+                                     counterparty. The row holds every voucher of the day with no party \
+                                     ledger, whatever name it prints (each usable printed name is shown \
+                                     with the row), so it may be one person's money or several people's; \
+                                     none is dropped or scattered across its tax/round-off lines."
+                            .to_string());
+                        ask.push(format!(
+                            "Who {act} on each of these vouchers, and did any one person reach the \
+                             {over_what} this day? Supply each counterparty's name and PAN."
+                        ));
                     }
                     let f_date = r.fig(
                         &format!("{prefix}_row_date_{rid}"),
@@ -689,7 +809,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                         vec![],
                     )?;
                     let mut evidence = voucher_evidence(&data.vouchers);
-                    evidence.push(party_ref(ledger));
+                    evidence.push(party_ref(ledger, data));
                     let mut facts =
                         vec![("amount".to_string(), f_amt), ("date".to_string(), f_date)];
                     if let Some(f_line) = f_line {
@@ -754,7 +874,7 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
                 &format!("Cash {dir}s from/to one party ledger (tag {h}) sharing voucher reference (tag {rh}), \
                           summed across every date."), voucher_evidence(&data.vouchers))?;
             let mut evidence = voucher_evidence(&data.vouchers);
-            evidence.push(party_ref(ledger));
+            evidence.push(party_ref(ledger, data));
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/single_transaction/{rid}"),
                 clauses: vec![clause.to_string()],
@@ -940,9 +1060,15 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
 
     match i.bank_statement {
         None => {
+            let coverage = match i.bank_statement_refused {
+                Some(reason) => {
+                    format!("the bank statement supplied was refused (it {reason})")
+                }
+                None => "no bank statement supplied for this engagement".to_string(),
+            };
             r.fig(
                 "s194n_coverage",
-                Value::Text("no bank statement supplied for this engagement".to_string()),
+                Value::Text(coverage),
                 Unit::Text,
                 "s.194N reads bank-statement narration only; no statement is available for this \
                              client.",

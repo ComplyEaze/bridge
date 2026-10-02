@@ -485,16 +485,33 @@ impl Server {
         let redeem_only = carried.is_some();
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
-        let snapshot = self
-            .latest_import_snapshot(batch_id)?
-            .ok_or_else(|| "import_batch_not_found".to_string())?;
-        if expected_sha256.is_some_and(|expected| snapshot.batch.sha256 != expected) {
-            return Err("import_batch_changed".to_string().into());
-        }
+        let admitted: Result<_, ToolFailure> = (|| {
+            let snapshot = self
+                .latest_import_snapshot(batch_id)?
+                .ok_or_else(|| "import_batch_not_found".to_string())?;
+            if expected_sha256.is_some_and(|expected| snapshot.batch.sha256 != expected) {
+                return Err("import_batch_changed".to_string().into());
+            }
+            if !batch_guid_matches(&snapshot.batch.company_guid, guid) {
+                return Err("import_batch_company_mismatch".to_string().into());
+            }
+            Ok(snapshot)
+        })();
+        let snapshot = match admitted {
+            Ok(snapshot) => snapshot,
+            // A refusal before the checked body withdraws an approval given
+            // for this batch just as one inside it does, so it cannot hold the
+            // slot against other batches for its whole limit (#857). The
+            // desktop's journal-only post holds none.
+            Err(failure) => {
+                if scope == PostScope::Vouchers {
+                    self.post_approvals
+                        .revoke_unredeemed(batch_id, "post_refused_before_intent");
+                }
+                return Err(failure);
+            }
+        };
         let line = snapshot.batch.clone();
-        if !batch_guid_matches(&line.company_guid, guid) {
-            return Err("import_batch_company_mismatch".to_string().into());
-        }
         // A re-entered call keeps what its first pass read (#725 slice 2.0).
         let mut accumulated = carried.unwrap_or_else(|| {
             evidence_from_runtime_read(crate::tally::runtime::RuntimeReadEvidence::empty())
@@ -1214,7 +1231,8 @@ impl Server {
         };
         // A refused redemption withdraws the approval it was to use (#725): a
         // later call asks the person again. One taken by this call has already
-        // lapsed; another call's, or a dialog, is left as it is.
+        // lapsed; a dialog still open or declined, one a call waits on, and another
+        // batch's hold are left as they are.
         if scope == PostScope::Vouchers && operation.is_err() {
             self.post_approvals
                 .revoke_unredeemed(batch_id, "post_refused_before_intent");

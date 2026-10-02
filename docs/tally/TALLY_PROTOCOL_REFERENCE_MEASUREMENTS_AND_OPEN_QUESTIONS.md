@@ -422,8 +422,9 @@ synthetic lab books, one-day windows. The reads ran on builds of two #1020 heads
 only. One run of each. The requests are described from each tool's own request trail (counts,
 hashes and sizes); no request or response was captured into this tree.
 
-When a census is read is derived from the code, not measured: the planner reads one only when a
-book's voucher mark times the shape's default size per voucher exceeds the 16 MiB budget. That is
+When a census is read (rule 2 of §11c.3) is derived from the code, not measured: the planner reads
+one only when a book's voucher mark times the shape's default size per voucher exceeds the 16 MiB
+budget. That is
 a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
 more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
 
@@ -439,17 +440,20 @@ more for the import-verification shape (96 KiB a voucher) that the read-back aft
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. That
-  reason names the widened read's neighbouring days, not the window, which returned no row; the
-  wording is a separate matter.
+  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
+  code, not the run: that reason is returned when the read widened by a day on each side finds
+  rows, none inside the window, so it names the neighbouring days, not the window, which returned
+  no row; the wording is a separate matter.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
 the read-back read a census. `post_import` returned `posted_verified`: created 1 and every other
 counter 0, one import sent and not resent, and the voucher mark moved by exactly 1. On a day empty
-before the post, the census answer grew from the empty answer to one holding the posted voucher.
-The read was admitted against it and returned complete, and `verify_import` read it again with the
-same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
+before the post, the census answer grew in size from the empty answer's, as one holding a voucher
+would; that a census was read is taken from request and response sizes in the tool's own request
+trail, not from captured bytes. The read was admitted against it and returned complete.
+`verify_import` then returned `posted_verified`, 1 verified, none unverified and no duplicate,
+reading the window again with the same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
 nobody changed.
 
 This does not establish:

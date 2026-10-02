@@ -1898,11 +1898,17 @@ mod through_the_tool {
         reads: Vec<String>,
         closing: Option<String>,
     ) -> Vec<ScenarioPlan> {
-        // Tally's own count of the ledgers agrees with the census's.
-        let counted: usize = slices
+        // Tally's own count of the ledgers agrees with the census's: the distinct
+        // GUIDs the census's own parser reads from the slices, so text that merely
+        // looks like a ledger row cannot skew it.
+        let counted = slices
             .iter()
-            .map(|body| body.matches("<LEDGER NAME=\"").count())
-            .sum();
+            .flat_map(|body| {
+                bridge_tally_protocol::parse_ledger_census_slice(body, GUID, u64::MAX)
+                    .expect("a census slice given to the helper parses")
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
         census_plans_counted(
             mark,
             slices,
@@ -2209,8 +2215,10 @@ mod through_the_tool {
     }
 
     /// A transport failure on the company-count read (here an answer past the
-    /// response cap) is not a damaged answer: it keeps its own cause and nothing
-    /// is sent after it.
+    /// response cap) is not a damaged answer: it is refused under the read's own
+    /// code with no `cause`, as any read whose response could not be taken is
+    /// (docs/agent/README.md), never as `ledger_count_company_invalid` or
+    /// `ledger_count_company_differs`, and nothing is sent after it.
     #[tokio::test]
     async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
         let mark = 102_161_u64;
@@ -2230,12 +2238,12 @@ mod through_the_tool {
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
         assert_eq!(requests, total, "a request was sent after the count read");
         assert_eq!(response["isError"], true, "{response}");
-        for other in [
-            "ledger_count_company_invalid",
-            "ledger_count_company_differs",
-        ] {
-            assert_ne!(refusal(&response)["cause"], other);
-        }
+        let error = refusal(&response);
+        assert_eq!(
+            error["code"], "party_ledger_master_read_failed",
+            "{response}"
+        );
+        assert!(error.get("cause").is_none(), "{response}");
     }
 
     /// The cross-check flag is added to a result whatever the frame was, and a

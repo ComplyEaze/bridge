@@ -2045,3 +2045,240 @@ async fn a_redeem_only_pass_of_the_desktop_post_is_refused_and_asks_nobody() {
     assert!(observed.is_empty(), "nothing was sent to Tally");
     assert_eq!(intents(directory.path()), 0);
 }
+
+/// A person's click that landed while no call waited (#857): the dialog is still
+/// in the slot with its answer, and the batch is saved and journaled.
+struct Clicked {
+    server: Server,
+    line: ImportLedgerLine,
+    args: Value,
+    simulator: SequenceSimulator,
+    directory: tempfile::TempDir,
+}
+
+async fn clicked_while_no_call_waits() -> Clicked {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::held();
+    first_call_pending(&server, directory.path(), &line, &args, &scripted).await;
+    scripted.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    Clicked {
+        server,
+        line,
+        args,
+        simulator,
+        directory,
+    }
+}
+
+/// The call was refused with `code` before its checked body, and the click it
+/// found did not keep the slot: it lapsed with a note, another batch is asked,
+/// and nothing went to Tally past the first call's checks or into the journal.
+fn assert_refused_and_slot_freed(clicked: Clicked, refused: &Value, code: &str) {
+    assert_eq!(result(refused)["error"]["code"], code, "{refused}");
+    let approvals = &clicked.server.post_approvals;
+    assert!(!approvals.holds(&clicked.line.batch_id), "not stranded");
+    assert!(
+        matches!(approvals.begin(OTHER), Begin::Ask),
+        "another batch is asked, not refused as busy"
+    );
+    assert_eq!(
+        approvals.lapse_note(&clicked.line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+    assert_eq!(intents(clicked.directory.path()), 0);
+    assert_eq!(sent(clicked.simulator).len(), before_approval().len());
+}
+
+/// A refusal before the body used to leave a clicked approval held for its whole
+/// limit, refusing every other batch as `post_approval_busy` (#857).
+#[tokio::test]
+async fn a_busy_journal_before_the_checks_does_not_strand_a_click() {
+    let clicked = clicked_while_no_call_waits().await;
+    let held = clicked.server.lock_import_admission().unwrap();
+    let refused = clicked
+        .server
+        .call_tool("post_import", clicked.args.clone())
+        .await;
+    drop(held);
+    assert_refused_and_slot_freed(clicked, &refused, "import_admission_busy");
+}
+
+#[tokio::test]
+async fn a_missing_batch_does_not_strand_a_click() {
+    let clicked = clicked_while_no_call_waits().await;
+    std::fs::write(
+        clicked.directory.path().join("agent-import-ledger.jsonl"),
+        b"",
+    )
+    .unwrap();
+    let refused = clicked
+        .server
+        .call_tool("post_import", clicked.args.clone())
+        .await;
+    assert_refused_and_slot_freed(clicked, &refused, "import_batch_not_found");
+}
+
+#[tokio::test]
+async fn a_wrong_company_does_not_strand_a_click() {
+    let clicked = clicked_while_no_call_waits().await;
+    let mut args = clicked.args.clone();
+    args["company_guid"] = json!(OTHER_COMPANY_GUID);
+    let refused = clicked.server.call_tool("post_import", args).await;
+    assert_refused_and_slot_freed(clicked, &refused, "import_batch_company_mismatch");
+}
+
+/// A refusal inside the checked body, but before `begin()` (here the saved file
+/// no longer matches its record), withdraws a click the same way (#857): the
+/// widened `revoke_unredeemed` reaches it too.
+#[tokio::test]
+async fn a_changed_file_before_the_approval_step_does_not_strand_a_click() {
+    let clicked = clicked_while_no_call_waits().await;
+    std::fs::write(
+        clicked
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", clicked.line.batch_id)),
+        b"<ENVELOPE/>",
+    )
+    .unwrap();
+    let refused = clicked
+        .server
+        .call_tool("post_import", clicked.args.clone())
+        .await;
+    assert_refused_and_slot_freed(clicked, &refused, "import_batch_changed");
+}
+
+const OTHER_COMPANY_GUID: &str = "00000000-0000-4000-8000-0000000000aa";
+
+/// The desktop's journal-only post holds no agent approval: its early refusal
+/// leaves the click alone.
+#[tokio::test]
+async fn a_journal_only_refusal_leaves_an_agent_click_held() {
+    let clicked = clicked_while_no_call_waits().await;
+    let refused = clicked
+        .server
+        .post_import_checked(&clicked.args, Some(&"0".repeat(64)), PostScope::JournalOnly)
+        .await
+        .err()
+        .expect("a stale digest is refused");
+    assert_eq!(refused.code, "import_batch_changed");
+    assert!(
+        clicked
+            .server
+            .post_approvals
+            .answered_for_test(&clicked.line.batch_id),
+        "the click stays held for its own batch's next call"
+    );
+    assert!(clicked
+        .server
+        .post_approvals
+        .lapse_note(&clicked.line.batch_id)
+        .is_none());
+    clicked.simulator.cancel();
+}
+
+/// Only an approval that was given and not taken is withdrawn: a clicked dialog
+/// and a collected approval, of this batch. An open or declined dialog, one a
+/// call waits on, a taken approval and another batch's hold stay.
+#[tokio::test]
+async fn revoke_unredeemed_takes_only_a_given_untaken_approval_of_its_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let native = || native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+
+    // A dialog the person approved while no call waited: withdrawn, with a note.
+    let approvals = PostApprovals::new(directory.path());
+    let dialog = dialog_with(ScriptedApproval::approving(), 1).await;
+    approvals
+        .hold_pending(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            dialog,
+            native(),
+        )
+        .unwrap();
+    until_answered_in(&approvals, &line.batch_id).await;
+    approvals.revoke_unredeemed(OTHER, "post_refused_before_intent");
+    assert!(approvals.holds(&line.batch_id), "another batch's call");
+    approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
+    assert!(!approvals.holds(&line.batch_id));
+    assert_eq!(
+        approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+
+    // A dialog still open is the person's to answer: left held.
+    let approvals = PostApprovals::new(directory.path());
+    let dialog = dialog_with(ScriptedApproval::held(), 1).await;
+    approvals
+        .hold_pending(
+            &line.batch_id,
+            binding_of(&line, "Synthetic preview"),
+            dialog,
+            native(),
+        )
+        .unwrap();
+    approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
+    assert!(approvals.holds(&line.batch_id), "an open dialog stays");
+
+    // A dialog a call has joined (taken out of the slot) is that call's.
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Join(_)));
+    approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
+    assert!(approvals.holds(&line.batch_id), "a joined dialog stays");
+
+    // A refusal the person gave is kept for its own batch's next call.
+    let approvals = PostApprovals::new(directory.path());
+    hold_declined(&approvals, &line, &line.batch_id).await;
+    approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Refused(code) if code == "import_approval_declined"
+    ));
+
+    // An approval a call has taken is not withdrawn from under it.
+    let approvals = PostApprovals::new(directory.path());
+    approvals.redeeming_for_test(&line.batch_id);
+    approvals.revoke_unredeemed(&line.batch_id, "post_refused_before_intent");
+    assert!(approvals.holds(&line.batch_id), "a taken approval stays");
+}
+
+/// Wait until `batch_id`'s held dialog in `approvals` has an answer stamped.
+async fn until_answered_in(approvals: &PostApprovals, batch_id: &str) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !approvals.answered_for_test(batch_id) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("the held dialog's answer was stamped");
+}
+
+/// The redeem-only pass inherits the early refusal (#857): a journal that lost
+/// the batch between the passes refuses the second pass before its checks, and
+/// the approval it was to redeem lapses instead of keeping the slot.
+#[tokio::test]
+async fn a_batch_lost_between_the_passes_does_not_strand_its_approval() {
+    let (answer, line, directory, server, scripted) = two_pass_call_with(|server, _| {
+        let journal = server.settings.data_dir.join("agent-import-ledger.jsonl");
+        std::sync::Arc::new(move || std::fs::write(&journal, b"").unwrap())
+    })
+    .await;
+    assert_eq!(
+        result(&answer)["error"]["code"],
+        "import_batch_not_found",
+        "{answer}"
+    );
+    assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
+    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}

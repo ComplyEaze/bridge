@@ -1295,7 +1295,7 @@ through the existing `package-mcpb.mjs --binary` path immediately after the Taur
 build and installer checks. A failed Tauri build stops staging. The standalone
 packaging command still builds its own release binary when `--binary` is absent.
 
-The prior [successful source run](https://github.com/lamemustafa/bridge/actions/runs/34199125671)
+The prior [successful source run](https://github.com/ComplyEaze/bridge/actions/runs/34199125671)
 spent 6m37s in macOS MCP staging after the Tauri build, recompiling native
 libraries and Tauri in a different feature/environment configuration. Reusing
 the same job's output removes that second build invocation. Preserve the
@@ -1314,11 +1314,11 @@ runs can publish caches in their own scopes. A cache miss still runs the
 complete build and gates. Keep the 50-minute job bound.
 
 The earlier multi-GB cache-save overrun is why this policy requires a measured
-cold/warm comparison. The [cache-only cold run](https://github.com/lamemustafa/bridge/actions/runs/34221535786)
+cold/warm comparison. The [cache-only cold run](https://github.com/ComplyEaze/bridge/actions/runs/34221535786)
 at `97a8d0b` passed Windows native
 in 28m32s, including a 67-second save of 825,712,308 compressed bytes. Its main
 compilation took 12m40s, including a 547.32-second OpenSSL build step; 778 library
-tests took 462.69s. The [same-commit warm run](https://github.com/lamemustafa/bridge/actions/runs/34224173710)
+tests took 462.69s. The [same-commit warm run](https://github.com/ComplyEaze/bridge/actions/runs/34224173710)
 passed in 9m55s, with a 33-second exact-cache restore and no OpenSSL/AWS-LC
 build-script execution. All 778 library tests still ran (328.08s). Hosted test
 time also varied, so do not attribute the entire elapsed difference to caching.
@@ -1392,7 +1392,7 @@ must not be summed as user wait time. Retain raw timings, report sample counts,
 and avoid a percentile claim from a handful of runs.
 
 The retained baseline had a 39m13s Windows native job and 75 summed job minutes.
-The [first profile experiment](https://github.com/lamemustafa/bridge/actions/runs/34207728015)
+The [first profile experiment](https://github.com/ComplyEaze/bridge/actions/runs/34207728015)
 passed the same 778 Windows / 786 macOS library tests and all remaining checks.
 Windows took 29m00s, including a 21m23s main test step and 2m03s main Clippy step
 (the baseline Clippy step took 10m33s). Total summed job time was 72m46s. This is
@@ -1401,7 +1401,7 @@ costs differed across the runs. The macOS profile cache was cold and saved
 693,838,529 compressed bytes in a 37-second post-cache step. Windows retained
 only registry/tool caching (167,987,643 compressed bytes; 44-second post-cache
 step), not its target tree.
-The [current dependency candidate](https://github.com/lamemustafa/bridge/actions/runs/34208820274),
+The [current dependency candidate](https://github.com/ComplyEaze/bridge/actions/runs/34208820274),
 with the same application sources and lockfile as the profile experiment, took
 10m49s in Windows main Clippy with line tables. This second baseline supports the
 observed compilation saving; it does not make unrelated cache states comparable.

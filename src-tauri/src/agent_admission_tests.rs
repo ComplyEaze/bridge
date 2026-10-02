@@ -504,3 +504,79 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         .all(|record| record.reason_code.as_deref() == Some("argument_unknown")));
     assert!(server.runtime.snapshots().unwrap().is_empty());
 }
+
+/// Two pull requests that add different tools must touch different lines, so
+/// every list a new tool is written into is kept in name order: each new name
+/// then has its own place instead of the same last line (#995). The lists are
+/// read from the source as written, because order is what a merge sees.
+#[test]
+fn every_list_a_new_tool_is_written_into_is_in_name_order() {
+    fn region<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
+        assert_eq!(source.matches(start).count(), 1, "marker moved: {start}");
+        let from = source.find(start).unwrap() + start.len();
+        let to = from + source[from..].find(end).expect(end);
+        &source[from..to]
+    }
+    fn arm_names(region: &str) -> Vec<&str> {
+        region
+            .lines()
+            .filter_map(|line| {
+                let rest = line.trim_start().strip_prefix('"')?;
+                let (name, after) = rest.split_once('"')?;
+                after.trim_start().starts_with("=>").then_some(name)
+            })
+            .collect()
+    }
+    fn assert_in_name_order(list: &str, names: &[&str]) {
+        assert!(names.len() > 1, "{list}: no names found");
+        assert!(
+            names.windows(2).all(|pair| pair[0] < pair[1]),
+            "{list} must be in name order with no duplicate: {names:?}"
+        );
+    }
+    let registered = super::catalog::REGISTERED_TOOL_NAMES;
+
+    let effects = arm_names(region(
+        include_str!("agent_catalog.rs"),
+        "pub(super) fn of(name: &str) -> Option<Self> {",
+        "_ => return None,",
+    ));
+    assert_in_name_order("ToolEffect::of", &effects);
+    assert_eq!(
+        effects, registered,
+        "ToolEffect::of and REGISTERED_TOOL_NAMES"
+    );
+
+    // The lab tools follow under their feature, after the shipped arms.
+    let dispatch = arm_names(region(
+        include_str!("agent.rs"),
+        "validate_tool_arguments(name, args)?;",
+        "#[cfg(feature = \"lab-writes\")]",
+    ));
+    assert_in_name_order("the tool dispatch in agent.rs", &dispatch);
+    assert_eq!(
+        dispatch, registered,
+        "the dispatch and REGISTERED_TOOL_NAMES"
+    );
+
+    let readme = region(
+        include_str!("../../docs/agent/README.md"),
+        "The ordinary default tools, in name order:\n\n",
+        "\n\n",
+    );
+    let listed = readme
+        .lines()
+        .map(|line| {
+            line.strip_prefix("- `")
+                .and_then(|rest| rest.strip_suffix('`'))
+                .unwrap_or_else(|| panic!("not a tool line: {line:?}"))
+        })
+        .collect::<Vec<_>>();
+    assert_in_name_order("the default tools in docs/agent/README.md", &listed);
+    for name in &listed {
+        assert!(
+            registered.contains(name),
+            "README names an unknown tool: {name}"
+        );
+    }
+}

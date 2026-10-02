@@ -322,9 +322,9 @@ const legalPins = {
   liability: [
     ["sections 13 and 14 of the Terms of Use are what apply", "terms", "13", "No warranty"],
     ["sections 13 and 14 of the Terms of Use are what apply", "terms", "14", "Limitation of liability"],
-    ["section 5.2 adds the Apache License\u2019s own disclaimer and limit of liability", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
-    ["To the extent the law allows, we, our partners, employees and agents, and the contributors to ComplyEaze Bridge are not liable at all", "terms", "14.1", "To the maximum extent permitted by applicable law, none of ComplyEaze, its partners, employees and agents, or the contributors to Bridge, will be liable"],
-    ["however it is caused, including through negligence (section 14.1)", "terms", "14.1", "however it is caused. It applies whether the claim is in contract, tort (including negligence)"],
+    ["section 5.2 of the Terms of Use adds the Apache License\u2019s own disclaimer and limit of liability", "terms", "5.2", "The Apache Licence's own disclaimer of warranty and limitation of liability (its sections 7 and 8) apply in addition to sections 13 and 14"],
+    ["To the extent the law allows, we, our partners, employees and agents, and the contributors to ComplyEaze Bridge are not liable for some kinds of loss", "terms", "14.1", "To the maximum extent permitted by applicable law, none of ComplyEaze, its partners, employees and agents, or the contributors to Bridge, will be liable"],
+    ["however caused, including by negligence (section 14.1)", "terms", "14.1", "however it is caused. It applies whether the claim is in contract, tort (including negligence)"],
     ["indirect, consequential or similar loss", "terms", "14.1", "any indirect, incidental, special, consequential, exemplary or punitive loss or damage"],
     ["lost profits, revenue or clients", "terms", "14.1", "any loss of profits, revenue, business, goodwill, clients"],
     ["lost or corrupted data, including your Tally books, and the cost of restoring it", "terms", "14.1", "any loss or corruption of data, including your Tally books, or the cost of restoring or re-entering it"],
@@ -365,6 +365,7 @@ const legalPins = {
     ["and these routes are in section 19", "terms", "19", "General questions and notices: contact@complyeaze.com"],
     ["Before starting any proceedings over a dispute, write to contact@complyeaze.com or to the postal address in section 1.1; both sides then try in good faith to resolve it within 30 days", "terms", "18.2", "Before starting any proceedings, the party raising a dispute will notify the other in writing, at the contact address in section 19. Both will then try in good faith to resolve it within 30 days."],
     ["or to the postal address in section 1.1", "terms", "1.1", "Our registered office is at"],
+    ["or to the postal address in section 1.1", "terms", "19", "at the address in section 1.1"],
     ["though either side can still seek urgent interim relief (section 18.2)", "terms", "18.2", "This does not stop either party from seeking urgent interim relief."],
     ["Do not put real client data, passwords or other confidential information in issues, bug reports, logs or screenshots you share with us or post publicly (section 12.3)", "terms", "12.3", "Do not include real client data, passwords or other confidential information in issues, bug reports, logs or screenshots that you share with us or post publicly"],
     ["“Grievance” in the subject", "privacy", "16", "with \"Grievance\" in the subject"],
@@ -376,11 +377,28 @@ const legalPins = {
   ],
 };
 // "section 14.1", "Section 5", "sections 8, 9 and 15", "sections 4 to 6", "section 16 of the Privacy Policy"
-const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)( of the Privacy Policy)?/gi;
+const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)/gi;
 const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|thirty|sixty|ninety|hundred|thousand)\b/gi;
 const withoutCitations = (text) => text.replace(citation, " ");
-// each citation as "document number"; a section is the Terms' unless the words say the Privacy Policy
-const citedIn = (text) => [...text.matchAll(citation)].flatMap((match) => [match[1], ...match[2].split(/, | and | to /).filter(Boolean)].map((number) => `${match[3] ? "privacy" : "terms"} ${number}`));
+// Each citation as "document number", read fail-closed: a citation followed by " of " must name exactly the Terms of
+// Use or the Privacy Policy, and a bare one is the Terms' only if its clause names neither the Privacy Policy nor the
+// Apache License, whose own sections would otherwise pass as the Terms'.
+function citedIn(text) {
+  return [...text.matchAll(citation)].flatMap((match) => {
+    const after = text.slice(match.index + match[0].length);
+    let doc = "terms";
+    if (after.startsWith(" of ")) {
+      if (after.startsWith(" of the Privacy Policy")) doc = "privacy";
+      else assert.ok(after.startsWith(" of the Terms of Use"), `"${match[0]}${after.slice(0, 24)}" names a document this check does not read`);
+    } else {
+      const start = Math.max(...[". ", "; ", ": "].map((mark) => text.lastIndexOf(mark, match.index)));
+      const ends = [". ", "; "].map((mark) => text.indexOf(mark, match.index)).filter((at) => at >= 0);
+      const around = text.slice(start + 1, ends.length ? Math.min(...ends) : text.length);
+      assert.doesNotMatch(around, /Privacy Policy|Apache/i, `"${match[0]}" sits beside another document without naming its own: ${around.trim()}`);
+    }
+    return [match[1], ...match[2].split(/, | and | to /).filter(Boolean)].map((number) => `${doc} ${number}`);
+  });
+}
 
 test("the liability and contact answers say no more and no less than the clauses they summarise", () => {
   const html = read("faq.html");
@@ -388,6 +406,11 @@ test("the liability and contact answers say no more and no less than the clauses
     const found = html.match(new RegExp(`<details class="faq-item" id="${id}">[\\s\\S]*?<div class="faq-answer">([\\s\\S]*?)<\\/div>\\s*<\\/details>`));
     assert.ok(found, `the page has no question #${id}`);
     const answer = faqText(found[1]);
+    // a link named for a document goes to that document
+    for (const [, href, name] of found[1].matchAll(/<a href="([^"]*)">([^<]*)<\/a>/g)) {
+      if (name === "Terms of Use") assert.equal(href, "./terms.html", `#${id}: a "Terms of Use" link goes to ${href}`);
+      if (name === "Privacy Policy") assert.equal(href, "./privacy.html", `#${id}: a "Privacy Policy" link goes to ${href}`);
+    }
     for (const [says, doc, number, reads] of pins) {
       assert.ok(answer.includes(says), `#${id} no longer says: ${says}`);
       assert.ok(clause(doc, number).includes(reads), `${doc} ${number} no longer reads: ${reads} (reread #${id} against it)`);

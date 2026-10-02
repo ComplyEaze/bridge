@@ -1,0 +1,5 @@
+src-tauri/src/agent_headline.rs
+src-tauri/src/agent_statements.rs
+src-tauri/src/reports/statements.rs
+src-tauri/src/reports/statements_tests.rs
+reviewer: lamemustafa

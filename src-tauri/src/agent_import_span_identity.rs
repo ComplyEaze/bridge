@@ -181,14 +181,14 @@ fn clean_create(
 }
 
 impl PostSpan {
-    /// The span of a clean POST of `count` vouchers bound later: its mark
-    /// after the POST was not read (a transport failure, a timeout, or a
-    /// crash), or the bind on the measured span was left unsettled, as by a
-    /// read without `EFFECTIVEDATE`. Bound later
-    /// (owner decision, 2026-10-02): `(before, before + count]`. No step is
-    /// checked, because none was measured; a later voucher change always takes
-    /// an AlterID above the mark, so the slots can only empty, and `bind`'s
-    /// count, positions and `LASTVCHID` decide. The caller must first have read
+    /// The span of a clean POST of `count` vouchers, for a bind made later
+    /// (owner decision, 2026-10-02): `(before, before + count]`. It is used
+    /// when the mark after the POST was not read (a transport failure, a
+    /// timeout or a crash), and by every later verification, including one
+    /// after a bind left unsettled (as by a read without `EFFECTIVEDATE`). No
+    /// step is checked here, because none was journaled; a later voucher change
+    /// always takes an AlterID above the mark, so the slots can only empty, and
+    /// `bind`'s count, positions and `LASTVCHID` decide. The caller must first have read
     /// the company's mark at or above `before + count`; below it, the book was
     /// rolled back and nothing may bind.
     pub(super) fn after_clean_response(

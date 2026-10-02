@@ -243,7 +243,9 @@ reference §9.15, VERIFIED on one run).
   and that its content no longer finds, is `sent_not_attributed`, never
   `not_found`. A refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
-- **Known limits:** twins are bound by request order alone (measured once);
+- **Known limits:** identical twins are bound by position alone, since they
+  read back identical and their own order cannot be observed (the request
+  order of vouchers that can be told apart was measured in two raw runs);
   the local journal is the trust root; writes from another Gold process are
   unmeasured; whether a restore or rewrite reuses AlterIDs or MasterIDs is
   unmeasured.

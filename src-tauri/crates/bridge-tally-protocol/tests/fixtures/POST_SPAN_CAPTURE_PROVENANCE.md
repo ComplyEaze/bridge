@@ -44,7 +44,8 @@ its own POST's AlterID span, with no narration tag.
 - **Counters:** `CREATED 10`; every other counter 0; no `LINEERROR`; all seven counters present; `LASTVCHID 1733`.
 - **The mark:** the target company's `ALTVCHID` went from 1795 to 1805, a step of exactly 10. `ALTMSTID` stayed at 234. The other two companies' marks did not move.
 - **The span:** it holds exactly the ten vouchers.
-  - ALTERIDs are 1796 to 1805 in request order, the identical pair at 1797 and 1798.
+  - ALTERIDs are 1796 to 1805 in request order for every voucher that can be told apart; the identical pair is at
+    1797 and 1798, and its own order cannot be observed (the two read back identical, and no sent REMOTEID comes back).
   - MASTERIDs are 1724 to 1733 in request order; the last equals `LASTVCHID`.
   - Type, date, `EFFECTIVEDATE`, signed entries and the untagged narration read back as sent.
 - **The GUID filter:** `$GUID` returns exactly one voucher for a present GUID (voucher 2, not its twin) and an empty collection for an absent one.

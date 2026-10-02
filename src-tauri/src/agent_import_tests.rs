@@ -3803,11 +3803,11 @@ fn each_post_span_binding_state_carries_its_own_plain_summary() {
         .collect();
     assert_eq!(summaries.len(), states.len(), "{summaries:?}");
     let unobserved = with_post_span_summary(
-        json!({ "state": "unsettled", "code": "binding_effective_date_not_observed" }),
+        json!({ "state": "unsettled", "code": span_identity::BindUnsettled::EffectiveDateNotObserved.code() }),
     );
     let unobserved = unobserved["summary"].as_str().unwrap_or_default();
     assert!(
-        unobserved.contains("Check the vouchers in Tally"),
+        unobserved.contains("check the vouchers in Tally before posting"),
         "{unobserved}"
     );
     assert!(!summaries.contains(unobserved), "{unobserved}");

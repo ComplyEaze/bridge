@@ -617,11 +617,11 @@ One `Import Data` request carried 10 Payment, Receipt and Contra vouchers in Bri
 | --- | --- |
 | Counters | `CREATED=10`, every other counter 0, no `LINEERROR`, all seven present, `LASTVCHID=1733` |
 | Company `ALTVCHID`, read just before and just after the POST | 1795 → 1805, a step of exactly 10; `ALTMSTID` unchanged; the other loaded companies unchanged |
-| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order**, the identical pair at 1797 and 1798; the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
+| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order** for every voucher that can be told apart, the identical pair at 1797 and 1798 (the two read back identical and no sent REMOTEID comes back, so their own order cannot be observed); the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
 | MasterIDs | 1724–1733 in request order; the last equals `LASTVCHID` |
 | Content | type, date, `EFFECTIVEDATE`, signed entries and the untagged narration as sent |
 | GUID | the company GUID, `-`, then the MasterID in 8 hex digits (`…-000006bc` = 1724); the `REMOTEID` attribute equals it (§9.3) |
-| `$GUID = "<guid>"` added to the day's formula | one row for a present GUID (it separated the identical pair); an empty collection for an absent one |
+| `$GUID = "<guid>"` added to the day's formula | one row for a present GUID (a GUID of the identical pair returned that voucher alone, not both); an empty collection for an absent one |
 
 The span and order for Journals were already in a capture of Bridge's own post path, tagged: 50 Journals at ALTERIDs 1,420–1,469 in batch order, mark 1,419 → 1,469 (`D3_BATCH_CAPTURE_PROVENANCE.md`). One import of 50, 200 and 500 Journals each stepped the mark by exactly its count over the raw gateway, and 50 and 200 did so through Bridge's own post path with contiguous AlterIDs ([§11c.5](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21), one run each).
 

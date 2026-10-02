@@ -438,7 +438,12 @@ fn with_post_span_summary(mut report: Value) -> Value {
     let summary = match report["state"].as_str() {
         Some("bound") => "Each voucher was matched to the Tally voucher this post created.",
         Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
-        Some("unsettled") if report["code"] == "binding_effective_date_not_observed" => "ComplyEaze Bridge could not confirm this post yet: Tally's answer left out the effective date it checks. Check the vouchers in Tally before posting any of them again.",
+        Some("unsettled")
+            if report["code"]
+                == span_identity::BindUnsettled::EffectiveDateNotObserved.code() =>
+        {
+            "ComplyEaze Bridge could not confirm this post yet: Tally's read of its vouchers left out the effective date that ComplyEaze Bridge checks, and a later check may settle it. Until then, check the vouchers in Tally before posting any of them again."
+        }
         Some("unsettled") => "ComplyEaze Bridge could not finish matching this post to Tally just now; run the check again.",
         Some("not_bound") => "ComplyEaze Bridge has no readable answer from Tally to this post, so it cannot confirm it: check the vouchers in Tally and do not post them again.",
         Some("book_rolled_back") => "The company's books are older than this post (probably restored from a backup or replaced by another copy), so its vouchers are no longer there: check in Tally before posting again.",

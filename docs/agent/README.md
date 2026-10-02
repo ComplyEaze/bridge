@@ -1183,8 +1183,9 @@ If the last read before the POST does not yield the company's voucher mark, the
 post is refused as `post_mark_unrecorded` before its dispatch intent is recorded
 and before anything is sent,
 and the approval is withdrawn, so the next call asks again. Known limits:
-identical vouchers in one batch are told apart by request order alone, measured
-once; the local journal is the trust root for the bindings (a lost journal
+identical vouchers in one batch are bound by position alone, since they read
+back identical and their own order cannot be observed (the request order of
+vouchers that can be told apart was measured in two raw runs); the local journal is the trust root for the bindings (a lost journal
 leaves the batch unknown, `import_batch_not_found`; in an edited journal, a
 bound voucher's GUID, MasterID and content are still read against the book,
 but not whether this post created it); and whether a write from another Gold

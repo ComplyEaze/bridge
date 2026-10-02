@@ -74,6 +74,7 @@ fn the_captured_answers_are_what_these_tests_say() {
 #[test]
 fn a_rejected_single_voucher_is_reported_not_created() {
     for answer in [rejected_one_education(), rejected_one_silver()] {
+        assert!(answer.counter_presence.all_reported(), "{answer:?}");
         assert_eq!(
             unmatched_cause(Some(&answer), 1, 1),
             UnmatchedCause::ReportedNotCreated,
@@ -83,26 +84,29 @@ fn a_rejected_single_voucher_is_reported_not_created() {
 }
 
 #[test]
-fn the_shortfall_of_a_partial_commit_is_reported_not_created() {
-    assert_eq!(
-        unmatched_cause(Some(&committed_49_of_50()), 50, 1),
-        UnmatchedCause::ReportedNotCreated
-    );
+fn a_partial_commit_is_never_read_as_not_created() {
+    // A count does not say which voucher Tally rejected: an edited voucher it
+    // did create could otherwise carry the label (bridge#1108 review).
+    for unmatched in [1, 2] {
+        assert_eq!(
+            unmatched_cause(Some(&committed_49_of_50()), 50, unmatched),
+            UnmatchedCause::NotEstablished
+        );
+    }
 }
 
 #[test]
-fn more_unmatched_than_the_shortfall_establishes_nothing() {
-    // One voucher Tally did not create, and one it did that the readback
-    // cannot find: neither can be told apart, so nothing is claimed.
+fn a_rejected_voucher_found_after_all_is_not_labelled() {
+    // Entered by hand with the same content since, it is found: nothing is
+    // claimed about it.
     assert_eq!(
-        unmatched_cause(Some(&committed_49_of_50()), 50, 2),
+        unmatched_cause(Some(&rejected_one_silver()), 1, 0),
         UnmatchedCause::NotEstablished
     );
 }
 
 #[test]
 fn a_clean_answer_never_reports_a_voucher_not_created() {
-    // Tally created the one sent: an unmatched voucher was edited, not refused.
     assert_eq!(
         unmatched_cause(Some(&created_one()), 1, 1),
         UnmatchedCause::NotEstablished
@@ -115,38 +119,53 @@ fn no_recorded_answer_establishes_nothing() {
 }
 
 #[test]
-fn an_answer_that_altered_a_voucher_establishes_nothing() {
-    // Synthetic: no capture has ALTERED with EXCEPTIONS on a voucher post. An
-    // altered voucher landed somewhere, so the shortfall is not "not created".
-    let altered = TallyImportResult {
-        altered: 1,
-        ..rejected_one_silver()
-    };
+fn an_answer_with_a_counter_missing_establishes_nothing() {
+    // Synthetic: an omitted counter is not an observed zero (§9.2).
+    let mut missing = rejected_one_silver();
+    missing.counter_presence.exceptions = false;
     assert_eq!(
-        unmatched_cause(Some(&altered), 2, 2),
+        unmatched_cause(Some(&missing), 1, 1),
         UnmatchedCause::NotEstablished
     );
 }
 
 #[test]
-fn an_answer_claiming_more_than_was_sent_establishes_nothing() {
-    // Synthetic: a CREATED above the number sent cannot be read as a shortfall,
-    // and must not underflow.
-    let excess = TallyImportResult {
-        created: 3,
-        ..rejected_one_silver()
-    };
+fn any_other_counter_establishes_nothing() {
+    // Synthetic, one counter at a time: only the measured shape is read. A
+    // voucher Tally created and also reported as an exception is not read as
+    // not created.
+    let cases: [(&str, fn(&mut TallyImportResult)); 6] = [
+        ("created", |c| c.created = 1),
+        ("altered", |c| c.altered = 1),
+        ("deleted", |c| c.deleted = 1),
+        ("ignored", |c| c.ignored = 1),
+        ("errors", |c| c.errors = 1),
+        ("cancelled", |c| c.cancelled = 1),
+    ];
+    for (name, set) in cases {
+        let mut answer = rejected_one_silver();
+        set(&mut answer);
+        assert_eq!(
+            unmatched_cause(Some(&answer), 1, 1),
+            UnmatchedCause::NotEstablished,
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn fewer_exceptions_than_vouchers_establishes_nothing() {
+    // Synthetic: two sent, none created, one exception. The second voucher's
+    // fate is not reported, so neither is labelled.
     assert_eq!(
-        unmatched_cause(Some(&excess), 2, 1),
+        unmatched_cause(Some(&rejected_one_silver()), 2, 2),
         UnmatchedCause::NotEstablished
     );
 }
 
 #[test]
-fn a_shortfall_without_an_exception_establishes_nothing() {
-    // Synthetic: a shortfall Tally answered with no exception (and no error).
-    // Only the measured shape, a rejection reported as an exception, is read
-    // as "not created"; a silent shortfall is not.
+fn no_exception_establishes_nothing() {
+    // Synthetic: none created and no exception reported.
     let silent = TallyImportResult {
         exceptions: 0,
         line_error_count: 0,

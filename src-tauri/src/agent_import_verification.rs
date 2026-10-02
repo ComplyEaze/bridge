@@ -492,12 +492,13 @@ pub(super) fn mark_sent_not_attributed(result: &mut Value) {
 /// found, as far as the post's own answer from Tally can say (bridge#1108).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum UnmatchedCause {
-    /// Tally's answer to the post said it created fewer vouchers than were
-    /// sent, altered none, and reported an exception, and the vouchers with no
-    /// match are exactly that shortfall: Tally reported them not created. Only
-    /// an exception is read this way: a rejected voucher was measured to
-    /// answer `EXCEPTIONS 1` (protocol reference §9.2), and an `ERRORS`-only
-    /// answer to a voucher post is not measured, so it stays not established.
+    /// Tally's answer to the post said it created **none** of the vouchers
+    /// sent, with one exception for each, every counter reported and every
+    /// other counter zero, and none of them is found: no voucher of this post
+    /// exists from this post, so each was not created by it. Only this
+    /// measured shape is read so (protocol reference §9.2: a rejected voucher
+    /// answers `CREATED 0, EXCEPTIONS 1`). A partial commit is never read so,
+    /// because a count does not say which voucher Tally rejected.
     ReportedNotCreated,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
@@ -505,9 +506,8 @@ pub(super) enum UnmatchedCause {
 }
 
 /// The cause for `unmatched` vouchers of a post of `sent`, from the post's own
-/// answer. The shortfall must equal the unmatched count exactly: one more
-/// unmatched voucher than Tally said it failed to create means something else
-/// happened too, and nothing is then claimed about any of them.
+/// answer. Every counter must have been present in the answer: an omitted
+/// counter is not an observed zero (§9.2).
 pub(super) fn unmatched_cause(
     counters: Option<&bridge_tally_protocol::TallyImportResult>,
     sent: usize,
@@ -519,10 +519,15 @@ pub(super) fn unmatched_cause(
     let Ok(sent) = u64::try_from(sent) else {
         return UnmatchedCause::NotEstablished;
     };
-    if counters.altered == 0
-        && counters.exceptions > 0
-        && counters.created < sent
-        && sent - counters.created == unmatched
+    if counters.counter_presence.all_reported()
+        && counters.created == 0
+        && counters.altered == 0
+        && counters.deleted == 0
+        && counters.ignored == 0
+        && counters.errors == 0
+        && counters.cancelled == 0
+        && counters.exceptions == sent
+        && unmatched == sent
     {
         UnmatchedCause::ReportedNotCreated
     } else {
@@ -533,15 +538,36 @@ pub(super) fn unmatched_cause(
 /// How many of a verification's vouchers its content found nowhere.
 pub(super) fn unmatched_count(result: &Value) -> u64 {
     result["counts"]["not_found"].as_u64().unwrap_or(0)
-        + result["counts"]["bound_not_in_window"]
-            .as_u64()
-            .unwrap_or(0)
+}
+
+/// When a `tally_reported_not_created` voucher is read: in the post's own
+/// readback, or in a later verification, after which someone may already have
+/// entered it by hand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ReadWhen {
+    PostsOwnReadback,
+    Later,
+}
+
+/// The plain line for a voucher Tally reported not created.
+pub(super) fn reported_not_created_next_step(when: ReadWhen) -> &'static str {
+    match when {
+        ReadWhen::PostsOwnReadback => "Tally reported this voucher as not created. Check that it is not in Tally, then enter this one voucher in Tally's voucher entry screen; do not import the batch file again. ComplyEaze Bridge will not send this saved voucher again.",
+        ReadWhen::Later => "When this voucher was posted, Tally reported it as not created, and ComplyEaze Bridge still cannot find it. Check Tally first: if no one has entered it since, enter this one voucher in Tally's voucher entry screen; do not import the batch file again.",
+    }
 }
 
 /// Rewrites a verification of a native post whose own answer from Tally
-/// reported the unmatched vouchers as not created (`UnmatchedCause::ReportedNotCreated`).
-pub(super) fn mark_reported_not_created(result: &mut Value) {
+/// reported its unmatched vouchers as not created (`UnmatchedCause::ReportedNotCreated`).
+pub(super) fn mark_reported_not_created(result: &mut Value, when: ReadWhen) {
     mark_not_found_as(result, "tally_reported_not_created");
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["status"] == "tally_reported_not_created" {
+                voucher["next_step"] = json!(reported_not_created_next_step(when));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -554,7 +580,6 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
         "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
         "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
         "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
-        "tally_reported_not_created" => Some("Tally reported this voucher as not created. Check that it is not in Tally, then enter it there yourself. ComplyEaze Bridge will not post it again."),
         _ => None,
     }
 }

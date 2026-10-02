@@ -4179,10 +4179,9 @@ async fn post_single_rejected(answer: String) -> Value {
     posted
 }
 
-fn assert_reported_not_created(posted: &Value) {
+fn assert_reported_not_created(posted: &Value, when: super::super::verification::ReadWhen) {
     let result = &posted["structuredContent"]["result"];
     assert_eq!(posted["isError"], json!(true), "{posted}");
-    assert_eq!(result["dispatch"]["counters"]["created"], 0, "{posted}");
     assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
     // Only the status a voucher moved to is counted: none moved to
@@ -4196,16 +4195,36 @@ fn assert_reported_not_created(posted: &Value) {
         result["counts"]["tally_reported_not_created"], 1,
         "{posted}"
     );
-    let voucher = &result["vouchers"][0];
+    // A post lists its vouchers; verify_import lists those not verified.
+    let voucher = match when {
+        super::super::verification::ReadWhen::PostsOwnReadback => &result["vouchers"][0],
+        super::super::verification::ReadWhen::Later => &result["unverified_vouchers"][0],
+    };
     assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
+    let next_step = voucher["next_step"].as_str().expect("a next step");
     assert_eq!(
-        voucher["next_step"],
-        json!(
-            super::super::verification::plain_next_step("tally_reported_not_created")
-                .expect("a plain line for tally_reported_not_created")
-        ),
+        next_step,
+        super::super::verification::reported_not_created_next_step(when),
         "{posted}"
     );
+    // Safety phrases, pinned before any shortening.
+    let phrases: &[&str] = match when {
+        super::super::verification::ReadWhen::PostsOwnReadback => &[
+            "Tally reported this voucher as not created",
+            "Check that it is not in Tally",
+            "do not import the batch file again",
+            "will not send this saved voucher again",
+        ],
+        super::super::verification::ReadWhen::Later => &[
+            "When this voucher was posted, Tally reported it as not created",
+            "Check Tally first",
+            "if no one has entered it since",
+            "do not import the batch file again",
+        ],
+    };
+    for phrase in phrases {
+        assert!(next_step.contains(phrase), "{phrase}: {next_step}");
+    }
 }
 
 /// A single voucher Tally rejected (Education capture) reads as not created by
@@ -4213,12 +4232,69 @@ fn assert_reported_not_created(posted: &Value) {
 #[tokio::test]
 async fn a_rejected_single_voucher_reads_as_not_created_by_tally_education() {
     let posted = post_single_rejected(rejected_one_education()).await;
-    assert_reported_not_created(&posted);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
+        0
+    );
+    assert_reported_not_created(
+        &posted,
+        super::super::verification::ReadWhen::PostsOwnReadback,
+    );
 }
 
 /// The same on licensed 7.1 Silver's own answer.
 #[tokio::test]
 async fn a_rejected_single_voucher_reads_as_not_created_by_tally_silver() {
     let posted = post_single_rejected(rejected_one_silver()).await;
-    assert_reported_not_created(&posted);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
+        0
+    );
+    assert_reported_not_created(
+        &posted,
+        super::super::verification::ReadWhen::PostsOwnReadback,
+    );
+}
+
+/// A later `verify_import` of the same rejected voucher keeps its status, but
+/// its next step no longer assumes nobody has entered it since.
+#[tokio::test]
+async fn a_rejected_single_voucher_verified_later_reads_with_the_later_next_step() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(rejected_one_silver())));
+    plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(empty_collection(), 10));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    let _ = sent(simulator);
+    assert_reported_not_created(
+        &posted,
+        super::super::verification::ReadWhen::PostsOwnReadback,
+    );
+    // The later check runs against its own simulator; a dispatched batch
+    // verifies only on the origin it recorded, so the journal moves with it.
+    let later_plans = span_readback(empty_collection(), 10);
+    let expected_requests = later_plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(later_plans)).unwrap();
+    let later_server = server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later_server.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let later = later_server.call_tool("verify_import", args).await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{later}");
+    assert_reported_not_created(&later, super::super::verification::ReadWhen::Later);
 }

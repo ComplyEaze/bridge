@@ -1300,9 +1300,10 @@ impl Server {
                 verification::mark_book_rolled_back(&mut result);
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
                 // An untagged native post that is not bound: what its content
-                // cannot find is never absent. When the post's own answer
-                // reported exactly those vouchers as not created, say so
-                // (bridge#1108); otherwise an edit in Tally is as likely.
+                // cannot find is never absent. When the post's own answer said
+                // Tally created none of its vouchers (each an exception) and
+                // none is found, say so (bridge#1108); otherwise an edit in
+                // Tally is as likely.
                 let counters = dispatch_response
                     .as_ref()
                     .and_then(|response| response.outcome.as_ref())
@@ -1313,7 +1314,14 @@ impl Server {
                     verification::unmatched_count(&result),
                 ) {
                     verification::UnmatchedCause::ReportedNotCreated => {
-                        verification::mark_reported_not_created(&mut result)
+                        verification::mark_reported_not_created(
+                            &mut result,
+                            if current_dispatch {
+                                verification::ReadWhen::PostsOwnReadback
+                            } else {
+                                verification::ReadWhen::Later
+                            },
+                        )
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)

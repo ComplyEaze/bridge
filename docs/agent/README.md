@@ -1288,11 +1288,13 @@ that post's binding for good.
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
 edit in Tally), is `sent_not_attributed`, never `not_found`. When the post's own
-answer from Tally reported exactly those vouchers as not created (fewer created
-than sent, an exception, nothing altered), they are `tally_reported_not_created`
-instead, and the person is told to check each is not in Tally and enter it there
-(bridge#1108). A binding refusal
-is final: an edit to one voucher of a batch in Tally before the binding is made
+answer from Tally reported every counter, created none of the vouchers sent and
+reported each as an exception, with nothing else counted, they are
+`tally_reported_not_created` instead (bridge#1108). The person is told to check
+that each is not in Tally and enter it there by hand, not by importing the batch
+file again; a later `verify_import` says first to check whether anyone has
+entered it since. A partly created batch is never read this way: a count does
+not say which voucher Tally rejected. A binding refusal is final: an edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and

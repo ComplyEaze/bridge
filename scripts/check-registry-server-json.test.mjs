@@ -45,7 +45,7 @@ test("a consistent file is accepted and names both assets", () => {
   assert.deepEqual(checked.assets.map((asset) => asset.platform), ["windows-x64", "macos-arm64"]);
 });
 
-test("each fault in the file is refused with its own code", () => {
+test("each fault in the file is refused with a code that names it", () => {
   const cases = [
     ["schema_url", (s) => { s.$schema = "https://example.invalid/schema.json"; }],
     ["name", (s) => { s.name = "io.github.someone-else/bridge-tally"; }],

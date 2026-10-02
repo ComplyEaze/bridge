@@ -6,7 +6,8 @@
 //   --published TAG   as --match-manifest, TAG is mcp-v<version>, the release is published and not
 //                     a pre-release, and each fileSha256 equals both the digest GitHub records for
 //                     the asset it names and the asset's .sha256 file (read from GitHub).
-// The version cannot be required equal on every pull request: the version pull request bumps the
+// The test next to this file runs the form and "not ahead" checks on registry/server.json in every
+// pull request (pnpm test). The version cannot be required equal on every pull request: the version pull request bumps the
 // manifest before the release exists, and the hashes are known only after the release is built.
 // Equality and the hashes are therefore checked when the publish workflow runs.
 import { readFile } from "node:fs/promises";
@@ -121,7 +122,9 @@ export async function checkPublished(checked, tag, fetchText) {
 }
 
 async function fetchOk(url) {
-  const response = await fetch(url, { redirect: "follow" });
+  // The release read goes to api.github.com; a token (the workflow's own) lifts the anonymous rate limit.
+  const headers = process.env.GITHUB_TOKEN && url.startsWith("https://api.github.com/") ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {};
+  const response = await fetch(url, { redirect: "follow", headers, signal: AbortSignal.timeout(20_000) });
   if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
   return response.text();
 }

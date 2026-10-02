@@ -787,13 +787,14 @@ disagree.
   required reviewer). For each release, after it is published, update `registry/server.json` in the
   post-release pull request: the version, the two asset addresses (they carry the
   version) and both `fileSha256` values, copied from the release's `.sha256` files.
-  Then dispatch the workflow with the release tag. It refuses to publish unless the
+  Merge that pull request, and dispatch the workflow from the default branch with the
+  release tag, before any later version pull request changes the manifest. It refuses to publish unless the
   file's version equals `packaging/mcpb/manifest.json`'s, the tag is `mcp-v<version>`,
   the release is final, and each hash equals both the digest GitHub records for the asset
   and its `.sha256` file. A published registry version
   cannot be edited or moved, so a wrong one is superseded by the next release's, not
-  repaired. `node scripts/check-registry-server-json.mjs` checks the file's form on
-  every pull request and that its version never runs ahead of the manifest; it cannot
+  repaired. The test `scripts/check-registry-server-json.test.mjs` (run by `pnpm test` in every
+  pull request) checks the file's form and that its version never runs ahead of the manifest; it cannot
   require equality on a pull request, because the version pull request bumps the
   manifest before the release (and so the hashes) exists.
 

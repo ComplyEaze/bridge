@@ -62,6 +62,8 @@ jobs:
           node-version-file: .node-version
       - name: Check registry/server.json against the manifest and the published release
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/check-registry-server-json.mjs --published "$RELEASE_TAG"
       - name: Download mcp-publisher and check it against the pinned digest
         shell: bash

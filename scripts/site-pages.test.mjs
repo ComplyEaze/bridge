@@ -352,7 +352,7 @@ const legalPins = {
     ["Nor do you cover any penalty imposed on us for our own breach of the law (section 15)", "terms", "15", "It does not cover any penalty imposed on us for our own breach of the law."],
     ["your decision to approve a voucher and its accounting consequences, whoever proposed it", "terms", "9.3", "You are responsible for that decision and its accounting consequences, whoever proposed the voucher"],
     ["that responsibility does not extend to any difference between what the approval window showed and what ComplyEaze Bridge actually posted (section 9.3)", "terms", "9.3", "This does not apply to any difference between what the window showed and what Bridge actually posted"],
-    ["Section 14 still limits any liability we have for such a difference", "terms", "14.2", "our total liability to you for all claims arising out of or in connection with Bridge"],
+    ["To the extent the law allows, and except as section 14.4 provides, section 14 still limits any liability we have for such a difference", "terms", "14.2", "To the maximum extent permitted by applicable law, our total liability to you for all claims arising out of or in connection with Bridge"],
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "8", "Your responsibilities"],
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "9", "AI assistants, posting and approvals"],
     ["sections 8, 9, 13, 14 and 15 are what apply", "terms", "13", "No warranty"],
@@ -378,7 +378,7 @@ const legalPins = {
 };
 // "section 14.1", "Section 5", "sections 8, 9 and 15", "sections 4 to 6", "section 16 of the Privacy Policy"
 const citation = /\bsections? ([0-9]+(?:\.[0-9]+)*)((?:(?:, | and | to )[0-9]+(?:\.[0-9]+)*)*)/gi;
-const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|thirty|sixty|ninety|hundred|thousand)\b/gi;
+const figure = /\b(?:[0-9][0-9,]*[0-9]|[0-9]|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\b/gi;
 const withoutCitations = (text) => text.replace(citation, " ");
 // Each citation as "document number", read fail-closed: a citation followed by " of " must name exactly the Terms of
 // Use or the Privacy Policy, and a bare one is the Terms' only if its clause names neither the Privacy Policy nor the

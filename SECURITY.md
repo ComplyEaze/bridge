@@ -5,14 +5,14 @@
 | Version | Security status |
 | --- | --- |
 | `master` | Development branch; a fix, if made, lands here first |
-| Latest `mcp-v0.4.x` release, currently <!-- managed:latest-preview -->[`mcp-v0.4.0`](https://github.com/ComplyEaze/bridge/releases/latest) (2 October 2026)<!-- /managed:latest-preview --> | Receives security fixes, as a new release, if we make one |
-| Older releases (earlier `mcp-v0.4.x`, `mcp-preview-0.3.0`, `mcp-preview-0.2.0` and `v0.1.0`) | Not supported; install the latest release |
+| <!-- managed:latest-preview -->[`mcp-v0.4.0`](https://github.com/ComplyEaze/bridge/releases/latest) (2 October 2026)<!-- /managed:latest-preview -->, the latest published release | Receives security fixes, as a new release, if we make one |
+| Earlier releases | Not supported; install the latest release |
 
 ComplyEaze Bridge is published as extension archives (`.mcpb`) on GitHub
-Releases. The latest release, `mcp-v0.4.0` ("ComplyEaze Bridge MCP 0.4.0"),
-carries a Windows archive and a macOS archive. Each archive has a SHA-256
-checksum, a provenance record naming the source commit it was built from, and a
-build attestation that the release workflow checks before publishing. The
+Releases. The latest published release, named in the table above, carries a
+Windows archive and a macOS archive. Each archive has a SHA-256 checksum, a
+provenance record naming the source commit it was built from, and a build
+attestation that the release workflow checks before publishing. The
 archives are not code-signed or notarized. An attestation says which workflow
 run and commit produced a file; it is not a code signature, no client checks it
 yet, and it does not show the code is safe. The desktop application has no

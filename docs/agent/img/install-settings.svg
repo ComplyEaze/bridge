@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 330" role="img" aria-labelledby="t d" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<title id="t">The five settings of ComplyEaze Bridge, drawn as a diagram</title>
+<desc id="d">A drawing, not a screenshot. Terms of Use line switched on; Tally host localhost; Tally port 9000; Response redaction none; Allow voucher posting switched off; a Save button.</desc>
+<rect width="720" height="330" fill="#f6f8fb"/>
+<rect x="20" y="20" width="680" height="290" rx="10" fill="#fff" stroke="#c5ccd8"/>
+<text x="40" y="50" font-size="12" fill="#5b6679" letter-spacing=".06em">A DRAWING OF THE SETTINGS, NOT A SCREENSHOT</text>
+<rect x="40" y="70" width="30" height="16" rx="8" fill="#1f3fbf"/><circle cx="62" cy="78" r="6" fill="#fff"/><text x="82" y="83" font-size="15" fill="#0b1436">I accept the ComplyEaze Bridge Terms of Use (version 2026-10)</text>
+<text x="630" y="83" font-size="13" fill="#1f3fbf" font-weight="700">on</text>
+<text x="40" y="128" font-size="15" fill="#0b1436">Tally host</text><rect x="220" y="110" width="150" height="26" rx="4" fill="#fff" stroke="#9aa5ba"/><text x="230" y="128" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#0b1436">localhost</text><text x="390" y="128" font-size="13" fill="#5b6679">do not change</text>
+<text x="40" y="168" font-size="15" fill="#0b1436">Tally port</text><rect x="220" y="150" width="150" height="26" rx="4" fill="#fff" stroke="#9aa5ba"/><text x="230" y="168" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#0b1436">9000</text><text x="390" y="168" font-size="13" fill="#5b6679">your number from Step 1</text>
+<text x="40" y="208" font-size="15" fill="#0b1436">Response redaction</text><rect x="220" y="190" width="150" height="26" rx="4" fill="#fff" stroke="#9aa5ba"/><text x="230" y="208" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="14" fill="#0b1436">none</text><text x="390" y="208" font-size="13" fill="#5b6679">do not change</text>
+<rect x="40" y="234" width="30" height="16" rx="8" fill="#c5ccd8"/><circle cx="48" cy="242" r="6" fill="#fff"/><text x="82" y="247" font-size="15" fill="#0b1436">Allow voucher posting (Journal, Payment, Receipt, Contra)</text>
+<text x="630" y="247" font-size="13" fill="#5b6679" font-weight="700">off</text>
+<rect x="40" y="268" width="80" height="28" rx="5" fill="#0b1436"/><text x="80" y="287" font-size="14" fill="#fff" text-anchor="middle" font-weight="600">Save</text>
+</svg>

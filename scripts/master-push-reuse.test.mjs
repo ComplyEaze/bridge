@@ -325,18 +325,23 @@ const FAMILY_JOBS = ["native", "bundle-smoke", "seam-control"];
 const MAY_NEED_A_FAMILY_JOB = ["compiler-cache-retention", "required-checks"];
 function skipHazards(workflow) {
   const jobs = new Map();
+  const problems = [];
+  // A job written in a form the reader below cannot see (a quoted id, a trailing comment, a flow mapping)
+  // would be skipped unseen, so every key at job level must be a plain `  id:` line.
+  const jobLevel = workflow.slice(workflow.indexOf("\njobs:\n")).split("\n").filter((line) => /^ {2}\S/.test(line) && !line.startsWith("  #"));
+  for (const line of jobLevel) if (!/^ {2}[A-Za-z0-9_-]+:$/.test(line)) problems.push(`a job this reader cannot parse: ${line.trim()}`);
   for (const [, id, body] of workflow.matchAll(/\n  ([A-Za-z0-9_-]+):\n((?:(?!\n  [A-Za-z0-9_-]+:\n)[\s\S])*)/g)) {
     const fields = new Map();
     let key = null;
     for (const line of body.split("\n")) {
       const start = /^    ([A-Za-z0-9_-]+):(.*)$/.exec(line);
-      if (start) { key = start[1]; fields.set(key, start[2]); } else if (key && /^(?:\s{5,}|\s*$)/.test(line)) fields.set(key, `${fields.get(key)}\n${line}`);
+      const uncommented = line.replace(/(^|\s)#.*$/, "");
+      if (start) { key = start[1]; fields.set(key, start[2].replace(/(^|\s)#.*$/, "")); } else if (key && /^(?:\s{5,}|\s*$)/.test(line)) fields.set(key, `${fields.get(key)}\n${uncommented}`);
       else key = null;
     }
     jobs.set(id, fields);
   }
-  const problems = [];
-  const gated = [...jobs].filter(([, fields]) => /changes\.outputs(?:\.|\[\s*['"])(?:native|bundle)\b/.test(fields.get("if") ?? "")).map(([id]) => id);
+  const gated = [...jobs].filter(([, fields]) => /outputs(?:\.|\s*\[\s*['"])(?:native|bundle)\b/.test(fields.get("if") ?? "")).map(([id]) => id);
   if (gated.sort().join() !== [...FAMILY_JOBS].sort().join()) problems.push(`jobs gated on the family outputs: ${gated.join(", ")}`);
   for (const [id, fields] of jobs) {
     const needs = (fields.get("needs") ?? "").match(/[A-Za-z0-9_-]+/g) ?? [];
@@ -356,11 +361,48 @@ test("only the jobs the families judge are gated on the scope outputs, and only 
     "the same with a block needs and a digit in the id": "\n  extra2_job:\n    needs:\n      - changes\n      - seam-control\n    runs-on: ubuntu-latest\n",
     "a job gated on an output by a multi-line if": "\n  extra-gated:\n    needs: changes\n    if: >-\n      github.event_name == 'push' ||\n      needs.changes.outputs.native == 'true'\n    runs-on: ubuntu-latest\n",
     "a job gated by the bracket form": "\n  extra-bracket:\n    needs: changes\n    if: needs.changes.outputs['bundle'] == 'true'\n    runs-on: ubuntu-latest\n",
+    "a quoted job id": "\n  \"quoted\":\n    needs: [bundle-smoke]\n    runs-on: ubuntu-latest\n",
+    "a job id with a trailing comment": "\n  commented: # note\n    needs: [seam-control]\n    runs-on: ubuntu-latest\n",
+    "a flow-mapping job": "\n  flow: {needs: native, runs-on: ubuntu-latest}\n",
+    "an extra job with always() that is not an allowed aggregator": "\n  extra-always:\n    needs: [native]\n    if: ${{ always() }}\n    runs-on: ubuntu-latest\n",
+    "the output through needs['changes']": "\n  extra-index:\n    needs: changes\n    if: needs['changes'].outputs.native == 'true'\n    runs-on: ubuntu-latest\n",
     "an aggregator without always()": null,
   };
+  const aggregator = "    if: ${{ always() }}\n    needs: [changes";
+  const edited = {
+    "required-checks whose always() is only in a trailing comment": workflow.replace(aggregator, "    if: github.event_name == 'push' # always()\n    needs: [changes"),
+    "required-checks whose always() is only in a comment line of a block if": workflow.replace(aggregator, "    if: >-\n      github.event_name == 'push'\n      # always()\n    needs: [changes"),
+  };
+  for (const [name, changed] of Object.entries(edited)) {
+    assert.notEqual(changed, workflow, name);
+    assert.notDeepEqual(skipHazards(changed), [], name);
+  }
   for (const [name, job] of Object.entries(hazards)) {
     const changed = job === null ? workflow.replace("    if: ${{ always() }}\n    needs: [changes", "    needs: [changes") : withJob(job);
     assert.notEqual(changed, workflow, name);
     assert.notDeepEqual(skipHazards(changed), [], name);
+  }
+});
+
+test("the script prints the decision lines first, in a fixed order, and never swaps the families", () => {
+  assert.deepEqual(render({ native: true, bundle: false, code: "evaluated", reason: "r" }),
+    ["reuse_native=true", "reuse_bundle=false", "code=evaluated", "reason=r"]);
+  assert.deepEqual(render({ native: false, bundle: true, code: "evaluated", reason: "r" }).slice(0, 2),
+    ["reuse_native=false", "reuse_bundle=true"]);
+});
+
+test("run as a command outside a master push, the script prints exactly four lines and no reuse", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./master-push-reuse.mjs", import.meta.url))], {
+    encoding: "utf8", env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: "pull_request" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "reuse_native=false\nreuse_bundle=false\ncode=not_a_master_push\nreason=not a push to master\n");
+});
+
+test("a commit SHA must be a full-length hex SHA", async () => {
+  for (const GITHUB_SHA of ["a".repeat(39), "abcd", "A".repeat(40)]) {
+    const outcome = await decide({ env: { ...env, GITHUB_SHA }, fetcher: github().fetcher, changedFiles: ordinaryChange, isAncestor: () => true, sleep: async () => {} });
+    assert.equal(outcome.code, "bad_sha", GITHUB_SHA);
   }
 });

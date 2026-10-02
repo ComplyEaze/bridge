@@ -784,7 +784,8 @@ disagree.
   from `registry/server.json` by the **Publish to the MCP registry** workflow
   (`.github/workflows/publish-mcp-registry.yml`, dispatched by hand, never by a tag; create
   its `mcp-registry-publish` environment first, limited to the default branch with a
-  required reviewer). For each release, after it is published, update `registry/server.json` in the
+  required reviewer; with one reviewer who may approve their own run, it is a confirmation
+  click, not a second person's approval). For each release, after it is published, update `registry/server.json` in the
   post-release pull request: the version, the two asset addresses (they carry the
   version) and both `fileSha256` values, copied from the release's `.sha256` files.
   Merge that pull request, and dispatch the workflow from the default branch with the
@@ -793,7 +794,8 @@ disagree.
   the release is final, and each hash equals both the digest GitHub records for the asset
   and its `.sha256` file. A published registry version
   cannot be edited or moved, so a wrong one is superseded by the next release's, not
-  repaired. The test `scripts/check-registry-server-json.test.mjs` (run by `pnpm test` in every
+  repaired; the publish permission can also deprecate or delete a version through the
+  registry's status endpoint, which hides it without removing its metadata. The test `scripts/check-registry-server-json.test.mjs` (run by `pnpm test` in every
   pull request) checks the file's form and that its version never runs ahead of the manifest; it cannot
   require equality on a pull request, because the version pull request bumps the
   manifest before the release (and so the hashes) exists.

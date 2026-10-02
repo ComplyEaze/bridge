@@ -128,25 +128,30 @@ settings (section 4).
   The changelog adds that the check does not by itself prove that no data
   leaves the machine.
 
-- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The
-  `parse_bank_statement` tool opened any absolute path it was given for the
-  statement or the password file, including a Windows network path. On Windows,
-  opening a path that names another computer makes Windows itself connect to
-  that computer, and may send the signed-in user's network sign-in response to
-  it. That is the operating system opening a file, not a network client in
-  ComplyEaze Bridge's own code, so the checks above do not see it. The
-  advisory names a network share and its WebDAV form. It needs the assistant to
-  be steered into giving such a path (for example by text it has read), your
-  approval of the call in the assistant or an always-allow setting, and
-  outbound file-sharing (or WebDAV) traffic to that computer. No Tally data is
-  sent. On macOS the advisory rates it low. In 0.4.1 both paths are checked as text before
-  anything is opened; a path that begins with two slashes or backslashes, in any
-  mix, is refused, and on Windows only a path that starts with a drive letter, a
-  colon and a slash or backslash is accepted. A drive letter mapped to a network share, a link or junction partway
-  along a path, and on a Mac a mounted network volume still pass. Keep
-  statements and password files on a local disk. On Windows the tool does not
-  check who can read the password file, so restrict its access yourself. See the
-  [advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
+- **One exception, in 0.3.0 and 0.4.0 (fixed in 0.4.1).** The Windows network
+  path ([advisory](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7)):
+  - *What was wrong.* The `parse_bank_statement` tool opened any absolute path
+    it was given for the statement or the password file, including a Windows
+    network path (a network share or its WebDAV form). That is the operating
+    system opening a file, not a network client in ComplyEaze Bridge's own
+    code, so the checks above do not see it.
+  - *Impact.* On Windows, opening a path that names another computer makes
+    Windows connect to it, and may send the signed-in user's network sign-in
+    response there. It needs the assistant to be steered into giving such a
+    path (for example by text it has read), your approval of the call in the
+    assistant or an always-allow setting, and outbound file-sharing or WebDAV
+    traffic to that computer. No Tally data is sent. The advisory's severity is
+    medium; on macOS it is low.
+  - *What 0.4.1 changes.* Both paths are checked as text before anything is
+    opened. A path that begins with two slashes or backslashes, in any mix, is
+    refused; this includes the Windows long-path form (`\\?\C:\...`), so use the
+    plain drive path. On Windows only a path that starts with a drive letter, a
+    colon and a slash or backslash is accepted.
+  - *What still passes.* A drive letter mapped to a network share, a link or
+    junction partway along a path, and on a Mac a mounted network volume.
+  - *What to do.* Keep statements and password files on a local disk. On
+    Windows the tool does not check who can read the password file, so restrict
+    its access yourself.
 
 **Not measured:** a network capture of the running extension on Windows or Mac.
 
@@ -248,7 +253,8 @@ Bridge — approve one voucher" with the buttons Cancel and Post voucher. On
 Windows it is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and
 Cancel, and No is the default. Only the positive button approves. The window
 closes by itself after two minutes without an answer, and an approval that is
-not used within fifteen minutes, or before the program restarts, is dropped.
+not used within fifteen minutes, or before the program restarts, is dropped. From 0.4.1 an approval you
+have given is also withdrawn when the post is then refused before it is sent (for example when the batch is not found).
 
 **Not measured:** what Claude Desktop itself needs when installing an extension,
 and a check of a machine before and after installing and running it.

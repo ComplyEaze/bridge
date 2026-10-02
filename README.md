@@ -105,17 +105,18 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   tools loaded in a chat. The record is the maintainer's dated notes and
   screenshots, kept privately. This was one run, not a controlled test of each
   key of the window.
-- A build of 0.4.1 on a Mac, on 2 October 2026: the package CI built for the
-  version pull request, not the published file (the release is built again on
-  another runner, and the program file inside differs; with no Tally both start
-  as version 0.4.1, list 21 tools and give the same answer to `tally_status`).
-  The maintainer upgraded an installed 0.4.0 over it in Claude Desktop. The
-  Terms setting and the other settings carried over, the app restarted the
-  extension itself, and `tally_status` and `list_companies` answered against
-  licensed TallyPrime Silver 7.1 holding the lab's own synthetic companies. The
-  record is the maintainer's dated notes, kept privately. The published 0.4.1
-  file was checked only without Tally; we have not installed it in Claude
-  Desktop.
+- A build of 0.4.1 on a Mac, on 2 October 2026. What was run: the package CI built
+  for the version pull request, not the published file. The maintainer installed
+  it in Claude Desktop over an installed 0.4.0, as an upgrade; the Terms setting
+  and the other settings carried over, and the app itself started the
+  extension's server process (observed, with the start time read from the
+  process list). `tally_status` and `list_companies` then answered against
+  licensed TallyPrime Silver 7.1 holding the lab's own synthetic companies.
+  The record is the maintainer's dated notes, kept privately. What was not run:
+  the published file is built again on another runner, and its program file
+  differs from the one tested. We ran both builds without Tally: each reports
+  version 0.4.1, lists 21 tools and gives the same answer to `tally_status`. We
+  have not installed the published file in Claude Desktop.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window

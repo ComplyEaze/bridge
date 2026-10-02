@@ -690,8 +690,9 @@ It checks every file first and writes none if one fails. Then:
    site as soon as it ends, before `gh release edit` marks the release latest, so
    the release snapshot deployed with the site still records it as a
    pre-release. The site workflow has no push trigger: text merged under `site/`
-   and in `CHANGELOG.md` goes live only when a maintainer dispatches it, so
-   dispatch it once after the post-release pull request merges.
+   and in `CHANGELOG.md` goes live only when a maintainer dispatches it or at
+   the next publication, so dispatch it once after the post-release pull request
+   merges.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.

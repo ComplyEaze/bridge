@@ -4158,7 +4158,7 @@ const PARTIAL_AMOUNTS: [&str; 3] = ["12.61", "13.61", "14.61"];
 
 /// `saved_captured_line`'s Journal three times, each with its own amount, as
 /// one batch: the second (13.61) is the one Tally rejects.
-fn saved_partial_batch(server: &Server) -> Value {
+fn saved_partial_batch(server: &Server) -> (ImportLedgerLine, Value) {
     let mut line = saved_captured_line(server);
     let template = line.vouchers[0].clone();
     line.vouchers = PARTIAL_AMOUNTS
@@ -4191,14 +4191,16 @@ fn saved_partial_batch(server: &Server) -> Value {
         rendered,
     )
     .unwrap();
-    json!({"company_guid":GUID,"batch_id":line.batch_id})
+    let args = json!({"company_guid":GUID,"batch_id":line.batch_id});
+    (line, args)
 }
 
 /// The window after the partial post: the captured posted Journal, untagged,
 /// twice, as the first and third vouchers. Each copy's named changes: the
 /// amount (both entries), ALTERID (11 and 12, inside the span (10, 12] the
 /// marks give), and MASTERID with the GUID and REMOTEID suffixes to match
-/// (1745 and 1746, the captured response's LASTVCHID being 1746). Each copy's
+/// (1745 and 1746, the captured response's LASTVCHID being 1746): the window's
+/// MasterIDs are derived by named edits from the Payment capture. Each copy's
 /// VCHKEY suffix is set to its MasterID only to keep the two keys distinct: it
 /// is a synthetic value, not derived from the capture.
 fn partial_window() -> String {
@@ -4264,13 +4266,15 @@ fn the_partial_post_answer_parses_as_two_created_and_one_exception() {
 async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed() {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_two_of_three())));
+    // The POST is the last request of the dispatch (see `after_approval`).
+    let post_at = plans.len() - 1;
     plans.push(xml(company_marks(12, 50, "WR2 Unicode Lab")));
     plans.extend(span_readback(partial_window(), 12));
     let expected_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = batch_server_at(simulator.address(), directory.path());
-    let args = saved_partial_batch(&server);
+    let (line, args) = saved_partial_batch(&server);
     let posted = SCRIPTED_APPROVAL
         .scope(
             ScriptedApproval::approving(),
@@ -4278,7 +4282,22 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         )
         .await;
     // Every scripted answer was asked for, and nothing more.
-    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), expected_requests, "{posted}");
+    // The POST carried exactly the saved batch, rendered with the REMOTEIDs
+    // its dispatch intent journaled before the send.
+    let intent = dispatch_intent(directory.path());
+    let recorded_sha = intent["native_request_sha256"].as_str().unwrap();
+    assert_eq!(observed[post_at].request_body_sha256, recorded_sha);
+    let remote_ids = intent["native_remote_ids"]
+        .as_array()
+        .expect("a batch intent journals one REMOTEID per voucher")
+        .iter()
+        .map(|id| Uuid::parse_str(id.as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(remote_ids.len(), 3);
+    let rendered = native_post_request(&line, RemoteIds::from_ids(remote_ids)).unwrap();
+    assert_eq!(rendered.request_sha256, recorded_sha);
     assert_eq!(posted["isError"], json!(true), "{posted}");
     let result = &posted["structuredContent"]["result"];
     assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");

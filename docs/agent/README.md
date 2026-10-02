@@ -223,8 +223,18 @@ failed read without `endpoint` either received a response whose body then failed
 parse or pass Bridge's checks, or hit a local limit or fault that does not involve the endpoint. A
 withdrawn call is `request_cancelled`.
 
-Like `remediation`, `cause`, `counts`, `size` and `endpoint` are omitted when `BRIDGE_AGENT_MAX_BYTES` is below
-4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+A refused argument that only needs sending again in the right form carries `expected`, a typed
+field beside `remediation`: for `argument_invalid:from`, `argument_invalid:to` or
+`argument_invalid:as_of`, `{"argument": <name>, "kind": "calendar_date", "formats": ["YYYYMMDD",
+"YYYY-MM-DD"]}`, and for `company_guid_invalid`, `{"argument": "company_guid", "kind":
+"company_guid", "from_tool": "list_companies"}`. Their guidance asks the assistant to work out a
+relative date itself and state the dates it used, or to take the GUID from `list_companies` rather
+than a company's name. Both are attached only to a refusal made before anything was read from
+Tally: `company_guid_invalid` also comes back after a read when Tally itself lists a company whose
+GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`.
+
+Like `remediation`, `expected`, `cause`, `counts`, `size` and `endpoint` are omitted when
+`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. Before a tool response is written, Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested

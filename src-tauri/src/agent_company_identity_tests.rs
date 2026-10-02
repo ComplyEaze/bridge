@@ -121,6 +121,136 @@ async fn malformed_or_non_native_guid_selectors_refuse_before_network() {
     }
 }
 
+/// A date sent as "last month" and a company sent by name were refused with a
+/// bare code, so an assistant had to guess the fix. Each such refusal now
+/// carries a typed `expected` field and plain guidance, under the same response
+/// budget as any guidance, and refuses before anything is sent to Tally.
+#[tokio::test]
+async fn a_misformed_date_or_company_guid_says_what_was_expected() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server("127.0.0.1:9".parse().unwrap(), directory.path());
+    let date = |argument: &str| json!({"argument": argument, "kind": "calendar_date", "formats": ["YYYYMMDD", "YYYY-MM-DD"]});
+    for (tool, args, code, expected) in [
+        (
+            "trial_balance",
+            json!({"company_guid": GUID, "from": "last month", "to": "20260930"}),
+            "argument_invalid:from",
+            date("from"),
+        ),
+        (
+            "trial_balance",
+            json!({"company_guid": GUID, "from": "20260401", "to": "today"}),
+            "argument_invalid:to",
+            date("to"),
+        ),
+        (
+            "outstandings",
+            json!({"company_guid": GUID, "as_of": "30 Sept 2026"}),
+            "argument_invalid:as_of",
+            date("as_of"),
+        ),
+        (
+            "trial_balance",
+            json!({"company_guid": "Synthetic Traders", "from": "20260401", "to": "20260930"}),
+            "company_guid_invalid",
+            json!({"argument": "company_guid", "kind": "company_guid", "from_tool": "list_companies"}),
+        ),
+    ] {
+        let response = server.call_tool(tool, args).await;
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], code, "{tool}: {error}");
+        assert_eq!(error["expected"], expected, "{code}");
+        let remediation = error["remediation"].as_str().expect("guidance");
+        assert!(
+            remediation.contains("Nothing was read from Tally."),
+            "{code}: {remediation}"
+        );
+        assert_eq!(
+            response["structuredContent"]["evidence"]["bytes"], 0,
+            "{code}"
+        );
+    }
+
+    // Neighbouring refusals name no expectation they cannot vouch for.
+    for (tool, args, code) in [
+        (
+            "outstandings",
+            json!({"company_guid": GUID, "direction": "sideways"}),
+            "argument_invalid:direction",
+        ),
+        (
+            "outstandings",
+            json!({"company_guid": GUID, "limit": 0}),
+            "pagination_invalid",
+        ),
+        (
+            "trial_balance",
+            json!({"company_guid": GUID, "from": "20260231", "to": "20260930"}),
+            "invalid_date",
+        ),
+    ] {
+        let response = server.call_tool(tool, args).await;
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], code, "{error}");
+        assert!(error.get("expected").is_none(), "{error}");
+    }
+
+    // Below the guidance budget the code survives alone.
+    let small = Server::new(Settings {
+        max_bytes: REMEDIATION_MIN_RESPONSE_BUDGET - 1,
+        ..server.settings.clone()
+    });
+    let response = small
+        .call_tool(
+            "trial_balance",
+            json!({"company_guid": GUID, "from": "last month", "to": "20260930"}),
+        )
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "argument_invalid:from", "{response}");
+    assert!(
+        error.get("expected").is_none() && error.get("remediation").is_none(),
+        "{error}"
+    );
+}
+
+/// `company_guid_invalid` also comes back after a read when Tally itself lists a
+/// company whose GUID is malformed. The caller's GUID was right then, so the
+/// refusal must not tell it to send the GUID `list_companies` returns, nor say
+/// that nothing was read.
+#[tokio::test]
+async fn a_malformed_guid_tally_lists_gets_no_repair_hint() {
+    let bytes = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-companies.utf16le.xml");
+    let captured = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let xml = captured.replace(GUID, "malformed-guid");
+    let plan = ScenarioPlan::new(Fixture::SyntheticXml(xml)).with_encoding(WireEncoding::Utf16Le);
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let simulator =
+        SequenceSimulator::spawn(vec![plan.clone(), status.clone(), plan, status]).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(simulator.address(), directory.path());
+    let response = server
+        .call_tool("ledger_masters", json!({"company_guid": GUID}))
+        .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "company_guid_invalid", "{response}");
+    assert!(
+        response["structuredContent"]["evidence"]["bytes"]
+            .as_u64()
+            .unwrap()
+            > 0,
+        "Tally was read: {response}"
+    );
+    assert!(error.get("expected").is_none(), "{error}");
+    assert!(error.get("remediation").is_none(), "{error}");
+}
+
 #[tokio::test]
 async fn observed_books_from_requires_a_calendar_date_before_company_scoped_reads() {
     let bytes = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-companies.utf16le.xml");

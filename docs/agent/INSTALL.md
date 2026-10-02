@@ -6,9 +6,11 @@ books.
 
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
 
-The TallyPrime keys, the Claude Desktop screens and buttons, and the Mac keys in these steps are as seen on
-2 October 2026 with TallyPrime 7.1 and Claude Desktop. Those are other companies' programs and they change, so a
-screen of yours may differ a little.
+What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
+seen in our tests on 1 and 2 October 2026. The TallyPrime keys (F1, Settings, Connectivity, Ctrl+A, Alt+K, Alt+Y) and
+the Mac keys are written from general knowledge of those programs; we did not walk them ourselves. On a Mac, the
+final question in Step 6 has not been run by us. These are other companies' programs and they change, so a screen of
+yours may differ a little.
 
 ## Before you start
 
@@ -71,12 +73,12 @@ question answered from Tally through it, after the Terms are accepted, is not ye
 Tally can answer other programs on the same computer, such as ComplyEaze Bridge. This is switched off until you turn
 it on. It changes one setting in TallyPrime and no data.
 
-**A caution before you turn it on.** As we understand TallyPrime, once this setting is on, Tally answers on that port,
-without a password, to anything that can reach it. ComplyEaze Bridge only ever calls Tally from this same computer,
-but the setting is Tally's own. What keeps other computers out is this computer's firewall. Check that the firewall
-does not allow incoming connections to that port, and that you are on a network you trust. We have not measured this
-ourselves.
-<!-- OWNER TO CONFIRM on the lab machine: what TallyPrime answers to another computer on the network once "acts as Both" is on. Reword this caution from the measurement. -->
+**A caution before you turn it on.** With this setting on, Tally answers on the port to other computers too, without
+asking for a password. In one test on 2 October 2026 with TallyPrime 7.1, a browser on another computer on the same
+network opened the Tally computer's network address and the port, and got Tally's "TallyPrime Server is Running"
+answer. ComplyEaze Bridge only ever calls Tally from this same computer, but the setting is Tally's own. What keeps
+other computers out is this computer's firewall. Check that the firewall does not allow incoming connections to the
+port, and that you are on a network you trust.
 
 1. Open TallyPrime and open your test company.
 2. Press **F1**. A Help menu opens. Choose **Settings**, then **Connectivity**.

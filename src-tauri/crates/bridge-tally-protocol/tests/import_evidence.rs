@@ -664,3 +664,39 @@ fn an_element_inside_a_line_error_refuses_the_response() {
     assert!(parse_import_outcome(&nested).is_err());
     assert!(parse_import_evidence(&nested).is_err());
 }
+
+const POST_SPAN_IMPORT_RESPONSE: &[u8] =
+    include_bytes!("fixtures/agent/post-span-import-response.utf16le.xml");
+
+/// The captured clean create of 10 vouchers keeps the `LASTVCHID` Tally
+/// reported (`fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`), beside its counters.
+#[test]
+fn a_captured_clean_create_keeps_its_lastvchid() {
+    let outcome = parse_import_outcome(&captured(POST_SPAN_IMPORT_RESPONSE)).unwrap();
+    assert!(outcome.counters().is_clean_success_for(10, 0, 0));
+    assert!(outcome.counters().counter_presence.all_reported());
+    assert_eq!(outcome.last_vch_id(), Some(1733));
+}
+
+/// `LASTVCHID` survives a saved record, a response without it records no key,
+/// and a record saved before it was kept reads it as not observed.
+#[test]
+fn lastvchid_is_kept_in_records_and_absent_when_unreported() {
+    let captured_outcome = parse_import_outcome(&captured(POST_SPAN_IMPORT_RESPONSE)).unwrap();
+    let stored = serde_json::to_value(&captured_outcome).unwrap();
+    assert_eq!(stored["last_vch_id"], 1733);
+    let reread: TallyImportOutcome = serde_json::from_value(stored.clone()).unwrap();
+    assert_eq!(reread.last_vch_id(), Some(1733));
+
+    let mut old = stored;
+    old.as_object_mut().unwrap().remove("last_vch_id");
+    let reread: TallyImportOutcome = serde_json::from_value(old).unwrap();
+    assert_eq!(reread.last_vch_id(), None);
+
+    let unreported = parse_import_outcome("<RESPONSE><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></RESPONSE>").unwrap();
+    assert_eq!(unreported.last_vch_id(), None);
+    assert!(serde_json::to_value(&unreported)
+        .unwrap()
+        .get("last_vch_id")
+        .is_none());
+}

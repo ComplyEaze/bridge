@@ -727,6 +727,52 @@ fn a_cancelled_purchase_with_no_tax_entry_is_listed_with_its_flag() {
     assert_eq!(listed["optional"], false);
 }
 
+/// The shape a cancelled voucher was measured to come back in: no ledger entries at all
+/// (protocol reference §11c.5, §9.14). The captured Purchase, emptied the same way, is
+/// listed apart with its flag and is never returned as an item (#1013).
+#[test]
+fn a_cancelled_purchase_read_back_without_entries_is_listed_apart_not_as_an_item() {
+    let mut rows = captured_rows();
+    rows[0]["amounts"] = json!([]);
+    rows[0]["cancelled"] = json!(true);
+    let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
+    let body = &result.result;
+    let side = &body["purchase_vouchers_without_duties_taxes_entry"];
+    assert_eq!(side["total"], 1);
+    assert_eq!(side["listed"][0]["date"], "20250903");
+    assert_eq!(side["listed"][0]["cancelled"], true);
+    let items = body["items"].as_array().unwrap();
+    assert_eq!(items.len(), 4);
+    assert!(items.iter().all(|item| item["date"] != "20250903"));
+}
+
+/// A caller reading the side list's count alone would take a cancelled voucher for an
+/// untaxed purchase, so the tool text and the result's own coverage say why it is there.
+#[test]
+fn the_register_says_why_a_cancelled_voucher_is_in_the_list_without_a_tax_entry() {
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|tool| tool["name"] == "purchase_register")
+        })
+        .expect("purchase_register tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains(
+        "A cancelled voucher is listed there with `cancelled` true whether or not it was taxed, \
+         because the cancelled vouchers measured came back from Tally with no ledger entries"
+    ));
+    let result = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
+    let coverage = result.result["coverage"].as_str().expect("coverage text");
+    assert!(coverage.contains(
+        "a cancelled voucher is listed there too, with cancelled true, because the cancelled \
+         vouchers measured came back from Tally with no ledger entries"
+    ));
+}
+
 #[test]
 fn a_flag_tally_did_not_report_is_absent_from_a_listed_voucher_not_null() {
     let mut rows = captured_rows();

@@ -471,7 +471,7 @@ pub(super) fn register_result(
         "vouchers_with_unplaced_ledgers": side(&page.vouchers_with_unplaced_ledgers),
         "purchase_vouchers_without_duties_taxes_entry":
             side(&page.register_class_without_duties_taxes_entry),
-        "coverage": "items are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger are counted in purchase_vouchers_without_duties_taxes_entry, not returned as items",
+        "coverage": "items are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger are counted in purchase_vouchers_without_duties_taxes_entry, not returned as items; a cancelled voucher is listed there too, with cancelled true, because the cancelled vouchers measured came back from Tally with no ledger entries, so being listed there does not mean a cancelled purchase was untaxed",
     });
     Ok(RegisterResult { result, truncated })
 }

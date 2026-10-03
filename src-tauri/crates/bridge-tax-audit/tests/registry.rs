@@ -111,3 +111,37 @@ fn the_26as_floors_are_what_each_test_emits_with_no_documents() {
     assert_eq!(figures("twentysixas_receipts"), 0);
     assert_eq!(floor("twentysixas_receipts"), 1);
 }
+
+/// `high_value_register`'s s.194N coverage, as the registry passes the caller's two statement
+/// inputs: a refused statement (no document) is stated with the reader's reason, never as "not
+/// supplied"; a statement that is supplied is read, whatever reason is also given.
+#[test]
+fn the_registry_passes_a_refused_statement_reason_to_the_coverage_figure() {
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let rules = rules_for(&e).unwrap();
+    let coverage = |c: &CallerData| -> String {
+        let dump = registry::run_canonical("high_value_register", &e, &rules, c).unwrap();
+        let fig = dump["figures"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["id"] == "high_value_register.s194n_coverage")
+            .expect("the coverage figure is always emitted");
+        fig["value"].as_str().unwrap().to_string()
+    };
+    let mut c = CallerData::default();
+    assert_eq!(
+        coverage(&c),
+        "no bank statement supplied for this engagement"
+    );
+    c.bank_statement_refused = Some("has no rows".to_string());
+    assert_eq!(
+        coverage(&c),
+        "the bank statement supplied was refused (it has no rows)"
+    );
+    c.bank_statement = caller("high_value_register").bank_statement;
+    assert!(
+        coverage(&c).contains(" only -- s.194N is an annual test"),
+        "a supplied statement is read"
+    );
+}

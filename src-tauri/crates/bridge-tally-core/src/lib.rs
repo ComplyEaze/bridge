@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use bridge_tally_primitives::exact_arithmetic;
 pub use bridge_tally_primitives::{
-    ExactDecimal, ReadResponseScope, TallyDate, TallyError, MAX_EXACT_DECIMAL_BYTES,
+    DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError, MAX_EXACT_DECIMAL_BYTES,
 };
 
 pub mod bills_reconciliation;

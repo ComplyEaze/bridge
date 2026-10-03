@@ -1,0 +1,66 @@
+{
+ "comment": "cash_payments_40a3, one voucher with no GUID and no number: it is named \"(none)\" and, being the only voucher with a blank GUID, is told apart by its place in the population.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null,
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Unsecured Loans": "Loans (Liability)"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_loan_blank-000"
+  },
+  {
+   "name": "Loan Y",
+   "chain": [
+    "Loans (Liability)"
+   ],
+   "guid": "edge-cp_loan_blank-001"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-07-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ],
+   "number": ""
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "cash_payments_40a3"
+ ],
+ "loan_ledgers": []
+}

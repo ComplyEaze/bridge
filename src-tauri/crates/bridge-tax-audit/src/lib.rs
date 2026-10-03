@@ -1450,13 +1450,16 @@ pub fn bank_reconciliation_on(
 /// caller documents (`None` and empty when not supplied). The counterparty types are the
 /// configured loan ledgers' `lender_type`, overridden by `[roles].counterparty_type_by_ledger`; the
 /// s.194N recipient type follows `[client].entity_type`. Refuses when `[loans]` is not a table, as
-/// the reference's `loan_ledgers_config` raises there. The reference module has no
+/// the reference's `loan_ledgers_config` raises there. `statement_refused` is the reader's reason
+/// when the engagement's statement was supplied but refused (then `statement` is `None`). The
+/// reference module has no
 /// `check_invariants`, so the dump's module invariants are empty on both sides.
 pub fn high_value_register_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
     statement: Option<&documents::BankStatementDoc>,
+    statement_refused: Option<&str>,
     ais_rows: &[documents::AisRow],
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
@@ -1479,6 +1482,7 @@ pub fn high_value_register_on(
         ),
         round_off_ledgers: &round_off_ledgers,
         counterparty_type_by_ledger: &counterparty_types,
+        bank_statement_refused: statement_refused,
     };
     let result = high_value_register::run(book, rules, &inputs)?;
     canonical::canonical_test_result(book, &result, None)

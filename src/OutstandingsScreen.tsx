@@ -487,8 +487,8 @@ export function OutstandingsScreen({
     }
     return (
       <section className="panel wide outstandings-empty">
-        <h2>Bridge could not read this company&rsquo;s currency</h2>
-        <p>Without it Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
+        <h2>ComplyEaze Bridge could not read this company&rsquo;s currency</h2>
+        <p>Without it ComplyEaze Bridge cannot tell whether this company&rsquo;s amounts are in rupees, so it does not read outstandings. Reopen the company to try again.</p>
       </section>
     );
   }
@@ -994,7 +994,7 @@ export function OutstandingsScreen({
       ) : !loading && !result && !error ? (
         <div className="outstandings-state">
           <strong>Ready for a read-only scan</strong>
-          <span>Bridge pins the company by GUID, reads each report twice, and shows numbers only when both copies agree.</span>
+          <span>ComplyEaze Bridge pins the company by GUID, reads each report twice, and shows numbers only when both copies agree.</span>
         </div>
       ) : null}
     </section>

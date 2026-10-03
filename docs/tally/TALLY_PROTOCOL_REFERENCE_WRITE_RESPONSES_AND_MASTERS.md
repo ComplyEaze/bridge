@@ -100,10 +100,11 @@ preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the sam
 - Each answer carried one `LINEERROR`, naming only the last rejected voucher's ledger. Where
   nothing was created, neither the voucher mark nor the master mark moved.
 
-So in these runs `EXCEPTIONS` counted rejected vouchers, not errors, and the `LINEERROR` never
-identified every rejected voucher. The first and third answers are preserved byte for byte as test
-fixtures (`batch-import-all-missing-ledgers`, `batch-import-two-missing-ledgers-in-one-voucher`).
-Not measured: any other cause of rejection, Gold and Education.
+So in these runs `EXCEPTIONS` counted rejected vouchers, not missing ledgers, and the `LINEERROR`
+never identified every rejected voucher. The first and third answers are preserved byte for byte as
+test fixtures (`batch-import-all-missing-ledgers`,
+`batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
+and Education.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 

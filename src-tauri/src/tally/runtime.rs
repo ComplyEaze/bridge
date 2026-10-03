@@ -1611,22 +1611,22 @@ fn all_unallocated_parties(
     let mut ranked = residuals
         .iter()
         .filter(|residual| !residual.amount.is_zero())
-        .filter_map(|residual| {
-            residual.amount.abs().ok().map(|amount| UnallocatedParty {
-                party: residual.party.clone(),
-                amount,
-                direction: if residual.amount.is_negative() {
-                    ExposureDirection::Receivable
-                } else {
-                    ExposureDirection::Payable
-                },
-                opening_balance: residual.opening_balance.clone(),
-                composition: Some(if residual.bill_wise_on {
-                    UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
-                } else {
-                    UnallocatedComposition::NotBillWiseLedger
-                }),
-            })
+        // The amount cannot fail, so no party is dropped for an error
+        // (bridge#1097).
+        .map(|residual| UnallocatedParty {
+            party: residual.party.clone(),
+            amount: residual.amount.magnitude(),
+            direction: if residual.amount.is_negative() {
+                ExposureDirection::Receivable
+            } else {
+                ExposureDirection::Payable
+            },
+            opening_balance: residual.opening_balance.clone(),
+            composition: Some(if residual.bill_wise_on {
+                UnallocatedComposition::BillWiseLedgerComponentsNotSeparated
+            } else {
+                UnallocatedComposition::NotBillWiseLedger
+            }),
         })
         .collect::<Vec<_>>();
     ranked.sort_by(|left, right| {

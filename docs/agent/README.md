@@ -1569,10 +1569,10 @@ deletion detection is unsupported.
 ### What each tool's evidence covers
 
 What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
-read from the code tool by tool (#726). It covers every tool that reads Tally,
-`verify_import`, and the tools that read nothing from Tally; it does not cover
-`build_import_xml`, `post_import` or `acknowledge_post_review`. Each list is in
-fold order. A step
+read from the code tool by tool (#726). It covers the read tools, `verify_import`
+and the tools that read nothing from Tally; it does not cover
+`build_import_xml`, `post_import` or `acknowledge_post_review`, which also send
+requests. Each list is in fold order. A step
 marked "(if …)" is folded only when that holds. Every step after the first is
 joined with the tool-level combination, so it is hashed even when one side is
 one request. The building blocks:

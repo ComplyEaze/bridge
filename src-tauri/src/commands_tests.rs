@@ -842,3 +842,55 @@ fn party_master_export_withholds_and_names_the_ledgers_it_would_leave_out() {
         "party_ledger_master_foreign_currency_ledgers"
     );
 }
+
+/// The desktop messages these files show name the product in full, never by its
+/// bare short name (#962). A line that is not a comment and holds the word
+/// "Bridge" must have it as "ComplyEaze Bridge", so a new message in one of
+/// these files cannot bring the short name back.
+#[test]
+fn desktop_messages_name_the_product_in_full() {
+    const SOURCES: [(&str, &str); 6] = [
+        ("commands.rs", include_str!("commands.rs")),
+        (
+            "commands/all_clients.rs",
+            include_str!("commands/all_clients.rs"),
+        ),
+        (
+            "commands_trial_balance.rs",
+            include_str!("commands_trial_balance.rs"),
+        ),
+        (
+            "reports/bulk_party_statement.rs",
+            include_str!("reports/bulk_party_statement.rs"),
+        ),
+        (
+            "source_draft/types.rs",
+            include_str!("source_draft/types.rs"),
+        ),
+        ("sync/coordinator.rs", include_str!("sync/coordinator.rs")),
+    ];
+    let is_word = |character: Option<char>| {
+        character.is_some_and(|character| character.is_alphanumeric() || character == '_')
+    };
+    for (file, source) in SOURCES {
+        for (number, line) in source.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            for (at, word) in line.match_indices("Bridge") {
+                let before = line[..at].chars().next_back();
+                let after = line[at + word.len()..].chars().next();
+                if is_word(before) || is_word(after) {
+                    continue;
+                }
+                assert!(
+                    line[..at].ends_with("ComplyEaze "),
+                    "{file}:{}: a bare Bridge: {}",
+                    number + 1,
+                    trimmed
+                );
+            }
+        }
+    }
+}

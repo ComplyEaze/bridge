@@ -35,7 +35,7 @@ fn native_trial_balance_errors_have_distinct_safe_desktop_remediation() {
         (
             NativeTrialBalanceError::InvalidAmount,
             "trial_balance_amount_invalid",
-            "amount Bridge could not represent safely",
+            "amount ComplyEaze Bridge could not represent safely",
             "affected ledger amount in Tally",
         ),
         (

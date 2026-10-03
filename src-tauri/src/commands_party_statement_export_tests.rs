@@ -392,7 +392,7 @@ fn bulk_statement_export_keeps_the_existing_deleted_destination_failure() {
     assert!(matches!(
         error,
         BulkPartyStatementExportError::Existing(message)
-            if message == "Bridge could not use that statement destination folder."
+            if message == "ComplyEaze Bridge could not use that statement destination folder."
     ));
 }
 

@@ -170,11 +170,11 @@ pub(super) fn error(code: &'static str) -> SourceDraftCommandError {
             "Continue editing or request the close action again.",
         ),
         "source_draft_lifecycle_unavailable" => (
-            "Bridge could not complete the requested native close action.",
+            "ComplyEaze Bridge could not complete the requested native close action.",
             "Continue editing and try the close action again.",
         ),
         "source_draft_catalogue_scope_invalid" => (
-            "Bridge could not verify the current Tally company selection.",
+            "ComplyEaze Bridge could not verify the current Tally company selection.",
             "Check Tally and select the intended current company, then load existing ledgers again.",
         ),
         "source_draft_catalogue_invalidated" => (
@@ -182,19 +182,19 @@ pub(super) fn error(code: &'static str) -> SourceDraftCommandError {
             "Load existing ledgers again before selecting a target.",
         ),
         "source_draft_catalogue_endpoint_invalid" => (
-            "The configured Tally endpoint is invalid, so Bridge never evaluated the company selection.",
-            "Check the Tally endpoint configuration (host, port, loopback) in Bridge settings, then load existing ledgers again.",
+            "The configured Tally endpoint is invalid, so ComplyEaze Bridge never evaluated the company selection.",
+            "Check the Tally endpoint configuration (host, port, loopback) in ComplyEaze Bridge settings, then load existing ledgers again.",
         ),
         "source_draft_catalogue_read_failed" => (
-            "Bridge could not read a complete current existing-ledger list.",
+            "ComplyEaze Bridge could not read a complete current existing-ledger list.",
             "Check Tally and retry the read; no target was applied.",
         ),
         "source_draft_catalogue_transport_failed" => (
-            "Bridge could not reach Tally for the current existing-ledger list.",
+            "ComplyEaze Bridge could not reach Tally for the current existing-ledger list.",
             "Check Tally and retry the read; no target was applied.",
         ),
         "source_draft_catalogue_unstable" => (
-            "The existing-ledger list changed while Bridge was reading it.",
+            "The existing-ledger list changed while ComplyEaze Bridge was reading it.",
             "Wait for Tally to settle, then load existing ledgers again; no target was applied.",
         ),
         "source_draft_catalogue_identity_mismatch" => (
@@ -218,11 +218,11 @@ pub(super) fn error(code: &'static str) -> SourceDraftCommandError {
             "Choose a listed target and try again.",
         ),
         "source_draft_catalogue_target_changed" => (
-            "The selected existing ledger changed before Bridge could apply it.",
+            "The selected existing ledger changed before ComplyEaze Bridge could apply it.",
             "Load existing ledgers again and make a fresh selection.",
         ),
         _ => (
-            "Bridge could not prepare this source draft.",
+            "ComplyEaze Bridge could not prepare this source draft.",
             "Review the selected local file and try again.",
         ),
     };

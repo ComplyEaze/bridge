@@ -153,7 +153,10 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
     let (response, requests) = run(recorded_plans(), ("20250903", "20250903")).await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
+    // The recorded read sent a voucher census (the `n` requests) and the window's one voucher
+    // was admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
     assert_eq!(result["state"], "complete");
+    assert!(result["reason"].is_null(), "{result}");
     assert_eq!(result["total"], 1);
     assert_eq!(result["vouchers_observed"], 1);
     assert_eq!(result["items"][0]["status"], "complete");
@@ -485,7 +488,10 @@ async fn a_credit_note_day_replays_through_the_sales_register_with_the_signs_tal
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["profile"], "agent_sales_register_v1");
+    // This call (118 requests) added a voucher census, which the window's voucher was admitted
+    // against: `complete` by the same rule as `vouchers` (#1031).
     assert_eq!(result["state"], "complete");
+    assert!(result["reason"].is_null(), "{result}");
     assert_eq!(result["total"], 1);
     assert_eq!(result["vouchers_observed"], 1);
     assert_eq!(result["ledger_masters_observed"], 44);
@@ -677,7 +683,20 @@ async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_i
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["profile"], "agent_sales_register_v1");
-    assert_eq!(result["state"], "complete");
+    // This call (96 requests) sent no voucher census, so nothing counted the window's rows:
+    // the label is the one `vouchers` gives the same window, `partial` for
+    // `nonempty_window_unqualified` (#1031), and the rows are returned as before. The live
+    // answer recorded below carries the older label; only its rows are compared.
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["reason"], "nonempty_window_unqualified");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"], "partial",
+        "{response}"
+    );
+    assert_eq!(
+        response["structuredContent"]["evidence"]["reason_code"],
+        "nonempty_window_unqualified"
+    );
     assert_eq!(result["total"], 1);
     assert_eq!(result["vouchers_observed"], 1);
     assert_eq!(result["ledger_masters_observed"], 8);

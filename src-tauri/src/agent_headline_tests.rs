@@ -337,12 +337,11 @@ fn an_established_statement_says_what_it_ties_to_and_no_more() {
         )],
         false,
     );
-    assert!(
-        sheet
-            .lead
-            .ends_with("passed the comparison with Tally's own Balance Sheet."),
-        "{}",
-        sheet.lead
+    // Pinned whole: one part takes "is", which a lead checked only at its end
+    // would not show.
+    assert_eq!(
+        sheet.lead,
+        "Balance sheet for \u{201c}Synthetic Traders\u{201d}, 1 Apr 2026 to 2 Sep 2026: the profit and loss line of the balance sheet is established, after the derived lines passed the comparison with Tally's own Balance Sheet."
     );
     assert!(sheet.rows.is_none() && sheet.page.is_none());
 }

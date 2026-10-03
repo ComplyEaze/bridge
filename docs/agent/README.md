@@ -1620,7 +1620,11 @@ Per tool:
   5. the ledger catalogue again (if `ledger`);
   6. the voucher-type catalogue (if a named type selected nothing).
 
-  Every page re-reads; there is no held read.
+  A later page of a window held from an earlier read (#485) is served from it
+  while the company's marks are unchanged. That page reports the company read
+  and one scoped read of the marks, nothing else (`serve_voucher_page`). If
+  the marks moved and no `snapshot_id` was named, the page reads afresh, and
+  that marks read is folded second, before step 2.
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
@@ -1683,8 +1687,10 @@ Per tool:
   3. the window read's marks and census, data parts and closing marks;
   4. the corroborating window's data parts and closing marks (no marks read:
      it replays the first window's);
-  5. the closing probe (if any voucher was not found);
-  6. the ledger catalogue (if the saved masters check runs and the read
+  5. a scoped read of the company's marks (if the batch was posted natively
+     and its voucher mark before the post was recorded, `current_voucher_mark`);
+  6. the closing probe (if any voucher was not found);
+  7. the ledger catalogue (if the saved masters check runs and the read
      succeeds; when it fails, nothing is folded and the check reports
      `check_unavailable`).
 

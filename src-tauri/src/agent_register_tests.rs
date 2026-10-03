@@ -1060,9 +1060,13 @@ fn the_sales_result_names_its_own_profile_classes_and_list() {
         "a recognised IGST head",
         "REFERENCEDATE (not returned)",
         "`not_measured_live`",
+        // What the response `state` means, in the rule `vouchers` uses (#1031).
+        "the response `state` follows the rule `vouchers` uses: `complete` only when the window's rows were admitted against a separate voucher count (or the window was empty and its corroboration read confirmed it), otherwise `partial` with `nonempty_window_unqualified`",
     ] {
         assert!(coverage.contains(named), "coverage lacks {named}");
     }
+    // The meaning of `state` is stated as it is now, with no change history in a response.
+    assert!(!coverage.contains("#1031") && !coverage.contains("before bridge#"));
     // The purchase register's response is unchanged by this note.
     let purchase = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
     assert!(!purchase.result["coverage"]
@@ -1414,3 +1418,38 @@ fn the_purchase_result_keeps_its_profile_and_classes() {
 // The two Sales item invoices of `sales-day/`: their voucher windows were read by the purchase register's
 // build. The taxed invoice is classified end to end in `agent_register_server_tests.rs` against the masters
 // read in the same call (`stock-lab-day/`); the untaxed invoice's masters were not committed.
+
+// The register's window label is the one rule `vouchers` uses (#985, #1031): a non-empty window
+// is `complete` only when it was counted, an empty one when its corroboration confirms it.
+#[test]
+fn the_register_labels_its_window_by_the_one_rule_vouchers_uses() {
+    use super::super::voucher_window::NONEMPTY_WINDOW_UNQUALIFIED;
+    // A non-empty window nothing counted: partial, for the same reason code `vouchers` gives.
+    assert_eq!(
+        register_window_label(false, None),
+        ("partial", Some(NONEMPTY_WINDOW_UNQUALIFIED))
+    );
+    assert_eq!(NONEMPTY_WINDOW_UNQUALIFIED, "nonempty_window_unqualified");
+    // A non-empty window admitted against its census: complete, no reason.
+    assert_eq!(register_window_label(true, None), ("complete", None));
+    // An empty window its corroboration read confirmed: complete, whatever the census says.
+    assert_eq!(
+        register_window_label(false, Some((false, None))),
+        ("complete", None)
+    );
+    // An empty window it could not confirm: partial, with the corroboration's own reason (the
+    // two codes `corroborate_empty_voucher_window` gives for it).
+    for reason in ["nonempty_uncorroborated", "empty_uncorroborated"] {
+        assert_eq!(
+            register_window_label(true, Some((true, Some(reason)))),
+            ("partial", Some(reason))
+        );
+    }
+    // A book with no vouchers at all corroborates an empty window as `company_has_no_vouchers`.
+    // `vouchers` keeps that reason on its `complete`; a register has never carried a reason with
+    // `complete` (as `voucher_presence` does not), so it is dropped here, as before #1031.
+    assert_eq!(
+        register_window_label(false, Some((false, Some("company_has_no_vouchers")))),
+        ("complete", None)
+    );
+}

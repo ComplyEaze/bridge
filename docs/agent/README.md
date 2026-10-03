@@ -761,6 +761,23 @@ or vouchers.
   follow `vouchers` (absent means not observed). Cancelled, optional and
   post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
   returned yet.
+- **What `state` means.** The response `state` follows the rule `vouchers` and
+  `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
+  every voucher read was checked against a separate count of the window (a census,
+  which ComplyEaze Bridge sends unless the book's voucher high-water mark alone
+  proves it small, a few dozen vouchers), and an empty window when its
+  corroboration read confirmed it. Otherwise it is `partial` with `reason`
+  `nonempty_window_unqualified` (or the corroboration's own reason for an empty
+  window), and the rows are still returned. Before #1031 the registers called a
+  window nothing had counted `complete` on the company marks and the ledger
+  masters alone. Those marks and masters reading the same before and after the
+  window still decide whether the read stands at all (a drift refuses it). The one
+  difference from `vouchers` is the reason `company_has_no_vouchers`, which
+  `vouchers` returns (and records in its evidence) beside `complete` for an empty
+  window on a book with no vouchers; a register returns `complete` with no reason
+  in the result or the evidence. A row's `status`
+  of `complete` is a different thing: every entry the voucher touches classified,
+  and `state` does not change it.
 - **Snapshot binding.** The ledger masters are read before the window (and the
   window is planned against their marks), the company's marks are read again
   after it, and the masters are read a second time and must classify exactly as
@@ -814,13 +831,10 @@ rate or return section, and matches nothing against any portal.
   `purchase_register`, are also replayed end to end from their recorded calls
   (tests). One Sales accounting voucher (not an invoice) is also classified, in
   tests, against the ledger masters of the purchase register's lab book.
-- **What `complete` rests on.** The response `state` is `complete` when the
-  company's marks and the ledger masters read the same before and after the
-  window (and, for an empty window, its corroboration read confirmed it). It
-  does not mean the window was admitted against a separate voucher count: on the
-  small book measured, the call sent no voucher census, and a small window that
-  `vouchers` calls `partial` can be `complete` here. A row's `status` of
-  `complete` is a different thing: every entry the voucher touches classified.
+- **What `state` means.** The same rule as `purchase_register` (see its
+  section): `complete` only when the window was counted (or an empty window its
+  corroboration confirmed), otherwise `partial` with `nonempty_window_unqualified`.
+  A row's `status` is separate.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of
@@ -1226,7 +1240,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    changed since approval, or whose REMOTEID the journal already records refuses
    with `import_batch_not_found`, `import_already_attempted`,
    `import_batch_changed` or `import_remote_id_reused`, and this post sends
-   nothing. Rebuild only when `attempt_recorded` is `false`, except after
+   nothing. An approval withdrawn after this call took it, and before it is
+   spent there, refuses the same way with `import_approval_revoked` (#791).
+   Rebuild only when `attempt_recorded` is `false`, except after
    `import_txn_already_posted` (below), where a rebuilt row is refused again.
    A batch holding a row that another batch of the same company already sent to
    Tally, or that a readback found posted, refuses with
@@ -2017,7 +2033,8 @@ canonical UUIDs. Failed receipt appends restore the previous file length.
 An incomplete log or failed rollback stops the session; a persisted build still
 returns its recovery batch ID before termination. Reads withheld by the result
 byte cap retain partial source commitments in the in-process evidence store.
-`vouchers` and `voucher_presence` label a window by one rule (#985): `complete`
+`vouchers`, `voucher_presence`, `purchase_register` and `sales_register` label a
+window by one rule (#985, #1031): `complete`
 only when its rows were admitted voucher for voucher against the census that
 sized the read (protocol reference §11c.3), or it was empty and corroborated;
 otherwise `partial` with reason `nonempty_window_unqualified`. A book whose

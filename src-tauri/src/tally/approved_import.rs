@@ -461,6 +461,10 @@ pub(crate) enum UnderLockRefusal {
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The approval could not be spent: it was revoked after this call took
+    /// it, or a voucher post reached the lock without one (#791).
+    #[error("import_approval_revoked")]
+    ApprovalRevoked,
 }
 
 impl UnderLockRefusal {
@@ -472,6 +476,7 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::ApprovalRevoked => "import_approval_revoked",
         }
     }
 }

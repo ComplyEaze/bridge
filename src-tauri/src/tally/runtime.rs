@@ -20,7 +20,7 @@ use crate::tally::runtime_control::{
     TELEMETRY_PREVIEW_SCHEMA,
 };
 use crate::warning_codes::WarningCode;
-use bridge_tally_core::{ExactDecimal, TallyDate};
+use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::{
     compute_native_outstandings_with_exclusions, parse_company_currency,
     parse_company_currency_name, parse_currency_master_list, parse_native_bill_rows,
@@ -1560,7 +1560,9 @@ fn all_open_bill_rows(
         .map(|row| (row, ExposureDirection::Receivable))
         .chain(payable.iter().map(|row| (row, ExposureDirection::Payable)))
         .filter_map(|(row, kind)| {
-            let amount = row.closing_balance.abs().ok()?;
+            // Neither the amount nor the age can fail, so no row is ever
+            // dropped for an error here (bridge#1097).
+            let amount = row.closing_balance.magnitude();
             // Tally can retain a fully settled native bill row with BILLCL=0.
             // It is not an open exposure and must be removed at this native
             // boundary before any statement or working-paper consumer sees it.
@@ -1571,14 +1573,8 @@ fn all_open_bill_rows(
                 OutstandingsAgeingAnchor::DueDate => &row.due_date,
                 OutstandingsAgeingAnchor::BillDate => &row.bill_date,
             };
-            let age_days = if anchor_date > as_of {
-                None
-            } else {
-                Some(
-                    bridge_tally_protocol::native_outstandings::age_in_days(anchor_date, as_of)
-                        .ok()?,
-                )
-            };
+            // A bill whose anchor date is after `as_of` has no age yet.
+            let age_days = DateSpan::new(anchor_date, as_of).map(|span| span.days());
             Some(OpenBillRow {
                 party: row.party.clone(),
                 reference: if row.reference.trim().is_empty() {

@@ -291,7 +291,10 @@ it. Before you do, know what it is and is not:
   your own computer, so a separate PC or a Tally elsewhere on your network
   cannot be reached by typing its address.
 - **It does not update itself.** To upgrade, install a newer release from
-  Claude Desktop's Extensions settings.
+  Claude Desktop's Extensions settings. Release 0.4.2 installs beside an older
+  release instead of replacing it (seen on a Mac; not tried on Windows): remove
+  the older extension first, do not delete the data folder, and enter your
+  settings again, including Response redaction, which starts at none.
 
 The Bridge **desktop application** is a separate program and has no published
 installer; building it from source is described under *Contributor quick start*
@@ -442,4 +445,4 @@ Attribution notices are provided in [NOTICE](./NOTICE).
 The ComplyEaze logo and icon files are not licensed under Apache-2.0; see
 [NOTICE](./NOTICE) and [TRADEMARKS.md](./TRADEMARKS.md).
 The historical `v0.1.0` release remains under the MIT license shipped with
-that tag; current development source is version `0.4.1` under Apache-2.0.
+that tag; current development source is version `0.4.2` under Apache-2.0.

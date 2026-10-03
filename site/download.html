@@ -82,7 +82,7 @@
       <h2>Before you install</h2>
       <ul class="before-list">
         <li>ComplyEaze Bridge is still being developed and may contain errors. Try it first on a test company, and take a backup before you turn posting on.</li>
-        <li>Posting is off by default in a new install. If you upgraded from an earlier version, check the setting. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
+        <li>Posting is off by default in a new install. Release 0.4.2 installs as a new extension, so check the setting after you install it. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed; the <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
         <li>Each download has a matching <code>.sha256</code> file on the same release. Compare it with your download before opening the package.</li>
         <li>What has been run against a real TallyPrime, and what has not, is listed in the <a href="https://github.com/ComplyEaze/bridge#what-has-been-run-against-a-real-tallyprime">README</a>.</li>
         <li>Tally must be running on the same computer as Claude&nbsp;Desktop.</li>
@@ -94,6 +94,7 @@
     <section class="page-section">
       <h2>Install, once</h2>
       <ol class="steps-list">
+        <li>If an earlier ComplyEaze&nbsp;Bridge is already installed, remove it first in Settings &rarr; Extensions: release 0.4.2 installs beside an older one instead of replacing it (seen on a Mac; not tried on Windows). Do not delete its data folder, which both versions use. Enter your settings again afterwards, including Response redaction, which starts at none.</li>
         <li>In TallyPrime, turn on the HTTP gateway (Tally acts as &ldquo;Both&rdquo;).</li>
         <li>Open the downloaded .mcpb file. If Claude&nbsp;Desktop doesn&rsquo;t pick it up: Settings &rarr; Extensions &rarr; Advanced settings &rarr; Install Extension. Claude&nbsp;Desktop may note that the extension is not verified by Anthropic.</li>
         <li>Check the Tally port in the extension settings (usually <code>9000</code>).</li>

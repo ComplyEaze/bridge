@@ -90,7 +90,15 @@ and leave Tally's product/licence mode unchanged. Bridge's checks do not lock
 out changes made directly in Tally or by other software.
 
 Stop Bridge and every client running its connector before upgrading, then restart
-them with the updated version. Dispatch coordination uses the operating system's
+them with the newer version. Release 0.4.2 installs as a second extension beside
+an older release instead of replacing it (its author line changed, and Claude
+Desktop includes the author in an extension's identity; seen on a Mac, not tried
+on Windows): remove the older extension first, in Claude Desktop's Extensions
+settings, and do not delete the data folder, which both versions use. The new
+extension does not carry over your settings: enter the Tally port, the posting
+setting (posting starts off), the Terms setting and Response redaction (it
+starts at none; set it again if you had shortened or masked names); every tool
+refuses until the Terms setting is on. Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request
@@ -112,7 +120,9 @@ is sent to the AI provider used for that conversation, so the conversation is
 not wholly local. Choose the package's redaction setting when it suits the
 workflow.
 
-Private MCPB downloads do not update automatically. Install a newer release
-from Claude Desktop's Extensions settings to upgrade, then confirm its version
-and settings. Use the same screen to uninstall. Neither action changes Tally's
+Private MCPB downloads do not update automatically. To upgrade from a release
+older than 0.4.2, remove the older extension in Claude Desktop's Extensions
+settings first (0.4.2 installs beside it, not over it), keep the data folder,
+install the newer release from the same screen, then confirm its version and
+enter your settings again. Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

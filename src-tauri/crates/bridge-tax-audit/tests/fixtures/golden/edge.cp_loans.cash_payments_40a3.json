@@ -7,6 +7,20 @@
   "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout.",
   "figures": [
     {
+      "id": "cash_payments_40a3.s269ss269t_amount_covered_1ff17650532c_1435718f",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "11eec52f1d8c55f6",
+      "definition_text": "Loan-ledger line (tag 1435718f) on voucher k19, cash accepted in the same voucher (covered by the client's list of loans). This voucher also has an opposite entry on 'Loan Y', 'Loan Z'; it may be a correction; check before counting.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k19",
+          "label": "Receipt k19 on 2025-07-22"
+        }
+      ]
+    },
+    {
       "id": "cash_payments_40a3.s269ss269t_amount_covered_80210cf3720c_1435718f",
       "value": 3000000,
       "unit": "paise",
@@ -246,7 +260,7 @@
     },
     {
       "id": "cash_payments_40a3.s269ss269t_candidate_count",
-      "value": 17,
+      "value": 18,
       "unit": "count",
       "definition_sha256_16": "c41789d6fac8a23a",
       "definition_text": "(Voucher, loan ledger, side) candidates on population, non-Contra vouchers with a cash line, where one side of a Loans (Liability)-chain ledger on the voucher -- its credits (a loan accepted) or its debits (a loan repaid), summed -- is at or over the s.269SS/269T limit (₹20,000).",
@@ -254,7 +268,7 @@
     },
     {
       "id": "cash_payments_40a3.s269ss269t_candidate_total",
-      "value": 52500000,
+      "value": 55500000,
       "unit": "paise",
       "definition_sha256_16": "d75ad66d54b6c86b",
       "definition_text": "Sum of the candidates' amounts: each (voucher, loan ledger, side) candidate's lines summed, taken without their sign, across the s.269SS/269T candidates. A voucher with entries on both sides of its loan ledgers (a correction, or a loan taken and repaid) may be counted in both directions.",
@@ -278,7 +292,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_party_days_any_amount_count",
-      "value": 15,
+      "value": 16,
       "unit": "count",
       "definition_sha256_16": "39560ecf00e50bec",
       "definition_text": "Distinct (date, party ledger) pairs with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts'.",
@@ -286,7 +300,7 @@
     },
     {
       "id": "cash_payments_40a3.s269st_party_days_any_amount_total",
-      "value": 44000000,
+      "value": 47000000,
       "unit": "paise",
       "definition_sha256_16": "b6d19da9c6734b41",
       "definition_text": "Sum of cash received across every (date, party ledger) pair with a cash receipt on a population, non-Contra voucher, party ledger not under 'Sales Accounts', any amount.",
@@ -365,6 +379,11 @@
           "kind": "voucher",
           "id": "k18",
           "label": "Receipt k18 on 2025-07-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "k19",
+          "label": "Receipt k19 on 2025-07-22"
         }
       ]
     },
@@ -519,6 +538,43 @@
       "limits_text": [
         "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
         "This loan ledger is NOT in the client's list of loans, so 'Loans and interest' never sees it -- this is the only place this entry is reported for Clause 31; add the ledger to that list to get the full lender-classification/running-balance test instead."
+      ],
+      "ask_client_sha256_16": "092bb454b09d1f8d",
+      "ask_client_text": [
+        "Confirm the lender/borrower's identity and relationship.",
+        "Confirm no s.269SS/269T exception applies."
+      ]
+    },
+    {
+      "id": "cash_payments_40a3/s269ss269t/1ff17650532c_1435718f",
+      "clauses": [
+        "s.269SS"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "cash_payments_40a3.s269ss269t_amount_covered_1ff17650532c_1435718f"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Loan X",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "k19",
+          "label": "Receipt k19 on 2025-07-22"
+        }
+      ],
+      "title_sha256_16": "0b6825667e767fb8",
+      "title_text": "Cash accepted against a loan ledger on 2025-07-22, at or over the s.269SS/269T limit",
+      "limits_sha256_16": "96623659ecfb7c67",
+      "limits_text": [
+        "Books only: confirm the counterparty is not government, a banking company, a co-operative bank, or another person/case excepted by s.269SS/269T, and that no other exception in the Act applies.",
+        "No Clause 31 tag here: this loan ledger is in the client's list of loans, so 'Loans and interest' already tags the matching entry 3CD-31(a)/3CD-31(c) -- this finding is an observation only, never counted a second time in the Clause 31 filing-aid total."
       ],
       "ask_client_sha256_16": "092bb454b09d1f8d",
       "ask_client_text": [
@@ -1145,7 +1201,7 @@
     {
       "invariant": "POP-1",
       "subject": "Cash",
-      "detail": "vouchers 39500000 vs TB movement 0 paise"
+      "detail": "vouchers 40500000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
@@ -1155,17 +1211,17 @@
     {
       "invariant": "POP-1",
       "subject": "Loan X",
-      "detail": "vouchers -7000000 vs TB movement 0 paise"
+      "detail": "vouchers -10000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Loan Y",
-      "detail": "vouchers -27500000 vs TB movement 0 paise"
+      "detail": "vouchers -26000000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-1",
       "subject": "Loan Z",
-      "detail": "vouchers -5000000 vs TB movement 0 paise"
+      "detail": "vouchers -3500000 vs TB movement 0 paise"
     },
     {
       "invariant": "POP-2",
@@ -1186,6 +1242,11 @@
       "invariant": "POP-2",
       "subject": "k16",
       "detail": "Receipt k16 2025-07-18 lines sum 1000000"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "k19",
+      "detail": "Receipt k19 2025-07-22 lines sum 1000000"
     },
     {
       "invariant": "POP-5",

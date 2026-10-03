@@ -3602,7 +3602,7 @@
  {
   "id": "Y02",
   "by": "author",
-  "what": "the no-party row ref loses its label",
+  "what": "the no-party row ref drops the printed names from its label",
   "file": "src/cash_payments_40a3.rs",
   "from": "            &row.names.label(UNIDENTIFIED_PARTY),",
   "to": "            UNIDENTIFIED_PARTY,"
@@ -8246,5 +8246,13 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "all.insert((g.clone(), voucher_label(v)));",
   "to": "if !all.iter().any(|(x, _)| x == g) { all.insert((g.clone(), voucher_label(v))); }"
+ },
+ {
+  "id": "CP-47",
+  "by": "author",
+  "what": "a candidate's opposite entries are listed in line order, not sorted",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "let opposite: BTreeSet<&String> = per_side",
+  "to": "let opposite: Vec<&String> = per_side"
  }
 ]

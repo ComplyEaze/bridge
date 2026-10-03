@@ -1,6 +1,7 @@
 //! bridge#1108: what a native post's own answer from Tally says about the
-//! vouchers its readback cannot find. The Silver answer and the batch of 50
-//! are live responses committed byte for byte; the Education answers are
+//! vouchers its readback cannot find. The Silver answers (one voucher, and
+//! two batches Tally rejected whole) and the batch of 50 are live responses
+//! committed byte for byte; the Education answers are
 //! derived from live captures (counter shape only, see
 //! EDUCATION_IMPORT_COUNTERS_PROVENANCE.md). Tests marked synthetic exist only
 //! to hold the guards that no capture reaches.
@@ -53,6 +54,22 @@ fn created_one() -> TallyImportResult {
     ))
 }
 
+/// Three vouchers, each naming a different missing ledger, licensed 7.1
+/// Silver (CREATED 0, EXCEPTIONS 3).
+fn rejected_all_three() -> TallyImportResult {
+    counters(&utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/batch-import-all-missing-ledgers.utf16le.xml"
+    )))
+}
+
+/// Two rejected vouchers carrying three missing ledgers between them,
+/// licensed 7.1 Silver (CREATED 0, EXCEPTIONS 2: one per voucher).
+fn rejected_two_carrying_three_missing_ledgers() -> TallyImportResult {
+    counters(&utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/batch-import-two-missing-ledgers-in-one-voucher.utf16le.xml"
+    )))
+}
+
 #[test]
 fn the_captured_answers_are_what_these_tests_say() {
     let education = rejected_one_education();
@@ -72,6 +89,21 @@ fn the_captured_answers_are_what_these_tests_say() {
     );
     let clean = created_one();
     assert_eq!((clean.created, clean.altered, clean.exceptions), (1, 0, 0));
+    for (answer, exceptions) in [
+        (rejected_all_three(), 3),
+        (rejected_two_carrying_three_missing_ledgers(), 2),
+    ] {
+        assert!(answer.counter_presence.all_reported(), "{answer:?}");
+        assert_eq!(
+            (
+                answer.created,
+                answer.altered,
+                answer.errors,
+                answer.exceptions
+            ),
+            (0, 0, 0, exceptions)
+        );
+    }
 }
 
 #[test]
@@ -79,7 +111,7 @@ fn a_rejected_single_voucher_is_reported_not_created() {
     for answer in [rejected_one_education(), rejected_one_silver()] {
         assert!(answer.counter_presence.all_reported(), "{answer:?}");
         assert_eq!(
-            unmatched_cause(Some(&answer), 1, 1),
+            unmatched_cause(Some(&answer), 1, 1, None),
             UnmatchedCause::ReportedNotCreated,
             "{answer:?}"
         );
@@ -92,7 +124,7 @@ fn a_partial_commit_is_never_read_as_not_created() {
     // did create could otherwise carry the label.
     for unmatched in [1, 2] {
         assert_eq!(
-            unmatched_cause(Some(&committed_49_of_50()), 50, unmatched),
+            unmatched_cause(Some(&committed_49_of_50()), 50, unmatched, Some(49)),
             UnmatchedCause::NotEstablished
         );
     }
@@ -103,7 +135,7 @@ fn a_rejected_voucher_found_after_all_is_not_labelled() {
     // Entered by hand with the same content since, it is found: nothing is
     // claimed about it.
     assert_eq!(
-        unmatched_cause(Some(&rejected_one_silver()), 1, 0),
+        unmatched_cause(Some(&rejected_one_silver()), 1, 0, None),
         UnmatchedCause::NotEstablished
     );
 }
@@ -111,14 +143,17 @@ fn a_rejected_voucher_found_after_all_is_not_labelled() {
 #[test]
 fn a_clean_answer_never_reports_a_voucher_not_created() {
     assert_eq!(
-        unmatched_cause(Some(&created_one()), 1, 1),
+        unmatched_cause(Some(&created_one()), 1, 1, None),
         UnmatchedCause::NotEstablished
     );
 }
 
 #[test]
 fn no_recorded_answer_establishes_nothing() {
-    assert_eq!(unmatched_cause(None, 1, 1), UnmatchedCause::NotEstablished);
+    assert_eq!(
+        unmatched_cause(None, 1, 1, None),
+        UnmatchedCause::NotEstablished
+    );
 }
 
 #[test]
@@ -127,7 +162,7 @@ fn an_answer_with_a_counter_missing_establishes_nothing() {
     let mut missing = rejected_one_silver();
     missing.counter_presence.exceptions = false;
     assert_eq!(
-        unmatched_cause(Some(&missing), 1, 1),
+        unmatched_cause(Some(&missing), 1, 1, None),
         UnmatchedCause::NotEstablished
     );
 }
@@ -152,7 +187,7 @@ fn any_other_counter_establishes_nothing() {
         let mut answer = rejected_one_silver();
         set(&mut answer);
         assert_eq!(
-            unmatched_cause(Some(&answer), 1, 1),
+            unmatched_cause(Some(&answer), 1, 1, None),
             UnmatchedCause::NotEstablished,
             "{name}"
         );
@@ -164,7 +199,7 @@ fn fewer_exceptions_than_vouchers_establishes_nothing() {
     // Synthetic: two sent, none created, one exception. The second voucher's
     // fate is not reported, so neither is labelled.
     assert_eq!(
-        unmatched_cause(Some(&rejected_one_silver()), 2, 2),
+        unmatched_cause(Some(&rejected_one_silver()), 2, 2, Some(0)),
         UnmatchedCause::NotEstablished
     );
 }
@@ -178,26 +213,44 @@ fn no_exception_establishes_nothing() {
         ..rejected_one_silver()
     };
     assert_eq!(
-        unmatched_cause(Some(&silent), 1, 1),
+        unmatched_cause(Some(&silent), 1, 1, None),
         UnmatchedCause::NotEstablished
     );
 }
 
 #[test]
-fn a_batch_is_never_read_as_not_created() {
-    // Synthetic: no batch Tally rejected whole has been captured. Two sent,
-    // none created, an exception for each, or one exception and one voucher
-    // found since: neither is labelled.
-    let both_rejected = TallyImportResult {
-        exceptions: 2,
-        ..rejected_one_silver()
-    };
+fn a_batch_tally_rejected_whole_is_reported_not_created_when_its_mark_did_not_move() {
+    for (answer, sent) in [
+        (rejected_all_three(), 3),
+        (rejected_two_carrying_three_missing_ledgers(), 2),
+    ] {
+        assert_eq!(
+            unmatched_cause(Some(&answer), sent, sent as u64, Some(0)),
+            UnmatchedCause::ReportedNotCreated,
+            "{answer:?}"
+        );
+    }
+}
+
+#[test]
+fn a_batch_rejected_whole_needs_its_voucher_mark_measured_unmoved() {
+    // A mark not read on both sides, or one that moved although Tally said it
+    // created nothing, establishes nothing for a batch.
+    for step in [None, Some(1)] {
+        assert_eq!(
+            unmatched_cause(Some(&rejected_all_three()), 3, 3, step),
+            UnmatchedCause::NotEstablished,
+            "{step:?}"
+        );
+    }
+}
+
+#[test]
+fn a_batch_with_a_voucher_found_is_never_read_as_not_created() {
+    // Synthetic count: one of the three rejected vouchers matched by content
+    // (for example entered by hand since), so nothing is claimed about any.
     assert_eq!(
-        unmatched_cause(Some(&both_rejected), 2, 2),
-        UnmatchedCause::NotEstablished
-    );
-    assert_eq!(
-        unmatched_cause(Some(&rejected_one_silver()), 2, 1),
+        unmatched_cause(Some(&rejected_all_three()), 3, 2, Some(0)),
         UnmatchedCause::NotEstablished
     );
 }
@@ -210,7 +263,7 @@ fn more_exceptions_than_vouchers_establishes_nothing() {
         ..rejected_one_silver()
     };
     assert_eq!(
-        unmatched_cause(Some(&doubled), 1, 1),
+        unmatched_cause(Some(&doubled), 1, 1, None),
         UnmatchedCause::NotEstablished
     );
 }
@@ -224,7 +277,7 @@ fn an_empty_post_establishes_nothing() {
         ..rejected_one_silver()
     };
     assert_eq!(
-        unmatched_cause(Some(&empty), 0, 0),
+        unmatched_cause(Some(&empty), 0, 0, Some(0)),
         UnmatchedCause::NotEstablished
     );
 }

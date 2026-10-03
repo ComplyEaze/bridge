@@ -1360,15 +1360,17 @@ that post's binding for good.
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
 edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
-readback only, when the post sent one voucher and its own answer from Tally
-reported every counter, created none and reported one exception, with nothing
-else counted, that voucher is `tally_reported_not_created` instead
-(bridge#1108). The person is told to check that it is not in Tally and enter it
-there by hand, not through Tally's Import menu. A later `verify_import` never
-reads the post's answer, since someone may have entered the voucher by hand and
-edited it since: it reads `sent_not_attributed`. A batch is never read as not
-created: a partial commit's count does not say which voucher Tally rejected, and
-no batch Tally rejected whole has been captured. A binding refusal is final: an
+readback only, when its own answer from Tally reported every counter, created
+none of the vouchers sent and reported one exception for each, with nothing else
+counted, and none of them is found, they are `tally_reported_not_created`
+instead (bridge#1108). For a batch this also needs the company's voucher mark
+read on both sides of the post and unmoved. The person is told to check that
+each is not in Tally and enter it there by hand, not through Tally's Import
+menu. A later `verify_import` never reads the post's answer, since someone may
+have entered a voucher by hand and edited it since: it reads
+`sent_not_attributed`. A partly created batch is never read as not created: a
+count does not say which voucher Tally rejected, and two vouchers of one batch
+with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays

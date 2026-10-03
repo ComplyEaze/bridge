@@ -4598,3 +4598,19 @@ async fn a_batch_tally_rejected_whole_reads_as_not_created_by_tally() {
         );
     }
 }
+
+/// The same answer with the voucher mark moved by one across the post: Tally
+/// said it created nothing, but something changed the book, so nothing is
+/// claimed about any voucher.
+#[tokio::test]
+async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
+    let posted = post_batch_rejected(rejected_all_three(), 11).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{posted}"
+    );
+}

@@ -492,12 +492,14 @@ pub(super) fn mark_sent_not_attributed(result: &mut Value) {
 /// found, as far as the post's own answer from Tally can say (bridge#1108).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum UnmatchedCause {
-    /// The post sent one voucher, Tally's answer reported every counter, with
-    /// `CREATED 0`, `EXCEPTIONS 1` and every other counter zero, and the
-    /// voucher is not found. Only this captured shape is read so (protocol
-    /// reference §9.2). A batch is never read so: a partial commit's count
-    /// does not say which voucher Tally rejected, and no batch that Tally
-    /// rejected whole has been captured.
+    /// Tally's answer reported every counter, with `CREATED 0`, `EXCEPTIONS`
+    /// equal to the vouchers sent and every other counter zero, and none of
+    /// them is found. For a batch of two or more, the company's voucher mark
+    /// was also read on both sides of the post and did not move. Only these
+    /// captured shapes are read so (protocol reference §9.2; bridge#1108). A
+    /// partly created batch is never read so: a count does not say which
+    /// voucher Tally rejected, and twins in one batch defeat matching by
+    /// content.
     ReportedNotCreated,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
@@ -506,11 +508,15 @@ pub(super) enum UnmatchedCause {
 
 /// The cause for `unmatched` vouchers of a post of `sent`, from the post's own
 /// answer. Every counter must have been present in the answer: an omitted
-/// counter is not an observed zero (§9.2).
+/// counter is not an observed zero (§9.2). `voucher_step` is how far the
+/// company's voucher mark moved across the post, `None` unless it was read on
+/// both sides; a batch of two or more needs it measured at 0, which catches a
+/// Tally that created something while answering `CREATED 0`.
 pub(super) fn unmatched_cause(
     counters: Option<&bridge_tally_protocol::TallyImportResult>,
     sent: usize,
     unmatched: u64,
+    voucher_step: Option<u64>,
 ) -> UnmatchedCause {
     let Some(counters) = counters else {
         return UnmatchedCause::NotEstablished;
@@ -518,7 +524,9 @@ pub(super) fn unmatched_cause(
     let Ok(sent) = u64::try_from(sent) else {
         return UnmatchedCause::NotEstablished;
     };
-    if sent == 1
+    let step_confirms = sent == 1 || voucher_step == Some(0);
+    if sent >= 1
+        && step_confirms
         && counters.counter_presence.all_reported()
         && counters.created == 0
         && counters.altered == 0

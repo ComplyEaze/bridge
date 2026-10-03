@@ -1301,11 +1301,12 @@ impl Server {
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
                 // An untagged native post that is not bound: what its content
                 // cannot find is never absent. When the post's own answer said
-                // Tally created none of its one voucher and it is not found,
-                // say so (bridge#1108); otherwise an edit in Tally is as
-                // likely. Only the post's own readback reads that answer: by
-                // a later verification someone may have entered the voucher
-                // by hand and edited it.
+                // Tally created none of its vouchers and none is found (for a
+                // batch, with the voucher mark measured unmoved), say so
+                // (bridge#1108); otherwise an edit in Tally is as likely. Only
+                // the post's own readback reads that answer: by a later
+                // verification someone may have entered a voucher by hand and
+                // edited it.
                 let counters = current_dispatch
                     .then(|| {
                         dispatch_response
@@ -1314,10 +1315,14 @@ impl Server {
                             .map(|outcome| outcome.counters())
                     })
                     .flatten();
+                let voucher_step = pre_post_voucher_mark
+                    .zip(after_post_mark)
+                    .and_then(|(before, after)| after.checked_sub(before));
                 match verification::unmatched_cause(
                     counters,
                     line.vouchers.len(),
                     verification::unmatched_count(&result),
+                    voucher_step,
                 ) {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)

@@ -634,11 +634,17 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
-A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
-cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
-accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
-does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
-the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
+from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
+whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). Otherwise it
+refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
+or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
+the ledger read, `matched` (`exact` or `case_or_spacing`) and `similar_ledgers` (at most 25, with `similar_ledgers_total`; both left out under `mask_parties`), the other ledgers that
+differ from an exact match only in case or whitespace. A name that only a looser reading reaches (a
+dropped symbol or accent, words run together) is not read: the ledger it would reach is offered among
+the candidates with the rule `lookup_key_equal`, listed first, and the user is asked. Both refusals can carry
+`candidates`, from the catalogue
 already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
 order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
 `candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
@@ -659,9 +665,9 @@ would cost the refusal its code), each list is cut to a sixteenth of the cap; th
 list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
 ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
 writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
-now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
-`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
-`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+now, because ignoring everything but its letters and digits would offer a ledger named `RARS` for
+`Ra…rs`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too, whether or not it resolves. A ledger spelled exactly as asked is still reached.
 
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
@@ -1360,15 +1366,17 @@ that post's binding for good.
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
 edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
-readback only, when the post sent one voucher and its own answer from Tally
-reported every counter, created none and reported one exception, with nothing
-else counted, that voucher is `tally_reported_not_created` instead
-(bridge#1108). The person is told to check that it is not in Tally and enter it
-there by hand, not through Tally's Import menu. A later `verify_import` never
-reads the post's answer, since someone may have entered the voucher by hand and
-edited it since: it reads `sent_not_attributed`. A batch is never read as not
-created: a partial commit's count does not say which voucher Tally rejected, and
-no batch Tally rejected whole has been captured. A binding refusal is final: an
+readback only, when its own answer from Tally reported every counter, created
+none of the vouchers sent and reported one exception for each, with nothing else
+counted, and none of them is found, they are `tally_reported_not_created`
+instead (bridge#1108). For a batch this also needs the company's voucher mark
+read on both sides of the post and unmoved. The person is told to check that
+each is not in Tally and enter it there by hand, not through Tally's Import
+menu. A later `verify_import` never reads the post's answer, since someone may
+have entered a voucher by hand and edited it since: it reads
+`sent_not_attributed`. A partly created batch is never read as not created: a
+count does not say which voucher Tally rejected, and two vouchers of one batch
+with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
@@ -1541,8 +1549,16 @@ are in alphabetical order), so it is read before the figures. When a byte cap tr
 the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
 `shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
 `rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
-the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
-read tools and the refusals follow.
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. `profit_and_loss` and `balance_sheet` carry one too, with no `rows`:
+when every result of the statement is established, the lead says so and what the derived lines passed
+the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
+as well); when any result is not established, the lead starts "Not established" and names each result
+with its own state, the reason in words (the reasons are a closed list, so a new one is a compile error
+until it has words) and, for a difference, how many lines did not tie (a Tally line that differs, a Tally line carrying an
+amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
+profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
+derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
+`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
 
 ## Protocol and migration notes
 

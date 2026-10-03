@@ -665,9 +665,10 @@ async fn a_long_candidate_list_never_costs_the_refusal_its_code() {
     }
 }
 
-/// Twenty-six ledgers that differ only in punctuation all collide: the refusal
-/// is `ledger_ambiguous`, lists the first twenty-five, and says `truncated`
-/// with the whole count, in the old field as well as the new word.
+/// Twenty-six ledgers that differ only in their spaces all collide (the
+/// catalogue itself refuses a book whose names differ only in case): the
+/// refusal is `ledger_ambiguous`, lists the first twenty-five, and says
+/// `truncated` with the whole count, in the old field as well as the new word.
 #[tokio::test]
 async fn more_colliding_ledgers_than_the_cap_are_truncated_with_the_whole_count() {
     let window = {
@@ -684,15 +685,15 @@ async fn more_colliding_ledgers_than_the_cap_are_truncated_with_the_whole_count(
         |catalogue| {
             crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
                 catalogue,
-                (1..=26).map(|dashes| {
+                (1..=26_usize).map(|spaces| {
                     (
-                        format!("Dup{}", "-".repeat(dashes)),
-                        format!("d{dashes:07x}"),
+                        format!("Dup{}xy", " ".repeat(spaces)),
+                        format!("d{spaces:07x}"),
                     )
                 }),
             )
         },
-        "dup",
+        "dup xy",
         200_000,
         Redaction::None,
     )
@@ -1069,4 +1070,27 @@ async fn an_all_withheld_window_is_not_empty_and_is_not_corroborated() {
     assert_eq!(result["withheld_total"], 3);
     assert_eq!(result["state"], "partial");
     assert_eq!(result["reason"], "vouchers_withheld");
+}
+
+/// #1076: a ledger named in another ASCII case is read, and the answer says
+/// which ledger and how the name reached it; the exact spelling says `exact`.
+/// Mutant killed: dropping `ledger_match` from the vouchers result.
+#[tokio::test]
+async fn a_ledger_filter_says_which_ledger_it_read_and_how() {
+    for (requested, matched) in [
+        ("Café Naïve Traders", "exact"),
+        ("CAFé NAïVE TRADERS", "case_or_spacing"),
+    ] {
+        let response = call_filtered_vouchers(|catalogue| catalogue.to_string(), requested).await;
+        assert_eq!(response["isError"], false, "{response}");
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["total"], 1, "{result}");
+        let ledger_match = &result["ledger_match"];
+        assert_eq!(ledger_match["matched"], matched, "{ledger_match}");
+        assert_eq!(
+            ledger_match["ledger"], "Café Naïve Traders",
+            "{ledger_match}"
+        );
+        assert_eq!(ledger_match["similar_ledgers"], json!([]), "{ledger_match}");
+    }
 }

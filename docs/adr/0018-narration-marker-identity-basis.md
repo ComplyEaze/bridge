@@ -243,9 +243,10 @@ Contra vouchers, and 5 Journals).
 - **Never absence:** a voucher of an untagged native post that was not bound,
   and that its content no longer finds, is `sent_not_attributed`, never
   `not_found`. The one exception is `tally_reported_not_created`
-  (bridge#1108), in the post's own readback only: a post of one voucher
-  whose own answer reported every counter, `CREATED 0`, `EXCEPTIONS 1` and
-  nothing else, and whose voucher its content does not find. It reads
+  (bridge#1108), in the post's own readback only: a post whose own answer
+  reported every counter, `CREATED 0`, one exception per voucher sent and
+  nothing else, and none of whose vouchers its content finds; a batch also
+  needs the voucher mark measured unmoved across the post. It reads
   Tally's answer together with that absence and, like
   `sent_not_attributed`, sits outside the absence qualification gate. A
   refusal is final, so an edit made in Tally to one voucher

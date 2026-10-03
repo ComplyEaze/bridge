@@ -1,7 +1,11 @@
 # Fixture provenance: `read_scope`, `party_identity` and `entity_269st_gap` (3 Oct 2026)
 
 Every book here is invented, with round figures and plain names and PANs and GSTINs that are made up
-(none is a real registration): no fixture is a Tally read of any real assessee.
+(none is a real registration): no fixture is a Tally read of any real assessee. Identifiers are written
+so that none has the shape of a real PAN, GSTIN or TAN (`PAN-BIGBY`; a GSTIN whose fourteenth
+character is not `Z`, which nothing here reads), except three recorded PANs in `ep_gap`, each one letter five times,
+one digit four times and that letter again: each must equal a PAN derived from a GSTIN, and the
+reference derives one only from a PAN-shaped segment.
 
 ## What these fixtures establish
 
@@ -23,17 +27,22 @@ Every book here is invented, with round figures and plain names and PANs and GST
   table.
 - **No synthetic golden for `entity_269st_gap`.** The reference ends on the synthetic read with
   `IncompleteLedgerChain`: the read has a ledger whose group chain is incomplete and does not settle
-  whether it is a party, and the reference refuses the whole test rather than guess. The port refuses
-  with the typed code `PARTY-chain-incomplete`; the registry-wide test asserts that code in place of a
+  whether it is a party, and the reference raises rather than guess, which ends its whole pack. The
+  port refuses only this test, with the typed code `PARTY-chain-incomplete` (a deliberate divergence:
+  every other test still gives its result); the registry-wide test asserts that code in place of a
   golden.
 - Regression fixtures only: they prove the port and the reference agree on the same inputs, and nothing
   about reading Tally. The evidence for real books is local parity on real reads, never committed.
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13. All five goldens
-regenerate byte-identical at its later commit `df4af35e` (checked 3 Oct 2026), whose only change under
-`tae/` and `selftest/` is `counter_cheques_40a3`'s invariants:
+At the reference engine (a private repository), under Python 3.13. The three `read_scope` goldens were
+made at commit `c62a4ab4` and regenerate byte-identical at its later commit `df4af35e` (checked 3 Oct
+2026), whose only change under `tae/` and `selftest/` is `counter_cheques_40a3`'s invariants. The two
+`entity_269st_gap` goldens were regenerated on 3 Oct 2026 at commit `da9e2d3d` (then the last change to
+`tae/` and `selftest/`, a docstring), after the books' identifiers were rewritten as above; each equals
+the golden made at `c62a4ab4` with the same identifier mapping applied, figure for figure and finding for
+finding:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \
@@ -50,10 +59,10 @@ The edge books are written by hand in a small generator, as data, then read by b
 | File | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.read_scope.json` | 2,532 | `8b191e04fdf6722106c6082a722cb7a2bb5e95308b2138701dc1b32f57ba26b5` | `golden/synthetic.read_scope.json` |
-| `ep_gap.json` | 18,612 | `02531f5aeb0524ea4885598a9d5d9c9fad60db1790f7062e41b1dd420b9ab7ee` | `edge-books/ep_gap.json` |
-| `edge.ep_gap.entity_269st_gap.json` | 48,921 | `2234933cce1a0b0fd3fdbc8826436f1dc13e3459388ec6e21fde3a52f77b3fc4` | `golden/edge.ep_gap.entity_269st_gap.json` |
-| `ep_gap_plain.json` | 5,638 | `b632cb6e251672e0bfdf23df7a97f6f70a66c5922f7b789d3bbf641f91efd5dc` | `edge-books/ep_gap_plain.json` |
-| `edge.ep_gap_plain.entity_269st_gap.json` | 5,964 | `8cbda182132b76cabfe531de917cf685cb51d49a7272790866a27806b8b3ffec` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
+| `ep_gap.json` | 18,574 | `bdc9198588eb5288b52b5740fe87fbb781f69a04904e9556cc742d134ebe4379` | `edge-books/ep_gap.json` |
+| `edge.ep_gap.entity_269st_gap.json` | 48,861 | `712811c66ee03c2da4a5c4f4d0b5091bc7ec8dee0e62f3b6c2ce4c275830f7b1` | `golden/edge.ep_gap.entity_269st_gap.json` |
+| `ep_gap_plain.json` | 5,620 | `676c3f7da6456523461882d6620fce636244defe5338d85150745fcb51249a65` | `edge-books/ep_gap_plain.json` |
+| `edge.ep_gap_plain.entity_269st_gap.json` | 5,959 | `6c81bcf8bd79e85428a492ed484fd1386cbdc08c000594c78128c1edcf3f9a39` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
 | `rs_unread.json` | 811 | `d717dcbaa974133eb7968eb442cf9900a7bdcb1a50f4fd9a7c27082c587ab0c5` | `edge-books/rs_unread.json` |
 | `edge.rs_unread.read_scope.json` | 1,976 | `54db49391f4e45ac8071208162926acd4d6ffe0c313d838ace457de88daf42f8` | `golden/edge.rs_unread.read_scope.json` |
 | `rs_read.json` | 813 | `e7cf8ce8546bb7f9c4681c1a1ed782a9794fdb69ebd6a3a361d0c2a68dfc75b0` | `edge-books/rs_read.json` |

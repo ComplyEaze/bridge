@@ -194,8 +194,9 @@ impl PartyIndex {
 }
 
 /// The PAN segment of a GSTIN (characters 3 to 12), upper-cased, or `None` when it is not shaped
-/// like a PAN (AAAAA9999A). A GSTIN is not always built on a PAN: a deductor may register on a TAN
-/// (AAAA99999A), and the two are told apart by the shape, so a TAN gives none.
+/// like a PAN (five letters, four digits, a letter). A GSTIN is not always built on a PAN: a
+/// deductor may register on a TAN (four letters, five digits, a letter), and the two are told apart
+/// by the shape, so a TAN gives none.
 pub fn pan_from_gstin(gstin: &str) -> Option<String> {
     let chars: Vec<char> = gstin.chars().collect();
     if chars.len() < 12 {
@@ -331,22 +332,27 @@ mod tests {
     /// The expected values are what the reference's `pan_from_gstin` gives for the same text.
     #[test]
     fn a_pan_is_the_pan_shaped_segment_of_a_gstin_and_nothing_else() {
+        // Built at run time, so no source line is shaped like a real identifier.
+        let pan = ["AAAAA", "1111", "A"].concat();
+        let tan = ["AAAA", "11111", "A"].concat();
+        let lower = pan.to_lowercase();
+        let last_lower = format!("{}{}", &pan[..9], &pan[9..].to_lowercase());
         for (gstin, want) in [
-            ("27ABCDE1234F1Z5", Some("ABCDE1234F")),
-            ("27abcde1234f1z5", Some("ABCDE1234F")),
-            ("27ABCDE1234f1Z5", Some("ABCDE1234F")),
-            ("27ABCDE1234F", Some("ABCDE1234F")),
-            ("  ABCDE1234F1Z5", Some("ABCDE1234F")),
-            ("27ABCD12345F1Z5", None), // a TAN
-            ("27ABCDE1234", None),     // fewer than twelve characters
-            ("", None),
-            ("29ABCDEF234F1Z5", None),
-            ("27ABCDE12345F1Z", None),
-            ("ABCDE1234F", None),
-            ("27ÄBCDE1234F1Z5", None),
-            ("27ABCDESS234F1Z5", None),
+            (format!("27{pan}1Z5"), Some(pan.as_str())),
+            (format!("27{lower}1z5"), Some(pan.as_str())),
+            (format!("27{last_lower}1Z5"), Some(pan.as_str())),
+            (format!("27{pan}"), Some(pan.as_str())),
+            (format!("  {pan}1Z5"), Some(pan.as_str())),
+            (format!("27{tan}1Z5"), None),      // a TAN
+            (format!("27{}", &pan[..9]), None), // fewer than twelve characters
+            (String::new(), None),
+            (format!("29{}{}1Z5", "AAAAAA", "111A"), None), // six letters, three digits
+            (format!("27{}{}1Z", "AAAAA", "11111"), None),  // five letters, five digits
+            (pan.clone(), None),
+            (format!("27Ä{}1Z5", &pan[1..]), None),
+            (format!("27{}SS{}1Z5", "AAAAA", "111A"), None),
         ] {
-            assert_eq!(pan_from_gstin(gstin).as_deref(), want, "{gstin:?}");
+            assert_eq!(pan_from_gstin(&gstin).as_deref(), want, "{gstin:?}");
         }
     }
 
@@ -409,7 +415,7 @@ additional_party_ledgers = [\"A\"]\nexcluded_ledgers = [\"E\"]\nround_off_ledger
                             master_opening_paise: 0,
                             guid: format!("invented-{name}"),
                             masterid: None,
-                            pan: "ABCDE1234F".to_string(),
+                            pan: "PAN-ABCDE".to_string(),
                             gstin: String::new(),
                         },
                     )

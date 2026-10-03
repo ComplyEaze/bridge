@@ -232,7 +232,7 @@ fn a_ledger_of_a_read_carries_its_pan_and_the_gstin_in_force_on_the_period_end()
         .map(|c| u16::from_le_bytes([c[0], c[1]]))
         .collect();
     let text = String::from_utf16(&units).unwrap();
-    let extra = "<INCOMETAXNUMBER>ABCDE1234F</INCOMETAXNUMBER>\
+    let extra = "<INCOMETAXNUMBER>PAN-READ-1</INCOMETAXNUMBER>\
         <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><GSTIN>G-AT-START</GSTIN></LEDGSTREGDETAILS.LIST>\
         <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20251201</APPLICABLEFROM><GSTIN>G-IN-FORCE-AT-END</GSTIN></LEDGSTREGDETAILS.LIST>\
         <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20260401</APPLICABLEFROM><GSTIN>G-AFTER-END</GSTIN></LEDGSTREGDETAILS.LIST>";
@@ -260,7 +260,7 @@ fn a_ledger_of_a_read_carries_its_pan_and_the_gstin_in_force_on_the_period_end()
     let mine: Vec<_> = book
         .ledgers
         .values()
-        .filter(|l| l.pan == "ABCDE1234F")
+        .filter(|l| l.pan == "PAN-READ-1")
         .collect();
     assert_eq!(mine.len(), 1, "exactly the edited ledger carries the PAN");
     assert_eq!(mine[0].gstin, "G-IN-FORCE-AT-END");

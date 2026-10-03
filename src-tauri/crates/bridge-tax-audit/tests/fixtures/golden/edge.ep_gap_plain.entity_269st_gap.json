@@ -7,7 +7,7 @@
   "population_note_text": "Population is cash_payments_40a3.compute_269st_rows, unchanged; this test only re-aggregates it by PAN and reports the residue no single ledger already triggers.",
   "figures": [
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_day_total_2025-06-01_PAN-ABCDE",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "79fd030fe032e256",
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-01_PAN-ABCDE",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "4a4b8ecb0619a3e3",
@@ -34,7 +34,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-01_PAN-ABCDE",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "a6694b35f835a79f",
@@ -76,7 +76,7 @@
   ],
   "findings": [
     {
-      "id": "entity_269st_gap/2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap/2025-06-01_PAN-ABCDE",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -85,7 +85,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-01_ABCDE1234F"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-01_PAN-ABCDE"
         }
       ],
       "evidence": [

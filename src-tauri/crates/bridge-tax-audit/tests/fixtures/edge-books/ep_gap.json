@@ -39,8 +39,8 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-002",
-   "pan": "ABCDE1234F",
-   "gstin": "27ABCDE1234F1Z5"
+   "pan": "PAN-ABCDE",
+   "gstin": "27ABCDE1234F1X5"
   },
   {
    "name": "Alpha Trading Co",
@@ -49,7 +49,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-003",
-   "pan": "ABCDE1234F"
+   "pan": "PAN-ABCDE"
   },
   {
    "name": "Zed Stores",
@@ -58,7 +58,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-004",
-   "pan": "ZZZZZ9999Z"
+   "pan": "PAN-ZZZZZ"
   },
   {
    "name": "Quick Mart",
@@ -67,7 +67,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-005",
-   "pan": "ZZZZZ9999Z"
+   "pan": "PAN-ZZZZZ"
   },
   {
    "name": "Big Buyer",
@@ -76,7 +76,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-006",
-   "pan": "BIGBY1111B"
+   "pan": "PAN-BIGBY"
   },
   {
    "name": "Big Buyer Branch",
@@ -85,7 +85,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-007",
-   "pan": "BIGBY1111B"
+   "pan": "PAN-BIGBY"
   },
   {
    "name": "Small One",
@@ -94,7 +94,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-008",
-   "pan": "SMALL2222S"
+   "pan": "PAN-SMALL"
   },
   {
    "name": "Small Two",
@@ -103,7 +103,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-009",
-   "pan": "SMALL2222S"
+   "pan": "PAN-SMALL"
   },
   {
    "name": "Derived Co",
@@ -112,7 +112,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-010",
-   "gstin": "29DERIV3333D1Z7"
+   "gstin": "29DDDDD3333D1X7"
   },
   {
    "name": "Derived Co North",
@@ -121,7 +121,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-011",
-   "pan": "DERIV3333D"
+   "pan": "DDDDD3333D"
   },
   {
    "name": "Tan Registrant",
@@ -147,7 +147,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-014",
-   "pan": "OVRDE4444O"
+   "pan": "PAN-OVRDE"
   },
   {
    "name": "Masters Win",
@@ -156,7 +156,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-015",
-   "pan": "MASTR5555M"
+   "pan": "PAN-MASTR"
   },
   {
    "name": "Masters Win Two",
@@ -165,7 +165,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-016",
-   "pan": "MASTR5555M"
+   "pan": "PAN-MASTR"
   },
   {
    "name": "No Pan Customer",
@@ -182,7 +182,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-018",
-   "pan": "SOLEL6666S"
+   "pan": "PAN-SOLEL"
   },
   {
    "name": "Excluded Bank",
@@ -191,7 +191,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-019",
-   "pan": "ABCDE1234F"
+   "pan": "PAN-ABCDE"
   },
   {
    "name": "Other Asset Party",
@@ -199,7 +199,7 @@
     "Other Assets"
    ],
    "guid": "edge-ep_gap-020",
-   "pan": "EXTRA7777E"
+   "pan": "PAN-EXTRA"
   },
   {
    "name": "Other Asset Party Two",
@@ -208,7 +208,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-021",
-   "pan": "EXTRA7777E"
+   "pan": "PAN-EXTRA"
   },
   {
    "name": "Sales",
@@ -224,7 +224,7 @@
     "Current Liabilities"
    ],
    "guid": "edge-ep_gap-023",
-   "pan": "ABCDE1234F"
+   "pan": "PAN-ABCDE"
   },
   {
    "name": "Round Off",
@@ -232,7 +232,7 @@
     "Indirect Expenses"
    ],
    "guid": "edge-ep_gap-024",
-   "pan": "ABCDE1234F"
+   "pan": "PAN-ABCDE"
   },
   {
    "name": "Alpha Pvt Ltd",
@@ -241,7 +241,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-025",
-   "pan": "STOPW1111S"
+   "pan": "PAN-STOPW"
   },
   {
    "name": "Beta Pvt Ltd",
@@ -250,7 +250,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-026",
-   "pan": "STOPW1111S"
+   "pan": "PAN-STOPW"
   },
   {
    "name": "AB Traders",
@@ -259,7 +259,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-027",
-   "pan": "SHORT2222T"
+   "pan": "PAN-SHORT"
   },
   {
    "name": "AB Stores",
@@ -268,7 +268,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-028",
-   "pan": "SHORT2222T"
+   "pan": "PAN-SHORT"
   },
   {
    "name": "ALPHA-Traders",
@@ -277,7 +277,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-029",
-   "pan": "CASEP3333C"
+   "pan": "PAN-CASEP"
   },
   {
    "name": "alpha.traders 2",
@@ -286,7 +286,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-030",
-   "pan": "CASEP3333C"
+   "pan": "PAN-CASEP"
   },
   {
    "name": "Café Alpha",
@@ -295,7 +295,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-031",
-   "pan": "UNICO4444U"
+   "pan": "PAN-UNICO"
   },
   {
    "name": "Cafe Alpha",
@@ -304,7 +304,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-032",
-   "pan": "UNICO4444U"
+   "pan": "PAN-UNICO"
   },
   {
    "name": "Gstin Override",
@@ -321,7 +321,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-034",
-   "pan": "OVRGS5555G"
+   "pan": "OOOOO5555O"
   },
   {
    "name": "Masters Gstin",
@@ -330,7 +330,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-035",
-   "gstin": "29MASTG6666G1Z1"
+   "gstin": "29MMMMM6666M1X1"
   },
   {
    "name": "Masters Gstin Two",
@@ -339,7 +339,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-036",
-   "pan": "MASTG6666G"
+   "pan": "MMMMM6666M"
   },
   {
    "name": "Group Party",
@@ -347,7 +347,7 @@
     "Related Parties"
    ],
    "guid": "edge-ep_gap-037",
-   "pan": "GROUP8888G"
+   "pan": "PAN-GROUP"
   },
   {
    "name": "Group Party Two",
@@ -356,7 +356,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-038",
-   "pan": "GROUP8888G"
+   "pan": "PAN-GROUP"
   },
   {
    "name": "Party Round",
@@ -365,7 +365,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-039",
-   "pan": "ALPHA9999A"
+   "pan": "PAN-ALPHA"
   },
   {
    "name": "Alpha Solo",
@@ -374,7 +374,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-040",
-   "pan": "ALPHA9999A"
+   "pan": "PAN-ALPHA"
   },
   {
    "name": "Partial Tax",
@@ -383,7 +383,7 @@
    ],
    "guid": "edge-ep_gap-041",
    "chain_complete": false,
-   "pan": "ABCDE1234F"
+   "pan": "PAN-ABCDE"
   },
   {
    "name": "Partial Debtor",
@@ -392,7 +392,7 @@
    ],
    "guid": "edge-ep_gap-042",
    "chain_complete": false,
-   "pan": "PARTL1010P"
+   "pan": "PAN-PARTL"
   },
   {
    "name": "Partial Debtor Two",
@@ -401,7 +401,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-043",
-   "pan": "PARTL1010P"
+   "pan": "PAN-PARTL"
   },
   {
    "name": "Exact One",
@@ -410,7 +410,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-044",
-   "pan": "EXACT1212E"
+   "pan": "PAN-EXACT"
   },
   {
    "name": "Exact Two",
@@ -419,7 +419,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-045",
-   "pan": "EXACT1212E"
+   "pan": "PAN-EXACT"
   },
   {
    "name": "Edge One",
@@ -428,7 +428,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-046",
-   "pan": "EDGEO1313E"
+   "pan": "PAN-EDGEO"
   },
   {
    "name": "Edge Two",
@@ -437,7 +437,7 @@
     "Current Assets"
    ],
    "guid": "edge-ep_gap-047",
-   "pan": "EDGEO1313E"
+   "pan": "PAN-EDGEO"
   }
  ],
  "tb": [],
@@ -1166,18 +1166,18 @@
   "overrides": {
    "Override Fill": {
     "name": "Zeta Holdings",
-    "pan": "OVRDE4444O",
+    "pan": "PAN-OVRDE",
     "gstin": "",
     "address": "1 Invented Lane"
    },
    "Masters Win": {
-    "pan": "OTHER0000X"
+    "pan": "PAN-OTHER"
    },
    "Gstin Override": {
-    "gstin": "29OVRGS5555G1Z9"
+    "gstin": "29OOOOO5555O1X9"
    },
    "Masters Gstin": {
-    "gstin": "29OTHER7777O1Z2"
+    "gstin": "29OTHER7777O1X2"
    }
   },
   "party_groups": [

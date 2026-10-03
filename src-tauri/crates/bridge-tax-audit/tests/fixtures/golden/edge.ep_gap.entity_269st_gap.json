@@ -7,7 +7,7 @@
   "population_note_text": "Population is cash_payments_40a3.compute_269st_rows, unchanged; this test only re-aggregates it by PAN and reports the residue no single ledger already triggers.",
   "figures": [
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_day_total_2025-06-01_PAN-ABCDE",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "79fd030fe032e256",
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-02_ZZZZZ9999Z",
+      "id": "entity_269st_gap.entity_day_total_2025-06-02_PAN-ZZZZZ",
       "value": 21000000,
       "unit": "paise",
       "definition_sha256_16": "7f1821cf02b8fd30",
@@ -45,7 +45,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-05_DERIV3333D",
+      "id": "entity_269st_gap.entity_day_total_2025-06-05_DDDDD3333D",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "1fb001534d5998dc",
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-06_OVRDE4444O",
+      "id": "entity_269st_gap.entity_day_total_2025-06-06_PAN-OVRDE",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "87dcde4a27a795ab",
@@ -83,7 +83,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-07_MASTR5555M",
+      "id": "entity_269st_gap.entity_day_total_2025-06-07_PAN-MASTR",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "89f3696895cc0fd1",
@@ -102,7 +102,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-06-11_EXTRA7777E",
+      "id": "entity_269st_gap.entity_day_total_2025-06-11_PAN-EXTRA",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "e16e7118fd40c0a9",
@@ -121,7 +121,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-01_STOPW1111S",
+      "id": "entity_269st_gap.entity_day_total_2025-07-01_PAN-STOPW",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "9ba0c2276e9b6022",
@@ -140,7 +140,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-02_SHORT2222T",
+      "id": "entity_269st_gap.entity_day_total_2025-07-02_PAN-SHORT",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "041870e2ad368fc7",
@@ -159,7 +159,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-03_CASEP3333C",
+      "id": "entity_269st_gap.entity_day_total_2025-07-03_PAN-CASEP",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "fd71f4886a82d050",
@@ -178,7 +178,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-04_UNICO4444U",
+      "id": "entity_269st_gap.entity_day_total_2025-07-04_PAN-UNICO",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "09227e723ea899ef",
@@ -197,7 +197,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-05_OVRGS5555G",
+      "id": "entity_269st_gap.entity_day_total_2025-07-05_OOOOO5555O",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "e211f37b0b3456fe",
@@ -216,7 +216,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-06_MASTG6666G",
+      "id": "entity_269st_gap.entity_day_total_2025-07-06_MMMMM6666M",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "2f7ef5a185ed6004",
@@ -235,7 +235,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-07_GROUP8888G",
+      "id": "entity_269st_gap.entity_day_total_2025-07-07_PAN-GROUP",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "05c0e828afa21a95",
@@ -254,7 +254,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-09_PARTL1010P",
+      "id": "entity_269st_gap.entity_day_total_2025-07-09_PAN-PARTL",
       "value": 24000000,
       "unit": "paise",
       "definition_sha256_16": "c9260cfc6e3a6915",
@@ -273,7 +273,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_day_total_2025-07-10_EXACT1212E",
+      "id": "entity_269st_gap.entity_day_total_2025-07-10_PAN-EXACT",
       "value": 20000000,
       "unit": "paise",
       "definition_sha256_16": "cfd572b0e2aab42c",
@@ -292,7 +292,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-01_PAN-ABCDE",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "4a4b8ecb0619a3e3",
@@ -300,7 +300,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-02_ZZZZZ9999Z",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-02_PAN-ZZZZZ",
       "value": 11000000,
       "unit": "paise",
       "definition_sha256_16": "d72ac4cba9a7f6a3",
@@ -308,7 +308,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-05_DERIV3333D",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-05_DDDDD3333D",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "7aa68de2218e2398",
@@ -316,7 +316,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-06_OVRDE4444O",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-06_PAN-OVRDE",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "5a687dd117b1c7ae",
@@ -324,7 +324,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-07_MASTR5555M",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-07_PAN-MASTR",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "f7b5bb75da95c343",
@@ -332,7 +332,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-11_EXTRA7777E",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-06-11_PAN-EXTRA",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "428f0d4a5f8e86ec",
@@ -340,7 +340,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-01_STOPW1111S",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-01_PAN-STOPW",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "bcfa2a7ef2124337",
@@ -348,7 +348,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-02_SHORT2222T",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-02_PAN-SHORT",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "6bd541713a5dfe02",
@@ -356,7 +356,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-03_CASEP3333C",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-03_PAN-CASEP",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "362486ee8376bded",
@@ -364,7 +364,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-04_UNICO4444U",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-04_PAN-UNICO",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "6ef44df3515f6b66",
@@ -372,7 +372,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-05_OVRGS5555G",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-05_OOOOO5555O",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "ccf1992e1beb2ab8",
@@ -380,7 +380,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-06_MASTG6666G",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-06_MMMMM6666M",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "b1b6c49fad1aad5b",
@@ -388,7 +388,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-07_GROUP8888G",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-07_PAN-GROUP",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "ab0ac0dec1c28506",
@@ -396,7 +396,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-09_PARTL1010P",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-09_PAN-PARTL",
       "value": 12000000,
       "unit": "paise",
       "definition_sha256_16": "9e8e93e0d668b822",
@@ -404,7 +404,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-10_EXACT1212E",
+      "id": "entity_269st_gap.entity_largest_single_ledger_2025-07-10_PAN-EXACT",
       "value": 10000000,
       "unit": "paise",
       "definition_sha256_16": "fdb79a9739f0b7ac",
@@ -412,7 +412,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-01_PAN-ABCDE",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "a6694b35f835a79f",
@@ -420,7 +420,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-02_ZZZZZ9999Z",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-02_PAN-ZZZZZ",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "bed8ed7732108081",
@@ -428,7 +428,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-05_DERIV3333D",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-05_DDDDD3333D",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "3ccfd88330863e13",
@@ -436,7 +436,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-06_OVRDE4444O",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-06_PAN-OVRDE",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "4fe421e267301877",
@@ -444,7 +444,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-07_MASTR5555M",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-07_PAN-MASTR",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "d8b3d29e17d1e7c6",
@@ -452,7 +452,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-06-11_EXTRA7777E",
+      "id": "entity_269st_gap.entity_ledger_count_2025-06-11_PAN-EXTRA",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "214bdfb2d17f22e3",
@@ -460,7 +460,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-01_STOPW1111S",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-01_PAN-STOPW",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "ef59c6f88d2e7493",
@@ -468,7 +468,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-02_SHORT2222T",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-02_PAN-SHORT",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "7b8389b2ab9799c8",
@@ -476,7 +476,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-03_CASEP3333C",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-03_PAN-CASEP",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "daf496875f3db066",
@@ -484,7 +484,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-04_UNICO4444U",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-04_PAN-UNICO",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "aaff994042486524",
@@ -492,7 +492,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-05_OVRGS5555G",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-05_OOOOO5555O",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "aae1e649c2e9b112",
@@ -500,7 +500,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-06_MASTG6666G",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-06_MMMMM6666M",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "aa1c7f6de77e9c35",
@@ -508,7 +508,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-07_GROUP8888G",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-07_PAN-GROUP",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "f3d704f5695080d6",
@@ -516,7 +516,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-09_PARTL1010P",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-09_PAN-PARTL",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "3be9e983ef3f7bd7",
@@ -524,7 +524,7 @@
       "evidence": []
     },
     {
-      "id": "entity_269st_gap.entity_ledger_count_2025-07-10_EXACT1212E",
+      "id": "entity_269st_gap.entity_ledger_count_2025-07-10_PAN-EXACT",
       "value": 2,
       "unit": "count",
       "definition_sha256_16": "ffb0b2f23371720b",
@@ -566,7 +566,7 @@
   ],
   "findings": [
     {
-      "id": "entity_269st_gap/2025-06-01_ABCDE1234F",
+      "id": "entity_269st_gap/2025-06-01_PAN-ABCDE",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -575,7 +575,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-01_ABCDE1234F"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-01_PAN-ABCDE"
         }
       ],
       "evidence": [
@@ -612,7 +612,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-06-02_ZZZZZ9999Z",
+      "id": "entity_269st_gap/2025-06-02_PAN-ZZZZZ",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -621,7 +621,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-02_ZZZZZ9999Z"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-02_PAN-ZZZZZ"
         }
       ],
       "evidence": [
@@ -659,7 +659,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-06-05_DERIV3333D",
+      "id": "entity_269st_gap/2025-06-05_DDDDD3333D",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -668,7 +668,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-05_DERIV3333D"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-05_DDDDD3333D"
         }
       ],
       "evidence": [
@@ -706,7 +706,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-06-06_OVRDE4444O",
+      "id": "entity_269st_gap/2025-06-06_PAN-OVRDE",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -715,7 +715,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-06_OVRDE4444O"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-06_PAN-OVRDE"
         }
       ],
       "evidence": [
@@ -753,7 +753,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-06-07_MASTR5555M",
+      "id": "entity_269st_gap/2025-06-07_PAN-MASTR",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -762,7 +762,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-07_MASTR5555M"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-07_PAN-MASTR"
         }
       ],
       "evidence": [
@@ -799,7 +799,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-06-11_EXTRA7777E",
+      "id": "entity_269st_gap/2025-06-11_PAN-EXTRA",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -808,7 +808,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-06-11_EXTRA7777E"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-06-11_PAN-EXTRA"
         }
       ],
       "evidence": [
@@ -845,7 +845,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-01_STOPW1111S",
+      "id": "entity_269st_gap/2025-07-01_PAN-STOPW",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -854,7 +854,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-01_STOPW1111S"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-01_PAN-STOPW"
         }
       ],
       "evidence": [
@@ -892,7 +892,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-02_SHORT2222T",
+      "id": "entity_269st_gap/2025-07-02_PAN-SHORT",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -901,7 +901,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-02_SHORT2222T"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-02_PAN-SHORT"
         }
       ],
       "evidence": [
@@ -939,7 +939,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-03_CASEP3333C",
+      "id": "entity_269st_gap/2025-07-03_PAN-CASEP",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -948,7 +948,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-03_CASEP3333C"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-03_PAN-CASEP"
         }
       ],
       "evidence": [
@@ -985,7 +985,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-04_UNICO4444U",
+      "id": "entity_269st_gap/2025-07-04_PAN-UNICO",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -994,7 +994,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-04_UNICO4444U"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-04_PAN-UNICO"
         }
       ],
       "evidence": [
@@ -1031,7 +1031,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-05_OVRGS5555G",
+      "id": "entity_269st_gap/2025-07-05_OOOOO5555O",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -1040,7 +1040,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-05_OVRGS5555G"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-05_OOOOO5555O"
         }
       ],
       "evidence": [
@@ -1078,7 +1078,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-06_MASTG6666G",
+      "id": "entity_269st_gap/2025-07-06_MMMMM6666M",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -1087,7 +1087,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-06_MASTG6666G"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-06_MMMMM6666M"
         }
       ],
       "evidence": [
@@ -1125,7 +1125,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-07_GROUP8888G",
+      "id": "entity_269st_gap/2025-07-07_PAN-GROUP",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -1134,7 +1134,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-07_GROUP8888G"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-07_PAN-GROUP"
         }
       ],
       "evidence": [
@@ -1171,7 +1171,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-09_PARTL1010P",
+      "id": "entity_269st_gap/2025-07-09_PAN-PARTL",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -1180,7 +1180,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-09_PARTL1010P"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-09_PAN-PARTL"
         }
       ],
       "evidence": [
@@ -1217,7 +1217,7 @@
       ]
     },
     {
-      "id": "entity_269st_gap/2025-07-10_EXACT1212E",
+      "id": "entity_269st_gap/2025-07-10_PAN-EXACT",
       "clauses": [
         "s.269ST(a)",
         "3CD-31(ba)"
@@ -1226,7 +1226,7 @@
       "facts": [
         {
           "name": "amount",
-          "figure_id": "entity_269st_gap.entity_day_total_2025-07-10_EXACT1212E"
+          "figure_id": "entity_269st_gap.entity_day_total_2025-07-10_PAN-EXACT"
         }
       ],
       "evidence": [

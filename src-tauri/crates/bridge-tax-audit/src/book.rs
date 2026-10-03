@@ -1493,8 +1493,8 @@ mod tests {
             l["x"].pan.clone()
         };
         assert_eq!(
-            pan_of("<INCOMETAXNUMBER> ABCDE1234F </INCOMETAXNUMBER>"),
-            "ABCDE1234F"
+            pan_of("<INCOMETAXNUMBER> PAN-READ-1 </INCOMETAXNUMBER>"),
+            "PAN-READ-1"
         );
         assert_eq!(pan_of(""), "");
     }

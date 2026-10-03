@@ -224,9 +224,11 @@ counter Tally keeps that moves when vouchers or ledgers change.
   is read as written, and gives no overdue days in the ageing; before, that one
   bill failed the whole read with no reason. A bill row whose dates cannot be
   read still refuses, and the refusal now carries a named cause, the report, the
-  row number when a row is what failed, and a next step, never the bill's party
-  or reference. A whole call on such a book was not shown to complete (see
-  Known limits) (#1091, #1098).
+  row number when a row is what failed (also for an error found while the
+  report is read, such as an unreadable amount or a repeated field, but not for
+  a value that appears before any bill row), and a next step, never the bill's
+  party, reference or date. A whole call on such a book was not shown to
+  complete (see Known limits) (#1091, #1096, #1098, #1128).
 - **The two log tools now say what they do not show.** `read_evidence` and
   `egress_log` say what each holds and that neither shows what your AI provider
   received, and tell the assistant never to say that no data has left the

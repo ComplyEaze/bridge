@@ -75,7 +75,12 @@ fn a_date_span_agrees_with_the_bills_day_count() {
             assert_eq!(age_in_days(&from, &to), Ok(days), "{}", from.as_str());
             if days > 0 {
                 assert_eq!(bridge_tally_primitives::DateSpan::new(&to, &from), None);
-                assert!(age_in_days(&to, &from).is_err());
+                assert_eq!(
+                    age_in_days(&to, &from),
+                    Err(NativeOutstandingsError::InvalidDate(
+                        "native_date_after_as_of"
+                    ))
+                );
             }
         }
     }

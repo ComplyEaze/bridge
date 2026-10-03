@@ -1050,7 +1050,15 @@ fn assert_replay_matches_the_live_call(
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "complete", "{result}");
     assert_eq!(result["as_of"], record["arguments"]["as_of"], "{result}");
-    assert_eq!(result["detail"], record["answer_detail"]);
+    // The live answer predates `ledger_match` (#1076); every field it has
+    // must still be the live call's, and the party was named exactly.
+    let mut detail = result["detail"].clone();
+    let ledger_match = detail
+        .as_object_mut()
+        .and_then(|fields| fields.remove("ledger_match"))
+        .expect("the detail says which ledger it read");
+    assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+    assert_eq!(detail, record["answer_detail"]);
 }
 
 /// Review P2.1: the `outstandings` tool with `detail: unadjusted`, replayed

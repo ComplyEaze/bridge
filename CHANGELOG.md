@@ -36,6 +36,13 @@ These changes are in source and not yet in a published build.
   cost of sales was. Both committed Profit and Loss captures still tie; whether a
   real Tally ever prints the heading zero or empty over a non-zero cost of sales
   is not measured (#1070).
+- `post_import` and `verify_import` proofs now measure `alter_id_delta` from the
+  company's voucher mark read just before the POST, for a native post, instead
+  of from the mark recorded when the batch was built. Anything posted between
+  the build and the POST no longer counts as this post's, so the delta agrees
+  with what Tally created. `alter_id_delta` gains `from` (`pre_post_mark`, or
+  `build_mark` for a file imported by hand, which has no POST of its own);
+  `pre_import_mark` still reports the build-time mark (#1087).
 
 ## [0.4.2] - 2026-10-03
 

@@ -2841,6 +2841,58 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
     assert_eq!(capped, bare);
 }
 
+/// A batch with no dispatch intent (a file a person imported by hand) has no
+/// mark from before a POST, so its proof measures `alter_id_delta` from the
+/// mark recorded when it was built, and says so (#1087).
+#[tokio::test]
+async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark() {
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    server
+        .call_tool_response(
+            "verify_import",
+            json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
+        )
+        .await;
+    let proof: Value = serde_json::from_slice(
+        &fs::read(
+            server
+                .imports_dir()
+                .unwrap()
+                .join(format!("{batch_id}.proof.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(proof["alter_id_delta"]["from"], "build_mark", "{proof}");
+    assert_eq!(
+        proof["alter_id_delta"]["before"], proof["pre_import_mark"]["value"],
+        "{proof}"
+    );
+    assert!(proof["pre_import_mark"]["value"].is_u64(), "{proof}");
+}
+
 #[tokio::test]
 async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_again() {
     // bridge#627: a whole-batch response outgrew the agent byte cap.

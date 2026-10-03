@@ -962,13 +962,27 @@ pub(super) fn company_high_water_mark(high_water: &Value) -> Result<PreImportMar
     })
 }
 
-pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> Value {
+/// The mark `alter_id_delta` measures from (#1087): the target's voucher mark
+/// the dispatch intent recorded just before the POST, for a native post, or
+/// the mark recorded when the batch was built, for one with no such intent (a
+/// file a person imported by hand). The build mark alone counts anything
+/// posted between the build and the POST as this post's.
+pub(super) enum DeltaBasis<'a> {
+    PrePost(u64),
+    Build(&'a PreImportMark),
+}
+
+pub(super) fn alter_id_delta(basis: DeltaBasis<'_>, observed: &[ReadVoucher]) -> Value {
+    let (before, from) = match basis {
+        DeltaBasis::PrePost(mark) => (Some(mark), "pre_post_mark"),
+        DeltaBasis::Build(mark) => (mark.value, "build_mark"),
+    };
     let latest = observed.iter().filter_map(|voucher| voucher.alter_id).max();
-    match (mark.value, latest) {
+    match (before, latest) {
         (Some(before), Some(after)) if after >= before => {
-            json!({"before":before,"after_seen":after,"delta":after-before})
+            json!({"before":before,"after_seen":after,"delta":after-before,"from":from})
         }
-        _ => json!({"before":mark.value,"after_seen":latest,"delta":"not_observed"}),
+        _ => json!({"before":before,"after_seen":latest,"delta":"not_observed","from":from}),
     }
 }
 

@@ -3885,6 +3885,30 @@ async fn an_untagged_native_post_binds_to_its_own_span_and_verifies() {
     assert!(verdicts[0].get("binding_refusal").is_none());
 }
 
+/// The proof's `alter_id_delta` measures a native post from the mark read just
+/// before its POST, not from the mark recorded when the batch was built
+/// (#1087). This batch was built at 8 and the aim snapshot before the POST read
+/// 10, so measuring from the build mark would report a delta of 3 beside one
+/// voucher created; the build mark stays in `pre_import_mark`.
+#[tokio::test]
+async fn a_native_posts_alter_id_delta_is_measured_from_the_mark_before_its_post() {
+    let (posted, _, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(untagged_posted_journal(), 11),
+        Vec::new(),
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
+    assert_eq!(
+        result["alter_id_delta"],
+        json!({"before": 10, "after_seen": 11, "delta": 1, "from": "pre_post_mark"}),
+        "{posted}"
+    );
+    assert_eq!(result["post_location"]["target_voucher_step"]["before"], 10);
+    assert_eq!(result["pre_import_mark"]["value"], 8, "{posted}");
+}
+
 /// A bound voucher a later window does not hold is `bound_not_in_window`,
 /// never `not_found`, and the batch is not verified.
 #[tokio::test]

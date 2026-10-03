@@ -464,6 +464,29 @@ fn a_search_that_cannot_run_still_offers_the_ledger_it_used_to_read() {
     assert_eq!(items[0]["rule"], "lookup_key_equal");
 }
 
+/// A no-break space, a figure space, a narrow no-break space and an
+/// ideographic space are not spaces to the spelling key, which folds only the
+/// ASCII space: a name holding one never resolves to the ledger it looks like.
+/// That ledger is listed as a candidate instead, for the person to choose
+/// (#1095). A name copied from a document or a web page can carry these.
+/// Mutant killed: `ledger_spelling_key` splitting on each of them.
+#[test]
+fn a_name_holding_a_unicode_space_asks_rather_than_resolves() {
+    for space in ['\u{a0}', '\u{2007}', '\u{202f}', '\u{3000}'] {
+        let requested = format!("Cash{space}Book");
+        let (code, miss, items) = refusal(&["Cash Book", "Bank"], &requested, Redaction::None);
+        let space = format!("U+{:04X}", space as u32);
+        assert_eq!(code, "ledger_not_found", "{space}");
+        assert_eq!(
+            (miss.listing, miss.found, miss.found_is_lower_bound),
+            (Listing::Listed, 1, false),
+            "{space}"
+        );
+        assert_eq!(listed_names(&items), ["Cash Book"], "{space}");
+        assert_eq!(items[0]["rule"], "normalized_equal", "{space}");
+    }
+}
+
 /// A book holding a CR LF twin (9.4e) is still searched by the binding rules,
 /// which list both twins themselves; the loose ledgers add no second copy.
 #[test]

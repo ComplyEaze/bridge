@@ -11,7 +11,9 @@ use crate::agent::agent_import::approval::{
 use crate::agent::agent_protocol::{run_post, Framer};
 use crate::agent::ToolResponse;
 use crate::tally::agent_read_request::AgentReadRequest;
-use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
+use crate::tally::approved_import::{
+    Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
+};
 use tokio::io::{AsyncWriteExt, BufReader};
 
 /// Bounds a wait on an event, only so that a hang fails instead of stalling
@@ -1080,6 +1082,71 @@ async fn a_cancel_inside_the_lease_finishes_its_reads_and_posts_nothing() {
     }
 }
 
+/// An approval revoked by another route after this call took it, and before
+/// the call spends it under the admission lock, refuses with its own code
+/// (#791): nothing was recorded or sent, so the outcome is known and the
+/// catch-all `import_dispatch_outcome_unknown` would misstate it. The held
+/// catalogue read keeps the call between take and spend while the test
+/// revokes.
+#[tokio::test]
+async fn an_approval_revoked_between_take_and_spend_is_refused_by_its_own_code() {
+    let mut plans = before_approval();
+    let lease_start = plans.len();
+    let mut lease = after_approval(xml(created_one()));
+    let held_at = 5;
+    lease[held_at] =
+        xml(catalogue()).with_delivery(Delivery::SlowHeaders(Duration::from_millis(400)));
+    let post_at = lease_start + lease.len() - 1;
+    plans.extend(lease);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    let post = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        server.call_tool("post_import", args),
+    );
+    let revoke = async {
+        tokio::time::timeout(HANG_GUARD, async {
+            while simulator.received() <= lease_start + held_at {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .expect("the post reached the held read");
+        assert_eq!(
+            server
+                .post_approvals
+                .begin_redeem(&line.batch_id)
+                .err()
+                .as_deref(),
+            Some("import_approval_in_use"),
+            "this call has taken the approval"
+        );
+        server
+            .post_approvals
+            .revoke(&line.batch_id, "revoked_elsewhere");
+    };
+    let (refused, ()) = tokio::join!(post, revoke);
+    let observed = sent(simulator);
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_approval_revoked",
+        "{refused}"
+    );
+    assert_eq!(
+        refused["structuredContent"]["evidence"]["reason_code"],
+        "import_approval_revoked"
+    );
+    assert_eq!(result(&refused)["attempt_recorded"], false, "{refused}");
+    assert_eq!(intents(directory.path()), 0);
+    assert_eq!(observed.len(), post_at, "every lease read, and no POST");
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "revoked_elsewhere"
+    );
+}
+
 /// A refusal in the call redeeming an approval withdraws it: the next call
 /// asks the person again rather than posting on the old click. Since slice
 /// 2.0 the redeeming call is the first one after the click.
@@ -1356,8 +1423,8 @@ async fn an_approval_is_spent_once_and_never_after_a_revocation() {
     );
     approvals.spend(&line.batch_id, taken.id()).unwrap();
     assert_eq!(
-        approvals.spend(&line.batch_id, taken.id()).err().as_deref(),
-        Some("import_approval_revoked")
+        approvals.spend(&line.batch_id, taken.id()).err(),
+        Some(UnderLockRefusal::ApprovalRevoked)
     );
     drop(taken);
     assert!(
@@ -1374,8 +1441,8 @@ async fn an_approval_is_spent_once_and_never_after_a_revocation() {
         .unwrap();
     approvals.revoke(&line.batch_id, "request_cancelled");
     assert_eq!(
-        approvals.spend(&line.batch_id, taken.id()).err().as_deref(),
-        Some("import_approval_revoked")
+        approvals.spend(&line.batch_id, taken.id()).err(),
+        Some(UnderLockRefusal::ApprovalRevoked)
     );
     assert_eq!(
         approvals.lapse_note(&line.batch_id).unwrap()["reason"],

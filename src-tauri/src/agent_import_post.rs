@@ -976,12 +976,12 @@ impl Server {
                             (_, Some(id)) => self
                                 .post_approvals
                                 .spend(batch_id, id)
-                                .map_err(BeforeDispatchError::Other)?,
+                                .map_err(BeforeDispatchError::Refused)?,
                             // Every agent post redeems an approval; one that
                             // reached here without one writes no intent.
                             (PostScope::Vouchers, None) => {
-                                return Err(BeforeDispatchError::Other(
-                                    "import_approval_revoked".into(),
+                                return Err(BeforeDispatchError::Refused(
+                                    UnderLockRefusal::ApprovalRevoked,
                                 ))
                             }
                             (PostScope::JournalOnly, None) => {}

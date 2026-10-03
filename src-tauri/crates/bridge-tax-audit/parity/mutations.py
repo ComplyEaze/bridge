@@ -439,6 +439,15 @@ def refused_shard(refusal) -> None:
         raise ValueError("not a shard refusal")
 
 
+def shard_results(doc) -> None:
+    """Raise ValueError unless `doc` is what a shard that ran writes: an object of records, each an
+    object. Valid JSON of any other shape (null, a number, a string, a list, a record that is not an
+    object) is then "not read", with the rest of the merge intact, rather than a crash or a file
+    merged as if it held nothing (#1041)."""
+    if not (isinstance(doc, dict) and all(isinstance(rec, dict) for rec in doc.values())):
+        raise ValueError("not shard results")
+
+
 def report(mutations: list[dict], merged: dict, committed: dict, unreadable: list[str] = (),
            accepted: dict | None = None, refused: dict | None = None) -> tuple[str, bool]:
     """(Markdown, failed?) for a whole-list run. It fails when any mutation was not run or not
@@ -902,6 +911,7 @@ def run(args: argparse.Namespace) -> int:
                     refused_shard(doc[REFUSED_KEY])                # never results
                     refused[doc[REFUSED_KEY]["shard"]] = doc[REFUSED_KEY]
                 else:
+                    shard_results(doc)
                     merged.update(doc)
             except (OSError, ValueError) as e:
                 unreadable.append(f"{path}: {type(e).__name__}")

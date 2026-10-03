@@ -1090,6 +1090,7 @@ mod tests {
             turnover_threshold_paise: 0,
             turnover_threshold_low_cash_paise: 0,
             cash_share_limit_bp: 0,
+            profession_gross_receipts_paise: None,
             s40a3_limit_per_person_per_day_paise: 0,
             s40a3_goods_carriage_limit_paise: 0,
             s40a3_excluded_group_roles: Vec::new(),

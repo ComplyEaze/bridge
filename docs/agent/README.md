@@ -634,11 +634,17 @@ known to help; the refusal's remediation says so. A
 `ledger` that the first catalogue does not hold refuses as `ledger_not_found` right
 after it, before any voucher is read.
 
-A ledger name that `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
-cannot resolve refuses as `ledger_not_found` (no ledger has that name once case, spaces, symbols and
-accent marks are ignored) or `ledger_ambiguous` (several do, and none is spelled as requested). Bridge
-does not change how a name resolves: a lone ledger whose key equals the request's is still read, and
-the refusals only add what to show the user. Both can carry `candidates`, from the catalogue
+A ledger name given to `ledger_movement`, `vouchers` (`ledger`) or the `outstandings` party detail
+resolves only when it is spelled exactly as a ledger in the book, or when exactly one ledger differs
+from it only in ASCII case and ASCII spaces and no other ledger differs from that one only in case or
+whitespace (#1076; the case of a letter outside A-Z is not folded, reference §9.4f). Otherwise it
+refuses as `ledger_not_found`, or as `ledger_ambiguous` when several ledgers differ from it only in case
+or whitespace (such as a twin with a trailing line break, §9.4e). Every answer for a named ledger carries `ledger_match`:
+the ledger read, `matched` (`exact` or `case_or_spacing`) and `similar_ledgers` (at most 25, with `similar_ledgers_total`; both left out under `mask_parties`), the other ledgers that
+differ from an exact match only in case or whitespace. A name that only a looser reading reaches (a
+dropped symbol or accent, words run together) is not read: the ledger it would reach is offered among
+the candidates with the rule `lookup_key_equal`, listed first, and the user is asked. Both refusals can carry
+`candidates`, from the catalogue
 already read, so no request is added: each is `{name, rule}`, with no score, none marked best (the
 order is by rule strength and then name, not by likelihood), and none is ever chosen for the caller.
 `candidates_listing` says what the list means: `listed`; `truncated` (more were found than fit, with the
@@ -659,9 +665,9 @@ would cost the refusal its code), each list is cut to a sixteenth of the cap; th
 list (`none`, `withheld`, `unavailable`, `names_masked`) and the remediation need 4,096. A requested
 ledger name that is not spelled exactly as a ledger in the book and carries `…` or `...` (Bridge
 writes `…` only to shorten a masked name) is refused as `ledger_name_masked` whatever the setting is
-now, because the lookup ignores everything but letters and digits and `Ra…rs` would find a ledger named
-`RARS`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
-`Ra rs`) is refused too. A ledger spelled exactly as asked is still reached.
+now, because ignoring everything but its letters and digits would offer a ledger named `RARS` for
+`Ra…rs`; under `mask_parties`, one that reads like the shortened form of another ledger's name (`Ra..rs`,
+`Ra rs`) is refused too, whether or not it resolves. A ledger spelled exactly as asked is still reached.
 
 The runtime retains its paired read, verified company and book-extent checks.
 Native ledger openings, basic/compliance ledger balances, and native outstandings
@@ -724,7 +730,11 @@ or vouchers.
   listed apart in `other_voucher_types_touching_duties_taxes` with exact counts:
   whether such a voucher belongs in a return is the CA's call, not the tool's.
   A Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger is
-  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. Rows are
+  counted in `purchase_vouchers_without_duties_taxes_entry`, not dropped. A cancelled
+  voucher is listed there too, with `cancelled` true, whether or not it was taxed: the
+  cancelled vouchers measured came back from Tally with no ledger entries (an empty entry
+  list; protocol reference §11c.5 and §9.14), and one cancelled Purchase read this way on 1 October 2026
+  (#1013). A cancelled voucher that keeps its entries is not measured. Rows are
   returned in `items` and paged by `offset` and `limit` like `vouchers` (each page re-reads the
   masters and the window, so rows can shift between pages); every ledger name in every list is
   masked when parties are masked, the same way `vouchers` masks it.
@@ -852,7 +862,10 @@ rate or return section, and matches nothing against any portal.
   ledger with no head, or an unrecognised head, is listed under the without-head
   or unrecognised list and the status is not complete.
   `sales_vouchers_without_duties_taxes_entry` lists such vouchers by identity
-  only; the tool does not say why one carries no tax entry. A Debit Note, even
+  only; the tool does not say why one carries no tax entry. A cancelled sale
+  that Tally returns with no ledger entries is listed there too, with
+  `cancelled` true; no cancelled sale has been read, so whether one keeps its
+  entries is not measured (#1013). A Debit Note, even
   to a customer, is not a sales row: it is listed apart by identity and ledger
   names, with no amount.
 
@@ -1057,7 +1070,12 @@ that turns that on.
    `Receipt` and `Contra` **both fields are refused** — neither element's fate
    has been observed on those types, and the bank's own reference belongs in
    the narration, which survives. A payload carrying one is rejected before any
-   live read. A batch that is not an amendment and holds a row another batch of
+   live read. A batch holds either Journals only, or `Payment`, `Receipt` and
+   `Contra` vouchers only (those three may share a batch): a batch that mixes a
+   Journal with any of them is refused as `voucher_type_shapes_mixed`, also before
+   any live read, because the two are rendered in different shapes and no file
+   mixing them has been imported (protocol reference §9.8 and §9.13). Split it
+   into one batch of each kind (#1082). A batch that is not an amendment and holds a row another batch of
    the company already sent to Tally, or that a readback found posted, is
    refused here as `import_txn_already_posted` (described under approved voucher
    posting) and no file is written: a hand import of that file would post the
@@ -1360,15 +1378,17 @@ that post's binding for good.
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
 edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
-readback only, when the post sent one voucher and its own answer from Tally
-reported every counter, created none and reported one exception, with nothing
-else counted, that voucher is `tally_reported_not_created` instead
-(bridge#1108). The person is told to check that it is not in Tally and enter it
-there by hand, not through Tally's Import menu. A later `verify_import` never
-reads the post's answer, since someone may have entered the voucher by hand and
-edited it since: it reads `sent_not_attributed`. A batch is never read as not
-created: a partial commit's count does not say which voucher Tally rejected, and
-no batch Tally rejected whole has been captured. A binding refusal is final: an
+readback only, when its own answer from Tally reported every counter, created
+none of the vouchers sent and reported one exception for each, with nothing else
+counted, and none of them is found, they are `tally_reported_not_created`
+instead (bridge#1108). For a batch this also needs the company's voucher mark
+read on both sides of the post and unmoved. The person is told to check that
+each is not in Tally and enter it there by hand, not through Tally's Import
+menu. A later `verify_import` never reads the post's answer, since someone may
+have entered a voucher by hand and edited it since: it reads
+`sent_not_attributed`. A partly created batch is never read as not created: a
+count does not say which voucher Tally rejected, and two vouchers of one batch
+with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
@@ -1529,6 +1549,198 @@ The unavailable `changed_since` implementation must not be used as
 change-enumeration evidence; its retained internal response states that
 deletion detection is unsupported.
 
+### What each tool's evidence covers
+
+What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
+read from the code tool by tool (#726). It covers every tool that reads Tally,
+`verify_import`, and the tools that read nothing from Tally; it does not cover
+`build_import_xml`, `post_import` or `acknowledge_post_review`. Each list is in
+fold order. A step
+marked "(if …)" is folded only when that holds. Every step after the first is
+joined with the tool-level combination, so it is hashed even when one side is
+one request. The building blocks:
+
+- **Company read.** The company-list request every company-scoped tool makes
+  first, after the probe for `verify_import` (`Server::companies` in
+  `src-tauri/src/agent_company.rs`). It is sent
+  twice as a paired read and reported as that one request's own hash. Only the
+  last attempt of a retried read is reported.
+- **Scoped read.** One admitted read (`Server::post_read` in
+  `src-tauri/src/agent.rs`), reported as that one request's own hash.
+- **Probe.** The status GET (an empty body) folded with the company-discovery
+  POST by the runtime combination (`probe_with_wire_evidence` in
+  `src-tauri/src/tally/connection.rs`). If the GET failed, it is the POST
+  alone. If the newer company list did not parse, the legacy one is folded in
+  third.
+- **Runtime read.** A read built inside the runtime and folded with the
+  runtime combination: the opening probe, the read's own requests in the order
+  listed, then the closing probe. The `outstandings` read returns early as
+  partial with the opening probe only when `as_of` is before the books begin or
+  its snapshot period is partial.
+- **Window read.** A bounded voucher window (`read_voucher_window_timed` in
+  `src-tauri/src/agent_voucher_window.rs`): the company's voucher marks (when
+  not already known), the census spans (when the marks alone do not bound the
+  window), the data parts, then closing marks (only when the window was
+  divided). Each is folded with the tool-level combination.
+- **Extent check.** On a later page of a listing, the two book-extent requests
+  that decide whether the held read can be reused, folded with the runtime
+  combination (`continued_listing` in `src-tauri/src/agent_ledgers.rs`).
+- **Corroboration.** The window read again, one day wider on each side, with
+  the marks already known, plus a scoped marks read if that window is empty
+  too (`corroborate_empty_voucher_read` in `src-tauri/src/agent_vouchers.rs`).
+
+These requests are sent but never digested anywhere in a result:
+- the identity-bracket company-list requests around each scoped and runtime read;
+- the status checks between and after a paired read's two sends;
+- the book-extent reads inside a runtime read;
+- the earlier attempts of a retried read;
+- a `verify_import` masters-check catalogue read that fails, which is sent and
+  then dropped.
+
+Per tool:
+
+- `list_companies`: the company read alone. This is one request's hash, not a
+  combination (`src-tauri/src/agent_company.rs`).
+- `tally_status`: the probe alone (`Server::status`,
+  `src-tauri/src/agent_company.rs`).
+- `masters`:
+  1. the company read;
+  2. the extent check (if a later page);
+  3. (if not served from a held read) a runtime read of the requested kind's
+     collection, paired (`fetch_masters_with_extent` in
+     `src-tauri/src/tally/runtime_masters.rs`).
+- `ledger_masters`:
+  1. the company read;
+  2. the extent check (if a later page);
+  3. (if not served from a held read) a runtime read
+     (`src-tauri/src/agent_ledgers.rs`, `src-tauri/src/tally/runtime.rs`).
+  - With `fields=basic` the runtime read is the currency masters, the ledger
+    export, and (if a `group` filter is given) the group collection.
+  - With `fields=compliance` it is the base-currency read, folded with a
+    source read (`fetch_agent_party_ledger_masters_with_evidence`). The source
+    read is the opening probe, then one commitment over the master, balance
+    and group reads, then the reads that counted the ledgers first, if any,
+    then the closing probe. Those counting reads are the census slices and the
+    ledger-count cross-check (when the read was admitted census-first), and
+    the catalogue read (when it was admitted count-first, or census-first with
+    a read split by parent group).
+  - That commitment's request digest hashes the joined request hashes
+    (`fetch_party_ledger_master_source` in `src-tauri/src/tally/connection.rs`).
+    Its response digest hashes `"<master>:<balance>:<group>"`
+    (`party_ledger_master_source_evidence` in `src-tauri/src/tally/runtime.rs`).
+    The master and balance sides are themselves aggregates when the read was
+    split by parent group; the group side is one paired read.
+  - The count requests are sent before the reads they admit but folded after
+    the commitment. None of the individual master, balance or group requests
+    is reported on its own.
+- `validate_masters`: the company read, then one scoped read of the ledger
+  catalogue (`src-tauri/src/agent_import.rs`). Its `catalogue_evidence_sha256`
+  hashes the parsed catalogue, not a request or a response.
+- `vouchers` (`src-tauri/src/agent_vouchers.rs`):
+  1. the company read;
+  2. the ledger catalogue (if `ledger`);
+  3. the window read, which always reads the marks;
+  4. the corroboration (if no rows);
+  5. the ledger catalogue again (if `ledger`);
+  6. the voucher-type catalogue (if a named type selected nothing).
+
+  A later page of a window held from an earlier read (#485) is served from it
+  while the company's marks are unchanged. That page reports the company read
+  and one scoped read of the marks, nothing else (`serve_voucher_page`). If
+  the marks moved and no `snapshot_id` was named, the page reads afresh, and
+  that marks read is folded second, before step 2.
+- `voucher_presence` (`src-tauri/src/agent_presence.rs`):
+  1. the company read;
+  2. the ledger catalogue;
+  3. the window read;
+  4. the corroboration (if empty);
+  5. the ledger catalogue again.
+
+  Its `catalogue_evidence_sha256` hashes parsed names, not a request.
+- `ledger_movement` (`src-tauri/src/agent_movement.rs`):
+  1. the company read;
+  2. a runtime ledger read (currency masters, ledger export);
+  3. the opening window's marks and census;
+  4. its data parts, with the corroboration folded in when empty;
+  5. its closing marks (if divided);
+  6. the runtime ledger read again;
+  7. the replay window's data parts, with the corroboration folded in when
+     empty (no marks read: it reuses the first window's);
+  8. the replay window's closing marks (if divided).
+
+  The corroboration is sent after the closing marks but folded before them.
+- `trial_balance`:
+  1. the company read;
+  2. the extent check (if a later page);
+  3. (if not served from a held read) a runtime read
+     (`fetch_trial_balance_sources` in
+     `src-tauri/src/tally/runtime_trial_balance.rs`): the currency masters,
+     (if the book has several currency masters) the currency-name reads that
+     find the base, then the trial balance.
+- `balance_sheet` and `profit_and_loss`: the company read, then a runtime read
+  (`fetch_statements`, same file): the currency masters, the trial balance,
+  the group collection and the Balance Sheet. `profit_and_loss` adds the
+  Profit and Loss statement.
+- `outstandings` (`src-tauri/src/agent_outstandings.rs`):
+  1. the company read;
+  2. the base-currency read;
+  3. a runtime read of receivable bills, the group collection, payable bills
+     and the ledger collection (`fetch_outstandings_native_with_currency` in
+     `src-tauri/src/tally/runtime.rs`);
+  4. (if `party` with `detail` on a complete read) the ledger
+     catalogue and a window read (`outstandings_detail_within` in
+     `src-tauri/src/agent_bill_trail.rs`).
+- `stock_summary`:
+  1. the company read;
+  2. the extent check (if a later page);
+  3. (if not served from a held read) a runtime read of the company's
+     inventory flags, the stock items and Tally's Stock Summary
+     (`src-tauri/src/tally/runtime_stock_summary.rs`).
+- `purchase_register` and `sales_register`, which send the same requests
+  (`register` in `src-tauri/src/agent_register.rs`):
+  1. the company read;
+  2. a masters read, as `ledger_masters` with `fields=compliance`;
+  3. the window read, with the marks already known from that masters read;
+  4. a scoped read of the closing marks;
+  5. the masters read again;
+  6. the corroboration (if no rows).
+- `verify_import` (`verify_import_with_dispatch` in
+  `src-tauri/src/agent_import.rs`):
+  1. the probe;
+  2. the company read;
+  3. the window read's marks and census, data parts and closing marks;
+  4. the corroborating window's data parts and closing marks (no marks read:
+     it replays the first window's);
+  5. a scoped read of the company's marks (if the batch was posted natively
+     and its voucher mark before the post was recorded, `current_voucher_mark`);
+  6. the closing probe (if any voucher was not found);
+  7. the ledger catalogue (if the saved masters check runs and the read
+     succeeds; when it fails, nothing is folded and the check reports
+     `check_unavailable`).
+
+  `evidence.mode_opening` is the opening probe and `mode_closing` the closing
+  one (or null). `company` is the company read. `voucher_read` is the first
+  window's data parts only, and `voucher_read_corroboration` the second's.
+  No named key covers the marks or census requests, which is what the lab
+  capture in #726 showed. A later page read with `proof_sha256` sends no
+  request: its request digest hashes
+  `verify_import_page:<batch_id>:<offset>` and its response digest hashes
+  the saved proof.
+- `changed_since` is refused before any request, so it carries only the
+  refusal's local evidence.
+- `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
+  and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
+  their response digest hashes what they return (for `voucher_schema`, the
+  name again).
+
+A refusal made before any request reports a request digest hashing
+`<tool>:<sha256 of the arguments>` and a response digest hashing the refusal
+code. A refusal after some requests keeps what was folded up to that point.
+A later page of `masters`, `ledger_masters`, `trial_balance` or `stock_summary`
+served from a held read reports only the company read and the extent check,
+not the first page's reads. A served `vouchers` page reports the company read
+and its marks read instead (see `vouchers`).
+
 ## The plain headline
 
 A result may carry a top-level `headline` beside `result`, in words and built only from the typed
@@ -1541,8 +1753,16 @@ are in alphabetical order), so it is read before the figures. When a byte cap tr
 the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
 `shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
 `rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
-the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
-read tools and the refusals follow.
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. `profit_and_loss` and `balance_sheet` carry one too, with no `rows`:
+when every result of the statement is established, the lead says so and what the derived lines passed
+the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
+as well); when any result is not established, the lead starts "Not established" and names each result
+with its own state, the reason in words (the reasons are a closed list, so a new one is a compile error
+until it has words) and, for a difference, how many lines did not tie (a Tally line that differs, a Tally line carrying an
+amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
+profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
+derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
+`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
 
 ## Protocol and migration notes
 

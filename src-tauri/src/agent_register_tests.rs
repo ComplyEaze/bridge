@@ -740,6 +740,52 @@ fn a_cancelled_purchase_with_no_tax_entry_is_listed_with_its_flag() {
     assert_eq!(listed["optional"], false);
 }
 
+/// The shape a cancelled voucher was measured to come back in: no ledger entries at all
+/// (protocol reference §11c.5, §9.14). The captured Purchase, emptied the same way, is
+/// listed apart with its flag and is never returned as an item (#1013).
+#[test]
+fn a_cancelled_purchase_read_back_without_entries_is_listed_apart_not_as_an_item() {
+    let mut rows = captured_rows();
+    rows[0]["amounts"] = json!([]);
+    rows[0]["cancelled"] = json!(true);
+    let result = result_for(rows, &captured_index(), Redaction::None).unwrap();
+    let body = &result.result;
+    let side = &body["purchase_vouchers_without_duties_taxes_entry"];
+    assert_eq!(side["total"], 1);
+    assert_eq!(side["listed"][0]["date"], "20250903");
+    assert_eq!(side["listed"][0]["cancelled"], true);
+    let items = body["items"].as_array().unwrap();
+    assert_eq!(items.len(), 4);
+    assert!(items.iter().all(|item| item["date"] != "20250903"));
+}
+
+/// A caller reading the side list's count alone would take a cancelled voucher for an
+/// untaxed purchase, so the tool text and the result's own coverage say why it is there.
+#[test]
+fn the_register_says_why_a_cancelled_voucher_is_in_the_list_without_a_tax_entry() {
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|tool| tool["name"] == "purchase_register")
+        })
+        .expect("purchase_register tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains(
+        "A cancelled voucher is listed there with `cancelled` true whether or not it was taxed, \
+         because the cancelled vouchers measured came back from Tally with no ledger entries"
+    ));
+    let result = result_for(captured_rows(), &captured_index(), Redaction::None).unwrap();
+    let coverage = result.result["coverage"].as_str().expect("coverage text");
+    assert!(coverage.contains(
+        "a cancelled voucher is listed there too, with cancelled true, because the cancelled \
+         vouchers measured came back from Tally with no ledger entries"
+    ));
+}
+
 #[test]
 fn a_flag_tally_did_not_report_is_absent_from_a_listed_voucher_not_null() {
     let mut rows = captured_rows();
@@ -1025,6 +1071,42 @@ fn the_sales_result_names_its_own_profile_classes_and_list() {
         .contains("not measured"));
 }
 
+/// A cancelled sale read back with no ledger entries is listed apart with its flag, as a
+/// cancelled purchase is, and the coverage says so without claiming a measurement: no
+/// cancelled sale has been read from Tally. The captured sale, emptied (#1013).
+#[test]
+fn a_sale_read_back_cancelled_without_entries_is_listed_apart_with_its_flag() {
+    let mut rows = captured_rows();
+    let sale = rows
+        .iter_mut()
+        .find(|row| row["voucher_class"] == "Sales")
+        .expect("the captured window holds a sale");
+    sale["amounts"] = json!([]);
+    sale["cancelled"] = json!(true);
+    let result = register_result(
+        RegisterKind::Sales,
+        &captured_index(),
+        rows,
+        ("20250901", "20250930"),
+        (0, 500),
+        Redaction::None,
+    )
+    .unwrap();
+    let body = &result.result;
+    assert_eq!(body["total"], 0);
+    let side = &body["sales_vouchers_without_duties_taxes_entry"];
+    assert_eq!(side["total"], 1);
+    assert_eq!(side["listed"][0]["voucher_class"], "Sales");
+    assert_eq!(side["listed"][0]["cancelled"], true);
+    let coverage = body["coverage"].as_str().unwrap();
+    assert!(coverage.contains(
+        "a cancelled sale that Tally returns with no ledger entries is listed there too, with \
+         cancelled true"
+    ));
+    assert!(coverage.contains("no cancelled sale has been read"));
+    assert!(!coverage.contains("the cancelled vouchers measured"));
+}
+
 #[test]
 fn the_sales_register_masks_every_ledger_and_the_party_like_the_purchase_register() {
     let result = register_result(
@@ -1127,10 +1209,6 @@ fn derived_sales_tail() -> String {
         .expect("the purchase description has its shared read");
     let swaps = [
         (
-            "whose head Bridge recognises as",
-            "whose head ComplyEaze Bridge recognises as",
-        ),
-        (
             "Return the Purchase and Debit Note vouchers",
             "Return the Sales and Credit Note vouchers",
         ),
@@ -1143,8 +1221,8 @@ fn derived_sales_tail() -> String {
             "(Purchase, Journal, Payment and so on)",
         ),
         (
-            "a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, or tax booked to a ledger filed elsewhere)",
-            "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry)",
+            "a Purchase or Debit Note voucher with no entry on a Duties & Taxes ledger under `purchase_vouchers_without_duties_taxes_entry` (exempt or unregistered purchases, tax booked to a ledger filed elsewhere, or a cancelled voucher). A cancelled voucher is listed there with `cancelled` true whether or not it was taxed, because the cancelled vouchers measured came back from Tally with no ledger entries; a cancelled voucher that keeps its entries is not measured.",
+            "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry). A cancelled sale that Tally returns with no ledger entries is listed there too, with `cancelled` true; no cancelled sale has been read, so whether one keeps its entries is not measured.",
         ),
         (
             "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
@@ -1187,6 +1265,7 @@ fn the_sales_description_says_nothing_only_the_purchase_register_would() {
         "input tax credit eligibility",
         "GSTR-2B",
         "exempt or unregistered",
+        "the cancelled vouchers measured",
     ] {
         assert!(
             !sales.contains(purchase_only),
@@ -1200,6 +1279,7 @@ fn the_sales_description_says_nothing_only_the_purchase_register_would() {
         "or whose sales ledger sits in an inventory allocation",
         "may hold the sales ledger in an inventory allocation instead; not measured",
         "the tool does not say why such a voucher carries no tax entry",
+        "no cancelled sale has been read",
         "A Debit Note, including one issued to a customer, is not a sales row",
         "run against a live Tally on two synthetic companies",
         "Not shown by any run: an invoice-view Credit Note",

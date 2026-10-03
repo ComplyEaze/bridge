@@ -93,7 +93,10 @@ impl Server {
             let mut movement =
                 BTreeMap::<String, (Option<String>, Option<String>, String, String, usize)>::new();
             for ledger in ledgers {
-                if selected.as_deref().is_none_or(|name| name == ledger.name) {
+                if selected
+                    .as_ref()
+                    .is_none_or(|found| found.name() == ledger.name)
+                {
                     movement.insert(
                         ledger.name,
                         (
@@ -176,7 +179,7 @@ impl Server {
             let truncated = offset.saturating_add(rows.len()) < total;
             let next_offset = truncated.then_some(offset + rows.len());
             Ok(ToolOutcome {
-                payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}}),
+                payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}}),
                 evidence: evidence.clone(),
                 company_guid: Some(guid.to_string()),
                 truncated,

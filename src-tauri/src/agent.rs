@@ -852,8 +852,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              `vouchers` still read it separately.",
         ),
         "ledger_not_found" => Some(
-            "No ledger in this company has this name, even ignoring case, spaces, symbols and \
-             accent marks, and ComplyEaze Bridge chose none. Show the user the ledgers in \
+            "No ledger in this company is spelled this way, even ignoring ASCII case and extra \
+             spaces (a symbol, an accent or the case of a letter outside A-Z is not ignored), and \
+             ComplyEaze Bridge chose none. Show the user the ledgers in \
              `candidates`, if there are any, and ask which one they meant: even one candidate \
              needs the user's confirmation, and none is marked best: the order is by rule \
              strength and then name, not by likelihood. Then call again with that name exactly \
@@ -868,14 +869,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              attached because the response budget is small: ask the user for the exact name.",
         ),
         "ledger_ambiguous" => Some(
-            "More than one ledger in this company matches this name once case, spaces, \
-             symbols and accent marks are ignored, and none is spelled exactly as requested, \
-             so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+            "More than one ledger in this company matches this name once case and spaces are \
+             ignored (they differ only in case or whitespace, such as a trailing line break), and \
+             none is spelled exactly as requested, so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
              ask which one they meant, then call again with that name exactly as listed. If \
              `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
              it is `names_masked` or absent the names are not shown: ask the user to type the \
              full name of the ledger exactly as spelled in Tally, since the names that clash \
-             may differ only in case, punctuation or accents.",
+             may differ only in case or whitespace.",
         ),
         "ledger_name_masked" => Some(
             "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
@@ -1211,6 +1212,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
         ),
+        // build_import_xml refuses this before any live read (`refuse_mixed_shapes`):
+        // the two shapes come from separate qualifications (protocol reference
+        // §9.8 and §9.13), and no file mixing them has been imported (#1082).
+        "voucher_type_shapes_mixed" => Some(
+            "A batch holds either Journals only, or Payment, Receipt and Contra vouchers only \
+             (those three may share a batch). Split the vouchers into one batch of each kind \
+             and build them separately; nothing was written or sent.",
+        ),
         _ => None,
     }
 }
@@ -1294,14 +1303,14 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
 fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         cause if cause.starts_with("native_date_") => Some(
-            "A date in one row of Tally's Bills Receivable or Payable report is not one \
-             ComplyEaze Bridge can read, so no figures were returned: leaving that bill out would \
-             change the totals. When the refusal carries a `bill_row`, it names the report and the row \
-             in the order Tally sent them, which may not be the order on screen: look in that \
-             report for a bill with a very long credit period or an unusual date and tell the \
-             user what Tally shows. A refusal about the book's date window has no `bill_row`: tell \
-             the user what the cause says. The \
-             book did not change during the read, so retrying gives the same refusal. Do not retry.",
+            "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge can \
+             read, so no figures were returned. When the refusal carries a `bill_row`, it names the \
+             report and the row in the order Tally sent them, which may not be the order on screen, \
+             and leaving that bill out would change the totals: look in that report for a bill \
+             with a very long credit period or an unusual date and tell the user what Tally shows. \
+             A refusal about the book's date window has no `bill_row`: tell the user what the cause \
+             says. The book did not change during the read, so retrying gives the same refusal. Do \
+             not retry.",
         ),
         cause if cause.starts_with("bills_") => Some(
             "Tally's Bills Receivable or Payable report came back in a shape ComplyEaze Bridge \
@@ -2241,6 +2250,9 @@ fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(
         .ok_or_else(|| "window_precedes_books_from".to_string())
 }
 
+/// Letters and digits only, lower-cased. It never resolves a name (#1076): it
+/// offers the ledger a looser spelling may mean as a `lookup_key_equal`
+/// candidate, and it is how a retyped masked name is recognised.
 fn ledger_lookup_key(value: &str) -> String {
     value
         .chars()
@@ -2249,21 +2261,152 @@ fn ledger_lookup_key(value: &str) -> String {
         .collect()
 }
 
+/// What may resolve without asking: ASCII case and ASCII spaces (trimmed and
+/// collapsed). It is the part of the measured fold (reference 9.4d) that never
+/// changes which ledger is meant. A non-ASCII letter's case is not folded
+/// (9.4f), and neither is any symbol, accent or separator (#1076, decision A).
+fn ledger_spelling_key(value: &str) -> String {
+    value
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+/// Any case and any whitespace. It never resolves; it finds the ledgers a
+/// name is nearly identical to, such as a twin that differs only by a
+/// trailing CR LF (9.4e), which no one can type.
+fn ledger_twin_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+/// A requested ledger name, resolved. `resolve_ledger_name` is its only
+/// producer, by convention: the type does not enforce it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerMatch {
+    /// Spelled exactly as in the book. `similar` holds the other ledgers that
+    /// differ from it only in case or whitespace: they are named in the
+    /// answer, never a reason to refuse, because the exact spelling is how a
+    /// twin is reached at all (an import binds the exact name, 9.4e).
+    Exact { name: String, similar: Vec<String> },
+    /// One ledger differs from the request only in ASCII case and ASCII
+    /// spaces, and no other ledger is that close to it.
+    CaseOrSpacing { name: String },
+}
+
+impl LedgerMatch {
+    fn name(&self) -> &str {
+        match self {
+            Self::Exact { name, .. } | Self::CaseOrSpacing { name } => name,
+        }
+    }
+
+    /// The `ledger_match` object a result carries, so the answer says which
+    /// ledger was read and how the request reached it. Under `mask_parties`
+    /// it names no similar ledger and gives no count of them, as a masked
+    /// refusal gives none.
+    fn to_json(&self, redaction: Redaction) -> Value {
+        let (matched, similar) = match self {
+            Self::Exact { similar, .. } => ("exact", similar.as_slice()),
+            Self::CaseOrSpacing { .. } => ("case_or_spacing", &[][..]),
+        };
+        if redaction == Redaction::MaskParties {
+            return redact_value(
+                json!({
+                    "ledger": party_name_value(self.name().to_string()),
+                    "matched": matched,
+                }),
+                redaction,
+            );
+        }
+        redact_value(
+            json!({
+                "ledger": party_name_value(self.name().to_string()),
+                "matched": matched,
+                // Bounded like a candidate list; the total says how many.
+                "similar_ledgers": similar
+                    .iter()
+                    .take(bridge_tally_core::master_binding::MAX_CANDIDATES_PER_ENTITY)
+                    .map(|name| party_name_value(name.clone()))
+                    .collect::<Vec<_>>(),
+                "similar_ledgers_total": similar.len(),
+            }),
+            redaction,
+        )
+    }
+}
+
+/// Why a requested ledger name did not resolve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerRefusal {
+    NotFound,
+    /// More than one ledger is that close, sorted: the set the user chooses from.
+    Ambiguous(Vec<String>),
+}
+
+impl LedgerRefusal {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound => "ledger_not_found",
+            Self::Ambiguous(_) => "ledger_ambiguous",
+        }
+    }
+}
+
+/// Resolves a requested ledger name: an exact spelling, or else the one ledger
+/// equal to it in ASCII case and spaces when no other ledger is a twin of
+/// it. Anything looser asks the user (#1076): a sole loose match is a
+/// candidate, never the answer (reference 9.4b).
 fn resolve_ledger_name<'a>(
     ledger_names: impl Iterator<Item = &'a str>,
     requested: &str,
-) -> Result<String, String> {
-    let requested_key = ledger_lookup_key(requested);
-    let exact = ledger_names
-        .filter(|name| ledger_lookup_key(name) == requested_key)
-        .collect::<Vec<_>>();
-    if let Some(name) = exact.iter().find(|name| **name == requested) {
-        return Ok((*name).to_string());
+) -> Result<LedgerMatch, LedgerRefusal> {
+    let mut names = ledger_names.collect::<Vec<_>>();
+    // A name listed twice is one ledger to the user, not a clash.
+    names.sort_unstable();
+    names.dedup();
+    let twins_of = |name: &str| {
+        let key = ledger_twin_key(name);
+        let mut twins = names
+            .iter()
+            .filter(|candidate| ledger_twin_key(candidate) == key)
+            .map(|candidate| (*candidate).to_string())
+            .collect::<Vec<_>>();
+        twins.sort_unstable();
+        twins.dedup();
+        twins
+    };
+    if names.contains(&requested) {
+        let similar = twins_of(requested)
+            .into_iter()
+            .filter(|name| name != requested)
+            .collect();
+        return Ok(LedgerMatch::Exact {
+            name: requested.to_string(),
+            similar,
+        });
     }
-    match exact.as_slice() {
-        [] => Err("ledger_not_found".to_string()),
-        [name] => Ok((*name).to_string()),
-        _ => Err("ledger_ambiguous".to_string()),
+    let key = ledger_spelling_key(requested);
+    let spelled = names
+        .iter()
+        .filter(|name| ledger_spelling_key(name) == key)
+        .collect::<Vec<_>>();
+    // Names equal in ASCII case and spaces are equal in any case and
+    // whitespace, so the twins of the first are every ledger that close.
+    match spelled.as_slice() {
+        [] => Err(LedgerRefusal::NotFound),
+        [only] => match twins_of(only).as_slice() {
+            [_] => Ok(LedgerMatch::CaseOrSpacing {
+                name: (**only).to_string(),
+            }),
+            twins => Err(LedgerRefusal::Ambiguous(twins.to_vec())),
+        },
+        [first, ..] => Err(LedgerRefusal::Ambiguous(twins_of(first))),
     }
 }
 

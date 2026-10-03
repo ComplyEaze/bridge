@@ -1,0 +1,21 @@
+{
+ "comment": "applicability_44ab, activity not recorded but s.44AB(a) is already yes (over the highest threshold): no s.44AB(b) question is asked.",
+ "entity_type": "individual",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": 10000000001
+ },
+ "a44_cash_share": {
+  "receipts_bp": 0,
+  "payments_bp": 0,
+  "limits": []
+ },
+ "tests": [
+  "applicability_44ab"
+ ]
+}

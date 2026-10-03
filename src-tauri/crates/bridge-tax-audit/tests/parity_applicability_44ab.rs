@@ -52,7 +52,15 @@ fn synthetic_read_matches_the_python_golden() {
     let d = diffs(&rust);
     assert!(d.is_empty(), "parity failed:\n{}", d.join("\n"));
     assert_eq!(rust["figures"].as_array().unwrap().len(), 12);
-    assert_eq!(rust["findings"].as_array().unwrap().len(), 2);
+    assert_eq!(rust["findings"].as_array().unwrap().len(), 3);
+    // Activity not recorded and s.44AB(a) "no": the s.44AB(b) question is asked, as a question only.
+    let b = rust["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["id"] == "applicability_44ab/profession_44ab_b")
+        .expect("the s.44AB(b) question");
+    assert_eq!(b["confidence"], "judgement_required");
     assert_eq!(value(&rust, "turnover"), json!(29_750_000)); // financial_statements' sales
     assert_eq!(value(&rust, "audit_required_44ab_a"), json!("no"));
     assert_eq!(

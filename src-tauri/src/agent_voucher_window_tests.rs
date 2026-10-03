@@ -4551,6 +4551,92 @@ async fn an_unnamed_later_page_is_served_while_the_marks_are_unchanged() {
     assert_eq!(one.requests(), total);
 }
 
+fn ledger_catalogue() -> String {
+    captured_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+    ))
+}
+
+/// A ledger first page read whole is held with the `ledger_match` it answered
+/// with, and its later page, served from that hold, answers with the same one
+/// (#1076): the ledger it read and that the name matched by case. The first
+/// page reads the catalogue, the counted window and the catalogue again; the
+/// second only the identity and the marks.
+#[tokio::test]
+async fn a_held_ledger_page_and_its_served_page_name_the_same_ledger() {
+    let mut plans = identity_plans();
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(paired(&counted_marks()));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(ledger_catalogue())));
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let ledger = "CAFé NAïVE TRADERS";
+    let first = one.call(json!({"ledger": ledger, "limit": 1})).await;
+    assert_ne!(first["isError"], true, "{first}");
+    let result = &first["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(page_snapshot(&first)["reused"], false, "{result}");
+    let ledger_match = result["ledger_match"].clone();
+    assert_eq!(
+        ledger_match["ledger"], "Café Naïve Traders",
+        "{ledger_match}"
+    );
+    assert_eq!(ledger_match["matched"], "case_or_spacing", "{ledger_match}");
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"ledger": ledger, "offset": 1, "limit": 1, "snapshot_id": id}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(
+        second["structuredContent"]["result"]["ledger_match"], ledger_match,
+        "{second}"
+    );
+    assert_eq!(one.requests(), total);
+}
+
+/// A page served from a held ledger window names the ledger it read, as the
+/// first page did (#1076): `ledger_match` is held with the rows, and the page
+/// still sends only the identity and marks reads.
+#[tokio::test]
+async fn a_served_page_of_a_ledger_window_names_the_ledger_it_read() {
+    let first =
+        call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
+    let rows = page_items_of(&first);
+    let window = first["structuredContent"]["result"]["window"].clone();
+    let plans = marks_page_plans(counted_marks());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let ledger_match = json!({"ledger": "Cash", "matched": "case_or_spacing",
+        "similar_ledgers": [], "similar_ledgers_total": 0});
+    let key = VoucherPageKey::new(&identity(), "20260801", "20260831", Some("cash"), None);
+    assert!(one
+        .server
+        .voucher_pages
+        .lock()
+        .unwrap()
+        .hold(Arc::new(VoucherPageSnapshot::new(
+            key,
+            marks_of(counted_marks_vouchers()),
+            Arc::new(rows),
+            window,
+            None,
+            Some(ledger_match.clone()),
+            None,
+        ))));
+    let second = one
+        .call(json!({"ledger": "cash", "offset": 1, "limit": 1}))
+        .await;
+    assert_eq!(page_snapshot(&second)["reused"], true, "{second}");
+    assert_eq!(
+        second["structuredContent"]["result"]["ledger_match"], ledger_match,
+        "{second}"
+    );
+    assert_eq!(one.requests(), total);
+}
+
 #[test]
 fn a_held_window_is_found_by_its_own_question_only() {
     let identity = identity();
@@ -4563,6 +4649,7 @@ fn a_held_window_is_found_by_its_own_question_only() {
             marks_of(3),
             Arc::new(Vec::new()),
             Value::Null,
+            None,
             None,
             None,
         ))

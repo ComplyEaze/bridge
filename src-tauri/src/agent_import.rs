@@ -650,6 +650,8 @@ impl Server {
         let args = &resolved.args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
+        // After the whole of `validate_payload`: in a batch with several
+        // defects, the first one it finds is reported, not this one (#1055).
         refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
         refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
@@ -1301,11 +1303,12 @@ impl Server {
             } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
                 // An untagged native post that is not bound: what its content
                 // cannot find is never absent. When the post's own answer said
-                // Tally created none of its one voucher and it is not found,
-                // say so (bridge#1108); otherwise an edit in Tally is as
-                // likely. Only the post's own readback reads that answer: by
-                // a later verification someone may have entered the voucher
-                // by hand and edited it.
+                // Tally created none of its vouchers and none is found (for a
+                // batch, with the voucher mark measured unmoved), say so
+                // (bridge#1108); otherwise an edit in Tally is as likely. Only
+                // the post's own readback reads that answer: by a later
+                // verification someone may have entered a voucher by hand and
+                // edited it.
                 let counters = current_dispatch
                     .then(|| {
                         dispatch_response
@@ -1314,10 +1317,13 @@ impl Server {
                             .map(|outcome| outcome.counters())
                     })
                     .flatten();
+                let voucher_step =
+                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
                 match verification::unmatched_cause(
                     counters,
                     line.vouchers.len(),
                     verification::unmatched_count(&result),
+                    voucher_step,
                 ) {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)

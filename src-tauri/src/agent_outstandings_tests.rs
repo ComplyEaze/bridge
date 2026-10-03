@@ -1050,7 +1050,15 @@ fn assert_replay_matches_the_live_call(
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "complete", "{result}");
     assert_eq!(result["as_of"], record["arguments"]["as_of"], "{result}");
-    assert_eq!(result["detail"], record["answer_detail"]);
+    // The live answer predates `ledger_match` (#1076); every field it has
+    // must still be the live call's, and the party was named exactly.
+    let mut detail = result["detail"].clone();
+    let ledger_match = detail
+        .as_object_mut()
+        .and_then(|fields| fields.remove("ledger_match"))
+        .expect("the detail says which ledger it read");
+    assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+    assert_eq!(detail, record["answer_detail"]);
 }
 
 /// Review P2.1: the `outstandings` tool with `detail: unadjusted`, replayed
@@ -1286,6 +1294,27 @@ async fn an_unreadable_bills_row_refuses_with_its_cause_report_and_row() {
         assert!(
             !text.contains(secret),
             "the refusal carries {secret:?}: {text}"
+        );
+    }
+}
+
+/// The next step for a date the Bills report could not read opens with words that fit every such
+/// cause, including the two about the book's date window, which name no row (#1096).
+#[test]
+fn the_date_remediation_opens_with_words_that_fit_a_book_window_cause() {
+    for cause in [
+        "native_date_book_window_invalid",
+        "native_date_year_ambiguous_book_window",
+        "native_date_year_invalid",
+    ] {
+        let text = outstandings_cause_remediation(cause).expect("a date cause has a next step");
+        assert_eq!(
+            text.split(". ").next(),
+            Some(
+                "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge \
+                 can read, so no figures were returned"
+            ),
+            "{cause}"
         );
     }
 }

@@ -259,3 +259,84 @@ fn a_refusal_about_the_book_window_is_not_pinned_on_a_row() {
         }
     }
 }
+
+/// A refusal raised while a row is still being read names that row too, not
+/// only one raised when the row is finished (#1096). Each case changes the
+/// captured long-due-date row, the 1,467th, and nothing else.
+#[test]
+fn a_refusal_raised_while_a_row_is_read_names_its_row() {
+    const DUE: &str = "<BILLDUE>1-Dec-2108</BILLDUE>";
+    let xml = receivable();
+    let at = xml.find(DUE).expect("the capture has the row");
+    // The row's own amount, and the end of its fixed fields, both before its due date.
+    let amount_open =
+        xml[..at].rfind("<BILLCL>").expect("the row has an amount") + "<BILLCL>".len();
+    let amount_close = amount_open + xml[amount_open..].find("</BILLCL>").unwrap();
+    let fixed_close = xml[..at]
+        .rfind("</BILLFIXED>")
+        .expect("the row has fixed fields");
+    let after_due = |extra: &str| xml.replacen(DUE, &format!("{DUE}{extra}"), 1);
+    let cases = [
+        (
+            format!("{}12O.00{}", &xml[..amount_open], &xml[amount_close..]),
+            NativeOutstandingsError::InvalidAmount,
+        ),
+        (
+            after_due("<BILLCL>1.00</BILLCL>"),
+            NativeOutstandingsError::InvalidResponse("bills_duplicate_billcl"),
+        ),
+        (
+            after_due(DUE),
+            NativeOutstandingsError::InvalidResponse("bills_duplicate_billdue"),
+        ),
+        (
+            // The row's own empty BILLOVERDUE follows, so this one makes it a repeat.
+            after_due("<BILLOVERDUE>1</BILLOVERDUE>"),
+            NativeOutstandingsError::InvalidResponse("bills_duplicate_billoverdue"),
+        ),
+        (
+            // The repeat is self-closing, which is read on its own path.
+            after_due("<BILLOVERDUE>1</BILLOVERDUE><BILLOVERDUE/>"),
+            NativeOutstandingsError::InvalidResponse("bills_duplicate_billoverdue"),
+        ),
+        (
+            after_due("<BILLOVERDUE>one</BILLOVERDUE>"),
+            NativeOutstandingsError::InvalidResponse("bills_overdue_invalid"),
+        ),
+        (
+            format!(
+                "{}<BILLREF>X</BILLREF>{}",
+                &xml[..fixed_close],
+                &xml[fixed_close..]
+            ),
+            NativeOutstandingsError::InvalidResponse("bills_fixed_duplicate_billref"),
+        ),
+    ];
+    for (changed, cause) in cases {
+        assert_ne!(changed, xml, "{cause:?}: the capture was changed");
+        assert_eq!(
+            parse(&changed),
+            Err(NativeOutstandingsError::BillRow {
+                report: None,
+                row: u32::try_from(LONG_ROW).unwrap(),
+                cause: Box::new(cause.clone()),
+            }),
+            "{cause:?}"
+        );
+        // The caller that knows the report names it; the row stays.
+        let error = parse(&changed).unwrap_err().in_report("receivable");
+        assert_eq!(
+            error.bill_row(),
+            Some((Some("receivable"), 1467)),
+            "{cause:?}"
+        );
+    }
+    // Control: a scalar before any row has no row to name, and stays as it is.
+    let before_any_row = xml.replacen("<BILLFIXED>", "<BILLCL>1.00</BILLCL><BILLFIXED>", 1);
+    assert_eq!(
+        parse(&before_any_row),
+        Err(NativeOutstandingsError::InvalidResponse(
+            "bills_scalar_before_fixed"
+        ))
+    );
+}

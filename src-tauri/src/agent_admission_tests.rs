@@ -582,6 +582,33 @@ fn every_list_a_new_tool_is_written_into_is_in_name_order() {
     }
 }
 
+/// Every tool description names the product in full, "ComplyEaze Bridge", never
+/// by its bare short name (#962, the guard promised in #1028). The one
+/// exception is a quoted voucher tag that `parse_bank_statement` writes into the
+/// book, which is data sent to Tally: it is taken out by its own constant, so
+/// any other "Bridge" beside it still fails.
+#[test]
+fn no_tool_description_names_the_product_by_its_bare_short_name() {
+    let tag = format!("\"{}\"", bridge_bank_statement::cash::PURPOSE_NOT_CONFIRMED);
+    for tool in registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+    {
+        let name = tool["name"].as_str().expect("tool name");
+        let text = tool["description"]
+            .as_str()
+            .expect("tool description")
+            .replace(&tag, "");
+        for (at, _) in text.match_indices("Bridge") {
+            assert!(
+                text[..at].ends_with("ComplyEaze "),
+                "{name} names a bare Bridge: {:?}",
+                &text[at.saturating_sub(40)..(at + 40).min(text.len())]
+            );
+        }
+    }
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be

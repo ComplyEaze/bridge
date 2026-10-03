@@ -35,8 +35,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   advisory rates the issue low there, and upgrading closes the same forms
   there.
 - **If you use 0.4.1: nothing below is urgent.** The reasons to upgrade are
-  that a ledger name that only nearly matches now makes the assistant ask you
-  instead of being read, later pages of a long voucher list can be served
+  that a ledger name that differs by a symbol, an accent or run-together words
+  now makes the assistant ask you instead of being read, later pages of a long voucher list can be served
   faster, and a post that Tally refuses is now named plainly. If you asked
   0.4.1 about a ledger by a name that was not its exact spelling, check that
   the answer named the ledger you meant (#1092).
@@ -87,10 +87,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
   currency other than the book's base cannot be marked. It needs a book whose
   base currency is INR and refuses a book too large to list. It reads the whole
   date window once and the ledger masters twice (before and after), and all of
-  it again for every page: 96 and 118 requests to Tally on two small books. Use
-  a narrow date range: its cost on a large book was not measured. It was run against a live Tally, once each, on
-  synthetic companies: one taxed Sales item invoice, one untaxed one (read by
-  an earlier build) and one Credit Note. What was not shown is under "Known
+  it again for every page. One call sent 96 requests to Tally on one small book
+  and 118 on another. Use a narrow date range: its cost on a large book was not measured. It was run against a live Tally, once each, on
+  synthetic companies: one taxed Sales item invoice, one untaxed one (read once by
+  an earlier build; its masters and the tool's answer were not kept) and one Credit Note. What was not shown is under "Known
   limits" (#1009).
 - **Later pages of a long voucher list can be served from the first page's
   read.** `vouchers` no longer reads the whole window again for every page when
@@ -98,7 +98,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   book, one month of 2,542 vouchers read in a release build, the first page took
   about 66 to 68 seconds and a later page about 1 second (one run each). A later page
   that names the first page's `snapshot_id` is refused if the company's marks
-  moved, instead of continuing from a different read. The read is held for ten
+  moved or the held read is gone (after ten minutes, or after a write through
+  ComplyEaze Bridge), instead of continuing from a different read. The read is held for ten
   minutes. A small or new company is not counted, so its window reads `partial`
   and every page reads it again. A later page that does not name the
   `snapshot_id` reads afresh when the books moved, and says so
@@ -108,7 +109,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   ones. A date is the same question as `2026-08-01` or
   `20260801`, while the `ledger` argument must be repeated exactly as typed
   (#1053, #1118).
-- **The assistant asks you which ledger you mean instead of guessing.** When
+- **A refused ledger name now tells the assistant to ask you which ledger you mean.** When
   `ledger_movement`, `vouchers` (with a ledger) or the party detail of
   `outstandings` cannot find the name you gave, the refusal can now list the
   ledgers it may mean (not when party names are masked), and the assistant is
@@ -141,7 +142,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   `open_bills_total` (every open bill in that direction, counted before
   paging) and `open_bills_shown`, so a cut page no longer reads like the whole
   list (on a partial read these cover base-currency ledgers only). In every
-  answer it returns the `as_of` date it used, which is today's date on this
+  answer that reads (a refusal carries none) it returns the `as_of` date it used, which is today's date on this
   computer when you gave none; `tally_status` returns that date as `today`
   (#1049, #1079).
 - **Pages that are not in the package:** a Questions page on the install site
@@ -163,12 +164,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
   other counter reported as 0) and the voucher is not found, `post_import` now
   says Tally reported it as not created, to check it is not in Tally, and to
   enter that one voucher in Tally's voucher entry screen, never through Tally's
-  Import menu; the voucher's status reads `tally_reported_not_created`. This
+  Import menu; in the answer to that post itself the voucher's status reads
+  `tally_reported_not_created`. This
   covers a single voucher, which is what the extension posts,
   and a saved batch of two or more vouchers rejected whole when the company's
   mark was read before and after and did not move (batch posting is an environment setting, `BRIDGE_AGENT_ENABLE_BATCH_POST`,
-  that the extension's settings do not offer). Tally's answer was captured only
-  for missing ledgers, on TallyPrime 7.1 Silver, and the reading of it was
+  that the extension's settings do not offer). Tally's answer was captured live only
+  for missing ledgers, on TallyPrime 7.1 Silver (one Education answer to a bad
+  date was also used, for its counter shape only), and the reading of it was
   tested on those saved answers, not in a live post; the code applies it to any
   answer of that shape, including on Gold, where it was not measured. After you
   enter the voucher by hand as told, the saved batch stays "reconciliation
@@ -216,13 +219,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
   the read refuses instead of being called established. On four synthetic lab
   books every zero line came back empty in both columns, so this has not been
   seen in a real answer (#1067, #1071).
-- **`outstandings` no longer fails on one far-future due date.** A due date that
+- **`outstandings` now reads one far-future due date.** A due date that
   Tally prints with a four-digit year of 2100 or later (such as `1-Dec-2108`)
   is read as written, and gives no overdue days in the ageing; before, that one
   bill failed the whole read with no reason. A bill row whose dates cannot be
   read still refuses, and the refusal now carries a named cause, the report, the
   row number when a row is what failed, and a next step, never the bill's party
-  or reference (#1091, #1098).
+  or reference. A whole call on such a book was not shown to complete (see
+  Known limits) (#1091, #1098).
 - **The two log tools now say what they do not show.** `read_evidence` and
   `egress_log` say what each holds and that neither shows what your AI provider
   received, and tell the assistant never to say that no data has left the
@@ -247,7 +251,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **`sales_register` was not shown** on an invoice-view Credit Note, an
   inter-state (IGST) line, a cancelled or optional sale, an unrecognised or
   missing duty head on a sale, more than one voucher in a window, paging, a
-  company with a registration, a tax Tally computes itself, a duty head no sales run showed (such as
+  company with a GST registration, a tax Tally computes itself, a duty head no sales run showed (such as
   cess), an invoice of another shape than the one run (for example several
   goods lines), a sale typed on Tally's screen, accounting-invoice mode, a
   post-dated sale, a `REFERENCE` or a filled `PARTYGSTIN` on a sale, a
@@ -260,7 +264,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   between pages, a window larger than 64 MiB is read again for each page, and
   what happens if someone changes the book at Tally's screen between two live
   pages, or a later page of a window with a voucher type or ledger filter, was
-  not tried against a live Tally (#1053, #1118).
+  not tried against a live Tally. Not established: whether a save by another
+  Tally Gold user, a restored copy of the company, or a company setting change
+  moves the marks at once (#1053, #1118).
 - **Ledger names:** a spelling that contains the mask mark (`…` or `...`) and is
   not typed exactly as the ledger is spelled is refused as `ledger_name_masked`,
   whatever the setting. When `mask_parties` is on, a spelling that shares a key
@@ -285,7 +291,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   not seen. After a backup is restored, if the books are keyed past the post's
   mark before the next check, the restore is not detected as one (the voucher
   reads `bound_not_in_window`); if Tally reuses the lost vouchers' IDs (not
-  measured), a lost voucher can even read `posted_verified` (#1050). Such
+  measured), a different voucher that took a lost voucher's ID and has the same
+  content can read `posted_verified` (#1050). Such
   vouchers cannot be posted again through ComplyEaze Bridge and must be entered
   by hand (#1038). Not tried: whether a voucher keeps its Tally ID when someone
   edits it in Tally's screens (if it does not, `verify_import` reads that
@@ -310,8 +317,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **Tried against TallyPrime** (7.1 Silver in a lab, synthetic companies, one
   run each unless a line above says otherwise): the `sales_register` reads, the
   paging run, the untagged-post runs, and the rejected-voucher answers. The
-  other changes are covered by automated tests, with saved real answers for the
-  due-date and statement items. The release check starts each package, lists
+  other changes are covered by automated tests, with a saved real answer behind
+  the due-date item; the statement fix is tested on hand-built lines, because
+  no saved answer has a 0 / 0 line. The release check starts each package, lists
   its tools and reads a sample bank statement, and does not run against
   TallyPrime. No one on our side installed the Windows package of this build in
   Claude Desktop on a Windows PC.

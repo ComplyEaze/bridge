@@ -98,12 +98,18 @@ impl ExactDecimal {
         exact_arithmetic::numeric_equal(self.as_str(), other.as_str())
     }
 
-    pub fn abs(&self) -> Result<Self, TallyError> {
-        if self.is_negative() {
-            Self::parse(self.as_str().trim_start_matches('-').to_string())
-        } else {
-            Ok(self.clone())
+    /// The value without its sign. It cannot fail: a validated lexeme without
+    /// its leading `-` is still a validated lexeme. As with [`Self::abs`],
+    /// only a negative non-zero value loses its sign, so `-0.00` is unchanged.
+    pub fn magnitude(&self) -> Self {
+        match self.0.strip_prefix('-') {
+            Some(digits) if self.is_negative() => Self(digits.to_string()),
+            _ => self.clone(),
         }
+    }
+
+    pub fn abs(&self) -> Result<Self, TallyError> {
+        Ok(self.magnitude())
     }
 
     pub fn cmp_magnitude(&self, other: &Self) -> std::cmp::Ordering {
@@ -231,6 +237,17 @@ impl TallyDate {
         Self::parse(format!("{target_year:04}{target_month:02}{target_day:02}"))
     }
 
+    /// Days since the civil epoch. It cannot fail: the eight digits were
+    /// validated when the date was built, so they are read, not parsed.
+    fn civil(&self) -> i64 {
+        let number = |range: std::ops::Range<usize>| {
+            self.0.as_bytes()[range]
+                .iter()
+                .fold(0_u32, |value, digit| value * 10 + u32::from(digit - b'0'))
+        };
+        civil_day(number(0..4), number(4..6), number(6..8))
+    }
+
     fn parts(&self) -> Result<(u32, u32, u32), TallyError> {
         let year = self.0[0..4]
             .parse::<u32>()
@@ -242,6 +259,29 @@ impl TallyDate {
             .parse::<u32>()
             .map_err(|_| invalid_data("invalid_tally_date"))?;
         Ok((year, month, day))
+    }
+}
+
+/// Two dates in order, the first on or before the second, with the whole days
+/// between them. It exists only for an ordered pair, so the ordering and the
+/// day count are one computation and cannot disagree, and the count cannot
+/// fail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DateSpan {
+    days: u32,
+}
+
+impl DateSpan {
+    /// The span from `from` to `to`, or `None` when `from` is after `to`.
+    pub fn new(from: &TallyDate, to: &TallyDate) -> Option<Self> {
+        u32::try_from(to.civil() - from.civil())
+            .ok()
+            .map(|days| Self { days })
+    }
+
+    /// Whole days from the first date to the second: 0 for the same day.
+    pub fn days(&self) -> u32 {
+        self.days
     }
 }
 

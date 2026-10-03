@@ -305,9 +305,12 @@ the payee."
     Ok(r)
 }
 
-/// CCQ-1 to CCQ-3, re-derived without calling [`compute_rows`]: the over-limit total equals the
-/// sum of the row-amount figures, the over-limit count equals the number of findings, and (when
-/// the `cash_payments_40a3` result is given) no voucher is evidence on a finding of both tests.
+/// CCQ-1 to CCQ-3, checked on the result alone, without calling [`compute_rows`]: the over-limit
+/// total equals the sum of the row-amount figures, the over-limit count equals the number of
+/// findings, and (when the `cash_payments_40a3` result is given) no voucher is evidence on a finding
+/// of both tests. [`run`] always emits the total and the count as integers, so an absent or
+/// non-integer total, count or row amount is itself a violation: a check that cannot see what it
+/// checks does not report that it holds (#1121, as the reference does since its fix).
 ///
 /// The reference's canonical dump calls this with the result alone, so CCQ-3 is exercised by its
 /// pack and by tests here, not by the parity dump.
@@ -324,23 +327,36 @@ pub fn check_invariants(result: &TestResult, cash_result: Option<&TestResult>) -
             })
     };
     let amount_prefix = format!("{TEST_ID}.row_amount_");
-    let rows: i128 = result
+    let rows: Vec<Option<i64>> = result
         .figures
         .iter()
         .filter(|f| f.id.starts_with(&amount_prefix))
         .map(|f| match &f.value {
-            Value::Int(n) => i128::from(*n),
-            _ => 0,
+            Value::Int(n) => Some(*n),
+            _ => None,
         })
-        .sum();
-    if let Some(total) = int_figure(&format!("{TEST_ID}.over_limit_total")) {
-        if i128::from(total) != rows {
-            out.push("CCQ-1: over_limit_total != sum of row_amount_* figures".to_string());
+        .collect();
+    let bad_rows = rows.iter().filter(|r| r.is_none()).count();
+    if bad_rows > 0 {
+        out.push(format!(
+            "CCQ-1: {bad_rows} row_amount_* figure(s) not an integer"
+        ));
+    }
+    match int_figure(&format!("{TEST_ID}.over_limit_total")) {
+        None => out.push("CCQ-1: over_limit_total figure absent or not an integer".to_string()),
+        Some(total) => {
+            let sum: i128 = rows.iter().flatten().map(|n| i128::from(*n)).sum();
+            if bad_rows == 0 && i128::from(total) != sum {
+                out.push("CCQ-1: over_limit_total != sum of row_amount_* figures".to_string());
+            }
         }
     }
-    if let Some(count) = int_figure(&format!("{TEST_ID}.over_limit_count")) {
-        if usize::try_from(count).ok() != Some(result.findings.len()) {
-            out.push("CCQ-2: over_limit_count != number of findings".to_string());
+    match int_figure(&format!("{TEST_ID}.over_limit_count")) {
+        None => out.push("CCQ-2: over_limit_count figure absent or not an integer".to_string()),
+        Some(count) => {
+            if usize::try_from(count).ok() != Some(result.findings.len()) {
+                out.push("CCQ-2: over_limit_count != number of findings".to_string());
+            }
         }
     }
     if let Some(cash) = cash_result {

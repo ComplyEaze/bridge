@@ -2750,3 +2750,29 @@ fn only_present_rows_are_named_and_a_clean_result_names_none() {
         .unwrap()
         .contains("error.preexisting_txn_ids"));
 }
+
+/// A refusal of the saved batch's own text says to build it again only when no
+/// attempt was recorded (#1055). Where an attempt was, or may have been, made,
+/// the message stays the reconciliation one, which says never to rebuild; and
+/// any other code with no attempt keeps the general message.
+#[test]
+fn a_text_refusal_says_to_build_again_only_when_no_attempt_was_recorded() {
+    let message = |attempted, code| {
+        reconciliation_failure_payload("bridge-test", attempted, None, code)["result"]["error"]
+            ["message"]
+            .clone()
+    };
+    assert_eq!(
+        message(Some(false), "voucher_text_invalid"),
+        json!(TEXT_REFUSED_MESSAGE)
+    );
+    let reconcile = json!("The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry.");
+    assert_eq!(message(Some(true), "voucher_text_invalid"), reconcile);
+    assert_eq!(message(None, "voucher_text_invalid"), reconcile);
+    assert_eq!(
+        message(Some(false), "voucher_entry_invalid"),
+        json!(
+            "No posting attempt was recorded. Review the error before requesting approval again."
+        )
+    );
+}

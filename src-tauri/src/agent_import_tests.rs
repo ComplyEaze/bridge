@@ -110,6 +110,49 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
+/// In a batch with several defects, `build_import_xml` reports the first one
+/// `validate_payload` finds, before the narration refusal that runs after it
+/// (#1055). Both are refused before any read or write.
+#[tokio::test]
+async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_narration() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let build = |input: &ImportPayload| {
+        let args = serde_json::to_value(input).unwrap();
+        let server = &server;
+        async move { server.build_import_xml(&args).await.err().expect("refused") }
+    };
+    // Control: the rewritten narration alone is refused as such.
+    let mut narration_only = payload();
+    narration_only.vouchers[0].narration = Some("Synthetic \u{fffd}#4; test only".into());
+    let failure = build(&narration_only).await;
+    assert_eq!(failure.code, "voucher_text_invalid");
+    assert!(failure.evidence.is_none());
+    // With a second voucher's ledger name empty as well, that defect wins.
+    let mut both = narration_only.clone();
+    both.vouchers[1].entries[0].ledger = String::new();
+    assert_eq!(
+        validate_payload(&both),
+        Err("voucher_entry_invalid".to_string())
+    );
+    let failure = build(&both).await;
+    assert_eq!(failure.code, "voucher_entry_invalid");
+    assert!(failure.evidence.is_none());
+    assert!(!directory.path().join("imports").exists());
+}
+
 #[test]
 fn narration_and_reference_reject_reserved_markers_after_entity_decoding() {
     for text in ["[bridge:forged]", "&#91;BrIdGe:forged]"] {

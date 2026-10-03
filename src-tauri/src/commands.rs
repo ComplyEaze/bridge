@@ -2528,27 +2528,80 @@ fn save_report_download_bytes(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
-    let path = write_unique_download(&downloads, &file_name, contents)
-        .map_err(|error| format!("Bridge could not write the export: {error}"))?;
-    Ok(path.to_string_lossy().into_owned())
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
+    save_download_into(
+        &downloads,
+        &app.state::<crate::exported_files::ExportedFiles>(),
+        &file_name,
+        contents,
+    )
+}
+
+/// Writes an export into `downloads` and records it, so the path returned to
+/// the webview is one the reveal command accepts (#915).
+fn save_download_into(
+    downloads: &std::path::Path,
+    exported: &crate::exported_files::ExportedFiles,
+    file_name: &str,
+    contents: &[u8],
+) -> Result<String, String> {
+    let path = write_unique_download(downloads, file_name, contents)
+        .map_err(|error| format!("ComplyEaze Bridge could not write the export: {error}"))?;
+    Ok(exported.record(path))
 }
 
 fn checked_export_file_name(file_name: &str) -> Result<String, String> {
     portable_export_file_name(file_name)
 }
 
+/// Why the reveal command refused a path, before launching anything.
+#[derive(Debug, PartialEq, Eq)]
+enum RevealRefusal {
+    /// No export of this process returned that path text.
+    NotExported,
+    /// An export did, but the file is no longer there.
+    Missing,
+}
+
+/// The reveal command's decision, apart from launching the file manager: the
+/// webview's path text is parsed into an exported file, which must still exist.
+fn reveal_target(
+    exported: &crate::exported_files::ExportedFiles,
+    path: &str,
+) -> Result<crate::exported_files::ExportedFile, RevealRefusal> {
+    let file = exported
+        .admit(path)
+        .map_err(|crate::exported_files::NotExported| RevealRefusal::NotExported)?;
+    if !file.path().is_file() {
+        return Err(RevealRefusal::Missing);
+    }
+    Ok(file)
+}
+
 /// Reveals an exported file in the OS file manager.
 ///
-/// Only ever called with a path this process just wrote, and the path is
-/// re-checked as an existing file before being handed to the platform tool --
-/// so a caller cannot use this to launch an arbitrary target.
+/// The path text comes from the webview, so it is parsed here into an
+/// [`ExportedFile`](crate::exported_files::ExportedFile): only a path an export
+/// recorded in this process is accepted, and any other path is refused before
+/// anything is launched (#915). The file is then re-checked as existing.
 #[tauri::command]
-pub async fn reveal_exported_file(path: String) -> Result<(), String> {
-    let target = std::path::PathBuf::from(&path);
-    if !target.is_file() {
-        return Err("Bridge could not find that export any more.".to_string());
-    }
+pub async fn reveal_exported_file(
+    path: String,
+    exported: State<'_, crate::exported_files::ExportedFiles>,
+) -> Result<(), String> {
+    let file = reveal_target(&exported, &path).map_err(|refusal| match refusal {
+        RevealRefusal::NotExported => {
+            "ComplyEaze Bridge shows only files it exported since it started. Export it again to \
+             show it."
+                .to_string()
+        }
+        RevealRefusal::Missing => {
+            "ComplyEaze Bridge could not find that export any more. It may have been moved or \
+             deleted."
+                .to_string()
+        }
+    })?;
+    let target = file.path();
 
     #[cfg(target_os = "macos")]
     let mut command = {
@@ -2557,7 +2610,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
             reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
         )]
         let mut command = std::process::Command::new("open");
-        command.arg("-R").arg(&target);
+        command.arg("-R").arg(target);
         command
     };
     #[cfg(target_os = "windows")]
@@ -2573,7 +2626,7 @@ pub async fn reveal_exported_file(path: String) -> Result<(), String> {
     };
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let mut command = {
-        let parent = target.parent().unwrap_or(&target);
+        let parent = target.parent().unwrap_or(target);
         #[expect(
             clippy::disallowed_methods,
             reason = "shows an existing local file in the OS file manager; the path is re-checked as an existing file first"
@@ -2758,6 +2811,7 @@ pub async fn export_bulk_party_statements(
     request: ExportBulkPartyStatementsRequest,
     approvals: State<'_, PartyStatementDestinationApprovals>,
     party_statement_sources: State<'_, PartyStatementSourceStore>,
+    exported: State<'_, crate::exported_files::ExportedFiles>,
 ) -> Result<
     crate::reports::bulk_party_statement::BulkPartyStatementResult,
     BulkPartyStatementExportError,
@@ -2766,6 +2820,7 @@ pub async fn export_bulk_party_statements(
         request,
         &approvals,
         &party_statement_sources,
+        &exported,
     )
 }
 
@@ -2773,6 +2828,7 @@ fn export_bulk_party_statements_at_selected_destination(
     request: ExportBulkPartyStatementsRequest,
     approvals: &PartyStatementDestinationApprovals,
     party_statement_sources: &PartyStatementSourceStore,
+    exported: &crate::exported_files::ExportedFiles,
 ) -> Result<
     crate::reports::bulk_party_statement::BulkPartyStatementResult,
     BulkPartyStatementExportError,
@@ -2820,7 +2876,10 @@ fn export_bulk_party_statements_at_selected_destination(
             })
         }
     };
-    result.map_err(BulkPartyStatementExportError::Existing)
+    let mut batch = result.map_err(BulkPartyStatementExportError::Existing)?;
+    // The batch's manifest is what the webview offers to reveal (#915).
+    batch.manifest_path = exported.record(std::path::PathBuf::from(&batch.manifest_path));
+    Ok(batch)
 }
 
 /// Builds the all-party, dual-ageing working paper from one completed native
@@ -2909,9 +2968,27 @@ pub async fn export_party_statement(
         .path()
         .download_dir()
         .or_else(|_| app.path().home_dir())
-        .map_err(|_| "Bridge could not locate a folder to save into.".to_string())?;
-    let path = write_unique_statement_file(&downloads, &stem, extension, &bytes)?;
-    Ok(path.to_string_lossy().into_owned())
+        .map_err(|_| "ComplyEaze Bridge could not locate a folder to save into.".to_string())?;
+    save_statement_into(
+        &downloads,
+        &app.state::<crate::exported_files::ExportedFiles>(),
+        &stem,
+        extension,
+        &bytes,
+    )
+}
+
+/// Writes a party statement into `downloads` and records it, so the path
+/// returned to the webview is one the reveal command accepts (#915).
+fn save_statement_into(
+    downloads: &std::path::Path,
+    exported: &crate::exported_files::ExportedFiles,
+    stem: &str,
+    extension: &str,
+    bytes: &[u8],
+) -> Result<String, String> {
+    let path = write_unique_statement_file(downloads, stem, extension, bytes)?;
+    Ok(exported.record(path))
 }
 
 /// Writes a new statement filename without ever replacing an earlier export.

@@ -159,6 +159,34 @@ mod listing {
         args
     }
 
+    /// A byte cap that trims the rows restates the headline's row sentence from
+    /// the rows that are left: it never says "all" over a shorter page, and
+    /// it points at the same offset the result's own cursor does.
+    #[tokio::test]
+    async fn a_byte_cap_that_trims_the_rows_restates_the_headline() {
+        let mut one = OneServer::spawn(first_page_plans(14));
+        one.server.settings.max_bytes = 5_000;
+        let response = one
+            .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02"}))
+            .await;
+        let content = &response["structuredContent"];
+        assert_eq!(content["truncated"], true, "{response}");
+        let shown = content["result"]["ledgers"].as_array().unwrap().len();
+        let total = content["result"]["total_ledgers"].as_u64().unwrap();
+        assert!(shown > 0 && (shown as u64) < total, "{shown} of {total}");
+        assert_eq!(
+            content["headline"]["rows"],
+            format!("Ledgers 1 to {shown} of {total}; more follow, from offset {shown}."),
+            "{content}"
+        );
+        assert_eq!(content["result"]["next_offset"], shown);
+        // The text copy carries the same headline.
+        let text: Value =
+            serde_json::from_str(response["content"][0]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(text["headline"], content["headline"]);
+        let _ = one.requests();
+    }
+
     /// Page 2 costs the identity read and one extent read, and continues the
     /// same report: its rows follow page 1's, and the frame is the same.
     #[tokio::test]
@@ -186,6 +214,21 @@ mod listing {
         };
         assert!(bytes(&second) < bytes(&first), "{second}");
 
+        // A whole book's headline says every ledger was read, and which page
+        // this is; the same on the continuation page.
+        let headline = |response: &Value| response["structuredContent"]["headline"].clone();
+        assert_eq!(
+            headline(&first)["lead"],
+            "Trial balance for \u{201c}Bridge Ageing Lab\u{201d}, 1 Apr 2026 to 2 Sep 2026: read for every ledger."
+        );
+        assert_eq!(
+            headline(&first)["rows"],
+            "Ledgers 1 to 3 of 6; more follow, from offset 3."
+        );
+        assert_eq!(
+            headline(&second)["rows"],
+            "Ledgers 4 to 6 of 6: the last page."
+        );
         let whole = OneServer::spawn(first_page_plans(14));
         let all = whole
             .call(json!({"company_guid":GUID,"from":"2026-04-01","to":"2026-09-02"}))
@@ -371,6 +414,24 @@ mod listing {
             assert_eq!(
                 page["limitations"][0],
                 "Base-currency ledgers only: 3 ledgers kept in another currency and 3 base-currency ledgers with a value Tally shows in another currency are excluded and listed."
+            );
+            // The headline says it in words, ahead of the figures: partial,
+            // the period, and both counts, on a continuation page too.
+            let headline = &response["structuredContent"]["headline"];
+            let lead = headline["lead"].as_str().unwrap();
+            assert!(
+                lead.starts_with("Partial trial balance for \u{201c}"),
+                "{headline}"
+            );
+            assert!(lead.contains("1 Apr 2025 to 15 Sep 2026"), "{headline}");
+            assert!(
+                lead.contains("3 ledgers kept in another currency and 3 base-currency ledgers"),
+                "{headline}"
+            );
+            let structured = response["structuredContent"].to_string();
+            assert!(
+                structured.find("\"headline\"").unwrap() < structured.find("\"result\"").unwrap(),
+                "the headline sorts ahead of the result"
             );
             assert!(!holds_key(response, "balanced"), "{response}");
             assert!(!response.to_string().contains(" @ "), "{response}");

@@ -223,8 +223,18 @@ failed read without `endpoint` either received a response whose body then failed
 parse or pass Bridge's checks, or hit a local limit or fault that does not involve the endpoint. A
 withdrawn call is `request_cancelled`.
 
-Like `remediation`, `cause`, `counts`, `size` and `endpoint` are omitted when `BRIDGE_AGENT_MAX_BYTES` is below
-4,096, so that the code always fits. Before a tool response is written, Bridge appends a
+A refused argument that only needs sending again in the right form carries `expected`, a typed
+field beside `remediation`: for `argument_invalid:from`, `argument_invalid:to` or
+`argument_invalid:as_of`, `{"argument": <name>, "kind": "calendar_date", "formats": ["YYYYMMDD",
+"YYYY-MM-DD"]}`, and for `company_guid_invalid`, `{"argument": "company_guid", "kind":
+"company_guid", "from_tool": "list_companies"}`. Their guidance asks the assistant to work out a
+relative date itself and state the dates it used, or to take the GUID from `list_companies` rather
+than a company's name. Both are attached only to a refusal made before anything was read from
+Tally: `company_guid_invalid` also comes back after a read when Tally itself lists a company whose
+GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`.
+
+Like `remediation`, `expected`, `cause`, `counts`, `size` and `endpoint` are omitted when
+`BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. Before a tool response is written, Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
@@ -1349,8 +1359,17 @@ that post's binding for good.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
-edit in Tally), is `sent_not_attributed`, never `not_found`. A binding refusal
-is final: an edit to one voucher of a batch in Tally before the binding is made
+edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
+readback only, when the post sent one voucher and its own answer from Tally
+reported every counter, created none and reported one exception, with nothing
+else counted, that voucher is `tally_reported_not_created` instead
+(bridge#1108). The person is told to check that it is not in Tally and enter it
+there by hand, not through Tally's Import menu. A later `verify_import` never
+reads the post's answer, since someone may have entered the voucher by hand and
+edited it since: it reads `sent_not_attributed`. A batch is never read as not
+created: a partial commit's count does not say which voucher Tally rejected, and
+no batch Tally rejected whole has been captured. A binding refusal is final: an
+edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
@@ -1509,6 +1528,21 @@ not the current year's opening: for a period's opening, use `trial_balance` or
 The unavailable `changed_since` implementation must not be used as
 change-enumeration evidence; its retained internal response states that
 deletion detection is unsupported.
+
+## The plain headline
+
+A result may carry a top-level `headline` beside `result`, in words and built only from the typed
+state the tool already has (never from the result's text): `lead` names the company (in quotes), the
+exact period (`1 Apr 2026 to 2 Sep 2026`, never `01/04/2026`) and the state, and `rows` says which rows
+this response lists. A read with any gap is `Partial` and its lead names every gap, with counts; a
+read with none says it covered every ledger. The type that decides this cannot build a whole read
+beside a gap. The headline sorts ahead of `result` in the serialized form (the keys of a response
+are in alphabetical order), so it is read before the figures. When a byte cap trims the page of rows
+the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
+`shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
+`rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
+read tools and the refusals follow.
 
 ## Protocol and migration notes
 

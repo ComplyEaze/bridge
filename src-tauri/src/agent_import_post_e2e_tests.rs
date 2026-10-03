@@ -4133,6 +4133,174 @@ async fn an_unbound_untagged_voucher_the_window_lacks_is_never_read_as_absent() 
     );
 }
 
+// bridge#1108: a single voucher Tally rejects. Its post's own answer says Tally
+// created none of the one sent and raised an exception, so the voucher is
+// reported as not created by Tally, never as possibly edited in Tally.
+
+/// The Education-mode answer to a rejected single voucher (CREATED 0,
+/// EXCEPTIONS 1), derived from a live capture with its LINEERROR text redacted:
+/// counter shape only, see EDUCATION_IMPORT_COUNTERS_PROVENANCE.md.
+fn rejected_one_education() -> String {
+    include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/live_education_w7_baddate_sanitized.xml"
+    )
+    .to_string()
+}
+
+/// The licensed 7.1 Silver answer to a rejected single voucher, committed byte
+/// for byte (`single-import-missing-ledger`, 2026-10-02): CREATED 0,
+/// EXCEPTIONS 1, one LINEERROR naming a ledger the book did not hold. Only the
+/// answer is borrowed; the voucher posted here is this suite's own.
+fn rejected_one_silver() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
+    ))
+}
+
+/// Posts the captured single-voucher batch with `answer` as Tally's answer to
+/// the POST, the marks after it unmoved and an empty window: Tally created
+/// nothing.
+async fn post_single_rejected(answer: String) -> Value {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(answer)));
+    plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(empty_collection(), 10));
+    let expected_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    posted
+}
+
+fn assert_reported_not_created(posted: &Value) {
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
+    assert_eq!(result["counts"]["not_found"], 0, "{posted}");
+    // Only the status a voucher moved to is counted: none moved to
+    // sent_not_attributed.
+    assert_eq!(
+        result["counts"].get("sent_not_attributed"),
+        None,
+        "{posted}"
+    );
+    assert_eq!(
+        result["counts"]["tally_reported_not_created"], 1,
+        "{posted}"
+    );
+    // Tally created nothing, so the post is not bound to its span.
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    let voucher = &result["vouchers"][0];
+    assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
+    let next_step = voucher["next_step"].as_str().expect("a next step");
+    assert_eq!(
+        Some(next_step),
+        super::super::verification::plain_next_step("tally_reported_not_created"),
+        "{posted}"
+    );
+    // Safety phrases, pinned before any shortening.
+    for phrase in [
+        "Tally reported this voucher as not created",
+        "Check that it is not in Tally",
+        "enter this one voucher",
+        "do not import it again through Tally's Import menu",
+        "will not send this saved voucher again",
+    ] {
+        assert!(next_step.contains(phrase), "{phrase}: {next_step}");
+    }
+}
+
+/// A single voucher Tally rejected (Education answer) reads as not created by
+/// Tally, with the next step that says so.
+#[tokio::test]
+async fn a_rejected_single_voucher_reads_as_not_created_on_the_education_answer_shape() {
+    let posted = post_single_rejected(rejected_one_education()).await;
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
+        0
+    );
+    assert_reported_not_created(&posted);
+}
+
+/// The same on licensed 7.1 Silver's own answer.
+#[tokio::test]
+async fn a_rejected_single_voucher_reads_as_not_created_on_the_silver_answer() {
+    let posted = post_single_rejected(rejected_one_silver()).await;
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["counters"]["created"],
+        0
+    );
+    assert_reported_not_created(&posted);
+}
+
+/// A later `verify_import` never reads the post's answer: by then someone may
+/// have entered the voucher by hand and edited it, so a voucher it cannot find
+/// is `sent_not_attributed`, with the line that says to check in Tally.
+#[tokio::test]
+async fn a_rejected_single_voucher_verified_later_is_not_labelled_from_the_old_answer() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(rejected_one_silver())));
+    plans.push(xml(company_marks(10, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(empty_collection(), 10));
+    let post_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(sent(simulator).len(), post_requests, "{posted}");
+    assert_reported_not_created(&posted);
+    // The later check runs against its own simulator; a dispatched batch
+    // verifies only on the origin it recorded, so the journal moves with it.
+    let later_plans = span_readback(empty_collection(), 10);
+    let expected_requests = later_plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(later_plans)).unwrap();
+    let later_server = server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later_server.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let later = later_server.call_tool("verify_import", args).await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{later}");
+    let result = &later["structuredContent"]["result"];
+    assert_eq!(later["isError"], json!(true), "{later}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{later}"
+    );
+    let voucher = &result["unverified_vouchers"][0];
+    assert_eq!(voucher["status"], "sent_not_attributed", "{later}");
+    assert_eq!(
+        voucher["next_step"].as_str(),
+        super::super::verification::plain_next_step("sent_not_attributed"),
+        "{later}"
+    );
+}
+
 // A batch that lands partly (the batch-conditions lab plan, condition 2c).
 // The POST is answered by the live response to a three-voucher import whose
 // second voucher Tally rejected (`partial-import-missing-ledger`, captured

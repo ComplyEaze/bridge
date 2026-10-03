@@ -90,13 +90,14 @@ and leave Tally's product/licence mode unchanged. Bridge's checks do not lock
 out changes made directly in Tally or by other software.
 
 Stop Bridge and every client running its connector before upgrading, then restart
-them with the updated version. Release 0.4.2 installs as a second extension beside
+them with the newer version. Release 0.4.2 installs as a second extension beside
 an older release instead of replacing it (its author line changed, and Claude
 Desktop includes the author in an extension's identity; seen on a Mac, not tried
 on Windows): remove the older extension first, in Claude Desktop's Extensions
-settings, and keep the data folder, which both versions use. The new extension
-does not carry over your settings: enter the Tally port and the posting setting
-again (posting starts off). Dispatch coordination uses the operating system's
+settings, and do not delete the data folder, which both versions use. The new
+extension does not carry over your settings: enter the Tally port, the posting
+setting (posting starts off) and the Terms setting again; every tool refuses
+until the Terms setting is on. Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request

@@ -24,14 +24,15 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 - **Remove the old extension first.** 0.4.2 installs beside 0.4.1 or earlier
   instead of replacing it, because its author line changed from "Bridge
-  contributors" to "ComplyEaze contributors" and Claude Desktop includes the
-  author in an extension's identity (seen on a Mac; we did not try Windows).
-  Before installing 0.4.2, in Claude Desktop open Settings, Extensions and
-  remove the older ComplyEaze Bridge. Keep ComplyEaze Bridge's data folder: both
-  versions use it. After installing, enter your settings again, such as the
-  Tally port and the posting setting (posting starts off), and tick the Terms
-  setting if it is off. If you already have two, remove the older one: it stops
-  working once 0.4.2 has sent a post (see the posting points below).
+  contributors" to "ComplyEaze contributors" and Claude Desktop builds an
+  extension's identity partly from its author name (seen on a Mac; we did not
+  try Windows). Before installing 0.4.2, in Claude Desktop open Settings,
+  Extensions and remove the older ComplyEaze Bridge. Keep ComplyEaze Bridge's
+  data folder: both versions use it, so do not delete it. After installing,
+  enter your settings again: the Tally port, the posting setting (posting starts
+  off) and the Terms setting, which every tool needs. If you already have two,
+  remove the older one: once 0.4.2 has tried a post, the older one can no longer
+  prepare, post or check vouchers (see the posting points below).
 - **The number is a patch number on a larger change.** 0.4.2 adds a tool, asks
   you about ledger names it used to read, and once you post with it you cannot
   go back to 0.4.1.
@@ -71,8 +72,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   read `absent` there. Check what ComplyEaze Bridge posted with `verify_import`,
   never with `voucher_presence`, before entering any of it again by hand. In
   Tally's own screens these vouchers can no longer be told from hand-entered
-  ones by their narration. Posting is off in a new install; check the setting
-  after you upgrade, since an earlier default may still be saved as on.
+  ones by their narration. Posting is off in a new install, and 0.4.2 installs
+  as one: check the setting after you install it.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude

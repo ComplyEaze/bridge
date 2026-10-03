@@ -10,9 +10,10 @@ measurement, counts only:
 
 The same bar holds these tests, measured by the reference's own `pack._compute` on the three
 clients (counts only):
-- `counter_cheques_40a3` and `narration_payees`: findings on one client only.
+- `narration_payees`: findings on one client only. (`counter_cheques_40a3`, held here for the same
+  reason, has since been ported: #1100.)
 - `entity_269st_gap`: no findings on any client; no person took cash on one day through two
-  ledgers.
+  ledgers. (Since ported, with invented edge books: #1142.)
 - `specified_persons_40a2b`: only its `applicable` figure on every client.
 - `related_parties_cl23`: substantive figures on one client only; the other two carry only its
   `applicable` figure and one finding.

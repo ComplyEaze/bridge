@@ -11,14 +11,14 @@ The reference engine's `applicability_44ab` gained, after the last pin, a questi
 - `ap_both`: activity "both", turnover over the highest threshold (s.44AB(a) yes): the question is still asked, with the receipts-not-split wording; a partial-coverage GSTR-1 turnover is stated and not differenced; the cash share is not supplied; no history.
 - `ap_unrecorded_no`: activity not recorded, s.44AB(a) "no": the question is asked, with the not-recorded wording.
 - `ap_unrecorded_yes`: activity not recorded, s.44AB(a) "yes": no question.
-- `ap_unrecorded_undetermined`: activity not recorded, turnover between the two thresholds and the cash share within 5% (s.44AB(a) undetermined): the question is asked with the not-recorded wording, which only the undetermined case reaches without a recorded profession.
+- `ap_unrecorded_undetermined`: activity not recorded, turnover between the two thresholds and the cash share within 5% (s.44AB(a) undetermined): the question is asked with the not-recorded wording. `ap_unrecorded_no` and the synthetic golden reach that wording too (activity not recorded, s.44AB(a) "no").
 - `ap_business`: activity "business", a profession-looking entity type, turnover not supplied: no question, and the s.44ADA flag is "yes".
 - The rules table: `profession_gross_receipts_paise` (50 lakh rupees, `status = "verified"` in the reference) is vendored as its own verbatim block of `rules/ay2026-27.s44ab.toml`; the reference rules file is unchanged since the last vendoring (same SHA-256), so the source constants stand.
 - Regression fixtures only: they prove the port and the reference agree on the same inputs, and nothing about reading Tally. The evidence for real books is local parity on real reads, never committed.
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `c62a4ab4` (the last change to its `tae/` and `selftest/`), under Python 3.13:
+At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13. The goldens below also regenerate byte-identical at its later commit `da9e2d3d` (checked 3 Oct 2026), the last change to its `tae/` and `selftest/` that day; the changes after `c62a4ab4` touch only `counter_cheques_40a3`:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \

@@ -1547,8 +1547,16 @@ are in alphabetical order), so it is read before the figures. When a byte cap tr
 the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
 `shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
 `rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
-the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
-read tools and the refusals follow.
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. `profit_and_loss` and `balance_sheet` carry one too, with no `rows`:
+when every result of the statement is established, the lead says so and what the derived lines passed
+the comparison with (Tally's own Balance Sheet, and its own Profit and Loss when a profit and loss read it
+as well); when any result is not established, the lead starts "Not established" and names each result
+with its own state, the reason in words (the reasons are a closed list, so a new one is a compile error
+until it has words) and, for a difference, how many lines did not tie (a Tally line that differs, a Tally line carrying an
+amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
+profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
+derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
+`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
 
 ## Protocol and migration notes
 

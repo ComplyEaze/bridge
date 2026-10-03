@@ -548,6 +548,65 @@ fn every_list_a_new_tool_is_written_into_is_in_name_order() {
         "ToolEffect::of and REGISTERED_TOOL_NAMES"
     );
 
+    // The description arms: an arm may serve several tools, so each arm's
+    // names are in order, the shipped arms are in order of their first name,
+    // the lab arms follow them, and every registered tool has exactly one arm.
+    let descriptions = region(
+        include_str!("agent_catalog.rs"),
+        "let (description, input_schema) = match name {",
+        "\n                    _ => (",
+    );
+    let arms = descriptions
+        .lines()
+        .filter_map(|line| {
+            let (pattern, _) = line
+                .strip_prefix("                    \"")?
+                .split_once("=>")?;
+            Some(
+                pattern
+                    .split('|')
+                    .map(|name| name.trim().trim_matches('"'))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+    for names in &arms {
+        assert!(
+            names.windows(2).all(|pair| pair[0] < pair[1]),
+            "a description arm's names must be in name order: {names:?}"
+        );
+    }
+    let is_lab = |names: &&Vec<&str>| names[0].starts_with("lab_");
+    let shipped = arms
+        .iter()
+        .filter(|names| !is_lab(names))
+        .collect::<Vec<_>>();
+    let lab = arms
+        .iter()
+        .filter(is_lab)
+        .map(|names| names[0])
+        .collect::<Vec<_>>();
+    assert!(
+        arms.iter()
+            .skip_while(|names| !is_lab(names))
+            .all(|names| is_lab(&names)),
+        "the lab description arms must follow the shipped ones: {arms:?}"
+    );
+    assert_in_name_order(
+        "the description arms",
+        &shipped.iter().map(|names| names[0]).collect::<Vec<_>>(),
+    );
+    assert_in_name_order("the lab description arms", &lab);
+    let mut described = shipped
+        .iter()
+        .flat_map(|names| names.iter().copied())
+        .collect::<Vec<_>>();
+    described.sort_unstable();
+    assert_eq!(
+        described, registered,
+        "the description arms and REGISTERED_TOOL_NAMES, each tool once"
+    );
+
     // The lab tools follow under their feature, after the shipped arms.
     let dispatch = arm_names(region(
         include_str!("agent.rs"),

@@ -28,6 +28,14 @@ These changes are in source and not yet in a published build.
   A row's `status` is unchanged. Not measured live: a window admitted against a
   census through the registers on a large book; the change sends no new request,
   it uses the census the read already makes (#1031).
+- `profit_and_loss` now compares Tally's `Cost of Sales :` heading with the
+  derived cost of sales (Purchase Accounts plus Direct Expenses) even when the
+  heading reads zero or empty. Over a non-zero cost of sales such a heading
+  refuses gross and net as `tally_profit_and_loss_differs`, naming the heading;
+  over a zero one it ties. Before, a zero or empty heading passed whatever the
+  cost of sales was. Both committed Profit and Loss captures still tie; whether a
+  real Tally ever prints the heading zero or empty over a non-zero cost of sales
+  is not measured (#1070).
 - `post_import` and `verify_import` proofs now measure `alter_id_delta` from the
   company's voucher mark read just before the POST, for a native post, instead
   of from the mark recorded when the batch was built. Anything posted between

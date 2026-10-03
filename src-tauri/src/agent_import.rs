@@ -2821,7 +2821,9 @@ fn validate_import_dates_for_profile(
     Ok(())
 }
 
-/// The reserved marker this module appends to every imported narration.
+/// The reserved marker this module appends to each narration of the file
+/// `build_import_xml` writes, for a person to import by hand. A native post
+/// sends the narration without it (#864; `render_native_vouchers_xml`).
 pub(super) const NARRATION_MARKER_PREFIX: &str = "[BRIDGE:";
 
 /// Every reserved marker occurrence in a narration, in the order written.

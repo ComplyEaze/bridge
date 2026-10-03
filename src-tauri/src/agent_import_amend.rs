@@ -63,8 +63,9 @@ pub(super) fn admit_lineage(
         if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {
             return Err("import_amend_endpoint_mismatch".into());
         }
-        // A native post carried the marker beside a random private REMOTEID.
-        // Re-importing under the batch identity would create, not alter.
+        // A native post was sent under a fresh private REMOTEID, not the batch
+        // identity, and since #864 without the narration marker. Re-importing
+        // under the batch identity would create, not alter.
         if build.dispatched {
             return Err("import_amend_natively_posted".into());
         }

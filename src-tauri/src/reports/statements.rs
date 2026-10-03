@@ -490,9 +490,12 @@ const COST_OF_SALES_HEADING: &str = "Cost of Sales :";
 const COST_OF_SALES_GROUPS: [&str; 2] = ["Purchase Accounts", "Direct Expenses"];
 
 /// As [`gate_failures`], for Tally's own Profit and Loss, with the one
-/// heading allowed when its amount is the derived cost of sales. A stock line
-/// (Opening or Closing Stock) is uncompared and refuses, and stock also moves
-/// the heading off the derived cost of sales.
+/// heading allowed when its amount is the derived cost of sales. The heading
+/// is compared as [`compare`] compares a line, before the no-amount arm, so a
+/// heading that reads zero or empty refuses over a non-zero cost of sales and
+/// ties over a zero one (#1070). A stock line (Opening or Closing Stock) is
+/// uncompared and refuses, and stock also moves the heading off the derived
+/// cost of sales.
 fn profit_and_loss_gate_failures(tie: &TieOut, cost_of_sales: &ExactDecimal) -> Vec<String> {
     let mut failures: Vec<String> = tie
         .lines
@@ -500,10 +503,11 @@ fn profit_and_loss_gate_failures(tie: &TieOut, cost_of_sales: &ExactDecimal) -> 
         .filter(|line| match &line.status {
             TieStatus::Matched | TieStatus::MatchedEmptyAsZero => false,
             TieStatus::Differs { .. } => true,
+            TieStatus::NotCompared { .. } if line.name == COST_OF_SALES_HEADING => !matches!(
+                compare(&line.tally_sub, &line.tally_main, cost_of_sales),
+                TieStatus::Matched | TieStatus::MatchedEmptyAsZero
+            ),
             TieStatus::NotCompared { .. } if !carries_an_amount(line) => false,
-            TieStatus::NotCompared { .. } if line.name == COST_OF_SALES_HEADING => {
-                !single_amount(line).is_some_and(|amount| amount.numeric_eq(cost_of_sales))
-            }
             TieStatus::NotCompared { .. } => true,
         })
         .map(|line| line.name.clone())
@@ -516,15 +520,6 @@ fn carries_an_amount(line: &TieLine) -> bool {
     [&line.tally_sub, &line.tally_main]
         .iter()
         .any(|amount| matches!(amount, NativeStatementAmount::Present(value) if !value.is_zero()))
-}
-
-/// The line's amount when exactly one of its two columns is present.
-fn single_amount(line: &TieLine) -> Option<&ExactDecimal> {
-    match (&line.tally_sub, &line.tally_main) {
-        (NativeStatementAmount::Present(value), NativeStatementAmount::Empty)
-        | (NativeStatementAmount::Empty, NativeStatementAmount::Present(value)) => Some(value),
-        _ => None,
-    }
 }
 
 fn place(chain: &bridge_tally_protocol::group_ancestry::AncestryChain) -> Placement {

@@ -2672,4 +2672,162 @@ deductor_aliases = 5\n"
         );
         assert!(bkq(&same).is_ok());
     }
+
+    // ---- [party_identity]: four ledger locations and one group location, as the reference's
+    // LEDGER_PATHS (after the creditor-ageing names, before the legacy trade-creditor source) and
+    // GROUP_PATHS (after `creditor_groups`) bind them ----
+
+    /// The book of [`book`] plus two debtor ledgers, one of them with a Tally GUID.
+    fn party_book() -> book::Book {
+        let mut b = book("Cash-in-Hand", G_CASH, None);
+        for (name, guid) in [("Cust A", ""), ("Cust B", G_OTHER)] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, "Sundry Debtors", guid, None));
+        }
+        b
+    }
+
+    #[test]
+    fn a_party_identity_name_that_matches_nothing_refuses() {
+        let b = party_book();
+        for (extra, code) in [
+            (
+                "[party_identity]\nadditional_party_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nexcluded_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nround_off_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity.overrides]\n\"No Such\" = { name = \"X\" }\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nparty_groups = [\"No Such\"]\n",
+                BIND_GROUP_UNKNOWN,
+            ),
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(code), "{extra}");
+        }
+    }
+
+    #[test]
+    fn a_malformed_party_identity_location_refuses() {
+        let b = party_book();
+        for extra in [
+            "[party_identity]\nexcluded_ledgers = \"Cust A\"\n",
+            "[party_identity]\nadditional_party_ledgers = [1]\n",
+            "[party_identity]\noverrides = 5\n",
+            "[party_identity]\nparty_groups = \"Sundry Debtors\"\n",
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_ID_MALFORMED), "{extra}");
+        }
+        // Not a table: the reference's `_expand` skips every location under it, and
+        // `PartyConfig::from_toml` refuses it when `entity_269st_gap` runs.
+        let (bound, _) = engagement("party_identity = 5\n").bind(&b).unwrap();
+        assert_eq!(bound.party_identity, Some(toml::Value::Integer(5)));
+    }
+
+    #[test]
+    fn a_label_used_only_under_party_identity_is_bound_and_rewritten() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [group_ids]\n\"Debtors Old\" = {G_OTHER:?}\n\
+             [party_identity]\n\
+             derive_pan_from_gstin = true\n\
+             party_groups = [\"Debtors Old\"]\n\
+             additional_party_ledgers = [\"Cust Old\"]\n\
+             excluded_ledgers = [\"Cust Old\", \"Cust A\"]\n\
+             round_off_ledgers = [\"Cust Old\"]\n\
+             [party_identity.overrides]\n\
+             \"Cust Old\" = {{ name = \"Customer B\" }}\n"
+        ));
+        let mut b = party_book();
+        b.group_masters
+            .insert("Sundry Debtors".to_string(), group_master(G_OTHER, None));
+        let (bound, report) = e.bind(&b).unwrap();
+        let expected: toml::Value = toml::from_str(
+            "derive_pan_from_gstin = true\n\
+             party_groups = [\"Sundry Debtors\"]\n\
+             additional_party_ledgers = [\"Cust B\"]\n\
+             excluded_ledgers = [\"Cust B\", \"Cust A\"]\n\
+             round_off_ledgers = [\"Cust B\"]\n\
+             [overrides]\n\
+             \"Cust B\" = { name = \"Customer B\" }\n",
+        )
+        .unwrap();
+        assert_eq!(bound.party_identity, Some(expected));
+        assert_eq!(report.drifts.len(), 2);
+    }
+
+    #[test]
+    fn two_override_keys_that_bind_to_one_ledger_refuse() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust Old\" = {{ name = \"X\" }}\n\
+             \"Cust B\" = {{ name = \"Y\" }}\n"
+        ));
+        let err = e.bind(&party_book()).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_COLLISION));
+    }
+
+    /// The production path: an override keyed by a label that `[ledger_ids]` binds to a renamed
+    /// ledger gives that ledger its PAN, so two ledgers carrying one PAN and receiving cash on one
+    /// day, each under the s.269ST(a) limit and together at or over it, make one gap row.
+    #[test]
+    fn entity_269st_gap_reads_the_bound_party_identity_table() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust A\" = {{ pan = \"PAN-SAME-1\" }}\n\
+             \"Cust Old\" = {{ pan = \"PAN-SAME-1\" }}\n"
+        ));
+        let mut b = party_book();
+        b.vouchers.clear(); // only the two receipts below
+        let day = TallyDate::parse("20250612").unwrap();
+        for (guid, party, paise) in [("r1", "Cust A", 12_000_000), ("r2", "Cust B", 10_000_000)] {
+            b.vouchers.push(Voucher {
+                guid: guid.to_string(),
+                date: day.clone(),
+                vtype: "Receipt".to_string(),
+                base_type: "Receipt".to_string(),
+                status: VoucherStatus::Regular,
+                lines: vec![
+                    LedgerLine {
+                        ledger: "Cash".to_string(),
+                        amount_paise: paise,
+                    },
+                    LedgerLine {
+                        ledger: party.to_string(),
+                        amount_paise: -paise,
+                    },
+                ],
+                ..Default::default()
+            });
+        }
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let dump = crate::entity_269st_gap_on(&e, &b, &rules).unwrap();
+        let figure = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("entity_269st_gap.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(figure("gap_rows_count"), Some(serde_json::json!(1)));
+        assert_eq!(figure("unbound_ledger_count"), Some(serde_json::json!(0)));
+        assert_eq!(
+            dump["module_invariants_evaluated"],
+            serde_json::json!(["entity_269st_gap.check_invariants"])
+        );
+    }
 }

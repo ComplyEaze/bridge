@@ -457,4 +457,68 @@ additional_party_ledgers = [\"A\"]\nexcluded_ledgers = [\"E\"]\nround_off_ledger
             .entity_for_ledger("Expense")
             .is_none());
     }
+
+    fn debtor(name: &str, pan: &str, gstin: &str) -> Ledger {
+        Ledger {
+            name: name.to_string(),
+            parent: "Sundry Debtors".to_string(),
+            chain: vec!["Sundry Debtors".to_string()],
+            chain_complete: true,
+            master_opening_paise: 0,
+            guid: format!("invented-{name}"),
+            masterid: None,
+            pan: pan.to_string(),
+            gstin: gstin.to_string(),
+        }
+    }
+
+    fn book_with(ledgers: Vec<Ledger>) -> Book {
+        Book {
+            ledgers: ledgers.into_iter().map(|l| (l.name.clone(), l)).collect(),
+            ..Default::default()
+        }
+    }
+
+    /// The reference's single-ledger entity always "agrees" with itself, whatever its name holds.
+    #[test]
+    fn a_single_ledger_entity_agrees_with_itself_even_with_no_name_word() {
+        let book = book_with(vec![debtor("M/s", "PAN-ALONE-1", "")]);
+        let index = build_party_index(&book, &PartyConfig::default()).unwrap();
+        let entity = index.entity_for_ledger("M/s").unwrap();
+        assert_eq!(entity.ledgers, vec!["M/s".to_string()]);
+        assert!(entity.names_agree);
+    }
+
+    /// With derivation opted in, a PAN the engagement supplies still comes before one derived
+    /// from the GSTIN: derivation only fills a gap nothing else filled.
+    #[test]
+    fn an_override_pan_comes_before_one_derived_from_the_gstin() {
+        // Built at run time so no source line is shaped like a real identifier.
+        let segment = ["DDDDD", "3333", "D"].concat();
+        let gstin = format!("29{segment}1X7");
+        let book = book_with(vec![debtor("Customer", "", &gstin)]);
+        let mut config = PartyConfig {
+            derive_pan_from_gstin: true,
+            ..PartyConfig::default()
+        };
+        let derived = build_party_index(&book, &config).unwrap();
+        let entity = derived.entity_for_ledger("Customer").unwrap();
+        assert_eq!(
+            (entity.pan.as_str(), entity.pan_sources.as_slice()),
+            (segment.as_str(), &[PanSource::DerivedFromGstin][..])
+        );
+        config.overrides.insert(
+            "Customer".to_string(),
+            PartyOverride {
+                pan: "PAN-OVR-1".to_string(),
+                ..PartyOverride::default()
+            },
+        );
+        let overridden = build_party_index(&book, &config).unwrap();
+        let entity = overridden.entity_for_ledger("Customer").unwrap();
+        assert_eq!(
+            (entity.pan.as_str(), entity.pan_sources.as_slice()),
+            ("PAN-OVR-1", &[PanSource::ClientConfig][..])
+        );
+    }
 }

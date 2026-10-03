@@ -8198,5 +8198,37 @@
   "file": "src/party_identity.rs",
   "from": ".fold(first, |acc, s| acc.intersection(&s).cloned().collect())",
   "to": ".take(1).fold(first, |acc, s| acc.intersection(&s).cloned().collect())"
+ },
+ {
+  "id": "CQ-27",
+  "by": "author",
+  "what": "CCQ-1 passes when the total is absent or not an integer",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "None => out.push(\"CCQ-1: over_limit_total figure absent or not an integer\".to_string()),",
+  "to": "None => {}"
+ },
+ {
+  "id": "CQ-28",
+  "by": "author",
+  "what": "CCQ-2 passes when the count is absent or not an integer",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "None => out.push(\"CCQ-2: over_limit_count figure absent or not an integer\".to_string()),",
+  "to": "None => {}"
+ },
+ {
+  "id": "CQ-29",
+  "by": "author",
+  "what": "a row amount that is not an integer is not reported",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if bad_rows > 0 {",
+  "to": "if false {"
+ },
+ {
+  "id": "CQ-30",
+  "by": "author",
+  "what": "the total is compared with a row sum that skips a non-integer row",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if bad_rows == 0 && i128::from(total) != sum {",
+  "to": "if i128::from(total) != sum {"
  }
 ]

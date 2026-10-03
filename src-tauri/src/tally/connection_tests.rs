@@ -1028,10 +1028,11 @@ async fn http_success_with_tally_status_zero_is_not_an_empty_success() {
         .await
         .expect_err("STATUS 0 must not become an empty ledger result");
     server.await.expect("synthetic Tally server task");
-    assert!(
+    assert_eq!(
         error
-            .to_string()
-            .contains("native ledger collection did not report success"),
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()),
+        Some(&bridge_tally_protocol::NativeCollectionError::NotSuccess),
         "unexpected error: {error:#}"
     );
 }

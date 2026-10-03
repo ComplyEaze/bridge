@@ -732,6 +732,13 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(amount.safe_code());
         }
+        // A native collection's whole-response refusal (#676), the ledger
+        // collection's included (#718): before this, the class was decided in
+        // the parser and then lost here.
+        if let Some(collection) = cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+        {
+            return Some(collection.safe_code());
+        }
         if let Some(masters) =
             cause.downcast_ref::<bridge_tally_protocol::native_masters::NativeMastersError>()
         {

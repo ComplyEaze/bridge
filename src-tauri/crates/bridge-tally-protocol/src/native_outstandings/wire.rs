@@ -87,8 +87,14 @@ pub fn parse_native_bill_rows(
                     // report shape means Tally reported failure, regardless
                     // of the value carried.
                     b"STATUS" => return Err(NativeOutstandingsError::TallyReportedFailure),
+                    // A refusal raised while a row is read names that row's
+                    // 1-based place in Tally's answer, as the finalising pass
+                    // below does, never its party or reference (bridge#1096).
+                    // The row a scalar belongs to is the last one opened.
                     b"BILLFIXED" => {
-                        let (party, reference, bill_date_raw) = parse_bill_fixed(&mut reader)?;
+                        let row_number = pending.len() + 1;
+                        let (party, reference, bill_date_raw) = parse_bill_fixed(&mut reader)
+                            .map_err(|error| error.in_row(row_number))?;
                         pending.push(PendingBillRow {
                             party,
                             reference,
@@ -101,6 +107,7 @@ pub fn parse_native_bill_rows(
                     }
                     b"BILLCL" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
@@ -110,15 +117,17 @@ pub fn parse_native_bill_rows(
                         if row.closing_balance.is_some() {
                             return Err(NativeOutstandingsError::InvalidResponse(
                                 "bills_duplicate_billcl",
-                            ));
+                            )
+                            .in_row(row_number));
                         }
-                        row.closing_balance = Some(
-                            ExactDecimal::parse(text.trim())
-                                .map_err(|_| NativeOutstandingsError::InvalidAmount)?,
-                        );
+                        row.closing_balance =
+                            Some(ExactDecimal::parse(text.trim()).map_err(|_| {
+                                NativeOutstandingsError::InvalidAmount.in_row(row_number)
+                            })?);
                     }
                     b"BILLDUE" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
@@ -128,19 +137,21 @@ pub fn parse_native_bill_rows(
                         if row.due_date_raw.is_some() {
                             return Err(NativeOutstandingsError::InvalidResponse(
                                 "bills_duplicate_billdue",
-                            ));
+                            )
+                            .in_row(row_number));
                         }
                         row.due_date_raw = Some(text);
                     }
                     b"BILLOVERDUE" => {
                         let text = read_element_text(&mut reader, element.name())?;
+                        let row_number = pending.len();
                         let row =
                             pending
                                 .last_mut()
                                 .ok_or(NativeOutstandingsError::InvalidResponse(
                                     "bills_scalar_before_fixed",
                                 ))?;
-                        set_bill_overdue(row, &text)?;
+                        set_bill_overdue(row, &text).map_err(|error| error.in_row(row_number))?;
                     }
                     _ => {
                         return Err(NativeOutstandingsError::InvalidResponse(
@@ -160,13 +171,14 @@ pub fn parse_native_bill_rows(
                     return Err(NativeOutstandingsError::TallyReportedFailure);
                 }
                 if name.as_slice() == b"BILLOVERDUE" {
+                    let row_number = pending.len();
                     let row =
                         pending
                             .last_mut()
                             .ok_or(NativeOutstandingsError::InvalidResponse(
                                 "bills_scalar_before_fixed",
                             ))?;
-                    set_bill_overdue(row, "")?;
+                    set_bill_overdue(row, "").map_err(|error| error.in_row(row_number))?;
                     continue;
                 }
                 return Err(NativeOutstandingsError::InvalidResponse(

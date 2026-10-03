@@ -1422,7 +1422,13 @@ fn empty_bill_party_from_raw_bytes_fails_closed_before_double_counting() {
     match result {
         Err(error) => assert_eq!(
             error,
-            NativeOutstandingsError::InvalidResponse("bills_fixed_empty_billparty")
+            NativeOutstandingsError::BillRow {
+                report: None,
+                row: 1,
+                cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                    "bills_fixed_empty_billparty"
+                )),
+            }
         ),
         Ok(result) => {
             assert_exact(&result.report.receivable_total, "100");
@@ -1456,9 +1462,13 @@ fn whitespace_and_self_closing_bill_party_use_the_distinct_empty_party_error() {
                 &as_of(AGEING_LAB_BOOKS_FROM),
                 &as_of(NATIVE_CAPTURE_AS_OF),
             ),
-            Err(NativeOutstandingsError::InvalidResponse(
-                "bills_fixed_empty_billparty"
-            ))
+            Err(NativeOutstandingsError::BillRow {
+                report: None,
+                row: 1,
+                cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                    "bills_fixed_empty_billparty"
+                )),
+            })
         );
     }
 }
@@ -1487,9 +1497,13 @@ fn self_closing_empty_billoverdue_is_none_and_still_rejects_duplicates() {
             &as_of(VALIDATION_LAB_BOOKS_FROM),
             &as_of(VALIDATION_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidResponse(
-            "bills_duplicate_billoverdue"
-        ))
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidResponse(
+                "bills_duplicate_billoverdue"
+            )),
+        })
     );
 }
 
@@ -1547,7 +1561,11 @@ fn illegal_numeric_references_in_amounts_remain_fail_closed() {
             &as_of(BILLWISE_LAB_BOOKS_FROM),
             &as_of(NATIVE_CAPTURE_AS_OF),
         ),
-        Err(NativeOutstandingsError::InvalidAmount)
+        Err(NativeOutstandingsError::BillRow {
+            report: None,
+            row: 1,
+            cause: Box::new(NativeOutstandingsError::InvalidAmount),
+        })
     );
 
     let ledgers = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\

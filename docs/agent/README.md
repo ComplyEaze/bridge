@@ -773,8 +773,9 @@ or vouchers.
   masters alone. Those marks and masters reading the same before and after the
   window still decide whether the read stands at all (a drift refuses it). The one
   difference from `vouchers` is the reason `company_has_no_vouchers`, which
-  `vouchers` returns beside `complete` for an empty window on a book with no
-  vouchers; a register returns `complete` with no reason there. A row's `status`
+  `vouchers` returns (and records in its evidence) beside `complete` for an empty
+  window on a book with no vouchers; a register returns `complete` with no reason
+  in the result or the evidence. A row's `status`
   of `complete` is a different thing: every entry the voucher touches classified,
   and `state` does not change it.
 - **Snapshot binding.** The ledger masters are read before the window (and the
@@ -831,8 +832,9 @@ rate or return section, and matches nothing against any portal.
   (tests). One Sales accounting voucher (not an invoice) is also classified, in
   tests, against the ledger masters of the purchase register's lab book.
 - **What `state` means.** The same rule as `purchase_register` (see its
-  section): `complete` only when the window was counted, otherwise `partial` with
-  `nonempty_window_unqualified`. A row's `status` is separate.
+  section): `complete` only when the window was counted (or an empty window its
+  corroboration confirmed), otherwise `partial` with `nonempty_window_unqualified`.
+  A row's `status` is separate.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of

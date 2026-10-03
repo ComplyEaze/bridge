@@ -759,24 +759,40 @@ fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
     request_files_are_exactly_the_requests_sent(STOCK_LAB_DAY, &["stock_lab_taxed_day"]);
 }
 
-/// The recorded purchase read with the window's census and window answers replaced by Tally's
-/// own empty collection, followed by the empty-window corroboration the register then makes: a
+/// The recorded purchase read with the window's census and window answers spliced out for
+/// Tally's own empty collection (a committed capture of an empty collection, not a capture of an
+/// empty-window call), followed by the empty-window corroboration the register then makes: a
 /// wider window read (its census and window, each paired) and the company's voucher mark.
 const EMPTY_WINDOW_TAIL: &str = "ensnseewswseemsmse";
 
-async fn empty_window_register() -> Value {
+/// The company-marks response with the voucher mark set to zero: a book with no vouchers.
+fn marks_with_voucher_mark_zero() -> String {
+    let body = body_of(Kind::Marks);
+    let start = body.find("<ALTVCHID").unwrap();
+    let open_end = start + body[start..].find('>').unwrap() + 1;
+    let close = open_end + body[open_end..].find('<').unwrap();
+    format!("{}0{}", &body[..open_end], &body[close..])
+}
+
+/// `corroborating_marks` answers the voucher-mark read of the corroboration (the tail's `m`s);
+/// the recorded marks when `None`.
+async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
     let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
     ))))
     .with_encoding(WireEncoding::Utf16Le)
     .with_framing(ResponseFraming::ContentLength);
+    let recorded = RECORDED_ORDER.len();
     let plans = RECORDED_ORDER
         .chars()
         .chain(EMPTY_WINDOW_TAIL.chars())
-        .map(|letter| {
+        .enumerate()
+        .map(|(position, letter)| {
             let kind = Kind::of(letter);
             if matches!(kind, Kind::Census | Kind::Window) {
                 empty.clone()
+            } else if kind == Kind::Marks && position >= recorded && corroborating_marks.is_some() {
+                plan(kind, corroborating_marks.clone().unwrap())
             } else {
                 plan(kind, body_of(kind))
             }
@@ -807,7 +823,7 @@ async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_regis
     // zero: nothing corroborates the emptiness, so the register says `partial` with the reason
     // `vouchers` gives the same window (agent.rs `corroborate_empty_voucher_window`), not
     // `complete`. This is the empty-window half of #1031, read end to end.
-    let response = empty_window_register().await;
+    let response = empty_window_register(None).await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["total"], 0, "{result}");
@@ -821,5 +837,27 @@ async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_regis
     assert_eq!(
         response["structuredContent"]["evidence"]["reason_code"],
         "empty_uncorroborated"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_window_on_a_book_with_no_vouchers_is_complete_in_a_register_with_no_reason() {
+    // The corroboration finds the company's voucher mark at zero: nothing could be missing, so
+    // the empty window is `complete`. `vouchers` returns the reason `company_has_no_vouchers`
+    // beside it; a register returns none, in `result` and in the evidence. The mark is the
+    // recorded one rewritten to zero, in the corroboration's read only.
+    let response = empty_window_register(Some(marks_with_voucher_mark_zero())).await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["state"], "complete", "{result}");
+    assert!(result["reason"].is_null(), "{result}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"], "complete",
+        "{response}"
+    );
+    assert!(
+        response["structuredContent"]["evidence"]["reason_code"].is_null(),
+        "{response}"
     );
 }

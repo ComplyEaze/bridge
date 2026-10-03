@@ -13,7 +13,11 @@
 //! Divergence, deliberate, and not parity: the reference reads the optional `[party_identity]` table
 //! leniently (a table that is not a table, or a key of the wrong type, is read as empty or by
 //! Python's truthiness, so a string for a list becomes the set of its characters). Here every such
-//! value refuses with a typed `Config` error, and only this test fails.
+//! value refuses with a typed `Config` error, and only this test fails. A key the reference does not
+//! read, at either level of the table, also refuses here where the reference ignores it.
+//!
+//! The table's ledger and group names reach this module already bound to the Book by
+//! [`crate::binding::bind`], as the reference's binding binds them before any test runs.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -171,8 +175,8 @@ pub struct EntityBinding {
     pub ledgers: Vec<String>,
     /// Per ledger, aligned with `ledgers`.
     pub pan_sources: Vec<PanSource>,
-    /// Disclosure only, never a binding criterion: whether every ledger name shares a word (of a
-    /// single ledger, whether its name has one).
+    /// Disclosure only, never a binding criterion: whether every ledger name shares a word. A single
+    /// ledger always agrees with itself, as in the reference.
     pub names_agree: bool,
 }
 
@@ -298,8 +302,7 @@ rest of the chain",
     let mut index = PartyIndex::default();
     for (pan, mut members) in by_pan {
         members.sort_by(|a, b| a.0.cmp(&b.0));
-        // A single-ledger entity never reaches a gap row, so its disclosure is never read.
-        let names_agree = {
+        let names_agree = members.len() == 1 || {
             let mut sets = members.iter().map(|m| name_tokens(&m.1));
             let first = sets.next().unwrap_or_default();
             !sets

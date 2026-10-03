@@ -132,8 +132,9 @@ pub struct Engagement {
     /// `high_value_register`-only: the optional `[roles].s194n_withdrawal_narration_terms`, kept as
     /// written and validated when that test runs ([`high_value_register::s194n_terms`]).
     pub s194n_withdrawal_narration_terms: Option<toml::Value>,
-    /// `entity_269st_gap`-only: the optional `[party_identity]` table, kept as written and
-    /// validated when that test runs ([`party_identity::PartyConfig::from_toml`]).
+    /// `entity_269st_gap`-only: the optional `[party_identity]` table. [`binding::bind`] binds its
+    /// ledger and group names to the Book; its values are typed when that test runs
+    /// ([`party_identity::PartyConfig::from_toml`]).
     pub party_identity: Option<toml::Value>,
     /// `depreciation`-only: `None` when the client config carries no `[depreciation]` table at
     /// all (an engagement that never runs that test); `Some` once the table is present, at which
@@ -1496,9 +1497,13 @@ pub fn high_value_register_on(
 }
 
 /// Run `entity_269st_gap` on a book and return its canonical parity dump. The party index is built
-/// from the engagement's optional `[party_identity]` table; a ledger whose group chain is
-/// incomplete and does not already settle whether it is a party refuses the test, as the
-/// reference's `IncompleteLedgerChain` ends it.
+/// from the engagement's optional `[party_identity]` table, its names bound to the Book. A ledger
+/// whose group chain is incomplete and does not already settle whether it is a party refuses this
+/// test (`PARTY-chain-incomplete`).
+///
+/// Divergence, deliberate, and not parity: the reference builds its party index inline in its pack,
+/// so its `IncompleteLedgerChain` ends the whole pack. Here only this test refuses, and every other
+/// test still gives its result.
 pub fn entity_269st_gap_on(
     engagement: &Engagement,
     book: &book::Book,

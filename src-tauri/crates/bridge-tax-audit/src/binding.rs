@@ -8,8 +8,10 @@
 //! `[partners.*].interest_ledger`, `[tds_tcs_26as]`'s three ledger lists and its
 //! `deductor_aliases` values (the keys are TANs),
 //! `[statutory_dues]`'s `salary_expense_ledgers` and `nature_by_ledger` keys,
-//! `[creditor_ageing_43bh]`'s `supplier_classification` keys and `mse_interest_ledgers`, the ledger
-//! names a legacy trade-creditor JSON source lists, and `[roles].creditor_groups` -- every location
+//! `[creditor_ageing_43bh]`'s `supplier_classification` keys and `mse_interest_ledgers`,
+//! `[party_identity]`'s `additional_party_ledgers`, `excluded_ledgers`, `round_off_ledgers` and
+//! `overrides` keys, the ledger names a legacy trade-creditor JSON source lists,
+//! `[roles].creditor_groups` and `[party_identity].party_groups` -- every location
 //! this crate's [`Engagement`] reads. Staff rename ledgers between reads, and a name that stops matching used to drop out of
 //! a role silently: the figures moved and nothing said why. [`bind`] is the one place a
 //! configured name meets the Book; every one of the locations above is bound once, before any
@@ -911,6 +913,34 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         mse_interest_ledgers,
     };
 
+    // `[party_identity]`'s four ledger locations, in the reference's LEDGER_PATHS order (after the
+    // creditor-ageing names, before the legacy trade-creditor source): the three lists, then the
+    // `overrides` keys. Each bound location is written back into a copy of the table, which
+    // `party_identity::PartyConfig::from_toml` types when `entity_269st_gap` runs. A location that
+    // is absent, or a `[party_identity]` that is not a table, is skipped, as the reference's
+    // `_expand` skips it; `from_toml` refuses the latter.
+    let mut party_identity = engagement.party_identity.clone();
+    for key in [
+        "additional_party_ledgers",
+        "excluded_ledgers",
+        "round_off_ledgers",
+    ] {
+        let path = ["party_identity", key];
+        let location = path.join(".");
+        let bound = lbinder.bind_list(&list_at(raw, &path)?, &location)?;
+        if raw_at(raw, &path).is_some() {
+            set_party_identity_key(&mut party_identity, key, toml::Value::from(bound));
+        }
+    }
+    if let Some(overrides) = table_at(raw, &["party_identity", "overrides"])? {
+        let bound = bind_table_keys(&mut lbinder, Some(overrides), "party_identity.overrides")?;
+        set_party_identity_key(
+            &mut party_identity,
+            "overrides",
+            toml::Value::Table(bound.into_iter().collect()),
+        );
+    }
+
     // As the reference does, after every other ledger location: a legacy trade-creditor source's
     // names are configuration too, read once here and replaced by the bound list.
     let mut trade_creditors_source = engagement.trade_creditors_source.clone();
@@ -950,6 +980,19 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         )?),
         None => None,
     };
+
+    // `[party_identity].party_groups`, after `creditor_groups`, as in the reference's GROUP_PATHS.
+    if raw_at(raw, &["party_identity", "party_groups"]).is_some() {
+        let bound = gbinder.bind_list(
+            &list_at(raw, &["party_identity", "party_groups"])?,
+            "party_identity.party_groups",
+        )?;
+        set_party_identity_key(
+            &mut party_identity,
+            "party_groups",
+            toml::Value::from(bound),
+        );
+    }
 
     gbinder.check_unused()?;
 
@@ -991,9 +1034,18 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         tds,
         tds_tcs_26as,
         book_keeping_quality,
+        party_identity,
         ..engagement.clone()
     };
     Ok((bound, report))
+}
+
+/// Write a bound location back into the engagement's `[party_identity]` table. Only called for a
+/// location [`raw_at`] found, so the table exists and is a table.
+fn set_party_identity_key(table: &mut Option<toml::Value>, key: &str, value: toml::Value) {
+    if let Some(t) = table.as_mut().and_then(toml::Value::as_table_mut) {
+        t.insert(key.to_string(), value);
+    }
 }
 
 /// Review Register rows (filing aid) for each renamed master, plain-worded for a CA reader.

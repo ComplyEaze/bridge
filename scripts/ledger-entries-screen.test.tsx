@@ -123,7 +123,7 @@ test("scope turnover clears the pending indicator before the obsolete read settl
 test("a refused read shows the backend recovery step and allows correction", async () => {
   mocks.invoke.mockRejectedValue({
     code: "selected_ledger_entries_refused",
-    message: "Bridge withheld this ledger investigation because its source could not be verified.",
+    message: "ComplyEaze Bridge withheld this ledger investigation because its source could not be verified.",
     remediation: "Choose a ledger from the verified company and try again.",
   });
   const host = document.createElement("div");

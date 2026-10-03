@@ -12,6 +12,23 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+### In plain words: the next build, since 0.4.2
+
+These changes are in source and not yet in a published build.
+
+**Safer or fixed**
+
+- `purchase_register` and `sales_register` now take their `state` from the rule
+  `vouchers` uses. A non-empty window is `complete` only when every voucher read
+  was checked against a separate count of the window; a window nothing counted,
+  which only a book small enough to need no census gets (a few dozen vouchers), is
+  `partial` with `reason` `nonempty_window_unqualified`, and its rows are still
+  returned. Before, the registers called such a window `complete` on the
+  company marks and the ledger masters alone, so the same window had two answers.
+  A row's `status` is unchanged. Not measured live: a window admitted against a
+  census through the registers on a large book; the change sends no new request,
+  it uses the census the read already makes (#1031).
+
 ## [0.4.2] - 2026-10-03
 
 ### In plain words: ComplyEaze Bridge 0.4.2, since 0.4.1 (2 Oct 2026)

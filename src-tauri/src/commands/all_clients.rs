@@ -116,14 +116,15 @@ pub fn save_client_group_label(
     request: SaveClientGroupLabelRequest,
 ) -> Result<(), String> {
     if request.company_key.trim().is_empty() {
-        return Err("Bridge could not identify the company for this group label.".to_string());
+        return Err(
+            "ComplyEaze Bridge could not identify the company for this group label.".to_string(),
+        );
     }
-    let directory = app
-        .path()
-        .app_config_dir()
-        .map_err(|_| "Bridge could not locate its local group-label configuration.".to_string())?;
+    let directory = app.path().app_config_dir().map_err(|_| {
+        "ComplyEaze Bridge could not locate its local group-label configuration.".to_string()
+    })?;
     client_groups::save_label(&directory, &request.company_key, &request.label)
-        .map_err(|_| "Bridge could not save this group label.".to_string())
+        .map_err(|_| "ComplyEaze Bridge could not save this group label.".to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,12 +139,11 @@ pub fn replace_client_group_labels(
     app: AppHandle,
     request: ReplaceClientGroupLabelsRequest,
 ) -> Result<(), String> {
-    let directory = app
-        .path()
-        .app_config_dir()
-        .map_err(|_| "Bridge could not locate its local group-label configuration.".to_string())?;
+    let directory = app.path().app_config_dir().map_err(|_| {
+        "ComplyEaze Bridge could not locate its local group-label configuration.".to_string()
+    })?;
     client_groups::replace_labels(&directory, request.labels)
-        .map_err(|_| "Bridge could not migrate local group labels.".to_string())
+        .map_err(|_| "ComplyEaze Bridge could not migrate local group labels.".to_string())
 }
 
 /// Saves the optional all-client sort preference without accessing the Tally mirror.
@@ -153,8 +153,8 @@ pub fn save_client_sort_preference(
     preference: client_groups::ClientSortPreference,
 ) -> Result<(), String> {
     let directory = app.path().app_config_dir().map_err(|_| {
-        "Bridge could not locate its local client-preference configuration.".to_string()
+        "ComplyEaze Bridge could not locate its local client-preference configuration.".to_string()
     })?;
     client_groups::save_sort_preference(&directory, preference)
-        .map_err(|_| "Bridge could not save the all-client sort preference.".to_string())
+        .map_err(|_| "ComplyEaze Bridge could not save the all-client sort preference.".to_string())
 }

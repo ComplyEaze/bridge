@@ -22,6 +22,16 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Should I upgrade?**
 
+- **Remove the old extension first.** 0.4.2 installs beside 0.4.1 or earlier
+  instead of replacing it, because its author line changed from "Bridge
+  contributors" to "ComplyEaze contributors" and Claude Desktop includes the
+  author in an extension's identity (seen on a Mac; we did not try Windows).
+  Before installing 0.4.2, in Claude Desktop open Settings, Extensions and
+  remove the older ComplyEaze Bridge. Keep ComplyEaze Bridge's data folder: both
+  versions use it. After installing, enter your settings again, such as the
+  Tally port and the posting setting (posting starts off), and tick the Terms
+  setting if it is off. If you already have two, remove the older one: it stops
+  working once 0.4.2 has sent a post (see the posting points below).
 - **The number is a patch number on a larger change.** 0.4.2 adds a tool, asks
   you about ledger names it used to read, and once you post with it you cannot
   go back to 0.4.1.
@@ -66,11 +76,12 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
-  Desktop, install the newer file from Settings, Extensions; (3) keep ComplyEaze
-  Bridge's data folder, which holds its record of what it has sent to Tally
-  (from 0.4.2 it is the only record of which vouchers it posted); (4) check that
-  the extension shows 0.4.2 and that "Allow voucher posting" is as you want it;
-  (5) quit Claude Desktop completely and reopen it.
+  Desktop, remove the older ComplyEaze Bridge in Settings, Extensions, then
+  install the new file from the same screen; (3) keep ComplyEaze Bridge's data
+  folder, which holds its record of what it has sent to Tally (from 0.4.2 it is
+  the only record of which vouchers it posted); (4) enter your settings again,
+  and check that the extension shows 0.4.2 and that "Allow voucher posting" is
+  as you want it; (5) quit Claude Desktop completely and reopen it.
 - **What was tried** is under "Known limits" below. No one on our side installed
   the Windows package of this build in Claude Desktop on a Windows PC.
 
@@ -265,9 +276,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
   setting now says more) and the three longest read descriptions lead with the
   outcome; assistant texts say "ComplyEaze Bridge" in full, and so do the
   desktop app's messages (source only); the extension's author line reads
-  "ComplyEaze contributors" (#1042); `acknowledge_post_review` names the refusal
-  for a review recorded for a different doubt (#1026, #1028, #1124, #1129,
-  #1130; issues #962, #1010, #830).
+  "ComplyEaze contributors", which is why 0.4.2 installs beside an older version
+  (#1042); `acknowledge_post_review` names the refusal for a review recorded for
+  a different doubt (#1026, #1028, #1124, #1129, #1130; issues #962, #1010,
+  #830).
 
 **Known limits**
 
@@ -325,14 +337,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both
   columns is not shown; the `Cost of Sales :` heading is not compared when it
   reads zero or empty (#1070).
-- **`outstandings` on a book with such a date:** one whole call on the
-  synthetic book that printed `1-Dec-2108` completed in a lab run (state
-  `complete`, 52 requests, 4.0 seconds, a page of 500 of 1,498 open bills). The
-  bill with that date was not on the page returned, later pages were not read,
-  and other books were not tried. A bill dated after `as_of` still refuses, and
-  a two-digit due year can be read in the wrong century, as before. A bill
-  cannot be left out and the rest returned as partial, because that would
-  misstate the party's balance (#1136, #1098; #1091 stays open).
+- **`outstandings` on a book with such a date:** one whole call on the synthetic
+  book that printed `1-Dec-2108` completed in a lab run (state `complete`, 52
+  requests, 4.0 seconds, a page of 500 of 1,498 open bills). The bill with that
+  date was not on the page returned, later pages were not read, and other books
+  were not tried. A bill dated after `as_of` still refuses, and a two-digit due
+  year can be read in the wrong century, as before. A bill cannot be left out
+  and the rest returned as partial, because that would misstate the party's
+  balance (#1136, #1098; #1091 stays open).
 - **Assistant text:** whether Claude Desktop passes the start-up instructions to
   the model at all, and whether any of the new wording changes what an assistant
   does, was not measured; the studies were plan-only, without tool calls or real

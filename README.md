@@ -291,7 +291,9 @@ it. Before you do, know what it is and is not:
   your own computer, so a separate PC or a Tally elsewhere on your network
   cannot be reached by typing its address.
 - **It does not update itself.** To upgrade, install a newer release from
-  Claude Desktop's Extensions settings.
+  Claude Desktop's Extensions settings. Release 0.4.2 installs beside an older
+  release instead of replacing it: remove the older extension first, keep the
+  data folder, and enter your settings again.
 
 The Bridge **desktop application** is a separate program and has no published
 installer; building it from source is described under *Contributor quick start*

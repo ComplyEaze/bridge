@@ -1,8 +1,8 @@
 # ComplyEaze Bridge Privacy Policy
 
-**Version:** 2026-10.1
+**Version:** 2026-10.2
 
-**Effective:** 3 October 2026
+**Effective:** 4 October 2026
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 
@@ -66,14 +66,14 @@ In the builds this version describes, Bridge's own code makes no internet connec
 
 ## 4. What ComplyEaze receives, and what it does not
 
-**Through Bridge, we do not receive** any of the following, so we cannot see, retrieve, correct or delete them:
+**Through Bridge on your computer, we do not receive** any of the following, so we cannot see, retrieve, correct or delete them:
 
 - your Tally Data;
 - your conversations with your AI Assistant;
 - your Local Files;
 - usage statistics, crash reports or device identifiers.
 
-**We receive information only when** you contact us by email, through GitHub or otherwise, for example in a support request, bug report or vulnerability report. We also receive limited information when you visit the Bridge website (section 8).
+**As the publisher of Bridge, we receive information only when** you contact us by email, through GitHub or otherwise, for example in a support request, bug report or vulnerability report. We also receive limited information when you visit the Bridge website (section 8).
 
 ## 5. What your AI Assistant and AI Provider receive
 
@@ -183,7 +183,7 @@ We do not sell personal data. We do not use it for advertising, except as the th
 
 ## 10. Sharing
 
-We share information we receive only:
+We share information that reaches us (section 4) only:
 
 - with service providers who host or run our website and email, such as GitHub and Cloudflare for the website and our email provider, under their terms of service;
 - where required by law, a court order or a lawful request from a government authority;

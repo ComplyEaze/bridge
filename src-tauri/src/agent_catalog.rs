@@ -423,6 +423,53 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "vouchers",
 ];
 
+/// The `company_guid` line, also written into `build_import_xml`'s schema at
+/// its source, so `voucher_schema` returns the same schema `tools/list` lists.
+pub(in crate::agent) const COMPANY_GUID_DESCRIPTION: &str =
+    "The company's company_guid, as list_companies returns it.";
+
+/// One line for a shared input parameter a tool's schema leaves undescribed
+/// (#1155): what it is, its format, and what leaving it out means. Each was
+/// read against the tool's own handling; a tool whose meaning differs has its
+/// own arm. Every date goes through `normalized_date`, which takes YYYYMMDD or
+/// YYYY-MM-DD, and every `limit` and `offset` here through `arg_positive_usize`
+/// and `arg_usize` against the server's row limit.
+fn shared_parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
+    Some(match (tool, parameter) {
+        (_, "company_guid") => COMPANY_GUID_DESCRIPTION,
+        (_, "batch_id") => "The batch_id build_import_xml returned for the saved batch.",
+        ("parse_bank_statement", "from") => "Optional: only statement rows dated on or after this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no start.",
+        ("parse_bank_statement", "to") => "Optional: only statement rows dated on or before this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no end.",
+        (_, "from") => "The first day of the date range, included (YYYYMMDD or YYYY-MM-DD).",
+        (_, "to") => "The last day of the date range, included (YYYYMMDD or YYYY-MM-DD).",
+        (_, "limit") => "The most rows to return on this page. The default and the maximum are this server's row limit (500 unless it is configured otherwise).",
+        (_, "offset") => "How many rows to skip before this page: 0, the default, is the first page.",
+        (_, "snapshot_id") => "Optional, on a later page only: the first page's snapshot_id, so the call is refused (listing_snapshot_changed) rather than continuing from a different read.",
+        ("ledger_masters", "as_of") => "Optional, with fields=compliance only: the day the GSTIN in force is read for (YYYYMMDD or YYYY-MM-DD). Left out, this computer's date.",
+        ("outstandings", "as_of") => "Optional: the day the open bills are read as of (YYYYMMDD or YYYY-MM-DD). Left out, this computer's date, and the date used is returned as result.as_of.",
+        ("stock_summary", "as_of") => "The last day of the stock period, a 31 March (YYYYMMDD or YYYY-MM-DD). The period runs from 1 April, or the book's start if later.",
+        _ => return None,
+    })
+}
+
+/// Gives each shared parameter of `name`'s schema its line, unless the schema
+/// already describes it.
+fn describe_shared_parameters(name: &str, schema: &mut Value) {
+    // `get_mut`, not indexing: indexing a schema with no `properties` would
+    // insert one as null.
+    let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) else {
+        return;
+    };
+    for (parameter, property) in properties.iter_mut() {
+        if property.get("description").is_some() {
+            continue;
+        }
+        if let Some(line) = shared_parameter_description(name, parameter) {
+            property["description"] = json!(line);
+        }
+    }
+}
+
 // Retain the internal schema while bounded change enumeration is unqualified.
 pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
@@ -604,6 +651,8 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     }
                     Some(ToolEffect::TallyPost) | None => description,
                 };
+                let mut input_schema = input_schema;
+                describe_shared_parameters(name, &mut input_schema);
                 let mut tool = json!({"name": name, "description": description, "inputSchema": input_schema});
                 if let Some(effect) = effect {
                     tool["annotations"] = effect.annotations();

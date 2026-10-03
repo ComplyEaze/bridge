@@ -22,6 +22,20 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Should I upgrade?**
 
+- **Remove the old extension first.** 0.4.2 installs beside 0.4.1 or earlier
+  instead of replacing it, because its author line changed from "Bridge
+  contributors" to "ComplyEaze contributors" and Claude Desktop builds an
+  extension's identity partly from its author name (seen with 0.4.1 on a Mac;
+  earlier releases carry the same author line, so the same is expected; we did
+  not try Windows). Before installing 0.4.2, in Claude Desktop open Settings,
+  Extensions and remove the older ComplyEaze Bridge (release 0.2.0 shows as
+  "Bridge Tally"). Keep ComplyEaze Bridge's data folder: both versions use it,
+  so do not delete it. After installing, enter your settings again: the Tally
+  port, the posting setting (posting starts off), the Terms setting, which every
+  tool needs, and Response redaction, which starts at none (set it again if you
+  had shortened or masked names). If you already have two, remove the older one:
+  once 0.4.2 has tried a post, the older one can no longer prepare, post or
+  check vouchers (see the posting points below).
 - **The number is a patch number on a larger change.** 0.4.2 adds a tool, asks
   you about ledger names it used to read, and once you post with it you cannot
   go back to 0.4.1.
@@ -61,16 +75,18 @@ counter Tally keeps that moves when vouchers or ledgers change.
   read `absent` there. Check what ComplyEaze Bridge posted with `verify_import`,
   never with `voucher_presence`, before entering any of it again by hand. In
   Tally's own screens these vouchers can no longer be told from hand-entered
-  ones by their narration. Posting is off in a new install; check the setting
-  after you upgrade, since an earlier default may still be saved as on.
+  ones by their narration. Posting is off in a new install, and 0.4.2 installs
+  as one: check the setting after you install it.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
-  Desktop, install the newer file from Settings, Extensions; (3) keep ComplyEaze
-  Bridge's data folder, which holds its record of what it has sent to Tally
-  (from 0.4.2 it is the only record of which vouchers it posted); (4) check that
-  the extension shows 0.4.2 and that "Allow voucher posting" is as you want it;
-  (5) quit Claude Desktop completely and reopen it.
+  Desktop, remove the older ComplyEaze Bridge in Settings, Extensions, then
+  install the new file from the same screen; (3) keep ComplyEaze Bridge's data
+  folder, which holds its record of what it has sent to Tally (from 0.4.2 it is
+  the only record of which vouchers it posted); (4) enter your settings again,
+  including Response redaction (it starts at none), and check that the extension
+  shows 0.4.2 and that "Allow voucher posting" is as you want it; (5) quit
+  Claude Desktop completely and reopen it.
 - **What was tried** is under "Known limits" below. No one on our side installed
   the Windows package of this build in Claude Desktop on a Windows PC.
 
@@ -265,9 +281,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
   setting now says more) and the three longest read descriptions lead with the
   outcome; assistant texts say "ComplyEaze Bridge" in full, and so do the
   desktop app's messages (source only); the extension's author line reads
-  "ComplyEaze contributors" (#1042); `acknowledge_post_review` names the refusal
-  for a review recorded for a different doubt (#1026, #1028, #1124, #1129,
-  #1130; issues #962, #1010, #830).
+  "ComplyEaze contributors", which is why 0.4.2 installs beside an older version
+  (#1042); `acknowledge_post_review` names the refusal for a review recorded for
+  a different doubt (#1026, #1028, #1124, #1129, #1130; issues #962, #1010,
+  #830).
 
 **Known limits**
 
@@ -325,14 +342,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both
   columns is not shown; the `Cost of Sales :` heading is not compared when it
   reads zero or empty (#1070).
-- **`outstandings` on a book with such a date:** one whole call on the
-  synthetic book that printed `1-Dec-2108` completed in a lab run (state
-  `complete`, 52 requests, 4.0 seconds, a page of 500 of 1,498 open bills). The
-  bill with that date was not on the page returned, later pages were not read,
-  and other books were not tried. A bill dated after `as_of` still refuses, and
-  a two-digit due year can be read in the wrong century, as before. A bill
-  cannot be left out and the rest returned as partial, because that would
-  misstate the party's balance (#1136, #1098; #1091 stays open).
+- **`outstandings` on a book with such a date:** one whole call on the synthetic
+  book that printed `1-Dec-2108` completed in a lab run (state `complete`, 52
+  requests, 4.0 seconds, a page of 500 of 1,498 open bills). The bill with that
+  date was not on the page returned, later pages were not read, and other books
+  were not tried. A bill dated after `as_of` still refuses, and a two-digit due
+  year can be read in the wrong century, as before. A bill cannot be left out
+  and the rest returned as partial, because that would misstate the party's
+  balance (#1136, #1098; #1091 stays open).
 - **Assistant text:** whether Claude Desktop passes the start-up instructions to
   the model at all, and whether any of the new wording changes what an assistant
   does, was not measured; the studies were plan-only, without tool calls or real

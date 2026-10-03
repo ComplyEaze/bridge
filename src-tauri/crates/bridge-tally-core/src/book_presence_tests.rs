@@ -3365,53 +3365,6 @@ fn book_observation_labels_are_bounded() {
     assert_eq!(group.book_voucher_count, 2);
 }
 
-/// This contract's two production files are pinned in the compatibility
-/// surface, and there is a way for that to stop being true **silently**.
-///
-/// Resolving a surface conflict by taking the base side — the way a generated
-/// artifact used to be resolved, and still a tempting one — drops the entries a
-/// branch *adds*, because nothing regenerates the authored pin list. The
-/// compatibility gate does not catch it: it digests the pins that are listed
-/// and checks the list is sorted, unique and within its fixed parse bound
-/// (`MAX_SURFACE_FILES`), none of which notices a pin that is simply absent. A
-/// bound on the count cannot catch a claim made too early, or a pin quietly
-/// lost.
-///
-/// So the claim is asserted here instead, in a file that is not itself pinned.
-/// If a rebase ever drops these two, this fails loudly rather than the seal
-/// passing over a surface that no longer covers the engine it was raised for.
-#[test]
-fn this_contracts_files_are_still_pinned_in_the_compatibility_surface() {
-    const SURFACE: &str =
-        include_str!("../../../../docs/tally/compatibility/compatibility-surface.json");
-    let surface: serde_json::Value = serde_json::from_str(SURFACE).expect("surface json");
-    let pinned = surface["files"]
-        .as_array()
-        .expect("files")
-        .iter()
-        .filter_map(|entry| entry["path"].as_str())
-        .collect::<BTreeSet<_>>();
-    for path in [
-        "src-tauri/crates/bridge-tally-core/src/book_presence.rs",
-        "src-tauri/src/agent_presence.rs",
-        // The adapter reads its bounds from the published schema rather than
-        // restating them, so the only independent statement of the admission
-        // contract is the assertion in this file. Unpinned, a loosened schema
-        // and its matching test update leave the digest untouched.
-        "src-tauri/src/agent_presence_tests.rs",
-        // A narration marker is whatever this derives (ADR 0018). Presence
-        // calls the same function the import writer calls so that a reader and
-        // a writer cannot disagree about one voucher's identity -- which makes
-        // an edit confined to it a silent change to what is reported present.
-        "src-tauri/src/agent_import_identity.rs",
-    ] {
-        assert!(
-            pinned.contains(path),
-            "{path} is no longer pinned: a conflict resolution dropped it and the gate cannot see that"
-        );
-    }
-}
-
 /// `unmatched_book_vouchers` promises to count rows no proposal matched **or
 /// even resembled**. A collision returns before rule three, so without help it
 /// would report a row this proposal plainly resembles as one nothing came

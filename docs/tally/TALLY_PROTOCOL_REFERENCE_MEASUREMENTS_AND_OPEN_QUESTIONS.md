@@ -1037,8 +1037,8 @@ TallyPrime 7.1 Silver) as of 20260331, from the book's start 20250401: 1,477 ope
 - Fixtures: `native-outstandings-probe-b-bills-receivable` and `native-outstandings-probe-b-bills-payable`, byte-exact, with provenance.
 - **The whole call then completed on this book — PARTIAL, one run, 2026-10-03.** A release build of `outstandings` from master 7b994e65 (later
   master commits are not in it; it holds the four-digit due-date change), for this company, as of 20260331, direction `both`, default limits,
-  through a recording read-only relay on the same licensed 7.1 Silver gateway. No write was made: all 26 POSTs were Export requests and the other
-  22 requests were status GETs. State `complete`, evidence `complete`, 4.0 s wall. It sent 48 requests (8 company-extent, 8 book-extent, 22
+  through a recording read-only relay on the same licensed 7.1 Silver gateway. No write was made: of the call's 48 requests, all 26 POSTs were Export requests and the other
+  22 were status GETs (the two status reads were an export and a GET each). State `complete`, evidence `complete`, 4.0 s wall. It sent 48 requests (8 company-extent, 8 book-extent, 22
   status GETs, 2 currency, and 2 each of Bills Receivable, Bills Payable, List of Ledgers and List of Groups), plus 2 status reads before and 2
   after: 52 in all, none refused. Sizes: Bills Receivable 674,070 bytes and Bills Payable 9,528 (each fetched twice, the same size both times),
   List of Ledgers 33,850, List of Groups 54,280; about 1.7 MB relayed in all, the slowest request 0.6 s (Bills Receivable). The result carried
@@ -1049,9 +1049,10 @@ TallyPrime 7.1 Silver) as of 20260331, from the book's start 20250401: 1,477 ope
   (the not-yet-due ones, the 1-Dec-2108 bill among them): checked by script, amounts are not quoted here.
 - What that shows, and what it does not: the four-digit due date was parsed without a refusal and the bill is inside the totals (deduced from the
   sums above, not seen as a row). The 2108 bill, like the 2033, 2035 and 2052 ones, was not on the returned page, because every due date on it was in
-  2025 (a second page would reach them), so how a 2108 due date shows in a live response was not seen. The overdue crosscheck has no field in
-  the result; the code leaves a read `partial` when it is inconsistent, so `complete` is the evidence it was not. A second page (offset 500) was
-  not read; one run, one book, `both` only.
+  2025 and the page is the first 500 by due date. From the printed due dates in the saved Bills answers (inferred, since only the first page was
+  read), the 2108 bill sorts last of the 1,498, so it would be on the last page (offset 1000), not the second. How a 2108 due date shows in a
+  live response was not seen. The overdue crosscheck has no field in the result; the code gives a `partial` reason for every outcome except an
+  honoured one, so `complete` is the evidence it was honoured. No further page was read; one run, one book, `both` only.
 
 ### 12a.4 The import path rewrites what you send — extends §9
 
@@ -1534,4 +1535,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-01 | §12a.7: what a GUID-filtered `Company` collection fetch returned for a company's own details on two synthetic licensed 7.1 Silver companies: the dates, currency, GST flag and company number with their text forms; an unset state or PIN code as an absent element (one company, before and after it was set); no registration type or number on the row of a company that has a registration; nothing for the address list (one sample, the address not confirmed set). VERIFIED for the names returned; PARTIAL for the address |
 | 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
-| 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page, which is sorted by due date), a second page, other books or directions. |
+| 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page, which is sorted by due date), the later pages, other books or directions. |

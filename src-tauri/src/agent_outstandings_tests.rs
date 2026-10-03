@@ -1298,6 +1298,27 @@ async fn an_unreadable_bills_row_refuses_with_its_cause_report_and_row() {
     }
 }
 
+/// The next step for a date the Bills report could not read opens with words that fit every such
+/// cause, including the two about the book's date window, which name no row (#1096).
+#[test]
+fn the_date_remediation_opens_with_words_that_fit_a_book_window_cause() {
+    for cause in [
+        "native_date_book_window_invalid",
+        "native_date_year_ambiguous_book_window",
+        "native_date_year_invalid",
+    ] {
+        let text = outstandings_cause_remediation(cause).expect("a date cause has a next step");
+        assert_eq!(
+            text.split(". ").next(),
+            Some(
+                "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge \
+                 can read, so no figures were returned"
+            ),
+            "{cause}"
+        );
+    }
+}
+
 /// The Bills-report next steps belong to the outstandings tool only (bridge#1091): the same cause
 /// codes reach other tools through reads that never open that report.
 #[test]

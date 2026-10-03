@@ -56,6 +56,8 @@ pub(super) mod local_data;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+#[path = "agent_import_span_identity.rs"]
+mod span_identity;
 pub(super) use approval::PostApprovals;
 #[path = "agent_import_verification.rs"]
 mod verification;
@@ -67,7 +69,7 @@ use verification::{
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    VerificationStatus,
+    Attribution, VerificationStatus,
 };
 #[cfg(test)]
 use verification::{
@@ -430,6 +432,54 @@ impl super::WindowRow for ReadVoucher {
     }
 }
 
+/// The report of how a native post was attributed, with one plain line a
+/// person reads first. The codes stay beside it for the assistant.
+fn with_post_span_summary(mut report: Value) -> Value {
+    let summary = match report["state"].as_str() {
+        Some("bound") => "Each voucher was matched to the Tally voucher this post created.",
+        Some("refused") => "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
+        Some("unsettled")
+            if report["code"]
+                == span_identity::BindUnsettled::EffectiveDateNotObserved.code() =>
+        {
+            "ComplyEaze Bridge could not confirm this post yet: Tally's read of its vouchers left out the effective date that ComplyEaze Bridge checks, and a later check may settle it. Until then, check the vouchers in Tally before posting any of them again."
+        }
+        Some("unsettled") => "ComplyEaze Bridge could not finish matching this post to Tally just now; run the check again.",
+        Some("not_bound") => "ComplyEaze Bridge has no readable answer from Tally to this post, so it cannot confirm it: check the vouchers in Tally and do not post them again.",
+        Some("book_rolled_back") => "The company's books are older than this post (probably restored from a backup or replaced by another copy), so its vouchers are no longer there: check in Tally before posting again.",
+        _ => return report,
+    };
+    report["summary"] = json!(summary);
+    report
+}
+
+/// How one verification attributes a native post by its own span, and what it
+/// reports about that (`post_span_binding` in the proof).
+struct PostSpanDecision {
+    bindings: Option<Vec<span_identity::PostedVoucherIdentity>>,
+    /// The journal generation this decision's own verdict record left.
+    recorded_at: Option<ledger::VerificationGeneration>,
+    /// The book reads below a mark this post left: it was rolled back, so a
+    /// voucher not found in it is reported as rolled back, never as absent.
+    rolled_back: bool,
+    report: Value,
+}
+
+impl PostSpanDecision {
+    fn not_applicable() -> Self {
+        Self::reported(json!({"state":"not_applicable"}))
+    }
+
+    fn reported(report: Value) -> Self {
+        Self {
+            bindings: None,
+            recorded_at: None,
+            rolled_back: false,
+            report,
+        }
+    }
+}
+
 /// A complete collection admitted before either corroboration or attribution.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ImportReadSource {
@@ -600,6 +650,7 @@ impl Server {
         let args = &resolved.args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
+        refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
         refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
         normalize_payload_dates(&mut payload)?;
@@ -1001,7 +1052,7 @@ impl Server {
         }
         let batch_id = required_string(args, "batch_id")?;
         let mut outcome = self
-            .verify_import_with_dispatch(args, false, &mut None, None, &mut None)
+            .verify_import_with_dispatch(args, false, &mut None, None, &mut None, None)
             .await?;
         let evidence = outcome.evidence.clone();
         let persisted = self
@@ -1088,7 +1139,7 @@ impl Server {
         args: &Value,
         rows: &mut Option<Vec<ReadVoucher>>,
     ) -> Result<ToolOutcome, ToolFailure> {
-        self.verify_import_with_dispatch(args, false, &mut None, None, rows)
+        self.verify_import_with_dispatch(args, false, &mut None, None, rows, None)
             .await
     }
 
@@ -1102,7 +1153,7 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let mut served = None;
         let outcome = self
-            .verify_import_with_dispatch(args, false, &mut served, None, &mut None)
+            .verify_import_with_dispatch(args, false, &mut served, None, &mut None, None)
             .await?;
         post::admit_post_window(served).map_err(|code| {
             ToolFailure::from(code).with_prior_evidence(outcome.evidence.clone())
@@ -1113,13 +1164,24 @@ impl Server {
     /// The readback right after this call's own POST. `masters_after_post`
     /// is the check of the company's masters across the post (#239); it goes
     /// into the proof before it is persisted, so a downgrade is recorded too.
+    /// `after_post_mark` is the target's voucher mark read just after the POST,
+    /// `None` when that read failed: the post is then bound by the rules for a
+    /// mark that was never measured, never by a guess.
     pub(in crate::agent) async fn verify_import_after_current_dispatch(
         &self,
         args: &Value,
         masters_after_post: Value,
+        after_post_mark: Option<u64>,
     ) -> Result<ToolOutcome, ToolFailure> {
-        self.verify_import_with_dispatch(args, true, &mut None, Some(masters_after_post), &mut None)
-            .await
+        self.verify_import_with_dispatch(
+            args,
+            true,
+            &mut None,
+            Some(masters_after_post),
+            &mut None,
+            after_post_mark,
+        )
+        .await
     }
 
     async fn verify_import_with_dispatch(
@@ -1129,14 +1191,17 @@ impl Server {
         served: &mut Option<super::WindowServed>,
         masters_after_post: Option<Value>,
         observed_rows: &mut Option<Vec<ReadVoucher>>,
+        after_post_mark: Option<u64>,
     ) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let ledger::BatchSnapshot {
             batch: line,
-            generation,
+            mut generation,
             response: dispatch_response,
             dispatched,
+            pre_post_voucher_mark,
+            span_verdict,
             ..
         } = self
             .latest_import_snapshot(batch_id)?
@@ -1199,7 +1264,73 @@ impl Server {
             // every part that was read, which is the honest commitment here.
             let voucher_read_sha256 = observed_evidence.response_sha256.clone();
             corroborate_verification_window(&observed, &corroboration, &line.date_from, &line.date_to)?;
-            let result = verify_batch(&line, &observed)?;
+            let span = match pre_post_voucher_mark {
+                Some(pre_post_voucher_mark) => {
+                    let (current, mark_evidence) =
+                        self.current_voucher_mark(&company, &identity).await?;
+                    accumulated = combine_evidence(accumulated.clone(), mark_evidence);
+                    let decision = self.decide_post_span(
+                        &line,
+                        span_identity::PreMark::recorded(pre_post_voucher_mark),
+                        span_verdict,
+                        dispatch_response.as_ref(),
+                        &observed,
+                        after_post_mark,
+                        current,
+                        generation,
+                    );
+                    // This verification's own verdict record moved the journal:
+                    // its status is persisted against the record it appended.
+                    if let Some(recorded) = decision.recorded_at {
+                        generation = recorded;
+                    }
+                    decision
+                }
+                None => PostSpanDecision::not_applicable(),
+            };
+            // A post that recorded its pre-POST mark sent no tag, so only its
+            // binding attributes it; a tag in the book is a hand import's.
+            let attribution = if pre_post_voucher_mark.is_some() {
+                Attribution::Span(span.bindings.as_deref())
+            } else {
+                Attribution::Tag
+            };
+            let mut result = verify_batch(&line, &observed, attribution)?;
+            if span.rolled_back {
+                verification::mark_book_rolled_back(&mut result);
+            } else if pre_post_voucher_mark.is_some() && span.bindings.is_none() {
+                // An untagged native post that is not bound: what its content
+                // cannot find is never absent. When the post's own answer said
+                // Tally created none of its vouchers and none is found (for a
+                // batch, with the voucher mark measured unmoved), say so
+                // (bridge#1108); otherwise an edit in Tally is as likely. Only
+                // the post's own readback reads that answer: by a later
+                // verification someone may have entered a voucher by hand and
+                // edited it.
+                let counters = current_dispatch
+                    .then(|| {
+                        dispatch_response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                            .map(|outcome| outcome.counters())
+                    })
+                    .flatten();
+                let voucher_step =
+                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
+                match verification::unmatched_cause(
+                    counters,
+                    line.vouchers.len(),
+                    verification::unmatched_count(&result),
+                    voucher_step,
+                ) {
+                    verification::UnmatchedCause::ReportedNotCreated => {
+                        verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::NotEstablished => {
+                        verification::mark_sent_not_attributed(&mut result)
+                    }
+                }
+            }
             let mut closing_mode_evidence = None;
             if result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {
                 // Positive rows are direct observations. Absence additionally requires
@@ -1224,6 +1355,7 @@ impl Server {
                 "dispatch_response": dispatch_response,
                 "pre_import_mark": line.pre_import_mark, "alter_id_delta": alter_id_delta(&line.pre_import_mark, &observed.rows),
                 "counts": result["counts"], "vouchers": result["vouchers"], "duplicates": result["duplicates"],
+                "post_span_binding": with_post_span_summary(span.report),
                 "unrelated_duplicates_in_window": result["unrelated_duplicates_in_window"],
                 "evidence": {"mode_opening": opening_mode.evidence, "mode_closing": closing_mode_evidence, "company": identity_evidence, "voucher_read": observed_evidence, "voucher_read_corroboration": corroboration_evidence, "voucher_read_sha256": voucher_read_sha256}
             });
@@ -1284,7 +1416,7 @@ impl Server {
                 if let Some(review) = self
                     .imports_dir()
                     .ok()
-                    .and_then(|imports| ack::operator_review(&imports, &line, &observed.rows))
+                    .and_then(|imports| ack::operator_review(&imports, &line, &observed.rows, span.bindings.as_deref()))
                 {
                     proof["operator_review"] = review;
                 }
@@ -1492,6 +1624,212 @@ impl Server {
             witness: read.witness,
             refused_a_part: read.refused_a_part,
         })
+    }
+
+    /// Decides how a native post is attributed in this verification: by the
+    /// bindings journaled for it, by binding it now, or not at all, and whether
+    /// the book was rolled back after it. `current` is the company's voucher
+    /// mark read in this verification (0 for a company holding no voucher).
+    ///
+    /// A journaled verdict is final. Without one, a clean response binds: on
+    /// the span the post measured when `after_post_mark` was read, otherwise on
+    /// the span its clean response implies (owner decision, 2026-10-02). A
+    /// refusal is journaled and permanent. A failure to read or record is not,
+    /// and neither is a span read without a Payment, Receipt or Contra's
+    /// `EFFECTIVEDATE`: the next verification decides again, on the span the
+    /// clean response implies (the same span the step had accepted). A post
+    /// whose response was lost never binds.
+    #[allow(clippy::too_many_arguments)]
+    fn decide_post_span(
+        &self,
+        line: &ImportLedgerLine,
+        pre_post_voucher_mark: span_identity::PreMark,
+        journaled: Option<ledger::PostSpanVerdict>,
+        response: Option<&ledger::DispatchResponse>,
+        observed: &ImportReadSource,
+        after_post_mark: Option<u64>,
+        current: u64,
+        generation: ledger::VerificationGeneration,
+    ) -> PostSpanDecision {
+        let before = pre_post_voucher_mark.value();
+        let outcome = response.and_then(|response| response.outcome.as_ref());
+        // After a create of N, the mark never again reads below before + N, nor
+        // below a mark read after the post, unless the book was rolled back
+        // (a backup restored, or another copy put in its place).
+        let floor = before
+            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .max(after_post_mark.unwrap_or(0));
+        if current < floor {
+            return PostSpanDecision {
+                rolled_back: true,
+                ..PostSpanDecision::reported(
+                    json!({"state":"book_rolled_back","current_mark":current,"expected_at_least":floor}),
+                )
+            };
+        }
+        match journaled {
+            Some(ledger::PostSpanVerdict::Bound(bindings)) => {
+                return PostSpanDecision {
+                    bindings: Some(bindings),
+                    ..PostSpanDecision::reported(json!({"state":"bound"}))
+                }
+            }
+            Some(ledger::PostSpanVerdict::Refused(code)) => {
+                return PostSpanDecision::reported(json!({"state":"refused","code":code}))
+            }
+            None => {}
+        }
+        let Some(outcome) = outcome else {
+            return PostSpanDecision::reported(
+                json!({"state":"not_bound","code":"binding_response_not_recorded"}),
+            );
+        };
+        let count = line.vouchers.len();
+        let span = match after_post_mark {
+            Some(after) => span_identity::PostSpan::after_clean_post(
+                pre_post_voucher_mark,
+                after,
+                outcome,
+                count,
+            ),
+            None => {
+                span_identity::PostSpan::after_clean_response(pre_post_voucher_mark, outcome, count)
+                    .map_err(span_identity::BindError::Refused)
+            }
+        };
+        let bound = span.and_then(|span| {
+            let window = span.alter_id_span();
+            let rows = ImportReadSource {
+                rows: observed
+                    .rows
+                    .iter()
+                    .filter(|row| {
+                        row.alter_id
+                            .is_some_and(|id| id > window.after && id <= window.through)
+                    })
+                    .cloned()
+                    .collect(),
+            };
+            let elsewhere = self.guids_bound_elsewhere(&line.batch_id).map_err(|_| {
+                span_identity::BindError::Unsettled(span_identity::BindUnsettled::JournalUnreadable)
+            })?;
+            span_identity::bind(&span, &line.company_guid, &line.vouchers, &rows, &elsewhere)
+        });
+        let verdict = match bound {
+            Ok(bindings) => ledger::PostSpanVerdict::Bound(bindings),
+            Err(span_identity::BindError::Refused(refusal)) => {
+                ledger::PostSpanVerdict::Refused(refusal.code().to_string())
+            }
+            Err(span_identity::BindError::Unsettled(unsettled)) => {
+                return PostSpanDecision::reported(
+                    json!({"state":"unsettled","code":unsettled.code()}),
+                )
+            }
+        };
+        match self.record_post_span_verdict(line, &verdict, generation) {
+            Ok((ledger::PostSpanVerdict::Bound(bindings), recorded_at)) => PostSpanDecision {
+                bindings: Some(bindings),
+                rolled_back: false,
+                report: json!({"state":"bound"}),
+                recorded_at: Some(recorded_at),
+            },
+            Ok((ledger::PostSpanVerdict::Refused(code), recorded_at)) => PostSpanDecision {
+                recorded_at: Some(recorded_at),
+                ..PostSpanDecision::reported(json!({"state":"refused","code":code}))
+            },
+            Err(_) => PostSpanDecision::reported(
+                json!({"state":"unsettled","code":"binding_not_recorded"}),
+            ),
+        }
+    }
+
+    /// Journals a post-span verdict under the exclusive admission lock, and
+    /// returns it with the journal generation it left. Refused if the batch's
+    /// journal moved since this verification read it (`expected`): something
+    /// else wrote, and this verification must not decide on a stale view. A
+    /// verdict already journaled is never replaced.
+    fn record_post_span_verdict(
+        &self,
+        line: &ImportLedgerLine,
+        verdict: &ledger::PostSpanVerdict,
+        expected: ledger::VerificationGeneration,
+    ) -> Result<(ledger::PostSpanVerdict, ledger::VerificationGeneration), String> {
+        let _lock = self.lock_import_admission()?;
+        let current = self
+            .import_snapshot_while_admitted(Some(&line.batch_id))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        if current.batch.sha256 != line.sha256 || current.generation != expected {
+            return Err("import_verification_conflict_retry".into());
+        }
+        if current.span_verdict.is_some() {
+            return Err("import_verification_conflict_retry".into());
+        }
+        // Another batch may have bound one of these GUIDs since the check
+        // before this lock: checked again here, where no other writer can.
+        let verdict = match verdict {
+            ledger::PostSpanVerdict::Bound(bound) => {
+                let elsewhere = match self.import_journal_while_admitted()? {
+                    Some(reader) => ledger::guids_bound_elsewhere(reader, &line.batch_id)?,
+                    None => BTreeSet::new(),
+                };
+                match bound
+                    .iter()
+                    .position(|identity| elsewhere.contains(&identity.guid))
+                {
+                    Some(position) => ledger::PostSpanVerdict::Refused(
+                        span_identity::SpanRefusal::IdentityReused { position }
+                            .code()
+                            .to_string(),
+                    ),
+                    None => verdict.clone(),
+                }
+            }
+            ledger::PostSpanVerdict::Refused(_) => verdict.clone(),
+        };
+        let verdict = &verdict;
+        self.append_import_record_while_admitted(&ledger::StatusRecord::post_span_verdict(
+            line, verdict,
+        ))?;
+        let recorded = self
+            .import_snapshot_while_admitted(Some(&line.batch_id))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        if recorded.span_verdict.as_ref() != Some(verdict) {
+            return Err("binding_not_recorded".into());
+        }
+        Ok((verdict.clone(), recorded.generation))
+    }
+
+    /// Every GUID another batch's post-span verdict bound.
+    fn guids_bound_elsewhere(&self, own_batch_id: &str) -> Result<BTreeSet<String>, String> {
+        let _lock = self.lock_import_admission_shared()?;
+        match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::guids_bound_elsewhere(reader, own_batch_id),
+            None => Ok(BTreeSet::new()),
+        }
+    }
+
+    /// The company's voucher mark now, for telling a book that kept a post from
+    /// one rolled back below it. A company holding no voucher omits the mark,
+    /// which reads as 0 here (a copy put in place of the book, or one emptied):
+    /// unlike before a first import, that is an answer, not a refusal. Any
+    /// other failure to read is a failed verification, never a guess.
+    async fn current_voucher_mark(
+        &self,
+        company: &bridge_tally_protocol::TallyCompany,
+        identity: &super::VerifiedCompanyIdentity,
+    ) -> Result<(u64, Evidence), ToolFailure> {
+        let guid = company
+            .guid
+            .as_deref()
+            .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+        let (xml, evidence) = self
+            .post_read(identity, company_high_water_read(&company.name))
+            .await?;
+        let mark = super::change_parse::company_voucher_high_water(&xml, guid).map_err(|code| {
+            ToolFailure::from(pre_import_mark_refusal(&code).to_string())
+                .with_prior_evidence(evidence.clone())
+        })?;
+        Ok((mark, evidence))
     }
 
     async fn pre_import_mark(
@@ -2110,14 +2448,6 @@ fn validate_payload(payload: &ImportPayload) -> Result<(), String> {
             .flatten()
         {
             // JSON Schema minLength/maxLength count Unicode code points, not UTF-8 bytes.
-            //
-            // No `reads_back_as_other_text` check here: `voucher_diffs`
-            // (agent_import_verification.rs) never compares narration or
-            // reference text, and attribution only searches narration for
-            // the `[BRIDGE:...]` tag, which the marker check above leaves
-            // untouched. A rewrite verification cannot see is not refused —
-            // see `reads_back_as_other_text`'s doc comment for which fields
-            // this refusal actually protects.
             if text.is_empty()
                 || text.chars().count() > MAX_TEXT_CHARS
                 || text.chars().any(char::is_control)
@@ -2395,15 +2725,14 @@ fn cash_bank_refusals(
 /// digits and `;` to `U+FFFD#65533;`. A posted ledger name or voucher number
 /// holding that sequence would therefore read back changed.
 ///
-/// Call this only on a field `voucher_diffs`
-/// (agent_import_verification.rs) actually compares — today that is a
-/// ledger name (checked in `validate_payload`'s entry loop) and the voucher
-/// number (checked above). Narration and reference are never compared there:
-/// attribution only searches narration for the `[BRIDGE:...]` tag, which the
-/// reserved-marker check above already protects, and a rewrite elsewhere in
-/// the text is invisible to verification either way. Calling this on
-/// narration or reference would refuse a value nothing downstream would ever
-/// notice as changed, so `validate_payload` does not.
+/// Call this only on a field something compares as text: a ledger name
+/// (checked in `validate_payload`'s entry loop) and the voucher number
+/// (checked above), which `voucher_diffs` (agent_import_verification.rs)
+/// compares, and the narration, which a native post's span binding compares
+/// byte for byte (`agent_import_span_identity.rs`) and the build and a native
+/// post refuse (`refuse_rewritten_narration`). The reference is never
+/// compared, so refusing it would refuse a value nothing downstream would
+/// ever notice as changed, and `validate_payload` does not.
 ///
 /// The value's five XML characters are escaped first (`quick_xml`'s escape),
 /// so a literal `&#4;` in it is text, not a reference, and is not refused.
@@ -2415,6 +2744,25 @@ fn reads_back_as_other_text(value: &str) -> bool {
         bridge_tally_protocol::mark_forbidden_numeric_references(&quick_xml::escape::escape(value)),
         std::borrow::Cow::Owned(_)
     )
+}
+
+/// A native post is bound to its span only if each voucher's narration reads
+/// back byte for byte (`agent_import_span_identity.rs`), so a narration that
+/// would read back rewritten is refused when the batch is built, and before a
+/// native POST of a batch saved before this check, rather than refusing that
+/// post's binding for good. `validate_payload` still admits such a saved batch
+/// for review and reconciliation. The reference is never compared, so it is
+/// not refused.
+fn refuse_rewritten_narration(vouchers: &[ImportVoucher]) -> Result<(), String> {
+    if vouchers.iter().any(|voucher| {
+        voucher
+            .narration
+            .as_deref()
+            .is_some_and(reads_back_as_other_text)
+    }) {
+        return Err("voucher_text_invalid".to_string());
+    }
+    Ok(())
 }
 
 fn contains_reserved_marker(value: &str) -> bool {
@@ -2900,7 +3248,7 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
         .iter()
         .map(|voucher| {
             let identity = import_identity(batch_id, &voucher.bridge_txn_id);
-            render_voucher_xml(voucher, identity, identity)
+            render_voucher_xml(voucher, identity, NarrationAttribution::Tagged(identity))
         })
         .collect::<String>();
     render_import_envelope(company, &messages)
@@ -2912,41 +3260,48 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
 /// imported and edited, and reusing its client REMOTEID for a native Create
 /// can make Tally treat it as an upsert. The caller records the ids with the
 /// dispatch intent before sending, because Tally deletes only by them and
-/// never exports them (bridge#579). The stable narration tag remains the
-/// batch attribution used by readback.
+/// never exports them (bridge#579). The narration carries no attribution tag:
+/// a client's narration is print-ready (owner decision, 2026-09-28), and a
+/// native post is attributed by its own AlterID span instead
+/// (`agent_import_span_identity.rs`).
 fn render_native_vouchers_xml<'a>(
     company: &str,
-    batch_id: &str,
     vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
 ) -> String {
     let messages: String = vouchers_with_remote_ids
         .map(|(voucher, remote_id)| {
-            render_voucher_xml(
-                voucher,
-                remote_id,
-                import_identity(batch_id, &voucher.bridge_txn_id),
-            )
+            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged)
         })
         .collect();
     render_import_envelope(company, &messages)
+}
+
+/// Whether a rendered voucher's narration carries Bridge's `[BRIDGE:…]` tag.
+/// A file a person imports by hand keeps it, because Bridge never sees that
+/// import and the tag is its only attribution; a native post does not.
+#[derive(Clone, Copy)]
+enum NarrationAttribution {
+    Tagged(Uuid),
+    Untagged,
 }
 
 fn render_import_envelope(company: &str, messages: &str) -> String {
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>", xml_escape(company))
 }
 
-fn render_voucher_xml(voucher: &ImportVoucher, remote_id: Uuid, attribution_id: Uuid) -> String {
-    let narration = format!(
-        "<NARRATION>{}</NARRATION>",
-        xml_escape(
-            format!(
-                "{} [BRIDGE:{}]",
-                voucher.narration.as_deref().unwrap_or("").trim(),
-                attribution_id
-            )
-            .trim(),
-        )
-    );
+fn render_voucher_xml(
+    voucher: &ImportVoucher,
+    remote_id: Uuid,
+    attribution: NarrationAttribution,
+) -> String {
+    let text = voucher.narration.as_deref().unwrap_or("").trim();
+    let narration = match attribution {
+        NarrationAttribution::Tagged(attribution_id) => format!(
+            "<NARRATION>{}</NARRATION>",
+            xml_escape(format!("{text} [BRIDGE:{attribution_id}]").trim())
+        ),
+        NarrationAttribution::Untagged => format!("<NARRATION>{}</NARRATION>", xml_escape(text)),
+    };
     // REFERENCE is retained because it is part of the agent input contract. Its effect is not used as posting evidence; verify_import compares the accounting entries, not this annotation.
     let reference = voucher
         .reference

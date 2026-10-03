@@ -1133,7 +1133,7 @@ fn resolved_ledger_filter_keeps_only_the_exact_live_spelling() {
             json!({"voucher_number":"exact","amounts":[{"ledger":"AB"}]}),
             json!({"voucher_number":"near","amounts":[{"ledger":"A-B"}]}),
         ],
-        &resolved,
+        resolved.name(),
     );
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["voucher_number"], "exact");
@@ -1161,7 +1161,7 @@ fn client_side_ledger_filter_accepts_unquoted_tdl_ledger_names() {
         assert!(!request.contains(ledger), "ledger must not enter TDL");
         let rows = filter_voucher_rows_for_ledger(
             vec![json!({"amounts":[{"ledger": ledger}]})],
-            &resolved,
+            resolved.name(),
         );
         assert_eq!(rows.len(), 1, "ledger remains selected after parsing");
     }
@@ -1273,25 +1273,43 @@ fn egress_log_tail_reads_only_the_last_bounded_chunks() {
     assert!(tail.truncated);
 }
 
+/// #1076, decision A: an exact spelling resolves, and so does the one ledger
+/// that differs from the request only in ASCII case and ASCII spaces. Nothing
+/// looser resolves: an underscore, a hyphen or a dropped symbol asks the user.
 #[test]
-fn ledger_lookup_prefers_exact_live_spelling_and_rejects_ambiguous_matches() {
+fn a_ledger_resolves_only_on_its_spelling_or_ascii_case_and_spaces() {
     let names = ["Bank Charges", "Sales-Ledger"];
     assert_eq!(
-        resolve_ledger_name(names.into_iter(), "bank_charges"),
-        Ok("Bank Charges".to_string())
+        resolve_ledger_name(names.into_iter(), "  bank   CHARGES "),
+        Ok(LedgerMatch::CaseOrSpacing {
+            name: "Bank Charges".to_string()
+        })
+    );
+    for looser in [
+        "bank_charges",
+        "BankCharges",
+        "Sales Ledger",
+        "missing ledger",
+    ] {
+        assert_eq!(
+            resolve_ledger_name(names.into_iter(), looser),
+            Err(LedgerRefusal::NotFound),
+            "{looser}"
+        );
+    }
+    // `a_b` reached both `A-B` and `AB` under the old key; neither is its
+    // spelling, so nothing resolves, and an exact `AB` reaches only `AB`.
+    let near = ["A-B", "AB"];
+    assert_eq!(
+        resolve_ledger_name(near.into_iter(), "a_b"),
+        Err(LedgerRefusal::NotFound)
     );
     assert_eq!(
-        resolve_ledger_name(names.into_iter(), "missing ledger"),
-        Err("ledger_not_found".to_string())
-    );
-    let ambiguous = ["A-B", "AB"];
-    assert_eq!(
-        resolve_ledger_name(ambiguous.into_iter(), "a_b"),
-        Err("ledger_ambiguous".to_string())
-    );
-    assert_eq!(
-        resolve_ledger_name(ambiguous.into_iter(), "AB"),
-        Ok("AB".to_string())
+        resolve_ledger_name(near.into_iter(), "AB"),
+        Ok(LedgerMatch::Exact {
+            name: "AB".to_string(),
+            similar: Vec::new()
+        })
     );
 }
 

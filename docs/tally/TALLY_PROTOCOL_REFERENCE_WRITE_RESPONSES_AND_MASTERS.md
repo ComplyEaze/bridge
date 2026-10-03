@@ -21,7 +21,11 @@ A bare `<RESPONSE>` root with **no `ENVELOPE`, no `HEADER`, no `STATUS`**:
 </RESPONSE>
 ```
 
-A `STATUS=1` rule cannot apply to imports — there is no `STATUS` to check.
+That is the answer to Bridge's `Import Data` envelope, and a `STATUS=1` rule cannot apply to it —
+there is no `STATUS` to check. Tally's documented `Import` envelope was answered in a different
+shape: an `ENVELOPE` whose `HEADER` carried `VERSION 1` and `STATUS 1`, then the same ten counter
+elements, in the same order, in `BODY/DATA/IMPORTRESULT` (PARTIAL, one run, §9.4g; not counted in
+§9.1a's numbering).
 
 ### 9.1a A malformed request returns a counter-less response — **fourth response shape**
 
@@ -73,6 +77,34 @@ do not infer missing evidence or resend it to obtain a cleaner receipt.
 
 `LINEERROR` text is **untrustworthy for cause attribution** — an out-of-range date produced
 "Voucher date is missing" when the date was present.
+
+**A batch can be created in part — PARTIAL, one run** (licensed TallyPrime 7.1 Silver, a
+synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in Bridge's
+`Import Data` envelope, of which the second debited a ledger the book did not hold:
+- Tally answered `CREATED 2, ERRORS 0, EXCEPTIONS 1`, every other counter 0, and one `LINEERROR`
+  naming the ledger. `LASTVCHID` was the last created voucher's MasterID; `LASTMID` was 0.
+- Read back within a minute, the other two vouchers had been created, in request order. The
+  company's voucher mark (`ALTVCHID`) stepped by 2. The rejected voucher took no MasterID and no
+  AlterID. This read-back is recorded in the lab notes and is not committed.
+
+In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
+named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is
+preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the same
+`CREATED`/`EXCEPTIONS` split for a batch of 50 (`CREATED 49, EXCEPTIONS 1`).
+
+**More than one rejected voucher — PARTIAL, one run each** (the same company and envelope,
+2026-10-03). No missing ledger was named by two vouchers.
+- Three vouchers, each naming a missing ledger: `CREATED 0, EXCEPTIONS 3`.
+- Bad, good, bad: `CREATED 1, EXCEPTIONS 2`; the middle voucher was created.
+- Two rejected vouchers carrying three missing ledgers between them: `CREATED 0, EXCEPTIONS 2`.
+- Each answer carried one `LINEERROR`, naming only the last rejected voucher's ledger. Where
+  nothing was created, neither the voucher mark nor the master mark moved.
+
+So in these runs `EXCEPTIONS` counted rejected vouchers, not missing ledgers, and the `LINEERROR`
+never identified every rejected voucher. The first and third answers are preserved byte for byte as
+test fixtures (`batch-import-all-missing-ledgers`,
+`batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
+and Education.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 
@@ -325,6 +357,11 @@ ALTERED=1` with no error — the existing master was **overwritten** with the re
 The observed counters distinguish an alteration of an existing master from creation
 of a new one. This experiment did not establish protection against a concurrent
 foreign writer or recovery of an unobserved prior master.
+
+A `Create` with the same name and a different parent, bill-wise flag and opening balance replaced
+all three at once, in one PARTIAL run on licensed 7.1 Silver (§9.4g). The documented `IMPORTDUPS`
+option `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both Bridge's envelope and
+Tally's documented one (PARTIAL: one run per envelope, plus a case variant in Bridge's; §9.4g).
 
 The required implementation workflow is maintained in
 [Implementation Guide §3.6](IMPLEMENTATION_GUIDE.md#36-master-re-create-is-a-silent-alter)
@@ -626,7 +663,7 @@ posted against — the counters alone would not have said. Every created voucher
 | `AND` for `&` | **rejected** | rejected |
 | a **missing** suffix word | **rejected** | rejected |
 | an **added** suffix word | **rejected** | not sent |
-| **NFD** against an NFC master | **rejected** | not sent |
+| **NFD** against an NFC master | **rejected** (but see the 2026-10-02 note under Fixtures) | not sent |
 
 **One row here was mislabelled and is corrected.** The first run of this probe recorded `AND` for
 `&` as rejected, but what it actually sent was a name with `AND CO` **appended** — against a master
@@ -675,7 +712,8 @@ withdrawn as binding authority rather than erased from the probe history.
 
 **What remains measured in this scope.** The listed forward slash-to-space case, the recorded
 hyphen and whitespace cases, and the rejected en dash, underscore, abbreviation, suffix, and
-NFD cases are observations of this one operation. They do not generalize across product, tier,
+NFD cases are observations of this one operation (the NFD case is now unsupported; see the
+2026-10-02 note under Fixtures). They do not generalize across product, tier,
 object class, direction, or caller.
 
 > **RULE: use only the recorded directional alternatives; do not fold separators into a canonical
@@ -692,6 +730,10 @@ the gateway accepts.
 elsewhere in this document: an NFD spelling of an NFC ledger does not resolve. A fold that
 normalises before comparing merges masters this gateway keeps apart.
 
+> **2026-10-02:** on licensed 7.1 this sentence rests on the NFD row, which is now unsupported (see
+> the note under Fixtures). The exact-codepoint evidence that remains is §9.4b's 2026-08-19
+> observation, on an unclassified Education instance.
+
 **Scope.** One instance, one build, one licence tier, **ledgers only**, one company, and the
 measurement is of *import-time* name resolution — not collection filters, not stock items, groups
 or voucher types, and not voucher numbers. §9.4b's Educational scope stands as its own row; this
@@ -701,6 +743,18 @@ about the same one.
 **Fixtures.** `MB-PROBE-LEDGER-A` and `MB CAFÉ PROBE` remain in `BRIDGE CORPUS OPENING` under
 `Suspense A/c`, carrying no balances, so this is repeatable. They post-date the catalogue digest
 recorded in `TEST_CORPUS.md` §9.2.
+
+> **Scoped correction, 2026-10-02: `MB CAFÉ PROBE` is not stored with an É.** A Ledger collection
+> read of `BRIDGE CORPUS OPENING` on licensed 7.1 Silver returned that ledger's name, in both its
+> `NAME` attribute and its `NAME.LIST`, as `MB CAF` + U+00C3 + U+0089 + ` PROBE`: the UTF-8 bytes of
+> É stored as two Latin-1 characters (mojibake). It cannot serve as an NFC master. Which ledger the
+> NFD row above was sent against is not recorded, but this is the section's only accented fixture;
+> if it was this one, that row compared NFD with a
+> mojibake name, and "rejected" carries no evidence about canonical equivalence: an NFD spelling of
+> É fails against `Ã` + U+0089 whatever Tally does with NFC and NFD. Qualifying 9.4d needed this ledger,
+> so treat the licensed-7.1 NFD row as **unsupported**. What remains is the 2026-08-19 observation in
+> §9.4b, scoped there to an unclassified Education instance and to no licensed SKU.
+> **Confidence: PARTIAL** (one read of one ledger).
 
 
 ### 9.4c Real catalogues carry families a partial name cannot separate
@@ -772,6 +826,176 @@ Gold, one client book, 2026-09-28).**
 - **Confidence.** VERIFIED for the 6 vouchers, because `ledger_movement` read back exactly those 6.
   The `Alter` clause is PARTIAL (reported, not read back). It is one session on one client book, so
   **Confidence: PARTIAL** beyond it.
+
+### 9.4f A `$Name` filter folds ASCII case, not accented capitals
+
+**Confidence: PARTIAL.** Measured on 2026-10-02, licensed TallyPrime 7.1 Silver (`education_mode=false`), on one
+synthetic company and one ledger, in one direction: the accented letter is stored lower-case and asked for
+upper-case.
+
+§9.4b and §9.4d measure ASCII case on **import**. This measures a Ledger collection filtered by the TDL formula
+`$Name = "<name>"`. The stored name was `Näive Chemicals &amp; Co.`: the `&amp;` is literal text in the name, and
+the `ä` is precomposed (U+00E4). The variants were built from the name as captured earlier from this company,
+which an Object export read back byte-for-byte before any filter was sent. Each request's codepoints were
+asserted, and its UTF-16 encoding was round-tripped, before it was sent. A match was judged by the ledger's GUID.
+
+| asked | matched |
+| --- | --- |
+| the stored name | **yes** |
+| ASCII letters upper-cased, `ä` unchanged (`NäIVE CHEMICALS &AMP; CO.`) | **yes** |
+| fully upper-cased, `Ä` (U+00C4) | **no** |
+| the same, with `Ä` decomposed (`A` + U+0308) | no |
+| accents removed (`Naive …`) | no |
+| a name the book does not hold | no |
+
+All four non-matches returned the same well-formed empty collection, with no `LINEERROR`, so each one is an answer
+and not a failed request.
+
+> **RULE: do not treat two names that differ in the case of a non-ASCII letter as one name.** Tally's `$Name`
+> equality did not, in the one direction measured, and nothing else measured shows Tally doing so. This adds no
+> licence to ASCII case beyond what §9.4b and §9.4d already scope (bridge#1076).
+
+**Not measured:**
+- the upper-case-stored direction: the only candidate found (the twelve ledgers under one parent in one company
+  were read) is stored as mojibake (see the 9.4d correction), and sending its control character inside a TDL
+  formula was not attempted;
+- import-time resolution of an accented capital;
+- an Object export looked up by a name the book does not hold: its failure mode is unknown, so the variants were
+  sent as filters, which fail in band;
+- other letters (ß, dotless i) and other builds.
+
+### 9.4g A ledger `Create` on an existing name replaced its parent, bill-wise flag and opening balance
+
+**Measured 2026-10-02, licensed TallyPrime 7.1 Silver** (`education_mode=false`). Synthetic company
+`BRIDGE AMEND LAB`, three runs, one run each: the case below and the two follow-up runs (the
+`IMPORTDUPS` runs near the end are counted separately). **Confidence: PARTIAL.**
+
+§9.4 measured an identical re-send. This measures a `Create` with the **same name**, whose fields
+differ from the existing ledger's. Each request below, except the `IMPORTDUPS` runs near the end,
+was a gateway import (`Import Data`, `REPORTNAME` `All Masters`) sent with no import option in
+`STATICVARIABLES`, so Tally applied its default handling.
+
+1. **The setup.** A new ledger `Create Probe 02` was created: `PARENT` `Sundry Creditors`,
+   `ISBILLWISEON` `Yes`, `OPENINGBALANCE` `-1000.00`, and no bill allocations.
+   - Tally answered `CREATED 1`, every other counter 0, and no `LINEERROR`. The operator watching
+     Tally's screen reported no dialog.
+   - The company's master mark (`ALTMSTID`) stepped by 1.
+2. **The `Create` on that name, with all three fields changed together.** It sent `PARENT`
+   `Indirect Expenses`, `ISBILLWISEON` `No` and `OPENINGBALANCE` `-2500.00`.
+   - Tally answered `CREATED 0, ALTERED 1`, every other counter 0, and no `LINEERROR`.
+   - `ALTMSTID` stepped by 1 again. The ledger kept its GUID and `MASTERID`; its `ALTERID` advanced.
+
+**After the `Create`, all three fields held the supplied values:**
+
+| Field | Before (as created in step 1) | Sent in step 2 | After (read back) |
+| --- | --- | --- | --- |
+| `PARENT` | `Sundry Creditors` | `Indirect Expenses` | `Indirect Expenses` |
+| `ISBILLWISEON` | `Yes` | `No` | `No` |
+| Opening balance | `-1000.00` | `-2500.00` | `-2500.00` |
+
+The "Before" values were read back after step 1. A date-less `Ledger` collection read showed all
+three fields. A trial balance read showed the parent and the opening.
+
+**The new opening, read two ways.**
+- Two trial balance reads through ComplyEaze Bridge 0.4.1's `trial_balance` tool, for April 2025
+  (the company's first month), taken at 16:04:39Z before the `Create` and 16:06:01Z after it, show
+  the opening as `-1000.00` and then `-2500.00`.
+- A `Ledger` collection read with `SVFROMDATE` and `SVTODATE` both set to the company's books-from
+  date shows `-2500.00`. It was taken after the `Create` only.
+
+**Read the opening at a stated date.** The same `Ledger` collection read **without** date variables
+returned `OPENINGBALANCE` `0.00` for this ledger after the `Create`. Before it, under `Sundry
+Creditors`, the same date-less read returned `-1000.00`.
+
+The cause was not isolated. It may be either of these:
+- the date-less read reporting the opening at the start of the loaded period (by analogy with §5.5);
+- the ledger now sitting under a nominal group (§5.5's 2026-09-06 correction).
+
+Either way, a date-less read showed a replaced opening as `0.00` (observed once). Read an opening at
+a stated date (IMPLEMENTATION_GUIDE I11).
+
+**What this means, on this run:**
+- a `Create` with the same name and a changed parent, bill-wise flag and opening did not fail;
+- it ended with all three at the supplied values;
+- the counters reported it only as `ALTERED 1`.
+
+IMPLEMENTATION_GUIDE §3.6 and `PROMPT_PLAYBOOK.md` Phase 4 step 3a hold the workflow that must
+prevent it. Step 3a already asserted that such an overwrite replaces a ledger's group and opening
+balance; this is a measurement of that case.
+
+**Two follow-up runs, one variable each** (2026-10-02, the same company, one run each, lab). Each
+used a new ledger under `Sundry Creditors`, with bill-wise `Yes` and an opening of `-1000.00`. The
+opening was read at the books-from date, before (right after the ledger was created) and after.
+- **Only the opening changed.** A `Create` with the same name, the same parent and bill-wise flag,
+  and `OPENINGBALANCE` `-2500.00` answered `ALTERED 1`. The opening became `-2500.00`; the parent
+  and bill-wise flag were unchanged.
+- **The opening omitted.** A `Create` with the same name, parent and bill-wise flag and no
+  `OPENINGBALANCE` element answered `ALTERED 1`. The opening stayed at `-1000.00`; the parent and
+  bill-wise flag were unchanged.
+
+So, on these runs, a supplied opening replaced the existing one, and an omitted opening was kept.
+In the first of the two, the date-less read agreed with the dated one (`-2500.00`), on a
+balance-sheet ledger. So the date-less `0.00` did not recur on a balance-sheet ledger (one run). That
+fits the nominal-group candidate above; it does not isolate it.
+
+**Object export.** A `TYPE=Object`, `SUBTYPE=Ledger` export, whose `FETCHLIST` held `FETCH` `*`,
+showed `PARENT` and `ISBILLWISEON`. It never showed:
+- `OPENINGBALANCE`, which was checked while the opening was `-1000.00`;
+- `ALTERID`;
+- `GUID`.
+
+So a diff of it could show a change to the parent or the bill-wise flag, but not to the opening
+(inferred from the fields it carried, one run).
+
+**`IMPORTDUPS` `@@DupIgnoreCombine` was counted as `ALTERED`, not `IGNORED`, in both envelopes —
+PARTIAL, one run per envelope plus a case variant** (2026-10-02 UTC, the same company).
+- **What Tally documents.** Tally's developer reference ("Case Study I", written for Tally.ERP 9
+  Release 6) puts an `IMPORTDUPS` static variable in a master import. For a ledger whose name
+  already exists, it names three system formulae for the treatment of the imported opening
+  balance, and describes `DupIgnoreCombine` as ignoring the ledger if it exists. It does not say
+  whether TallyPrime honours the variable over the HTTP gateway.
+- **What was sent.** Each run re-sent an identical ledger `Create` for a ledger the company already
+  held, with no opening balance, and with `<IMPORTDUPS>@@DupIgnoreCombine</IMPORTDUPS>` in
+  `STATICVARIABLES`.
+- **In Bridge's `Import Data` envelope:** Tally answered `ALTERED 1`, every other counter 0. A
+  second spelling, `@@DUPIGNORECOMBINE`, answered the same. Tally's TDL reference documents
+  formula names as case-insensitive, so this very likely tested one value, not two.
+- **In the documented envelope** (`TALLYREQUEST` `Import`, `TYPE` `Data`, `ID` `All Masters`,
+  `DESC` and `DATA`, no `REPORTNAME`): Tally answered `ALTERED 1`, every other counter 0.
+  - Two synthetic companies were loaded (a loaded-company read listed two, before and after). The
+    request named the ledger's company in `SVCURRENTCOMPANY`; the other company was Tally's
+    current company, per the operator's word, not observed.
+  - The named company's master mark (`ALTMSTID`) stepped by 1, and the other company's did not, so
+    the import landed in the named company.
+  - The answer came as an `ENVELOPE` with a `HEADER` (`VERSION 1`, `STATUS 1`), then
+    `BODY/DATA/IMPORTRESULT`, with the company's `CMPINFO` under `DESC`, not as §9.1's bare
+    `RESPONSE`.
+
+So, on these runs, `@@DupIgnoreCombine` did not stop Tally from counting the `Create` as an
+alteration of the existing ledger, in either envelope. The re-send was identical, so no field could
+tell an ignore from an alteration; the evidence is the counter (`ALTERED 1`, `IGNORED 0`). In the
+documented envelope the master mark's step of 1 is consistent with that; what an ignore does to the
+mark was not measured.
+
+**Not measured:**
+- whether the parent and the bill-wise flag each change on their own: in the first run they changed
+  together, with the opening, and the parent moved from a balance-sheet group to a nominal group;
+- a parent change within balance-sheet groups;
+- a `Create` that omits `PARENT` or `ISBILLWISEON`;
+- an `OPENINGBALANCE` of `0` or an empty element (only an omitted element was measured);
+- an opening-only change on a ledger under a nominal group;
+- an omitted opening in a `Create` that also changes the parent or the bill-wise flag;
+- a folded or differently cased spelling of the name (§9.4b, §9.4d, §9.4e);
+- a ledger that holds bill allocations or posted vouchers;
+- the cause of the date-less `0.00`;
+- the same behaviour on Gold or Education;
+- `IMPORTDUPS` on a `Create` whose fields differ from the existing ledger's (both option runs
+  re-sent an identical ledger);
+- whether `IMPORTDUPS` changes how an opening balance is treated, which is all the reference
+  scopes it to (the re-sent ledger had no opening);
+- any other `IMPORTDUPS` value: neither `DupModify` nor `DupCombine` was sent (the reference
+  describes `DupCombine` as combining opening balances);
+- any import option other than `IMPORTDUPS`, and any formula name the reference does not document.
 
 
 #

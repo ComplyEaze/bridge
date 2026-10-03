@@ -2,7 +2,7 @@
 //! rules table.
 //!
 //! Provenance: `rules/ay2026-27.s44ab.toml` holds byte-for-byte verbatim blocks of the
-//! reference implementation's own AY 2026-27 rules file -- `[meta]`, then `[s44ab]` as two blocks,
+//! reference implementation's own AY 2026-27 rules file -- `[meta]`, then `[s44ab]` as three blocks,
 //! then `[s40a3]` in full, then the first three lines of `[s269st]`, then `[s269ss_269t]`'s first
 //! three lines, its two lender-type lists with their status lines and the accepted-loans list,
 //! then `[depreciation]` in full with its three `[depreciation.blocks.<key>]` sub-tables, then
@@ -28,7 +28,7 @@ use crate::error::{AuditError, Result};
 
 pub const VENDORED: &str = include_str!("../rules/ay2026-27.s44ab.toml");
 pub const VENDORED_SHA256: &str =
-    "5485e9512b502cb0bcc4c10ed267fef32281d9e10acb0d87a4a55d153e633ec5";
+    "83b007fd05a9dd795e16d3d324a182966a6b71cb518c66c482d6e37af3a88f13";
 pub const SOURCE_PATH: &str = "the reference Python implementation's AY 2026-27 rules file";
 pub const SOURCE_SHA256: &str = "6a95baa80420c044f466320c92898240f7e6c292182fbffbe086207d87113857";
 pub const SOURCE_COMMIT: &str = "e2456bcf4f163cf770945e8620e715788db0ca46";
@@ -41,6 +41,9 @@ pub struct Rules {
     pub turnover_threshold_paise: i64,
     pub turnover_threshold_low_cash_paise: i64,
     pub cash_share_limit_bp: i64,
+    /// `[s44ab].profession_gross_receipts_paise`, the s.44AB(b) limit; `None` when the table does not hold it, as
+    /// the reference's `.get` allows.
+    pub profession_gross_receipts_paise: Option<i64>,
     /// `[s40a3].limit_per_person_per_day_paise`.
     pub s40a3_limit_per_person_per_day_paise: i64,
     /// `[s40a3].goods_carriage_limit_paise`.
@@ -274,6 +277,10 @@ impl Rules {
                 "turnover_threshold_low_cash_paise",
             )?,
             cash_share_limit_bp: int_in(s44ab, "s44ab", "cash_share_limit_bp")?,
+            profession_gross_receipts_paise: match s44ab.get("profession_gross_receipts_paise") {
+                None => None,
+                Some(_) => Some(int_in(s44ab, "s44ab", "profession_gross_receipts_paise")?),
+            },
             s40a3_limit_per_person_per_day_paise: int_in(
                 s40a3,
                 "s40a3",
@@ -569,6 +576,7 @@ mod tests {
         assert_eq!(rules.turnover_threshold_paise, 1_000_000_000);
         assert_eq!(rules.turnover_threshold_low_cash_paise, 10_000_000_000);
         assert_eq!(rules.cash_share_limit_bp, 500);
+        assert_eq!(rules.profession_gross_receipts_paise, Some(500_000_000));
     }
 
     #[test]

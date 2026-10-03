@@ -914,10 +914,9 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
     // As the reference does, after every other ledger location: a legacy trade-creditor source's
     // names are configuration too, read once here and replaced by the bound list.
     let mut trade_creditors_source = engagement.trade_creditors_source.clone();
-    if let Some(names) = crate::legacy_trade_creditor_names(
-        engagement.trade_creditors_source.as_ref(),
-        &engagement.base_dir,
-    )? {
+    if let Some(names) =
+        engagement.legacy_creditor_names(engagement.trade_creditors_source.as_ref())?
+    {
         let bound = lbinder.bind_list(&names, LEGACY_PATH_LABEL)?;
         let mut t = toml::Table::new();
         t.insert("kind".to_string(), toml::Value::from("ledgers"));

@@ -41,6 +41,8 @@ mod company;
 use company::*;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_headline.rs"]
+mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
 use ledger_candidates::resolve_ledger_or_refuse;
@@ -51,6 +53,7 @@ mod masters;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
+use vouchers::VoucherPages;
 #[path = "agent_bill_trail.rs"]
 mod bill_trail;
 #[path = "agent_outstandings.rs"]
@@ -414,6 +417,9 @@ struct Server {
     /// Ledger listings read once and served page by page (#630). In memory
     /// only; see `agent_ledgers.rs`.
     listings: Arc<Mutex<ListingSnapshots>>,
+    /// `vouchers` windows read once and served page by page (#485). In memory
+    /// only; see `agent_vouchers.rs`.
+    voucher_pages: Arc<Mutex<VoucherPages>>,
     /// A post dialog or approval that outlived the call which asked it
     /// (#725). In memory only; see `agent_import_approval.rs`.
     post_approvals: Arc<agent_import::PostApprovals>,
@@ -475,6 +481,16 @@ struct ReadDetail {
     /// How many data requests a refused window read needed, at least, against
     /// the allowance it may spend.
     planned_reads: Option<PlannedReads>,
+    /// The report kind and 1-based row of a Bills report whose row could not be
+    /// read (bridge#1091). A word and a number: never the bill's party or reference.
+    bill_row: Option<BillRowRef>,
+}
+
+/// See [`ReadDetail::bill_row`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BillRowRef {
+    report: Option<&'static str>,
+    row: u32,
 }
 
 impl ToolFailure {
@@ -741,6 +757,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(statement.code());
         }
+        if let Some(outstandings) =
+            cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+        {
+            return Some(outstandings.code());
+        }
         if let Some(derivation) =
             cause.downcast_ref::<crate::reports::statements::StatementsError>()
         {
@@ -831,8 +852,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              `vouchers` still read it separately.",
         ),
         "ledger_not_found" => Some(
-            "No ledger in this company has this name, even ignoring case, spaces, symbols and \
-             accent marks, and ComplyEaze Bridge chose none. Show the user the ledgers in \
+            "No ledger in this company is spelled this way, even ignoring ASCII case and extra \
+             spaces (a symbol, an accent or the case of a letter outside A-Z is not ignored), and \
+             ComplyEaze Bridge chose none. Show the user the ledgers in \
              `candidates`, if there are any, and ask which one they meant: even one candidate \
              needs the user's confirmation, and none is marked best: the order is by rule \
              strength and then name, not by likelihood. Then call again with that name exactly \
@@ -847,14 +869,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              attached because the response budget is small: ask the user for the exact name.",
         ),
         "ledger_ambiguous" => Some(
-            "More than one ledger in this company matches this name once case, spaces, \
-             symbols and accent marks are ignored, and none is spelled exactly as requested, \
-             so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
+            "More than one ledger in this company matches this name once case and spaces are \
+             ignored (they differ only in case or whitespace, such as a trailing line break), and \
+             none is spelled exactly as requested, so ComplyEaze Bridge chose none. Show the user every ledger in `candidates` and \
              ask which one they meant, then call again with that name exactly as listed. If \
              `candidates_listing` is `truncated`, more ledgers match than are listed, and if \
              it is `names_masked` or absent the names are not shown: ask the user to type the \
              full name of the ledger exactly as spelled in Tally, since the names that clash \
-             may differ only in case, punctuation or accents.",
+             may differ only in case or whitespace.",
         ),
         "ledger_name_masked" => Some(
             "Refused: ask the user to type the full ledger name exactly as spelled in Tally. \
@@ -1082,17 +1104,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // Narration, reference and voucher number share this code for several
         // unrelated text failures (empty, over the schema's character cap, a
-        // control character); the least discoverable of them is specific to
-        // the voucher number, so it is named here rather than left for a
-        // caller to reverse-engineer.
+        // control character); the least discoverable of them applies to the
+        // voucher number and the narration, so it is named here rather than
+        // left for a caller to reverse-engineer.
         "voucher_text_invalid" => Some(
-            "The voucher number is empty, longer than the schema allows, holds a control \
-             character, or — the one cause that is not visible by inspection — begins a \
-             literal U+FFFD immediately followed by `#`, digits and `;` (for example \
-             U+FFFD#5;). ComplyEaze Bridge's own agent readers rewrite exactly that sequence before \
-             parsing, so a voucher number carrying it would read back as different text and \
-             could never be confirmed as posted. Remove that sequence from the voucher number \
-             and resubmit; narration and reference may carry it freely.",
+            "A narration, reference or voucher number is empty, longer than the schema \
+             allows, or holds a control character; or — the one cause that is not visible by \
+             inspection — the voucher number or narration holds a literal U+FFFD immediately \
+             followed by `#`, digits and `;` (for example U+FFFD#5;). ComplyEaze Bridge's own agent \
+             readers rewrite exactly that sequence before parsing, so a voucher number \
+             carrying it could never be confirmed as posted, and a native post of a narration \
+             carrying it could never be bound to the voucher it created, so never confirmed \
+             either. Remove that sequence from the voucher number or narration and build the \
+             batch again with build_import_xml: a saved batch cannot be changed, and \
+             post_import refuses one saved with such a narration. The reference may carry it \
+             freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -1185,6 +1211,114 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
              Build the batch again over fewer days, then post that batch.",
+        ),
+        _ => None,
+    }
+}
+
+/// A refused argument whose fix is to send it again in the right form, not to
+/// make a different read. Seen in use: "last month" sent as `from`, and a
+/// company's name sent as `company_guid`; both were refused with a bare code.
+/// One type gives both the guidance and the typed `expected` field, so the two
+/// cannot disagree. Only a refusal made before any read gets it:
+/// `company_guid_invalid` is also returned after a read when Tally itself lists
+/// a company whose GUID is malformed, and there the caller's GUID was right.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArgumentRepair {
+    /// `from`, `to` or `as_of` was not shaped like a date (the published
+    /// pattern accepts YYYYMMDD or YYYY-MM-DD).
+    CalendarDate(&'static str),
+    /// `company_guid` was not the hyphenated GUID `list_companies` returns.
+    CompanyGuid,
+}
+
+impl ArgumentRepair {
+    fn of(code: &str) -> Option<Self> {
+        match code {
+            "argument_invalid:from" => Some(Self::CalendarDate("from")),
+            "argument_invalid:to" => Some(Self::CalendarDate("to")),
+            "argument_invalid:as_of" => Some(Self::CalendarDate("as_of")),
+            "company_guid_invalid" => Some(Self::CompanyGuid),
+            _ => None,
+        }
+    }
+
+    fn remediation(self) -> &'static str {
+        match self {
+            Self::CalendarDate(_) => {
+                "Send the date as text, YYYYMMDD (for example 20260930) or YYYY-MM-DD. If the \
+                 user said \"last month\" or \"this financial year\" (1 April to 31 March), work \
+                 out the exact dates yourself and tell the user which dates you used. Nothing was \
+                 read from Tally."
+            }
+            Self::CompanyGuid => {
+                "company_guid must be the 36-character ID that list_companies gives for the \
+                 company, not its name. Call list_companies and use the company the user named; if \
+                 more than one fits, ask which. Nothing was read from Tally."
+            }
+        }
+    }
+
+    /// What the argument should have been, as a typed field beside the code.
+    fn expected(self) -> Value {
+        match self {
+            Self::CalendarDate(argument) => json!({
+                "argument": argument,
+                "kind": "calendar_date",
+                "formats": ["YYYYMMDD", "YYYY-MM-DD"],
+            }),
+            Self::CompanyGuid => json!({
+                "argument": "company_guid",
+                "kind": "company_guid",
+                "from_tool": "list_companies",
+            }),
+        }
+    }
+}
+
+/// The next step for a refusal: its own code's, else its cause's, and the outstandings
+/// causes' only under the outstandings code.
+fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
+    refusal_remediation(code)
+        .or_else(|| cause.and_then(refusal_remediation))
+        .or_else(|| {
+            (code == "native_outstandings_read_failed")
+                .then(|| cause.and_then(outstandings_cause_remediation))
+                .flatten()
+        })
+}
+
+/// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
+/// only under that code: the same cause codes reach other tools through `?` sites that never
+/// read the Bills report, and the text below would be wrong for them. A refusal is whole:
+/// leaving one bill out would change the totals, so nothing is returned.
+fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
+    match cause {
+        cause if cause.starts_with("native_date_") => Some(
+            "A date in one row of Tally's Bills Receivable or Payable report is not one \
+             ComplyEaze Bridge can read, so no figures were returned: leaving that bill out would \
+             change the totals. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen: look in that \
+             report for a bill with a very long credit period or an unusual date and tell the \
+             user what Tally shows. A refusal about the book's date window has no `bill_row`: tell \
+             the user what the cause says. The \
+             book did not change during the read, so retrying gives the same refusal. Do not retry.",
+        ),
+        cause if cause.starts_with("bills_") => Some(
+            "Tally's Bills Receivable or Payable report came back in a shape ComplyEaze Bridge \
+             does not recognise (the cause names the rule it broke; `bill_row` names the report \
+             and row when a row is the problem), so no figures were returned. The book did not \
+             change during the read, so retrying gives the same refusal. Do not retry; tell the \
+             user what the cause says.",
+        ),
+        "native_amount_invalid" | "native_arithmetic_overflow" => Some(
+            "A bill amount in Tally's Bills report could not be read exactly, so no figures were \
+             returned. Do not retry; tell the user what the cause says.",
+        ),
+        "native_tally_reported_failure" => Some(
+            "Tally answered the Bills report request with a failure, so no figures were returned. \
+             Ask the user to check that the company is open in Tally and that its Bills \
+             Receivable report opens, then call outstandings once more.",
         ),
         _ => None,
     }
@@ -1331,6 +1465,12 @@ impl ToolFailure {
                 .map(|failure| Box::new(evidence_from_runtime_read(failure.evidence.clone())))
         });
         let cause = runtime_refusal_cause(&error).filter(|cause| *cause != code);
+        let bill_row = error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+                .and_then(|error| error.bill_row())
+                .map(|(report, row)| BillRowRef { report, row })
+        });
         Self {
             code: code.to_string(),
             evidence,
@@ -1341,7 +1481,12 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            read_detail: None,
+            read_detail: bill_row.map(|bill_row| {
+                Box::new(ReadDetail {
+                    bill_row: Some(bill_row),
+                    ..ReadDetail::default()
+                })
+            }),
         }
     }
 
@@ -1364,6 +1509,7 @@ impl Server {
             runtime: TallyRuntime::default(),
             evidence: Arc::new(Mutex::new(EvidenceStore::default())),
             listings: Arc::new(Mutex::new(ListingSnapshots::default())),
+            voucher_pages: Arc::new(Mutex::new(VoucherPages::default())),
             post_approvals,
             terms: terms::TermsGate::NotRequired,
         }
@@ -1477,6 +1623,11 @@ impl Server {
                 candidates,
                 read_detail,
             }) => {
+                // Nothing was read when the failure carries no evidence of a read.
+                let repair = evidence
+                    .is_none()
+                    .then(|| ArgumentRepair::of(&code))
+                    .flatten();
                 let mut evidence = evidence.map(|value| *value).unwrap_or_else(|| Evidence {
                     request_sha256: sha256_hex(format!("{name}:{args_sha256}").as_bytes()),
                     response_sha256: sha256_hex(code.as_bytes()),
@@ -1511,11 +1662,18 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) =
-                    refusal_remediation(&code).or_else(|| cause.and_then(refusal_remediation))
+                if let Some(remediation) = refusal_remediation(&code)
+                    .or_else(|| repair.map(ArgumentRepair::remediation))
+                    .or_else(|| remediation_for(&code, cause))
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
+                    }
+                }
+                // Same budget rule: what a refused argument should have been.
+                if let Some(repair) = repair {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["expected"] = repair.expected();
                     }
                 }
                 // A typed validation cause wins; otherwise a request that no
@@ -1632,9 +1790,20 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads) = read_detail
-                    .map(|detail| (detail.incomplete_read, detail.planned_reads))
+                let (incomplete_read, planned_reads, bill_row) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                        )
+                    })
                     .unwrap_or_default();
+                if let Some(bill_row) = bill_row {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});
+                    }
+                }
                 if let Some(read) = incomplete_read {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["partial_reason"] = json!(read.partial_reason);
@@ -1693,17 +1862,20 @@ impl Server {
         });
         evidence.read_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         evidence.duration_ms = Some((Utc::now() - started).num_milliseconds().max(0) as u128);
-        let response_value = redact_tool_response(
-            name,
-            json!({
-                "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
-                "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
-                "evidence": evidence,
-                "truncated": truncated,
-                "result": payload.get("result").cloned().unwrap_or(payload),
-            }),
-            self.settings.redaction,
-        );
+        // A tool that states its outcome in words carries it as `headline`
+        // beside `result`; it sorts ahead of `result` in the serialized form.
+        let headline = payload.get("headline").cloned();
+        let mut envelope = json!({
+            "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
+            "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "evidence": evidence,
+            "truncated": truncated,
+            "result": payload.get("result").cloned().unwrap_or(payload),
+        });
+        if let Some(headline) = headline {
+            envelope["headline"] = headline;
+        }
+        let response_value = redact_tool_response(name, envelope, self.settings.redaction);
         let (response_value, _bytes_truncated, surviving_rows) =
             match enforce_response_byte_cap(response_value, self.settings.max_bytes) {
                 Ok(value) => value,
@@ -2012,17 +2184,13 @@ pub(crate) async fn desktop_selected_vouchers(
             "offset": offset,
             "limit": limit,
         }),
-        vouchers::VoucherOperationScope {
-            guid: company_guid,
-            from: normalized_from,
-            to: normalized_to,
+        vouchers::VoucherOperationScope::desktop(
+            company_guid,
+            normalized_from,
+            normalized_to,
             company,
             identity,
-            initial_evidence: None,
-            // The desktop screen cannot show a withheld voucher, so a
-            // foreign-currency composite still refuses its window (#674).
-            composites: vouchers::VoucherComposites::Refuse,
-        },
+        ),
     )
     .await
     .map_err(|failure| failure.code)?;
@@ -2074,6 +2242,9 @@ fn ensure_movement_window_within_books(from: &str, books_from: &str) -> Result<(
         .ok_or_else(|| "window_precedes_books_from".to_string())
 }
 
+/// Letters and digits only, lower-cased. It never resolves a name (#1076): it
+/// offers the ledger a looser spelling may mean as a `lookup_key_equal`
+/// candidate, and it is how a retyped masked name is recognised.
 fn ledger_lookup_key(value: &str) -> String {
     value
         .chars()
@@ -2082,21 +2253,152 @@ fn ledger_lookup_key(value: &str) -> String {
         .collect()
 }
 
+/// What may resolve without asking: ASCII case and ASCII spaces (trimmed and
+/// collapsed). It is the part of the measured fold (reference 9.4d) that never
+/// changes which ledger is meant. A non-ASCII letter's case is not folded
+/// (9.4f), and neither is any symbol, accent or separator (#1076, decision A).
+fn ledger_spelling_key(value: &str) -> String {
+    value
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+/// Any case and any whitespace. It never resolves; it finds the ledgers a
+/// name is nearly identical to, such as a twin that differs only by a
+/// trailing CR LF (9.4e), which no one can type.
+fn ledger_twin_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+/// A requested ledger name, resolved. `resolve_ledger_name` is its only
+/// producer, by convention: the type does not enforce it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerMatch {
+    /// Spelled exactly as in the book. `similar` holds the other ledgers that
+    /// differ from it only in case or whitespace: they are named in the
+    /// answer, never a reason to refuse, because the exact spelling is how a
+    /// twin is reached at all (an import binds the exact name, 9.4e).
+    Exact { name: String, similar: Vec<String> },
+    /// One ledger differs from the request only in ASCII case and ASCII
+    /// spaces, and no other ledger is that close to it.
+    CaseOrSpacing { name: String },
+}
+
+impl LedgerMatch {
+    fn name(&self) -> &str {
+        match self {
+            Self::Exact { name, .. } | Self::CaseOrSpacing { name } => name,
+        }
+    }
+
+    /// The `ledger_match` object a result carries, so the answer says which
+    /// ledger was read and how the request reached it. Under `mask_parties`
+    /// it names no similar ledger and gives no count of them, as a masked
+    /// refusal gives none.
+    fn to_json(&self, redaction: Redaction) -> Value {
+        let (matched, similar) = match self {
+            Self::Exact { similar, .. } => ("exact", similar.as_slice()),
+            Self::CaseOrSpacing { .. } => ("case_or_spacing", &[][..]),
+        };
+        if redaction == Redaction::MaskParties {
+            return redact_value(
+                json!({
+                    "ledger": party_name_value(self.name().to_string()),
+                    "matched": matched,
+                }),
+                redaction,
+            );
+        }
+        redact_value(
+            json!({
+                "ledger": party_name_value(self.name().to_string()),
+                "matched": matched,
+                // Bounded like a candidate list; the total says how many.
+                "similar_ledgers": similar
+                    .iter()
+                    .take(bridge_tally_core::master_binding::MAX_CANDIDATES_PER_ENTITY)
+                    .map(|name| party_name_value(name.clone()))
+                    .collect::<Vec<_>>(),
+                "similar_ledgers_total": similar.len(),
+            }),
+            redaction,
+        )
+    }
+}
+
+/// Why a requested ledger name did not resolve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LedgerRefusal {
+    NotFound,
+    /// More than one ledger is that close, sorted: the set the user chooses from.
+    Ambiguous(Vec<String>),
+}
+
+impl LedgerRefusal {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound => "ledger_not_found",
+            Self::Ambiguous(_) => "ledger_ambiguous",
+        }
+    }
+}
+
+/// Resolves a requested ledger name: an exact spelling, or else the one ledger
+/// equal to it in ASCII case and spaces when no other ledger is a twin of
+/// it. Anything looser asks the user (#1076): a sole loose match is a
+/// candidate, never the answer (reference 9.4b).
 fn resolve_ledger_name<'a>(
     ledger_names: impl Iterator<Item = &'a str>,
     requested: &str,
-) -> Result<String, String> {
-    let requested_key = ledger_lookup_key(requested);
-    let exact = ledger_names
-        .filter(|name| ledger_lookup_key(name) == requested_key)
-        .collect::<Vec<_>>();
-    if let Some(name) = exact.iter().find(|name| **name == requested) {
-        return Ok((*name).to_string());
+) -> Result<LedgerMatch, LedgerRefusal> {
+    let mut names = ledger_names.collect::<Vec<_>>();
+    // A name listed twice is one ledger to the user, not a clash.
+    names.sort_unstable();
+    names.dedup();
+    let twins_of = |name: &str| {
+        let key = ledger_twin_key(name);
+        let mut twins = names
+            .iter()
+            .filter(|candidate| ledger_twin_key(candidate) == key)
+            .map(|candidate| (*candidate).to_string())
+            .collect::<Vec<_>>();
+        twins.sort_unstable();
+        twins.dedup();
+        twins
+    };
+    if names.contains(&requested) {
+        let similar = twins_of(requested)
+            .into_iter()
+            .filter(|name| name != requested)
+            .collect();
+        return Ok(LedgerMatch::Exact {
+            name: requested.to_string(),
+            similar,
+        });
     }
-    match exact.as_slice() {
-        [] => Err("ledger_not_found".to_string()),
-        [name] => Ok((*name).to_string()),
-        _ => Err("ledger_ambiguous".to_string()),
+    let key = ledger_spelling_key(requested);
+    let spelled = names
+        .iter()
+        .filter(|name| ledger_spelling_key(name) == key)
+        .collect::<Vec<_>>();
+    // Names equal in ASCII case and spaces are equal in any case and
+    // whitespace, so the twins of the first are every ledger that close.
+    match spelled.as_slice() {
+        [] => Err(LedgerRefusal::NotFound),
+        [only] => match twins_of(only).as_slice() {
+            [_] => Ok(LedgerMatch::CaseOrSpacing {
+                name: (**only).to_string(),
+            }),
+            twins => Err(LedgerRefusal::Ambiguous(twins.to_vec())),
+        },
+        [first, ..] => Err(LedgerRefusal::Ambiguous(twins_of(first))),
     }
 }
 

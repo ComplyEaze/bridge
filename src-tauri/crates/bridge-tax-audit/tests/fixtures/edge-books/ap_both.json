@@ -1,0 +1,24 @@
+{
+ "comment": "applicability_44ab, a client recorded as carrying on both a business and a profession, turnover over the highest threshold: s.44AB(a) is yes and the s.44AB(b) question is still asked, with the receipts-not-split wording; a partial-coverage GSTR-1 turnover is stated and not differenced; the cash share is not supplied; no presumptive history.",
+ "entity_type": "individual",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": 11000000000,
+  "gstr1_turnover_paise": 10000000000,
+  "gstr1_coverage": "first half only"
+ },
+ "a44_cash_share": {
+  "receipts_bp": null,
+  "payments_bp": null,
+  "limits": []
+ },
+ "tests": [
+  "applicability_44ab"
+ ],
+ "deductor_activity": "both"
+}

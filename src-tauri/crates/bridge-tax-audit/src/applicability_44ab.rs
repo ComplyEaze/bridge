@@ -20,6 +20,7 @@
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::rules::Rules;
+use crate::tds_payees::DeductorActivity;
 
 pub const TEST_ID: &str = "applicability_44ab";
 pub const VERSION: &str = "1";
@@ -105,6 +106,20 @@ fn py_repr(v: Option<&toml::Value>) -> Result<String> {
     }
 }
 
+/// `paise / 1_00_000_00` as Python's `:g` prints it, for a whole number of lakh below a million (the only shape
+/// the rules table holds); any other value is refused rather than printed differently from the reference.
+fn lakh_g(paise: i64) -> Result<String> {
+    const LAKH_PAISE: i64 = 10_000_000;
+    // Python's `:g` keeps six significant digits, so a million lakh or more prints in exponent form.
+    if paise % LAKH_PAISE == 0 && (paise / LAKH_PAISE).abs() < 1_000_000 {
+        Ok((paise / LAKH_PAISE).to_string())
+    } else {
+        Err(AuditError::Config(format!(
+            "applicability_44ab: [s44ab].profession_gross_receipts_paise {paise} is not a whole number of lakh below a million"
+        )))
+    }
+}
+
 /// `limit_bp / 100` as Python's `:g` prints it for a whole or two-decimal percentage.
 fn percent_g(bp: i64) -> String {
     let (q, r) = (bp / 100, (bp % 100).abs());
@@ -121,6 +136,7 @@ pub fn run(
     turnover_inputs: &TurnoverInputs,
     cash_share: &CashShare,
     presumptive_history: Option<&toml::Table>,
+    deductor_activity: Option<DeductorActivity>,
 ) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let limit_bp = rules.cash_share_limit_bp;
@@ -268,6 +284,7 @@ the cash share resolves, 'no' when it certainly does not, else 'undetermined'. T
         ),
         Vec::new(),
     )?;
+    let f_req_id = f_req.clone();
     facts.push(("audit_required_44ab_a".to_string(), f_req));
 
     let profession = crate::support::py_lower(entity_type).contains("profession");
@@ -360,6 +377,54 @@ above is not understated by a non-account-payee cheque or draft booked as bank."
         limits,
         ask_client,
     });
+
+    // s.44AB(b), a question only: a profession's audit turns on its gross receipts, which the books' sales figure is
+    // not, and whether the client carries on a profession is configuration. Asked where the client is recorded as a
+    // profession or both, or where the activity is unrecorded and s.44AB(a) does not already require the audit.
+    if matches!(
+        deductor_activity,
+        Some(DeductorActivity::Profession | DeductorActivity::Both)
+    ) || (deductor_activity.is_none() && audit_required != "yes")
+    {
+        let limit_text = match rules.profession_gross_receipts_paise {
+            Some(paise) => format!("₹{} lakh", lakh_g(paise)?),
+            None => "the limit, which this rules table does not hold".to_string(),
+        };
+        let rule_b = format!(
+            "s.44AB(b) requires a tax audit where gross receipts in a profession exceed {limit_text} in the previous \
+year."
+        );
+        let why = match deductor_activity {
+            Some(DeductorActivity::Profession) => format!(
+                "The client is recorded as carrying on a profession. {rule_b} This test reads the books' sales \
+turnover for s.44AB(a) only; a profession's gross receipts are not computed here, so the s.44AB(a) call above does \
+not settle whether an audit is required."
+            ),
+            Some(DeductorActivity::Both) => format!(
+                "The client is recorded as carrying on both a business and a profession: s.44AB(a) applies to the \
+business turnover and s.44AB(b) to the profession's gross receipts, each on its own. {rule_b} The receipts are not \
+split between the two here."
+            ),
+            _ => format!(
+                "Whether the client carries on a profession is not recorded, and s.44AB(a) does not already require an \
+audit here. {rule_b} A profession's gross receipts are not computed here."
+            ),
+        };
+        r.findings.push(Finding {
+            id: format!("{TEST_ID}/profession_44ab_b"),
+            clauses: vec!["s.44AB(b)".to_string(), "3CD-8".to_string()],
+            title: "s.44AB(b): a profession's tax audit turns on its gross receipts, which this test does not compute"
+                .to_string(),
+            facts: vec![("audit_required_44ab_a".to_string(), f_req_id.clone())],
+            evidence: vec![EvidenceRef::new("rule", "s44ab")],
+            confidence: Confidence::JudgementRequired,
+            limits: vec![format!("{why} The CA determines.")],
+            ask_client: vec![
+                "Whether the client carries on a profession, and its gross receipts from the profession in the year."
+                    .to_string(),
+            ],
+        });
+    }
 
     let clauses = vec![
         "s.44AB(e)".to_string(),
@@ -474,7 +539,15 @@ mod tests {
     }
 
     fn call(t: Option<i64>, c: &CashShare) -> String {
-        let r = run(&rules(), "individual", &turnover(t), c, None).unwrap();
+        let r = run(
+            &rules(),
+            "individual",
+            &turnover(t),
+            c,
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .unwrap();
         match fig(&r, "audit_required_44ab_a") {
             Value::Text(s) => s,
             other => panic!("{other:?}"),
@@ -516,6 +589,7 @@ mod tests {
             &turnover(t),
             &cash(Some(500), Some(500)),
             None,
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         assert_eq!(fig(&r, "applicable_threshold"), Value::Int(10 * CRORE));
@@ -526,6 +600,7 @@ mod tests {
             &turnover(t),
             &cash(Some(501), Some(0)),
             None,
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         assert_eq!(fig(&r, "applicable_threshold"), Value::Int(CRORE));
@@ -544,6 +619,7 @@ mod tests {
             &turnover(None),
             &cash(None, None),
             None,
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         assert_eq!(fig(&r, "turnover"), Value::Text("not supplied".to_string()));
@@ -569,6 +645,7 @@ mod tests {
             &inputs,
             &cash(Some(0), Some(0)),
             None,
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         assert_eq!(fig(&r, "gstr1_turnover_diff_from_books"), Value::Int(1_000));
@@ -595,13 +672,22 @@ mod tests {
             &turnover(None),
             &cash(None, None),
             None,
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         assert_eq!(
             fig(&r, "s44ada_professions_in_scope"),
             Value::Text("yes".to_string())
         );
-        let r = run(&rules(), "firm", &turnover(None), &cash(None, None), None).unwrap();
+        let r = run(
+            &rules(),
+            "firm",
+            &turnover(None),
+            &cash(None, None),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .unwrap();
         assert_eq!(
             fig(&r, "s44ada_professions_in_scope"),
             Value::Text("no".to_string())
@@ -610,7 +696,15 @@ mod tests {
 
     #[test]
     fn due_dates_carry_their_status() {
-        let r = run(&rules(), "firm", &turnover(None), &cash(None, None), None).unwrap();
+        let r = run(
+            &rules(),
+            "firm",
+            &turnover(None),
+            &cash(None, None),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .unwrap();
         assert_eq!(
             fig(&r, "due_date_audit_report"),
             Value::Text("2026-09-30".to_string())
@@ -618,7 +712,15 @@ mod tests {
         assert!(r.findings[0].limits[0].contains("not yet been checked"));
         let mut verified = rules();
         verified.due_dates_status = "verified".to_string();
-        let r = run(&verified, "firm", &turnover(None), &cash(None, None), None).unwrap();
+        let r = run(
+            &verified,
+            "firm",
+            &turnover(None),
+            &cash(None, None),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .unwrap();
         assert_eq!(
             r.findings[0].limits[0],
             "The due dates above are checked against the Finance Act 2026 text."
@@ -637,6 +739,7 @@ mod tests {
             &turnover(None),
             &cash(None, None),
             Some(&h),
+            Some(DeductorActivity::Business),
         )
         .unwrap();
         r.figures
@@ -667,18 +770,122 @@ mod tests {
             "firm",
             &turnover(None),
             &cash(None, None),
-            Some(&h)
+            Some(&h),
+            Some(DeductorActivity::Business)
         )
         .is_err());
     }
 
     #[test]
     fn absent_history_is_a_question_never_assumed() {
-        let r = run(&rules(), "firm", &turnover(None), &cash(None, None), None).unwrap();
+        let r = run(
+            &rules(),
+            "firm",
+            &turnover(None),
+            &cash(None, None),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .unwrap();
         assert_eq!(
             fig(&r, "presumptive_history_status"),
             Value::Text("not supplied".to_string())
         );
         assert_eq!(r.findings[1].confidence, Confidence::JudgementRequired);
+    }
+
+    fn profession_limits(r: &TestResult) -> Option<&str> {
+        r.findings
+            .iter()
+            .find(|f| f.id == "applicability_44ab/profession_44ab_b")
+            .map(|f| f.limits[0].as_str())
+    }
+
+    #[test]
+    fn the_profession_question_names_the_limit_the_table_holds() {
+        let r = run(
+            &rules(),
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .unwrap();
+        let text = profession_limits(&r).expect("asked for a profession");
+        assert!(
+            text.contains("exceed ₹50 lakh in the previous year"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn the_profession_question_says_so_when_the_table_holds_no_limit() {
+        let mut rules = rules();
+        rules.profession_gross_receipts_paise = None;
+        let r = run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Both),
+        )
+        .unwrap();
+        let text = profession_limits(&r).expect("asked for both");
+        assert!(
+            text.contains(
+                "exceed the limit, which this rules table does not hold in the previous year"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn a_limit_that_is_not_a_whole_number_of_lakh_is_refused_not_printed_differently() {
+        let mut rules = rules();
+        rules.profession_gross_receipts_paise = Some(500_000_001);
+        let err = run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .unwrap_err();
+        assert!(matches!(err, AuditError::Config(_)), "{err:?}");
+        // A million lakh or more would print in exponent form under Python's `:g`: refused too.
+        rules.profession_gross_receipts_paise = Some(10_000_000 * 1_000_000);
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .is_err());
+        rules.profession_gross_receipts_paise = Some(10_000_000 * 999_999);
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Profession),
+        )
+        .is_ok());
+        rules.profession_gross_receipts_paise = Some(500_000_001);
+        // A client not asked the question is not refused for it.
+        assert!(run(
+            &rules,
+            "individual",
+            &turnover(Some(2_000_000_000)),
+            &cash(Some(0), Some(0)),
+            None,
+            Some(DeductorActivity::Business),
+        )
+        .is_ok());
     }
 }

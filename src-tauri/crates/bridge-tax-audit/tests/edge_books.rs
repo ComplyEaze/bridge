@@ -25,11 +25,13 @@ use bridge_tax_audit::documents::{bank_statement_from_json, traces_documents_fro
 use bridge_tax_audit::error::AuditError;
 use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
+use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
-    bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
-    high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly,
-    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
-    trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
+    applicability_44ab, bank_reconciliation, book_keeping_quality, cash_book_integrity,
+    counter_cheques_40a3, creditor_ageing_43bh, high_value_register, ledger_scrutiny,
+    loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1, statutory_dues_43b,
+    stock, stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts,
+    PartnersConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -502,6 +504,69 @@ fn stock_inputs(s: &Value) -> stock_read::StockInputs {
     }
 }
 
+/// `applicability_44ab`'s inputs from an edge book: `a44_turnover` (the reference's `turnover_inputs`), `a44_cash_share`,
+/// `presumptive_history` and `deductor_activity`, each typed strictly as `parity/edge_golden.py` reads it.
+fn applicability_inputs(
+    s: &Value,
+) -> (
+    applicability_44ab::TurnoverInputs,
+    applicability_44ab::CashShare,
+    Option<toml::Table>,
+    Option<DeductorActivity>,
+) {
+    let t = &s["a44_turnover"];
+    let optional_int = |v: &Value| -> Option<i64> {
+        if v.is_null() {
+            None
+        } else {
+            Some(v.as_i64().expect("an integer or null"))
+        }
+    };
+    let source = |name: &str| {
+        optional_int(&t[format!("{name}_turnover_paise")]).map(|turnover_paise| {
+            applicability_44ab::ComparisonTurnover {
+                turnover_paise,
+                coverage: t[format!("{name}_coverage")]
+                    .as_str()
+                    .unwrap_or("full")
+                    .to_string(),
+            }
+        })
+    };
+    let inputs = applicability_44ab::TurnoverInputs {
+        books_turnover_paise: optional_int(&t["books_turnover_paise"]),
+        gstr1: source("gstr1"),
+        gstr3b: source("gstr3b"),
+        ais: source("ais"),
+    };
+    let c = &s["a44_cash_share"];
+    let cash = applicability_44ab::CashShare {
+        receipts_bp: optional_int(&c["receipts_bp"]),
+        payments_bp: optional_int(&c["payments_bp"]),
+        limits: strs(&c["limits"]),
+    };
+    let history = s["presumptive_history"].as_object().map(|m| {
+        m.iter()
+            .map(|(k, v)| {
+                let value = match v {
+                    Value::String(x) => toml::Value::String(x.clone()),
+                    Value::Bool(b) => toml::Value::Boolean(*b),
+                    Value::Number(n) => toml::Value::Integer(n.as_i64().expect("an integer")),
+                    other => {
+                        panic!("presumptive_history holds text, integers and booleans, not {other}")
+                    }
+                };
+                (k.clone(), value)
+            })
+            .collect::<toml::Table>()
+    });
+    let activity = s["deductor_activity"].as_str().map(|a| {
+        DeductorActivity::parse(a)
+            .unwrap_or_else(|| panic!("deductor_activity {a:?} is not recognised"))
+    });
+    (inputs, cash, history, activity)
+}
+
 /// Build the book, run every test the spec names, and compare each whole dump with the reference's.
 fn check(name: &str) {
     let s = spec(name);
@@ -535,6 +600,13 @@ fn check(name: &str) {
             "ledger_scrutiny" => {
                 let r = ledger_scrutiny::run(&book, &rules, &period(&s), &cash).unwrap();
                 let c = ledger_scrutiny::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "counter_cheques_40a3" => {
+                let terms: BTreeSet<String> =
+                    strs(&s["counter_cheque_terms"]).into_iter().collect();
+                let r = counter_cheques_40a3::run(&book, &rules, &cash, &bank, &terms).unwrap();
+                let c = counter_cheques_40a3::check_invariants(&r, None);
                 (r, c)
             }
             "cash_book_integrity" => {
@@ -643,6 +715,25 @@ fn check(name: &str) {
                     entity_type,
                     &partners(&s),
                     &strs(&s["tds_payable_ledgers"]).into_iter().collect(),
+                )
+                .unwrap();
+                // The reference module has no check_invariants: an empty evaluated list.
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
+            "applicability_44ab" => {
+                let (inputs, cash_share, history, activity) = applicability_inputs(&s);
+                let entity_type = s["entity_type"].as_str().unwrap_or("individual");
+                let r = applicability_44ab::run(
+                    &rules,
+                    entity_type,
+                    &inputs,
+                    &cash_share,
+                    history.as_ref(),
+                    activity,
                 )
                 .unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
@@ -772,10 +863,12 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 16] = [
+const EDGE_TESTS: [&str; 18] = [
+    "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
     "cash_book_integrity",
+    "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "high_value_register",
     "ledger_scrutiny",

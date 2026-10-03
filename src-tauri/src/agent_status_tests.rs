@@ -74,9 +74,17 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             writes_enabled: false,
             batch_post_enabled: false,
         });
+        let before = tally_host_today();
         let response = server.call_tool("tally_status", json!({})).await;
+        let after = tally_host_today();
         assert_eq!(response["isError"], false, "{fault}");
         let result = &response["structuredContent"]["result"];
+        // The date an omitted `as_of` defaults to is stated, as the host's
+        // calendar day: bracketed so a midnight crossing cannot fail the test.
+        assert!(
+            result["today"] == before || result["today"] == after,
+            "{fault}: {result}"
+        );
         assert_eq!(
             result["product"],
             if fault == "unobserved" {
@@ -540,6 +548,23 @@ async fn a_busy_wire_lock_names_itself_and_says_when_to_retry() {
     drop(held);
 }
 
+/// An assistant reads this description to learn that `today` is stated, and
+/// which defaults it is the date of.
+#[test]
+fn the_status_description_says_what_today_is_the_date_of() {
+    let definitions = tool_definitions(true, false);
+    let description = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "tally_status"))
+        .expect("tally_status tool definition")["description"]
+        .as_str()
+        .expect("tool description");
+    assert!(description.contains("`today` is this computer's calendar date (YYYYMMDD)"));
+    assert!(description.contains(
+        "`outstandings` uses when `as_of` is left out, and `ledger_masters` with `fields=compliance` for `party_gstin`"
+    ));
+}
+
 /// The company rule is in `list_companies`' own description as well as in the
 /// server instructions, so a client that drops the instructions keeps it.
 #[test]
@@ -566,7 +591,9 @@ fn the_company_rule_is_in_the_list_companies_description() {
 /// whether the user's data had been sent anywhere answered, from their names,
 /// that nothing had left the computer. Each now says what it holds and what
 /// it does not, so the descriptions must differ and must both carry the
-/// statement that what the assistant reads goes to the AI provider.
+/// statement that what the assistant reads goes to the AI provider. That
+/// statement comes first: in a plan-only eval a model that read "no figures
+/// or book content" first echoed it as "no figures or client data sent".
 #[test]
 fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     let definitions = tool_definitions(true, false);
@@ -581,8 +608,25 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     };
     let evidence = description_of("read_evidence");
     let egress = description_of("egress_log");
-    let first_sentence = |text: &str| text.split(". ").next().unwrap().to_string();
-    assert_ne!(first_sentence(&evidence), first_sentence(&egress));
+    let disclosure = "Everything the assistant reads from Tally through ComplyEaze Bridge in this chat, amounts included, is sent to the AI provider;";
+    for description in [&evidence, &egress] {
+        assert!(description.starts_with(disclosure), "{description}");
+        let holds = description.find("no figures or book content").unwrap();
+        assert!(
+            description
+                .find("Never tell the user that no data has left their computer.")
+                .unwrap()
+                < holds,
+            "{description}"
+        );
+    }
+    let holding_sentence = |text: &str| {
+        text.split(". ")
+            .find(|s| s.starts_with("Shows "))
+            .unwrap()
+            .to_string()
+    };
+    assert_ne!(holding_sentence(&evidence), holding_sentence(&egress));
     // Each says what it holds, and not what the other holds.
     assert!(evidence.contains("kept in memory"), "{evidence}");
     assert!(!evidence.contains("local log file"), "{evidence}");

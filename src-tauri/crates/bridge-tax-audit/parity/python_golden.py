@@ -128,7 +128,7 @@ def _financial_statements(c):
 
 def _applicability_44ab(c):
     from tae.audit_tests import applicability_44ab, cash_44ab, financial_statements
-    from tae.config import partner_interest_ledgers, presumptive_history_config
+    from tae.config import deductor_activity, partner_interest_ledgers, presumptive_history_config
     a = c.args
     if a.turnover_inputs and a.emit_turnover_inputs:
         c.ap.error("--turnover-inputs and --emit-turnover-inputs are exclusive")
@@ -161,7 +161,8 @@ def _applicability_44ab(c):
                   "payments_bp": c44.figures[f"{cash_44ab.TEST_ID}.cash_share_payments"].value,
                   "limits": c44.findings[0].limits}
     return applicability_44ab, applicability_44ab.run(
-        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg))
+        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg),
+        deductor_activity=deductor_activity(c.cfg))
 
 
 def _depreciation(c):
@@ -174,6 +175,13 @@ def _depreciation(c):
                  **{k: v for k, v in c.rules["depreciation"].items() if k not in ("authority", "status")}}
     return depreciation, depreciation.run(c.eng, rules_dep, block_by_ledger, opening_wdv_paise,
                                           dep_expense_ledgers)
+
+
+def _counter_cheques_40a3(c):
+    from tae.audit_tests import counter_cheques_40a3
+    from tae.config import counter_cheque_narration_terms
+    return counter_cheques_40a3, counter_cheques_40a3.run(
+        c.eng, c.rules, cash=c.cash, bank=c.bank, narration_terms=counter_cheque_narration_terms(c.cfg))
 
 
 def _creditor_ageing_43bh(c):
@@ -400,6 +408,7 @@ RUNNERS = {
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
+    "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,
     "financial_statements": _financial_statements,

@@ -223,6 +223,37 @@
       "ask_client_text": [
         "Confirm the presumptive-taxation status for every remaining year in the s.44AD(4)/(5) lookback window, and whether an opt-out in any of them requires an audit under s.44AB(e) independently of the turnover threshold above."
       ]
+    },
+    {
+      "id": "applicability_44ab/profession_44ab_b",
+      "clauses": [
+        "s.44AB(b)",
+        "3CD-8"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "audit_required_44ab_a",
+          "figure_id": "applicability_44ab.audit_required_44ab_a"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "rule",
+          "id": "s44ab",
+          "label": ""
+        }
+      ],
+      "title_sha256_16": "20d3d6417c2dd07a",
+      "title_text": "s.44AB(b): a profession's tax audit turns on its gross receipts, which this test does not compute",
+      "limits_sha256_16": "f8bfce052e4f1397",
+      "limits_text": [
+        "Whether the client carries on a profession is not recorded, and s.44AB(a) does not already require an audit here. s.44AB(b) requires a tax audit where gross receipts in a profession exceed ₹50 lakh in the previous year. A profession's gross receipts are not computed here. The CA determines."
+      ],
+      "ask_client_sha256_16": "f891afd08f5b0f5f",
+      "ask_client_text": [
+        "Whether the client carries on a profession, and its gross receipts from the profession in the year."
+      ]
     }
   ],
   "book_invariants_evaluated": [

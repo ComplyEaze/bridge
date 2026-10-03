@@ -499,17 +499,32 @@ async fn a_named_reference_starts_the_window_at_its_bill_date() {
 }
 
 /// The party is resolved against the ledger catalogue as `vouchers ledger=`
-/// resolves it: a name that differs only in case and punctuation finds the
-/// ledger, and the answer names it as the catalogue spells it.
+/// resolves it: a name that differs only in ASCII case finds the ledger, and
+/// the answer names it as the catalogue spells it and says how it matched.
 #[tokio::test]
 async fn a_party_named_in_another_case_is_answered_under_the_catalogues_name() {
     let mut call = Call::new(DetailKind::Unadjusted);
-    call.party = "CAFÉ NAÏVE TRADERS";
+    call.party = "CAFé NAïVE TRADERS";
     call.unallocated = vec![residual("102.02")];
     let (result, _) = run(detail_plans(captured_window()), call).await;
     let (detail, _) = result.unwrap();
     assert_eq!(detail["party"], PARTY);
+    assert_eq!(
+        detail["ledger_match"]["matched"], "case_or_spacing",
+        "{detail}"
+    );
     assert_eq!(detail["state"], "tied", "{detail}");
+}
+
+/// The case of an accented letter is not folded (#1076 decision A, reference
+/// 9.4f): `CAFÉ` asks the user rather than reading `Café`.
+#[tokio::test]
+async fn a_party_whose_accented_letters_differ_in_case_is_asked_about() {
+    let mut call = Call::new(DetailKind::Unadjusted);
+    call.party = "CAFÉ NAÏVE TRADERS";
+    call.unallocated = vec![residual("102.02")];
+    let (result, _) = run(detail_plans(captured_window()), call).await;
+    assert_eq!(result.unwrap_err().code, "ledger_not_found");
 }
 
 /// A party the catalogue does not hold is refused after the catalogue and

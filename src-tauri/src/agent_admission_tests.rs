@@ -636,6 +636,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "only the person, in its own native dialog, records a review",
         ),
         (
+            "acknowledge_post_review",
+            "a call about a different doubt is refused as ack_recorded_review_stale",
+            "a review on file never answers for another doubt",
+        ),
+        (
             "build_import_xml",
             "do not re-import or rebuild the same business event",
             "a second file for an event already imported can post it twice",

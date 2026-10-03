@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>ComplyEaze Bridge blog</title>
+  <subtitle>Plain answers for CAs and accountants on using Claude Desktop with TallyPrime through ComplyEaze Bridge.</subtitle>
+  <link rel="self" type="application/atom+xml" href="https://bridge.complyeaze.com/feed.xml" />
+  <link rel="alternate" type="text/html" href="https://bridge.complyeaze.com/blog.html" />
+  <id>https://bridge.complyeaze.com/blog.html</id>
+  <updated>2026-10-03T10:40:00Z</updated>
+  <author><name>ComplyEaze</name></author>
+  <entry>
+    <title>Where your client’s data goes when Claude reads Tally</title>
+    <link rel="alternate" type="text/html" href="https://bridge.complyeaze.com/blog-where-does-client-data-go.html" />
+    <id>https://bridge.complyeaze.com/blog-where-does-client-data-go.html</id>
+    <published>2026-10-03T10:40:00Z</published>
+    <updated>2026-10-03T10:40:00Z</updated>
+    <author><name>Tapish Khandelwal</name></author>
+    <summary>When you ask Claude about a client’s books, what Claude reads goes to Anthropic. That can be party names, narrations, GSTINs and amounts. A setting can shorten the names. Nothing hides the amounts.</summary>
+  </entry>
+  <entry>
+    <title>Bank statement to Tally vouchers: check the ledger names first</title>
+    <link rel="alternate" type="text/html" href="https://bridge.complyeaze.com/blog-bank-statement-ledger-names.html" />
+    <id>https://bridge.complyeaze.com/blog-bank-statement-ledger-names.html</id>
+    <published>2026-10-03T10:40:00Z</published>
+    <updated>2026-10-03T10:40:00Z</updated>
+    <author><name>Tapish Khandelwal</name></author>
+    <summary>Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names in your mapping against your live book.</summary>
+  </entry>
+  <entry>
+    <title>Ten questions before you connect Claude to Tally</title>
+    <link rel="alternate" type="text/html" href="https://bridge.complyeaze.com/blog-ten-questions.html" />
+    <id>https://bridge.complyeaze.com/blog-ten-questions.html</id>
+    <published>2026-10-03T10:40:00Z</published>
+    <updated>2026-10-03T10:40:00Z</updated>
+    <author><name>Tapish Khandelwal</name></author>
+    <summary>Where client data goes, what it can change in your books, what it costs and who answers if something goes wrong.</summary>
+  </entry>
+  <entry>
+    <title>Who approves a post to TallyPrime, and what is still weak</title>
+    <link rel="alternate" type="text/html" href="https://bridge.complyeaze.com/blog-who-approves-a-post.html" />
+    <id>https://bridge.complyeaze.com/blog-who-approves-a-post.html</id>
+    <published>2026-10-03T10:40:00Z</published>
+    <updated>2026-10-03T10:40:00Z</updated>
+    <author><name>Tapish Khandelwal</name></author>
+    <summary>ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each voucher.</summary>
+  </entry>
+</feed>

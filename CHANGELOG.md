@@ -24,7 +24,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 - **The number is a patch number on a larger change.** 0.4.2 adds a tool,
   asks you about ledger names it used to read, and once you post with it you
-  cannot go back to 0.4.1. The number 0.5.0 is kept for a larger release.
+  cannot go back to 0.4.1.
 - **If you use 0.3.0 or 0.4.0 on Windows: yes.** 0.4.2 contains everything in
   0.4.1, including the fix for the network-path forms of the bank-statement
   path issue published as
@@ -32,7 +32,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   Some paths still pass; the advisory lists which. If you cannot upgrade yet,
   follow the advisory's steps.
 - **On a Mac with 0.3.0 or 0.4.0: recommended, though not urgent.** The
-  advisory rates the issue low there, and upgrading closes it there too.
+  advisory rates the issue low there, and upgrading closes the same forms
+  there.
 - **If you use 0.4.1: nothing below is urgent.** The reasons to upgrade are
   that a ledger name that only nearly matches now makes the assistant ask you
   instead of being read, later pages of a long voucher list can be served
@@ -48,8 +49,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   fields they refuse to read, and they stop preparing, posting and checking
   vouchers. Before that first post, going back is harmless.
 - **If you turn posting on: `voucher_presence` cannot recognise these
-  vouchers.** It still finds a ComplyEaze Bridge voucher only by the tag, so a
-  voucher posted with 0.4.2 that someone then edited or re-dated in Tally can
+  vouchers.** It cannot identify a voucher this version posted (it matches a
+  ComplyEaze Bridge voucher by the tag only for files you imported by hand), so
+  a voucher posted with 0.4.2 that someone then edited or re-dated in Tally can
   read `absent` there. Check what ComplyEaze Bridge posted with `verify_import`,
   never with `voucher_presence`, before entering any of it again by hand. In
   Tally's own screens these vouchers can no longer be told from hand-entered
@@ -76,12 +78,16 @@ counter Tally keeps that moves when vouchers or ledgers change.
   add signed amounts), and may be a sales return or a credit note to a supplier:
   each row says the party's group and the tool does not choose. A Debit Note is
   listed apart, without an amount. The state-side tax head has two recognised
-  forms, `state_tax` and `sgst_utgst`, for the same side, and a row of a kind
-  that was not run live is marked `not_measured_live`. It needs a book whose
+  forms, `state_tax` and `sgst_utgst`, for the same side. A row is marked
+  `not_measured_live` only for kinds the row itself shows (for example
+  inter-state, cancelled, optional or post-dated); an unmarked row is not
+  thereby measured, because a sale typed on Tally's screen, a tax Tally
+  computed, a duty head such as cess, an invoice with several goods lines and a
+  currency other than the book's base cannot be marked. It needs a book whose
   base currency is INR and refuses a book too large to list. It reads the whole
-  date window and the ledger masters twice, and again for every page (about 100
-  requests to Tally on two small books), so use a narrow date range: its cost on
-  a large book was not measured. It was run against a live Tally, once each, on
+  date window once and the ledger masters twice (before and after), and all of
+  it again for every page: 96 and 118 requests to Tally on two small books. Use
+  a narrow date range: its cost on a large book was not measured. It was run against a live Tally, once each, on
   synthetic companies: one taxed Sales item invoice, one untaxed one (read by
   an earlier build) and one Credit Note. What was not shown is under "Known
   limits" (#1009).
@@ -94,9 +100,11 @@ counter Tally keeps that moves when vouchers or ledgers change.
   moved, instead of continuing from a different read. The read is held for ten
   minutes. A small or new company is not counted, so its window reads `partial`
   and every page reads it again. A later page that does not name the
-  `snapshot_id`, after the books moved or the hold ran out, reads afresh and says
-  that its offsets do not continue the earlier pages (`earlier_snapshot`): start
-  again from the first page. A date is the same question as `2026-08-01` or
+  `snapshot_id` reads afresh when the books moved, and says so
+  (`earlier_snapshot`: its offsets do not continue the earlier pages, so start
+  again from the first page); when the hold ran out it reads afresh without that
+  flag, and only a page whose `snapshot.reused` is true continues the earlier
+  ones. A date is the same question as `2026-08-01` or
   `20260801`, while the `ledger` argument must be repeated exactly as typed
   (#1053, #1118).
 - **The assistant asks you which ledger you mean instead of guessing.** When
@@ -114,8 +122,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   #1092, #1095, #1127).
 - **The assistant is told how to pick a company, and to say which one it
   used.** `list_companies` now begins "Start here" and states the rule (use the
-  one open company only when you named no client or exactly one matches;
-  otherwise ask, and never guess), and Claude Desktop is sent the same rule at
+  open company only if it is the only one open and you named no client, or if
+  exactly one open company matches the client you named; otherwise ask, and
+  never guess), and Claude Desktop is sent the same rule at
   start-up, with the instruction to name the company, dates and ledger in the
   first line of an answer, and what to do after a refusal. The start-up text
   follows your posting setting: with posting off or import only, it says this
@@ -130,9 +139,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **`outstandings` says what it counted and which date it used.** It returns
   `open_bills_total` (every open bill in that direction, counted before
   paging) and `open_bills_shown`, so a cut page no longer reads like the whole
-  list (on a partial read these cover base-currency ledgers only). It always
-  returns the `as_of` date it used, which is today's date on this computer when
-  you gave none; `tally_status` returns that date as `today` (#1049, #1079).
+  list (on a partial read these cover base-currency ledgers only). In every
+  answer it returns the `as_of` date it used, which is today's date on this
+  computer when you gave none; `tally_status` returns that date as `today`
+  (#1049, #1079).
 - **Pages that are not in the package:** a Questions page on the install site
   with a table of what it can and cannot do, a before-you-start list and
   plain answers, including how far our liability goes and how to reach us
@@ -152,7 +162,8 @@ counter Tally keeps that moves when vouchers or ledgers change.
   other counter reported as 0) and the voucher is not found, `post_import` now
   says Tally reported it as not created, to check it is not in Tally, and to
   enter that one voucher in Tally's voucher entry screen, never through Tally's
-  Import menu. This covers a single voucher, which is what the extension posts,
+  Import menu; the voucher's status reads `tally_reported_not_created`. This
+  covers a single voucher, which is what the extension posts,
   and a saved batch of two or more vouchers rejected whole when the company's
   mark was read before and after and did not move (batch posting is a
   command-line setting that the extension does not offer). It was measured only
@@ -163,7 +174,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   unfound voucher of a post read `not_found`. In 0.4.2 a voucher of a post that
   cannot be matched reads `sent_not_attributed` ("check in Tally before posting
   it again", for example after an edit), never `not_found`. That is also the
-  reading for a batch that landed in part and for a later `verify_import`,
+  reading for a batch that landed in part, and for a later `verify_import`,
   including of a voucher Tally refused. Other new readings name why a voucher
   is missing: `bound_not_in_window` (it may have been deleted or re-dated) and
   `book_rolled_back` (the books look older than the post). A post is refused as
@@ -224,16 +235,19 @@ counter Tally keeps that moves when vouchers or ledgers change.
   outcome; assistant texts say "ComplyEaze Bridge" in full, and so do the
   desktop app's messages (source only); `acknowledge_post_review` names the
   refusal for a review recorded for a different doubt (#962, #1010, #1026,
-  #1028, #1124, #830, #1130).
+  #1028, #1124, #1129, #830, #1130).
 
 **Known limits**
 
 - **`sales_register` was not shown** on an invoice-view Credit Note, an
   inter-state (IGST) line, a cancelled or optional sale, an unrecognised or
   missing duty head on a sale, more than one voucher in a window, paging, a
-  company with a registration, a tax Tally computes itself, a sale typed on
-  Tally's screen, accounting-invoice mode, a post-dated sale, a `REFERENCE` or
-  a filled `PARTYGSTIN` on a sale, or a currency other than the book's base.
+  company with a registration, a tax Tally computes itself, a duty head no sales run showed (such as
+  cess), an invoice of another shape than the one run (for example several
+  goods lines), a sale typed on Tally's screen, accounting-invoice mode, a
+  post-dated sale, a `REFERENCE` or a filled `PARTYGSTIN` on a sale, a
+  `REFERENCEDATE` (it is not returned), or a currency other than the book's
+  base.
   The invoice it was replayed on was imported by this project. Its `complete`
   state rests on the company marks and the ledger masters reading the same
   before and after, not on a separate voucher count (#1009).
@@ -267,7 +281,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   mark before the next check, the loss is not detected; if Tally reuses the lost
   vouchers' IDs (not measured), a lost voucher can even read `posted_verified`;
   such vouchers cannot be posted again through ComplyEaze Bridge and must be
-  entered by hand (#1050). Not tried: whether deleting a voucher can lower the
+  entered by hand (#1050, #1038). Not tried: whether deleting a voucher can lower the
   company's mark, a Windows approval dialog, Education mode, and more than 3
   vouchers through ComplyEaze Bridge's own path (#1054).
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both

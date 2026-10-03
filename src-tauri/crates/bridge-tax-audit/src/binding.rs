@@ -2948,8 +2948,8 @@ deductor_aliases = 5\n"
             Some(serde_json::json!(20_000_000))
         );
     }
-    /// The production path's bank set, as bound: a bank line on a cash receipt is not a party, so
-    /// the receipt's whole credit is its one party's and the day reaches the s.269ST(a) limit.
+    /// The production path's bank set, as bound: a bank line on a cash receipt is not a party (nor
+    /// part of the party's amount), so it is not counted as an unbound ledger.
     #[test]
     fn entity_269st_gap_reads_the_bound_bank_groups() {
         const G_BANK: &str = "11111111-1111-1111-1111-000000000009";
@@ -2970,15 +2970,16 @@ deductor_aliases = 5\n"
             .insert("Bank Accounts".to_string(), group_master(G_BANK, None));
         b.vouchers.clear();
         let day = TallyDate::parse("20250612").unwrap();
-        // Cust A pays 1,00,000 in cash, 90,000 of it booked to its ledger and 10,000 to a bank
-        // ledger on the same voucher; Cust B pays 1,00,000.
+        // Cust A's voucher takes 1,10,000 in cash: 1,00,000 to its ledger and 10,000 to a bank
+        // ledger; Cust B pays 1,00,000.
         for (guid, credits) in [
-            ("r1", vec![("Cust A", 9_000_000), ("Bank One", 1_000_000)]),
+            ("r1", vec![("Cust A", 10_000_000), ("Bank One", 1_000_000)]),
             ("r2", vec![("Cust B", 10_000_000)]),
         ] {
+            let cash_in: i64 = credits.iter().map(|(_, paise)| paise).sum();
             let mut lines = vec![LedgerLine {
                 ledger: "Cash".to_string(),
-                amount_paise: 10_000_000,
+                amount_paise: cash_in,
             }];
             lines.extend(credits.into_iter().map(|(ledger, paise)| LedgerLine {
                 ledger: ledger.to_string(),

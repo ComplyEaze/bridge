@@ -6988,8 +6988,8 @@
   "by": "author",
   "what": "CCQ-1 accepts a total that is not the sum",
   "file": "src/counter_cheques_40a3.rs",
-  "from": "if i128::from(total) != rows {",
-  "to": "if i128::from(total) == rows {"
+  "from": "i128::from(total) != sum",
+  "to": "i128::from(total) == sum"
  },
  {
   "id": "CQ-23",

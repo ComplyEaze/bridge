@@ -2753,6 +2753,46 @@ mod through_the_tool {
         assert_eq!(error["cause"], "company_base_currency_not_inr");
     }
 
+    /// A ledger export refused as a whole names why (#718): Tally's failure
+    /// answer, no answer, a response cut off before its root closed, and one
+    /// whose ledgers belong to another company each carry their own cause
+    /// beside `ledger_export_invalid`. Each is the captured basic export with
+    /// one change made here; before #718 all four carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_as_a_whole_names_its_cause() {
+        let captured = period_opening();
+        let company_prefix = format!("{GUID}-");
+        assert!(captured.contains(&company_prefix));
+        for (body, cause) in [
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1),
+                "native_collection_not_success",
+            ),
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS></STATUS>", 1),
+                "native_collection_status_absent",
+            ),
+            (
+                captured.replacen("</ENVELOPE>", "", 1),
+                "native_collection_malformed_response",
+            ),
+            (
+                captured.replace(&company_prefix, "00000000-0000-4000-8000-0000000000aa-"),
+                "native_collection_identity_mismatch",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
     /// As `basic_plans`, with the ledger export given and, when `groups` is
     /// supplied, the paired group collection a `group` filter adds inside the
     /// same extent and identity bracket.

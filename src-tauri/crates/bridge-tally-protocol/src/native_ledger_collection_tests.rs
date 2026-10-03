@@ -247,53 +247,44 @@ fn party_ledger_master_pipeline_preserves_a_forbidden_reference_marker_as_litera
 }
 
 /// The ledger collection's STATUS must read `1`; another value is Tally's
-/// failure answer. A complete envelope with no STATUS, an empty one or a
-/// self-closing one is no answer, typed as `NativeCollectionError::StatusAbsent`
-/// so a caller can tell it apart. An empty body, a response cut off after the
-/// STATUS, and a second STATUS are malformed (bridge#717, #863).
+/// failure answer, typed `NotSuccess`. A complete envelope with no STATUS, an
+/// empty one or a self-closing one is no answer, typed as
+/// `NativeCollectionError::StatusAbsent` so a caller can tell it apart. An empty
+/// body, a response cut off after the STATUS, and a second STATUS are typed
+/// `MalformedResponse` (bridge#717, #863, #718).
 #[test]
 fn a_ledger_collection_status_is_one_failure_or_absent_and_its_shape_is_checked() {
     let xml = master_response(None);
-    let parse = |xml: &str| {
+    let class = |xml: &str| {
         parse_native_ledger_source_records_with_evidence(xml, EXPECTED_COMPANY_GUID)
             .expect_err("the ledger collection is refused")
+            .downcast_ref::<crate::NativeCollectionError>()
+            .copied()
     };
-    let failed = parse(&xml.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1));
-    assert!(failed
-        .downcast_ref::<crate::NativeCollectionError>()
-        .is_none());
-    assert!(
-        failed.to_string().contains("did not report success"),
-        "{failed:#}"
+    assert_eq!(
+        class(&xml.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1)),
+        Some(crate::NativeCollectionError::NotSuccess)
     );
     for absent in ["", "<STATUS/>", "<STATUS></STATUS>", "<STATUS> </STATUS>"] {
         let silent = xml.replacen("<STATUS>1</STATUS>", absent, 1);
         assert_ne!(silent, xml);
         assert_eq!(
-            parse(&silent).downcast_ref::<crate::NativeCollectionError>(),
-            Some(&crate::NativeCollectionError::StatusAbsent),
+            class(&silent),
+            Some(crate::NativeCollectionError::StatusAbsent),
             "{absent:?}"
         );
         let cut = xml.find("<STATUS>1</STATUS>").unwrap() + absent.len();
-        let truncated = parse(&silent[..cut]);
-        assert!(
-            truncated
-                .downcast_ref::<crate::NativeCollectionError>()
-                .is_none()
-                && truncated
-                    .to_string()
-                    .contains("ended before its root closed"),
-            "{absent:?} cut off: {truncated:#}"
+        assert_eq!(
+            class(&silent[..cut]),
+            Some(crate::NativeCollectionError::MalformedResponse),
+            "{absent:?} cut off"
         );
     }
     for empty in ["", " \r\n", "<ENVELOPE/>"] {
-        let refused = parse(empty);
-        assert!(
-            refused
-                .downcast_ref::<crate::NativeCollectionError>()
-                .is_none()
-                && refused.to_string().contains("had no ENVELOPE"),
-            "{empty:?}: {refused:#}"
+        assert_eq!(
+            class(empty),
+            Some(crate::NativeCollectionError::MalformedResponse),
+            "{empty:?}"
         );
     }
     for repeated in [
@@ -304,10 +295,60 @@ fn a_ledger_collection_status_is_one_failure_or_absent_and_its_shape_is_checked(
         "<STATUS/><STATUS/>",
         "<STATUS>1</STATUS><STATUS>1</STATUS>",
     ] {
-        let refused = parse(&xml.replacen("<STATUS>1</STATUS>", repeated, 1));
-        assert!(
-            refused.to_string().contains("carried a second STATUS"),
-            "{repeated:?}: {refused:#}"
+        assert_eq!(
+            class(&xml.replacen("<STATUS>1</STATUS>", repeated, 1)),
+            Some(crate::NativeCollectionError::MalformedResponse),
+            "{repeated:?}"
         );
     }
+}
+
+/// The rest of the whole-response classes (#718), each typed where the parser
+/// fails rather than read from its message: a root that is not `ENVELOPE` and
+/// a response with no `COLLECTION` are malformed; a ledger collection none of
+/// whose rows carries the requested company's GUID prefix, and a party-master
+/// collection whose response company GUID is absent or another company's, did
+/// not bind to the company.
+#[test]
+fn a_ledger_collection_refused_as_a_whole_is_typed_by_class() {
+    use crate::NativeCollectionError as Class;
+    let source = |xml: &str| {
+        parse_native_ledger_source_records_with_evidence(xml, EXPECTED_COMPANY_GUID)
+            .expect_err("the ledger collection is refused")
+            .downcast_ref::<Class>()
+            .copied()
+    };
+    let party = |xml: &str| {
+        parse_native_party_ledger_master_records_with_evidence(xml, EXPECTED_COMPANY_GUID)
+            .expect_err("the party master collection is refused")
+            .downcast_ref::<Class>()
+            .copied()
+    };
+    let other_company = "22222222-2222-2222-2222-222222222222";
+    let xml = master_response(None);
+    assert_eq!(
+        source(&xml.replace("ENVELOPE>", "RESPONSE>")),
+        Some(Class::MalformedResponse)
+    );
+    assert_eq!(
+        source(&xml.replace("COLLECTION>", "ITEMS>")),
+        Some(Class::MalformedResponse)
+    );
+    assert_eq!(
+        source(&xml.replace(EXPECTED_COMPANY_GUID, other_company)),
+        Some(Class::CompanyIdentityMismatch)
+    );
+    assert_eq!(party(&xml), Some(Class::CompanyIdentityMismatch));
+    assert_eq!(
+        party(&master_response(Some(other_company))),
+        Some(Class::CompanyIdentityMismatch)
+    );
+    assert!(
+        parse_native_party_ledger_master_records_with_evidence(
+            &master_response(Some(EXPECTED_COMPANY_GUID)),
+            EXPECTED_COMPANY_GUID
+        )
+        .is_ok(),
+        "the control binds"
+    );
 }

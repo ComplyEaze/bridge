@@ -157,6 +157,14 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
     // was admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
     assert_eq!(result["state"], "complete");
     assert!(result["reason"].is_null(), "{result}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"], "complete",
+        "{response}"
+    );
+    assert!(
+        response["structuredContent"]["evidence"]["reason_code"].is_null(),
+        "{response}"
+    );
     assert_eq!(result["total"], 1);
     assert_eq!(result["vouchers_observed"], 1);
     assert_eq!(result["items"][0]["status"], "complete");
@@ -749,4 +757,69 @@ async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_i
 #[test]
 fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
     request_files_are_exactly_the_requests_sent(STOCK_LAB_DAY, &["stock_lab_taxed_day"]);
+}
+
+/// The recorded purchase read with the window's census and window answers replaced by Tally's
+/// own empty collection, followed by the empty-window corroboration the register then makes: a
+/// wider window read (its census and window, each paired) and the company's voucher mark.
+const EMPTY_WINDOW_TAIL: &str = "ensnseewswseemsmse";
+
+async fn empty_window_register() -> Value {
+    let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
+    ))))
+    .with_encoding(WireEncoding::Utf16Le)
+    .with_framing(ResponseFraming::ContentLength);
+    let plans = RECORDED_ORDER
+        .chars()
+        .chain(EMPTY_WINDOW_TAIL.chars())
+        .map(|letter| {
+            let kind = Kind::of(letter);
+            if matches!(kind, Kind::Census | Kind::Window) {
+                empty.clone()
+            } else {
+                plan(kind, body_of(kind))
+            }
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            "purchase_register",
+            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+        )
+        .await;
+    // Every scripted answer was asked for, in this order: the corroboration really ran.
+    let observed = simulator.finish().unwrap();
+    assert_eq!(
+        observed.len(),
+        RECORDED_ORDER.len() + EMPTY_WINDOW_TAIL.len(),
+        "{response}"
+    );
+    response
+}
+
+#[tokio::test]
+async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_register() {
+    // No voucher in the window, none in the wider window, and the company's voucher mark is not
+    // zero: nothing corroborates the emptiness, so the register says `partial` with the reason
+    // `vouchers` gives the same window (agent.rs `corroborate_empty_voucher_window`), not
+    // `complete`. This is the empty-window half of #1031, read end to end.
+    let response = empty_window_register().await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["vouchers_observed"], 0, "{result}");
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["reason"], "empty_uncorroborated", "{result}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"], "partial",
+        "{response}"
+    );
+    assert_eq!(
+        response["structuredContent"]["evidence"]["reason_code"],
+        "empty_uncorroborated"
+    );
 }

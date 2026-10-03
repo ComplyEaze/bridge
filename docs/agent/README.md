@@ -761,6 +761,22 @@ or vouchers.
   follow `vouchers` (absent means not observed). Cancelled, optional and
   post-dated vouchers are returned flagged, not excluded. `REFERENCEDATE` is not
   returned yet.
+- **What `state` means.** The response `state` follows the rule `vouchers` and
+  `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
+  every voucher read was checked against a separate count of the window (a census,
+  which ComplyEaze Bridge sends unless the book's voucher high-water mark alone
+  proves it small, a few dozen vouchers), and an empty window when its
+  corroboration read confirmed it. Otherwise it is `partial` with `reason`
+  `nonempty_window_unqualified` (or the corroboration's own reason for an empty
+  window), and the rows are still returned. Before #1031 the registers called a
+  window nothing had counted `complete` on the company marks and the ledger
+  masters alone. Those marks and masters reading the same before and after the
+  window still decide whether the read stands at all (a drift refuses it). The one
+  difference from `vouchers` is the reason `company_has_no_vouchers`, which
+  `vouchers` returns beside `complete` for an empty window on a book with no
+  vouchers; a register returns `complete` with no reason there. A row's `status`
+  of `complete` is a different thing: every entry the voucher touches classified,
+  and `state` does not change it.
 - **Snapshot binding.** The ledger masters are read before the window (and the
   window is planned against their marks), the company's marks are read again
   after it, and the masters are read a second time and must classify exactly as
@@ -814,19 +830,9 @@ rate or return section, and matches nothing against any portal.
   `purchase_register`, are also replayed end to end from their recorded calls
   (tests). One Sales accounting voucher (not an invoice) is also classified, in
   tests, against the ledger masters of the purchase register's lab book.
-- **What `complete` rests on.** The response `state` follows the rule
-  `vouchers` and `voucher_presence` use (#985, #1031): a non-empty window is
-  `complete` only when every voucher read was checked against a separate count of
-  the window (a census, which ComplyEaze Bridge sends on every book too large to
-  read whole without one), and an empty window when its corroboration read
-  confirmed it. Otherwise it is `partial` with `reason`
-  `nonempty_window_unqualified`, and the rows are still returned. So on a small
-  book where no census was sent, a window is `partial` here exactly as it is for
-  `vouchers`; before this change the register called it `complete` on the marks
-  and the masters alone. The company marks and the ledger masters reading the
-  same before and after the window still decide whether the read stands at all
-  (a drift refuses it). A row's `status` of `complete` is a different thing: every
-  entry the voucher touches classified, and `state` does not change it.
+- **What `state` means.** The same rule as `purchase_register` (see its
+  section): `complete` only when the window was counted, otherwise `partial` with
+  `nonempty_window_unqualified`. A row's `status` is separate.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
   sums tax over a window must add signed amounts. The measured Credit Note of
@@ -2025,7 +2031,8 @@ canonical UUIDs. Failed receipt appends restore the previous file length.
 An incomplete log or failed rollback stops the session; a persisted build still
 returns its recovery batch ID before termination. Reads withheld by the result
 byte cap retain partial source commitments in the in-process evidence store.
-`vouchers` and `voucher_presence` label a window by one rule (#985): `complete`
+`vouchers`, `voucher_presence`, `purchase_register` and `sales_register` label a
+window by one rule (#985, #1031): `complete`
 only when its rows were admitted voucher for voucher against the census that
 sized the read (protocol reference §11c.3), or it was empty and corroborated;
 otherwise `partial` with reason `nonempty_window_unqualified`. A book whose

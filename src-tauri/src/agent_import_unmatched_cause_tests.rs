@@ -5,7 +5,7 @@
 //! derived from live captures (counter shape only, see
 //! EDUCATION_IMPORT_COUNTERS_PROVENANCE.md). Tests marked synthetic exist only
 //! to hold the guards that no capture reaches.
-use super::{unmatched_cause, UnmatchedCause};
+use super::{measured_voucher_step, unmatched_cause, UnmatchedCause};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportResult};
 
 fn utf16(bytes: &[u8]) -> String {
@@ -280,4 +280,14 @@ fn an_empty_post_establishes_nothing() {
         unmatched_cause(Some(&empty), 0, 0, Some(0)),
         UnmatchedCause::NotEstablished
     );
+}
+
+#[test]
+fn a_voucher_step_is_measured_only_when_both_marks_were_read_and_did_not_go_down() {
+    assert_eq!(measured_voucher_step(Some(10), Some(10)), Some(0));
+    assert_eq!(measured_voucher_step(Some(10), Some(12)), Some(2));
+    // A mark that reads lower after the post is no step at all: never 0.
+    assert_eq!(measured_voucher_step(Some(10), Some(9)), None);
+    assert_eq!(measured_voucher_step(None, Some(10)), None);
+    assert_eq!(measured_voucher_step(Some(10), None), None);
 }

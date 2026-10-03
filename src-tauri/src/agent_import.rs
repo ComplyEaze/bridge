@@ -1315,9 +1315,8 @@ impl Server {
                             .map(|outcome| outcome.counters())
                     })
                     .flatten();
-                let voucher_step = pre_post_voucher_mark
-                    .zip(after_post_mark)
-                    .and_then(|(before, after)| after.checked_sub(before));
+                let voucher_step =
+                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
                 match verification::unmatched_cause(
                     counters,
                     line.vouchers.len(),

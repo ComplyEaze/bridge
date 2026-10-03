@@ -543,6 +543,15 @@ pub(super) fn unmatched_cause(
     }
 }
 
+/// How far the company's voucher mark moved across the post, from the mark
+/// journaled before it and the one read after it: `None` unless both were
+/// read, and `None` when the later one reads lower (the book moved backwards).
+pub(super) fn measured_voucher_step(before: Option<u64>, after: Option<u64>) -> Option<u64> {
+    before
+        .zip(after)
+        .and_then(|(before, after)| after.checked_sub(before))
+}
+
 /// How many of a verification's vouchers its content found nowhere. Read only
 /// where nothing is bound, so no voucher is `bound_not_in_window`.
 pub(super) fn unmatched_count(result: &Value) -> u64 {

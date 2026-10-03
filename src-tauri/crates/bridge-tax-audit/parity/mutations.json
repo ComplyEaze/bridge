@@ -7742,5 +7742,461 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "suffix: match (sides.len() == 2, *side) {",
   "to": "suffix: match (sides.len() == 2 && sides.iter().all(|(_, a)| a.iter().sum::<i64>().abs() >= limit_ss_t), *side) {"
+ },
+ {
+  "id": "EG-01",
+  "by": "author",
+  "what": "read_scope says the currency was read when it was not",
+  "file": "src/read_scope.rs",
+  "from": "Value::Text(if book.currency_read { \"yes\" } else { \"no\" }.to_string()),",
+  "to": "Value::Text(if !book.currency_read { \"yes\" } else { \"no\" }.to_string()),"
+ },
+ {
+  "id": "EG-02",
+  "by": "author",
+  "what": "read_scope asks about the currency even when it was read",
+  "file": "src/read_scope.rs",
+  "from": "    if !book.currency_read {\n        r.findings.push",
+  "to": "    if true {\n        r.findings.push"
+ },
+ {
+  "id": "EG-03",
+  "by": "author",
+  "what": "read_scope never asks about the currency",
+  "file": "src/read_scope.rs",
+  "from": "    if !book.currency_read {\n        r.findings.push",
+  "to": "    if false {\n        r.findings.push"
+ },
+ {
+  "id": "EG-04",
+  "by": "author",
+  "what": "a ledger master's PAN is not read",
+  "file": "src/book.rs",
+  "from": "pan: l.child_text(\"INCOMETAXNUMBER\").to_string(),",
+  "to": "pan: String::new(),"
+ },
+ {
+  "id": "EG-05",
+  "by": "author",
+  "what": "a flat GSTIN does not win over a dated one",
+  "file": "src/book.rs",
+  "from": "flat => flat.to_string(),",
+  "to": "_ => gstin_as_of(l, as_of),"
+ },
+ {
+  "id": "EG-06",
+  "by": "author",
+  "what": "an undated registration is the newest",
+  "file": "src/book.rs",
+  "from": "\"\" => \"00000000\",",
+  "to": "\"\" => \"99999999\","
+ },
+ {
+  "id": "EG-07",
+  "by": "author",
+  "what": "a registration beginning on the last day is not in force",
+  "file": "src/book.rs",
+  "from": "*from <= as_of.as_str())",
+  "to": "*from < as_of.as_str())"
+ },
+ {
+  "id": "EG-08",
+  "by": "author",
+  "what": "a registration with no GSTIN is in force",
+  "file": "src/book.rs",
+  "from": ".filter(|(from, _, gstin)| !gstin.is_empty() && *from <= as_of.as_str())",
+  "to": ".filter(|(from, _, _)| *from <= as_of.as_str())"
+ },
+ {
+  "id": "EG-09",
+  "by": "author",
+  "what": "the oldest registration is in force",
+  "file": "src/book.rs",
+  "from": "        .max()\n        .map_or_else(String::new, |(_, _, gstin)| gstin.to_string())",
+  "to": "        .min()\n        .map_or_else(String::new, |(_, _, gstin)| gstin.to_string())"
+ },
+ {
+  "id": "EG-10",
+  "by": "author",
+  "what": "two registrations of one date: the earlier wins",
+  "file": "src/book.rs",
+  "from": "(from, i, d.child_text(\"GSTIN\"))",
+  "to": "(from, 0, d.child_text(\"GSTIN\"))"
+ },
+ {
+  "id": "EG-11",
+  "by": "author",
+  "what": "the GSTIN is read as of the period start",
+  "file": "src/book.rs",
+  "from": "        &lp.id,\n        &read.period.to,",
+  "to": "        &lp.id,\n        &read.period.from,"
+ },
+ {
+  "id": "EG-12",
+  "by": "author",
+  "what": "an excluded ledger is a party",
+  "file": "src/party_identity.rs",
+  "from": "        if config.excluded_ledgers.contains(&ledger.name)\n            || config.round_off_ledgers",
+  "to": "        if config.round_off_ledgers"
+ },
+ {
+  "id": "EG-13",
+  "by": "author",
+  "what": "a round-off ledger is a party",
+  "file": "src/party_identity.rs",
+  "from": "            || config.round_off_ledgers.contains(&ledger.name)\n            || ledger.under(DUTIES_TAXES_GROUP)",
+  "to": "            || ledger.under(DUTIES_TAXES_GROUP)"
+ },
+ {
+  "id": "EG-14",
+  "by": "author",
+  "what": "a Duties & Taxes ledger is a party",
+  "file": "src/party_identity.rs",
+  "from": "            || ledger.under(DUTIES_TAXES_GROUP)\n        {",
+  "to": "            || false\n        {"
+ },
+ {
+  "id": "EG-15",
+  "by": "author",
+  "what": "a Sundry Debtors or Creditors ledger is not a party",
+  "file": "src/party_identity.rs",
+  "from": "if DEFAULT_PARTY_GROUPS.iter().any(|g| ledger.under(g))",
+  "to": "if false"
+ },
+ {
+  "id": "EG-16",
+  "by": "author",
+  "what": "a configured party group is ignored",
+  "file": "src/party_identity.rs",
+  "from": "            || config.party_groups.iter().any(|g| ledger.under(g))",
+  "to": "            || false"
+ },
+ {
+  "id": "EG-17",
+  "by": "author",
+  "what": "a ledger the engagement names is not a party",
+  "file": "src/party_identity.rs",
+  "from": "            || config.additional_party_ledgers.contains(&ledger.name)",
+  "to": "            || false"
+ },
+ {
+  "id": "EG-18",
+  "by": "author",
+  "what": "an incomplete chain that settles nothing is read as no party",
+  "file": "src/party_identity.rs",
+  "from": "        if !ledger.chain_complete {",
+  "to": "        if false {"
+ },
+ {
+  "id": "EG-19",
+  "by": "author",
+  "what": "every complete chain that settles nothing is refused",
+  "file": "src/party_identity.rs",
+  "from": "        if !ledger.chain_complete {",
+  "to": "        if true {"
+ },
+ {
+  "id": "EG-20",
+  "by": "author",
+  "what": "a master GSTIN is replaced by the override's",
+  "file": "src/party_identity.rs",
+  "from": "let gstin = if ledger.gstin.is_empty() {",
+  "to": "let gstin = if !ledger.gstin.is_empty() {"
+ },
+ {
+  "id": "EG-21",
+  "by": "author",
+  "what": "an override PAN wins over a master PAN",
+  "file": "src/party_identity.rs",
+  "from": "        let (mut pan, mut source) = if !ledger.pan.is_empty() {",
+  "to": "        let (mut pan, mut source) = if ledger.pan.is_empty() {"
+ },
+ {
+  "id": "EG-22",
+  "by": "author",
+  "what": "a PAN is derived without the engagement opting in",
+  "file": "src/party_identity.rs",
+  "from": "if pan.is_empty() && config.derive_pan_from_gstin {",
+  "to": "if pan.is_empty() {"
+ },
+ {
+  "id": "EG-23",
+  "by": "author",
+  "what": "a derived PAN replaces a recorded one",
+  "file": "src/party_identity.rs",
+  "from": "if pan.is_empty() && config.derive_pan_from_gstin {",
+  "to": "if config.derive_pan_from_gstin {"
+ },
+ {
+  "id": "EG-24",
+  "by": "author",
+  "what": "a derived PAN is labelled as a master's",
+  "file": "src/party_identity.rs",
+  "from": "source = Some(PanSource::DerivedFromGstin);",
+  "to": "source = Some(PanSource::Masters);"
+ },
+ {
+  "id": "EG-25",
+  "by": "author",
+  "what": "an override name is not used for the names",
+  "file": "src/party_identity.rs",
+  "from": "\"\" => ledger.name.clone(),",
+  "to": "_ => ledger.name.clone(),"
+ },
+ {
+  "id": "EG-26",
+  "by": "author",
+  "what": "a stopword counts as a shared word",
+  "file": "src/party_identity.rs",
+  "from": "if !NAME_STOPWORDS.contains(&word.as_str()) && word.len() > 2 {",
+  "to": "if word.len() > 2 {"
+ },
+ {
+  "id": "EG-27",
+  "by": "author",
+  "what": "a two-letter word counts as a shared word",
+  "file": "src/party_identity.rs",
+  "from": "&& word.len() > 2 {",
+  "to": "&& word.len() > 1 {"
+ },
+ {
+  "id": "EG-28",
+  "by": "author",
+  "what": "names differing by case do not share a word",
+  "file": "src/party_identity.rs",
+  "from": "let lower = py_lower(name);",
+  "to": "let lower = name.to_string();"
+ },
+ {
+  "id": "EG-29",
+  "by": "author",
+  "what": "the last word of a name is dropped",
+  "file": "src/party_identity.rs",
+  "from": "for c in lower.chars().chain(std::iter::once('\\n')) {",
+  "to": "for c in lower.chars() {"
+ },
+ {
+  "id": "EG-30",
+  "by": "author",
+  "what": "a GSTIN of eleven characters gives a PAN segment",
+  "file": "src/party_identity.rs",
+  "from": "if chars.len() < 12 {",
+  "to": "if chars.len() < 11 {"
+ },
+ {
+  "id": "EG-31",
+  "by": "author",
+  "what": "a lower-case GSTIN segment is not upper-cased",
+  "file": "src/party_identity.rs",
+  "from": "let segment = py_upper(&chars[2..12].iter().collect::<String>());",
+  "to": "let segment: String = chars[2..12].iter().collect();"
+ },
+ {
+  "id": "EG-32",
+  "by": "author",
+  "what": "a letter in a digit place of a PAN segment is accepted",
+  "file": "src/party_identity.rs",
+  "from": "s[5..9].iter().all(char::is_ascii_digit)",
+  "to": "s[5..9].iter().all(char::is_ascii_alphanumeric)"
+ },
+ {
+  "id": "EG-33",
+  "by": "author",
+  "what": "a digit in the last place of a PAN segment is accepted",
+  "file": "src/party_identity.rs",
+  "from": "s[9].is_ascii_uppercase();",
+  "to": "s[9].is_ascii_alphanumeric();"
+ },
+ {
+  "id": "EG-34",
+  "by": "author",
+  "what": "an unknown [party_identity] key is read",
+  "file": "src/party_identity.rs",
+  "from": "        if let Some(unknown) = table.keys().find(|k| !KEYS.contains(&k.as_str())) {",
+  "to": "        if let Some(unknown) = None::<&String> {"
+ },
+ {
+  "id": "EG-35",
+  "by": "author",
+  "what": "deriving PANs is on unless the engagement says no",
+  "file": "src/party_identity.rs",
+  "from": "            None => false,\n            Some(v) => v.as_bool()",
+  "to": "            None => true,\n            Some(v) => v.as_bool()"
+ },
+ {
+  "id": "EG-36",
+  "by": "author",
+  "what": "an aggregate of exactly the limit is not a gap",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        if slot.paise < limit {",
+  "to": "        if slot.paise <= limit {"
+ },
+ {
+  "id": "EG-37",
+  "by": "author",
+  "what": "a single ledger of exactly the limit is not already reported",
+  "file": "src/entity_269st_gap.rs",
+  "from": "if slot.ledgers.values().any(|amt| *amt >= limit) {",
+  "to": "if slot.ledgers.values().any(|amt| *amt > limit) {"
+ },
+ {
+  "id": "EG-38",
+  "by": "author",
+  "what": "a person-day of one ledger counts as multi-ledger",
+  "file": "src/entity_269st_gap.rs",
+  "from": "by_entity.values().filter(|s| s.ledgers.len() > 1).count()",
+  "to": "by_entity.values().filter(|s| !s.ledgers.is_empty()).count()"
+ },
+ {
+  "id": "EG-39",
+  "by": "author",
+  "what": "an unbound ledger is not counted",
+  "file": "src/entity_269st_gap.rs",
+  "from": "            unbound_ledgers.insert(ledger_name);",
+  "to": "            let _ = ledger_name;"
+ },
+ {
+  "id": "EG-40",
+  "by": "author",
+  "what": "a gap row does not name its ledgers",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        evidence.extend(slot.ledgers.keys().map(|l| EvidenceRef::new(\"ledger\", l)));",
+  "to": ""
+ },
+ {
+  "id": "EG-41",
+  "by": "author",
+  "what": "a derived PAN is not disclosed",
+  "file": "src/entity_269st_gap.rs",
+  "from": "if binding.pan_sources.contains(&PanSource::DerivedFromGstin) {",
+  "to": "if false {"
+ },
+ {
+  "id": "EG-42",
+  "by": "author",
+  "what": "disagreeing names are not disclosed",
+  "file": "src/entity_269st_gap.rs",
+  "from": "        if !binding.names_agree {",
+  "to": "        if false {"
+ },
+ {
+  "id": "EG-43",
+  "by": "author",
+  "what": "GAP-1 does not fire at the limit",
+  "file": "src/entity_269st_gap.rs",
+  "from": "Value::Int(v) if v >= GAP_1_LIMIT_PAISE =>",
+  "to": "Value::Int(v) if v > GAP_1_LIMIT_PAISE =>"
+ },
+ {
+  "id": "EG-44",
+  "by": "author",
+  "what": "the largest single ledger is the smallest",
+  "file": "src/entity_269st_gap.rs",
+  "from": "slot.ledgers.values().copied().max().unwrap_or(0)",
+  "to": "slot.ledgers.values().copied().min().unwrap_or(0)"
+ },
+ {
+  "id": "EG-45",
+  "by": "author",
+  "what": "an entity's days are pooled",
+  "file": "src/entity_269st_gap.rs",
+  "from": ".entry((day.clone(), binding.pan.as_str()))",
+  "to": ".entry((rows.keys().next().unwrap().0.clone(), binding.pan.as_str()))"
+ },
+ {
+  "id": "EG-46",
+  "by": "author",
+  "what": "the three party identity lists are not bound",
+  "file": "src/binding.rs",
+  "from": "let bound = lbinder.bind_list(&list_at(raw, &path)?, &location)?;",
+  "to": "let bound = list_at(raw, &path)?;"
+ },
+ {
+  "id": "EG-47",
+  "by": "author",
+  "what": "a bound party identity list is not written back",
+  "file": "src/binding.rs",
+  "from": "            set_party_identity_key(&mut party_identity, key, toml::Value::from(bound));",
+  "to": "            let _ = bound;"
+ },
+ {
+  "id": "EG-48",
+  "by": "author",
+  "what": "the party identity override keys are not bound",
+  "file": "src/binding.rs",
+  "from": "let bound = bind_table_keys(&mut lbinder, Some(overrides), \"party_identity.overrides\")?;",
+  "to": "let bound: BTreeMap<String, toml::Value> = overrides.iter().map(|(k, v)| (k.clone(), v.clone())).collect();"
+ },
+ {
+  "id": "EG-49",
+  "by": "author",
+  "what": "the bound override keys are written under another key",
+  "file": "src/binding.rs",
+  "from": "            \"overrides\",\n",
+  "to": "            \"overrides_bound\",\n"
+ },
+ {
+  "id": "EG-50",
+  "by": "author",
+  "what": "the party groups are neither bound nor written back",
+  "file": "src/binding.rs",
+  "from": "if raw_at(raw, &[\"party_identity\", \"party_groups\"]).is_some() {",
+  "to": "if false {"
+ },
+ {
+  "id": "EG-51",
+  "by": "author",
+  "what": "bind drops the bound party identity table",
+  "file": "src/binding.rs",
+  "from": "        party_identity,\n        ..engagement.clone()",
+  "to": "        ..engagement.clone()"
+ },
+ {
+  "id": "EG-52",
+  "by": "author",
+  "what": "entity_269st_gap reads the party identity table as written, not as bound",
+  "file": "src/lib.rs",
+  "from": "PartyConfig::from_toml(bound.party_identity.as_ref())",
+  "to": "PartyConfig::from_toml(engagement.party_identity.as_ref())"
+ },
+ {
+  "id": "EG-53",
+  "by": "author",
+  "what": "a single-ledger entity's names_agree follows its name's words",
+  "file": "src/party_identity.rs",
+  "from": "let names_agree = members.len() == 1 || {",
+  "to": "let names_agree = {"
+ },
+ {
+  "id": "EG-54",
+  "by": "author",
+  "what": "a GSTIN-derived PAN comes before an override PAN when derivation is opted in",
+  "file": "src/party_identity.rs",
+  "from": "} else if !from_over(|o| &o.pan).is_empty() {",
+  "to": "} else if !from_over(|o| &o.pan).is_empty() && !config.derive_pan_from_gstin {"
+ },
+ {
+  "id": "EG-55",
+  "by": "author",
+  "what": "entity_269st_gap reads no round-off ledgers",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &BTreeSet::new())"
+ },
+ {
+  "id": "EG-56",
+  "by": "author",
+  "what": "entity_269st_gap reads the cash groups as written, not as bound",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &book.ledgers_under_any(&engagement.cash_groups), &bank, &index, &round_off_ledgers)"
+ },
+ {
+  "id": "EG-57",
+  "by": "author",
+  "what": "names agree when the first two ledgers share a word",
+  "file": "src/party_identity.rs",
+  "from": ".fold(first, |acc, s| acc.intersection(&s).cloned().collect())",
+  "to": ".take(1).fold(first, |acc, s| acc.intersection(&s).cloned().collect())"
  }
 ]

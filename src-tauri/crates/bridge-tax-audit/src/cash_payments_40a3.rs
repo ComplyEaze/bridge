@@ -137,9 +137,9 @@ pub(crate) fn group_for_kind(kind: &str) -> Result<&'static str> {
 use crate::support::{rupees, voucher_label};
 
 /// One (date, ledger) row's aggregate: cash amount and the distinct vouchers that contributed.
-struct RowAgg<'a> {
-    paise: i64,
-    vouchers: BTreeMap<String, &'a Voucher>,
+pub(crate) struct RowAgg<'a> {
+    pub(crate) paise: i64,
+    pub(crate) vouchers: BTreeMap<String, &'a Voucher>,
     /// The names its vouchers print: shown with a pooling s.40A(3) row or a pooled s.269ST row
     /// with no party ledger, never used to key or attribute.
     names: PrintedNames,
@@ -161,7 +161,7 @@ impl<'a> RowAgg<'a> {
     }
 }
 
-type RowMap<'a> = BTreeMap<(TallyDate, String), RowAgg<'a>>;
+pub(crate) type RowMap<'a> = BTreeMap<(TallyDate, String), RowAgg<'a>>;
 
 /// Evidence refs for one voucher map: sorted by guid, each carrying the fixed voucher label the
 /// canonical serialiser compares.
@@ -244,7 +244,7 @@ fn pool_unidentified<'a>(
 }
 
 /// party_rows: (date, party ledger name) -> aggregate, for cash RECEIVED from a party.
-fn compute_269st_rows<'a>(
+pub(crate) fn compute_269st_rows<'a>(
     pop: &[&'a Voucher],
     book: &Book,
     cash: &BTreeSet<String>,
@@ -1134,6 +1134,8 @@ mod tests {
             chain: chain.iter().map(|g| (*g).to_string()).collect(),
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("invented-{name}"),
             masterid: None,
         };

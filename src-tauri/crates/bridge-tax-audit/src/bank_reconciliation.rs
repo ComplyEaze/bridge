@@ -885,6 +885,7 @@ mod tests {
             group_masters: BTreeMap::new(),
             ledgers: BTreeMap::new(),
             stock: None,
+            currency_read: false,
             vouchers,
             tb: BTreeMap::from([(
                 "Bank".to_string(),

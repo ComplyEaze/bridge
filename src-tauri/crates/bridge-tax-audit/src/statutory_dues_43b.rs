@@ -1077,6 +1077,8 @@ mod tests {
                     chain: vec!["Duties & Taxes".to_string()],
                     chain_complete: true,
                     master_opening_paise: 0,
+                    pan: String::new(),
+                    gstin: String::new(),
                     guid: "gx".to_string(),
                     masterid: None,
                 },

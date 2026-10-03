@@ -1133,6 +1133,8 @@ mod tests {
             chain: vec!["Fixed Assets".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("guid-{name}"),
             masterid: None,
         }
@@ -1145,6 +1147,8 @@ mod tests {
             chain: vec![group.to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("guid-{name}"),
             masterid: None,
         }

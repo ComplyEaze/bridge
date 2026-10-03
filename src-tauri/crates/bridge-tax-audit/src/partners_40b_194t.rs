@@ -1902,6 +1902,8 @@ mod tests {
             chain: vec!["Capital Account".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: String::new(),
             masterid: None,
         }

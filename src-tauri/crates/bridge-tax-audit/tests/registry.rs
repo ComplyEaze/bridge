@@ -51,11 +51,23 @@ fn caller(id: &str) -> CallerData {
     c
 }
 
+/// Tests the reference itself ends on the synthetic read, with the refusal code the port gives:
+/// `entity_269st_gap` (`party_identity.IncompleteLedgerChain`: the read has a ledger whose group
+/// chain is incomplete and does not settle whether it is a party). Their parity is the edge books'.
+const SYNTHETIC_REFUSALS: [(&str, &str); 1] = [("entity_269st_gap", "PARTY-chain-incomplete")];
+
 #[test]
 fn every_registered_test_matches_its_synthetic_golden() {
     let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
     let rules = rules_for(&e).unwrap();
     for test in PORTED {
+        if let Some((_, code)) = SYNTHETIC_REFUSALS.iter().find(|(id, _)| *id == test.id) {
+            // The reference raises on this read, so there is no golden: the port refuses, typed.
+            let err = registry::run_canonical(test.id, &e, &rules, &caller(test.id))
+                .expect_err("the reference raises on the synthetic read");
+            assert_eq!(err.code(), Some(*code), "{}: {err}", test.id);
+            continue;
+        }
         let rust = registry::run_canonical(test.id, &e, &rules, &caller(test.id)).unwrap();
         let golden = common::golden_named(&format!("synthetic.{}", test.id));
         let diffs = compare(&golden, &rust, None).unwrap();

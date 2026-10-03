@@ -28,16 +28,47 @@ use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, cash_book_integrity,
-    cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh, high_value_register,
-    ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
-    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
-    twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
+    cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh, entity_269st_gap,
+    high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_identity,
+    party_monthly, read_scope, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
+    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig,
+    TdsConfig,
 };
 use serde_json::Value;
 
 fn spec(name: &str) -> Value {
     let path = common::fixtures().join(format!("edge-books/{name}.json"));
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+/// The `party_identity` table of an edge book, as the engagement's TOML table would give it.
+fn party_config(v: &Value) -> party_identity::PartyConfig {
+    let text = |o: &Value, k: &str| o[k].as_str().unwrap_or_default().to_string();
+    party_identity::PartyConfig {
+        derive_pan_from_gstin: v["derive_pan_from_gstin"].as_bool().unwrap_or(false),
+        party_groups: strs(&v["party_groups"]),
+        additional_party_ledgers: strs(&v["additional_party_ledgers"]).into_iter().collect(),
+        excluded_ledgers: strs(&v["excluded_ledgers"]).into_iter().collect(),
+        round_off_ledgers: strs(&v["round_off_ledgers"]).into_iter().collect(),
+        overrides: v["overrides"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(k, x)| {
+                        (
+                            k.clone(),
+                            party_identity::PartyOverride {
+                                name: text(x, "name"),
+                                pan: text(x, "pan"),
+                                gstin: text(x, "gstin"),
+                                address: text(x, "address"),
+                            },
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
 }
 
 fn strs(v: &Value) -> Vec<String> {
@@ -122,6 +153,12 @@ fn build(s: &Value) -> Book {
                 chain_complete: typed(l, "chain_complete", false, "true or false", Value::as_bool)
                     .unwrap_or(true),
                 master_opening_paise: 0,
+                pan: typed(l, "pan", false, "text", |p| p.as_str().map(str::to_string))
+                    .unwrap_or_default(),
+                gstin: typed(l, "gstin", false, "text", |p| {
+                    p.as_str().map(str::to_string)
+                })
+                .unwrap_or_default(),
                 guid: l["guid"].as_str().unwrap().to_string(),
                 masterid: None,
             };
@@ -197,6 +234,8 @@ fn build(s: &Value) -> Book {
         ledgers,
         vouchers,
         tb,
+        currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
+            .unwrap_or(false),
         ..Default::default()
     }
 }
@@ -634,6 +673,32 @@ fn check(name: &str) {
                 assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
                 continue;
             }
+            "entity_269st_gap" => {
+                // As `parity/edge_golden.py` runs it: the party index from the book's own
+                // `party_identity` table (the engagement's), the round-off ledgers as given.
+                let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+                let config = party_config(&s["party_identity"]);
+                let index = party_identity::build_party_index(&book, &config).unwrap();
+                let r = entity_269st_gap::run(
+                    &book,
+                    &rules,
+                    &cash,
+                    &bank,
+                    &index,
+                    &set("round_off_ledgers"),
+                )
+                .unwrap();
+                let c = entity_269st_gap::check_invariants(&r);
+                (r, c)
+            }
+            "read_scope" => {
+                let r = read_scope::run(&book, &rules).unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
             "creditor_ageing_43bh" => {
                 let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
                 let r = creditor_ageing_43bh::run(
@@ -883,7 +948,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 19] = [
+const EDGE_TESTS: [&str; 21] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -891,11 +956,13 @@ const EDGE_TESTS: [&str; 19] = [
     "cash_payments_40a3",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
+    "entity_269st_gap",
     "high_value_register",
     "ledger_scrutiny",
     "loans_interest",
     "partners_40b_194t",
     "party_monthly",
+    "read_scope",
     "stale_balances_41_1",
     "statutory_dues_43b",
     "stock",

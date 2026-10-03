@@ -220,3 +220,48 @@ fn a_manifest_that_does_not_match_the_supplied_handle_is_refused() {
         "C1-handle"
     );
 }
+
+/// A ledger master of a read carries its own PAN, and the GSTIN in force on the period's LAST day
+/// from its dated registrations (not the first, not the one at the period's start).
+#[test]
+fn a_ledger_of_a_read_carries_its_pan_and_the_gstin_in_force_on_the_period_end() {
+    let mut store = MemoryStore::synthetic();
+    let bytes = store.blobs["parts/ledgers.xml"].clone();
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .collect();
+    let text = String::from_utf16(&units).unwrap();
+    let extra = "<INCOMETAXNUMBER>PAN-READ-1</INCOMETAXNUMBER>\
+        <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM><GSTIN>G-AT-START</GSTIN></LEDGSTREGDETAILS.LIST>\
+        <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20251201</APPLICABLEFROM><GSTIN>G-IN-FORCE-AT-END</GSTIN></LEDGSTREGDETAILS.LIST>\
+        <LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20260401</APPLICABLEFROM><GSTIN>G-AFTER-END</GSTIN></LEDGSTREGDETAILS.LIST>";
+    // The first ledger element of the data, not the `<LEDGER>0</LEDGER>` count in the header.
+    let data_at = text.find("<DATA>").unwrap();
+    let (head, data) = text.split_at(data_at);
+    let edited = format!(
+        "{head}{}",
+        data.replacen("</LEDGER>", &format!("{extra}</LEDGER>"), 1)
+    );
+    assert_ne!(edited, text);
+    let new_bytes: Vec<u8> = edited.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut manifest = store.manifest();
+    let response = &mut part_mut(&mut manifest, "ledgers")["response"];
+    response["sha256"] = json!(hex(&new_bytes));
+    response["stored_sha256"] = json!(hex(&new_bytes));
+    response["bytes"] = json!(new_bytes.len());
+    response["stored_bytes"] = json!(new_bytes.len());
+    store
+        .blobs
+        .insert("parts/ledgers.xml".to_string(), new_bytes);
+    store.set_manifest(&manifest);
+    let read = open(&store).unwrap();
+    let book = bridge_tax_audit::book::load_book(&read, "Invented").unwrap();
+    let mine: Vec<_> = book
+        .ledgers
+        .values()
+        .filter(|l| l.pan == "PAN-READ-1")
+        .collect();
+    assert_eq!(mine.len(), 1, "exactly the edited ledger carries the PAN");
+    assert_eq!(mine[0].gstin, "G-IN-FORCE-AT-END");
+}

@@ -88,6 +88,11 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::depreciation_on(e, b, r),
     },
     PortedTest {
+        id: "entity_269st_gap",
+        min_figures: 4,
+        run_on: |e, b, r, _| crate::entity_269st_gap_on(e, b, r),
+    },
+    PortedTest {
         id: "financial_statements",
         min_figures: 18,
         run_on: |e, b, r, c| crate::financial_statements_on(e, b, r, c.report_totals.as_ref()),
@@ -130,6 +135,11 @@ pub const PORTED: &[PortedTest] = &[
         // year and voucher count, and the Trial Balance movement and difference.
         min_figures: 16,
         run_on: |e, b, r, _| crate::party_monthly_on(e, b, r),
+    },
+    PortedTest {
+        id: "read_scope",
+        min_figures: 1,
+        run_on: |_, b, r, _| crate::read_scope_on(b, r),
     },
     PortedTest {
         id: "stale_balances_41_1",

@@ -483,7 +483,7 @@ fn party_master_export_keeps_runtime_control_error_code_and_hides_runtime_detail
     assert!(error.local_state_changed);
     assert!(error
         .message
-        .starts_with("Bridge withheld the party/ledger master:"));
+        .starts_with("ComplyEaze Bridge withheld the party/ledger master:"));
     assert!(!error.message.contains("QueueDeadline"));
 }
 

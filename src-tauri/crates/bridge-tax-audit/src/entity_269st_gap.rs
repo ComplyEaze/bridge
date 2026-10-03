@@ -242,12 +242,12 @@ mod tests {
             }
             r
         };
-        let day = "entity_largest_single_ledger_2025-06-01_ABCDE1234F";
+        let day = "entity_largest_single_ledger_2025-06-01_PAN-ABCDE";
         assert!(check_invariants(&result_with(&[(day, GAP_1_LIMIT_PAISE - 1)])).is_empty());
         let fired = check_invariants(&result_with(&[
             (day, GAP_1_LIMIT_PAISE),
             (
-                "entity_day_total_2025-06-01_ABCDE1234F",
+                "entity_day_total_2025-06-01_PAN-ABCDE",
                 GAP_1_LIMIT_PAISE * 3,
             ),
         ]));

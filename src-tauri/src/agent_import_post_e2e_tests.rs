@@ -4526,3 +4526,91 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     assert_eq!(verdicts.len(), 1, "{verdicts:?}");
     assert_eq!(verdicts[0]["binding_refusal"], "span_counters_not_clean");
 }
+
+// bridge#1108, the batch case: a batch Tally rejected whole. Its post's own
+// answer says Tally created none of the vouchers sent, each an exception, and
+// the company's voucher mark measurably did not move, so every voucher is
+// reported as not created by Tally.
+
+/// The captured live answer to an import of three vouchers, each naming a
+/// different missing ledger (`batch-import-all-missing-ledgers`, 2026-10-03):
+/// CREATED 0, EXCEPTIONS 3, one LINEERROR. Only the answer is borrowed; the
+/// batch posted here is this suite's own three Journals.
+fn rejected_all_three() -> String {
+    captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/batch-import-all-missing-ledgers.utf16le.xml"
+    ))
+}
+
+/// Posts the three-Journal batch with `answer` as Tally's answer to the POST,
+/// the voucher mark read after it at `after_mark` (10 before) and an empty
+/// window, and asserts that every scripted answer was asked for.
+async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(answer)));
+    plans.push(xml(company_marks(after_mark, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(empty_collection(), after_mark));
+    let expected_requests = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (_, args) = saved_partial_batch(&server);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
+    posted
+}
+
+#[tokio::test]
+async fn a_batch_tally_rejected_whole_reads_as_not_created_by_tally() {
+    let posted = post_batch_rejected(rejected_all_three(), 10).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(
+        result["dispatch"]["state"], "reconciliation_required",
+        "{posted}"
+    );
+    assert_eq!(result["dispatch"]["counters"]["created"], 0, "{posted}");
+    assert_eq!(result["dispatch"]["counters"]["exceptions"], 3, "{posted}");
+    assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
+    assert_eq!(result["counts"]["not_found"], 0, "{posted}");
+    assert_eq!(
+        result["counts"].get("sent_not_attributed"),
+        None,
+        "{posted}"
+    );
+    assert_eq!(
+        result["counts"]["tally_reported_not_created"], 3,
+        "{posted}"
+    );
+    let vouchers = result["vouchers"].as_array().expect("the vouchers");
+    assert_eq!(vouchers.len(), 3, "{posted}");
+    for voucher in vouchers {
+        assert_eq!(voucher["status"], "tally_reported_not_created", "{posted}");
+        assert_eq!(
+            voucher["next_step"].as_str(),
+            super::super::verification::plain_next_step("tally_reported_not_created"),
+            "{posted}"
+        );
+    }
+}
+
+/// The same answer with the voucher mark moved by one across the post: Tally
+/// said it created nothing, but something changed the book, so nothing is
+/// claimed about any voucher.
+#[tokio::test]
+async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
+    let posted = post_batch_rejected(rejected_all_three(), 11).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(posted["isError"], json!(true), "{posted}");
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    assert_eq!(
+        result["counts"].get("tally_reported_not_created"),
+        None,
+        "{posted}"
+    );
+}

@@ -90,9 +90,21 @@ synthetic company, 2026-10-02). One gateway import of three Payment vouchers, in
 In this run `EXCEPTIONS` equalled the number of rejected vouchers (one), and nothing in the answer
 named which voucher it was: the `LINEERROR` names a ledger, not a voucher. The answer alone is
 preserved byte for byte as a test fixture (bridge#1107). §11c.5 records the same
-`CREATED`/`EXCEPTIONS` split for a batch of 50 (`CREATED 49, EXCEPTIONS 1`). Not measured: more than
-one rejected voucher in a batch (so whether `EXCEPTIONS` counts vouchers or errors), any other cause
-of rejection, Gold and Education.
+`CREATED`/`EXCEPTIONS` split for a batch of 50 (`CREATED 49, EXCEPTIONS 1`).
+
+**More than one rejected voucher — PARTIAL, one run each** (the same company and envelope,
+2026-10-03). No missing ledger was named by two vouchers.
+- Three vouchers, each naming a missing ledger: `CREATED 0, EXCEPTIONS 3`.
+- Bad, good, bad: `CREATED 1, EXCEPTIONS 2`; the middle voucher was created.
+- Two rejected vouchers carrying three missing ledgers between them: `CREATED 0, EXCEPTIONS 2`.
+- Each answer carried one `LINEERROR`, naming only the last rejected voucher's ledger. Where
+  nothing was created, neither the voucher mark nor the master mark moved.
+
+So in these runs `EXCEPTIONS` counted rejected vouchers, not missing ledgers, and the `LINEERROR`
+never identified every rejected voucher. The first and third answers are preserved byte for byte as
+test fixtures (`batch-import-all-missing-ledgers`,
+`batch-import-two-missing-ledgers-in-one-voucher`). Not measured: any other cause of rejection, Gold
+and Education.
 
 ### 9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**
 

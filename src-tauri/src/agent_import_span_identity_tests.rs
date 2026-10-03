@@ -696,3 +696,144 @@ fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
     // The identical pair binds by position alone.
     assert_eq!((bound[1].master_id, bound[2].master_id), (1735, 1736));
 }
+
+/// The ten captured vouchers saved as one batch on a server of its own, with
+/// the journal on disk that `decide_post_span` records its verdict in.
+fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, ImportLedgerLine) {
+    let server = crate::agent::Server::new(crate::agent::Settings {
+        endpoint: bridge_tally_transport::TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: true,
+    });
+    let batch_id = "bridge-00000000-0000-4000-8000-000000001055";
+    let vouchers = sent();
+    let mut line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id": batch_id, "identity_scheme": "batch_v1",
+        "company_guid": COMPANY_GUID,
+        "company": {"name": COMPANY, "guid": COMPANY_GUID, "company_number": "100001", "books_from": "20260401"},
+        "txn_ids": vouchers.iter().map(|voucher| voucher.bridge_txn_id.clone()).collect::<Vec<_>>(),
+        "date_from": "20260710", "date_to": "20260710",
+        "sha256": "", "built_at": "2026-10-02T07:45:00.000Z", "status": "built",
+        "pre_import_mark": {"kind": "company_high_water", "value": target_mark(MARKS_BEFORE), "master_value": 234},
+        "vouchers": vouchers,
+    }))
+    .unwrap();
+    line.sha256 = crate::agent::sha256_hex(
+        super::super::render_import_xml(COMPANY, &line.vouchers, batch_id).as_bytes(),
+    );
+    server.append_import_ledger(&line).unwrap();
+    // What the post left in the journal: its dispatch intent, with the
+    // pre-POST mark and the captured REMOTEIDs, and its response.
+    let native = super::super::post::native_post_request(
+        &line,
+        super::super::post::RemoteIds::from_ids(captured_remote_ids()),
+    )
+    .unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&super::super::ledger::StatusRecord::dispatch_for(
+                &line,
+                &native,
+                Some(target_mark(MARKS_BEFORE)),
+            ))
+            .unwrap();
+        server
+            .append_import_record_while_admitted(&super::super::ledger::StatusRecord::response(
+                &line,
+                super::super::ledger::DispatchResponse {
+                    request_sha256: native.request_sha256.clone(),
+                    response_sha256: crate::agent::sha256_hex(RESPONSE),
+                    bytes: RESPONSE.len(),
+                    outcome: Some(outcome()),
+                },
+            ))
+            .unwrap();
+    }
+    (server, line)
+}
+
+/// One verification's decision on the captured post, as `verify_import` makes
+/// it: from the journal as it stands, with the captured response, the marks
+/// either side of the POST and `read` as the window's rows.
+fn decided(
+    server: &crate::agent::Server,
+    line: &ImportLedgerLine,
+    read: &ImportReadSource,
+) -> (Value, Option<super::super::ledger::PostSpanVerdict>) {
+    let snapshot = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap();
+    let response = snapshot.response.expect("the post's recorded response");
+    let decision = server.decide_post_span(
+        line,
+        PreMark::recorded(
+            snapshot
+                .pre_post_voucher_mark
+                .expect("the recorded pre-POST mark"),
+        ),
+        snapshot.span_verdict,
+        Some(&response),
+        read,
+        Some(target_mark(MARKS_AFTER)),
+        target_mark(MARKS_AFTER),
+        snapshot.generation,
+    );
+    let journaled = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap()
+        .span_verdict;
+    (decision.report, journaled)
+}
+
+/// An unsettled bind is never journaled (#1055, point 9): with one voucher's
+/// `EFFECTIVEDATE` left out of the read, the decision is `unsettled` and the
+/// journal holds no verdict, so the next verification decides again; the
+/// read as captured then binds, and that verdict is journaled. Server level,
+/// on the captured rows: the transport and `verify_import`'s own reads are
+/// not exercised, since no census of this day is captured.
+#[test]
+fn an_unsettled_bind_is_left_out_of_the_journal_and_a_later_read_binds() {
+    let directory = tempfile::tempdir().unwrap();
+    let (server, line) = journaled_batch(directory.path());
+    let mut without = span_read();
+    without
+        .rows
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1796))
+        .unwrap()
+        .effective_date = None;
+
+    let (report, journaled) = decided(&server, &line, &without);
+    assert_eq!(
+        report,
+        json!({"state": "unsettled", "code": BindUnsettled::EffectiveDateNotObserved.code()})
+    );
+    assert_eq!(journaled, None, "an unsettled bind is never journaled");
+
+    let (report, journaled) = decided(&server, &line, &span_read());
+    assert_eq!(report, json!({"state": "bound"}));
+    let expected = bind(
+        &span(),
+        COMPANY_GUID,
+        &sent(),
+        &span_read(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(expected.len(), 10);
+    assert_eq!(
+        journaled,
+        Some(super::super::ledger::PostSpanVerdict::Bound(expected))
+    );
+}

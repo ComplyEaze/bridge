@@ -2214,10 +2214,9 @@ mod through_the_tool {
         assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
     }
 
-    /// A transport failure on the company-count read (here an answer past the
-    /// response cap) is not a damaged answer: it is refused under the read's own
-    /// code with no `cause`, as any read whose response could not be taken is
-    /// (docs/agent/README.md), never as `ledger_count_company_invalid` or
+    /// A company-count answer past the response cap is not a damaged answer: it
+    /// is refused under the read's own code with its own `cause` and remediation
+    /// (#1033), never as `ledger_count_company_invalid` or
     /// `ledger_count_company_differs`, and nothing is sent after it.
     #[tokio::test]
     async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
@@ -2243,7 +2242,57 @@ mod through_the_tool {
             error["code"], "party_ledger_master_read_failed",
             "{response}"
         );
-        assert!(error.get("cause").is_none(), "{response}");
+        assert_eq!(
+            error["cause"], "ledger_count_company_response_too_large",
+            "{response}"
+        );
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_count_company_response_too_large").unwrap()
+        );
+    }
+
+    /// Any other failure of the company-count read keeps what it had (#1144
+    /// review): a reset connection still carries no `cause`, and an HTTP error
+    /// keeps the transport's own. Only an answer past the cap is renamed, so
+    /// neither reads as `ledger_count_company_response_too_large`, and nothing
+    /// is sent after either.
+    #[tokio::test]
+    async fn a_count_read_failure_short_of_the_cap_keeps_its_own_cause() {
+        for (failed, cause) in [
+            (
+                xml(company_count_body(Some("9")))
+                    .with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+                None,
+            ),
+            (
+                xml(company_count_body(Some("9"))).with_http_status(500),
+                Some("http_status_failure"),
+            ),
+        ] {
+            let mark = 102_161_u64;
+            let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+            plans.extend(
+                census_bodies(mark, GUID, &[(24, 0..9)])
+                    .into_iter()
+                    .map(xml),
+            );
+            plans.push(failed);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(
+                error["code"], "party_ledger_master_read_failed",
+                "{response}"
+            );
+            assert_eq!(
+                error.get("cause").and_then(Value::as_str),
+                cause,
+                "{response}"
+            );
+        }
     }
 
     /// The cross-check flag is added to a result whatever the frame was, and a

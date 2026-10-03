@@ -208,6 +208,15 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: OutstandingsError,
     },
+    /// Tally's answer to the company ledger-count request (#938) ran past the
+    /// transport's response cap (#1033), far more than one company's count can
+    /// account for. The transport drops the connection with the rest of the
+    /// response unread. Nothing was sized from it, and nothing after it was sent.
+    #[error("Tally's answer to the company ledger-count request ran past ComplyEaze Bridge's response limit")]
+    LedgerCountCompanyResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
     /// A slice of the ledger census (#679) failed validation: another company,
     /// a damaged response, a foreign field, or a ledger seen twice within the
     /// slice. Nothing was sized from it.
@@ -279,6 +288,9 @@ impl PartyLedgerMasterSourceValidationError {
             Self::LedgerSpan { source } => source.safe_code(),
             Self::LedgerCountCompanyDiffers { .. } => "ledger_count_company_differs",
             Self::LedgerCountCompanyInvalid { .. } => "ledger_count_company_invalid",
+            Self::LedgerCountCompanyResponseTooLarge { .. } => {
+                "ledger_count_company_response_too_large"
+            }
             Self::LedgerSpanSliceInvalid { source } => match source {
                 StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
                 StandardLedgerCatalogError::CompanyIdentityMismatch => {
@@ -622,6 +634,26 @@ fn admit_counted_catalogue(ledgers: u64) -> Result<(), PartyLedgerMasterSourceVa
 /// its width in ledgers, far under the cap. Any other failure is left as it
 /// came.
 fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge { source }
+    })
+}
+
+/// Names the company ledger-count read (#938) that ran past the response cap
+/// as such (#1033), so the refusal carries its own cause rather than none. Any
+/// other failure is left as it came.
+fn company_count_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerCountCompanyResponseTooLarge { source }
+    })
+}
+
+/// `error` wrapped by `name` when the transport refused the response as past
+/// its cap; any other failure unchanged.
+fn named_past_the_cap(
+    error: anyhow::Error,
+    name: fn(anyhow::Error) -> PartyLedgerMasterSourceValidationError,
+) -> anyhow::Error {
     let over_the_cap = error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<TallyTransportError>(),
@@ -629,11 +661,7 @@ fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
         )
     });
     if over_the_cap {
-        anyhow::Error::new(
-            PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge {
-                source: error,
-            },
-        )
+        anyhow::Error::new(name(error))
     } else {
         error
     }
@@ -2076,7 +2104,10 @@ impl TallyClient {
         count_evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<CountCrossCheck> {
         let request = render_company_ledger_count_request(identity.display_name());
-        let (body, bytes, sha256) = self.post_xml_with_encoded_bytes(request.clone()).await?;
+        let (body, bytes, sha256) = self
+            .post_xml_with_encoded_bytes(request.clone())
+            .await
+            .map_err(company_count_response_error)?;
         let read = RuntimeReadEvidence::single(&request, sha256, bytes);
         *evidence = evidence.clone().combine(read.clone());
         *count_evidence = count_evidence.clone().combine(read);

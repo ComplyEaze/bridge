@@ -1319,6 +1319,20 @@ fn the_date_remediation_opens_with_words_that_fit_a_book_window_cause() {
     }
 }
 
+/// An unreadable bill amount can now name its row (#1096), so its next step says
+/// what a `bill_row` means, as a sentence of its own (#1128 review).
+#[test]
+fn the_amount_remediation_says_what_a_bill_row_names() {
+    let text = outstandings_cause_remediation("native_amount_invalid")
+        .expect("an amount cause has a next step");
+    assert!(
+        text.split(". ").any(|sentence| sentence
+            == "When the refusal carries a `bill_row`, it names the report and the row in the \
+                order Tally sent them, which may not be the order on screen"),
+        "{text}"
+    );
+}
+
 /// The Bills-report next steps belong to the outstandings tool only (bridge#1091): the same cause
 /// codes reach other tools through reads that never open that report.
 #[test]

@@ -641,6 +641,45 @@ fn every_list_a_new_tool_is_written_into_is_in_name_order() {
     }
 }
 
+/// About 40 bytes either side of `at`, widened to whole characters, so a
+/// failure message can quote text beside a multi-byte character (an em dash, a
+/// curly quote or ₹) instead of panicking on a character boundary.
+fn around(text: &str, at: usize) -> &str {
+    let mut start = at.saturating_sub(40);
+    while !text.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (at + 40).min(text.len());
+    while !text.is_char_boundary(end) {
+        end += 1;
+    }
+    &text[start..end]
+}
+
+/// The window never splits a character, whichever side the 40 bytes land on
+/// (#1129 review).
+#[test]
+fn the_failure_window_never_splits_a_character() {
+    // Three-byte characters on both sides, shifted a byte at a time, so the
+    // 40-byte edges fall inside a character on some shifts and between two on
+    // others.
+    let mut split = 0;
+    for pad in 0..3 {
+        let text = format!(
+            "{}{}Bridge{}",
+            "x".repeat(pad),
+            "—".repeat(20),
+            "₹".repeat(20)
+        );
+        let at = text.find("Bridge").unwrap();
+        split += usize::from(!text.is_char_boundary(at - 40));
+        split += usize::from(!text.is_char_boundary(at + 40));
+        let window = around(&text, at);
+        assert!(window.contains("—Bridge₹"), "{pad}: {window:?}");
+    }
+    assert!(split > 0, "no edge fell inside a character");
+}
+
 /// Every tool description names the product in full, "ComplyEaze Bridge", never
 /// by its bare short name (#962, the guard promised in #1028). The one
 /// exception is a quoted voucher tag that `parse_bank_statement` writes into the
@@ -662,7 +701,7 @@ fn no_tool_description_names_the_product_by_its_bare_short_name() {
             assert!(
                 text[..at].ends_with("ComplyEaze "),
                 "{name} names a bare Bridge: {:?}",
-                &text[at.saturating_sub(40)..(at + 40).min(text.len())]
+                around(&text, at)
             );
         }
     }

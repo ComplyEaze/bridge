@@ -1032,6 +1032,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              means Tally's answer to that request is not what ComplyEaze Bridge expects: call ledger_masters \
              with fields=basic instead."
         ),
+        "ledger_count_company_response_too_large" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span and asked Tally for the \
+             company's own count of its ledgers to check it, and the answer was larger than \
+             ComplyEaze Bridge's response limit, far more than one company's count can account \
+             for. No master was requested, and nothing was sent after that response. Retry once \
+             with the company left alone. A repeat means Tally's answer to that request is not \
+             what ComplyEaze Bridge expects: call ledger_masters with fields=basic instead.",
+        ),
         "ledger_count_catalogue_too_large" => Some(
             "The census counted more ledgers than one compliance read holds, so ComplyEaze Bridge would \
              read them in parts by parent group, but the catalogue that names their parents \
@@ -1321,7 +1329,9 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
         ),
         "native_amount_invalid" | "native_arithmetic_overflow" => Some(
             "A bill amount in Tally's Bills report could not be read exactly, so no figures were \
-             returned. Do not retry; tell the user what the cause says.",
+             returned. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen. Do not retry; \
+             tell the user what the cause says.",
         ),
         "native_tally_reported_failure" => Some(
             "Tally answered the Bills report request with a failure, so no figures were returned. \

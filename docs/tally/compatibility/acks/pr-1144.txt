@@ -1,4 +1,5 @@
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
+src-tauri/src/commands.rs
 src-tauri/src/tally/connection.rs
 reviewer: lamemustafa

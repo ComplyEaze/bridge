@@ -649,7 +649,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
     // appends receipt lines to the local log" as a write contradicting readOnlyHint: the log
     // tool says the read changes nothing and that the one write is this call's own receipt.
     assert!(egress.contains("Reading the log changes nothing in it; this call's own receipt is added after the read, like every call's."), "{egress}");
-    assert!(evidence.contains("It reads memory only; this call's own receipt goes to the local log, like every call's."), "{evidence}");
+    assert!(evidence.contains("It reads memory only; this call's own record is added to memory after the read, and its receipt goes to the local log, like every call's."), "{evidence}");
     let bound = format!("at most {MAX_EVIDENCE_RECORDS}");
     for (name, description) in [("read_evidence", &evidence), ("egress_log", &egress)] {
         assert!(
@@ -660,6 +660,7 @@ fn the_two_log_tools_say_what_they_hold_and_what_reached_the_ai_provider() {
             .as_array()
             .and_then(|tools| tools.iter().find(|tool| tool["name"] == name))
             .unwrap_or_else(|| panic!("{name} tool definition"));
+        assert_eq!(tool["annotations"]["readOnlyHint"], json!(true), "{name}");
         let limit = tool["inputSchema"]["properties"]["limit"]["description"]
             .as_str()
             .unwrap_or_default();

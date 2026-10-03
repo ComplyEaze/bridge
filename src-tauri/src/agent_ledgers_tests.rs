@@ -2214,10 +2214,9 @@ mod through_the_tool {
         assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
     }
 
-    /// A transport failure on the company-count read (here an answer past the
-    /// response cap) is not a damaged answer: it is refused under the read's own
-    /// code with no `cause`, as any read whose response could not be taken is
-    /// (docs/agent/README.md), never as `ledger_count_company_invalid` or
+    /// A company-count answer past the response cap is not a damaged answer: it
+    /// is refused under the read's own code with its own `cause` and remediation
+    /// (#1033), never as `ledger_count_company_invalid` or
     /// `ledger_count_company_differs`, and nothing is sent after it.
     #[tokio::test]
     async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
@@ -2243,7 +2242,14 @@ mod through_the_tool {
             error["code"], "party_ledger_master_read_failed",
             "{response}"
         );
-        assert!(error.get("cause").is_none(), "{response}");
+        assert_eq!(
+            error["cause"], "ledger_count_company_response_too_large",
+            "{response}"
+        );
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_count_company_response_too_large").unwrap()
+        );
     }
 
     /// The cross-check flag is added to a result whatever the frame was, and a

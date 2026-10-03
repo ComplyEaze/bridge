@@ -192,7 +192,8 @@ count and the ledgers the read returned, that differ are refused as `ledger_coun
 slices and before the count is used, Bridge reads Tally's own count of the company's ledgers once
 (`NUMLEDGERS` of the Company object, #938) and refuses the call as `ledger_count_company_differs` if it is
 higher than the census's, or as `ledger_count_company_invalid` if that answer was damaged, named another
-company or held something other than a plain number; a count that is equal, lower or absent never admits
+company or held something other than a plain number, or as `ledger_count_company_response_too_large` if that
+answer was larger than the response limit (#1033); a count that is equal, lower or absent never admits
 or sizes anything, and the
 result of a counted read says which it was in `ledger_count_cross_check.status` (`matched`,
 `company_count_lower` or `unavailable`, the last meaning the check did not run). Equality was measured

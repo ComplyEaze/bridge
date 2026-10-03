@@ -47,12 +47,15 @@ ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:
 - ComplyEaze does not receive your TallyPrime data through ComplyEaze Bridge;
   what Claude reads goes to your AI provider. Response redaction can mask party
   names or drop narration; nothing hides amounts.
-- Posting is off by default. When it is on, each voucher waits for your
-  approval in a separate ComplyEaze Bridge window, and no ComplyEaze Bridge
-  tool lets the assistant approve it. It cannot undo a posted voucher; you
-  correct it in TallyPrime.
-- It connects only to a loopback address on your own computer, and it cannot
-  tell whether that port is forwarded elsewhere.
+- Posting is off by default for a new install; an earlier version may have
+  saved it on, so check the setting. When it is on, each voucher waits for your
+  approval in a separate ComplyEaze Bridge window. No ComplyEaze Bridge tool can
+  approve it for you, but software that controls your screen could click the
+  window, so do not let it. It cannot undo a posted voucher; you correct it in
+  TallyPrime.
+- It connects only to a loopback address on your own computer. If you forward
+  that port to a virtual machine or another machine, the traffic follows your
+  forward, and ComplyEaze Bridge cannot tell.
 - ComplyEaze has not set a price and does not sell licences to it; the code of
   current releases is under Apache-2.0.
 - What has been run against a real TallyPrime, and what has not, is listed in

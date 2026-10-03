@@ -40,8 +40,8 @@ vouchers is off by default. This page is the short path; the
    settings → Install Extension…** and choose the `.mcpb` file.
 5. **Fill in its settings.** Keep **Tally host** as `localhost`. Set **Tally
    port** to the gateway port from step 1. Read the Terms of Use linked in the
-   settings, then turn on **I accept the ComplyEaze Bridge Terms of Use** (its label names
-   the Terms version):
+   settings, then turn on **I accept the ComplyEaze Bridge Terms of Use (version
+   2026-10)**:
    until you do, every tool call is refused and nothing is read from
    TallyPrime.
 6. **Restart Claude Desktop.** Save the settings, quit Claude Desktop
@@ -56,8 +56,11 @@ vouchers is off by default. This page is the short path; the
   company names, party names and amounts. The **Response redaction** setting
   can mask party names (`mask_parties`) or drop narration (`drop_narration`);
   neither removes amounts. It starts at `none`.
-- **Posting is off by default.** If you turn it on, each voucher waits for your
-  approval in a separate ComplyEaze Bridge window. ComplyEaze Bridge cannot
+- **Posting is off by default** for a new install; an earlier version may
+  have saved it on, so check the setting. If you turn it on, each voucher waits
+  for your approval in a separate ComplyEaze Bridge window. No ComplyEaze
+  Bridge tool can approve it for you, but software that controls your screen
+  could click the window, so do not let it. ComplyEaze Bridge cannot
   undo a posted voucher; you correct it in TallyPrime. Read *Before you turn on
   posting* in the [README](../../README.md#before-you-turn-on-posting) first.
 - **Every tool call leaves a receipt** in a log on your computer.

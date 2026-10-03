@@ -1,0 +1,3 @@
+scripts/ledger-entries-screen.test.tsx
+src-tauri/src/commands.rs
+reviewer: lamemustafa

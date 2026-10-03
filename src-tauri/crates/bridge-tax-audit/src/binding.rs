@@ -2783,7 +2783,9 @@ deductor_aliases = 5\n"
         }
         // Not a table: the reference's `_expand` skips every location under it, and
         // `PartyConfig::from_toml` refuses it when `entity_269st_gap` runs.
-        let (bound, _) = engagement("party_identity = 5\n").bind(&b).unwrap();
+        let not_a_table = format!("party_identity = 5\n{}", base_toml(""));
+        let e = Engagement::from_toml(&not_a_table, Path::new(".")).unwrap();
+        let (bound, _) = e.bind(&b).unwrap();
         assert_eq!(bound.party_identity, Some(toml::Value::Integer(5)));
     }
 

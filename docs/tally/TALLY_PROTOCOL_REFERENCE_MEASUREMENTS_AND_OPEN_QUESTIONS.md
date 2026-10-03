@@ -1035,8 +1035,18 @@ TallyPrime 7.1 Silver) as of 20260331, from the book's start 20250401: 1,477 ope
 - The report's latest bill date was the as-of date. The issue records later probe vouchers dated after the financial year on this book
   (not re-read here), so on this book the as-of Bills report did not list a later-dated bill. One book; it was inferred before.
 - Fixtures: `native-outstandings-probe-b-bills-receivable` and `native-outstandings-probe-b-bills-payable`, byte-exact, with provenance.
-- Not measured: whether the rest of the call (the ledger and group reads, the party join and the overdue crosscheck) then completes on
-  this book: the capture held only the extent and the two Bills reports.
+- **The whole call then completed on this book — PARTIAL, one run, 2026-10-03.** A master build (7b994e65, before #1133) of `outstandings` for
+  this company, as of 20260331, direction both, default limits, through a recording read-only relay on the same licensed 7.1 Silver
+  gateway, with no write made and the owner holding Tally's screen exports (no export dialog open), as reported. State `complete`, evidence `complete`, 4.0 s wall. It sent 48 requests (8
+  company-extent, 8 book-extent, 22 status GETs, 2 currency, and 2 each of Bills Receivable, Bills Payable, List of Ledgers and List of
+  Groups), plus 2 status reads before and 2 after: 52 in all, none refused. Sizes: Bills Receivable 674,070 bytes and Bills Payable 9,528 (each
+  fetched twice, the same size both times), List of Ledgers 33,850, List of Groups 54,280; about 1.7 MB relayed in all, the slowest request 0.6 s
+  (Bills Receivable). The result carried 1,498 open bills (1,477 receivable and 21 payable, the counts of the earlier parse of the saved capture), a page of 500
+  (`open_bills_shown` 500, `next_offset` 500) and 15 unallocated parties, in a 181,044-byte MCP result, under the 200,000-byte cap. The gross
+  billed total equalled receivable plus payable and the sum of the five ageing buckets (checked by script; amounts are not quoted here).
+- Not measured on that run: the 1-Dec-2108 bill was not on the returned page (every due date on it was in 2025), so how a 2108 due date shows
+  in a live response (its age and bucket) was not seen; the overdue crosscheck's own verdict has no field in the result, so `complete` is the
+  only evidence it did not lower the state; a second page (offset 500) was not read; one run on one book.
 
 ### 12a.4 The import path rewrites what you send — extends §9
 
@@ -1519,3 +1529,4 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-01 | §12a.7: what a GUID-filtered `Company` collection fetch returned for a company's own details on two synthetic licensed 7.1 Silver companies: the dates, currency, GST flag and company number with their text forms; an unset state or PIN code as an absent element (one company, before and after it was set); no registration type or number on the row of a company that has a registration; nothing for the address list (one sample, the address not confirmed set). VERIFIED for the names returned; PARTIAL for the address |
 | 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |
 | 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
+| 2026-10-03 | §12a.3: a whole `outstandings` call (master build 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page), a second page, other books. |

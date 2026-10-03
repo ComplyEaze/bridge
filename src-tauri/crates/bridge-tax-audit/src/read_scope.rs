@@ -5,7 +5,8 @@
 //! Not ported: the reference's finding also carries `confirm`, the client's representation for the
 //! management letter ("The books are kept in Indian rupees, and no ledger is kept in a foreign
 //! currency."). This crate's `Finding` has no such field yet, and the canonical dump leaves it out
-//! on both sides, so parity cannot see it. The question to the client (`ask_client`) is ported.
+//! on both sides, so parity cannot see it (#1139). The question to the client (`ask_client`) is
+//! ported.
 //!
 //! Amounts are read as Indian rupees only, and an amount that carries a foreign-currency value is
 //! refused when the book is read (FX-1). But a read that does not carry the books' currency settings

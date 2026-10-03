@@ -1540,13 +1540,17 @@ deletion detection is unsupported.
 ### What each tool's evidence covers
 
 What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
-read from the code tool by tool (#726). Each list is in fold order. A step
+read from the code tool by tool (#726). It covers every tool that reads Tally,
+`verify_import`, and the tools that read nothing from Tally; it does not cover
+`build_import_xml`, `post_import` or `acknowledge_post_review`. Each list is in
+fold order. A step
 marked "(if …)" is folded only when that holds. Every step after the first is
 joined with the tool-level combination, so it is hashed even when one side is
 one request. The building blocks:
 
 - **Company read.** The company-list request every company-scoped tool makes
-  first (`Server::companies` in `src-tauri/src/agent_company.rs`). It is sent
+  first, after the probe for `verify_import` (`Server::companies` in
+  `src-tauri/src/agent_company.rs`). It is sent
   twice as a paired read and reported as that one request's own hash. Only the
   last attempt of a retried read is reported.
 - **Scoped read.** One admitted read (`Server::post_read` in
@@ -1558,7 +1562,9 @@ one request. The building blocks:
   third.
 - **Runtime read.** A read built inside the runtime and folded with the
   runtime combination: the opening probe, the read's own requests in the order
-  listed, then the closing probe.
+  listed, then the closing probe. The `outstandings` read returns early as
+  partial with the opening probe only when `as_of` is before the books begin or
+  its snapshot period is partial.
 - **Window read.** A bounded voucher window (`read_voucher_window_timed` in
   `src-tauri/src/agent_voucher_window.rs`): the company's voucher marks (when
   not already known), the census spans (when the marks alone do not bound the
@@ -1575,7 +1581,9 @@ These requests are sent but never digested anywhere in a result:
 - the identity-bracket company-list requests around each scoped and runtime read;
 - the status checks between and after a paired read's two sends;
 - the book-extent reads inside a runtime read;
-- the earlier attempts of a retried read.
+- the earlier attempts of a retried read;
+- a `verify_import` masters-check catalogue read that fails, which is sent and
+  then dropped.
 
 Per tool:
 
@@ -1599,13 +1607,17 @@ Per tool:
   - With `fields=compliance` it is the base-currency read, folded with a
     source read (`fetch_agent_party_ledger_masters_with_evidence`). The source
     read is the opening probe, then one commitment over the master, balance
-    and group reads, then (if the ledgers had to be counted first) the census
-    slices, the ledger-count cross-check and the catalogue read, then the
-    closing probe.
-  - That commitment's request digest hashes the joined request hashes. Its
-    response digest hashes `"<master>:<balance>:<group>"`, where each side is
-    itself an aggregate when the read was split by parent group
+    and group reads, then the reads that counted the ledgers first, if any,
+    then the closing probe. Those counting reads are the census slices and the
+    ledger-count cross-check (when the read was admitted census-first), and
+    the catalogue read (when it was admitted count-first, or census-first with
+    a read split by parent group).
+  - That commitment's request digest hashes the joined request hashes
     (`fetch_party_ledger_master_source` in `src-tauri/src/tally/connection.rs`).
+    Its response digest hashes `"<master>:<balance>:<group>"`
+    (`party_ledger_master_source_evidence` in `src-tauri/src/tally/runtime.rs`).
+    The master and balance sides are themselves aggregates when the read was
+    split by parent group; the group side is one paired read.
   - The count requests are sent before the reads they admit but folded after
     the commitment. None of the individual master, balance or group requests
     is reported on its own.
@@ -1663,7 +1675,7 @@ Per tool:
   3. a runtime read of receivable bills, the group collection, payable bills
      and the ledger collection (`fetch_outstandings_native_with_currency` in
      `src-tauri/src/tally/runtime.rs`);
-  4. (if `party` with `detail` or `reference` on a complete read) the ledger
+  4. (if `party` with `detail` on a complete read) the ledger
      catalogue and a window read (`outstandings_detail_within` in
      `src-tauri/src/agent_bill_trail.rs`).
 - `stock_summary`:
@@ -1704,16 +1716,18 @@ Per tool:
   the saved proof.
 - `changed_since` is refused before any request, so it carries only the
   refusal's local evidence.
-- `egress_log`, `local_data_report`, `read_evidence` and `voucher_schema`
-  read nothing from Tally. Their request digest hashes the tool's name, and
+- `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
+  and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
   their response digest hashes what they return (for `voucher_schema`, the
   name again).
 
 A refusal made before any request reports a request digest hashing
 `<tool>:<sha256 of the arguments>` and a response digest hashing the refusal
 code. A refusal after some requests keeps what was folded up to that point.
-A page served from a held read reports only the company read and the extent
-check, not the first page's reads.
+A later page of `masters`, `ledger_masters`, `trial_balance` or `stock_summary`
+served from a held read reports only the company read and the extent check,
+not the first page's reads. A served `vouchers` page reports the company read
+and its marks read instead (see `vouchers`).
 
 ## The plain headline
 

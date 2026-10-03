@@ -1,13 +1,20 @@
 # ComplyEaze Bridge
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an MCP server that connects Claude Desktop to the
-TallyPrime running on your own computer. It is built for CA firms and
-accountants. You can ask about outstanding receivables and payables with
-ageing, the trial balance, ledger movement and vouchers. It checks ledger
-names before you post, and it prepares Journal, Payment, Receipt and Contra
-vouchers as a file. If you turn posting on in the extension, it posts them one
-at a time, after you approve each one.
+ComplyEaze Bridge is a TallyPrime MCP server for Claude Desktop. It connects
+Claude Desktop to the TallyPrime running on your own computer, and it is built
+for chartered accountants, CA firms and accountants. You can ask about the
+trial balance, outstanding receivables and payables with ageing, ledger
+movement and vouchers, the purchase and sales registers, the stock summary,
+and the Profit and Loss and Balance Sheet (a book with stock items is expected
+to be refused for these two). It checks ledger names before you post. For bank
+statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
+vouchers from a password-protected SBI, HDFC or Union Bank of India statement
+PDF, and it prepares Journal, Payment, Receipt and Contra vouchers as an import
+file that you review and import into TallyPrime yourself. Posting is off by
+default, so as installed it never posts to TallyPrime: it reads from it and
+prepares files on your computer. If you turn posting on in the extension, it
+posts vouchers one at a time, after you approve each one.
 
 **Current release:**
 <!-- managed:current-release -->[`mcp-v0.4.2`](https://github.com/ComplyEaze/bridge/releases/latest) (3 October 2026)<!-- /managed:current-release -->,
@@ -28,6 +35,38 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the outstanding receivables and payables, with ageing, as of 31 March."
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
+
+**Its tools.** Release 0.4.2 installs these 22, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
+with no figures, to a log on this computer.
+
+| Tool | What it gives you | What it writes besides that receipt |
+| --- | --- | --- |
+| `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
+| `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
+| `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
+| `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
+| `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
+| `list_companies` | The companies loaded in TallyPrime (start here) | Nothing |
+| `local_data_report` | What ComplyEaze Bridge keeps on this computer | Nothing |
+| `masters` | Voucher types, godowns, units, stock groups or account groups | Nothing |
+| `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
+| `parse_bank_statement` | Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
+| `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |
+| `purchase_register` | Purchases as the books record them (not a GST return) | Nothing |
+| `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
+| `sales_register` | Sales as the books record them (not a GST return) | Nothing |
+| `stock_summary` | The closing stock value of each item as of a date | Nothing |
+| `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
+| `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
+| `validate_masters` | Checks ledger names against the live book before you post | Nothing |
+| `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
+| `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
+| `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
+| `vouchers` | The vouchers in a period | Nothing |
+
+With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
+ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
+whose ledger now points to a different master.
 
 ## How it handles your books
 

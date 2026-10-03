@@ -47,12 +47,6 @@ These changes are in source and not yet in a published build.
   a book that changed between pages could skip or repeat vouchers while every
   page said `complete`. A window that is only `partial` is read again for each
   page, as before (#485).
-- In the desktop app, the button on an export notice that shows the file
-  (Show in Finder, Show in Explorer or Open folder) now opens only a file
-  ComplyEaze Bridge exported since it started. Any other path is refused
-  before the file manager opens, so a compromised app window cannot use it to
-  point at other files on the computer. Exports work as before (#915, #1051).
-
 - `outstandings` no longer refuses because one bill's due date in the Bills
   Receivable report is printed with a four-digit year (a bill with a credit period
   of about 83 years, `1-Dec-2108`): that one date made the whole read fail with no
@@ -62,6 +56,11 @@ These changes are in source and not yet in a published build.
   refuses the read; the refusal now carries a typed `cause`, the report and the
   row number when it is a row that fails, and a next step, never the bill's party
   or reference. A due date that far out gives no overdue days in the ageing (#1091).
+- In the desktop app, the button on an export notice that shows the file
+  (Show in Finder, Show in Explorer or Open folder) now opens only a file
+  ComplyEaze Bridge exported since it started. Any other path is refused
+  before the file manager opens, so a compromised app window cannot use it to
+  point at other files on the computer. Exports work as before (#915, #1051).
 
 ## [0.4.1] - 2026-10-02
 

@@ -603,7 +603,9 @@ too (#692).
   - no line of its with an amount is uncompared, except the `Cost of Sales :`
     heading, spelled exactly so, while its amount is exactly the derived
     Purchase Accounts plus Direct Expenses (the cost of sales without stock).
-    That allowance was observed once, on one book.
+    That allowance was observed once, on one book. The heading is compared
+    even when it reads zero or empty, as any line is: over a non-zero cost of
+    sales it refuses, and over a zero one it ties (#1070).
   - An Opening or Closing Stock line refuses.
 
 ### Ledger-movement opening decision

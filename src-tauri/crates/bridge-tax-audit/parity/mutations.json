@@ -8102,5 +8102,77 @@
   "file": "src/entity_269st_gap.rs",
   "from": ".entry((day.clone(), binding.pan.as_str()))",
   "to": ".entry((rows.keys().next().unwrap().0.clone(), binding.pan.as_str()))"
+ },
+ {
+  "id": "EG-46",
+  "by": "author",
+  "what": "the three party identity lists are not bound",
+  "file": "src/binding.rs",
+  "from": "let bound = lbinder.bind_list(&list_at(raw, &path)?, &location)?;",
+  "to": "let bound = list_at(raw, &path)?;"
+ },
+ {
+  "id": "EG-47",
+  "by": "author",
+  "what": "a bound party identity list is not written back",
+  "file": "src/binding.rs",
+  "from": "            set_party_identity_key(&mut party_identity, key, toml::Value::from(bound));",
+  "to": "            let _ = bound;"
+ },
+ {
+  "id": "EG-48",
+  "by": "author",
+  "what": "the party identity override keys are not bound",
+  "file": "src/binding.rs",
+  "from": "let bound = bind_table_keys(&mut lbinder, Some(overrides), \"party_identity.overrides\")?;",
+  "to": "let bound: BTreeMap<String, toml::Value> = overrides.iter().map(|(k, v)| (k.clone(), v.clone())).collect();"
+ },
+ {
+  "id": "EG-49",
+  "by": "author",
+  "what": "the bound override keys are written under another key",
+  "file": "src/binding.rs",
+  "from": "            \"overrides\",\n",
+  "to": "            \"overrides_bound\",\n"
+ },
+ {
+  "id": "EG-50",
+  "by": "author",
+  "what": "the party groups are neither bound nor written back",
+  "file": "src/binding.rs",
+  "from": "if raw_at(raw, &[\"party_identity\", \"party_groups\"]).is_some() {",
+  "to": "if false {"
+ },
+ {
+  "id": "EG-51",
+  "by": "author",
+  "what": "bind drops the bound party identity table",
+  "file": "src/binding.rs",
+  "from": "        party_identity,\n        ..engagement.clone()",
+  "to": "        ..engagement.clone()"
+ },
+ {
+  "id": "EG-52",
+  "by": "author",
+  "what": "entity_269st_gap reads the party identity table as written, not as bound",
+  "file": "src/lib.rs",
+  "from": "PartyConfig::from_toml(bound.party_identity.as_ref())",
+  "to": "PartyConfig::from_toml(engagement.party_identity.as_ref())"
+ },
+ {
+  "id": "EG-53",
+  "by": "author",
+  "what": "a single-ledger entity's names_agree follows its name's words",
+  "file": "src/party_identity.rs",
+  "from": "let names_agree = members.len() == 1 || {",
+  "to": "let names_agree = {"
+ },
+ {
+  "id": "EG-54",
+  "by": "author",
+  "what": "a GSTIN-derived PAN comes before an override PAN when derivation is opted in",
+  "file": "src/party_identity.rs",
+  "from": "} else if !from_over(|o| &o.pan).is_empty() {",
+  "to": "} else if !from_over(|o| &o.pan).is_empty() && !config.derive_pan_from_gstin {"
  }
 ]

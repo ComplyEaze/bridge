@@ -25,14 +25,17 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **Remove the old extension first.** 0.4.2 installs beside 0.4.1 or earlier
   instead of replacing it, because its author line changed from "Bridge
   contributors" to "ComplyEaze contributors" and Claude Desktop builds an
-  extension's identity partly from its author name (seen on a Mac; we did not
-  try Windows). Before installing 0.4.2, in Claude Desktop open Settings,
-  Extensions and remove the older ComplyEaze Bridge. Keep ComplyEaze Bridge's
-  data folder: both versions use it, so do not delete it. After installing,
-  enter your settings again: the Tally port, the posting setting (posting starts
-  off) and the Terms setting, which every tool needs. If you already have two,
-  remove the older one: once 0.4.2 has tried a post, the older one can no longer
-  prepare, post or check vouchers (see the posting points below).
+  extension's identity partly from its author name (seen with 0.4.1 on a Mac;
+  earlier releases carry the same author line, so the same is expected; we did
+  not try Windows). Before installing 0.4.2, in Claude Desktop open Settings,
+  Extensions and remove the older ComplyEaze Bridge (release 0.2.0 shows as
+  "Bridge Tally"). Keep ComplyEaze Bridge's data folder: both versions use it,
+  so do not delete it. After installing, enter your settings again: the Tally
+  port, the posting setting (posting starts off), the Terms setting, which every
+  tool needs, and Response redaction, which starts at none (set it again if you
+  had shortened or masked names). If you already have two, remove the older one:
+  once 0.4.2 has tried a post, the older one can no longer prepare, post or
+  check vouchers (see the posting points below).
 - **The number is a patch number on a larger change.** 0.4.2 adds a tool, asks
   you about ledger names it used to read, and once you post with it you cannot
   go back to 0.4.1.
@@ -81,8 +84,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   install the new file from the same screen; (3) keep ComplyEaze Bridge's data
   folder, which holds its record of what it has sent to Tally (from 0.4.2 it is
   the only record of which vouchers it posted); (4) enter your settings again,
-  and check that the extension shows 0.4.2 and that "Allow voucher posting" is
-  as you want it; (5) quit Claude Desktop completely and reopen it.
+  including Response redaction (it starts at none), and check that the extension
+  shows 0.4.2 and that "Allow voucher posting" is as you want it; (5) quit
+  Claude Desktop completely and reopen it.
 - **What was tried** is under "Known limits" below. No one on our side installed
   the Windows package of this build in Claude Desktop on a Windows PC.
 

@@ -96,8 +96,9 @@ Desktop includes the author in an extension's identity; seen on a Mac, not tried
 on Windows): remove the older extension first, in Claude Desktop's Extensions
 settings, and do not delete the data folder, which both versions use. The new
 extension does not carry over your settings: enter the Tally port, the posting
-setting (posting starts off) and the Terms setting again; every tool refuses
-until the Terms setting is on. Dispatch coordination uses the operating system's
+setting (posting starts off), the Terms setting and Response redaction (it
+starts at none; set it again if you had shortened or masked names); every tool
+refuses until the Terms setting is on. Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request

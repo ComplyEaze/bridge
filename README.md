@@ -52,13 +52,13 @@ with no figures, to a log on this computer.
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC or Union Bank of India statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is expected to be refused) | Nothing |
-| `purchase_register` | Purchases as the books record them (not a GST return) | Nothing |
+| `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
-| `sales_register` | Sales as the books record them (not a GST return) | Nothing |
+| `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `stock_summary` | The closing stock value of each item as of a date | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
-| `validate_masters` | Checks ledger names against the live book before you post | Nothing |
+| `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |

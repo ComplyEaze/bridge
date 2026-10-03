@@ -653,6 +653,11 @@ async fn a_cancelled_purchase_is_never_a_row_and_is_listed_with_its_cancelled_fl
         listed,
         &answer["result"]["purchase_vouchers_without_duties_taxes_entry"]
     );
+    // The response says why the cancelled voucher is in that list (#1013).
+    assert!(result["coverage"].as_str().unwrap().contains(
+        "a cancelled voucher is listed there too, with cancelled true, because the cancelled \
+         vouchers measured came back from Tally with no ledger entries"
+    ));
 }
 
 // A taxed Sales item invoice through `sales_register`, replayed from a live call on the stock lab

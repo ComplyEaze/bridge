@@ -74,7 +74,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
         "type":"object", "additionalProperties":false,
         "required":["company_guid"],
         "properties":{
-            "company_guid":{"type":"string","minLength":1},
+            "company_guid":{"type":"string","minLength":1,"description":crate::agent::catalog::COMPANY_GUID_DESCRIPTION},
             "amends_batch_id":{
                 "type":"string",
                 "pattern":crate::agent::catalog::BRIDGE_BATCH_ID_PATTERN,

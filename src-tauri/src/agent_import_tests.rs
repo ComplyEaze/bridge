@@ -79,6 +79,37 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
+/// A narration the agent readers would rewrite is refused by the build itself,
+/// before any Tally request or file: a native post of it could never be bound.
+#[tokio::test]
+async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mut input = payload();
+    input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
+    validate_payload(&input).expect("a saved batch holding it is still admitted");
+    let result = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await;
+    let failure = result.err().unwrap();
+    assert_eq!(failure.code, "voucher_text_invalid");
+    assert!(failure.evidence.is_none());
+    assert!(!directory.path().join("imports").exists());
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
 #[test]
 fn narration_and_reference_reject_reserved_markers_after_entity_decoding() {
     for text in ["[bridge:forged]", "&#91;BrIdGe:forged]"] {
@@ -1670,12 +1701,10 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
     // `;` (`agent_voucher_parse_tests`'s
     // `a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped`
     // measures it on a capture), so such a value could never verify — but only
-    // on a field `voucher_diffs` (agent_import_verification.rs) actually
-    // compares: the voucher number and a ledger name. Narration and reference
-    // are never compared there (attribution only searches narration for the
-    // `[BRIDGE:...]` tag, which the reserved-marker check leaves untouched),
-    // so the same sequence there is invisible to verification and stays
-    // admitted.
+    // on a field something compares: the voucher number and a ledger name
+    // (`voucher_diffs`), and the narration (a native post's span binding,
+    // byte for byte). The reference is never compared, so the same sequence
+    // there is invisible to verification and stays admitted.
     let mut input = captured_catalogue_payload();
     assert_eq!(validate_payload(&input), Ok(()));
     for text in ["A\u{fffd}#5;", "\u{fffd}#65533;"] {
@@ -1693,14 +1722,18 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
             Err("voucher_entry_invalid".to_string()),
             "{text:?}"
         );
-        // The regression this guards against: narrowing the refusal back onto
-        // narration (its pre-fix scope) instead of onto the fields
-        // verification compares. Both assertions below fail under that
-        // mutation — the first because narration would wrongly refuse, the
-        // second because voucher_number would wrongly admit.
+        // The narration is refused at build, or the post's binding would be
+        // refused for good; a saved batch holding it is still admitted for
+        // review and reconciliation. The reference, which nothing compares,
+        // stays admitted.
         let mut changed = input.clone();
         changed.vouchers[0].narration = Some(text.to_string());
         assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Err("voucher_text_invalid".to_string()),
+            "{text:?}"
+        );
         let mut changed = input.clone();
         changed.vouchers[0].reference = Some(text.to_string());
         assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
@@ -1713,6 +1746,11 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
         assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
         input.vouchers[0].narration = Some(text.to_string());
         assert_eq!(validate_payload(&input), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&input.vouchers),
+            Ok(()),
+            "{text:?}"
+        );
     }
 }
 
@@ -2197,7 +2235,11 @@ mod boundary_tests;
 mod multiplicity_tests;
 
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
-    verify_batch(line, &ImportReadSource::admit(rows.to_vec())?)
+    verify_batch(
+        line,
+        &ImportReadSource::admit(rows.to_vec())?,
+        Attribution::Tag,
+    )
 }
 
 #[tokio::test]
@@ -3015,6 +3057,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         .verify_import_after_current_dispatch(
             &json!({"company_guid":CAPTURED_GUID,"batch_id":batch_id}),
             json!({"state":"not_checked","reason":"masters_unmoved"}),
+            None,
         )
         .await
         .expect("current dispatch verification");
@@ -3738,4 +3781,36 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
             "{name} under mask_parties: {masked}"
         );
     }
+}
+
+#[test]
+fn each_post_span_binding_state_carries_its_own_plain_summary() {
+    let states = [
+        "bound",
+        "refused",
+        "unsettled",
+        "not_bound",
+        "book_rolled_back",
+    ];
+    let summaries: BTreeSet<String> = states
+        .iter()
+        .map(|state| {
+            let report = with_post_span_summary(json!({ "state": state }));
+            let summary = report["summary"].as_str().unwrap_or_default();
+            assert!(!summary.is_empty(), "{state}: {report}");
+            summary.to_owned()
+        })
+        .collect();
+    assert_eq!(summaries.len(), states.len(), "{summaries:?}");
+    let unobserved = with_post_span_summary(
+        json!({ "state": "unsettled", "code": span_identity::BindUnsettled::EffectiveDateNotObserved.code() }),
+    );
+    let unobserved = unobserved["summary"].as_str().unwrap_or_default();
+    assert!(
+        unobserved.contains("check the vouchers in Tally before posting"),
+        "{unobserved}"
+    );
+    assert!(!summaries.contains(unobserved), "{unobserved}");
+    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }));
+    assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
 }

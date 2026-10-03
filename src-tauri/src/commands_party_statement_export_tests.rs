@@ -169,6 +169,7 @@ fn bulk_statement_export_refuses_an_unknown_source_without_writing() {
         ),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("an unknown source must be refused");
     assert!(matches!(
@@ -194,6 +195,7 @@ fn bulk_statement_export_rejects_an_unselected_destination_without_writing() {
         bulk_export_request(destination.path(), "not-issued", &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("an unselected destination must be rejected");
 
@@ -225,15 +227,22 @@ fn bulk_statement_export_writes_to_the_destination_approved_by_the_picker() {
         .issue(destination.path().to_path_buf())
         .expect("record picker destination");
 
+    let exported = crate::exported_files::ExportedFiles::default();
     let result = export_bulk_party_statements_at_selected_destination(
         bulk_export_request(destination.path(), &approval_id, &source_id),
         &approvals,
         &sources,
+        &exported,
     )
     .expect("recorded destination is accepted");
 
     assert_eq!(result.written.len(), 1);
     assert!(std::path::Path::new(&result.manifest_path).is_file());
+    // The manifest the webview offers to reveal is one the reveal accepts (#915).
+    assert_eq!(
+        exported.admit(&result.manifest_path).unwrap().path(),
+        std::path::Path::new(&result.manifest_path)
+    );
     assert!(destination
         .path()
         .join(&result.written[0].file_name)
@@ -259,12 +268,14 @@ fn independent_picker_approvals_export_to_their_own_destinations() {
         bulk_export_request(first_destination.path(), &first_approval, &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect("first approved destination writes");
     let second = export_bulk_party_statements_at_selected_destination(
         bulk_export_request(second_destination.path(), &second_approval, &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect("second approved destination writes");
 
@@ -290,6 +301,7 @@ fn cancelled_picker_leaves_no_approval_that_can_export() {
         bulk_export_request(destination.path(), "no-picker-selection", &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("a cancelled picker has no approval to consume");
 
@@ -321,6 +333,7 @@ fn approval_destination_mismatch_is_rejected_without_writing() {
         bulk_export_request(requested_destination.path(), &approval_id, &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("an approval cannot be substituted for another destination");
 
@@ -333,6 +346,7 @@ fn approval_destination_mismatch_is_rejected_without_writing() {
         bulk_export_request(approved_destination.path(), &approval_id, &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("a mismatched approval must be consumed");
     assert!(matches!(
@@ -371,6 +385,7 @@ fn bulk_statement_export_keeps_the_existing_deleted_destination_failure() {
         bulk_export_request(&destination_path, &approval_id, &source_id),
         &approvals,
         &sources,
+        &crate::exported_files::ExportedFiles::default(),
     )
     .expect_err("a deleted selected destination must fail the existing directory check");
 
@@ -405,4 +420,62 @@ fn local_export_file_names_reject_path_like_and_hidden_values() {
 fn statement_party_slug_is_portable_and_nonempty() {
     assert_eq!(statement_filename_slug("  ../Aarav & Sons  "), "aarav-sons");
     assert_eq!(statement_filename_slug("///"), "party");
+}
+
+/// bridge#915: the reveal command accepts only a file an export of this process
+/// recorded. A path it did not export is refused before anything is launched,
+/// even when the file exists; an export it just wrote is revealed; an export
+/// that has since gone is reported missing.
+#[test]
+fn the_reveal_command_accepts_only_a_file_this_process_exported() {
+    let directory = tempfile::tempdir().expect("synthetic folder");
+    let exported = crate::exported_files::ExportedFiles::default();
+
+    let elsewhere = directory.path().join("not-an-export.txt");
+    std::fs::write(&elsewhere, b"synthetic").unwrap();
+    assert_eq!(
+        reveal_target(&exported, &elsewhere.to_string_lossy()),
+        Err(RevealRefusal::NotExported)
+    );
+
+    let written = directory
+        .path()
+        .join("statement-synthetic-party-20260331.pdf");
+    std::fs::write(&written, b"synthetic").unwrap();
+    let returned = exported.record(written.clone());
+    assert_eq!(
+        reveal_target(&exported, &returned).unwrap().path(),
+        written.as_path()
+    );
+
+    std::fs::remove_file(&written).unwrap();
+    assert_eq!(
+        reveal_target(&exported, &returned),
+        Err(RevealRefusal::Missing)
+    );
+}
+
+/// bridge#915: what the two Downloads writers return is a path the reveal
+/// command accepts, so a report or a statement just exported can be revealed.
+#[test]
+fn a_report_or_statement_just_exported_can_be_revealed() {
+    let downloads = tempfile::tempdir().expect("synthetic Downloads folder");
+    let exported = crate::exported_files::ExportedFiles::default();
+
+    let report = save_download_into(downloads.path(), &exported, "report.csv", b"a,b\n")
+        .expect("write a synthetic report");
+    let statement = save_statement_into(
+        downloads.path(),
+        &exported,
+        "statement-synthetic-party-20260331",
+        "pdf",
+        b"synthetic",
+    )
+    .expect("write a synthetic statement");
+
+    for returned in [&report, &statement] {
+        let file = reveal_target(&exported, returned).expect("an export just written reveals");
+        assert_eq!(file.path(), std::path::Path::new(returned));
+        assert!(file.path().starts_with(downloads.path()));
+    }
 }

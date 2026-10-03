@@ -14,9 +14,9 @@
 //!
 //! Tally does not echo a client REMOTEID on readback (TALLY_PROTOCOL_REFERENCE
 //! §9.3), so the voucher is located by its narration marker, which carries the
-//! same batch-derived UUID. A natively posted batch carried that marker beside a
-//! random private REMOTEID, so an amendment of it would create a duplicate; any
-//! dispatch in the lineage refuses the amendment.
+//! same batch-derived UUID. A natively posted batch carries a random private
+//! REMOTEID and, since #864, no marker at all, so an amendment of it would create
+//! a duplicate; any dispatch in the lineage refuses the amendment.
 //!
 //! The comparison covers the date, a bank voucher's effective date when read,
 //! the voucher type, the voucher number when the batch set one, each entry's

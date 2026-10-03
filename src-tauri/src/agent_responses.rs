@@ -137,6 +137,9 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
             {
                 rows.truncate(width);
                 figures["next_offset"] = json!(offset + width as u64);
+                if let Some(shown) = figures.get_mut("open_bills_shown") {
+                    *shown = json!(width);
+                }
             }
             if let Some(rows) = figures["unallocated"]["parties"]
                 .as_array_mut()
@@ -156,6 +159,13 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
         }
     }
     response["truncated"] = json!(true);
+    // A headline that lists rows says only the rows that are left. Only a page
+    // of rows (`Rows`) trims what such a headline describes: the other shapes
+    // trim other lists (a partial trial balance's excluded ledgers), and its
+    // ledgers are then as many as before.
+    if matches!(shape, PageShape::Rows(_)) {
+        headline::restate_rows(response, width);
+    }
     Ok(())
 }
 

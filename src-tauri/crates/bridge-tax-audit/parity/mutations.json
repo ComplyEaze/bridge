@@ -6744,6 +6744,286 @@
   "to": "            self.figures.push(Figure {\n                id: id.clone(),\n                value,\n                unit,\n                definition: definition.to_string(),\n                evidence,\n            });\n            return Err(AuditError::DuplicateFigureId(id));\n        }\n        self.figures.push(Figure {\n            id: id.clone(),\n            value,\n            unit,\n            definition: definition.to_string(),\n            evidence,\n        });"
  },
  {
+  "id": "S1-01",
+  "by": "author",
+  "what": "a [snapshot] table is accepted for a held book",
+  "file": "src/lib.rs",
+  "from": "        if in_memory && cfg.contains_key(\"snapshot\") {",
+  "to": "        if false && cfg.contains_key(\"snapshot\") {"
+ },
+ {
+  "id": "S1-02",
+  "by": "author",
+  "what": "a legacy_json source is accepted for a held book",
+  "file": "src/lib.rs",
+  "from": "        if in_memory\n            && roles\n                .get(\"trade_creditors_source\")",
+  "to": "        if false\n            && roles\n                .get(\"trade_creditors_source\")"
+ },
+ {
+  "id": "S1-03",
+  "by": "author",
+  "what": "a held-book engagement can be loaded as a directory",
+  "file": "src/lib.rs",
+  "from": "    if engagement.in_memory {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\",",
+  "to": "    if false {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\","
+ },
+ {
+  "id": "S1-04",
+  "by": "author",
+  "what": "a directory engagement is marked as held",
+  "file": "src/lib.rs",
+  "from": "            in_memory,\n",
+  "to": "            in_memory: true,\n"
+ },
+ {
+  "id": "S1-05",
+  "by": "author",
+  "what": "a held-book engagement keeps a directory path",
+  "file": "src/lib.rs",
+  "from": "            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),",
+  "to": "            read_dir: PathBuf::from(\"x\"),"
+ },
+ {
+  "id": "S1-06",
+  "by": "author",
+  "what": "a directory engagement skips the format check",
+  "file": "src/lib.rs",
+  "from": "        if !in_memory\n            && snapshot.get(\"format\")",
+  "to": "        if in_memory\n            && snapshot.get(\"format\")"
+ },
+ {
+  "id": "S1-07",
+  "by": "author",
+  "what": "a held book still looks for a [snapshot] table",
+  "file": "src/lib.rs",
+  "from": "        let snapshot = if in_memory {\n            &empty\n        } else {",
+  "to": "        let snapshot = if false {\n            &empty\n        } else {"
+ },
+ {
+  "id": "S1-08",
+  "by": "author",
+  "what": "a held book reads a legacy creditor file when the source is set after parsing",
+  "file": "src/lib.rs",
+  "from": "        if self.in_memory && legacy {",
+  "to": "        if false && legacy {"
+ },
+ {
+  "id": "S1-09",
+  "by": "author",
+  "what": "a legacy source is taken for any other kind, and the reverse",
+  "file": "src/lib.rs",
+  "from": "            == Some(\"legacy_json\");\n        if self.in_memory && legacy {",
+  "to": "            != Some(\"legacy_json\");\n        if self.in_memory && legacy {"
+ },
+ {
+  "id": "CQ-01",
+  "by": "author",
+  "what": "Contra voucher no longer skipped",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "        if v.base_type == \"Contra\" {\n            continue;\n        }",
+  "to": "        if false {\n            continue;\n        }"
+ },
+ {
+  "id": "CQ-02",
+  "by": "author",
+  "what": "a bank line of nil counts as money leaving the bank",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .any(|l| bank.contains(&l.ledger) && l.amount_paise < 0)\n        {\n            continue; // money did not leave a bank ledger on this voucher",
+  "to": "            .any(|l| bank.contains(&l.ledger) && l.amount_paise <= 0)\n        {\n            continue; // money did not leave a bank ledger on this voucher"
+ },
+ {
+  "id": "CQ-03",
+  "by": "author",
+  "what": "a bank line of any sign counts as money leaving the bank",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .any(|l| bank.contains(&l.ledger) && l.amount_paise < 0)\n        {\n            continue; // money did not leave a bank ledger on this voucher",
+  "to": "            .any(|l| bank.contains(&l.ledger))\n        {\n            continue; // money did not leave a bank ledger on this voucher"
+ },
+ {
+  "id": "CQ-04",
+  "by": "author",
+  "what": "a cash line of nil counts as a cash leg",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .any(|l| cash.contains(&l.ledger) && l.amount_paise < 0)\n        {\n            continue; // a cash leg",
+  "to": "            .any(|l| cash.contains(&l.ledger) && l.amount_paise <= 0)\n        {\n            continue; // a cash leg"
+ },
+ {
+  "id": "CQ-05",
+  "by": "author",
+  "what": "a cash debit counts as a cash leg, a cash credit does not",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .any(|l| cash.contains(&l.ledger) && l.amount_paise < 0)\n        {\n            continue; // a cash leg",
+  "to": "            .any(|l| cash.contains(&l.ledger) && l.amount_paise > 0)\n        {\n            continue; // a cash leg"
+ },
+ {
+  "id": "CQ-06",
+  "by": "author",
+  "what": "an empty term is no longer ignored",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "!t.is_empty() && text.contains(",
+  "to": "text.contains("
+ },
+ {
+  "id": "CQ-07",
+  "by": "author",
+  "what": "the narration is not upper-cased",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "let text = py_upper(narration);",
+  "to": "let text = narration.to_string();"
+ },
+ {
+  "id": "CQ-08",
+  "by": "author",
+  "what": "the term is not upper-cased",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "text.contains(py_upper(t).as_str())",
+  "to": "text.contains(t.as_str())"
+ },
+ {
+  "id": "CQ-09",
+  "by": "author",
+  "what": "another bank ledger on the debit side is a payee",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            if bank.contains(&l.ledger) || cash.contains(&l.ledger) || l.amount_paise <= 0 {",
+  "to": "            if cash.contains(&l.ledger) || l.amount_paise <= 0 {"
+ },
+ {
+  "id": "CQ-10",
+  "by": "author",
+  "what": "a cash ledger on the debit side is a payee",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            if bank.contains(&l.ledger) || cash.contains(&l.ledger) || l.amount_paise <= 0 {",
+  "to": "            if bank.contains(&l.ledger) || l.amount_paise <= 0 {"
+ },
+ {
+  "id": "CQ-11",
+  "by": "author",
+  "what": "a nil line is a payee",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            if bank.contains(&l.ledger) || cash.contains(&l.ledger) || l.amount_paise <= 0 {",
+  "to": "            if bank.contains(&l.ledger) || cash.contains(&l.ledger) || l.amount_paise < 0 {"
+ },
+ {
+  "id": "CQ-12",
+  "by": "author",
+  "what": "an excluded role's payee stays in scope",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            if let Some(total) = excluded.get_mut(kind) {",
+  "to": "            if let Some(total) = excluded.get_mut(\"none\") {"
+ },
+ {
+  "id": "CQ-13",
+  "by": "author",
+  "what": "an excluded payee adds one paisa, not its amount",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": ".checked_add(l.amount_paise)\n                    .ok_or_else(|| support::overflow(TEST_ID))?;\n                continue;",
+  "to": ".checked_add(1)\n                    .ok_or_else(|| support::overflow(TEST_ID))?;\n                continue;"
+ },
+ {
+  "id": "CQ-14",
+  "by": "author",
+  "what": "over means at or over the limit",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "filter(|x| x.paise > limit)",
+  "to": "filter(|x| x.paise >= limit)"
+ },
+ {
+  "id": "CQ-15",
+  "by": "author",
+  "what": "under means strictly under the limit",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "filter(|x| x.paise <= limit)",
+  "to": "filter(|x| x.paise < limit)"
+ },
+ {
+  "id": "CQ-16",
+  "by": "author",
+  "what": "a finding id ignores the voucher",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{}|{tag}\", v.guid)));",
+  "to": "let rid = format!(\"{day}_{}\", hash8(&format!(\"{tag}\")));"
+ },
+ {
+  "id": "CQ-17",
+  "by": "author",
+  "what": "matched terms joined without a space",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "row.terms.join(\", \")",
+  "to": "row.terms.join(\",\")"
+ },
+ {
+  "id": "CQ-18",
+  "by": "author",
+  "what": "the finding says a document is not needed",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "confidence: Confidence::NeedsDocument,",
+  "to": "confidence: Confidence::Computed,"
+ },
+ {
+  "id": "CQ-19",
+  "by": "author",
+  "what": "the finding names clause 21(c)",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "\"3CD-21(d)\".to_string()",
+  "to": "\"3CD-21(c)\".to_string()"
+ },
+ {
+  "id": "CQ-20",
+  "by": "author",
+  "what": "the excluded figure is named by its group, not its role",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "&format!(\"excluded_total_{kind}\"),",
+  "to": "&format!(\"excluded_total_{}\", group_for_kind(kind)?),"
+ },
+ {
+  "id": "CQ-21",
+  "by": "author",
+  "what": "an absent key is refused, not read as no terms",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "    let Some(raw) = raw else {\n        return Ok(BTreeSet::new());\n    };",
+  "to": "    let Some(raw) = raw else {\n        return Err(AuditError::Config(format!(\"{TEST_ID}: absent\")));\n    };"
+ },
+ {
+  "id": "CQ-22",
+  "by": "author",
+  "what": "CCQ-1 accepts a total that is not the sum",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if i128::from(total) != rows {",
+  "to": "if i128::from(total) == rows {"
+ },
+ {
+  "id": "CQ-23",
+  "by": "author",
+  "what": "CCQ-2 accepts a count that is not the findings",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if usize::try_from(count).ok() != Some(result.findings.len()) {",
+  "to": "if usize::try_from(count).ok() == Some(result.findings.len()) {"
+ },
+ {
+  "id": "CQ-24",
+  "by": "author",
+  "what": "CCQ-3 needs two shared vouchers",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "if both > 0 {",
+  "to": "if both > 1 {"
+ },
+ {
+  "id": "CQ-25",
+  "by": "author",
+  "what": "CCQ-3 reads every cash finding, not the s.40A(3) family",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .filter(|f| f.id.starts_with(\"cash_payments_40a3/s40a3/\"))\n",
+  "to": "            .filter(|f| f.id.starts_with(\"cash_payments_40a3/\"))\n"
+ },
+ {
+  "id": "CQ-26",
+  "by": "author",
+  "what": "CCQ-3 counts a ledger ref as a voucher",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": "            .filter(|e| e.kind == \"voucher\")\n            .map(|e| e.id.as_str())\n            .collect();\n        let mine",
+  "to": "            .map(|e| e.id.as_str())\n            .collect();\n        let mine"
+ },
+ {
   "id": "HV-01",
   "by": "author",
   "what": "a printed name is not stripped of its surrounding whitespace",

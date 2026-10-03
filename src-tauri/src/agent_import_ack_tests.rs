@@ -23,7 +23,7 @@ fn seeded(
         let _lock = server.lock_import_admission().unwrap();
         server
             .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
-                &line, &native,
+                &line, &native, None,
             ))
             .unwrap();
         server
@@ -673,7 +673,7 @@ fn dispatched_batch(server: &Server) -> ImportLedgerLine {
         let _lock = server.lock_import_admission().unwrap();
         server
             .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
-                &line, &native,
+                &line, &native, None,
             ))
             .unwrap();
     }

@@ -1895,6 +1895,29 @@ where
     })
 }
 
+impl Server {
+    /// One paired, identity-bracketed read of the company's two marks, for a
+    /// later page of a held `vouchers` window (#485): the same read, and the same
+    /// [`CompanyMarks`], the window read opened and closed on.
+    pub(super) async fn read_company_marks_once(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+    ) -> Result<(CompanyMarks, Evidence), ToolFailure> {
+        let mut evidence = None;
+        let mut boundary = None;
+        let marks = read_marks(
+            &AgentReader(self),
+            identity,
+            company,
+            &mut evidence,
+            &mut boundary,
+        )
+        .await?;
+        Ok((marks, evidence.expect("a marks read leaves its evidence")))
+    }
+}
+
 async fn read_marks<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,

@@ -1,0 +1,17 @@
+{
+  "source": "Live licensed TallyPrime 7.1 Silver answer to one raw gateway import of three Payment vouchers into the synthetic lab company BRIDGE AMEND LAB, of which the second debits a ledger the book does not hold (Probe Absent Ledger 01). The request was the Import Data envelope Bridge renders for a voucher batch, sent as UTF-16LE with a BOM",
+  "observed_date": "2026-10-02",
+  "source_response_bytes": 710,
+  "source_response_sha256": "30438f1480e4601a5c236d52be7fa85a89da9cb0d1f42a6b1ad88bf02f3fba50",
+  "source_request_bytes": 2382,
+  "source_request_sha256": "fc211926ee7a6ef3c74e0661b7889926ce8eaa2a5dc6652c845509b303446847",
+  "fixture_bytes": 710,
+  "fixture_sha256": "30438f1480e4601a5c236d52be7fa85a89da9cb0d1f42a6b1ad88bf02f3fba50",
+  "encoding": "UTF-16LE without BOM",
+  "rows": 0,
+  "transformation": [
+    "none: the fixture is the response byte for byte"
+  ],
+  "provenance_limit": "One live import, sent once, from a licensed TallyPrime 7.1 Silver holding only synthetic lab companies, 2 Oct 2026 14:53 UTC. Establishes that a batch in which one voucher names a missing ledger is answered CREATED 2, ERRORS 0, EXCEPTIONS 1, every other counter 0, LASTVCHID equal to the last created voucher's MasterID, LASTMID 0, and one LINEERROR naming the ledger. Read back the same minute (observed once and recorded in the lab notes; the read-back response itself is not committed here): the two other vouchers were created in request order, the company's voucher mark stepped by 2, and the rejected voucher took no MasterID and no AlterID. It does not establish the answer for any other cause of rejection, for more than one rejected voucher, or on any other Tally version or edition.",
+  "sensitivity_review": "Synthetic lab company and synthetic ledger names only; no GSTIN, PAN, email, phone, address, URL, credentials or machine paths."
+}

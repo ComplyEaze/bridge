@@ -1,0 +1,571 @@
+{
+ "comment": "counter_cheques_40a3 with no term configured: the test looks at nothing, so every figure but the excluded-role totals is zero and the configured_terms_count figure says so.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Capital Account": null,
+  "Loans (Liability)": "Current Liabilities",
+  "Fixed Assets": null,
+  "Duties & Taxes": "Current Liabilities"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "cc-cash"
+  },
+  {
+   "name": "Bank1",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "cc-bank1"
+  },
+  {
+   "name": "Bank2",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "cc-bank2"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "cc-wages"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "cc-rent"
+  },
+  {
+   "name": "Straße Transport",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "cc-strasse"
+  },
+  {
+   "name": "Partner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "cc-capital"
+  },
+  {
+   "name": "Bank Loan",
+   "chain": [
+    "Loans (Liability)",
+    "Current Liabilities"
+   ],
+   "guid": "cc-loan"
+  },
+  {
+   "name": "Plant",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "cc-plant"
+  },
+  {
+   "name": "GST Input",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "cc-gst"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 17500000,
+   "credit": 0,
+   "closing": 17500000
+  },
+  {
+   "ledger": "Bank1",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 23200001,
+   "closing": -21700001
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 3900001,
+   "credit": 1800000,
+   "closing": 2100001
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 500000,
+   "closing": 0
+  },
+  {
+   "ledger": "Partner Capital",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Bank Loan",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Plant",
+   "opening": 0,
+   "debit": 700000,
+   "credit": 0,
+   "closing": 700000
+  },
+  {
+   "ledger": "GST Input",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Straße Transport",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Bank2",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 2100000,
+   "closing": -100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "v01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     -1500000
+    ]
+   ],
+   "narration": "Cheque encashed OVER THE COUNTER"
+  },
+  {
+   "guid": "v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     600000
+    ],
+    [
+     "Bank1",
+     -600000
+    ]
+   ],
+   "narration": "bearer chq to same payee"
+  },
+  {
+   "guid": "v03",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     1000000
+    ],
+    [
+     "Bank1",
+     -1000000
+    ]
+   ],
+   "narration": "SELF counter"
+  },
+  {
+   "guid": "v04",
+   "date": "2025-06-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent",
+     1000001
+    ],
+    [
+     "Bank1",
+     -1000001
+    ]
+   ],
+   "narration": "Bearer"
+  },
+  {
+   "guid": "v05",
+   "date": "2025-06-03",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     -1500000
+    ]
+   ],
+   "narration": "counter transfer"
+  },
+  {
+   "guid": "v06",
+   "date": "2025-06-03",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1200000
+    ],
+    [
+     "Cash",
+     -500000
+    ],
+    [
+     "Bank1",
+     -700000
+    ]
+   ],
+   "narration": "counter, part cash"
+  },
+  {
+   "guid": "v07",
+   "date": "2025-06-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Bank1",
+     1500000
+    ],
+    [
+     "Wages",
+     300000
+    ],
+    [
+     "Rent",
+     -1800000
+    ]
+   ],
+   "narration": "counter receipt"
+  },
+  {
+   "guid": "v08",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Partner Capital",
+     1000000
+    ],
+    [
+     "Bank Loan",
+     500000
+    ],
+    [
+     "Plant",
+     700000
+    ],
+    [
+     "GST Input",
+     300000
+    ],
+    [
+     "Wages",
+     500000
+    ],
+    [
+     "Bank1",
+     -3000000
+    ]
+   ],
+   "narration": "BEARER mixed"
+  },
+  {
+   "guid": "v09",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     2500000
+    ],
+    [
+     "Bank1",
+     -2500000
+    ]
+   ],
+   "narration": "NEFT"
+  },
+  {
+   "guid": "v10",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Straße Transport",
+     1200000
+    ],
+    [
+     "Bank2",
+     -1200000
+    ]
+   ],
+   "narration": "Zahlung an der STRASSE gegen Barscheck"
+  },
+  {
+   "guid": "v11",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1300000
+    ],
+    [
+     "Bank1",
+     -1300000
+    ]
+   ],
+   "narration": "counter",
+   "status": "optional"
+  },
+  {
+   "guid": "v12",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1400000
+    ],
+    [
+     "Bank1",
+     -1400000
+    ]
+   ],
+   "narration": "counter",
+   "status": "cancelled"
+  },
+  {
+   "guid": "v13",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     400000
+    ],
+    [
+     "Wages",
+     700000
+    ],
+    [
+     "Bank1",
+     -1100000
+    ]
+   ],
+   "narration": "bearer, two lines one ledger"
+  },
+  {
+   "guid": "v14",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     -1500000
+    ]
+   ],
+   "narration": ""
+  },
+  {
+   "guid": "v15",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     900000
+    ],
+    [
+     "Bank2",
+     -900000
+    ]
+   ],
+   "narration": "FINAL counter"
+  },
+  {
+   "guid": "v16",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1200000
+    ],
+    [
+     "Rent",
+     1100000
+    ],
+    [
+     "Bank1",
+     -2300000
+    ]
+   ],
+   "narration": "counter two ledgers over"
+  },
+  {
+   "guid": "v17",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     0
+    ],
+    [
+     "Rent",
+     800000
+    ],
+    [
+     "Bank1",
+     -800000
+    ]
+   ],
+   "narration": "counter zero line"
+  },
+  {
+   "guid": "v18",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     2000000
+    ],
+    [
+     "Bank1",
+     -2000000
+    ]
+   ],
+   "narration": "ﬁnal over"
+  },
+  {
+   "guid": "v19",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1500000
+    ],
+    [
+     "Bank1",
+     0
+    ]
+   ],
+   "narration": "counter, bank line nil"
+  },
+  {
+   "guid": "v20",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Wages",
+     1200000
+    ],
+    [
+     "Cash",
+     0
+    ],
+    [
+     "Bank1",
+     -1200000
+    ]
+   ],
+   "narration": "counter, cash line nil"
+  },
+  {
+   "guid": "v21",
+   "date": "2025-06-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Bank1",
+     -500000
+    ]
+   ],
+   "narration": "counter, cash debited"
+  },
+  {
+   "guid": "v22",
+   "date": "2025-06-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Bank2",
+     2000000
+    ],
+    [
+     "Bank1",
+     -2000000
+    ]
+   ],
+   "narration": "counter, other bank debited"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank1",
+  "Bank2"
+ ],
+ "counter_cheque_terms": [],
+ "tests": [
+  "counter_cheques_40a3"
+ ]
+}

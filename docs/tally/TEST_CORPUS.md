@@ -501,6 +501,9 @@ runs above, so `catalogue_evidence_sha256` for `BRIDGE CORPUS OPENING` no longer
 `0767077c…`. Anyone re-running this slice should expect a different digest and check the ledger
 list before treating it as the book changing underneath them.
 
+**2026-10-02:** `MB CAFÉ PROBE` is stored as mojibake (`Ã` + U+0089 where É was meant), so it is not
+an NFC master; see the dated note under the reference's §9.4d fixtures.
+
 **What it found within minutes.** The `DELTA`/`EPSILON` pair exposed a defect no fabricated
 fixture had produced: a *byte-exact* request for `MB PARTY DELTA (5550001009)` was being
 refused as `IdentifierConflict`, because the number in its name is shared. That made the

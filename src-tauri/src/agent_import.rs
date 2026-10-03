@@ -650,6 +650,8 @@ impl Server {
         let args = &resolved.args;
         let mut payload = parse_payload(args)?;
         validate_payload(&payload)?;
+        // After the whole of `validate_payload`: in a batch with several
+        // defects, the first one it finds is reported, not this one (#1055).
         refuse_rewritten_narration(&payload.vouchers)?;
         let (debit, credit) = totals(&payload.vouchers)?;
         refuse_unqualified_types(&payload.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;

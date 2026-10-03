@@ -1470,6 +1470,10 @@ const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could no
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
 const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. If Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again: ask the user to enter the voucher in Tally. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it.";
 
+/// What a caller is told when `post_import` refuses a saved batch's own text
+/// before any attempt (#1055).
+const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a narration, reference or voucher number that cannot be posted, and a saved batch cannot be changed. Correct the text, build the batch again, then post the new one.";
+
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
     payload["result"]["error"]["blocking_batch_id"] = json!(id);
@@ -1495,6 +1499,13 @@ fn reconciliation_failure_payload(
     if code == "import_txn_already_posted" {
         payload["result"]["error"]["message"] = json!("Nothing was sent: another batch of this company already sent, or was found to have posted, a row of this batch.");
         payload["result"]["error"]["next_step"] = json!(TXN_ALREADY_POSTED_NEXT_STEP);
+    }
+    // The saved text itself is refused, and a saved batch cannot be changed,
+    // so asking for approval again always fails the same way: it has to be
+    // built again (#1055). Only with no attempt recorded: a batch that may
+    // have been sent is reconciled, never rebuilt.
+    if code == "voucher_text_invalid" && attempted == Some(false) {
+        payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
     if code == "tally_endpoint_busy" {
         payload["result"]["error"]["retry_after_s"] =

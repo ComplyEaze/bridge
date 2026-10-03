@@ -8254,5 +8254,45 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "let opposite: BTreeSet<&String> = per_side",
   "to": "let opposite: Vec<&String> = per_side"
+ },
+ {
+  "id": "EG-58",
+  "by": "author",
+  "what": "a ledger under Duties & Taxes is a party when a party group or the party list names it",
+  "file": "src/party_identity.rs",
+  "from": "|| ledger.under(DUTIES_TAXES_GROUP)",
+  "to": "|| (ledger.under(DUTIES_TAXES_GROUP) && !config.party_groups.iter().any(|g| ledger.under(g)) && !config.additional_party_ledgers.contains(&ledger.name))"
+ },
+ {
+  "id": "EG-59",
+  "by": "author",
+  "what": "'limited' is not a stopword",
+  "file": "src/party_identity.rs",
+  "from": "\"pvt\", \"private\", \"ltd\", \"limited\", \"and\",",
+  "to": "\"pvt\", \"private\", \"ltd\", \"limitedx\", \"and\","
+ },
+ {
+  "id": "EG-60",
+  "by": "author",
+  "what": "a segment longer than ten characters after upper-casing can be a PAN",
+  "file": "src/party_identity.rs",
+  "from": "let pan_shaped = s.len() == 10",
+  "to": "let pan_shaped = s.len() >= 10"
+ },
+ {
+  "id": "EG-61",
+  "by": "author",
+  "what": "entity_269st_gap reads no bank ledgers",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &cash, &BTreeSet::new(), &index, &round_off_ledgers)"
+ },
+ {
+  "id": "EG-62",
+  "by": "author",
+  "what": "entity_269st_gap reads the round-off ledgers as written, not as bound",
+  "file": "src/lib.rs",
+  "from": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)",
+  "to": "entity_269st_gap::run(book, rules, &cash, &bank, &index, &engagement.round_off_ledgers.iter().cloned().collect())"
  }
 ]

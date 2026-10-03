@@ -2884,13 +2884,14 @@ deductor_aliases = 5\n"
             serde_json::json!(["entity_269st_gap.check_invariants"])
         );
     }
-    /// The production path's other two sources: the cash groups as bound (a label bound by
-    /// identity to the book's cash group) and the roles' round-off ledgers (a receipt's round-off
-    /// line belongs to its party, so the day reaches the s.269ST(a) limit exactly).
+    /// The production path's other two sources, each as bound (a label bound by identity to the
+    /// book's cash group, and one to its round-off ledger): a receipt's round-off line belongs to
+    /// its party, so the day reaches the s.269ST(a) limit exactly.
     #[test]
     fn entity_269st_gap_reads_the_bound_cash_groups_and_round_off_ledgers() {
         let toml = base_toml(&format!(
-            "round_off_ledgers = [\"Round Off\"]\n\
+            "round_off_ledgers = [\"Round Old\"]\n\
+             [ledger_ids]\n\"Round Old\" = {G_ROUNDOFF:?}\n\
              [group_ids]\n\"Cash Old\" = {G_CASH:?}\n\
              [party_identity.overrides]\n\
              \"Cust A\" = {{ pan = \"PAN-SAME-2\" }}\n\
@@ -2946,5 +2947,64 @@ deductor_aliases = 5\n"
             figure("gap_amount_total"),
             Some(serde_json::json!(20_000_000))
         );
+    }
+    /// The production path's bank set, as bound: a bank line on a cash receipt is not a party, so
+    /// the receipt's whole credit is its one party's and the day reaches the s.269ST(a) limit.
+    #[test]
+    fn entity_269st_gap_reads_the_bound_bank_groups() {
+        const G_BANK: &str = "11111111-1111-1111-1111-000000000009";
+        let toml = base_toml(&format!(
+            "[group_ids]\n\"Bank Old\" = {G_BANK:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust A\" = {{ pan = \"PAN-SAME-3\" }}\n\
+             \"Cust B\" = {{ pan = \"PAN-SAME-3\" }}\n"
+        ))
+        .replace("bank_groups = []", "bank_groups = [\"Bank Old\"]");
+        let e = Engagement::from_toml(&toml, Path::new(".")).unwrap();
+        let mut b = party_book();
+        b.ledgers.insert(
+            "Bank One".to_string(),
+            ledger("Bank One", "Bank Accounts", "", None),
+        );
+        b.group_masters
+            .insert("Bank Accounts".to_string(), group_master(G_BANK, None));
+        b.vouchers.clear();
+        let day = TallyDate::parse("20250612").unwrap();
+        // Cust A pays 1,00,000 in cash, 90,000 of it booked to its ledger and 10,000 to a bank
+        // ledger on the same voucher; Cust B pays 1,00,000.
+        for (guid, credits) in [
+            ("r1", vec![("Cust A", 9_000_000), ("Bank One", 1_000_000)]),
+            ("r2", vec![("Cust B", 10_000_000)]),
+        ] {
+            let mut lines = vec![LedgerLine {
+                ledger: "Cash".to_string(),
+                amount_paise: 10_000_000,
+            }];
+            lines.extend(credits.into_iter().map(|(ledger, paise)| LedgerLine {
+                ledger: ledger.to_string(),
+                amount_paise: -paise,
+            }));
+            b.vouchers.push(Voucher {
+                guid: guid.to_string(),
+                date: day.clone(),
+                vtype: "Receipt".to_string(),
+                base_type: "Receipt".to_string(),
+                status: VoucherStatus::Regular,
+                lines,
+                ..Default::default()
+            });
+        }
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let dump = crate::entity_269st_gap_on(&e, &b, &rules).unwrap();
+        let figure = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("entity_269st_gap.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(figure("gap_rows_count"), Some(serde_json::json!(1)));
+        assert_eq!(figure("unbound_ledger_count"), Some(serde_json::json!(0)));
     }
 }

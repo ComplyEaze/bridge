@@ -53,6 +53,27 @@ impl Server {
                     })
                     .collect::<Vec<_>>();
                 let read_evidence = evidence_from_runtime_read(read.evidence);
+                // What this read covers, from the same typed scope that decides
+                // the frame below: whole only when no ledger was set aside.
+                let basis = headline::TrialBalanceBasis::new(
+                    read.from.clone(),
+                    read.to.clone(),
+                    match &read.ledger_scope {
+                        crate::tally::runtime::TrialBalanceLedgerScope::AllLedgers => {
+                            headline::Completeness::from_gaps(Vec::new())
+                        }
+                        crate::tally::runtime::TrialBalanceLedgerScope::BaseCurrencyLedgersOnly {
+                            foreign,
+                            mixed,
+                            ..
+                        } => headline::Completeness::from_gaps(vec![
+                            headline::Gap::BaseCurrencyLedgersOnly {
+                                foreign: foreign.len(),
+                                mixed: mixed.len(),
+                            },
+                        ]),
+                    },
+                );
                 let mut frame = json!({
                     "from": read.from, "to": read.to, "currency": read.currency,
                     "read_at": read.read_at, "totals": read.totals,
@@ -103,14 +124,14 @@ impl Server {
                             mixed.len(),
                         ));
                 }
-                self.hold_listing(ListingSnapshot::new(
+                self.hold_listing(ListingSnapshot::trial_balance(
                     &identity,
                     kind,
                     extent,
                     rows,
-                    None,
                     frame,
                     read_evidence,
+                    basis,
                 ))?
             }
         };
@@ -128,6 +149,7 @@ impl Server {
             .take(limit)
             .cloned()
             .collect::<Vec<_>>();
+        let returned = rows.len();
         let (truncated, next_offset) = page_boundary(offset, rows.len(), total);
         let frame = &snapshot.frame;
         let mut limitations = json!([
@@ -167,11 +189,17 @@ impl Server {
             list.insert(0, json!(label));
         }
         result["limitations"] = limitations;
+        let mut payload = json!({
+            "company": company_json(&company, std::slice::from_ref(&company)),
+            "result": result,
+        });
+        if let Some(basis) = &snapshot.trial_balance_basis {
+            let page = headline::Page::new(headline::Rows::Ledgers, offset, returned, total);
+            payload["headline"] =
+                json!(basis.headline(&headline::CompanyName::new(&company.name), page));
+        }
         Ok(ToolOutcome {
-            payload: json!({
-                "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": result,
-            }),
+            payload,
             evidence,
             company_guid: Some(guid.to_string()),
             truncated,
@@ -181,7 +209,7 @@ impl Server {
 
 /// At most this many set-aside ledgers are named per list; `count` covers
 /// them all. The lists are not paged with the rows, so they are bounded here.
-const EXCLUDED_TRIAL_BALANCE_LEDGERS_NAMED: usize = 20;
+pub(super) const EXCLUDED_TRIAL_BALANCE_LEDGERS_NAMED: usize = 20;
 
 pub(super) fn page_boundary(offset: usize, returned: usize, total: usize) -> (bool, Option<usize>) {
     let Some(next_offset) = offset.checked_add(returned) else {

@@ -194,6 +194,13 @@ def _depreciation(c):
                                           dep_expense_ledgers)
 
 
+def _counter_cheques_40a3(c):
+    from tae.audit_tests import counter_cheques_40a3
+    from tae.config import counter_cheque_narration_terms
+    return counter_cheques_40a3, counter_cheques_40a3.run(
+        c.eng, c.rules, cash=c.cash, bank=c.bank, narration_terms=counter_cheque_narration_terms(c.cfg))
+
+
 def _creditor_ageing_43bh(c):
     from tae.audit_tests import creditor_ageing_43bh
     from tae.config import creditor_ageing_config, trade_creditors
@@ -418,6 +425,7 @@ RUNNERS = {
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
+    "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,
     "entity_269st_gap": _entity_269st_gap,

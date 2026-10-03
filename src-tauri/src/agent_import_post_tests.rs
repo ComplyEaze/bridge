@@ -61,7 +61,7 @@ fn native_preview_contains_all_accounting_inputs_and_pinned_destination() {
         "REF-1",
         "Synthetic test only",
         "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
-        "Ledgers checked by identity against the build; ComplyEaze Bridge adds its batch reference.",
+        "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
         &line.batch_id,
     ] {
         assert!(preview.contains(field), "missing {field}");
@@ -1141,21 +1141,32 @@ fn absence_is_required_before_a_first_attempt() {
     .is_ok());
 }
 
+/// A native post sends a fresh REMOTEID and a print-ready narration with no
+/// `[BRIDGE:…]` tag (owner decision, 2026-09-28); everything else is the
+/// reviewed public file byte for byte. The public file keeps its tag.
 #[test]
-fn native_request_uses_a_private_remote_identity_but_preserves_batch_attribution() {
+fn native_request_uses_a_private_remote_identity_and_an_untagged_narration() {
     let (line, _) = batch();
     let voucher = &line.vouchers[0];
     let public = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
     let first = render_native_vouchers_xml(
         "Synthetic Accounts",
-        &line.batch_id,
         std::iter::once((voucher, Uuid::new_v4())),
     );
     let second = render_native_vouchers_xml(
         "Synthetic Accounts",
-        &line.batch_id,
         std::iter::once((voucher, Uuid::new_v4())),
     );
+    let tag = format!(
+        " [BRIDGE:{}]",
+        import_identity(&line.batch_id, &voucher.bridge_txn_id)
+    );
+    assert_eq!(
+        public.matches(tag.as_str()).count(),
+        1,
+        "the public file keeps its tag"
+    );
+    assert!(!first.contains("[BRIDGE:") && !second.contains("[BRIDGE:"));
     let remote_id = |xml: &str| {
         let mut reader = quick_xml::Reader::from_str(xml);
         loop {
@@ -1179,21 +1190,22 @@ fn native_request_uses_a_private_remote_identity_but_preserves_batch_attribution
     assert_ne!(first_id, public_id);
     assert_ne!(second_id, public_id);
     assert_ne!(first_id, second_id);
-    // Only the client mutation selector changes; accounting, company and stable
-    // readback attribution remain byte-for-byte the reviewed public document.
+    // Only the client mutation selector and the tag change; accounting,
+    // company and narration text remain byte-for-byte the reviewed public file.
+    let untagged_public = public.replace(tag.as_str(), "");
     assert_eq!(
         first.replace(
             &format!("REMOTEID=\"{first_id}\""),
             &format!("REMOTEID=\"{public_id}\"")
         ),
-        public
+        untagged_public
     );
     assert_eq!(
         second.replace(
             &format!("REMOTEID=\"{second_id}\""),
             &format!("REMOTEID=\"{public_id}\"")
         ),
-        public
+        untagged_public
     );
     assert_eq!(sha256_hex(public.as_bytes()), line.sha256);
 }
@@ -1615,7 +1627,8 @@ fn the_dispatch_intent_records_the_remoteid_the_native_request_carries() {
         ))
     );
 
-    let intent = serde_json::to_value(ledger::StatusRecord::dispatch_for(&line, &request)).unwrap();
+    let intent =
+        serde_json::to_value(ledger::StatusRecord::dispatch_for(&line, &request, None)).unwrap();
     assert_eq!(intent["native_remote_id"], json!(sent));
     assert_eq!(
         intent["native_request_sha256"],
@@ -2235,6 +2248,7 @@ fn the_intent_keeps_the_single_id_shape_for_one_voucher() {
     let single = serde_json::to_value(ledger::StatusRecord::dispatch_for(
         &one,
         &native_post_request(&one, RemoteIds::from_ids(vec![id])).unwrap(),
+        None,
     ))
     .unwrap();
     assert_eq!(
@@ -2248,6 +2262,7 @@ fn the_intent_keeps_the_single_id_shape_for_one_voucher() {
     let batch = serde_json::to_value(ledger::StatusRecord::dispatch_for(
         &two,
         &native_post_request(&two, RemoteIds::from_ids(ids.to_vec())).unwrap(),
+        None,
     ))
     .unwrap();
     assert!(batch.get("native_remote_id").is_none(), "{batch}");

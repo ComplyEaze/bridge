@@ -6,6 +6,7 @@ pub mod commands;
 pub mod db;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
+pub(crate) mod exported_files;
 pub mod gst;
 pub(crate) mod local_files;
 // Crate-internal only: the previously separate `bridge-tally-observability` crate had exactly
@@ -95,6 +96,7 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let builder = tauri::Builder::default()
         .manage(tally::TallyRuntime::default())
+        .manage(exported_files::ExportedFiles::default())
         .manage(source_draft::SourceDraftStore::default())
         .manage(source_draft::SourceDraftLifecycleGuard::default())
         .manage(reports::bulk_party_statement::PartyStatementDestinationApprovals::default())

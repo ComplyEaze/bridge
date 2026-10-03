@@ -205,3 +205,54 @@ portable layer and turns a hash lookup into a per-proposal substring scan.
 existing readback helper does, and silently resolves the middle case. The
 import path's stricter helper refuses it, and this contract agrees with the
 stricter one.
+
+## Amendment — 2026-10-02: the post-span basis for native posts
+
+A client's narration is print-ready and carries no product marker (owner
+decision, 2026-09-28), so a native post no longer writes `[BRIDGE:…]`, and the
+marker basis cannot reach it. A fourth basis takes its place for vouchers
+Bridge posts natively: **position in the post's own AlterID span** (protocol
+reference §9.15, VERIFIED on two raw gateway runs: 10 Payment, Receipt and
+Contra vouchers, and 5 Journals).
+
+- **Decisive:** the target's voucher mark recorded with the dispatch intent
+  before the POST; a clean response with `CREATED = N` and `LASTVCHID`; the
+  mark's step equal to `CREATED` when it was measured; exactly N rows in the
+  span, row k at mark + k.
+- **Refuse-only cross-checks:** the content sent, narration byte for byte;
+  MasterIDs ending on `LASTVCHID`; each GUID equal to the company GUID plus
+  its MasterID in hex; no GUID another batch bound.
+- **Persisted:** the bound GUID and MasterID, once per batch, in the journal.
+  A refusal is persisted and permanent; a failure to read is not.
+- **Not a fingerprint promoted to identity (ADR 0017):** content decides
+  nothing. Inside a span only the post's own creates could fill, the count and
+  the positions do; content can only refuse.
+- **Rank:** a bound GUID ranks first, and a tag on the same voucher is not
+  consulted. A bound GUID the window lacks is `bound_not_in_window`, which is
+  never absence. A post that sent no tag is never attributed by one: a row
+  carrying its batch's tag is a hand import of the batch's file, matched by
+  content only, so it can never read as that post's voucher.
+- **Deferred bind** (owner decision, 2026-10-02): when the mark after the POST
+  was not read, or for a later `verify_import`, the span is `(mark, mark +
+  N]`, which the clean response implies. It never binds a lost response, never
+  overrides a refusal that was journaled, and requires the company's mark to
+  read at least mark + N. A step measured during the post is not kept unless
+  its verdict was journaled; without it, the position, content and MasterID
+  checks still refuse a voucher written by anyone else. Below that the book was rolled back:
+  `book_rolled_back`, nothing bound, nothing read as absent.
+- **Never absence:** a voucher of an untagged native post that was not bound,
+  and that its content no longer finds, is `sent_not_attributed`, never
+  `not_found`. The one exception is `tally_reported_not_created`
+  (bridge#1108), in the post's own readback only: a post of one voucher
+  whose own answer reported every counter, `CREATED 0`, `EXCEPTIONS 1` and
+  nothing else, and whose voucher its content does not find. It reads
+  Tally's answer together with that absence and, like
+  `sent_not_attributed`, sits outside the absence qualification gate. A
+  refusal is final, so an edit made in Tally to one voucher
+  before a deferred bind refuses the binding of the whole batch.
+- **Known limits:** identical twins are bound by position alone, since they
+  are identical in content and their own order cannot be observed (the request
+  order of vouchers that can be told apart was measured in two raw runs);
+  the local journal is the trust root; writes from another Gold process are
+  unmeasured; whether a restore or rewrite reuses AlterIDs or MasterIDs is
+  unmeasured.

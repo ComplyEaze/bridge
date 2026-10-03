@@ -491,6 +491,38 @@
     ]
    ],
    "party": "Edge Bank"
+  },
+  {
+   "guid": "a14",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -100000
+    ],
+    [
+     "Office Expense",
+     100000
+    ]
+   ],
+   "party": "Ram's Traders"
+  },
+  {
+   "guid": "r06",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     500000
+    ],
+    [
+     "Sales",
+     -500000
+    ]
+   ],
+   "party": "Ram's Traders"
   }
  ],
  "cash": [

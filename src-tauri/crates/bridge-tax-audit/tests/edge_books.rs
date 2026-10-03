@@ -27,10 +27,10 @@ use bridge_tax_audit::read::Window;
 use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::{
     bank_reconciliation, book_keeping_quality, cash_book_integrity, cash_payments_40a3,
-    creditor_ageing_43bh, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest,
-    partners_40b_194t, party_identity, party_monthly, read_scope, stale_balances_41_1,
-    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
-    twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
+    counter_cheques_40a3, creditor_ageing_43bh, entity_269st_gap, high_value_register,
+    ledger_scrutiny, loans_interest, partners_40b_194t, party_identity, party_monthly, read_scope,
+    stale_balances_41_1, statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as,
+    trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -576,6 +576,13 @@ fn check(name: &str) {
                 let c = ledger_scrutiny::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "counter_cheques_40a3" => {
+                let terms: BTreeSet<String> =
+                    strs(&s["counter_cheque_terms"]).into_iter().collect();
+                let r = counter_cheques_40a3::run(&book, &rules, &cash, &bank, &terms).unwrap();
+                let c = counter_cheques_40a3::check_invariants(&r, None);
+                (r, c)
+            }
             "cash_book_integrity" => {
                 let terms = strs(&s["own_account_terms"]);
                 let r = cash_book_integrity::run(&book, &rules, &cash, &bank, &terms).unwrap();
@@ -857,11 +864,12 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 19] = [
+const EDGE_TESTS: [&str; 20] = [
     "bank_reconciliation",
     "book_keeping_quality",
     "cash_book_integrity",
     "cash_payments_40a3",
+    "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "entity_269st_gap",
     "high_value_register",

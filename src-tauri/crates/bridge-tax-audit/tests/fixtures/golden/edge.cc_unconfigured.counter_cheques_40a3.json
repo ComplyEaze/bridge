@@ -1,0 +1,139 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "counter_cheques_40a3",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "1933c2ac379d908a",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); bank payments whose narration carries a configured counter-encashment term; Contra and any voucher with a cash leg excluded.",
+  "figures": [
+    {
+      "id": "counter_cheques_40a3.at_or_under_limit_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "2b6a41eed90675c8",
+      "definition_text": "Matched lines at or under the limit. Not tested for same-payee same-day aggregation: the payee is named only in the bank narration, so two such payments to one person on one day are not joined.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.at_or_under_limit_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0e82b944249bfa7e",
+      "definition_text": "Sum of the at-or-under-limit matched lines.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.configured_terms_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "9d0dcec115af5eff",
+      "definition_text": "Bank-narration terms the client configuration identifies as counter-encashed or non-account-payee payments (roles.counter_cheque_narration_terms). Zero means this test was not configured and found nothing because it looked at nothing.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_capital",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "49cd150c5111200f",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Capital Account' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_duties_taxes",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c62d6ab1ba1b3404",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Duties & Taxes' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_fixed_assets",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "23bed290c074cd83",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Fixed Assets' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_loans_advances_asset",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a36d014819dee2f1",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Loans & Advances (Asset)' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_loans_liability",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ed93452c7ce7e084",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Loans (Liability)' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.matched_expenditure_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "429d1998143f815b",
+      "definition_text": "Expenditure debit lines on bank payments whose narration carries a configured term, any amount.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.matched_expenditure_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fc70dd978cecdba6",
+      "definition_text": "Sum of those expenditure debit lines, any amount.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.over_limit_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1deba0b3c698bf46",
+      "definition_text": "Of those, lines where the single payment exceeds the s.40A(3) limit (1000000 paise).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.over_limit_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5a5ff41058846f1d",
+      "definition_text": "Sum of the over-limit lines above.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-2",
+      "subject": "v19",
+      "detail": "Payment v19 2025-06-10 lines sum 1500000"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 1500000 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "counter_cheques_40a3.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

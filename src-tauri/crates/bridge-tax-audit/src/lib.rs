@@ -37,6 +37,7 @@ pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
 pub mod compare;
+pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
 pub mod documents;
@@ -91,6 +92,9 @@ pub struct Engagement {
     pub label: String,
     pub assessment_year: String,
     pub period: Window,
+    /// The directory of the read. Empty for an engagement built for a book the caller holds
+    /// ([`Engagement::from_toml_for_read`]); never give that to `Read::open`. [`load_book`] refuses
+    /// such an engagement, and the field stays `pub` until the engagement is split into two types.
     pub read_dir: PathBuf,
     pub allow_unbracketed_read: bool,
     /// `[client.tally]` `company_guid` + `books_from`: the company every read must come from
@@ -107,6 +111,11 @@ pub struct Engagement {
     /// not every test on the engagement -- the reference, too, reads the key only when it runs
     /// `cash_book_integrity`. `None` when the key is absent.
     pub own_account_narration_terms: Option<toml::Value>,
+    /// `counter_cheques_40a3`-only: the optional `[roles].counter_cheque_narration_terms`, the bank
+    /// narration terms that mark a payment as encashed across the counter or not account payee
+    /// (client data). Kept as written and validated only when that test runs
+    /// ([`counter_cheques_40a3::narration_terms`]), as `own_account_narration_terms` is.
+    pub counter_cheque_narration_terms: Option<toml::Value>,
     /// `bank_reconciliation`-only: `[roles].bank_reconciliation_ledger`, the bank ledger a supplied
     /// statement is reconciled against. Set when the engagement is bound (by identity, like every
     /// other configured name); `None` before binding or when the key is absent, and the test then
@@ -199,6 +208,10 @@ pub struct Engagement {
     raw_cfg: toml::Table,
     /// The directory `[snapshot].path` and a legacy trade-creditor source are relative to.
     base_dir: PathBuf,
+    /// Built by [`Engagement::from_toml_for_read`]: no `[snapshot]`, no directory. [`load_book`]
+    /// refuses such an engagement, so it cannot reach a directory by any path; its book comes from
+    /// the caller, and the tests run on it through [`registry`].
+    in_memory: bool,
 }
 
 /// `[loans]` from the client config, bound. Empty when the config has no `[loans]` table: the
@@ -492,6 +505,18 @@ const LEGACY_SNAPSHOT_KEYS: [&str; 10] = [
 impl Engagement {
     /// Parse a client config; `[snapshot].path` is relative to `base_dir`.
     pub fn from_toml(text: &str, base_dir: &Path) -> Result<Self> {
+        Self::parse(text, Some(base_dir))
+    }
+
+    /// Parse a client config for a book the caller already holds (a read Bridge made itself): no
+    /// `[snapshot]` table is allowed, there is no directory, and the result can never be given to
+    /// [`load_book`]. Everything else is read and refused exactly as [`Engagement::from_toml`] does,
+    /// except a `legacy_json` trade-creditor source, which names a file and so is refused here.
+    pub fn from_toml_for_read(text: &str) -> Result<Self> {
+        Self::parse(text, None)
+    }
+
+    fn parse(text: &str, base_dir: Option<&Path>) -> Result<Self> {
         let cfg: toml::Table = toml::from_str(text)
             .map_err(|e| AuditError::Config(format!("engagement TOML: {e}")))?;
         let table = |name: &str| {
@@ -526,13 +551,36 @@ impl Engagement {
                     AuditError::Config(format!("[period].{key} {s:?} is not YYYY-MM-DD"))
                 })
         };
-        let (client, period, snapshot, roles) = (
-            table("client")?,
-            table("period")?,
-            table("snapshot")?,
-            table("roles")?,
-        );
-        if snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1") {
+        let (client, period, roles) = (table("client")?, table("period")?, table("roles")?);
+        let in_memory = base_dir.is_none();
+        if in_memory && cfg.contains_key("snapshot") {
+            return Err(AuditError::refused(
+                "CFG-snapshot-for-read",
+                "[snapshot] names a directory, and this engagement has none",
+            ));
+        }
+        if in_memory
+            && roles
+                .get("trade_creditors_source")
+                .and_then(toml::Value::as_table)
+                .and_then(|t| t.get("kind"))
+                .and_then(toml::Value::as_str)
+                == Some("legacy_json")
+        {
+            return Err(AuditError::refused(
+                "CFG-legacy-for-read",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        let empty = toml::Table::new();
+        let snapshot = if in_memory {
+            &empty
+        } else {
+            table("snapshot")?
+        };
+        if !in_memory
+            && snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1")
+        {
             return Err(AuditError::refused(
                 "C1-format",
                 "[snapshot].format is not \"tally-read-v1\"",
@@ -548,11 +596,15 @@ impl Engagement {
                 format!("[snapshot] names a read and also legacy keys {mixed:?}"),
             ));
         }
-        let path = snapshot
-            .get("path")
-            .and_then(toml::Value::as_str)
-            .filter(|p| !p.is_empty())
-            .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?;
+        let path = if in_memory {
+            ""
+        } else {
+            snapshot
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .filter(|p| !p.is_empty())
+                .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?
+        };
         let company_pin = client
             .get("tally")
             .map(|t| -> Result<CompanyPin> {
@@ -843,7 +895,7 @@ not YYYY-MM-DD"
                 from: date(period, "start")?,
                 to: date(period, "end")?,
             },
-            read_dir: base_dir.join(path),
+            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),
             allow_unbracketed_read: snapshot
                 .get("allow_unbracketed_read")
                 .and_then(toml::Value::as_bool)
@@ -856,6 +908,7 @@ not YYYY-MM-DD"
                 None => Vec::new(),
             },
             own_account_narration_terms: roles.get("own_account_narration_terms").cloned(),
+            counter_cheque_narration_terms: roles.get("counter_cheque_narration_terms").cloned(),
             bank_reconciliation_ledger: None,
             bank_charge_narration_terms: roles.get("bank_charge_narration_terms").cloned(),
             counterparty_type_by_ledger: BTreeMap::new(),
@@ -900,7 +953,8 @@ not YYYY-MM-DD"
             partners: PartnersConfig::default(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
-            base_dir: base_dir.to_path_buf(),
+            base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
+            in_memory,
             raw_cfg: cfg,
         })
     }
@@ -911,6 +965,28 @@ not YYYY-MM-DD"
     /// the reference implementation's `run.load()` calling `bind_config()` once.
     pub fn bind(&self, book: &book::Book) -> Result<(Self, binding::BindingReport)> {
         binding::bind(self, book)
+    }
+
+    /// The ledger names a `legacy_json` trade-creditor source reads, or `None` for any other
+    /// source. This is the one place an engagement reads such a file, and a held-book engagement
+    /// refuses to: its source can be set after parsing (the field is public), and the parse-time
+    /// refusal (`CFG-legacy-for-read`) cannot see that.
+    pub(crate) fn legacy_creditor_names(
+        &self,
+        source: Option<&toml::Value>,
+    ) -> Result<Option<Vec<String>>> {
+        let legacy = source
+            .and_then(toml::Value::as_table)
+            .and_then(|t| t.get("kind"))
+            .and_then(toml::Value::as_str)
+            == Some("legacy_json");
+        if self.in_memory && legacy {
+            return Err(AuditError::refused(
+                "CFG-no-directory",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        legacy_trade_creditor_names(source, &self.base_dir)
     }
 }
 
@@ -984,12 +1060,11 @@ pub fn trade_creditors(engagement: &Engagement, book: &book::Book) -> Result<BTr
                 })
             })
             .collect(),
-        "legacy_json" => Ok(
-            legacy_trade_creditor_names(Some(src), &engagement.base_dir)?
-                .unwrap_or_default()
-                .into_iter()
-                .collect(),
-        ),
+        "legacy_json" => Ok(engagement
+            .legacy_creditor_names(Some(src))?
+            .unwrap_or_default()
+            .into_iter()
+            .collect()),
         other => Err(AuditError::Config(format!(
             "roles.trade_creditors_source: unknown kind {other:?}"
         ))),
@@ -1009,6 +1084,12 @@ pub fn rules_for(engagement: &Engagement) -> Result<Rules> {
 
 /// Read and verify the engagement's read, and build its book (C1-C10).
 pub fn load_book(engagement: &Engagement) -> Result<book::Book> {
+    if engagement.in_memory {
+        return Err(AuditError::refused(
+            "CFG-no-directory",
+            "this engagement was built for a book the caller holds and names no read directory",
+        ));
+    }
     let read = Read::open(&engagement.read_dir)?;
     read.check(
         &engagement.period,
@@ -1058,6 +1139,33 @@ pub fn cash_payments_40a3_on(
         &round_off_ledgers,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `counter_cheques_40a3` on a book and return its canonical parity dump. The cash and bank
+/// groups and the optional `[roles].counter_cheque_narration_terms` are as the reference's pack
+/// passes them; the module's own invariants run on the result alone (CCQ-3 needs the
+/// `cash_payments_40a3` result and the reference's dump does not pass it either).
+pub fn counter_cheques_40a3_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (engagement, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&engagement.cash_groups);
+    let bank = book.ledgers_under_any(&engagement.bank_groups);
+    let terms =
+        counter_cheques_40a3::narration_terms(engagement.counter_cheque_narration_terms.as_ref())?;
+    let result = counter_cheques_40a3::run(book, rules, &cash, &bank, &terms)?;
+    let module_check = counter_cheques_40a3::check_invariants(&result, None);
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Read, verify, build the book, run `counter_cheques_40a3` and return its canonical parity dump.
+pub fn counter_cheques_40a3_canonical(
+    engagement: &Engagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    counter_cheques_40a3_on(engagement, &load_book(engagement)?, rules)
 }
 
 /// Read, verify, build the book, run `cash_payments_40a3` and return its canonical parity dump.

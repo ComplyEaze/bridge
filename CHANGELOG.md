@@ -43,9 +43,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **If you turn posting on, the way a posted voucher is matched has changed.**
   A post no longer adds a ComplyEaze Bridge tag to the narration, and each
   voucher is matched by its place in the run of changes Tally records for that
-  post (#1054). From the first post you approve with 0.4.2, even one Tally
-  refuses, do not run 0.4.1 or earlier, of the extension or of the desktop app,
-  on this computer: the record of what was sent (the import journal) then holds
+  post (#1054). From the first post 0.4.2 sends to Tally (its record is written
+  just before sending, so this includes a post Tally refuses or never answers),
+  do not run 0.4.1 or earlier, of the extension or of the desktop app, on this
+  computer: the record of what was sent (the import journal) then holds
   fields they refuse to read, and they stop preparing, posting and checking
   vouchers. Before that first post, going back is harmless.
 - **If you turn posting on: `voucher_presence` cannot recognise these
@@ -62,7 +63,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
   Desktop, install the newer file from Settings, Extensions; (3) keep
   ComplyEaze Bridge's data folder, which holds its record of what it has sent
-  to Tally; (4) check that the extension shows 0.4.2 and that "Allow voucher
+  to Tally (from 0.4.2 it is the only record of which vouchers it posted); (4) check that the extension shows 0.4.2 and that "Allow voucher
   posting" is as you want it; (5) quit Claude Desktop completely and reopen it.
 - **What was tried** is under "Known limits" below. No one on our side
   installed the Windows package of this build in Claude Desktop on a Windows PC.
@@ -95,7 +96,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   read.** `vouchers` no longer reads the whole window again for every page when
   the window was read `complete`, which means counted first. On one synthetic
   book, one month of 2,542 vouchers read in a release build, the first page took
-  about 66 seconds and a later page about 1 second (one run each). A later page
+  about 66 to 68 seconds and a later page about 1 second (one run each). A later page
   that names the first page's `snapshot_id` is refused if the company's marks
   moved, instead of continuing from a different read. The read is held for ten
   minutes. A small or new company is not counted, so its window reads `partial`
@@ -157,26 +158,30 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Safer or fixed**
 
-- **A post that Tally refuses is named plainly.** If Tally answered a post with
-  "not created" (`CREATED 0`, an exception for each voucher sent and every
+- **A post that Tally refuses is named plainly.** If Tally's answer to a post counted
+  nothing created (`CREATED 0`, an exception for each voucher sent and every
   other counter reported as 0) and the voucher is not found, `post_import` now
   says Tally reported it as not created, to check it is not in Tally, and to
   enter that one voucher in Tally's voucher entry screen, never through Tally's
   Import menu; the voucher's status reads `tally_reported_not_created`. This
   covers a single voucher, which is what the extension posts,
   and a saved batch of two or more vouchers rejected whole when the company's
-  mark was read before and after and did not move (batch posting is a
-  command-line setting that the extension does not offer). It was measured only
-  for a missing ledger, on TallyPrime 7.1 Silver; the code applies it to any
-  answer of that shape, including on Gold, where it was not measured (#1116,
+  mark was read before and after and did not move (batch posting is an environment setting, `BRIDGE_AGENT_ENABLE_BATCH_POST`,
+  that the extension's settings do not offer). Tally's answer was captured only
+  for missing ledgers, on TallyPrime 7.1 Silver, and the reading of it was
+  tested on those saved answers, not in a live post; the code applies it to any
+  answer of that shape, including on Gold, where it was not measured. After you
+  enter the voucher by hand as told, the saved batch stays "reconciliation
+  required" and ComplyEaze Bridge cannot close it (#1039 is open; #1116,
   #1126).
 - **Where a posted voucher cannot be matched, the status changed.** In 0.4.1 an
-  unfound voucher of a post read `not_found`. In 0.4.2 a voucher of a post that
-  cannot be matched reads `sent_not_attributed` ("check in Tally before posting
-  it again", for example after an edit), never `not_found`. That is also the
-  reading for a batch that landed in part, and for a later `verify_import`,
+  unfound voucher of a post read `not_found`. In 0.4.2 a voucher of a post made
+  with 0.4.2 that cannot be matched reads `sent_not_attributed` ("check in Tally before posting
+  it again", for example after an edit), never `not_found`; posts made with 0.4.1 or earlier are read as before. That
+  is also the reading for a batch that landed in part, and for a later `verify_import`,
   including of a voucher Tally refused. Other new readings name why a voucher
-  is missing: `bound_not_in_window` (it may have been deleted or re-dated) and
+  is missing: `bound_not_in_window` (it may have been deleted, re-dated or edited, or the
+  company restored from a backup: check in Tally) and
   `book_rolled_back` (the books look older than the post). A post is refused as
   `post_mark_unrecorded`, with nothing sent and the approval withdrawn, when
   the company's voucher mark cannot be read before it (#1054).
@@ -266,7 +271,7 @@ counter Tally keeps that moves when vouchers or ledgers change.
   144 synthetic names; a real book was not tried (#1057, #1092).
 - **Posting, what was tried:** two live posts through ComplyEaze Bridge's own
   path, of 3 vouchers each (3 Journals; a Payment, a Receipt and a Contra),
-  made with the command-line batch setting, and raw runs against Tally of 10
+  made with the environment batch setting, and raw runs against Tally of 10
   untagged Payment, Receipt and Contra vouchers and of 5 Journals, all on a
   synthetic company in TallyPrime 7.1 Silver. The extension posts one voucher
   per approval; that one-voucher path was not run live with 0.4.2's untagged
@@ -278,12 +283,16 @@ counter Tally keeps that moves when vouchers or ledgers change.
   `acknowledge_post_review` does not apply, and you check its vouchers in Tally
   yourself (#1039 is open). Another Tally Gold client writing during a post is
   not seen. After a backup is restored, if the books are keyed past the post's
-  mark before the next check, the loss is not detected; if Tally reuses the lost
-  vouchers' IDs (not measured), a lost voucher can even read `posted_verified`;
-  such vouchers cannot be posted again through ComplyEaze Bridge and must be
-  entered by hand (#1050, #1038). Not tried: whether deleting a voucher can lower the
-  company's mark, a Windows approval dialog, Education mode, and more than 3
-  vouchers through ComplyEaze Bridge's own path (#1054).
+  mark before the next check, the restore is not detected as one (the voucher
+  reads `bound_not_in_window`); if Tally reuses the lost vouchers' IDs (not
+  measured), a lost voucher can even read `posted_verified` (#1050). Such
+  vouchers cannot be posted again through ComplyEaze Bridge and must be entered
+  by hand (#1038). Not tried: whether a voucher keeps its Tally ID when someone
+  edits it in Tally's screens (if it does not, `verify_import` reads that
+  voucher as `bound_not_in_window`, which does not mean it was deleted),
+  whether deleting a voucher can lower the company's mark, a Windows approval
+  dialog, Education mode, and more than 3 vouchers through ComplyEaze Bridge's
+  own path (#1054).
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both
   columns is not shown; the `Cost of Sales :` heading is not compared when it
   reads zero or empty (#1070).

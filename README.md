@@ -1,4 +1,4 @@
-# ComplyEaze Bridge
+# ComplyEaze Bridge: TallyPrime MCP server for Claude Desktop
 
 <!-- llms:begin -->
 ComplyEaze Bridge is a TallyPrime MCP server for Claude Desktop. It connects

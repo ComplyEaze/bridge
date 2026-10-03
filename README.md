@@ -25,7 +25,9 @@ TallyPrime, and nothing we can run covers every
 Tally edition, set of books or setting. What has been run against a real
 TallyPrime, and what has not, is listed below.
 [Install it](./docs/agent/INSTALL.md) · [What changed](./CHANGELOG.md) ·
-[Security and privacy](./docs/security-and-privacy.md)
+[Security and privacy](./docs/security-and-privacy.md) ·
+[How to connect Claude to TallyPrime](./docs/guides/connect-claude-to-tallyprime.md) ·
+[How to choose a TallyPrime MCP server safely](./docs/guides/choose-a-tallyprime-mcp-server-safely.md)
 
 Not yet code-signed; your computer may warn you before opening it.
 

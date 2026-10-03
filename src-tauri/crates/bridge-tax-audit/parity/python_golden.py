@@ -128,7 +128,7 @@ def _financial_statements(c):
 
 def _applicability_44ab(c):
     from tae.audit_tests import applicability_44ab, cash_44ab, financial_statements
-    from tae.config import partner_interest_ledgers, presumptive_history_config
+    from tae.config import deductor_activity, partner_interest_ledgers, presumptive_history_config
     a = c.args
     if a.turnover_inputs and a.emit_turnover_inputs:
         c.ap.error("--turnover-inputs and --emit-turnover-inputs are exclusive")
@@ -161,7 +161,8 @@ def _applicability_44ab(c):
                   "payments_bp": c44.figures[f"{cash_44ab.TEST_ID}.cash_share_payments"].value,
                   "limits": c44.findings[0].limits}
     return applicability_44ab, applicability_44ab.run(
-        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg))
+        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg),
+        deductor_activity=deductor_activity(c.cfg))
 
 
 def _depreciation(c):

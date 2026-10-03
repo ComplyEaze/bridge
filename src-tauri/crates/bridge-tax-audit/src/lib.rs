@@ -1642,6 +1642,7 @@ pub fn applicability_44ab_on(
         &inputs,
         &cash_share,
         bound.presumptive_history.as_ref(),
+        bound.deductor_activity,
     )?;
     canonical::canonical_test_result(book, &result, None)
 }

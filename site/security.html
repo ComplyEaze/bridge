@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Security and your clients’ data: ComplyEaze Bridge</title>
+<meta name="description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, how to report a vulnerability, and what has not been done yet." />
+<link rel="canonical" href="https://bridge.complyeaze.com/security.html" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Security and your clients’ data: ComplyEaze Bridge" />
+<meta property="og:description" content="What ComplyEaze Bridge keeps on your computer, what reaches your AI provider and ComplyEaze, how posting is approved, how to report a vulnerability, and what has not been done yet." />
+<meta property="og:url" content="https://bridge.complyeaze.com/security.html" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page ce-page--plain">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./faq.html">Questions</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="legal-layout">
+<article class="legal">
+<h1>Security and your clients’ data</h1>
+<p>What a CA or a firm’s IT person asks before installing ComplyEaze&nbsp;Bridge next to client books, in one place. Each answer repeats what the <a href="./faq.html">Questions</a> page, the <a href="./privacy.html">Privacy Policy</a>, the <a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">security policy</a> and the <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy notes</a> already say. Where this page and those documents differ, those documents apply.</p>
+
+<h2>What stays on your computer</h2>
+<p>ComplyEaze&nbsp;Bridge keeps a log of every call: the tool, the time, the company’s Tally identifier, fingerprints of the question and the answer, how many rows came back, and the last requests it sent to Tally. The log is designed to hold no figures, names or narrations, though sizes in it can hint at the length of a name.</p>
+<p>It also keeps copies of the vouchers it prepared or posted, the proof of what Tally read back, every row of a bank statement you asked it to read, and a small record, with your operating-system account name, when you record a review of a posted voucher. The copies hold dates, amounts and narrations. None of these files is encrypted. ComplyEaze&nbsp;Bridge does not delete or trim any of them, and removing the extension may leave them. Section 7 of the Privacy Policy says where they are and how to archive them.</p>
+
+<h2>What reaches your AI provider</h2>
+<p>Your AI provider (Anthropic, if you use Claude) receives whatever the assistant reads, as part of the chat: company names, party names, amounts and, when it asks for them, details such as PAN, GSTIN and bank account numbers. Claude Desktop may also keep its own record of the conversation and results on your computer.</p>
+<p>The extension’s “Response redaction” setting (off by default) can shorten party and ledger names or drop narrations. Neither choice hides amounts, company names, or PAN and GSTIN numbers. Masking leaves a name written inside a narration or reference as it is; dropping narrations removes narrations but not references. How long the provider keeps what it receives, whether it trains on it, and where it is processed (which may be outside India) depend on your plan and the provider’s own terms.</p>
+
+<h2>What reaches ComplyEaze</h2>
+<p>Through ComplyEaze&nbsp;Bridge on your computer, we do not receive your Tally data, your conversations with your AI assistant, the files it keeps on your computer, or usage statistics, crash reports or device identifiers (section 4 of the Privacy Policy). We found no analytics, usage tracking, crash reporting or automatic update check in it. That comes from our reading of the published code and our own checks; it has not been independently audited.</p>
+
+<h2>Posting waits for your approval</h2>
+<p>Posting is off in a new install; if you upgraded from an earlier version, check the setting. Reading, checking ledger names, reading a bank statement and preparing a voucher file write nothing to Tally.</p>
+<p>With posting on, it can post one Journal, Payment, Receipt or Contra at a time, and only after you approve that voucher in a separate window. No ComplyEaze&nbsp;Bridge tool can approve it for you, but software that controls your screen could click the window, so do not let it. An approval is used once and stays valid for at most 15 minutes after you give it.</p>
+<p>After each post it reads the voucher back and reports what it found. It compares some details, not every one, and a match does not mean the entry is correct. Two known limits can send a post to the wrong place: a company renamed to, or loaded under, the target’s name just after the last check, and a ledger renamed and replaced in the same moment. It may not be able to say where the voucher went. ComplyEaze&nbsp;Bridge has no tool to delete or undo a posted voucher; you correct it in Tally. The README gives these limits in full.</p>
+
+<h2>The connection to Tally</h2>
+<p>ComplyEaze&nbsp;Bridge connects to Tally only at an address that means “this computer”: <code>localhost</code>, <code>127.0.0.1</code> (or any <code>127.x.x.x</code>) and <code>::1</code>. It does not use a proxy or follow redirects. If you or your IT support forward that address somewhere else, its requests go wherever you forwarded them.</p>
+<p>Tally’s own gateway is a separate question. In one test by a maintainer on TallyPrime 7.1 (not recorded in the repository), a second computer on the same network opened the Tally computer’s address and port and got Tally’s status answer with no password asked. What keeps other computers out is the firewall of the computer that runs Tally, not Tally itself. We did not test what else the gateway shows. Ask whoever looks after your computers to confirm that the firewall does not allow incoming connections to Tally’s port.</p>
+
+<h2>Reporting a vulnerability</h2>
+<p>Please do not report a vulnerability in a public issue. Report it privately, through <a href="https://github.com/ComplyEaze/bridge/security/advisories/new" target="_blank" rel="noopener noreferrer">GitHub private vulnerability reporting</a>, or by email to security@complyeaze.com. We aim to acknowledge a report within seven days. If we fix a security issue, the fix will be in a new release; we are not obliged to make one. Published advisories are listed in the <a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">security policy</a>.</p>
+
+<h2>What has not been done yet</h2>
+<ul>
+<li>It is not yet code-signed or notarised: Apple and Microsoft have not certified it as coming from us, so your computer may warn you before opening it. Compare each download with the <code>.sha256</code> file on the same release before opening it.</li>
+<li>No independent security audit has been done. The source code is public and the project runs its own checks, but that is not an external review.</li>
+<li>Not yet run by us in a controlled test: posting with a published package against a live TallyPrime; each way of declining in the Windows approval window (one was tried); the tools answering through Claude Desktop on macOS after the Terms are accepted; posting on TallyPrime Education; posting on TallyPrime Gold with its approval step recorded. The README lists what has been run.</li>
+<li>Not measured: a network capture of the running extension on Windows or a Mac; the permissions its data folder ends up with on Windows (on a Mac, ComplyEaze&nbsp;Bridge restricts its folder to your user account through file permissions); and whether PDFium, the PDF library it uses only to read a bank statement you name, opens any network connection or file other than that PDF.</li>
+</ul>
+<p>The <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy notes</a> give each answer in more detail, with what was measured and what was not. The <a href="https://github.com/ComplyEaze/bridge#readme" target="_blank" rel="noopener noreferrer">README</a> lists each run against Tally.</p>
+</article>
+  </div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>ComplyEaze Bridge&rsquo;s own code connects to Tally on this computer only.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./faq.html">Questions</a></li>
+          <li><a href="./capabilities.html">Capabilities</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+          <li><a href="./security.html" aria-current="page">Security</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+      <span>Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231. Registered office: S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+</body>
+</html>

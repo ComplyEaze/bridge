@@ -31,8 +31,9 @@ Every book here is invented, with round figures and plain names and PANs and GST
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `c62a4ab4` (the last change to its `tae/` and
-`selftest/`), under Python 3.13:
+At the reference engine (a private repository), commit `c62a4ab4`, under Python 3.13. All five goldens
+regenerate byte-identical at its later commit `df4af35e` (checked 3 Oct 2026), whose only change under
+`tae/` and `selftest/` is `counter_cheques_40a3`'s invariants:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \

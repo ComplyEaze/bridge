@@ -28,7 +28,7 @@ const CAPABILITY_REASON_LABELS: Record<string, string> = {
   xml_export_probe_failed: "The safe XML export probe did not complete.",
   tally_status_not_recognized: "The endpoint response was not recognized as a compatible Tally status.",
   release_not_observed: "The Tally release was not observed, so this transport was not tested.",
-  configuration_not_observed: "Bridge did not inspect this optional transport's configuration.",
+  configuration_not_observed: "ComplyEaze Bridge did not inspect this optional transport's configuration.",
   company_identity_invalid: "The company result contained an invalid or unsafe identity field.",
   company_identity_ambiguous: "Two or more returned companies shared the same complete observed identity.",
   company_identity_display_scope_ambiguous: "Two same-GUID books differ only by name casing or surrounding whitespace, so Tally cannot safely scope the selected book. Rename one book, then probe again.",
@@ -46,7 +46,7 @@ const CAPABILITY_REASON_LABELS: Record<string, string> = {
   selected_read_identity_unavailable: "The selected response did not prove stable unique row identity.",
   selected_read_schema_rejected: "The selected response did not match the exact reviewed schema and structure.",
   selected_read_transport_or_validation_failed: "The selected read failed transport, decoding, or strict validation and remains unknown.",
-  write_probe_not_run: "No write probe was run. Bridge never infers write support from read access.",
+  write_probe_not_run: "No write probe was run. ComplyEaze Bridge never infers write support from read access.",
   verified_snapshot_not_run: "No profile-scoped capability run has established this pack's declared contract.",
 };
 

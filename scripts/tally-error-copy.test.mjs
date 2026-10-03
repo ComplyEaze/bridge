@@ -13,7 +13,7 @@ test("a deadline explains the safe next step without exposing protocol jargon", 
     }),
     {
       category: "Tally is taking longer than expected",
-      action: "Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
+      action: "ComplyEaze Bridge did not change data in Tally. Do not repeat the same request. Wait until Tally is responsive, then review the connection and company before making a changed request.",
     },
   );
 });
@@ -22,8 +22,8 @@ test("an unstructured request failure remains fail-closed without internal navig
   assert.deepEqual(
     classifyUnstructuredTallyError("Cannot read properties of undefined (reading 'invoke')"),
     {
-      category: "Bridge could not complete this request",
-      action: "Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
+      category: "ComplyEaze Bridge could not complete this request",
+      action: "ComplyEaze Bridge cannot confirm the final state. Do not retry the same request yet; check Tally and the connection first.",
     },
   );
 });
@@ -42,6 +42,6 @@ test("a persisted-profile failure stays local instead of directing the operator 
   const guidance = classifyUnstructuredTallyError("persisted_tally_company_profiles_unavailable");
 
   assert.match(guidance.category, /saved company profiles are unavailable/i);
-  assert.match(guidance.action, /restart bridge/i);
+  assert.match(guidance.action, /restart complyeaze bridge/i);
   assert.match(guidance.action, /keep tally unchanged/i);
 });

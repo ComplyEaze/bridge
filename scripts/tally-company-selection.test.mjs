@@ -206,13 +206,13 @@ test("a successful probe prompts the operator to explicitly choose a discovered 
   assert.deepEqual(companyDiscoveryPrompt("", ["company-a"]), {
     companyCount: 1,
     heading: "1 company discovered",
-    detail: "Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
+    detail: "ComplyEaze Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
     actionLabel: "Choose company",
   });
   assert.deepEqual(companyDiscoveryPrompt("", ["company-a", "company-b"]), {
     companyCount: 2,
     heading: "2 companies discovered",
-    detail: "Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
+    detail: "ComplyEaze Bridge identified the current Tally company list. Choose one explicitly before reading or saving any company-scoped data.",
     actionLabel: "Choose company",
   });
   assert.equal(companyDiscoveryPrompt("company-a", ["company-a"]), null);
@@ -223,7 +223,7 @@ test("a direct compatibility listing prompts verification instead of selecting a
   assert.deepEqual(companyDiscoveryPrompt("", [], 1), {
     companyCount: 1,
     heading: "1 company listed for verification",
-    detail: "Tally returned a compatibility company listing. Verify the intended company before Bridge treats its identity as evidence or enables company-scoped reads.",
+    detail: "Tally returned a compatibility company listing. Verify the intended company before ComplyEaze Bridge treats its identity as evidence or enables company-scoped reads.",
     actionLabel: "Verify company",
   });
   assert.equal(companyDiscoveryPrompt("selected-company", [], 1), null);

@@ -166,6 +166,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
 
 **Safer or fixed**
 
+- **A withdrawn approval is named.** If an approval is withdrawn after the post
+  has taken it but before anything is recorded or sent, `post_import` now
+  answers `import_approval_revoked`; before, it answered
+  `import_dispatch_outcome_unknown` although nothing had been recorded or sent.
+  The message ("No posting attempt was recorded. Review the error before
+  requesting approval again.") and the `attempt_recorded: false` field are
+  unchanged, and no next step is attached. It was tested on a scripted Tally,
+  not a live one (#1131; issue #791).
 - **A post that Tally refuses is named plainly.** If Tally's answer to a post
   counted nothing created (`CREATED 0`, an exception for each voucher sent and
   every other counter reported as 0) and the voucher is not found, `post_import`
@@ -238,8 +246,9 @@ counter Tally keeps that moves when vouchers or ledgers change.
   number when a row is what failed (also for an error found while the report is
   read, such as an unreadable amount or a repeated field, but not for a value
   that appears before any bill row), and a next step, never the bill's party,
-  reference or date. A whole call on such a book was not shown to complete (see
-  Known limits) (#1098, #1128; issues #1091, #1096).
+  reference or date. A whole call on the synthetic book that printed such a date
+  has since completed once (see Known limits) (#1098, #1128, #1136; issues
+  #1091, #1096).
 - **The two log tools now say what they do not show.** `read_evidence` and
   `egress_log` say what each holds and that neither shows what your AI provider
   received, and tell the assistant never to say that no data has left the
@@ -316,10 +325,14 @@ counter Tally keeps that moves when vouchers or ledgers change.
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both
   columns is not shown; the `Cost of Sales :` heading is not compared when it
   reads zero or empty (#1070).
-- **`outstandings` on a book with such a date:** that a whole call then
-  completes was not shown, because the capture held only the two Bills reports;
-  a bill dated after `as_of` still refuses, and a two-digit due year can be read
-  in the wrong century, as before (#1091 stays open).
+- **`outstandings` on a book with such a date:** one whole call on the
+  synthetic book that printed `1-Dec-2108` completed in a lab run (state
+  `complete`, 52 requests, 4.0 seconds, a page of 500 of 1,498 open bills). The
+  bill with that date was not on the page returned, later pages were not read,
+  and other books were not tried. A bill dated after `as_of` still refuses, and
+  a two-digit due year can be read in the wrong century, as before. A bill
+  cannot be left out and the rest returned as partial, because that would
+  misstate the party's balance (#1136, #1098; #1091 stays open).
 - **Assistant text:** whether Claude Desktop passes the start-up instructions to
   the model at all, and whether any of the new wording changes what an assistant
   does, was not measured; the studies were plan-only, without tool calls or real

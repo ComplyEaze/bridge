@@ -1,5 +1,7 @@
 # ComplyEaze Bridge: TallyPrime MCP server for Claude Desktop
 
+[![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
+
 <!-- llms:begin -->
 ComplyEaze Bridge is a TallyPrime MCP server for Claude Desktop. It connects
 Claude Desktop to the TallyPrime running on your own computer, and it is built

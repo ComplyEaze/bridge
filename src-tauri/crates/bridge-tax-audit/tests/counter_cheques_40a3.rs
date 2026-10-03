@@ -81,9 +81,11 @@ fn the_terms_book_golden_holds_the_scenario_it_was_written_for() {
     let g = common::golden_named("edge.cc_terms.counter_cheques_40a3");
     assert_eq!(g["figures"].as_array().unwrap().len(), 26);
     assert_eq!(g["findings"].as_array().unwrap().len(), 7);
-    // Seven terms from eight entries: the repeat collapses, the empty term counts.
-    assert_eq!(figure(&g, "configured_terms_count"), 7);
-    // 14 matched lines; a payment of exactly the limit is under and one paisa more is over.
+    // Eight terms from nine entries: the repeat collapses, the empty term counts.
+    assert_eq!(figure(&g, "configured_terms_count"), 8);
+    // 14 matched lines (the term holding U+019B matches nothing: only Rust's own upper-casing would
+    // turn it into the narration's U+A7DC); a payment of exactly the limit is under and one paisa
+    // more is over.
     assert_eq!(figure(&g, "matched_expenditure_count"), 14);
     assert_eq!(figure(&g, "over_limit_count"), 7);
     assert_eq!(figure(&g, "over_limit_total"), 9_200_001);

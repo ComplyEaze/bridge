@@ -8230,5 +8230,13 @@
   "file": "src/counter_cheques_40a3.rs",
   "from": "if bad_rows == 0 && i128::from(total) != sum {",
   "to": "if i128::from(total) != sum {"
+ },
+ {
+  "id": "CQ-31",
+  "by": "author",
+  "what": "a term is upper-cased with Rust's tables, not Python's",
+  "file": "src/counter_cheques_40a3.rs",
+  "from": ".filter(|t| !t.is_empty() && text.contains(py_upper(t).as_str()))",
+  "to": ".filter(|t| !t.is_empty() && text.contains(t.to_uppercase().as_str()))"
  }
 ]

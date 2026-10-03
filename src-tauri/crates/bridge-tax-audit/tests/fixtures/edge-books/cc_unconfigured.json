@@ -1,5 +1,5 @@
 {
- "comment": "counter_cheques_40a3 with no term configured: the test looks at nothing, so every figure but the excluded-role totals is zero and the configured_terms_count figure says so.",
+ "comment": "counter_cheques_40a3 with no term configured: the test looks at nothing, so every figure is zero, the excluded-role totals included, and the configured_terms_count figure says why.",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",

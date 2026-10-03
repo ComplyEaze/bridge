@@ -31,8 +31,8 @@ use bridge_tax_audit::{
     cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh, entity_269st_gap,
     high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_identity,
     party_monthly, read_scope, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
-    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
-    Tds26asConfig, TdsConfig,
+    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig, Tds26asConfig,
+    TdsConfig,
 };
 use serde_json::Value;
 

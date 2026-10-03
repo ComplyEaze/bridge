@@ -8238,5 +8238,13 @@
   "file": "src/counter_cheques_40a3.rs",
   "from": ".filter(|t| !t.is_empty() && text.contains(py_upper(t).as_str()))",
   "to": ".filter(|t| !t.is_empty() && text.contains(t.to_uppercase().as_str()))"
+ },
+ {
+  "id": "CP-46",
+  "by": "author",
+  "what": "a figure's evidence keeps one voucher per GUID, so a second voucher sharing it is not cited",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "all.insert((g.clone(), voucher_label(v)));",
+  "to": "if !all.iter().any(|(x, _)| x == g) { all.insert((g.clone(), voucher_label(v))); }"
  }
 ]

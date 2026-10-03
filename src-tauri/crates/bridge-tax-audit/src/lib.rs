@@ -37,6 +37,7 @@ pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
 pub mod compare;
+pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
 pub mod documents;
@@ -107,6 +108,11 @@ pub struct Engagement {
     /// not every test on the engagement -- the reference, too, reads the key only when it runs
     /// `cash_book_integrity`. `None` when the key is absent.
     pub own_account_narration_terms: Option<toml::Value>,
+    /// `counter_cheques_40a3`-only: the optional `[roles].counter_cheque_narration_terms`, the bank
+    /// narration terms that mark a payment as encashed across the counter or not account payee
+    /// (client data). Kept as written and validated only when that test runs
+    /// ([`counter_cheques_40a3::narration_terms`]), as `own_account_narration_terms` is.
+    pub counter_cheque_narration_terms: Option<toml::Value>,
     /// `bank_reconciliation`-only: `[roles].bank_reconciliation_ledger`, the bank ledger a supplied
     /// statement is reconciled against. Set when the engagement is bound (by identity, like every
     /// other configured name); `None` before binding or when the key is absent, and the test then
@@ -896,6 +902,7 @@ not YYYY-MM-DD"
                 None => Vec::new(),
             },
             own_account_narration_terms: roles.get("own_account_narration_terms").cloned(),
+            counter_cheque_narration_terms: roles.get("counter_cheque_narration_terms").cloned(),
             bank_reconciliation_ledger: None,
             bank_charge_narration_terms: roles.get("bank_charge_narration_terms").cloned(),
             counterparty_type_by_ledger: BTreeMap::new(),
@@ -1125,6 +1132,33 @@ pub fn cash_payments_40a3_on(
         &round_off_ledgers,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `counter_cheques_40a3` on a book and return its canonical parity dump. The cash and bank
+/// groups and the optional `[roles].counter_cheque_narration_terms` are as the reference's pack
+/// passes them; the module's own invariants run on the result alone (CCQ-3 needs the
+/// `cash_payments_40a3` result and the reference's dump does not pass it either).
+pub fn counter_cheques_40a3_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (engagement, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&engagement.cash_groups);
+    let bank = book.ledgers_under_any(&engagement.bank_groups);
+    let terms =
+        counter_cheques_40a3::narration_terms(engagement.counter_cheque_narration_terms.as_ref())?;
+    let result = counter_cheques_40a3::run(book, rules, &cash, &bank, &terms)?;
+    let module_check = counter_cheques_40a3::check_invariants(&result, None);
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Read, verify, build the book, run `counter_cheques_40a3` and return its canonical parity dump.
+pub fn counter_cheques_40a3_canonical(
+    engagement: &Engagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    counter_cheques_40a3_on(engagement, &load_book(engagement)?, rules)
 }
 
 /// Read, verify, build the book, run `cash_payments_40a3` and return its canonical parity dump.

@@ -41,6 +41,8 @@ mod company;
 use company::*;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_headline.rs"]
+mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
 use ledger_candidates::resolve_ledger_or_refuse;
@@ -479,6 +481,16 @@ struct ReadDetail {
     /// How many data requests a refused window read needed, at least, against
     /// the allowance it may spend.
     planned_reads: Option<PlannedReads>,
+    /// The report kind and 1-based row of a Bills report whose row could not be
+    /// read (bridge#1091). A word and a number: never the bill's party or reference.
+    bill_row: Option<BillRowRef>,
+}
+
+/// See [`ReadDetail::bill_row`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BillRowRef {
+    report: Option<&'static str>,
+    row: u32,
 }
 
 impl ToolFailure {
@@ -744,6 +756,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             .downcast_ref::<bridge_tally_protocol::native_statement_reports::NativeStatementError>()
         {
             return Some(statement.code());
+        }
+        if let Some(outstandings) =
+            cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+        {
+            return Some(outstandings.code());
         }
         if let Some(derivation) =
             cause.downcast_ref::<crate::reports::statements::StatementsError>()
@@ -1199,6 +1216,54 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
     }
 }
 
+/// The next step for a refusal: its own code's, else its cause's, and the outstandings
+/// causes' only under the outstandings code.
+fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
+    refusal_remediation(code)
+        .or_else(|| cause.and_then(refusal_remediation))
+        .or_else(|| {
+            (code == "native_outstandings_read_failed")
+                .then(|| cause.and_then(outstandings_cause_remediation))
+                .flatten()
+        })
+}
+
+/// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
+/// only under that code: the same cause codes reach other tools through `?` sites that never
+/// read the Bills report, and the text below would be wrong for them. A refusal is whole:
+/// leaving one bill out would change the totals, so nothing is returned.
+fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
+    match cause {
+        cause if cause.starts_with("native_date_") => Some(
+            "A date in one row of Tally's Bills Receivable or Payable report is not one \
+             ComplyEaze Bridge can read, so no figures were returned: leaving that bill out would \
+             change the totals. When the refusal carries a `bill_row`, it names the report and the row \
+             in the order Tally sent them, which may not be the order on screen: look in that \
+             report for a bill with a very long credit period or an unusual date and tell the \
+             user what Tally shows. A refusal about the book's date window has no `bill_row`: tell \
+             the user what the cause says. The \
+             book did not change during the read, so retrying gives the same refusal. Do not retry.",
+        ),
+        cause if cause.starts_with("bills_") => Some(
+            "Tally's Bills Receivable or Payable report came back in a shape ComplyEaze Bridge \
+             does not recognise (the cause names the rule it broke; `bill_row` names the report \
+             and row when a row is the problem), so no figures were returned. The book did not \
+             change during the read, so retrying gives the same refusal. Do not retry; tell the \
+             user what the cause says.",
+        ),
+        "native_amount_invalid" | "native_arithmetic_overflow" => Some(
+            "A bill amount in Tally's Bills report could not be read exactly, so no figures were \
+             returned. Do not retry; tell the user what the cause says.",
+        ),
+        "native_tally_reported_failure" => Some(
+            "Tally answered the Bills report request with a failure, so no figures were returned. \
+             Ask the user to check that the company is open in Tally and that its Bills \
+             Receivable report opens, then call outstandings once more.",
+        ),
+        _ => None,
+    }
+}
+
 /// Whether a refusal code is one of the two that mean "this window asked for
 /// more than one read can carry".
 ///
@@ -1340,6 +1405,12 @@ impl ToolFailure {
                 .map(|failure| Box::new(evidence_from_runtime_read(failure.evidence.clone())))
         });
         let cause = runtime_refusal_cause(&error).filter(|cause| *cause != code);
+        let bill_row = error.chain().find_map(|cause| {
+            cause
+                .downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
+                .and_then(|error| error.bill_row())
+                .map(|(report, row)| BillRowRef { report, row })
+        });
         Self {
             code: code.to_string(),
             evidence,
@@ -1350,7 +1421,12 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            read_detail: None,
+            read_detail: bill_row.map(|bill_row| {
+                Box::new(ReadDetail {
+                    bill_row: Some(bill_row),
+                    ..ReadDetail::default()
+                })
+            }),
         }
     }
 
@@ -1521,9 +1597,7 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) =
-                    refusal_remediation(&code).or_else(|| cause.and_then(refusal_remediation))
-                {
+                if let Some(remediation) = remediation_for(&code, cause) {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
                     }
@@ -1642,9 +1716,20 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads) = read_detail
-                    .map(|detail| (detail.incomplete_read, detail.planned_reads))
+                let (incomplete_read, planned_reads, bill_row) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                        )
+                    })
                     .unwrap_or_default();
+                if let Some(bill_row) = bill_row {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["bill_row"] = json!({"report": bill_row.report, "row": bill_row.row});
+                    }
+                }
                 if let Some(read) = incomplete_read {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["partial_reason"] = json!(read.partial_reason);
@@ -1703,17 +1788,20 @@ impl Server {
         });
         evidence.read_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         evidence.duration_ms = Some((Utc::now() - started).num_milliseconds().max(0) as u128);
-        let response_value = redact_tool_response(
-            name,
-            json!({
-                "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
-                "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
-                "evidence": evidence,
-                "truncated": truncated,
-                "result": payload.get("result").cloned().unwrap_or(payload),
-            }),
-            self.settings.redaction,
-        );
+        // A tool that states its outcome in words carries it as `headline`
+        // beside `result`; it sorts ahead of `result` in the serialized form.
+        let headline = payload.get("headline").cloned();
+        let mut envelope = json!({
+            "company": payload.get("company").cloned().unwrap_or_else(|| json!({"state":"not_company_scoped"})),
+            "read_at": started.to_rfc3339_opts(SecondsFormat::Millis, true),
+            "evidence": evidence,
+            "truncated": truncated,
+            "result": payload.get("result").cloned().unwrap_or(payload),
+        });
+        if let Some(headline) = headline {
+            envelope["headline"] = headline;
+        }
+        let response_value = redact_tool_response(name, envelope, self.settings.redaction);
         let (response_value, _bytes_truncated, surviving_rows) =
             match enforce_response_byte_cap(response_value, self.settings.max_bytes) {
                 Ok(value) => value,

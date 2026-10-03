@@ -715,6 +715,113 @@ fn a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher() {
     assert_eq!(review["masters"]["state"], "current", "{review}");
 }
 
+/// A batch review record that names another batch or company, binds a
+/// voucher under another GUID, or was written under another fingerprint field
+/// list reads `stale` (#745). Each copy changes one binding and keeps every
+/// other one, so only the check under test can catch it.
+#[test]
+fn a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale() {
+    let imports = tempfile::tempdir().unwrap();
+    let line = posted_batch(2);
+    let rows = batch_rows(&line);
+    fs::write(masters_doubt_path(imports.path(), BATCH), MASTERS_DOUBT).unwrap();
+    let shown = admit_review(
+        imports.path(),
+        &line,
+        &verified(2),
+        &rows,
+        DoubtKind::Masters,
+        None,
+    )
+    .unwrap();
+    let current = || BatchAckRecord {
+        version: BATCH_RECORD_VERSION,
+        batch_id: BATCH.into(),
+        company_guid: line.company_guid.clone(),
+        doubt: "masters".into(),
+        doubt_sha256: sha256_hex(MASTERS_DOUBT),
+        vouchers: shown.vouchers.clone(),
+        voucher_fingerprint_fields: FINGERPRINT_FIELDS.into(),
+        shown: json!([]),
+        reviewed_at: "2026-09-26T00:00:00.000Z".into(),
+        local_account_label: None,
+    };
+    let review_of = |record: &BatchAckRecord| {
+        fs::write(
+            DoubtKind::Masters.ack_path(imports.path(), BATCH),
+            serde_json::to_vec(record).unwrap(),
+        )
+        .unwrap();
+        operator_review(imports.path(), &line, &rows, None).unwrap()["masters"].clone()
+    };
+    // Control: the record as written is current.
+    let review = review_of(&current());
+    assert_eq!(review["state"], "current", "{review}");
+    type Edit = fn(&mut BatchAckRecord);
+    let cases: [(&str, Edit, bool, Value); 4] = [
+        (
+            "another batch",
+            |record| record.batch_id = "bridge-00000000-0000-4000-8000-000000000001".into(),
+            false,
+            json!([]),
+        ),
+        (
+            "another company",
+            |record| record.company_guid = "00000000-0000-4000-8000-000000000002".into(),
+            false,
+            json!([]),
+        ),
+        (
+            "a voucher under another GUID",
+            |record| record.vouchers[1].guid = "g-other".into(),
+            true,
+            json!(["T2"]),
+        ),
+        (
+            "another fingerprint field list",
+            |record| record.voucher_fingerprint_fields = "v0:guid".into(),
+            true,
+            json!(["T1", "T2"]),
+        ),
+    ];
+    for (name, edit, covers_doubt, changed_vouchers) in cases {
+        let mut record = current();
+        edit(&mut record);
+        let review = review_of(&record);
+        assert_eq!(review["state"], "stale", "{name}: {review}");
+        assert_eq!(review["covers_doubt"], covers_doubt, "{name}: {review}");
+        assert_eq!(
+            review["vouchers_unchanged"], !covers_doubt,
+            "{name}: {review}"
+        );
+        assert_eq!(
+            review["changed_vouchers"], changed_vouchers,
+            "{name}: {review}"
+        );
+    }
+}
+
+/// A step doubt file that says `unmatched` but holds no `target_voucher_step`
+/// reads `unreadable`, never as a doubt a review could bind to (#745).
+#[test]
+fn a_step_doubt_without_its_step_reads_unreadable() {
+    let imports = tempfile::tempdir().unwrap();
+    let line = posted_batch(2);
+    let rows = batch_rows(&line);
+    let step_doubt = super::batch_step_doubt_path(imports.path(), BATCH);
+    fs::write(&step_doubt, br#"{"state":"unmatched"}"#).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
+    assert_eq!(
+        review["batch_step"],
+        json!({"state":"unreadable"}),
+        "{review}"
+    );
+    // Control: with its step, the same file is a doubt with no review yet.
+    fs::write(&step_doubt, STEP_DOUBT).unwrap();
+    let review = operator_review(imports.path(), &line, &rows, None).unwrap();
+    assert_eq!(review["batch_step"]["state"], "absent", "{review}");
+}
+
 /// A kind whose verdict is not yet recorded reads `pending`, not `null`: the
 /// verdict counts it as doubt, so the review reports it rather than hide it.
 #[test]

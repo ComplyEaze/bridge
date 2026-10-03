@@ -29,7 +29,8 @@ meaning none; `inventory` is [{item, qty?, rate?,
 amount?, direction?, qty_field_present?}], `qty` a number read as a float, `rate`/`amount` integer
 paise (debit positive), `direction` 1 or -1, each absent or null meaning None, `qty_field_present` a
 boolean defaulting to true when absent; any other type is refused, here and in
-`tests/edge_books.rs`), `cash`, `bank`, `own_account_terms`, `rules_without` (top-level rules tables
+`tests/edge_books.rs`), `cash`, `bank`, `own_account_terms`, `counter_cheque_terms` (a list of text, default []; the
+`[roles].counter_cheque_narration_terms` of `counter_cheques_40a3`), `rules_without` (top-level rules tables
 to drop, e.g. ["ledger_scrutiny"]; the Rust side must map each one, see `tests/edge_books.rs`),
 `creditors` (the trade-creditor ledger names `creditor_ageing_43bh` ages), `creditor_ageing`
 ({acceptance_lag_days?, supplier_classification?, mse_interest_ledgers?, post_year_payments?: {ledger:
@@ -86,7 +87,8 @@ def main() -> int:
     from tae.adapters.bank_documents import BankStatementDoc
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
-    from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, creditor_ageing_43bh,
+    from tae.audit_tests import (bank_reconciliation, book_keeping_quality, cash_book_integrity, counter_cheques_40a3,
+                                 creditor_ageing_43bh,
                                  high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
@@ -159,6 +161,9 @@ def main() -> int:
     eng.form26as = form26as
     aliases = dict(spec.get("deductor_aliases", {}))
     terms = frozenset(spec.get("own_account_terms", []))
+    counter_cheque_terms = typed(spec, "counter_cheque_terms",
+                                 lambda x: isinstance(x, list) and all(isinstance(t, str) for t in x),
+                                 "a list of text", absent=[], nullable=False)
     ca = spec.get("creditor_ageing", {})
     sd = spec.get("statutory_dues", {})
     post_year = {k: [(date.fromisoformat(d), a) for d, a in v] for k, v in ca.get("post_year_payments", {}).items()}
@@ -290,6 +295,8 @@ def main() -> int:
             set(bkq.get("writeoff_discount_ledgers", [])))),
         "cash_book_integrity": lambda: (cash_book_integrity,
                                         cash_book_integrity.run(eng, rules, cash, bank, terms)),
+        "counter_cheques_40a3": lambda: (counter_cheques_40a3, counter_cheques_40a3.run(
+            eng, rules, cash, bank, frozenset(counter_cheque_terms))),
         "creditor_ageing_43bh": lambda: (creditor_ageing_43bh, creditor_ageing_43bh.run(
             eng, rules, set(spec.get("creditors", [])), acceptance_lag_days=ca.get("acceptance_lag_days", 0),
             supplier_classification=ca.get("supplier_classification", {}), post_year_payments=post_year,

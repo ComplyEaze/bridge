@@ -1,0 +1,718 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "counter_cheques_40a3",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "1933c2ac379d908a",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); bank payments whose narration carries a configured counter-encashment term; Contra and any voucher with a cash leg excluded.",
+  "figures": [
+    {
+      "id": "counter_cheques_40a3.at_or_under_limit_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "2b6a41eed90675c8",
+      "definition_text": "Matched lines at or under the limit. Not tested for same-payee same-day aggregation: the payee is named only in the bank narration, so two such payments to one person on one day are not joined.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.at_or_under_limit_total",
+      "value": 4900000,
+      "unit": "paise",
+      "definition_sha256_16": "0e82b944249bfa7e",
+      "definition_text": "Sum of the at-or-under-limit matched lines.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v02",
+          "label": "Payment v02 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "v03",
+          "label": "Payment v03 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "v08",
+          "label": "Payment v08 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "v13",
+          "label": "Payment v13 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "v15",
+          "label": "Payment v15 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "v17",
+          "label": "Payment v17 on 2025-06-09"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.configured_terms_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "9d0dcec115af5eff",
+      "definition_text": "Bank-narration terms the client configuration identifies as counter-encashed or non-account-payee payments (roles.counter_cheque_narration_terms). Zero means this test was not configured and found nothing because it looked at nothing.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_capital",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "49cd150c5111200f",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Capital Account' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_duties_taxes",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "c62d6ab1ba1b3404",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Duties & Taxes' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_fixed_assets",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "23bed290c074cd83",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Fixed Assets' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_loans_advances_asset",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a36d014819dee2f1",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Loans & Advances (Asset)' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.excluded_total_loans_liability",
+      "value": 500000,
+      "unit": "paise",
+      "definition_sha256_16": "ed93452c7ce7e084",
+      "definition_text": "Matched bank payments debited to ledgers under Tally group 'Loans (Liability)' (not expenditure for s.40A(3)).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.matched_expenditure_count",
+      "value": 14,
+      "unit": "count",
+      "definition_sha256_16": "429d1998143f815b",
+      "definition_text": "Expenditure debit lines on bank payments whose narration carries a configured term, any amount.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.matched_expenditure_total",
+      "value": 14100001,
+      "unit": "paise",
+      "definition_sha256_16": "fc70dd978cecdba6",
+      "definition_text": "Sum of those expenditure debit lines, any amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "v02",
+          "label": "Payment v02 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "v03",
+          "label": "Payment v03 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "v08",
+          "label": "Payment v08 on 2025-06-04"
+        },
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "v13",
+          "label": "Payment v13 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "v15",
+          "label": "Payment v15 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "v17",
+          "label": "Payment v17 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.over_limit_count",
+      "value": 7,
+      "unit": "count",
+      "definition_sha256_16": "1deba0b3c698bf46",
+      "definition_text": "Of those, lines where the single payment exceeds the s.40A(3) limit (1000000 paise).",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.over_limit_total",
+      "value": 9200001,
+      "unit": "paise",
+      "definition_sha256_16": "5a5ff41058846f1d",
+      "definition_text": "Sum of the over-limit lines above.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-06-01"
+        },
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-06-02"
+        },
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-06-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-01_d28d5ed0",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "94fa24bc20edb2aa",
+      "definition_text": "One bank payment on 2025-06-01 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-06-01"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-02_b32c1007",
+      "value": 1000001,
+      "unit": "paise",
+      "definition_sha256_16": "8e1a11f883fe6dbf",
+      "definition_text": "One bank payment on 2025-06-02 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-06-02"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-05_c9e72aa9",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "e01a01ce942cc3eb",
+      "definition_text": "One bank payment on 2025-06-05 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-06-05"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-08_711ba2e1",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "1440ae6be654175a",
+      "definition_text": "One bank payment on 2025-06-08 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-08_8995b3d9",
+      "value": 1100000,
+      "unit": "paise",
+      "definition_sha256_16": "1440ae6be654175a",
+      "definition_text": "One bank payment on 2025-06-08 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-09_da4fc2d6",
+      "value": 2000000,
+      "unit": "paise",
+      "definition_sha256_16": "1eb1604f6e64597c",
+      "definition_text": "One bank payment on 2025-06-09 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-09"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_amount_2025-06-10_7b6bc198",
+      "value": 1200000,
+      "unit": "paise",
+      "definition_sha256_16": "8c385cfafc19f958",
+      "definition_text": "One bank payment on 2025-06-10 debited to an expense ledger, narration carrying a configured counter-encashment term.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-01_d28d5ed0",
+      "value": "COUNTER, counter",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-02_b32c1007",
+      "value": "bearer",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-05_c9e72aa9",
+      "value": "straße",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-08_711ba2e1",
+      "value": "COUNTER, counter",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-08_8995b3d9",
+      "value": "COUNTER, counter",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-09_da4fc2d6",
+      "value": "ﬁnal",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    },
+    {
+      "id": "counter_cheques_40a3.row_terms_2025-06-10_7b6bc198",
+      "value": "COUNTER, counter",
+      "unit": "text",
+      "definition_sha256_16": "603b9fd2cfee877d",
+      "definition_text": "The configured narration term(s) this payment's bank narration carries.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-01_d28d5ed0",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-01_d28d5ed0"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-01_d28d5ed0"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v01",
+          "label": "Payment v01 on 2025-06-01"
+        }
+      ],
+      "title_sha256_16": "6fc52802b22c5895",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-01",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-02_b32c1007",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-02_b32c1007"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-02_b32c1007"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Rent",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v04",
+          "label": "Payment v04 on 2025-06-02"
+        }
+      ],
+      "title_sha256_16": "14bc198f7b6edfe5",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-02",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-05_c9e72aa9",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-05_c9e72aa9"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-05_c9e72aa9"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Straße Transport",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v10",
+          "label": "Payment v10 on 2025-06-05"
+        }
+      ],
+      "title_sha256_16": "ed09c0de54ee46bf",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-05",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-08_711ba2e1",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-08_711ba2e1"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-08_711ba2e1"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        }
+      ],
+      "title_sha256_16": "3c306d9a5a1da6ed",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-08",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-08_8995b3d9",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-08_8995b3d9"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-08_8995b3d9"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Rent",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v16",
+          "label": "Payment v16 on 2025-06-08"
+        }
+      ],
+      "title_sha256_16": "3c306d9a5a1da6ed",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-08",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-09_da4fc2d6",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-09_da4fc2d6"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-09_da4fc2d6"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v18",
+          "label": "Payment v18 on 2025-06-09"
+        }
+      ],
+      "title_sha256_16": "37c70ed8bc10f427",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-09",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    },
+    {
+      "id": "counter_cheques_40a3/s40a3/2025-06-10_7b6bc198",
+      "clauses": [
+        "s.40A(3)",
+        "3CD-21(d)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "counter_cheques_40a3.row_amount_2025-06-10_7b6bc198"
+        },
+        {
+          "name": "narration_terms",
+          "figure_id": "counter_cheques_40a3.row_terms_2025-06-10_7b6bc198"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Wages",
+          "label": ""
+        },
+        {
+          "kind": "voucher",
+          "id": "v20",
+          "label": "Payment v20 on 2025-06-10"
+        }
+      ],
+      "title_sha256_16": "6b9e77463d10efb3",
+      "title_text": "Bank payment by a non-account-payee instrument over the s.40A(3) limit on 2025-06-10",
+      "limits_sha256_16": "632e13e2df33732d",
+      "limits_text": [
+        "The instrument is inferred from the bank narration only; the cheque itself or the bank's paid-cheque record shows whether it was crossed account payee.",
+        "Rule 6DD exceptions are not visible from the books; wages have no general exception.",
+        "Rows are per payment: sub-limit payments to the same person on the same day are not joined, so this list can understate, never overstate, the payments over the limit."
+      ],
+      "ask_client_sha256_16": "451a4cb8c680e02a",
+      "ask_client_text": [
+        "Provide the cheque (or the bank's paid-cheque image) for this payment and name the payee.",
+        "State whether any Rule 6DD exception applies, with the supporting record."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-2",
+      "subject": "v19",
+      "detail": "Payment v19 2025-06-10 lines sum 1500000"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 1500000 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "counter_cheques_40a3.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

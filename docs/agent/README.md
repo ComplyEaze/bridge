@@ -893,8 +893,9 @@ covers only the identity and marks reads it sent.
   64 MiB); a window larger than that is not held and its
   result carries no `snapshot`. A write through this server drops the company's
   held windows. The desktop screen holds nothing. A later page is served only
-  for the same question: it must repeat the dates, the voucher-type selector and
-  the `ledger` argument exactly as on the first page; a differently spelled
+  for the same question: the same dates (a date is the same question however it
+  is written, `2026-08-01` or `20260801`), the same voucher-type selector and the
+  `ledger` argument exactly as typed on the first page; a differently spelled
   `ledger` is a different question and reads the whole window again.
 - **What a page cannot see.** A change that moves neither mark. The screen
   actions measured so far each moved a mark (§11c.5, one run each: a voucher
@@ -1354,8 +1355,17 @@ that post's binding for good.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
-edit in Tally), is `sent_not_attributed`, never `not_found`. A binding refusal
-is final: an edit to one voucher of a batch in Tally before the binding is made
+edit in Tally), is `sent_not_attributed`, never `not_found`. In the post's own
+readback only, when the post sent one voucher and its own answer from Tally
+reported every counter, created none and reported one exception, with nothing
+else counted, that voucher is `tally_reported_not_created` instead
+(bridge#1108). The person is told to check that it is not in Tally and enter it
+there by hand, not through Tally's Import menu. A later `verify_import` never
+reads the post's answer, since someone may have entered the voucher by hand and
+edited it since: it reads `sent_not_attributed`. A batch is never read as not
+created: a partial commit's count does not say which voucher Tally rejected, and
+no batch Tally rejected whole has been captured. A binding refusal is final: an
+edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
@@ -1493,7 +1503,14 @@ source observations carry local evidence.
 billed totals explicitly scoped to open bills, four overdue-age buckets, an
 `unaged` bucket for future-due or unobserved ages, top parties,
 open bills, and unallocated counts and directional totals; a refused runtime read instead has `state: "partial"` and its
-exact `partial_reason`. `ledger_movement` returns literal-window voucher
+exact `partial_reason`. A Bills report row whose dates Bridge cannot read refuses the whole
+read (leaving a bill out would change the totals) with its `cause` (a typed code
+for the rule that failed), a `bill_row` (`report`, `receivable` or `payable`, and
+the 1-based `row` in the order Tally sent them: never the bill's party, reference
+or date) and a next step. A refusal that is not about one row (an amount, the
+shape of the report, the book window) has a `cause` and no `bill_row`. A due date
+printed with a four-digit year of 2100 or later is read as written; no other form
+is added (protocol reference section 12a.3, one observation). `ledger_movement` returns literal-window voucher
 movement with exact decimal `opening`, `debit`, `credit`, `closing`, parent,
 and `vouchers_touching`. `ledger_masters` accepts `fields: "compliance"` to
 return the paired party-master GSTIN/PAN/MSME/bank/IFSC/email/phone/state and
@@ -1507,6 +1524,21 @@ not the current year's opening: for a period's opening, use `trial_balance` or
 The unavailable `changed_since` implementation must not be used as
 change-enumeration evidence; its retained internal response states that
 deletion detection is unsupported.
+
+## The plain headline
+
+A result may carry a top-level `headline` beside `result`, in words and built only from the typed
+state the tool already has (never from the result's text): `lead` names the company (in quotes), the
+exact period (`1 Apr 2026 to 2 Sep 2026`, never `01/04/2026`) and the state, and `rows` says which rows
+this response lists. A read with any gap is `Partial` and its lead names every gap, with counts; a
+read with none says it covered every ledger. The type that decides this cannot build a whole read
+beside a gap. The headline sorts ahead of `result` in the serialized form (the keys of a response
+are in alphabetical order), so it is read before the figures. When a byte cap trims the page of rows
+the headline lists, the `rows` sentence is restated from the rows that are left, and `page` (`offset`,
+`shown`, `total`) keeps the numbers it is made from; a headline that cannot be restated loses its
+`rows` sentence rather than keeping a stale one. A partial read names every gap with its counts, and
+the result names up to 20 ledgers of each kind that were left out. The codes stay in `result`. So far `trial_balance` carries one; the other
+read tools and the refusals follow.
 
 ## Protocol and migration notes
 

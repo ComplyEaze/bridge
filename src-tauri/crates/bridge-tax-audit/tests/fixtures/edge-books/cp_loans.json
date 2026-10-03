@@ -1,0 +1,436 @@
+{
+ "comment": "cash_payments_40a3, s.269SS/269T candidates per voucher, loan ledger and side: a receipt split over two lines of one ledger (one acceptance, summed), two lines each over the limit, both sides of one ledger on one voucher (never netted, the id and the text say which side, an opposite entry shown), a transfer between loans on a voucher whose cash moved the other way, a voucher with a blank GUID named by its number, an amount exactly at the limit, a zero line on a ledger that also has a real side, an acceptance with opposite entries on two other loans, a ledger with one side over the limit and the other under (still suffixed by its side), a candidate whose GUID a Contra voucher also carries (told apart by its place), two vouchers sharing a GUID on one day, told apart by their place after a Contra voucher, a repayment, a zero line, a side under the limit, a voucher whose cash nets to nothing, no cash line, a Contra voucher, and a ledger configured with the client's loans beside others not.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null,
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Unsecured Loans": "Loans (Liability)"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_loans-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-cp_loans-001"
+  },
+  {
+   "name": "Loan X",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-cp_loans-002"
+  },
+  {
+   "name": "Loan Y",
+   "chain": [
+    "Loans (Liability)"
+   ],
+   "guid": "edge-cp_loans-003"
+  },
+  {
+   "name": "Loan Z",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-cp_loans-004"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "k00",
+   "date": "2025-07-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Edge Bank",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "k01",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan X",
+     -3000000
+    ],
+    [
+     "Loan X",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "k02",
+   "date": "2025-07-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -1500000
+    ],
+    [
+     "Loan Y",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "k03",
+   "date": "2025-07-04",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     5000000
+    ],
+    [
+     "Loan Y",
+     -2500000
+    ],
+    [
+     "Loan Y",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "k04",
+   "date": "2025-07-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Loan X",
+     -4000000
+    ],
+    [
+     "Loan X",
+     3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k05",
+   "date": "2025-07-06",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -500000
+    ],
+    [
+     "Loan X",
+     -3000000
+    ],
+    [
+     "Loan Z",
+     3500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-07",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ],
+   "number": "LV/6"
+  },
+  {
+   "guid": "dup",
+   "date": "2025-07-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup",
+   "date": "2025-07-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k07",
+   "date": "2025-07-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Cash",
+     -3000000
+    ],
+    [
+     "Loan X",
+     3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k08",
+   "date": "2025-07-11",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan X",
+     0
+    ],
+    [
+     "Loan Y",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "k09",
+   "date": "2025-07-12",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Cash",
+     -1000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k10",
+   "date": "2025-07-13",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k11",
+   "date": "2025-07-14",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k12",
+   "date": "2025-07-15",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Z",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k13",
+   "date": "2025-07-16",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Z",
+     -1000000
+    ],
+    [
+     "Loan Z",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "k14",
+   "date": "2025-07-17",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     2000000
+    ],
+    [
+     "Loan Z",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "k16",
+   "date": "2025-07-18",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Loan X",
+     -3000000
+    ],
+    [
+     "Loan Y",
+     1500000
+    ],
+    [
+     "Loan Z",
+     1500000
+    ]
+   ]
+  },
+  {
+   "guid": "k17",
+   "date": "2025-07-19",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     2000000
+    ],
+    [
+     "Loan Y",
+     -3000000
+    ],
+    [
+     "Loan Y",
+     1000000
+    ]
+   ]
+  },
+  {
+   "guid": "k18",
+   "date": "2025-07-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     3000000
+    ],
+    [
+     "Loan Z",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "k18",
+   "date": "2025-07-21",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     1000000
+    ],
+    [
+     "Edge Bank",
+     -1000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "cash_payments_40a3"
+ ],
+ "loan_ledgers": [
+  "Loan X"
+ ]
+}

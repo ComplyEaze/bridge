@@ -390,8 +390,8 @@
       "id": "high_value_register.cash_payment_day_row_amount_cash_payment_day_2025-06-01_0e76c1f2",
       "value": 21000000,
       "unit": "paise",
-      "definition_sha256_16": "6eecf31f7b0ef791",
-      "definition_text": "Cash payment from/to one party ledger (tag 0e76c1f2) on 2025-06-01, summed across every population voucher that day.",
+      "definition_sha256_16": "93bbb0939e141c98",
+      "definition_text": "Cash payments on 2025-06-01 on vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payees' side of each voucher.",
       "evidence": [
         {
           "kind": "voucher",
@@ -685,8 +685,8 @@
       "id": "high_value_register.cash_receipt_day_row_amount_cash_receipt_day_2025-05-11_0e76c1f2",
       "value": 23600000,
       "unit": "paise",
-      "definition_sha256_16": "36c597ec7186c2ef",
-      "definition_text": "Cash receipt from/to one party ledger (tag 0e76c1f2) on 2025-05-11, summed across every population voucher that day.",
+      "definition_sha256_16": "843e7a455ae493b7",
+      "definition_text": "Cash receipts on 2025-05-11 on vouchers with no party ledger (tag 0e76c1f2), whatever name they print, summed: the payers' side of each voucher.",
       "evidence": [
         {
           "kind": "voucher",
@@ -1239,19 +1239,18 @@
           "label": "Payment h14 on 2025-06-01"
         }
       ],
-      "title_sha256_16": "aa7a9b9818a342ef",
-      "title_text": "Cash paid to one unidentified party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-06-01 -- reportable in clause 31(bc)",
-      "limits_sha256_16": "e50a7cba7126da10",
+      "title_sha256_16": "49a9d24074d66df6",
+      "title_text": "Cash paid on 2025-06-01 on vouchers that do not name the payee: the total is at or over the s.269ST(a) limit; whether any one person was paid that much is not known",
+      "limits_sha256_16": "57b2e370493d45df",
       "limits_text": [
         "s.269ST(a) is a duty on the receiver of the cash, not the payer ('No person shall receive...'); a payment by the assessee is not a books-testable exposure for the assessee under s.269ST -- it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",
         "Books test covers limb (a) only. Limbs (b)/(c) need bill-wise/event linkage the books do not carry.",
-        "No party ledger is on this voucher -- the books cannot name the counterparty; this is grouped as one transaction (limb (b) candidate) rather than dropped or scattered across its tax/round-off lines."
+        "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "0de650d783f52cda",
+      "ask_client_sha256_16": "a656eb7015e098a1",
       "ask_client_text": [
-        "Confirm whether this payment is genuinely to one party.",
         "Confirm whether limbs (b)/(c) apply (documents needed).",
-        "Supply the counterparty's name and PAN for this transaction."
+        "Who was paid on each of these vouchers, and did any one person reach the s.269ST(a) limit this day? Supply each counterparty's name and PAN."
       ]
     },
     {
@@ -1460,18 +1459,17 @@
           "label": "Receipt h03 on 2025-05-11"
         }
       ],
-      "title_sha256_16": "40add653f1a17fe2",
-      "title_text": "Cash received from one unidentified party at or over the s.269ST(a) limb (a) person-per-day threshold on 2025-05-11",
-      "limits_sha256_16": "ebef0053f555e468",
+      "title_sha256_16": "c6b16b314e2ef870",
+      "title_text": "Cash received on 2025-05-11 on vouchers that do not name the payer: the total is at or over the s.269ST(a) limit; whether any one person paid that much is not known",
+      "limits_sha256_16": "b7903e4e6e6b42d5",
       "limits_text": [
         "Books test covers limb (a) (aggregate per person per day) only. Limbs (b) (a single transaction) and (c) (receipts relating to one event or occasion) need bill-wise/event linkage the books do not carry (see the single-transaction and event views below).",
-        "No party ledger is on this voucher -- the books cannot name the counterparty; this is grouped as one transaction (limb (b) candidate) rather than dropped or scattered across its tax/round-off lines."
+        "No party ledger is on these vouchers -- the books cannot name the counterparty. The row holds every voucher of the day with no party ledger, whatever name it prints (each usable printed name is shown with the row), so it may be one person's money or several people's; none is dropped or scattered across its tax/round-off lines."
       ],
-      "ask_client_sha256_16": "64e6ef4d918d446c",
+      "ask_client_sha256_16": "be2294a46a8bfb61",
       "ask_client_text": [
-        "Confirm whether this receipt is genuinely from one party.",
         "Confirm whether limbs (b)/(c) apply (documents needed).",
-        "Supply the counterparty's name and PAN for this transaction."
+        "Who paid on each of these vouchers, and did any one person reach the s.269ST(a) limit this day? Supply each counterparty's name and PAN."
       ]
     },
     {

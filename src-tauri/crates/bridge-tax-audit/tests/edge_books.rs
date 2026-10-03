@@ -28,10 +28,10 @@ use bridge_tax_audit::rules::Rules;
 use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, cash_book_integrity,
-    counter_cheques_40a3, creditor_ageing_43bh, high_value_register, ledger_scrutiny,
-    loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1, statutory_dues_43b,
-    stock, stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts,
-    PartnersConfig, Tds26asConfig, TdsConfig,
+    cash_payments_40a3, counter_cheques_40a3, creditor_ageing_43bh, high_value_register,
+    ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, stale_balances_41_1,
+    statutory_dues_43b, stock, stock_read, tds_payees, tds_tcs_26as, trial_balance,
+    twentysixas_receipts, PartnersConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
 
@@ -615,6 +615,25 @@ fn check(name: &str) {
                 let c = cash_book_integrity::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "cash_payments_40a3" => {
+                // As `parity/edge_golden.py` runs it: the configured loan ledgers and the
+                // round-off ledgers as given. The reference module has no `check_invariants`.
+                let set = |k: &str| -> BTreeSet<String> { strs(&s[k]).into_iter().collect() };
+                let r = cash_payments_40a3::run(
+                    &book,
+                    &rules,
+                    &cash,
+                    &bank,
+                    &set("loan_ledgers"),
+                    &set("round_off_ledgers"),
+                )
+                .unwrap();
+                let rust = canonical_test_result(&book, &r, None).unwrap();
+                let golden = common::golden_named(&format!("edge.{name}.{test}"));
+                let diffs = compare(&golden, &rust, None).unwrap();
+                assert!(diffs.is_empty(), "{name} {test}:\n{}", diffs.join("\n"));
+                continue;
+            }
             "creditor_ageing_43bh" => {
                 let creditors: BTreeSet<String> = strs(&s["creditors"]).into_iter().collect();
                 let r = creditor_ageing_43bh::run(
@@ -804,6 +823,7 @@ fn check(name: &str) {
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
+                    bank_statement_refused: s["bank_statement_refused"].as_str(),
                 };
                 let r = high_value_register::run(&book, &rules, &inputs).unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
@@ -863,11 +883,12 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 18] = [
+const EDGE_TESTS: [&str; 19] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
     "cash_book_integrity",
+    "cash_payments_40a3",
     "counter_cheques_40a3",
     "creditor_ageing_43bh",
     "high_value_register",
@@ -1372,6 +1393,7 @@ fn a_journal_on_one_ledger_is_refused_not_panicked() {
         s194n_recipient_type: None,
         round_off_ledgers: &none,
         counterparty_type_by_ledger: &no_types,
+        bank_statement_refused: None,
     };
     let result = std::panic::catch_unwind(|| high_value_register::run(&book, &rules, &inputs))
         .expect("refused, not panicked");

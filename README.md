@@ -120,15 +120,17 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
 - A build of 0.4.2 on a Mac, on 3 October 2026. What was run: the package CI
   built for the release candidate, not the published file. The maintainer
   installed it in Claude Desktop on a Mac that had 0.4.1: it did not replace
-  0.4.1 but installed as a second extension, because the author line changed;
-  the settings did not carry over. `tally_status` and `list_companies` then
+  0.4.1 but installed as a second extension (the author line changed in 0.4.2,
+  and Claude Desktop builds an extension's identity partly from it); the
+  settings did not carry over. `tally_status` and `list_companies` then
   answered against licensed TallyPrime Silver 7.1 holding the lab's own
   companies. The record is our dated notes, kept privately. What was not run:
   the published file is built again on another runner, and its program file
   differs from the one tested. We ran the published Mac file without Tally: it
-  reports version 0.4.2, lists 22 tools, and refuses a call with the Terms
-  setting off. We have not installed the published file in Claude Desktop, and
-  nobody on our side has run the Windows package.
+  reports version 0.4.2, lists 22 tools with posting off (24 with it on), and
+  refuses a call with the Terms setting off. We have not installed the
+  published file in Claude Desktop, and nobody on our side has installed the
+  Windows package in Claude Desktop on a Windows PC.
 
 Not yet run by us in a controlled test: posting with a published package
 against a live TallyPrime; each way of declining in the Windows approval window

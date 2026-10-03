@@ -1,9 +1,9 @@
 # Security and privacy
 
 This page answers, in one place, what a CA or a firm's IT person asks before
-installing ComplyEaze Bridge next to client books. It describes the latest
-published release as of 0.4.1; release 0.4.2 followed on 3 October 2026, and this
-page was not read again against its tag (the 0.4.2 notes list what changed). It
+installing ComplyEaze Bridge next to client books. It describes release 0.4.1
+as read at that release; release 0.4.2, the latest, followed on 3 October 2026, and
+this page was not read again against its tag (the 0.4.2 notes list what changed). It
 was written from a reading of the source code of release 0.4.0, at the tag `mcp-v0.4.0`, on 2 October 2026, and updated
 for 0.4.1 only where the changes between the two tags change an answer on this
 page: the sections on network destinations (3) and on what it reads and

@@ -360,7 +360,10 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
                 | Validation::LedgerSpanSliceInvalid { .. }
                 | Validation::LedgerCountDiffers { .. }
                 | Validation::LedgerCountCompanyDiffers { .. }
-                | Validation::LedgerCountCompanyInvalid { .. }) => Some((error.safe_code(), false)),
+                | Validation::LedgerCountCompanyInvalid { .. }
+                | Validation::LedgerCountCompanyResponseTooLarge { .. }) => {
+                    Some((error.safe_code(), false))
+                }
                 error @ (Validation::LedgerSpanSliceResponseTooLarge { .. }
                 | Validation::CountedCatalogueTooLarge { .. }) => Some((error.safe_code(), true)),
                 _ => None,

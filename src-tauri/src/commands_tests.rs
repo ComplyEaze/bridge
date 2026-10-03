@@ -751,6 +751,12 @@ fn a_size_refused_party_master_export_names_the_size_not_a_validation_failure() 
             "ledger_count_company_invalid",
         ),
         (
+            Validation::LedgerCountCompanyResponseTooLarge {
+                source: anyhow::anyhow!("past the cap"),
+            },
+            "ledger_count_company_response_too_large",
+        ),
+        (
             Validation::CountedCatalogueTooLarge {
                 ledgers: 23_000,
                 estimated_bytes: 32_200_000,

@@ -1032,6 +1032,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              means Tally's answer to that request is not what ComplyEaze Bridge expects: call ledger_masters \
              with fields=basic instead."
         ),
+        "ledger_count_company_response_too_large" => Some(
+            "ComplyEaze Bridge counts this book's ledgers by AlterID span and asked Tally for the \
+             company's own count of its ledgers to check it, and the answer was larger than \
+             ComplyEaze Bridge's response limit, far more than one company's count can account \
+             for. No master was requested, and nothing was sent after that response. Retry once \
+             with the company left alone. A repeat means Tally's answer to that request is not \
+             what ComplyEaze Bridge expects: call ledger_masters with fields=basic instead.",
+        ),
         "ledger_count_catalogue_too_large" => Some(
             "The census counted more ledgers than one compliance read holds, so ComplyEaze Bridge would \
              read them in parts by parent group, but the catalogue that names their parents \

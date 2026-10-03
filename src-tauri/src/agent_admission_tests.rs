@@ -707,12 +707,15 @@ fn no_tool_description_names_the_product_by_its_bare_short_name() {
     }
 }
 
-/// Every shared input parameter of every tool carries a description (#1155):
-/// a tool that gains `company_guid`, a date window, paging, `snapshot_id`,
-/// `batch_id` or `as_of` without one fails here by name. A description a
-/// schema already wrote is kept, and a schema with no parameters gains none.
+/// Every input parameter of every listed tool carries a description (#1155):
+/// a tool that gains a parameter without one fails here by name. A description
+/// a schema already wrote is kept, and a schema with no parameters gains none.
+/// Three tools are held to the parameters many tools share only:
+/// `changed_since`, registered but not listed (`tool_definitions`), and the
+/// two lab-only import tools, compiled in only with the `lab-writes` feature;
+/// their own parameters were not read for this.
 #[test]
-fn every_shared_parameter_of_every_tool_is_described() {
+fn every_parameter_of_every_tool_is_described() {
     const SHARED_PARAMETERS: [&str; 8] = [
         "as_of",
         "batch_id",
@@ -741,12 +744,16 @@ fn every_shared_parameter_of_every_tool_is_described() {
                 .is_some_and(Value::is_null),
             "{name} gained a null properties"
         );
+        let shared_only = matches!(
+            name,
+            "changed_since" | "lab_import_masters" | "lab_import_vouchers"
+        );
         for (parameter, property) in tool["inputSchema"]["properties"]
             .as_object()
             .into_iter()
             .flatten()
         {
-            if !SHARED_PARAMETERS.contains(&parameter.as_str()) {
+            if shared_only && !SHARED_PARAMETERS.contains(&parameter.as_str()) {
                 continue;
             }
             assert!(

@@ -428,13 +428,15 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
 pub(in crate::agent) const COMPANY_GUID_DESCRIPTION: &str =
     "The company's company_guid, as list_companies returns it.";
 
-/// One line for a shared input parameter a tool's schema leaves undescribed
-/// (#1155): what it is, its format, and what leaving it out means. Each was
-/// read against the tool's own handling; a tool whose meaning differs has its
-/// own arm. Every date goes through `normalized_date`, which takes YYYYMMDD or
-/// YYYY-MM-DD, and every `limit` and `offset` here through `arg_positive_usize`
-/// and `arg_usize` against the server's row limit.
-fn shared_parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
+/// One line for an input parameter a tool's schema leaves undescribed (#1155):
+/// what it is, its format, and what leaving it out means. Each was read against
+/// the tool's own handling. The names many tools share come first, with an arm
+/// of its own where a tool's meaning differs: every date goes through
+/// `normalized_date`, which takes YYYYMMDD or YYYY-MM-DD, and every `limit` and
+/// `offset` here through `arg_positive_usize` and `arg_usize` against the
+/// server's row limit. The parameters of one tool follow, by tool; where the
+/// tool's description already explains one at length, its line points there.
+fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
     Some(match (tool, parameter) {
         (_, "company_guid") => COMPANY_GUID_DESCRIPTION,
         (_, "batch_id") => "The batch_id build_import_xml returned for the saved batch.",
@@ -448,13 +450,41 @@ fn shared_parameter_description(tool: &str, parameter: &str) -> Option<&'static 
         ("ledger_masters", "as_of") => "Optional, with fields=compliance only: the day the GSTIN in force is read for (YYYYMMDD or YYYY-MM-DD). Left out, this computer's date.",
         ("outstandings", "as_of") => "Optional: the day the open bills are read as of (YYYYMMDD or YYYY-MM-DD). Left out, this computer's date, and the date used is returned as result.as_of.",
         ("stock_summary", "as_of") => "The last day of the stock period, a 31 March (YYYYMMDD or YYYY-MM-DD). The period runs from 1 April, or the book's start if later.",
+        ("acknowledge_post_review", "doubt") => "Optional: the doubt this review records, masters (an approved ledger now resolves to another master) or batch_step (a batch only: its voucher mark's step was not confirmed). Left out, the one doubt observed; with both observed, name one (ack_doubt_ambiguous).",
+        ("ledger_masters", "fields") => "basic (the default) or compliance, which adds the party-master observations, each ledger's group ancestry and its gst_duty_head; the description says what each holds.",
+        ("ledger_masters", "group") => "Optional: return only the ledgers under this group name; which ones count follows group_scope.",
+        ("ledger_masters", "group_scope") => "With group: immediate (the default) matches only a ledger's own parent; ancestry matches any group in its resolved chain, the whole subtree.",
+        ("ledger_movement", "ledger") => "Optional: one ledger's name, spelled as in the book or differing only in ASCII case and spaces. Left out, every ledger. A name that does not resolve is refused before any voucher is read.",
+        ("masters", "kind") => "Which masters to list, one kind per call: voucher_types, godowns, units, stock_groups or groups (account groups).",
+        ("outstandings", "ageing_basis") => "Which date each open bill is aged from: due_date (the default) or bill_date. A bill whose date is after as_of has no age yet.",
+        ("outstandings", "detail") => "Optional, with party: bill_trail (each bill's allocations) or unadjusted (the party's on-account, advance and pending note allocations). It reads the company's vouchers; the description gives its cost and limits.",
+        ("outstandings", "direction") => "receivable, payable or both (the default). Direction follows the sign of each bill's balance, not the type of party.",
+        ("outstandings", "party") => "Optional, for detail: a party ledger's name, spelled as in the book or differing only in ASCII case and spaces.",
+        ("outstandings", "reference") => "Optional, with detail=bill_trail: one bill reference as open_bills lists it; the read then starts at the earliest date the reports list for that bill.",
+        ("outstandings", "top") => "How many parties to rank by gross exposure (default 25). It ranks parties only; page the bills with offset and limit.",
+        ("parse_bank_statement", "bank_ledger") => "The Tally ledger of this bank account, spelled as in the book; check it with validate_masters.",
+        ("parse_bank_statement", "closing_balance") => "The closing balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
+        ("parse_bank_statement", "mapping") => "Optional: one row per counterparty, spelled as counterparties lists it (case and spaces ignored), with the ledger to post it under and a treatment: auto (the default: a Payment when money leaves the bank, a Receipt when it arrives), contra (both legs are bank or cash ledgers; needs a ledger) or skip (a transfer another imported statement already carries). Cash lines are answered in cash_answers, not mapped.",
+        ("parse_bank_statement", "opening_balance") => "The opening balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
+        ("parse_bank_statement", "password_file") => "The path of a local file holding the statement's password, readable only by its owner. The password is never returned.",
+        ("parse_bank_statement", "statement_path") => "The path of the bank-statement PDF on this computer.",
+        ("parse_bank_statement", "suspense_ledger") => "The Tally ledger a line is posted to when no mapping or answer names one, tagged for the CA, spelled as in the book.",
+        ("stock_summary", "items") => "Optional: 1 to 50 stock item GUIDs, each once, to return only those items. A GUID not found is listed under items_not_found; the totals still cover the whole book.",
+        ("validate_masters", "ledgers") => "1 to 100 ledger names to bind against the live catalogue, each spelled as it will be written into a voucher.",
+        ("verify_import", "proof_sha256") => "On a later page only: the proof.sha256 the first page returned, so the page is served from that saved proof without reading Tally again.",
+        ("voucher_presence", "numbering") => "One entry per voucher type the proposals name, with its numbering method: manual, automatic or unknown. Under automatic, Tally discards a supplied number, so nothing is decided from it.",
+        ("voucher_presence", "vouchers") => "1 to 500 proposed vouchers to look for in the book; the description says what decides present, possibly_present and absent.",
+        ("vouchers", "ledger") => "Optional: only vouchers with an entry on this ledger, spelled as in the book or differing only in ASCII case and spaces.",
+        ("vouchers", "voucher_class") => "Optional, at most one of voucher_class, voucher_type_guid and voucher_type: a reserved class, matched however the book has renamed its types, child types included.",
+        ("vouchers", "voucher_type") => "Optional, at most one of the three: one voucher type's display name, matched ignoring ASCII case. A name that could mean more than one class or type is refused (voucher_type_ambiguous).",
+        ("vouchers", "voucher_type_guid") => "Optional, at most one of the three: exactly one voucher type, by its GUID. Another company's GUID is refused (voucher_type_guid_foreign).",
         _ => return None,
     })
 }
 
-/// Gives each shared parameter of `name`'s schema its line, unless the schema
-/// already describes it.
-fn describe_shared_parameters(name: &str, schema: &mut Value) {
+/// Gives each parameter of `name`'s schema its line, unless the schema already
+/// describes it.
+fn describe_parameters(name: &str, schema: &mut Value) {
     // `get_mut`, not indexing: indexing a schema with no `properties` would
     // insert one as null.
     let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) else {
@@ -464,7 +494,7 @@ fn describe_shared_parameters(name: &str, schema: &mut Value) {
         if property.get("description").is_some() {
             continue;
         }
-        if let Some(line) = shared_parameter_description(name, parameter) {
+        if let Some(line) = parameter_description(name, parameter) {
             property["description"] = json!(line);
         }
     }
@@ -652,7 +682,7 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     Some(ToolEffect::TallyPost) | None => description,
                 };
                 let mut input_schema = input_schema;
-                describe_shared_parameters(name, &mut input_schema);
+                describe_parameters(name, &mut input_schema);
                 let mut tool = json!({"name": name, "description": description, "inputSchema": input_schema});
                 if let Some(effect) = effect {
                     tool["annotations"] = effect.annotations();

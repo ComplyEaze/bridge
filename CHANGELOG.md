@@ -17,28 +17,44 @@ Apache-2.0 builds from current source stays unambiguous.
 ### In plain words: ComplyEaze Bridge 0.4.2, since 0.4.1 (2 Oct 2026)
 
 These changes are in ComplyEaze Bridge 0.4.2. Each line names the pull
-requests it comes from, except where it names an issue.
+requests it comes from, except where it names an issue. A "mark" below is a
+counter Tally keeps that moves when vouchers or ledgers change.
 
 **Should I upgrade?**
 
+- **The number is a patch number on a larger change.** 0.4.2 adds a tool,
+  asks you about ledger names it used to read, and once you post with it you
+  cannot go back to 0.4.1. The number 0.5.0 is kept for a larger release.
 - **If you use 0.3.0 or 0.4.0 on Windows: yes.** 0.4.2 contains everything in
   0.4.1, including the fix for the network-path forms of the bank-statement
   path issue published as
   [advisory GHSA-vm5g-r3p7-wxx7](https://github.com/ComplyEaze/bridge/security/advisories/GHSA-vm5g-r3p7-wxx7).
-  Some paths still pass; the advisory lists which.
+  Some paths still pass; the advisory lists which. If you cannot upgrade yet,
+  follow the advisory's steps.
+- **On a Mac with 0.3.0 or 0.4.0: recommended, though not urgent.** The
+  advisory rates the issue low there, and upgrading closes it there too.
 - **If you use 0.4.1: nothing below is urgent.** The reasons to upgrade are
   that a ledger name that only nearly matches now makes the assistant ask you
-  instead of being read, later pages of a long voucher list are served
-  faster, and a post that Tally refuses is now named plainly. If you turn
-  posting on, read the next point first.
-- **If you turn posting on: the way a posted voucher is matched has changed.**
+  instead of being read, later pages of a long voucher list can be served
+  faster, and a post that Tally refuses is now named plainly. If you asked
+  0.4.1 about a ledger by a name that was not its exact spelling, check that
+  the answer named the ledger you meant (#1092).
+- **If you turn posting on, the way a posted voucher is matched has changed.**
   A post no longer adds a ComplyEaze Bridge tag to the narration, and each
   voucher is matched by its place in the run of changes Tally records for that
-  post (#1054). From the first voucher you post with 0.4.2, do not go back to
-  0.4.1 or earlier: the record of what was sent (the import journal) then holds
-  fields an older version refuses to read. Before that first post, going back
-  is harmless. Posting is off in a new install; check the setting after you
-  upgrade, since an earlier default may still be saved as on.
+  post (#1054). From the first post you approve with 0.4.2, even one Tally
+  refuses, do not run 0.4.1 or earlier, of the extension or of the desktop app,
+  on this computer: the record of what was sent (the import journal) then holds
+  fields they refuse to read, and they stop preparing, posting and checking
+  vouchers. Before that first post, going back is harmless.
+- **If you turn posting on: `voucher_presence` cannot recognise these
+  vouchers.** It still finds a ComplyEaze Bridge voucher only by the tag, so a
+  voucher posted with 0.4.2 that someone then edited or re-dated in Tally can
+  read `absent` there. Check what ComplyEaze Bridge posted with `verify_import`,
+  never with `voucher_presence`, before entering any of it again by hand. In
+  Tally's own screens these vouchers can no longer be told from hand-entered
+  ones by their narration. Posting is off in a new install; check the setting
+  after you upgrade, since an earlier default may still be saved as on.
 - **How:** ComplyEaze Bridge does not update itself. Follow the
   [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
   (1) close any other program that runs ComplyEaze Bridge; (2) in Claude
@@ -57,96 +73,126 @@ requests it comes from, except where it names an issue.
   head on that ledger's master, never from a name or an amount. It reads as
   `purchase_register` does, and it is a register of the books, not a GST
   return. A Credit Note keeps Tally's signs (nothing is netted or flipped, so
-  add signed amounts). It was run against a live Tally, once each, on
+  add signed amounts), and may be a sales return or a credit note to a supplier:
+  each row says the party's group and the tool does not choose. A Debit Note is
+  listed apart, without an amount. The state-side tax head has two recognised
+  forms, `state_tax` and `sgst_utgst`, for the same side, and a row of a kind
+  that was not run live is marked `not_measured_live`. It needs a book whose
+  base currency is INR and refuses a book too large to list. It reads the whole
+  date window and the ledger masters twice, and again for every page (about 100
+  requests to Tally on two small books), so use a narrow date range: its cost on
+  a large book was not measured. It was run against a live Tally, once each, on
   synthetic companies: one taxed Sales item invoice, one untaxed one (read by
   an earlier build) and one Credit Note. What was not shown is under "Known
   limits" (#1009).
-- **Later pages of a long voucher list are served from the first page's
-  read.** `vouchers` no longer reads the whole window again for every page. On
-  one synthetic book, one month of 2,542 vouchers read in a release build, the
-  first page took about 66 seconds and a later page about 1 second (one run
-  each). A later page that names the first page's `snapshot_id` is refused if
-  the company's books changed in a way that moves their marks, instead of
-  continuing from a different read (#1053, #1118).
+- **Later pages of a long voucher list can be served from the first page's
+  read.** `vouchers` no longer reads the whole window again for every page when
+  the window was read `complete`, which means counted first. On one synthetic
+  book, one month of 2,542 vouchers read in a release build, the first page took
+  about 66 seconds and a later page about 1 second (one run each). A later page
+  that names the first page's `snapshot_id` is refused if the company's marks
+  moved, instead of continuing from a different read. The read is held for ten
+  minutes. A small or new company is not counted, so its window reads `partial`
+  and every page reads it again. A later page that does not name the
+  `snapshot_id`, after the books moved or the hold ran out, reads afresh and says
+  that its offsets do not continue the earlier pages (`earlier_snapshot`): start
+  again from the first page. A date is the same question as `2026-08-01` or
+  `20260801`, while the `ledger` argument must be repeated exactly as typed
+  (#1053, #1118).
 - **The assistant asks you which ledger you mean instead of guessing.** When
   `ledger_movement`, `vouchers` (with a ledger) or the party detail of
   `outstandings` cannot find the name you gave, the refusal can now list the
-  ledgers it may mean, and the assistant is told to ask you, even when there is
-  one candidate, and never to choose. A name is now read without asking only
-  when it matches a ledger's spelling exactly, or differs only in ASCII upper or
-  lower case or spaces. Before, a name that differed by a dropped symbol, an
-  accent or run-together words was read if one ledger had the same letters and
-  digits; on a synthetic lab book that read the truncated name `Input Cess (`
-  as a different ledger, `Input Cess`. Each answer for a named ledger now says
-  how the name matched (#1057, #1092, #1095, #1127).
+  ledgers it may mean (not when party names are masked), and the assistant is
+  told to ask you, even when there is one candidate, and never to choose. A name
+  is now read without asking only when it matches a ledger's spelling exactly,
+  or differs only in upper or lower case English letters or in spaces. Before, a
+  name that differed by a dropped symbol, an accent or run-together words was
+  read if one ledger had the same letters and digits; in a lab list of synthetic
+  ledger names that read the truncated name `Input Cess (` as a different
+  ledger, `Input Cess`. Each answer for a named ledger now says how the name
+  matched. A name with a Unicode space in it asks, as a test now pins (#1057,
+  #1092, #1095, #1127).
 - **The assistant is told how to pick a company, and to say which one it
-  used.** `list_companies` now opens with the rule (use the one open company
-  only when you named no client or exactly one matches; otherwise ask), and
-  Claude Desktop is sent the same rule at start-up, with the instruction to
-  name the company, dates and ledger in the first line of an answer, and what
-  to do after a refusal. The start-up text follows your posting setting: with
-  posting off or import only, it says this connection cannot post to Tally. It
-  also tells the assistant to ask before reading vouchers over more than a
-  month unless you gave the period, and before an `outstandings` party detail
-  (#1058, #1113).
+  used.** `list_companies` now begins "Start here" and states the rule (use the
+  one open company only when you named no client or exactly one matches;
+  otherwise ask, and never guess), and Claude Desktop is sent the same rule at
+  start-up, with the instruction to name the company, dates and ledger in the
+  first line of an answer, and what to do after a refusal. The start-up text
+  follows your posting setting: with posting off or import only, it says this
+  connection cannot post to Tally. It also tells the assistant to ask before
+  reading vouchers over more than a month unless you gave the period, and
+  before an `outstandings` party detail (#1058, #1113).
 - **A plain opening line on three reads.** `trial_balance`,
-  `profit_and_loss` and `balance_sheet` now begin with a `headline`: the
-  company, the exact period and whether the figures were established, partial
-  or not established, in words. The codes and figures stay in `result`
-  unchanged (#1062, #1066).
+  `profit_and_loss` and `balance_sheet` now begin with a `headline` when they
+  answer: the company, the exact period and, in words, whether the figures were
+  read for every ledger, partial, or established or not. A refusal has no
+  headline yet. The codes and figures stay in `result` unchanged (#1062, #1066).
 - **`outstandings` says what it counted and which date it used.** It returns
   `open_bills_total` (every open bill in that direction, counted before
   paging) and `open_bills_shown`, so a cut page no longer reads like the whole
-  list; it returns the `as_of` date it used when you gave none; `tally_status`
-  returns today's date on this computer, which is what an omitted `as_of`
-  defaults to (#1049, #1079).
+  list (on a partial read these cover base-currency ledgers only). It always
+  returns the `as_of` date it used, which is today's date on this computer when
+  you gave none; `tally_status` returns that date as `today` (#1049, #1079).
 - **Pages that are not in the package:** a Questions page on the install site
   with a table of what it can and cannot do, a before-you-start list and
   plain answers, including how far our liability goes and how to reach us
   (#1061, #1084); a "What it costs" section in the README and a line on the
   Download page: ComplyEaze has set no price and sells no licence today (#1059);
   the Privacy Policy (version 2026-10.1, effective 3 October 2026) and every
-  footer now name SPMS Comply Eaze Solutions LLP with its registration number
-  and registered office, the policy adds a purpose for publishing written
-  quotes you consent to, and says a grievance is answered within one month
-  (it said 30 days) (#1104). The site also gained canonical addresses, a
-  sitemap and an `llms.txt` (#1047, #1101).
+  footer now name the publisher with its registration number and registered
+  office, the policy adds a purpose for publishing written quotes you consent
+  to, and says a grievance is answered within one month (it said 30 days)
+  (#1104). The site also gained canonical addresses, a sitemap and an
+  `llms.txt` (#1047, #1101).
 
 **Safer or fixed**
 
-- **A post that Tally refuses is named plainly.** If Tally answered a
-  single-voucher post with "not created" (`CREATED 0`, one exception) and the
-  voucher is not found, `post_import` now says Tally reported it as not
-  created, to check it is not in Tally, and to enter that one voucher in
-  Tally's voucher entry screen, never through Tally's Import menu. The same
-  applies to a batch Tally rejected whole (`CREATED 0` and an exception for
-  every voucher, no voucher found, and for two or more vouchers the company's
-  voucher mark read before and after and unmoved). Before, both read as "sent,
-  not attributed", suggesting the voucher was edited in Tally. A batch that
-  landed in part, and a later `verify_import`, are unchanged (#1116, #1126).
-- **Clearer next steps on refused batches.** A saved batch refused because a
-  narration, reference or voucher number cannot be posted now says that
-  nothing was sent, and to correct the text, build the batch again and post the
-  new one (before, it said to review the error before asking for approval
-  again, which fails the same way each time) (#1105). A batch that mixes a
-  Journal with Payment, Receipt or Contra vouchers is refused as before, and
-  now says to split it into one batch of Journals and one of the others (#1094).
-  A refused date or company GUID now says what it should have been: a date as
-  text in the form YYYYMMDD or YYYY-MM-DD, and the 36-character company ID from
-  `list_companies`, not its name (#1115). The refusal for a changed ledger
-  count names an altered ledger as a possible cause, marked as reasoned and
-  not reproduced (#1032).
+- **A post that Tally refuses is named plainly.** If Tally answered a post with
+  "not created" (`CREATED 0`, an exception for each voucher sent and every
+  other counter reported as 0) and the voucher is not found, `post_import` now
+  says Tally reported it as not created, to check it is not in Tally, and to
+  enter that one voucher in Tally's voucher entry screen, never through Tally's
+  Import menu. This covers a single voucher, which is what the extension posts,
+  and a saved batch of two or more vouchers rejected whole when the company's
+  mark was read before and after and did not move (batch posting is a
+  command-line setting that the extension does not offer). It was measured only
+  for a missing ledger, on TallyPrime 7.1 Silver; the code applies it to any
+  answer of that shape, including on Gold, where it was not measured (#1116,
+  #1126).
+- **Where a posted voucher cannot be matched, the status changed.** In 0.4.1 an
+  unfound voucher of a post read `not_found`. In 0.4.2 a voucher of a post that
+  cannot be matched reads `sent_not_attributed` ("check in Tally before posting
+  it again", for example after an edit), never `not_found`. That is also the
+  reading for a batch that landed in part and for a later `verify_import`,
+  including of a voucher Tally refused. Other new readings name why a voucher
+  is missing: `bound_not_in_window` (it may have been deleted or re-dated) and
+  `book_rolled_back` (the books look older than the post). A post is refused as
+  `post_mark_unrecorded`, with nothing sent and the approval withdrawn, when
+  the company's voucher mark cannot be read before it (#1054).
+- **Clearer next steps on refused batches.** When no attempt was made, a saved
+  batch refused because a narration, reference or voucher number cannot be
+  posted now says that nothing was sent, and to correct the text, build the
+  batch again and post the new one (before, it said to review the error before
+  asking for approval again, which fails the same way each time) (#1105). A
+  batch that mixes a Journal with Payment, Receipt or Contra vouchers is refused
+  as before, and now says to split it into one batch of Journals and one of the
+  others (#1094). A date or company ID refused before anything is read now says
+  what it should have been: a date as text in the form YYYYMMDD or YYYY-MM-DD,
+  and the 36-character company ID from `list_companies`, not its name (#1115).
+  The refusal for a changed ledger count names an altered ledger as a possible
+  cause, marked as reasoned and not reproduced (#1032).
 - **The posting path says what is sent.** Narrations are sent as given, and the
   approval dialogs say "narrations sent as prepared, nothing added" instead of
   saying a batch reference is added. A narration that contains the character
-  U+FFFD followed by `#`, digits and `;` is now refused when the batch is built,
-  because it is compared byte for byte. The file you import by hand keeps its
-  tag (#1054).
+  U+FFFD (a diamond with a question mark) followed by `#`, digits and `;` is now
+  refused when the batch is built, because it is compared byte for byte. The
+  file you import by hand keeps its tag (#1054).
 - **`purchase_register` explains a cancelled Purchase.** A cancelled Purchase or
   Debit Note sits in the list of vouchers without a tax entry, with `cancelled:
   true`, because the cancelled vouchers measured came back from Tally with no
-  ledger entries, so being listed there does not mean the voucher was untaxed
-  (#1013, #1027).
+  ledger entries, so being listed there does not mean the voucher was untaxed.
+  A cancelled voucher that keeps its entries has not been measured (#1013,
+  #1027).
 - **A statement line that reads 0 and 0 is compared, not skipped.**
   `profit_and_loss` and `balance_sheet` now compare a Tally statement line that
   has `0.00` present in both columns with the line derived from the trial
@@ -156,24 +202,29 @@ requests it comes from, except where it names an issue.
   seen in a real answer (#1067, #1071).
 - **`outstandings` no longer fails on one far-future due date.** A due date that
   Tally prints with a four-digit year of 2100 or later (such as `1-Dec-2108`)
-  is read as written; before, that one bill failed the whole read with no
-  reason. A bill row whose dates cannot be read still refuses, and the refusal
-  now carries a typed cause, the report and row number, and a next step, never
-  the bill's party or reference (#1091, #1098).
-- **The two log tools no longer invite "nothing left your computer".**
-  `read_evidence` and `egress_log` now say what each holds and that neither
-  shows what your AI provider received, and tell the assistant never to say no
-  data has left the computer. What the assistant reads, amounts included, goes
-  to your AI provider (#1045, #1113).
-- **In the desktop app, "Show in folder" opens only a file this app exported
-  since it started.** Any other path is refused before the file manager opens,
-  so a compromised app window cannot use it to point at other files on the
-  computer. Exports work as before (#915, #1051).
-- **Wording.** The extension's settings and the three longest read
-  descriptions are shorter and lead with the outcome; the desktop and
-  assistant texts say "ComplyEaze Bridge" in full; `acknowledge_post_review`
-  names the refusal for a review recorded for a different doubt (#962, #1010,
-  #1026, #1028, #1124, #830, #1130).
+  is read as written, and gives no overdue days in the ageing; before, that one
+  bill failed the whole read with no reason. A bill row whose dates cannot be
+  read still refuses, and the refusal now carries a named cause, the report, the
+  row number when a row is what failed, and a next step, never the bill's party
+  or reference (#1091, #1098).
+- **The two log tools now say what they do not show.** `read_evidence` and
+  `egress_log` say what each holds and that neither shows what your AI provider
+  received, and tell the assistant never to say that no data has left the
+  computer. What the assistant reads, amounts included, goes to your AI provider
+  (#1045, #1113).
+- **Source only, not in the extension: the desktop app's "Show in folder"
+  opens only a file it exported since it started.** ComplyEaze Bridge publishes
+  no desktop installer, and the extension does not contain the desktop app. Any
+  other path is refused before the file manager opens. A file replaced by a link
+  after export would still open, the record keeps the 1,000 newest exports, and
+  the Windows and Linux paths and the button itself were not tried by hand
+  (#915, #1051).
+- **Wording.** The extension's settings are shorter overall (the redaction
+  setting now says more) and the three longest read descriptions lead with the
+  outcome; assistant texts say "ComplyEaze Bridge" in full, and so do the
+  desktop app's messages (source only); `acknowledge_post_review` names the
+  refusal for a review recorded for a different doubt (#962, #1010, #1026,
+  #1028, #1124, #830, #1130).
 
 **Known limits**
 
@@ -189,32 +240,43 @@ requests it comes from, except where it names an issue.
 - **Long voucher lists:** a change that moves neither company mark is not seen
   between pages, a window larger than 64 MiB is read again for each page, and
   what happens if someone changes the book at Tally's screen between two live
-  pages was not tried (#1053, #1118).
-- **Ledger names:** when `mask_parties` is on, a spelling that carries the mask
-  mark, or shares a key with another ledger's masked form, is refused as
-  `ledger_name_masked`, which can also refuse an ordinary name typed in a
-  different case until it is typed exactly. The candidates were tested on saved
-  Tally answers, not a live book, and the ledger-name changes on a lab corpus
-  of 144 synthetic names; a real book was not tried (#1057, #1092).
-- **Posting:** another Tally Gold client writing during a post is not seen by
-  the matching; a restore of the books keyed past a post's mark is not seen;
-  whether deleting a voucher can lower the company's mark, a Windows approval
-  dialog, Education mode and posts of more than 3 vouchers through
-  ComplyEaze Bridge's own path were not tried. Tried live: one raw run of 10
-  untagged Payment, Receipt and Contra vouchers, and one run of 3 Journals and
-  3 other vouchers through ComplyEaze Bridge, on a synthetic company in
-  TallyPrime 7.1 Silver (#1054). "Not created" naming covers a missing ledger
-  in a single voucher or a batch rejected whole, on Silver; a rejection for
-  another cause, Gold, a post that landed in part and a later `verify_import`
-  still read as before, and after you enter that voucher by hand as told, the
-  batch stays in reconciliation (#1116, #1126; #1108 stays open).
+  pages, or a later page of a window with a voucher type or ledger filter, was
+  not tried against a live Tally (#1053, #1118).
+- **Ledger names:** a spelling that contains the mask mark (`…` or `...`) and is
+  not typed exactly as the ledger is spelled is refused as `ledger_name_masked`,
+  whatever the setting. When `mask_parties` is on, a spelling that shares a key
+  with another ledger's masked form is refused the same way, which can also
+  refuse an ordinary name typed in a different case until it is typed exactly,
+  and the refusal lists no candidates. The candidates were tested on saved
+  Tally answers, not a live book, and the ledger-name changes on a lab list of
+  144 synthetic names; a real book was not tried (#1057, #1092).
+- **Posting, what was tried:** two live posts through ComplyEaze Bridge's own
+  path, of 3 vouchers each (3 Journals; a Payment, a Receipt and a Contra),
+  made with the command-line batch setting, and raw runs against Tally of 10
+  untagged Payment, Receipt and Contra vouchers and of 5 Journals, all on a
+  synthetic company in TallyPrime 7.1 Silver. The extension posts one voucher
+  per approval; that one-voucher path was not run live with 0.4.2's untagged
+  matching (#1054).
+- **Posting, what is not seen or not closed:** if a post's vouchers cannot be
+  matched (for example one was edited in Tally before the matching was made, or
+  Tally stored a narration differently; only one Hindi-and-rupee-sign narration
+  was checked), that is final: the batch stays "reconciliation required",
+  `acknowledge_post_review` does not apply, and you check its vouchers in Tally
+  yourself (#1039 is open). Another Tally Gold client writing during a post is
+  not seen. After a backup is restored, if the books are keyed past the post's
+  mark before the next check, the loss is not detected; if Tally reuses the lost
+  vouchers' IDs (not measured), a lost voucher can even read `posted_verified`;
+  such vouchers cannot be posted again through ComplyEaze Bridge and must be
+  entered by hand (#1050). Not tried: whether deleting a voucher can lower the
+  company's mark, a Windows approval dialog, Education mode, and more than 3
+  vouchers through ComplyEaze Bridge's own path (#1054).
 - **Statement gate (#1071):** whether a real Tally ever prints `0` in both
   columns is not shown; the `Cost of Sales :` heading is not compared when it
   reads zero or empty (#1070).
-- **`outstandings` on that book:** that a whole call then completes on a book
-  with such a date was not shown, because the capture held only the two Bills
-  reports; a bill dated after `as_of` and a two-digit due year read in the wrong
-  century still refuse or can misread, as before (#1091 stays open).
+- **`outstandings` on a book with such a date:** that a whole call then
+  completes was not shown, because the capture held only the two Bills reports;
+  a bill dated after `as_of` still refuses, and a two-digit due year can be read
+  in the wrong century, as before (#1091 stays open).
 - **Assistant text:** whether Claude Desktop passes the start-up instructions to
   the model at all, and whether any of the new wording changes what an
   assistant does, was not measured; the studies were plan-only, without tool
@@ -225,13 +287,14 @@ requests it comes from, except where it names an issue.
 - **Tried against TallyPrime** (7.1 Silver in a lab, synthetic companies, one
   run each unless a line above says otherwise): the `sales_register` reads, the
   paging run, the untagged-post runs, and the rejected-voucher answers. The
-  other changes are covered by automated tests only. The release check starts
-  each package, lists its tools and reads a sample bank statement, and does not
-  run against TallyPrime. No one on our side installed the Windows package of
-  this build in Claude Desktop on a Windows PC.
+  other changes are covered by automated tests, with saved real answers for the
+  due-date and statement items. The release check starts each package, lists
+  its tools and reads a sample bank statement, and does not run against
+  TallyPrime. No one on our side installed the Windows package of this build in
+  Claude Desktop on a Windows PC.
 - **Pages:** no lawyer or CA has read the Questions page answers on liability
-  and claims or the changed Privacy Policy text; the LLP registration number
-  and address were checked against the certificate of incorporation, not the
+  and claims or the changed Privacy Policy text; the registration number and
+  address were checked against the certificate of incorporation, not the
   current record (#1084, #1104).
 
 ## [0.4.1] - 2026-10-02

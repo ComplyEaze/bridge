@@ -103,8 +103,8 @@ The ordinary default tools, in name order:
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
-`local_data_report` were added in release 0.4.0; `sales_register` is in source and not
-in a published release. `local_data_report` (also
+`local_data_report` were added in release 0.4.0; `sales_register` was added in release
+0.4.2. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank

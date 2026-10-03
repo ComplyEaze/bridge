@@ -5,9 +5,10 @@ Every book here is invented, with round figures and plain names and PANs and GST
 compared as text is a token such as `PAN-BIGBY`. Every GSTIN has a fourteenth character other than
 `Z`, which nothing here reads, so none has a real GSTIN's shape. A GSTIN's characters 3 to 12 keep a
 PAN's or a TAN's shape where the reference derives a PAN from them or refuses to (the derivation
-cases and the TAN case). Three recorded PANs in `ep_gap` keep a PAN's shape, each one letter five
-times, one digit four times and that letter again: each must equal a PAN derived from a GSTIN, and
-the reference derives one only from a PAN-shaped segment.
+cases and the TAN case). Four recorded PANs keep a PAN's shape, each one letter five times, one digit
+four times and that letter again: three in `ep_gap`, each of which must equal a PAN derived from a
+GSTIN (the reference derives one only from a PAN-shaped segment), and the same derivable value in
+`ep_gap_plain`, where without the opt-in it must not join the GSTIN's ledger.
 
 ## What these fixtures establish
 
@@ -63,7 +64,7 @@ The edge books are written by hand in a small generator, as data, then read by b
 | `synthetic.read_scope.json` | 2,532 | `8b191e04fdf6722106c6082a722cb7a2bb5e95308b2138701dc1b32f57ba26b5` | `golden/synthetic.read_scope.json` |
 | `ep_gap.json` | 18,574 | `b744e4d9bb6c7818cd9530d06639e764b6fb56d55d8a96d3c9046a61261b06d5` | `edge-books/ep_gap.json` |
 | `edge.ep_gap.entity_269st_gap.json` | 48,861 | `712811c66ee03c2da4a5c4f4d0b5091bc7ec8dee0e62f3b6c2ce4c275830f7b1` | `golden/edge.ep_gap.entity_269st_gap.json` |
-| `ep_gap_plain.json` | 5,620 | `8efe09db3f24102f55a0ecb5b431d45d08ce9f2ae0b2911e1ac591bcc21e6e99` | `edge-books/ep_gap_plain.json` |
+| `ep_gap_plain.json` | 5,621 | `c13e6b8778f1eaf1a6fc1588f0016d553b44a5747663f6766651b91485eaae94` | `edge-books/ep_gap_plain.json` |
 | `edge.ep_gap_plain.entity_269st_gap.json` | 5,959 | `6c81bcf8bd79e85428a492ed484fd1386cbdc08c000594c78128c1edcf3f9a39` | `golden/edge.ep_gap_plain.entity_269st_gap.json` |
 | `rs_unread.json` | 811 | `d717dcbaa974133eb7968eb442cf9900a7bdcb1a50f4fd9a7c27082c587ab0c5` | `edge-books/rs_unread.json` |
 | `edge.rs_unread.read_scope.json` | 1,976 | `54db49391f4e45ac8071208162926acd4d6ffe0c313d838ace457de88daf42f8` | `golden/edge.rs_unread.read_scope.json` |

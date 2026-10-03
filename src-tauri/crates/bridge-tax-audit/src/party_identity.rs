@@ -530,4 +530,17 @@ additional_party_ledgers = [\"A\"]\nexcluded_ledgers = [\"E\"]\nround_off_ledger
             ("PAN-OVR-1", &[PanSource::ClientConfig][..])
         );
     }
+    /// Agreement is across every ledger of an entity, not the first two.
+    #[test]
+    fn three_ledgers_agree_only_on_a_word_all_three_share() {
+        let book = book_with(vec![
+            debtor("Alpha Traders", "PAN-TRIO", ""),
+            debtor("Alpha Stores", "PAN-TRIO", ""),
+            debtor("Beta Mart", "PAN-TRIO", ""),
+        ]);
+        let index = build_party_index(&book, &PartyConfig::default()).unwrap();
+        let entity = index.entity_for_ledger("Beta Mart").unwrap();
+        assert_eq!(entity.ledgers.len(), 3);
+        assert!(!entity.names_agree);
+    }
 }

@@ -759,6 +759,66 @@ fn every_shared_parameter_of_every_tool_is_described() {
     }
 }
 
+/// Where two tools are easy to confuse, each says when to use the other
+/// (#1155, item 3), in a line taken from what the other tool's own description
+/// says it is for. Each line is a whole sentence of its tool's description, and
+/// the tool it points to is in the catalogue.
+#[test]
+fn each_tool_of_a_confusable_pair_points_to_the_other() {
+    const LINES: &[(&str, &str, &str)] = &[
+        (
+            "ledger_masters",
+            "outstandings",
+            "For what parties owe or are owed now, by their open bills, use outstandings instead.",
+        ),
+        (
+            "ledger_movement",
+            "trial_balance",
+            "For every ledger's balances from Tally's own Trial Balance, without reading vouchers, use trial_balance instead.",
+        ),
+        (
+            "outstandings",
+            "ledger_masters",
+            "For a ledger's master record (its group, opening balance and, with fields=compliance, GSTIN and party details), use ledger_masters instead.",
+        ),
+        (
+            "trial_balance",
+            "ledger_movement",
+            "For one ledger's movement counted from the window's vouchers, with how many vouchers touched it, use ledger_movement instead.",
+        ),
+        (
+            "voucher_presence",
+            "vouchers",
+            "To list the vouchers of a date window, use vouchers instead.",
+        ),
+        (
+            "vouchers",
+            "voucher_presence",
+            "To ask whether vouchers you mean to post are already in the book, use voucher_presence instead.",
+        ),
+    ];
+    let tools = registered_tool_definitions(true, true);
+    let tools = tools.as_array().expect("tools");
+    let description = |name: &str| {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .and_then(|tool| tool["description"].as_str())
+            .unwrap_or_else(|| panic!("{name} is not in the catalogue"))
+    };
+    for (tool, other, line) in LINES {
+        let sentence = line.trim_end_matches('.');
+        assert!(
+            description(tool)
+                .split(". ")
+                .any(|part| part.trim_end_matches('.') == sentence),
+            "{tool} lacks the sentence pointing to {other}"
+        );
+        assert!(line.ends_with(&format!("use {other} instead.")), "{line}");
+        description(other);
+    }
+}
+
 /// The sentences an assistant relies on for safety, each pinned on its own so a
 /// shorter description cannot drop one unnoticed (#1010). Only the phrase is
 /// asserted, never a whole description, so the text around it can still be
